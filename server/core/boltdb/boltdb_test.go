@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package boltdb_test
@@ -18,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -967,8 +959,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -984,8 +976,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -1004,9 +996,9 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
-								CurApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
+								Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 							},
 						},
 					},
@@ -1030,7 +1022,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					},
 				},
 			},
@@ -1042,13 +1034,174 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 			},
 		}, updateStatus.Projects)
 	}
 	b.Close()
+}
+
+// Test that policy approvals are preserved when HeadCommit changes,
+// so sticky approvals can survive across code pushes.
+func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Write initial policy check results with an approval at commit A.
+	_, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.PolicyCheck,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Failure: "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName:    "policy1",
+							ReqApprovalCount: 1,
+							Hashes:           []string{"h1", "h2"},
+							Approvals: []models.PolicySetApproval{
+								{Approver: "boss", Hashes: []string{"h1", "h2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// Push new commit B with a plan result (no PolicyCheckResults).
+	// This simulates what happens when autoplan writes the plan to DB
+	// before the policy check runs.
+	pull.HeadCommit = "sha-B"
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "plan output",
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// The policy approvals from commit A should be preserved.
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	Assert(t, len(status.Projects[0].PolicyStatus) > 0, "expected policy status to be preserved across commit change")
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 1, len(status.Projects[0].PolicyStatus[0].Approvals))
+	Equals(t, "boss", status.Projects[0].PolicyStatus[0].Approvals[0].Approver)
+
+	// Verify via GetPullStatus too.
+	getStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
+	b.Close()
+}
+
+// TestPullStatus_UpdateOverwritesCorruptData verifies that
+// UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
+// no longer matches the current Go shape (e.g. after upgrading across a
+// PullStatus schema change). The corrupt entry should be logged and
+// overwritten rather than causing every subsequent plan to fail.
+func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
+	tmp := t.TempDir()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// First, let boltdb.New create the file and buckets.
+	b, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, b.Close())
+
+	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
+	// that the current Go types cannot unmarshal.
+	key := fmt.Appendf(nil, "%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	err = raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, corrupt)
+	})
+	Ok(t, err)
+	Ok(t, raw.Close())
+
+	// Reopen and write fresh results. This must succeed despite the
+	// unreadable prior entry.
+	b, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer b.Close()
+
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	// Prior in-flight approvals are lost; this is the documented trade-off.
+	Equals(t, 0, len(status.Projects[0].PolicyStatus))
+
+	// The corrupt entry is gone: reading it back returns clean data.
+	got, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
 // newTestDB returns a TestDB using a temporary path.

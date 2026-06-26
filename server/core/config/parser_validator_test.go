@@ -82,18 +82,23 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 func TestParseCfgs_InvalidYAML(t *testing.T) {
 	cases := []struct {
 		description string
-		input       string
+		input       []byte
 		expErr      string
 	}{
 		{
 			"random characters",
-			"slkjds",
+			[]byte("slkjds"),
 			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
 		},
 		{
 			"just a colon",
-			":",
+			[]byte(":"),
 			"yaml: did not find expected key",
+		},
+		{
+			"invalid merge key from fuzzing",
+			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
+			"parsing yaml: runtime error: hash of unhashable type []interface {}",
 		},
 	}
 
@@ -102,7 +107,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := os.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, c.input, 0600)
 			Ok(t, err)
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
@@ -216,7 +221,7 @@ projects:
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
@@ -239,7 +244,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -285,7 +290,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -308,7 +313,7 @@ workflows: ~
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -336,7 +341,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -367,7 +372,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -401,7 +406,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -435,7 +440,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable"},
@@ -469,7 +474,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged"},
@@ -503,7 +508,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable", "approved"},
@@ -537,7 +542,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "approved"},
@@ -571,7 +576,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable"},
@@ -605,7 +610,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
@@ -633,7 +638,7 @@ projects:
 						Workspace:             "myworkspace",
 						TerraformDistribution: String("opentofu"),
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -740,7 +745,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -749,7 +754,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -791,7 +796,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -890,7 +895,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -981,7 +986,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1074,7 +1079,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1544,14 +1549,16 @@ policies:
 					"custom1": customWorkflow1,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      conftestVersion,
-					ApproveCount: 1,
+					Version:         conftestVersion,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/policy",
-							Source:       valid.LocalPolicySet,
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/policy",
+							Source:          valid.LocalPolicySet,
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},
@@ -1656,7 +1663,6 @@ workflows:
 						RepoLocks:                 &valid.DefaultRepoLocks,
 						PolicyCheck:               Bool(false),
 						CustomPolicyCheck:         Bool(false),
-						AutoDiscover:              raw.DefaultAutoDiscover(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1888,14 +1894,16 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					"custom":  customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      conftestVersion,
-					ApproveCount: 1,
+					Version:         conftestVersion,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/policy",
-							Source:       valid.LocalPolicySet,
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/policy",
+							Source:          valid.LocalPolicySet,
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},

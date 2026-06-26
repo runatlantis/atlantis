@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
@@ -1214,6 +1214,28 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "sticky approval survives re-plan",
+			RepoDir:         "policy-checks-sticky-approvals",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis plan",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-policy-check-approved.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1370,9 +1392,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	noOpLocker := locking.NewNoOpLocker()
 	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  e2eVCSClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      e2eVCSClient,
+		ExecutableName: "atlantis",
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,

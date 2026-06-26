@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -16,10 +7,11 @@ package events
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v83/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -28,7 +20,6 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	"github.com/runatlantis/atlantis/server/recovery"
-	"github.com/runatlantis/atlantis/server/utils"
 	"github.com/uber-go/tally/v4"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -37,7 +28,7 @@ const (
 	ShutdownComment = "Atlantis server is shutting down, please try again later."
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
 
 // CommandRunner is the first step after a command request has been parsed.
 type CommandRunner interface {
@@ -48,7 +39,7 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
 type GithubPullGetter interface {
@@ -56,7 +47,7 @@ type GithubPullGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_azuredevops_pull_getter.go AzureDevopsPullGetter
 
 // AzureDevopsPullGetter makes API calls to get pull requests.
 type AzureDevopsPullGetter interface {
@@ -64,7 +55,7 @@ type AzureDevopsPullGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*azuredevops.GitPullRequest, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_gitlab_merge_request_getter.go GitlabMergeRequestGetter
 
 // GitlabMergeRequestGetter makes API calls to get merge requests.
 type GitlabMergeRequestGetter interface {
@@ -150,7 +141,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	scope := c.StatsScope.SubScope("autoplan")
@@ -194,7 +185,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
 			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)
-		} else if utils.SlicesContains(labels, c.DisableAutoplanLabel) {
+		} else if slices.Contains(labels, c.DisableAutoplanLabel) {
 			ctx.Log.Info("Pull/merge request has disable auto plan label '%s' so not running autoplan.", c.DisableAutoplanLabel)
 			return
 		}
@@ -354,7 +345,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
-		log.Err("Unable to fetch pull status, this is likely a bug.", err)
+		log.Err("Unable to fetch pull status, this is likely a bug: %s", err)
 	}
 
 	ctx := &command.Context{
@@ -526,7 +517,7 @@ func (c *DefaultCommandRunner) ensureValidRepoMetadata(
 	}
 
 	if err != nil {
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, fmt.Sprintf("`Error: %s`", err), ""); commentErr != nil {
 			log.Err("unable to comment: %s", commentErr)
 		}

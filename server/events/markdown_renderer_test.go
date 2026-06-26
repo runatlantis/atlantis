@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -74,7 +65,7 @@ func TestRenderErr(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -149,7 +140,7 @@ func TestRenderFailure(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -397,15 +388,15 @@ $$$
 									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 								{
 									PolicySetName: "policy2",
 									// strings.Repeat require to get wrapped result
-									PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-									Passed:       true,
-									ReqApprovals: 1,
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -476,8 +467,8 @@ $$$
 									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1041,10 +1032,10 @@ $$$
 						PolicyCheckResults: &models.PolicyCheckResults{
 							PolicySetResults: []models.PolicySetResult{
 								{
-									PolicySetName: "policy1",
-									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-									Passed:        false,
-									ReqApprovals:  1,
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							}, LockURL: "lock-url",
 							ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -1129,6 +1120,257 @@ $$$
 * :repeat: To re-run policies **plan** this project again by commenting:
   $$$shell
   atlantis plan
+  $$$
+`,
+		},
+		{
+			"approved policy set shows output in details",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+										},
+									}},
+								},
+								{
+									PolicySetName: "policy2",
+									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+<details><summary>:white_check_mark: 2 previously approved items</summary>
+
+$$$diff
+FAIL - deny_something
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+</details>
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"partially approved multi-set policy check",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+										},
+									}},
+								},
+								{
+									PolicySetName:    "policy2",
+									PolicyOutput:     "FAIL - deny_other\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+							},
+							LockURL:            "lock-url",
+							ApplyCmd:           "atlantis apply -d path -w workspace",
+							RePlanCmd:          "atlantis plan -d path -w workspace",
+							ApprovePoliciesCmd: "atlantis approve_policies -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+<details><summary>:white_check_mark: 2 previously approved items</summary>
+
+$$$diff
+FAIL - deny_something
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+</details>
+
+#### Policy Set: $policy2$
+$$$diff
+FAIL - deny_other
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: approved.
+policy set: policy2: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  atlantis approve_policies -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"per-item filtering with stale approval",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\nFAIL - deny_other",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("FAIL - deny_other"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("old_line"),
+										},
+									}},
+								},
+							},
+							LockURL:            "lock-url",
+							ApplyCmd:           "atlantis apply -d path -w workspace",
+							RePlanCmd:          "atlantis plan -d path -w workspace",
+							ApprovePoliciesCmd: "atlantis approve_policies -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - deny_other
+$$$
+<details><summary>:white_check_mark: 1 previously approved item</summary>
+
+$$$diff
+FAIL - deny_something
+$$$
+</details>
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  atlantis approve_policies -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
   $$$
 `,
 		},
@@ -1264,7 +1506,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1324,14 +1566,14 @@ func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 								{
-									PolicySetName: "policy2",
-									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-									Passed:        true,
-									ReqApprovals:  1,
+									PolicySetName:    "policy2",
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1402,8 +1644,8 @@ $$$
 									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-									Passed:       false,
-									ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							},
 							LockURL:   "lock-url",
@@ -1563,10 +1805,10 @@ Ran Policy Check for 2 projects:
 						PolicyCheckResults: &models.PolicyCheckResults{
 							PolicySetResults: []models.PolicySetResult{
 								{
-									PolicySetName: "policy1",
-									PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-									Passed:        false,
-									ReqApprovals:  1,
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
 								},
 							}, LockURL: "lock-url",
 							ApplyCmd:  "atlantis apply -d path -w workspace",
@@ -1652,7 +1894,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1861,7 +2103,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2054,7 +2296,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2113,7 +2355,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2190,7 +2432,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2302,7 +2544,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
-				logger.Info(logText)
+				logger.Info("%s", logText)
 				ctx := &command.Context{
 					Log: logger,
 					Pull: models.PullRequest{
@@ -2450,7 +2692,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
-					logger.Info(logText)
+					logger.Info("%s", logText)
 					ctx := &command.Context{
 						Log: logger,
 						Pull: models.PullRequest{
@@ -2605,7 +2847,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2689,7 +2931,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2930,7 +3172,7 @@ This plan was not saved because one or more projects failed and automerge requir
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
-			logger.Info(logText)
+			logger.Info("%s", logText)
 			ctx := &command.Context{
 				Log: logger,
 				Pull: models.PullRequest{
@@ -3527,7 +3769,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -3669,7 +3911,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			ctx := &command.Context{
@@ -4131,7 +4373,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -4187,7 +4429,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		b.Run(c.Description, func(b *testing.B) {
@@ -4412,7 +4654,7 @@ Ran Plan for 3 projects:
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {

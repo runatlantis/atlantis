@@ -285,7 +285,7 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TERRAGRUNT_TFPATH environment variable to accommodate setting --default-tf-version
+# Specify TG_TF_PATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
@@ -295,7 +295,7 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -310,7 +310,7 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -320,7 +320,7 @@ workflows:
     import:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
       - env:
           name: TF_VAR_author
@@ -330,7 +330,7 @@ workflows:
     state_rm:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
@@ -350,7 +350,7 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -362,7 +362,7 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
+          name: TG_TF_PATH
           command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
@@ -580,9 +580,9 @@ A map from string to `extra_args` for a built-in command with extra arguments.
     extra_args: [arg1, arg2]
 ```
 
-| Key                             | Type                               | Default | Required | Description                                                                                                                                                               |
-|---------------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
 
@@ -625,7 +625,7 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
 ```
 
 | Key | Type | Default | Required | Description |
-|-----|-----|-----|-----|-----|
+| ----- | ----- | ----- | ----- | ----- |
 | run | map\[string -> string\] | none | no | Run a custom command |
 | run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
@@ -700,11 +700,11 @@ as the environment variable value.
       - "-c"
 ```
 
-| Key             | Type                  | Default | Required | Description                                                                                                     |
-|-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
-| env | map\[string -> string\] | none    | no       | Set environment variables for subsequent steps                                                                  |
-| env.name | string | none | yes | Name of the environment variable                                                                                |
-| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
+| Key | Type | Default | Required | Description |
+| ----------------- | ----------------------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| env | map\[string -> string\] | none | no | Set environment variables for subsequent steps |
+| env.name | string | none | yes | Name of the environment variable |
+| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command` |
 | env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
 | env.shell | string | "sh" | no | Name of the shell to use for command execution. Cannot be set without `command` |
 | env.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
@@ -742,13 +742,13 @@ Full:
     output: show
 ```
 
-| Key                | Type                  | Default | Required | Description                                                                         |
-|--------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
-| multienv           | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
-| multienv.command   | string                | none    | yes      | Name of the custom script to run                                                    |
-| multienv.shell     | string                | "sh"    | no       | Name of the shell to use for command execution                                      |
-| multienv.shellArgs | string or []string    | "-c"    | no       | Command line arguments to be passed to the shell. Cannot be set without `shell`     |
-| multienv.output    | string                | "show"  | no       | Setting output to "hide" will suppress the message about added environment variables |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| multienv | map[string -> string] | none | no | Run a custom command and add printed environment variables |
+| multienv.command | string | none | yes | Name of the custom script to run |
+| multienv.shell | string | "sh" | no | Name of the shell to use for command execution |
+| multienv.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
+| multienv.output | string | "show" | no | Setting output to "hide" will suppress the message about added environment variables |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`

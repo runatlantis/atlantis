@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package gitlab
@@ -20,12 +11,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-version"
 	"github.com/jpillora/backoff"
-	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -327,28 +318,95 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, err
 	}
 
-	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
-	if resp != nil {
-		logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
-	}
-	if err != nil {
-		return models.MergeableStatus{}, err
+	// Get Commit Statuses — paginate so the head-ref filter below cannot be
+	// defeated by a noisy MR pushing the MR-owned status past the first page.
+	const maxPerPage = 100
+	var statuses []*gitlab.CommitStatus
+	nextPage := 1
+	for {
+		statusOpts := &gitlab.GetCommitStatusesOptions{
+			ListOptions: gitlab.ListOptions{Page: nextPage, PerPage: maxPerPage},
+		}
+		page, statusResp, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, statusOpts)
+		if statusResp != nil {
+			logger.Debug("GET /projects/%d/commits/%s/statuses page %d returned: %d", mr.ProjectID, commit, nextPage, statusResp.StatusCode)
+		}
+		if err != nil {
+			return models.MergeableStatus{}, err
+		}
+		statuses = append(statuses, page...)
+		if statusResp.NextPage == 0 {
+			break
+		}
+		nextPage = statusResp.NextPage
 	}
 
+	// GET /repository/commits/:sha/statuses returns every status posted against
+	// the SHA across all refs. When the same SHA appears in multiple MRs
+	// (force-pushed shared source branch, etc.) a status from another MR
+	// leaks here and can self-block the current MR.
+	//
+	// Filter strategy:
+	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head or
+	//      refs/merge-requests/<iid>/merge are unambiguously owned by this MR.
+	//   2. If any such MR-ref status exists for this SHA, restrict the
+	//      evaluation to MR-ref + refless statuses + branch-only source_branch
+	//      statuses. If the same status name appears on a current MR ref, the
+	//      source_branch copy is dropped because the same branch may back several
+	//      MRs and a stale status could leak.
+	//   3. Otherwise fall back to source_branch + refless statuses, preserving
+	//      behaviour for external CIs that post against the branch ref.
+	// Empty Ref is always treated as MR-owned (backward-compat for callers
+	// that post refless statuses).
+	expectedHeadRef := fmt.Sprintf("refs/merge-requests/%d/head", mr.IID)
+	expectedMergeRef := fmt.Sprintf("refs/merge-requests/%d/merge", mr.IID)
+	isCurrentMRRef := func(ref string) bool {
+		return ref == expectedHeadRef || ref == expectedMergeRef
+	}
+	hasMRRefStatus := false
+	currentMRStatusNames := make(map[string]struct{})
 	for _, status := range statuses {
-		// Ignore any commit statuses with 'atlantis/apply' as prefix
-		if strings.HasPrefix(status.Name, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())) {
+		if isCurrentMRRef(status.Ref) {
+			hasMRRefStatus = true
+			currentMRStatusNames[status.Name] = struct{}{}
+		}
+	}
+	isBranchOnlySourceBranchStatus := func(status *gitlab.CommitStatus) bool {
+		if status.Ref != mr.SourceBranch {
+			return false
+		}
+		_, hasCurrentMRStatusWithSameName := currentMRStatusNames[status.Name]
+		return !hasCurrentMRStatusWithSameName
+	}
+	// Collect every blocking status (rather than returning on the first) so that
+	// a per-project command requirement check can tell whether the only blockers
+	// are plan statuses belonging to other projects in the same merge request.
+	// See DefaultCommandRequirementHandler.
+	blockingStatusState := make(map[string]string)
+	var blockingStatuses []string
+	for _, status := range statuses {
+		if status.Ref != "" {
+			if hasMRRefStatus {
+				if !isCurrentMRRef(status.Ref) && !isBranchOnlySourceBranchStatus(status) {
+					continue
+				}
+			} else if status.Ref != mr.SourceBranch {
+				continue
+			}
+		}
+		// Ignore Atlantis-owned commit statuses that can self-block apply.
+		// Keep plan statuses in this check: a later failed or running specific
+		// plan can leave an older .tfplan on disk, so it must still block apply.
+		if isSkippableAtlantisCommitStatus(status.Name, vcsstatusname) {
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
-			}, nil
+			if _, seen := blockingStatusState[status.Name]; !seen {
+				blockingStatusState[status.Name] = status.Status
+				blockingStatuses = append(blockingStatuses, status.Name)
+			}
 		}
 	}
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -361,12 +419,42 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	if !res.IsMergeable {
+		logger.Debug("Merge request is not mergeable")
+		return res, nil
+	}
+	if len(blockingStatuses) > 0 {
+		// Sort so the reported Reason and the BlockingStatuses slice are
+		// deterministic, independent of the order GitLab returns statuses in.
+		sort.Strings(blockingStatuses)
+		res = models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
+			BlockingStatuses: blockingStatuses,
+		}
+	}
 	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
 	} else {
 		logger.Debug("Merge request is not mergeable")
 	}
 	return res, nil
+}
+
+func isSkippableAtlantisCommitStatus(statusName string, vcsStatusName string) bool {
+	prefix := vcsStatusName + "/"
+	if !strings.HasPrefix(statusName, prefix) {
+		return false
+	}
+
+	statusContext := strings.TrimPrefix(statusName, prefix)
+	commandName, _, _ := strings.Cut(statusContext, ": ")
+	switch commandName {
+	case "apply", "policy_check", "pre_workflow_hook", "post_workflow_hook":
+		return true
+	default:
+		return false
+	}
 }
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
@@ -487,7 +575,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		attempt := int(pipelineRetryer.Attempt()) + 1
 		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
 		if resp != nil {
-			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+			logger.Debug("GET /projects/%s/repository/commits/%s: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
@@ -567,7 +655,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 		sleep := retryer.Duration()
 
-		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %w", err)
+		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %s", err)
 		time.Sleep(sleep)
 	}
 }

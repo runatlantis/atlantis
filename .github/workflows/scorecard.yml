@@ -20,12 +20,12 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
         with:
           egress-policy: audit
 
       - name: 'Checkout code'
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
           show-progress: false
@@ -48,7 +48,7 @@ jobs:
       # Upload the results as artifacts (optional). Commenting out will disable uploads of run results in SARIF
       # format to the repository Actions tab.
       - name: 'Upload artifact'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: SARIF file
           path: results.sarif
@@ -56,6 +56,6 @@ jobs:
 
       # Upload the results to GitHub's code scanning dashboard.
       - name: 'Upload to code-scanning'
-        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3.32.4
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: results.sarif

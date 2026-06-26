@@ -4,15 +4,27 @@
 package raw
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
+// terraformAutoplanIndicators are intentionally broad to preserve the default
+// autoplan behavior for changes inside existing projects.
+var terraformAutoplanIndicators = []string{
+	"*.tf*",
+	"terragrunt.hcl",
+	".terraform.lock.hcl",
+}
+
 // DefaultAutoPlanWhenModified is the default element in the when_modified
 // list if none is defined.
-var DefaultAutoPlanWhenModified = []string{
-	"**/*.tf*",
-	"**/terragrunt.hcl",
-	"**/.terraform.lock.hcl",
+func DefaultAutoPlanWhenModified() []string {
+	var ret []string
+	for _, indicator := range terraformAutoplanIndicators {
+		ret = append(ret, fmt.Sprintf("**/%s", indicator))
+	}
+	return ret
 }
 
 type Autoplan struct {
@@ -23,7 +35,7 @@ type Autoplan struct {
 func (a Autoplan) ToValid() valid.Autoplan {
 	var v valid.Autoplan
 	if a.WhenModified == nil {
-		v.WhenModified = DefaultAutoPlanWhenModified
+		v.WhenModified = DefaultAutoPlanWhenModified()
 	} else {
 		v.WhenModified = a.WhenModified
 	}
@@ -44,7 +56,7 @@ func (a Autoplan) Validate() error {
 // DefaultAutoPlan returns the default autoplan config.
 func DefaultAutoPlan() valid.Autoplan {
 	return valid.Autoplan{
-		WhenModified: DefaultAutoPlanWhenModified,
+		WhenModified: DefaultAutoPlanWhenModified(),
 		Enabled:      valid.DefaultAutoPlanEnabled,
 	}
 }
