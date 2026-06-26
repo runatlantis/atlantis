@@ -22,8 +22,9 @@
 
 **Mocks:** `make go-generate` (regenerate after interface changes) • `make regen-mocks` (delete & regenerate all)
 
-**Website (VitePress):** `npm install` (required first) • `npm run website:dev` (<http://localhost:8080>) • `npm run website:build` • `npm run website:lint` • `npm run e2e` (Playwright)
+**Website (VitePress):** `npm install` (required first) • `npm run website:dev` (<http://localhost:8080>) • `npm run website:build` • `npm run e2e` (Playwright)
 📁 Docs: `runatlantis.io/docs/*.md` • Config: `runatlantis.io/.vitepress/config.js`
+📝 Markdown linting: Done in CI with `DavidAnson/markdownlint-cli2-action`. For local linting, use an editor extension or run the GitHub Actions workflow.
 
 ## Architecture
 
@@ -41,7 +42,7 @@
 
 **test.yml:** `make test-all` + `make check-fmt` in `ghcr.io/runatlantis/testing-env:latest` • E2E for GitHub/GitLab (skips on forks - no secrets)
 **lint.yml:** golangci-lint via GitHub Action • Path filtered (Go files only)
-**website.yml:** markdownlint → lychee link check → `npm install && npm run website:build` → `npm run e2e` (Playwright)
+**website.yml:** markdownlint-cli2-action → lychee link check → `npm install && npm run website:build` → `npm run e2e` (Playwright)
 **Others:** pr-lint (Conventional Commits), codeql, scorecard, dependency-review
 
 **Replicate CI locally:** `make test-all && make check-fmt` OR use Docker: `docker run --rm -v $(pwd):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test-all"`
@@ -110,7 +111,7 @@
 
 **Daily:** `make build-service` • `make test` • `make check-fmt`
 **Pre-commit:** `make test-all` • `make check-fmt`
-**Website:** `npm install` • `npm run website:dev` • `npm run website:lint`
+**Website:** `npm install` • `npm run website:dev` • `npm run website:build`
 **Coverage:** `make test-coverage-html`
 **Docker:** `make docker/dev` • `docker-compose up`
 
