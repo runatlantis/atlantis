@@ -156,6 +156,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			log.Err("Unable to fetch user teams: %s", err)
 			return
 		}
+		directUserTeams := append([]string(nil), user.Teams...)
 
 		ok, err := c.checkUserPermissions(baseRepo, &user, "plan")
 		if err != nil {
@@ -165,6 +166,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		if !ok {
 			return
 		}
+		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, command.Plan, directUserTeams)
 	}
 
 	ctx := &command.Context{
@@ -300,6 +302,74 @@ func fetchDescendantTeams(fetcher vcs.Client, logger logging.SimpleLogging, repo
 	return result, nil
 }
 
+func teamSet(teams []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(teams))
+	for _, team := range teams {
+		result[strings.ToLower(team)] = struct{}{}
+	}
+	return result
+}
+
+func (c *DefaultCommandRunner) addHierarchyTeamsForCommand(repo models.Repo, user *models.User, cmdName string) {
+	c.addHierarchyTeamsForCommandForTeams(repo, user, cmdName, user.Teams)
+}
+
+func (c *DefaultCommandRunner) addHierarchyTeamsForCommandForTeams(repo models.Repo, user *models.User, cmdName string, teams []string) {
+	if c.TeamAllowlistChecker == nil || !c.TeamAllowlistChecker.HasRules() {
+		return
+	}
+
+	ctx := models.TeamAllowlistCheckerContext{
+		BaseRepo:    repo,
+		CommandName: cmdName,
+		Log:         c.Logger,
+		Pull:        models.PullRequest{},
+		User:        *user,
+		Verbose:     false,
+		API:         false,
+	}
+
+	// Only direct user teams should authorize hierarchy grants. Parent teams inferred
+	// during this pass are appended for downstream direct-membership filters, not for
+	// chaining additional hierarchy grants.
+	directUserTeams := teamSet(teams)
+	currentUserTeams := teamSet(user.Teams)
+
+	const maxHierarchyDepth = 20
+	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
+		if allowedTeam == "*" {
+			continue
+		}
+		normalizedAllowedTeam := strings.ToLower(allowedTeam)
+		if _, ok := currentUserTeams[normalizedAllowedTeam]; ok {
+			continue
+		}
+		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
+			continue
+		}
+		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
+		if err != nil {
+			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
+			continue
+		}
+		for _, descendant := range descendants {
+			if _, ok := directUserTeams[strings.ToLower(descendant)]; !ok {
+				continue
+			}
+			user.Teams = append(user.Teams, allowedTeam)
+			currentUserTeams[normalizedAllowedTeam] = struct{}{}
+			break
+		}
+	}
+}
+
+func (c *DefaultCommandRunner) addPolicyCheckHierarchyTeamsForPlan(repo models.Repo, user *models.User, cmdName command.Name, directUserTeams []string) {
+	if cmdName != command.Plan {
+		return
+	}
+	c.addHierarchyTeamsForCommandForTeams(repo, user, command.PolicyCheck.String(), directUserTeams)
+}
+
 // checkUserPermissions checks if the user has permissions to execute the command.
 // It first checks direct team membership against the allowlist. If that fails,
 // it expands each allowlisted team to include all its descendant teams (up to
@@ -330,33 +400,10 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 	}
 
 	// Slow path: check if the user belongs to a descendant team of any allowlisted team.
-	const maxHierarchyDepth = 20
-	for _, allowedTeam := range c.TeamAllowlistChecker.AllTeams() {
-		if allowedTeam == "*" {
-			continue
-		}
-		// Only expand teams that actually grant permission for this command.
-		if !c.TeamAllowlistChecker.IsCommandAllowedForTeam(ctx, allowedTeam, cmdName) {
-			continue
-		}
-		descendants, err := fetchDescendantTeams(c.VCSClient, c.Logger, repo, allowedTeam, maxHierarchyDepth)
-		if err != nil {
-			c.Logger.Warn("Could not fetch child teams for '%s': %s", allowedTeam, err)
-			continue
-		}
-		descendantSet := make(map[string]struct{}, len(descendants))
-		for _, desc := range descendants {
-			descendantSet[strings.ToLower(desc)] = struct{}{}
-		}
-		for _, userTeam := range user.Teams {
-			if _, ok := descendantSet[strings.ToLower(userTeam)]; ok {
-				// Add the matched allowlisted parent team to user.Teams so that
-				// per-project allowlist filters (which check direct membership)
-				// also pass for this user.
-				user.Teams = append(user.Teams, allowedTeam)
-				return true, nil
-			}
-		}
+	c.addHierarchyTeamsForCommand(repo, user, cmdName)
+	ctx.User = *user
+	if c.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, user.Teams, cmdName) {
+		return true, nil
 	}
 	return false, nil
 }
@@ -402,6 +449,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			c.Logger.Err("Unable to fetch user teams: %s", err)
 			return
 		}
+		directUserTeams := append([]string(nil), user.Teams...)
 
 		ok, err := c.checkUserPermissions(baseRepo, &user, cmd.Name.String())
 		if err != nil {
@@ -412,6 +460,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 			c.commentUserDoesNotHavePermissions(baseRepo, pullNum, user, cmd)
 			return
 		}
+		c.addPolicyCheckHierarchyTeamsForPlan(baseRepo, &user, cmd.Name, directUserTeams)
 	}
 
 	// Check if the provided var files in a 'plan' command are allowlisted

@@ -241,6 +241,36 @@ func TestCheckUserPermissions(t *testing.T) {
 		Assert(t, len(user.Teams) == 2, "expected user.Teams to contain both child-team and parent-team")
 		Equals(t, "parent-team", user.Teams[1])
 	})
+
+	t.Run("plan fast path adds policy_check hierarchy parent for project filters", func(t *testing.T) {
+		checker, err := command.NewTeamAllowlistChecker("plan-team:plan,security-parent:policy_check")
+		Ok(t, err)
+		cr := &DefaultCommandRunner{
+			Logger:               logger,
+			TeamAllowlistChecker: checker,
+			VCSClient: &childTeamVCSClient{
+				children: map[string][]string{"security-parent": {"security-child"}},
+			},
+		}
+		user := models.User{Username: "alice", Teams: []string{"plan-team", "security-child"}}
+		directUserTeams := append([]string(nil), user.Teams...)
+
+		ok, checkErr := cr.checkUserPermissions(repo, &user, command.Plan.String())
+		Ok(t, checkErr)
+		Assert(t, ok, "expected direct plan team member to be allowed")
+		Equals(t, []string{"plan-team", "security-child"}, user.Teams)
+
+		cr.addPolicyCheckHierarchyTeamsForPlan(repo, &user, command.Plan, directUserTeams)
+		Equals(t, []string{"plan-team", "security-child", "security-parent"}, user.Teams)
+
+		ctx := models.TeamAllowlistCheckerContext{
+			BaseRepo:    repo,
+			CommandName: command.PolicyCheck.String(),
+			Log:         logger,
+			User:        user,
+		}
+		Assert(t, checker.IsCommandAllowedForAnyTeam(ctx, user.Teams, command.PolicyCheck.String()), "expected generated policy_check to pass direct project filtering")
+	})
 }
 
 func TestApplyUpdateCommitStatus(t *testing.T) {
