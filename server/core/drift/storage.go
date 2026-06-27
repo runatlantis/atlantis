@@ -13,7 +13,7 @@ import (
 // Storage defines the interface for drift status persistence.
 // Implementations can store drift data in memory, database, or external services.
 //
-//go:generate pegomock generate --package mocks -o mocks/mock_drift_storage.go Storage
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_drift_storage.go Storage
 type Storage interface {
 	// Store saves a drift result for a project.
 	Store(repository string, drift models.ProjectDrift) error

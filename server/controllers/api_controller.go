@@ -1142,6 +1142,19 @@ func findProjectRemediationResult(results []models.ProjectRemediationResult, pro
 			return i
 		}
 	}
+	for i := range results {
+		if results[i].ProjectName == "" || results[i].ProjectName != projectName || results[i].Path != "" {
+			continue
+		}
+		if results[i].Workspace != "" && results[i].Workspace != workspace {
+			continue
+		}
+		results[i].Path = path
+		if results[i].Workspace == "" {
+			results[i].Workspace = workspace
+		}
+		return i
+	}
 	return -1
 }
 

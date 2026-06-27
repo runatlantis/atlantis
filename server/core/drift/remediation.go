@@ -3,7 +3,7 @@
 
 package drift
 
-//go:generate pegomock generate --package mocks -o mocks/mock_remediation_service.go RemediationService
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_remediation_service.go RemediationService
 
 import (
 	"fmt"
@@ -141,12 +141,13 @@ func (s *InMemoryRemediationService) completeApplyProjectResults(req models.Reme
 		projectsByKey[remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace)] = proj
 	}
 
-	resultKeys := make(map[string]struct{}, len(results))
+	matchedProjectKeys := make(map[string]struct{}, len(results))
 	for i := range results {
 		result := &results[i]
-		key := remediationProjectKey(result.ProjectName, result.Path, result.Workspace)
-		resultKeys[key] = struct{}{}
-		proj, ok := projectsByKey[key]
+		proj, projectKey, ok := findRemediationProjectForResult(projects, projectsByKey, *result)
+		if ok {
+			matchedProjectKeys[projectKey] = struct{}{}
+		}
 		if ok && result.DriftBefore == nil && proj.Drift.HasDrift {
 			result.DriftBefore = cloneDriftSummaryPtr(&proj.Drift)
 		}
@@ -164,6 +165,9 @@ func (s *InMemoryRemediationService) completeApplyProjectResults(req models.Reme
 		}
 		if result.Status == models.RemediationStatusSuccess && s.driftStorage != nil && ok {
 			updatedDrift := proj
+			updatedDrift.ProjectName = result.ProjectName
+			updatedDrift.Path = result.Path
+			updatedDrift.Workspace = result.Workspace
 			updatedDrift.Ref = req.Ref
 			updatedDrift.Drift = *result.DriftAfter
 			updatedDrift.Error = ""
@@ -177,7 +181,7 @@ func (s *InMemoryRemediationService) completeApplyProjectResults(req models.Reme
 
 	for _, proj := range projects {
 		key := remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace)
-		if _, ok := resultKeys[key]; ok {
+		if _, ok := matchedProjectKeys[key]; ok {
 			continue
 		}
 		results = append(results, models.ProjectRemediationResult{
@@ -370,6 +374,23 @@ func (s *InMemoryRemediationService) storeResult(result *models.RemediationResul
 
 func remediationProjectKey(projectName, path, workspace string) string {
 	return projectName + "\n" + path + "\n" + workspace
+}
+
+func findRemediationProjectForResult(projects []models.ProjectDrift, projectsByKey map[string]models.ProjectDrift, result models.ProjectRemediationResult) (models.ProjectDrift, string, bool) {
+	key := remediationProjectKey(result.ProjectName, result.Path, result.Workspace)
+	if proj, ok := projectsByKey[key]; ok {
+		return proj, key, true
+	}
+	for _, proj := range projects {
+		if proj.ProjectName == "" || proj.ProjectName != result.ProjectName || proj.Path != "" {
+			continue
+		}
+		if proj.Workspace != "" && proj.Workspace != result.Workspace {
+			continue
+		}
+		return proj, remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace), true
+	}
+	return models.ProjectDrift{}, "", false
 }
 
 func cloneRemediationResult(result *models.RemediationResult) *models.RemediationResult {

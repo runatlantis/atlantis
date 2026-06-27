@@ -37,7 +37,7 @@ type DriftProjectResult struct {
 	Error       string `json:"error,omitempty"`
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_drift_sender.go DriftSender
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_drift_sender.go DriftSender
 
 // DriftSender sends drift webhooks.
 type DriftSender interface {

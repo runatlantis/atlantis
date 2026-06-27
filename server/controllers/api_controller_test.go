@@ -872,7 +872,7 @@ func initAPIControllerGitRepo(t *testing.T) (string, string) {
 	repoDir, err := os.MkdirTemp("", "api-controller-git-*")
 	Ok(t, err)
 	t.Cleanup(func() {
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			if err := os.RemoveAll(repoDir); err == nil {
 				return
 			}
