@@ -67,6 +67,13 @@ func TestParser_HasDrift(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "has outside-only changes",
+			plan: &models.PlanSuccess{
+				TerraformOutput: "Note: Objects have changed outside of Terraform\ndummy\nNo changes. Infrastructure is up-to-date.",
+			},
+			expected: true,
+		},
+		{
 			name: "mixed drift",
 			plan: &models.PlanSuccess{
 				TerraformOutput: "Plan: 2 to add, 3 to change, 1 to destroy.",

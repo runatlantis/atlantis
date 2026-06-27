@@ -142,10 +142,8 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx:     command.ProjectContext{},
 			wantErr: assert.NoError,
 		},
-		// Non-PR API workflow tests - verifies PR-specific requirements are skipped
-		// when API=true and Pull.Num<=0 (e.g., drift detection)
 		{
-			name: "API call without PR skips approved requirement",
+			name: "API call without PR enforces approved requirement by default",
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,
@@ -155,15 +153,45 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
 				},
 			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "drift API call without PR skips approved requirement",
+			ctx: command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				API:                true,
+				SkipPRRequirements: true,
+				Pull:               models.PullRequest{Num: -1},
+				ApplyRequirements:  []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
 			wantErr: assert.NoError,
 		},
 		{
-			name: "API call without PR skips mergeable requirement",
+			name: "API call without PR enforces mergeable requirement by default",
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,
 				Pull:              models.PullRequest{Num: -2},
 				ApplyRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "drift API call without PR skips mergeable requirement",
+			ctx: command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				API:                true,
+				SkipPRRequirements: true,
+				Pull:               models.PullRequest{Num: -2},
+				ApplyRequirements:  []string{raw.MergeableRequirement},
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: false},
 				},
@@ -202,6 +230,23 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				)).ThenReturn(true)
 			},
 			wantFailure: "Default branch must be rebased onto pull request before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without PR fails policies_passed when no policy status exists",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: -1},
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{{
+						Name:         "policy1",
+						ApproveCount: 1,
+					}},
+				},
+			},
+			wantFailure: "All policies must pass for project before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{

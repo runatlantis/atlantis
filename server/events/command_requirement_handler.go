@@ -63,16 +63,15 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 }
 
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
-	// Check if this is a non-PR API call (e.g., drift detection)
-	// PR-specific requirements (approved, mergeable) should be skipped for these
-	isNonPRAPICall := ctx.API && ctx.Pull.Num <= 0
+	// Only explicitly opted-in non-PR API workflows, such as drift detection and
+	// remediation, may skip PR-only requirements.
+	skipPRRequirements := ctx.API && ctx.Pull.Num <= 0 && ctx.SkipPRRequirements
 
 	for _, req := range requirements {
 		switch req {
 		case raw.ApprovedRequirement:
-			// Skip approval check for non-PR API calls - approval is a PR-specific concept
-			if isNonPRAPICall {
-				ctx.Log.Info("skipping approval requirement for API call without PR number (e.g., drift detection)")
+			if skipPRRequirements {
+				ctx.Log.Info("skipping approval requirement for drift API call without PR number")
 				continue
 			}
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
@@ -81,13 +80,15 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
 			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
+			if ctx.API && ctx.Pull.Num <= 0 && len(ctx.ProjectPolicyStatus) == 0 {
+				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
+			}
 			if !ctx.PolicyCleared() {
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
-			// Skip mergeability check for non-PR API calls - mergeability is a PR-specific concept
-			if isNonPRAPICall {
-				ctx.Log.Info("skipping mergeable requirement for API call without PR number (e.g., drift detection)")
+			if skipPRRequirements {
+				ctx.Log.Info("skipping mergeable requirement for drift API call without PR number")
 				continue
 			}
 			mergeableStatus := ctx.PullReqStatus.MergeableStatus

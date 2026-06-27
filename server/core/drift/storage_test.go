@@ -229,6 +229,39 @@ func TestInMemoryStorage_DeleteByProject(t *testing.T) {
 	Equals(t, "project2", results[0].ProjectName)
 }
 
+func TestInMemoryStorage_DeleteMatching(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "main",
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "dev",
+		LastChecked: time.Now(),
+	}))
+
+	err := storage.DeleteMatching("owner/repo", drift.GetOptions{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "main",
+	})
+	Ok(t, err)
+
+	mainResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	Equals(t, 0, len(mainResults))
+	devResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "dev"})
+	Ok(t, err)
+	Equals(t, 1, len(devResults))
+}
+
 func TestInMemoryStorage_DeleteNonExistent(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 

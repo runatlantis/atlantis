@@ -41,6 +41,21 @@ func (mock *MockStorage) Delete(repository string, projectName string) error {
 	return _ret0
 }
 
+func (mock *MockStorage) DeleteMatching(repository string, opts drift.GetOptions) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockStorage().")
+	}
+	_params := []pegomock.Param{repository, opts}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteMatching", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockStorage) Get(repository string, opts drift.GetOptions) ([]models.ProjectDrift, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockStorage().")
@@ -160,6 +175,41 @@ func (c *MockStorage_Delete_OngoingVerification) GetAllCapturedArguments() (_par
 			_param1 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(string)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockStorage) DeleteMatching(repository string, opts drift.GetOptions) *MockStorage_DeleteMatching_OngoingVerification {
+	_params := []pegomock.Param{repository, opts}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteMatching", _params, verifier.timeout)
+	return &MockStorage_DeleteMatching_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockStorage_DeleteMatching_OngoingVerification struct {
+	mock              *MockStorage
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockStorage_DeleteMatching_OngoingVerification) GetCapturedArguments() (string, drift.GetOptions) {
+	repository, opts := c.GetAllCapturedArguments()
+	return repository[len(repository)-1], opts[len(opts)-1]
+}
+
+func (c *MockStorage_DeleteMatching_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []drift.GetOptions) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]drift.GetOptions, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(drift.GetOptions)
 			}
 		}
 	}

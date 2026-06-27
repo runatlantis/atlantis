@@ -163,8 +163,8 @@ type RemediationResult struct {
 	Status RemediationStatus `json:"status"`
 	// StartedAt is when the remediation started.
 	StartedAt time.Time `json:"started_at"`
-	// CompletedAt is when the remediation completed (zero if still running).
-	CompletedAt time.Time `json:"completed_at,omitzero"`
+	// CompletedAt is when the remediation completed.
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	// TotalProjects is the total number of projects targeted.
 	TotalProjects int `json:"total_projects"`
 	// SuccessCount is the number of projects successfully remediated.
@@ -192,7 +192,8 @@ func NewRemediationResult(id, repository, ref string, action RemediationAction) 
 
 // Complete marks the remediation as complete and calculates final status.
 func (r *RemediationResult) Complete() {
-	r.CompletedAt = time.Now()
+	completedAt := time.Now()
+	r.CompletedAt = &completedAt
 	r.TotalProjects = len(r.Projects)
 
 	// Reset counts before recomputing to avoid double-counting if Complete() is called multiple times

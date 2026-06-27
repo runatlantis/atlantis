@@ -50,6 +50,11 @@ type Context struct {
 	// API is true if plan/apply by API endpoints
 	API bool
 
+	// SkipPRRequirements allows API workflows that are intentionally not tied to
+	// a pull request, such as drift detection/remediation, to skip PR-only
+	// requirements like approved and mergeable.
+	SkipPRRequirements bool
+
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
 

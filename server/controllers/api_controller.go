@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -232,17 +233,11 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 	}
 
-	// Convert to API response format
-	apiResult := NewCommandResultAPI(result, command.Plan.String())
-
-	// Return per-project statuses inside the success envelope. Project-level
-	// failures use 207 Multi-Status so clients can read per-project results
-	// without needing to parse an error envelope.
 	statusCode := http.StatusOK
 	if result.HasErrors() {
-		statusCode = http.StatusMultiStatus
+		statusCode = http.StatusInternalServerError
 	}
-	responder.Success(w, r, statusCode, apiResult)
+	responder.writeJSON(w, statusCode, result)
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
@@ -269,10 +264,15 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ctx.CommandSkipped {
-		responder.Success(w, r, http.StatusOK, NewCommandResultAPI(result, command.Apply.String()))
+		responder.writeJSON(w, http.StatusOK, result)
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	if result.HasErrors() {
+		responder.writeJSON(w, http.StatusInternalServerError, result)
+		return
+	}
 
 	// The API apply endpoint runs plan first. Refresh PR status afterward so
 	// apply requirements evaluate the VCS state the plan phase just produced.
@@ -286,17 +286,11 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert to API response format
-	apiResult := NewCommandResultAPI(result, command.Apply.String())
-
-	// Return per-project statuses inside the success envelope. Project-level
-	// failures use 207 Multi-Status so clients can read per-project results
-	// without needing to parse an error envelope.
 	statusCode := http.StatusOK
 	if result.HasErrors() {
-		statusCode = http.StatusMultiStatus
+		statusCode = http.StatusInternalServerError
 	}
-	responder.Success(w, r, statusCode, apiResult)
+	responder.writeJSON(w, statusCode, result)
 }
 
 // LockDetail is deprecated - use LockDetailAPI instead.
@@ -329,10 +323,22 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert to API response format
-	apiResult := NewListLocksResultAPI(locks)
+	result := ListLocksResult{}
+	for name, lock := range locks {
+		result.Locks = append(result.Locks, LockDetail{
+			Name:            name,
+			ProjectName:     lock.Project.ProjectName,
+			ProjectRepo:     lock.Project.RepoFullName,
+			ProjectRepoPath: lock.Project.Path,
+			PullID:          lock.Pull.Num,
+			PullURL:         lock.Pull.URL,
+			User:            lock.User.Username,
+			Workspace:       lock.Workspace,
+			Time:            lock.Time,
+		})
+	}
 
-	responder.Success(w, r, http.StatusOK, apiResult)
+	responder.writeJSON(w, http.StatusOK, result)
 }
 
 // DriftStatus returns cached drift detection results for a repository.
@@ -848,9 +854,10 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope: e.controller.Scope,
-		Log:   e.logger,
-		API:   true,
+		Scope:              e.controller.Scope,
+		Log:                e.logger,
+		API:                true,
+		SkipPRRequirements: true,
 	}
 
 	// Setup working directory
@@ -911,9 +918,10 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope: e.controller.Scope,
-		Log:   e.logger,
-		API:   true,
+		Scope:              e.controller.Scope,
+		Log:                e.logger,
+		API:                true,
+		SkipPRRequirements: true,
 	}
 
 	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
@@ -982,9 +990,10 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope: e.controller.Scope,
-		Log:   e.logger,
-		API:   true,
+		Scope:              e.controller.Scope,
+		Log:                e.logger,
+		API:                true,
+		SkipPRRequirements: true,
 	}
 
 	// Setup working directory
@@ -1297,15 +1306,18 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 
 	// Parse limit (default: 10)
 	limit := 10
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
+	if values, ok := r.URL.Query()["limit"]; ok {
+		limitStr := ""
+		if len(values) > 0 {
+			limitStr = values[0]
+		}
+		parsedLimit, err := strconv.Atoi(strings.TrimSpace(limitStr))
+		if err != nil || parsedLimit <= 0 {
 			responder.ValidationFailed(w, r, "invalid limit parameter",
 				ValidationError{Field: "limit", Message: "must be a positive integer"})
 			return
 		}
-		if limit <= 0 {
-			limit = 10
-		}
+		limit = parsedLimit
 		if limit > 100 {
 			limit = 100
 		}
@@ -1332,6 +1344,44 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	}
 
 	responder.Success(w, r, http.StatusOK, response)
+}
+
+type driftProjectIdentity struct {
+	projectName string
+	path        string
+	workspace   string
+	ref         string
+}
+
+func newDriftProjectIdentity(project models.ProjectDrift) driftProjectIdentity {
+	return driftProjectIdentity{
+		projectName: project.ProjectName,
+		path:        project.Path,
+		workspace:   project.Workspace,
+		ref:         project.Ref,
+	}
+}
+
+func (a *APIController) reconcileDriftStorage(repository, ref string, detected map[driftProjectIdentity]struct{}) error {
+	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref})
+	if err != nil {
+		return err
+	}
+
+	for _, project := range existing {
+		if _, ok := detected[newDriftProjectIdentity(project)]; ok {
+			continue
+		}
+		if err := a.DriftStorage.DeleteMatching(repository, drift.GetOptions{
+			ProjectName: project.ProjectName,
+			Path:        project.Path,
+			Workspace:   project.Workspace,
+			Ref:         project.Ref,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DetectDrift handles POST /api/drift/detect requests.
@@ -1426,9 +1476,10 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			HeadCommit: request.Ref,
 			BaseRepo:   baseRepo,
 		},
-		Scope: a.Scope,
-		Log:   a.Logger,
-		API:   true,
+		Scope:              a.Scope,
+		Log:                a.Logger,
+		API:                true,
+		SkipPRRequirements: true,
 	}
 
 	// Setup working directory
@@ -1458,6 +1509,9 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Process results and store drift data
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
+	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
+	detectedProjects := map[driftProjectIdentity]struct{}{}
+	storeFailed := false
 
 	for _, pr := range result.ProjectResults {
 		if pr.Command != command.Plan {
@@ -1486,12 +1540,20 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
 		}
 
-		// Store drift data
+		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
+
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
+			storeFailed = true
 			a.Logger.Warn("failed to store drift data: %v", err)
 		}
 
 		detectionResult.AddProject(projectDrift)
+	}
+
+	if fullDetection && !storeFailed {
+		if err := a.reconcileDriftStorage(baseRepo.ID(), request.Ref, detectedProjects); err != nil {
+			a.Logger.Warn("failed to reconcile drift data: %v", err)
+		}
 	}
 
 	// Send drift webhook notifications if drift was detected

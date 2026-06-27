@@ -122,6 +122,10 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 		ref  string
 	}{
 		{
+			name: "branch",
+			ref:  "branch",
+		},
+		{
 			name: "raw commit",
 			ref:  branchCommit,
 		},
@@ -156,6 +160,45 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 			merged, err := wd.MergeAgain(logger, models.Repo{}, pull, "default")
 			Ok(t, err)
 			Equals(t, false, merged)
+		})
+	}
+}
+
+func TestClone_SyntheticNonPRRefsRejectPRNamespaces(t *testing.T) {
+	repoDir := initRepo(t)
+	logger := logging.NewNoopLogger(t)
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+
+	for _, ref := range []string{
+		"pull/1/head",
+		"pull/1/merge",
+		"refs/pull/1/head",
+		"refs/pull/1/merge",
+		"merge-requests/1/head",
+		"merge-requests/1/merge",
+		"refs/merge-requests/1/head",
+		"refs/merge-requests/1/merge",
+		"pull-requests/1/from",
+		"refs/pull-requests/1/merge",
+	} {
+		t.Run(ref, func(t *testing.T) {
+			wd := &events.FileWorkspace{
+				DataDir:                     t.TempDir(),
+				CheckoutMerge:               true,
+				TestingOverrideHeadCloneURL: overrideURL,
+				TestingOverrideBaseCloneURL: overrideURL,
+				GpgNoSigningEnabled:         true,
+			}
+			pull := models.PullRequest{
+				Num:        -1,
+				BaseRepo:   models.Repo{},
+				BaseBranch: ref,
+				HeadBranch: ref,
+				HeadCommit: ref,
+			}
+
+			_, err := wd.Clone(logger, models.Repo{}, pull, "default")
+			ErrContains(t, "pull request and merge request refs are not allowed", err)
 		})
 	}
 }

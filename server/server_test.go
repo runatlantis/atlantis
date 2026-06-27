@@ -57,6 +57,28 @@ func TestNewServer_GitHubUser(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestNewServer_EnableDriftDetectionWiresServices(t *testing.T) {
+	tmpDir := t.TempDir()
+	s, err := server.NewServer(
+		server.UserConfig{
+			DataDir:              tmpDir,
+			AtlantisURL:          testAtlantisUrl,
+			LockingDBType:        testLockingDBType,
+			GithubHostname:       testGitHubHostName,
+			GithubUser:           testGitHubUser,
+			APISecret:            "token",
+			EnableDriftDetection: true,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
+	Ok(t, err)
+
+	Assert(t, s.APIController.DriftStorage != nil, "expected drift storage to be configured")
+	Assert(t, s.APIController.RemediationService != nil, "expected remediation service to be configured")
+	Assert(t, s.APIController.DriftWebhookSender != nil, "expected drift webhook sender to be configured")
+}
+
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {

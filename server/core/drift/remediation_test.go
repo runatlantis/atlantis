@@ -41,6 +41,10 @@ func (f failingRemediationStorage) Delete(string, string) error {
 	return nil
 }
 
+func (f failingRemediationStorage) DeleteMatching(string, drift.GetOptions) error {
+	return nil
+}
+
 func (f failingRemediationStorage) GetAll() (map[string][]models.ProjectDrift, error) {
 	return nil, nil
 }
@@ -133,7 +137,7 @@ func TestInMemoryRemediationService_GetProjectsErrorPreservesFailureStatus(t *te
 	Equals(t, "failed to get drift data: storage unavailable", result.Error)
 	Equals(t, 0, result.TotalProjects)
 	Equals(t, 0, len(result.Projects))
-	Assert(t, !result.CompletedAt.IsZero(), "expected completed timestamp")
+	Assert(t, result.CompletedAt != nil && !result.CompletedAt.IsZero(), "expected completed timestamp")
 }
 
 func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) {

@@ -258,3 +258,58 @@ func TestNewDriftStatusResponse_Empty(t *testing.T) {
 	Equals(t, 0, result.TotalProjects)
 	Equals(t, 0, result.ProjectsWithDrift)
 }
+
+func TestDriftDetectionRequestValidateRejectsEmptySelectors(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		request models.DriftDetectionRequest
+		field   string
+	}{
+		{
+			name: "empty project",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Projects:   []string{""},
+			},
+			field: "projects",
+		},
+		{
+			name: "space-only project",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Projects:   []string{"   "},
+			},
+			field: "projects",
+		},
+		{
+			name: "empty path",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: ""}},
+			},
+			field: "paths",
+		},
+		{
+			name: "space-only path",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: "   "}},
+			},
+			field: "paths",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			errs := c.request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, c.field, errs[0].Field)
+		})
+	}
+}

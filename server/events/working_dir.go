@@ -735,6 +735,9 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 	if targetRef == "" {
 		return fmt.Errorf("checking out API ref: empty ref")
 	}
+	if isUnsafeNonPRRef(targetRef) {
+		return fmt.Errorf("checking out API ref: pull request and merge request refs are not allowed")
+	}
 	fetchArgs := []string{"fetch", "--depth=1", "origin", targetRef}
 	if w.CheckoutDepth > 0 {
 		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", targetRef}
@@ -746,6 +749,35 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 		return err
 	}
 	return w.cleanStalePlanFiles(logger, c)
+}
+
+func isUnsafeNonPRRef(ref string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(ref))
+	normalized = strings.TrimLeft(normalized, "+")
+	normalized = strings.TrimPrefix(normalized, "refs/")
+
+	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {
+		if hasUnsafePRNamespace(normalized, namespace) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnsafePRNamespace(ref, namespace string) bool {
+	parts := strings.Split(ref, "/")
+	if len(parts) < 3 || parts[0] != namespace {
+		return false
+	}
+	if _, err := strconv.Atoi(parts[1]); err != nil {
+		return false
+	}
+	switch parts[2] {
+	case "head", "merge", "from", "to":
+		return true
+	default:
+		return false
+	}
 }
 
 func nonPRTargetRef(p models.PullRequest) string {

@@ -329,6 +329,7 @@ func newProjectCommandContext(ctx *command.Context,
 		SilencePRComments:          projCfg.SilencePRComments,
 		TeamAllowlistChecker:       teamAllowlistChecker,
 		API:                        ctx.API,
+		SkipPRRequirements:         ctx.SkipPRRequirements,
 	}
 }
 

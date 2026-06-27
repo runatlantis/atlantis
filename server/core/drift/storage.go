@@ -4,6 +4,7 @@
 package drift
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -25,6 +26,11 @@ type Storage interface {
 	// Delete removes drift results for a repository.
 	// If projectName is empty, all drift results for the repository are removed.
 	Delete(repository string, projectName string) error
+
+	// DeleteMatching removes drift results for a repository that match the given
+	// filters. At least one filter must be set; use Delete(repository, "") to
+	// clear an entire repository.
+	DeleteMatching(repository string, opts GetOptions) error
 
 	// GetAll retrieves all stored drift results across all repositories.
 	GetAll() (map[string][]models.ProjectDrift, error)
@@ -97,20 +103,7 @@ func (s *InMemoryStorage) Get(repository string, opts GetOptions) ([]models.Proj
 	result := make([]models.ProjectDrift, 0)
 
 	for _, drift := range repoData {
-		// Apply filters
-		if opts.ProjectName != "" && drift.ProjectName != opts.ProjectName {
-			continue
-		}
-		if opts.Path != "" && drift.Path != opts.Path {
-			continue
-		}
-		if opts.Workspace != "" && drift.Workspace != opts.Workspace {
-			continue
-		}
-		if opts.Ref != "" && drift.Ref != opts.Ref {
-			continue
-		}
-		if opts.MaxAge > 0 && now.Sub(drift.LastChecked) > opts.MaxAge {
+		if !matchesGetOptions(drift, opts, now) {
 			continue
 		}
 
@@ -118,6 +111,25 @@ func (s *InMemoryStorage) Get(repository string, opts GetOptions) ([]models.Proj
 	}
 
 	return result, nil
+}
+
+func matchesGetOptions(drift models.ProjectDrift, opts GetOptions, now time.Time) bool {
+	if opts.ProjectName != "" && drift.ProjectName != opts.ProjectName {
+		return false
+	}
+	if opts.Path != "" && drift.Path != opts.Path {
+		return false
+	}
+	if opts.Workspace != "" && drift.Workspace != opts.Workspace {
+		return false
+	}
+	if opts.Ref != "" && drift.Ref != opts.Ref {
+		return false
+	}
+	if opts.MaxAge > 0 && now.Sub(drift.LastChecked) > opts.MaxAge {
+		return false
+	}
+	return true
 }
 
 // Delete removes drift results for a repository.
@@ -139,6 +151,29 @@ func (s *InMemoryStorage) Delete(repository string, projectName string) error {
 
 	for key, drift := range repoData {
 		if drift.ProjectName == projectName {
+			delete(repoData, key)
+		}
+	}
+
+	return nil
+}
+
+// DeleteMatching removes drift results for a repository that match the given filters.
+func (s *InMemoryStorage) DeleteMatching(repository string, opts GetOptions) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if opts == (GetOptions{}) {
+		return fmt.Errorf("at least one drift delete filter is required")
+	}
+
+	repoData, ok := s.data[repository]
+	if !ok {
+		return nil
+	}
+
+	for key, drift := range repoData {
+		if matchesGetOptions(drift, opts, time.Now()) {
 			delete(repoData, key)
 		}
 	}

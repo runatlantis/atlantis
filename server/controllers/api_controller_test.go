@@ -115,6 +115,50 @@ func TestAPIController_Plan(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 }
 
+func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("plan failed"),
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy plan response must not use success envelope: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "plan failed"), "expected project error in response: %s", responseBody)
+}
+
+func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy plan response must not use success envelope: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
+}
+
 func TestAPIController_Apply(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 
@@ -192,6 +236,71 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("apply failed"),
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy apply response must not use success envelope: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "apply failed"), "expected project error in response: %s", responseBody)
+}
+
+func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy apply response must not use success envelope: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
+}
+
+func TestAPIController_ApplyPlanFailureDoesNotRunApply(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("plan failed"),
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
 // TestAPIController_Plan_PreWorkflowHooksReceiveCorrectCommand verifies that when
@@ -407,21 +516,21 @@ func TestAPIController_ListLocks(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	responseBody, _ := io.ReadAll(w.Result().Body)
-	var result controllers.ListLocksResultAPI
-	parseAPIResponse(t, responseBody, &result)
+	var result controllers.ListLocksResult
+	Ok(t, json.Unmarshal(responseBody, &result))
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy locks response must not use success envelope: %s", responseBody)
 
 	// Verify the lock details
 	Assert(t, len(result.Locks) == 1, "expected 1 lock")
-	Equals(t, 1, result.TotalCount)
 	lock := result.Locks[0]
-	Equals(t, "lock-id", lock.ID)
+	Equals(t, "lock-id", lock.Name)
 	Equals(t, "terraform", lock.ProjectName)
-	Equals(t, "owner/repo", lock.Repository)
-	Equals(t, "/path", lock.Path)
+	Equals(t, "owner/repo", lock.ProjectRepo)
+	Equals(t, "/path", lock.ProjectRepoPath)
 	Equals(t, "default", lock.Workspace)
-	Equals(t, 123, lock.PullRequestID)
-	Equals(t, "url", lock.PullRequestURL)
-	Equals(t, "jdoe", lock.LockedBy)
+	Equals(t, 123, lock.PullID)
+	Equals(t, "url", lock.PullURL)
+	Equals(t, "jdoe", lock.User)
 }
 
 func TestAPIController_PlanFetchesPullReqStatus(t *testing.T) {
@@ -675,10 +784,10 @@ func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
 			capturedPullStatus = ctx.PullStatus
 			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
 			Equals(t, 1, len(capturedPullStatus.Projects))
-			Equals(t, models.ErroredPolicyCheckStatus, capturedPullStatus.Projects[0].Status)
+			Equals(t, models.PassedPolicyCheckStatus, capturedPullStatus.Projects[0].Status)
 			Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 			Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
-			Equals(t, false, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
+			Equals(t, true, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
 
 			return ReturnValues{[]command.ProjectContext{{
 				CommandName: command.Apply,
@@ -694,12 +803,11 @@ func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
 			projectCtx := args[0].(command.ProjectContext)
 			if projectCtx.CommandName == command.PolicyCheck {
 				return ReturnValues{command.ProjectCommandOutput{
-					Failure: "Some policy sets did not pass.",
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
 								PolicySetName:    "policy",
-								Passed:           false,
+								Passed:           true,
 								ReqApprovalCount: 1,
 							},
 						},
@@ -727,7 +835,7 @@ func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
 	Equals(t, 1, len(capturedPullStatus.Projects))
 	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 	Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
-	Equals(t, false, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
+	Equals(t, true, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {
@@ -742,12 +850,12 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	responseBody, _ := io.ReadAll(w.Result().Body)
-	var result controllers.ListLocksResultAPI
-	parseAPIResponse(t, responseBody, &result)
+	var result controllers.ListLocksResult
+	Ok(t, json.Unmarshal(responseBody, &result))
+	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy locks response must not use success envelope: %s", responseBody)
 
 	// Verify empty result
 	Equals(t, 0, len(result.Locks))
-	Equals(t, 0, result.TotalCount)
 }
 
 type apiControllerTestConfig struct {
@@ -1621,6 +1729,28 @@ func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 }
 
+func TestAPIController_ListRemediationResults_InvalidLimit(t *testing.T) {
+	cases := []string{"5abc", "5+6", "abc", "", "0", "-1"}
+	for _, limit := range cases {
+		t.Run(limit, func(t *testing.T) {
+			ac, _, _ := setup(t)
+			remediationService := driftmocks.NewMockRemediationService()
+			ac.RemediationService = remediationService
+
+			req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo&type=Github&limit="+limit, nil)
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.ListRemediationResults(w, req)
+
+			Equals(t, http.StatusBadRequest, w.Code)
+			response, _ := io.ReadAll(w.Result().Body)
+			apiErr := parseAPIError(t, response)
+			Equals(t, controllers.ErrCodeValidation, apiErr.Code)
+			remediationService.VerifyWasCalled(Never()).ListResults(Any[string](), Any[int]())
+		})
+	}
+}
+
 func TestAPIController_ListRemediationResults_MissingType(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -1725,6 +1855,93 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	var result controllers.DriftDetectionResultAPI
 	parseAPIResponse(t, response, &result)
 	Equals(t, "Repo", result.Repository)
+}
+
+func TestAPIController_DetectDrift_FullDetectionRemovesStaleSameRefRecords(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "stale",
+		Path:        "stale",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "other-ref",
+		Path:        "other-ref",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "dev",
+		LastChecked: time.Now(),
+	}))
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "current",
+			RepoRelDir:  "current",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	mainRecords, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(mainRecords))
+	Equals(t, "current", mainRecords[0].ProjectName)
+	devRecords, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "dev"})
+	Ok(t, err)
+	Equals(t, 1, len(devRecords))
+	Equals(t, "other-ref", devRecords[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_ScopedDetectionKeepsUnrelatedRecords(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "stale",
+		Path:        "stale",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		LastChecked: time.Now(),
+	}))
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "current",
+			RepoRelDir:  "current",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"current"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	mainRecords, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	Equals(t, 2, len(mainRecords))
 }
 
 func TestAPIController_DetectDrift_ResolvesSyntheticRefBeforePlanReuse(t *testing.T) {

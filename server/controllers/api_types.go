@@ -383,9 +383,9 @@ func NewRemediationResultAPI(rr *models.RemediationResult) RemediationResultAPI 
 		Error:      rr.Error,
 	}
 
-	// Only include completed time if it's set
-	if !rr.CompletedAt.IsZero() {
-		result.CompletedAt = &rr.CompletedAt
+	// Only include completed time if it's set.
+	if rr.CompletedAt != nil {
+		result.CompletedAt = rr.CompletedAt
 	}
 
 	for _, p := range rr.Projects {

@@ -4,6 +4,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -151,6 +152,18 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
 	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {
 		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, BitbucketCloud, BitbucketServer, AzureDevops, Gitea"})
+	}
+	for _, project := range r.Projects {
+		if strings.TrimSpace(project) == "" {
+			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
+			break
+		}
+	}
+	for _, path := range r.Paths {
+		if strings.TrimSpace(path.Directory) == "" {
+			errors = append(errors, FieldError{Field: "paths", Message: "path directories cannot be empty"})
+			break
+		}
 	}
 
 	return errors
