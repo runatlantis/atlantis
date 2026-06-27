@@ -20,9 +20,10 @@ type remediationExecutorCall struct {
 }
 
 type recordingRemediationExecutor struct {
-	planCalls  []remediationExecutorCall
-	applyCalls []remediationExecutorCall
-	planDrift  *models.DriftSummary
+	planCalls         []remediationExecutorCall
+	applyCalls        []remediationExecutorCall
+	applyProjectCalls [][]remediationExecutorCall
+	planDrift         *models.DriftSummary
 }
 
 type failingRemediationStorage struct{}
@@ -62,6 +63,31 @@ func (r *recordingRemediationExecutor) ExecuteApply(_, _, _, projectName, path, 
 		workspace:   workspace,
 	})
 	return "apply", nil
+}
+
+func (r *recordingRemediationExecutor) ExecuteApplyProjects(_, _, _ string, projects []models.ProjectDrift) ([]models.ProjectRemediationResult, error) {
+	calls := make([]remediationExecutorCall, 0, len(projects))
+	results := make([]models.ProjectRemediationResult, 0, len(projects))
+	for _, project := range projects {
+		call := remediationExecutorCall{
+			projectName: project.ProjectName,
+			path:        project.Path,
+			workspace:   project.Workspace,
+		}
+		calls = append(calls, call)
+		r.planCalls = append(r.planCalls, call)
+		r.applyCalls = append(r.applyCalls, call)
+		results = append(results, models.ProjectRemediationResult{
+			ProjectName: project.ProjectName,
+			Path:        project.Path,
+			Workspace:   project.Workspace,
+			Status:      models.RemediationStatusSuccess,
+			PlanOutput:  "plan",
+			ApplyOutput: "apply",
+		})
+	}
+	r.applyProjectCalls = append(r.applyProjectCalls, calls)
+	return results, nil
 }
 
 func TestInMemoryRemediationService_ExplicitProjectsHonorWorkspaceFilters(t *testing.T) {
@@ -137,6 +163,7 @@ func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) 
 	Equals(t, models.RemediationStatusSuccess, result.Status)
 	Equals(t, 1, len(executor.planCalls))
 	Equals(t, 1, len(executor.applyCalls))
+	Equals(t, 1, len(executor.applyProjectCalls))
 	Assert(t, result.Projects[0].DriftBefore != nil, "expected drift before remediation")
 	Assert(t, result.Projects[0].DriftAfter != nil, "expected drift after remediation")
 	Equals(t, false, result.Projects[0].DriftAfter.HasDrift)
@@ -151,6 +178,43 @@ func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) 
 	Equals(t, 1, len(cached))
 	Equals(t, false, cached[0].Drift.HasDrift)
 	Equals(t, "Apply completed successfully", cached[0].Drift.Summary)
+}
+
+func TestInMemoryRemediationService_AutoApplyUsesSingleProjectBatch(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "network",
+		Path:        "network",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		DriftOnly:  true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.applyProjectCalls))
+	Equals(t, 2, len(executor.applyProjectCalls[0]))
+	Equals(t, 2, len(result.Projects))
 }
 
 func TestInMemoryRemediationService_ExplicitProjectsPreserveCachedTargetMetadata(t *testing.T) {
@@ -272,4 +336,38 @@ func TestInMemoryRemediationService_ListResultsUsesHostQualifiedStorageRepositor
 	rawResults, err := service.ListResults("acme/infra", 10)
 	Ok(t, err)
 	Equals(t, 0, len(rawResults))
+}
+
+func TestInMemoryRemediationService_ReturnsResultSnapshots(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Projects:   []string{"app"},
+	}, executor)
+	Ok(t, err)
+
+	got, err := service.GetResult(result.ID)
+	Ok(t, err)
+	got.Status = models.RemediationStatusFailed
+	got.Projects[0].Status = models.RemediationStatusFailed
+	got.Projects[0].DriftAfter = &models.DriftSummary{HasDrift: true, ToAdd: 99}
+
+	gotAgain, err := service.GetResult(result.ID)
+	Ok(t, err)
+	Equals(t, models.RemediationStatusSuccess, gotAgain.Status)
+	Equals(t, models.RemediationStatusSuccess, gotAgain.Projects[0].Status)
+	Equals(t, false, gotAgain.Projects[0].DriftAfter.HasDrift)
+
+	listed, err := service.ListResults("owner/repo", 10)
+	Ok(t, err)
+	Equals(t, 1, len(listed))
+	listed[0].Status = models.RemediationStatusFailed
+
+	listedAgain, err := service.ListResults("owner/repo", 10)
+	Ok(t, err)
+	Equals(t, models.RemediationStatusSuccess, listedAgain[0].Status)
 }

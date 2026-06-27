@@ -34,8 +34,8 @@ type RemediationExecutor interface {
 	// ExecutePlan runs a plan for the given project.
 	ExecutePlan(repository, ref, vcsType, projectName, path, workspace string) (output string, driftSummary *models.DriftSummary, err error)
 
-	// ExecuteApply runs an apply for the given project.
-	ExecuteApply(repository, ref, vcsType, projectName, path, workspace string) (output string, err error)
+	// ExecuteApplyProjects plans and applies the given projects as one operation.
+	ExecuteApplyProjects(repository, ref, vcsType string, projects []models.ProjectDrift) ([]models.ProjectRemediationResult, error)
 }
 
 // InMemoryRemediationService implements RemediationService with in-memory storage.
@@ -92,10 +92,16 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 		return result, nil
 	}
 
-	// Execute remediation for each project
-	for _, proj := range projects {
-		projectResult := s.remediateProject(req, proj, executor)
-		result.AddProjectResult(projectResult)
+	if req.Action == models.RemediationAutoApply {
+		for _, projectResult := range s.remediateProjectsWithApply(req, projects, executor) {
+			result.AddProjectResult(projectResult)
+		}
+	} else {
+		// Execute remediation for each project
+		for _, proj := range projects {
+			projectResult := s.remediateProject(req, proj, executor)
+			result.AddProjectResult(projectResult)
+		}
 	}
 
 	// Mark as complete
@@ -103,6 +109,88 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 	s.storeResult(result)
 
 	return result, nil
+}
+
+func (s *InMemoryRemediationService) remediateProjectsWithApply(req models.RemediationRequest, projects []models.ProjectDrift, executor RemediationExecutor) []models.ProjectRemediationResult {
+	results, err := executor.ExecuteApplyProjects(req.Repository, req.Ref, req.Type, projects)
+	if err != nil && len(results) == 0 {
+		return failedProjectRemediationResults(projects, err.Error())
+	}
+	results = s.completeApplyProjectResults(req, projects, results, err)
+	return results
+}
+
+func failedProjectRemediationResults(projects []models.ProjectDrift, errorMessage string) []models.ProjectRemediationResult {
+	results := make([]models.ProjectRemediationResult, 0, len(projects))
+	for _, proj := range projects {
+		results = append(results, models.ProjectRemediationResult{
+			ProjectName: proj.ProjectName,
+			Path:        proj.Path,
+			Workspace:   proj.Workspace,
+			Status:      models.RemediationStatusFailed,
+			Error:       errorMessage,
+			DriftBefore: cloneDriftSummaryPtr(&proj.Drift),
+		})
+	}
+	return results
+}
+
+func (s *InMemoryRemediationService) completeApplyProjectResults(req models.RemediationRequest, projects []models.ProjectDrift, results []models.ProjectRemediationResult, applyErr error) []models.ProjectRemediationResult {
+	projectsByKey := make(map[string]models.ProjectDrift, len(projects))
+	for _, proj := range projects {
+		projectsByKey[remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace)] = proj
+	}
+
+	resultKeys := make(map[string]struct{}, len(results))
+	for i := range results {
+		result := &results[i]
+		key := remediationProjectKey(result.ProjectName, result.Path, result.Workspace)
+		resultKeys[key] = struct{}{}
+		proj, ok := projectsByKey[key]
+		if ok && result.DriftBefore == nil && proj.Drift.HasDrift {
+			result.DriftBefore = cloneDriftSummaryPtr(&proj.Drift)
+		}
+		if result.Status == models.RemediationStatusRunning {
+			result.Status = models.RemediationStatusFailed
+			if result.Error == "" && applyErr != nil {
+				result.Error = applyErr.Error()
+			}
+		}
+		if result.Status == models.RemediationStatusSuccess && result.DriftAfter == nil {
+			result.DriftAfter = &models.DriftSummary{
+				HasDrift: false,
+				Summary:  "Apply completed successfully",
+			}
+		}
+		if result.Status == models.RemediationStatusSuccess && s.driftStorage != nil && ok {
+			updatedDrift := proj
+			updatedDrift.Ref = req.Ref
+			updatedDrift.Drift = *result.DriftAfter
+			updatedDrift.Error = ""
+			updatedDrift.LastChecked = time.Now()
+			if err := s.driftStorage.Store(remediationStorageRepository(req), updatedDrift); err != nil {
+				result.Error = fmt.Sprintf("updating drift status after apply: %v", err)
+				result.Status = models.RemediationStatusFailed
+			}
+		}
+	}
+
+	for _, proj := range projects {
+		key := remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace)
+		if _, ok := resultKeys[key]; ok {
+			continue
+		}
+		results = append(results, models.ProjectRemediationResult{
+			ProjectName: proj.ProjectName,
+			Path:        proj.Path,
+			Workspace:   proj.Workspace,
+			Status:      models.RemediationStatusFailed,
+			Error:       "apply did not return a result for project",
+			DriftBefore: cloneDriftSummaryPtr(&proj.Drift),
+		})
+	}
+
+	return results
 }
 
 // getProjectsToRemediate determines which projects to remediate based on the request.
@@ -253,52 +341,10 @@ func (s *InMemoryRemediationService) remediateProject(req models.RemediationRequ
 		return result
 	}
 
-	// If plan-only, we're done
-	if req.Action == models.RemediationPlanOnly {
-		result.Status = models.RemediationStatusSuccess
-		if driftSummary != nil {
-			result.DriftAfter = driftSummary
-		}
-		return result
-	}
-
-	// Execute apply for auto-apply action
-	applyOutput, err := executor.ExecuteApply(
-		req.Repository,
-		req.Ref,
-		req.Type,
-		proj.ProjectName,
-		proj.Path,
-		proj.Workspace,
-	)
-	result.ApplyOutput = applyOutput
-
-	if err != nil {
-		result.Error = err.Error()
-		result.Status = models.RemediationStatusFailed
-		return result
-	}
-
 	result.Status = models.RemediationStatusSuccess
-
-	// After apply, drift should be resolved
-	result.DriftAfter = &models.DriftSummary{
-		HasDrift: false,
-		Summary:  "Apply completed successfully",
+	if driftSummary != nil {
+		result.DriftAfter = driftSummary
 	}
-	if s.driftStorage != nil {
-		updatedDrift := proj
-		updatedDrift.Ref = req.Ref
-		updatedDrift.Drift = *result.DriftAfter
-		updatedDrift.Error = ""
-		updatedDrift.LastChecked = time.Now()
-		if err := s.driftStorage.Store(remediationStorageRepository(req), updatedDrift); err != nil {
-			result.Error = fmt.Sprintf("updating drift status after apply: %v", err)
-			result.Status = models.RemediationStatusFailed
-			return result
-		}
-	}
-
 	return result
 }
 
@@ -307,7 +353,7 @@ func (s *InMemoryRemediationService) storeResult(result *models.RemediationResul
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.results[result.ID] = result
+	s.results[result.ID] = cloneRemediationResult(result)
 
 	repositoryKey := remediationResultRepositoryKey(result)
 
@@ -320,6 +366,37 @@ func (s *InMemoryRemediationService) storeResult(result *models.RemediationResul
 	if !slices.Contains(s.repoResults[repositoryKey], result.ID) {
 		s.repoResults[repositoryKey] = append(s.repoResults[repositoryKey], result.ID)
 	}
+}
+
+func remediationProjectKey(projectName, path, workspace string) string {
+	return projectName + "\n" + path + "\n" + workspace
+}
+
+func cloneRemediationResult(result *models.RemediationResult) *models.RemediationResult {
+	if result == nil {
+		return nil
+	}
+	clone := *result
+	clone.Projects = make([]models.ProjectRemediationResult, len(result.Projects))
+	for i := range result.Projects {
+		clone.Projects[i] = cloneProjectRemediationResult(result.Projects[i])
+	}
+	return &clone
+}
+
+func cloneProjectRemediationResult(result models.ProjectRemediationResult) models.ProjectRemediationResult {
+	clone := result
+	clone.DriftBefore = cloneDriftSummaryPtr(result.DriftBefore)
+	clone.DriftAfter = cloneDriftSummaryPtr(result.DriftAfter)
+	return clone
+}
+
+func cloneDriftSummaryPtr(summary *models.DriftSummary) *models.DriftSummary {
+	if summary == nil {
+		return nil
+	}
+	clone := *summary
+	return &clone
 }
 
 func remediationResultRepositoryKey(result *models.RemediationResult) string {
@@ -338,7 +415,7 @@ func (s *InMemoryRemediationService) GetResult(id string) (*models.RemediationRe
 	if !ok {
 		return nil, fmt.Errorf("remediation result not found: %s", id)
 	}
-	return result, nil
+	return cloneRemediationResult(result), nil
 }
 
 // ListResults returns all remediation results for a repository.
@@ -354,7 +431,7 @@ func (s *InMemoryRemediationService) ListResults(repository string, limit int) (
 	results := make([]*models.RemediationResult, 0, len(ids))
 	for i := len(ids) - 1; i >= 0 && (limit <= 0 || len(results) < limit); i-- {
 		if result, ok := s.results[ids[i]]; ok {
-			results = append(results, result)
+			results = append(results, cloneRemediationResult(result))
 		}
 	}
 

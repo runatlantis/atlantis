@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -159,7 +160,33 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		return nil, nil, events.ErrIgnoredTargetedDir
 	}
 
+	sortCommandPairsByExecutionOrder(cmds, keptCommentCommands)
 	return cmds, keptCommentCommands, nil
+}
+
+func sortCommandPairsByExecutionOrder(cmds []command.ProjectContext, commentCommands []*events.CommentCommand) {
+	if len(cmds) != len(commentCommands) {
+		return
+	}
+	type commandPair struct {
+		cmd            command.ProjectContext
+		commentCommand *events.CommentCommand
+		index          int
+	}
+	pairs := make([]commandPair, len(cmds))
+	for i := range cmds {
+		pairs[i] = commandPair{cmd: cmds[i], commentCommand: commentCommands[i], index: i}
+	}
+	sort.SliceStable(pairs, func(i, j int) bool {
+		if pairs[i].cmd.ExecutionOrderGroup == pairs[j].cmd.ExecutionOrderGroup {
+			return pairs[i].index < pairs[j].index
+		}
+		return pairs[i].cmd.ExecutionOrderGroup < pairs[j].cmd.ExecutionOrderGroup
+	})
+	for i := range pairs {
+		cmds[i] = pairs[i].cmd
+		commentCommands[i] = pairs[i].commentCommand
+	}
 }
 
 // apiHandleParseError maps HTTP status codes from apiParseAndValidate to API responses.
@@ -857,6 +884,76 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	return output.String(), driftSummary, nil
 }
 
+// ExecuteApplyProjects runs a pre-apply plan and apply for all projects in one
+// API context so dependency checks and execution order can see sibling project
+// statuses.
+func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType string, projects []models.ProjectDrift) ([]models.ProjectRemediationResult, error) {
+	request := &APIRequest{
+		Repository:       repository,
+		Ref:              ref,
+		Type:             vcsType,
+		DiscoverProjects: len(projects) == 0,
+	}
+	for _, project := range projects {
+		request.Paths = append(request.Paths, APIRequestPath{
+			ProjectName: project.ProjectName,
+			Directory:   project.Path,
+			Workspace:   project.Workspace,
+		})
+	}
+
+	ctx := &command.Context{
+		HeadRepo: e.baseRepo,
+		Pull: models.PullRequest{
+			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
+			BaseBranch: ref,
+			HeadBranch: ref,
+			HeadCommit: ref,
+			BaseRepo:   e.baseRepo,
+		},
+		Scope: e.controller.Scope,
+		Log:   e.logger,
+		API:   true,
+	}
+
+	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
+		return nil, fmt.Errorf("setup failed: %w", err)
+	}
+	defer e.controller.cleanupNonPRWorkingDir(ctx)
+
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
+	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		if e.controller.FailOnPreWorkflowHookError {
+			return nil, fmt.Errorf("pre-workflow hook failed: %w", err)
+		}
+		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
+	}
+
+	planResult, err := e.controller.apiPlan(request, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("plan failed: %w", err)
+	}
+	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
+	remediationResults := projectRemediationResultsFromPlan(projects, planResult)
+	if planResult.HasErrors() {
+		markRunningRemediationResultsFailed(remediationResults, "apply skipped because pre-apply plan failed")
+		return remediationResults, fmt.Errorf("plan had errors")
+	}
+	seedPullStatusFromPlanResult(ctx, planResult)
+
+	applyResult, err := e.controller.apiApply(request, ctx)
+	if err != nil {
+		return remediationResults, err
+	}
+	remediationResults = mergeApplyRemediationResults(remediationResults, applyResult)
+	if applyResult.HasErrors() {
+		return remediationResults, fmt.Errorf("apply had errors")
+	}
+
+	return remediationResults, nil
+}
+
 // ExecuteApply runs an apply for the given project using the API infrastructure.
 func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectName, path, workspace string) (string, error) {
 	// Create a minimal API request for the apply
@@ -962,6 +1059,126 @@ func applyRemediationOutput(result *command.Result) strings.Builder {
 		}
 	}
 	return output
+}
+
+func projectRemediationResultsFromPlan(projects []models.ProjectDrift, result *command.Result) []models.ProjectRemediationResult {
+	remediationResults := make([]models.ProjectRemediationResult, 0, len(projects))
+	for _, project := range projects {
+		remediationResult := models.ProjectRemediationResult{
+			ProjectName: project.ProjectName,
+			Path:        project.Path,
+			Workspace:   project.Workspace,
+			Status:      models.RemediationStatusRunning,
+		}
+		if project.Drift.HasDrift {
+			driftBefore := project.Drift
+			remediationResult.DriftBefore = &driftBefore
+		}
+		remediationResults = append(remediationResults, remediationResult)
+	}
+	if result == nil {
+		return remediationResults
+	}
+	for _, projectResult := range result.ProjectResults {
+		idx := findProjectRemediationResult(remediationResults, projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
+		if idx == -1 {
+			remediationResults = append(remediationResults, models.ProjectRemediationResult{
+				ProjectName: projectResult.ProjectName,
+				Path:        projectResult.RepoRelDir,
+				Workspace:   projectResult.Workspace,
+				Status:      models.RemediationStatusRunning,
+			})
+			idx = len(remediationResults) - 1
+		}
+		planOutput, _ := planProjectRemediationOutput(projectResult)
+		remediationResults[idx].PlanOutput = planOutput
+		if projectResult.Error != nil {
+			remediationResults[idx].Status = models.RemediationStatusFailed
+			remediationResults[idx].Error = projectResult.Error.Error()
+		} else if projectResult.Failure != "" {
+			remediationResults[idx].Status = models.RemediationStatusFailed
+			remediationResults[idx].Error = projectResult.Failure
+		}
+	}
+	return remediationResults
+}
+
+func mergeApplyRemediationResults(remediationResults []models.ProjectRemediationResult, result *command.Result) []models.ProjectRemediationResult {
+	if result == nil {
+		return remediationResults
+	}
+	for _, projectResult := range result.ProjectResults {
+		idx := findProjectRemediationResult(remediationResults, projectResult.ProjectName, projectResult.RepoRelDir, projectResult.Workspace)
+		if idx == -1 {
+			remediationResults = append(remediationResults, models.ProjectRemediationResult{
+				ProjectName: projectResult.ProjectName,
+				Path:        projectResult.RepoRelDir,
+				Workspace:   projectResult.Workspace,
+				Status:      models.RemediationStatusRunning,
+			})
+			idx = len(remediationResults) - 1
+		}
+		remediationResults[idx].ApplyOutput = applyProjectRemediationOutput(projectResult)
+		if projectResult.Error != nil {
+			remediationResults[idx].Status = models.RemediationStatusFailed
+			remediationResults[idx].Error = projectResult.Error.Error()
+		} else if projectResult.Failure != "" {
+			remediationResults[idx].Status = models.RemediationStatusFailed
+			remediationResults[idx].Error = projectResult.Failure
+		} else {
+			remediationResults[idx].Status = models.RemediationStatusSuccess
+			remediationResults[idx].DriftAfter = &models.DriftSummary{
+				HasDrift: false,
+				Summary:  "Apply completed successfully",
+			}
+		}
+	}
+	return remediationResults
+}
+
+func findProjectRemediationResult(results []models.ProjectRemediationResult, projectName, path, workspace string) int {
+	for i, result := range results {
+		if result.ProjectName == projectName && result.Path == path && result.Workspace == workspace {
+			return i
+		}
+	}
+	return -1
+}
+
+func markRunningRemediationResultsFailed(results []models.ProjectRemediationResult, errorMessage string) {
+	for i := range results {
+		if results[i].Status == models.RemediationStatusRunning {
+			results[i].Status = models.RemediationStatusFailed
+			results[i].Error = errorMessage
+		}
+	}
+}
+
+func planProjectRemediationOutput(result command.ProjectResult) (string, *models.DriftSummary) {
+	var output strings.Builder
+	var driftSummary *models.DriftSummary
+	if result.Error != nil {
+		fmt.Fprintf(&output, "Error: %v\n", result.Error)
+	} else if result.Failure != "" {
+		fmt.Fprintf(&output, "Failure: %s\n", result.Failure)
+	} else if result.PlanSuccess != nil {
+		output.WriteString(result.PlanSuccess.TerraformOutput)
+		summary := models.NewDriftSummaryFromPlanSuccess(result.PlanSuccess)
+		driftSummary = &summary
+	}
+	return output.String(), driftSummary
+}
+
+func applyProjectRemediationOutput(result command.ProjectResult) string {
+	var output strings.Builder
+	if result.Error != nil {
+		fmt.Fprintf(&output, "Error: %v\n", result.Error)
+	} else if result.Failure != "" {
+		fmt.Fprintf(&output, "Failure: %s\n", result.Failure)
+	} else if result.ApplySuccess != "" {
+		output.WriteString(result.ApplySuccess)
+	}
+	return output.String()
 }
 
 // GetRemediationResult handles GET /api/drift/remediate/{id} requests.

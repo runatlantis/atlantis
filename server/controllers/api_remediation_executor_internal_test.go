@@ -92,7 +92,7 @@ func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *t
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
-func TestAPIRemediationExecutor_ExecuteApplySeedsPullStatusForDependencies(t *testing.T) {
+func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependencies(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
@@ -118,48 +118,47 @@ func TestAPIRemediationExecutor_ExecuteApplySeedsPullStatusForDependencies(t *te
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn([]command.ProjectContext{
-			{
-				CommandName: command.Plan,
-				ProjectName: "network",
-				RepoRelDir:  "network",
-				Workspace:   events.DefaultWorkspace,
-			},
-			{
-				CommandName: command.Plan,
-				ProjectName: "app",
-				RepoRelDir:  "app",
-				Workspace:   events.DefaultWorkspace,
-			},
-		}, nil)
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			executionOrderGroup := 0
+			if cmd.ProjectName == "app" {
+				executionOrderGroup = 1
+			}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:         command.Plan,
+				ProjectName:         cmd.ProjectName,
+				RepoRelDir:          cmd.RepoRelDir,
+				Workspace:           cmd.Workspace,
+				ExecutionOrderGroup: executionOrderGroup,
+			}}, nil}
+		})
 
 	var capturedPullStatus *models.PullStatus
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
+			cmd := args[1].(*events.CommentCommand)
 			capturedPullStatus = ctx.PullStatus
 			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
 			Equals(t, 2, len(capturedPullStatus.Projects))
 			Equals(t, models.PlannedPlanStatus, capturedPullStatus.Projects[0].Status)
 			Equals(t, models.PlannedPlanStatus, capturedPullStatus.Projects[1].Status)
 
-			return ReturnValues{[]command.ProjectContext{
-				{
-					CommandName: command.Apply,
-					ProjectName: "network",
-					RepoRelDir:  "network",
-					Workspace:   events.DefaultWorkspace,
-					PullStatus:  capturedPullStatus,
-				},
-				{
-					CommandName: command.Apply,
-					ProjectName: "app",
-					RepoRelDir:  "app",
-					Workspace:   events.DefaultWorkspace,
-					DependsOn:   []string{"network"},
-					PullStatus:  capturedPullStatus,
-				},
-			}, nil}
+			executionOrderGroup := 0
+			dependsOn := []string(nil)
+			if cmd.ProjectName == "app" {
+				executionOrderGroup = 1
+				dependsOn = []string{"network"}
+			}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:         command.Apply,
+				ProjectName:         cmd.ProjectName,
+				RepoRelDir:          cmd.RepoRelDir,
+				Workspace:           cmd.Workspace,
+				DependsOn:           dependsOn,
+				PullStatus:          capturedPullStatus,
+				ExecutionOrderGroup: executionOrderGroup,
+			}}, nil}
 		})
 
 	projectCommandRunner := NewMockProjectCommandRunner()
@@ -167,9 +166,11 @@ func TestAPIRemediationExecutor_ExecuteApplySeedsPullStatusForDependencies(t *te
 		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
 	})
 	applyCalls := 0
+	applyOrder := []string{}
 	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 		applyCalls++
 		projectCtx := args[0].(command.ProjectContext)
+		applyOrder = append(applyOrder, projectCtx.ProjectName)
 		if projectCtx.ProjectName == "app" {
 			Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[0].Status)
 		}
@@ -203,11 +204,23 @@ func TestAPIRemediationExecutor_ExecuteApplySeedsPullStatusForDependencies(t *te
 		logger:     logger,
 	}
 
-	output, err := executor.ExecuteApply("owner/repo", "main", "Github", "", "", "")
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{
+		{
+			ProjectName: "app",
+			Path:        "app",
+			Workspace:   events.DefaultWorkspace,
+		},
+		{
+			ProjectName: "network",
+			Path:        "network",
+			Workspace:   events.DefaultWorkspace,
+		},
+	})
 
 	Ok(t, err)
-	Assert(t, strings.Contains(output, "success"), "expected apply output, got %q", output)
+	Equals(t, 2, len(results))
 	Equals(t, 2, applyCalls)
+	Equals(t, []string{"network", "app"}, applyOrder)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[0].Status)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[1].Status)
 
