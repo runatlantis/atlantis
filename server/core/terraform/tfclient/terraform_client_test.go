@@ -480,6 +480,47 @@ func TestRunCommandWithVersion_SerializesConcurrentInstallsForSameVersion(t *tes
 	Equals(t, int32(1), downloader.calls.Load())
 }
 
+func TestEnsureVersion_ReusesConcurrentManagedBinaryRepair(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	startedFile := filepath.Join(tmp, "broken-validation-started")
+	releaseFile := filepath.Join(tmp, "release-broken-validation")
+	Ok(t, writeExecutable(
+		filepath.Join(binDir, "terraform99.99.99"),
+		fmt.Sprintf("printf x >> %q\nwhile [ ! -f %q ]; do sleep 0.01; done\nexit 1", startedFile, releaseFile),
+	))
+
+	downloader := &trackingDownloader{}
+	distribution := terraform.NewDistributionTerraformWithDownloader(downloader)
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	errCh := make(chan error, 2)
+	for range 2 {
+		go func() {
+			errCh <- c.EnsureVersion(logger, distribution, v)
+		}()
+	}
+
+	waitForFileSize(t, startedFile, 2, time.Second)
+	Ok(t, os.WriteFile(releaseFile, []byte("release"), 0600))
+
+	for range 2 {
+		Ok(t, <-errCh)
+	}
+	Equals(t, int32(1), downloader.calls.Load())
+}
+
 // Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -716,6 +757,18 @@ func waitForFile(t *testing.T, path string, timeout time.Duration) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for %s", path)
+}
+
+func waitForFileSize(t *testing.T, path string, minSize int64, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if stat, err := os.Stat(path); err == nil && stat.Size() >= minSize {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s to reach size %d", path, minSize)
 }
 
 type trackingDownloader struct {

@@ -620,6 +620,10 @@ func redownloadVersionBinary(
 
 	if currentPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok && currentPath != binPath {
 		return currentPath, nil
+	} else if ok {
+		if err := validateVersionBinary(currentPath, dist.BinName()); err == nil {
+			return currentPath, nil
+		}
 	}
 	deleteVersionBinaryPath(versions, versionsLock, v, binPath)
 	if isManagedVersionBinary(binPath, binDir) {
