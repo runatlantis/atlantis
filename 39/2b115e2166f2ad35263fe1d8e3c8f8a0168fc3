@@ -1,0 +1,37 @@
+server/core/terraform/tfclient/terraform_client_test.go
+  s_12c46f3ee857ef::t_268941475bbe9f 1078,1080-1081,1097
+  s_12c46f3ee857ef::t_ce815b7a7a4f97 1036,1057-1077,1079,1082-1096,1098-1124
+  s_12c46f3ee857ef::t_a286d509a01e34 1125
+server/core/terraform/tfclient/terraform_client.go
+  s_12c46f3ee857ef::t_c38f5ee578adfe 47-48,293,322
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_12c46f3ee857ef::t_a4a76b28fd32d9 281-282
+server/events/project_command_context_builder.go
+  s_12c46f3ee857ef::t_c38f5ee578adfe 12,129,180,227,230-238
+  s_12c46f3ee857ef::t_cea5bb73d398dc 228-229
+  s_12c46f3ee857ef::t_7f067d9003c921 239-240
+server/events/project_command_builder_test.go
+  s_12c46f3ee857ef::t_0f8e6b00cf9e4f 3191-3197,3199-3203,3263-3278,3302-3307,3363-3364
+  s_12c46f3ee857ef::t_868a83d24d3577 16
+  s_12c46f3ee857ef::t_07ed23b8b951d4 3365
+runatlantis.io/docs/terraform-versions.md
+  s_12c46f3ee857ef::t_a4a76b28fd32d9 61-63
+server/core/terraform/tfclient/mocks/mock_terraform_client.go
+  s_12c46f3ee857ef::t_186974159b4e54 31,35,117-118,128-130,133,143,145-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "392b115e2166f2ad35263fe1d8e3c8f8a0168fc3",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
