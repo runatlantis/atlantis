@@ -296,16 +296,16 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 
 #### Parameters
 
-| Name       | Type     | Required | Description                                                              |
-|------------|----------|----------|--------------------------------------------------------------------------|
-| repository  | string   | Yes      | Full repository name (e.g., `owner/repo`)                                |
-| ref         | string   | Yes      | Git reference (branch/tag/commit) to use for remediation                 |
-| base_branch | string   | Required for raw commit SHA or `refs/tags/...` refs | Branch context used for Atlantis repo-config branch filters and undiverged checks |
-| type        | string   | Yes      | Type of the VCS provider (`Github`/`Gitlab`)                             |
-| action      | string   | No       | Remediation action: `plan` (default) or `apply`                          |
-| projects    | []string | No       | List of project names to remediate. If empty, uses drift detection data  |
-| workspaces  | []string | No       | Filter remediation to specific workspaces                                |
-| drift_only  | boolean  | No       | If true, only remediate projects with detected drift                     |
+| Name        | Type     | Required    | Description                                                             |
+|-------------|----------|-------------|-------------------------------------------------------------------------|
+| repository  | string   | Yes         | Full repository name (e.g., `owner/repo`)                               |
+| ref         | string   | Yes         | Git reference (branch/tag/commit) to use for remediation                |
+| base_branch | string   | Conditional | Branch context for repo-config branch filters and undiverged checks     |
+| type        | string   | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                            |
+| action      | string   | No          | Remediation action: `plan` (default) or `apply`                         |
+| projects    | []string | No          | List of project names to remediate. If empty, uses drift detection data |
+| workspaces  | []string | No          | Filter remediation to specific workspaces                               |
+| drift_only  | boolean  | No          | If true, only remediate projects with detected drift                    |
 
 ::: tip Actions
 
@@ -547,14 +547,14 @@ When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#d
 
 #### Parameters
 
-| Name       | Type                 | Required | Description                                                |
-|------------|----------------------|----------|------------------------------------------------------------|
-| repository  | string               | Yes      | Full repository name (e.g., `owner/repo`)                  |
-| ref         | string               | Yes      | Git reference (branch/tag/commit) to check for drift       |
-| base_branch | string               | Required for raw commit SHA or `refs/tags/...` refs | Branch context used for Atlantis repo-config branch filters and undiverged checks |
-| type        | string               | Yes      | Type of the VCS provider (`Github`/`Gitlab`)               |
-| projects    | []string             | No       | List of project names to check. If empty, all are checked  |
-| paths       | []DriftDetectionPath | No       | List of paths to check. If empty, project names are used   |
+| Name        | Type                 | Required    | Description                                                         |
+|-------------|----------------------|-------------|---------------------------------------------------------------------|
+| repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                           |
+| ref         | string               | Yes         | Git reference (branch/tag/commit) to check for drift                |
+| base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks |
+| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                        |
+| projects    | []string             | No          | List of project names to check. If empty, all are checked           |
+| paths       | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used            |
 
 #### DriftDetectionPath
 
@@ -853,14 +853,14 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 #### Error Responses
 
-| Status Code | Error Code          | Description                                           |
-|-------------|---------------------|-------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Missing required `id`, `repository`, or `type` parameter |
-| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header          |
-| 403         | FORBIDDEN           | Repository is not in the allowlist                    |
-| 404         | NOT_FOUND           | Remediation result not found                          |
-| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server        |
-| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data            |
+| Status Code | Error Code          | Description                                                  |
+|-------------|---------------------|--------------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required parameter                                   |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header                 |
+| 403         | FORBIDDEN           | Repository is not in the allowlist                           |
+| 404         | NOT_FOUND           | Remediation result not found                                 |
+| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server               |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data                   |
 
 ## Other Endpoints
 
