@@ -1,0 +1,74 @@
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_9ab2c432ca7d23 13,25-27,37,39
+  s_243a1a1edc15e5::t_9078791b04f356 97-98
+  s_243a1a1edc15e5::t_730a77ab54b5ab 312,521-522
+  s_243a1a1edc15e5::t_63ae928cab86b3 173,177,187-198
+  s_243a1a1edc15e5::t_14e8c97ef9682e 153-167
+  s_243a1a1edc15e5::t_07c4967727ff2f 264-276,281
+cmd/server.go
+  s_243a1a1edc15e5::t_d63181e9f00308 165,683-687
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_a68d4b6e25c3c6 50,196-199,208,214,221,241,247,255,277,314,414-422,505-510,514-525,570-575,785-788,833-838,882,899,948-952,967,1026-1030,1048,1077-1088,1529,1549
+  s_243a1a1edc15e5::t_a88f160b7c4676 40-49,51-60,878-881,944-947,1022-1025,1525-1528
+  s_243a1a1edc15e5::t_a85baf460b1270 1089-1090
+server/user_config.go
+  s_243a1a1edc15e5::t_9576cd13934974 58
+server/server_test.go
+  s_243a1a1edc15e5::t_5031489fe6e117 79,83-103
+  s_243a1a1edc15e5::t_96afa3ade85f76 104-105
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_0c2597f4faf976 2103-2155,2160-2161,2166-2210
+  s_243a1a1edc15e5::t_79649013b5d193 253
+  s_243a1a1edc15e5::t_b2774c143cb90f 1050-1056,1058-1065,2156-2159,2162-2165,2401-2408
+  s_243a1a1edc15e5::t_e4b23bf90611be 968
+  s_243a1a1edc15e5::t_7f5a5a2766fb6e 900-910,912-913,1057,2661-2663,2667-2668
+  s_243a1a1edc15e5::t_55d67e1fdbd795 162-184
+  s_243a1a1edc15e5::t_b35ddaceda81da 185-236,238-252,255-259
+  s_243a1a1edc15e5::t_b265a5ddd6b73b 2211-2254
+  s_243a1a1edc15e5::t_b8d48dfe24c772 254
+  s_243a1a1edc15e5::t_0b54e80aad9aee 1348-1387
+  s_243a1a1edc15e5::t_b52d96f82831c3 1461,1496-1503,1518,1520-1580,1584-1585,1587-1616
+  s_243a1a1edc15e5::t_d9a342291b9e7c 955-967,969-970
+  s_243a1a1edc15e5::t_82a4d371234ad8 237
+runatlantis.io/docs/server-configuration.md
+  s_243a1a1edc15e5::t_699121e56a23c2 615-617,619-632
+server/server.go
+  s_243a1a1edc15e5::t_92886f87241be1 1005-1008
+  s_243a1a1edc15e5::t_460477360e13d0 999-1004,1009-1019
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_8afc7b3ec15ef1 12,24-64
+  s_243a1a1edc15e5::t_1c6915c868452c 80-81,114,276
+  s_243a1a1edc15e5::t_51bdaa169666e9 155-156
+  s_243a1a1edc15e5::t_b221bb5233f20d 238
+  s_243a1a1edc15e5::t_db13bd9243b888 282-372
+  s_243a1a1edc15e5::t_3f0b37e4d5ec86 65
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_41800f548aaba4 1924,1987-2005,2116-2118,2135-2137
+  s_243a1a1edc15e5::t_46dc796f36d230 1916-1923
+cmd/server_test.go
+  s_243a1a1edc15e5::t_77f5fcd587a990 170
+server/events/command/context.go
+  s_243a1a1edc15e5::t_cb62471069b1cf 58-65
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_fba9df69d944f5 756-758
+server/events/project_command_builder.go
+  s_243a1a1edc15e5::t_5e04003676c64b 1019
+server/events/working_dir_internal_test.go
+  s_243a1a1edc15e5::t_ce76ba94fedaac 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "ba40868859bb24f852ce1aad3a22e3f31eb142b2",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
