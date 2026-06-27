@@ -1,0 +1,33 @@
+cmd/server.go
+  s_1475eaaa18ac58::t_6c9a0a89b491d0 75,309-312
+cmd/server_test.go
+  s_1475eaaa18ac58::t_9b1fe4a2c49d87 164
+server/controllers/events/events_controller_e2e_test.go
+  s_1475eaaa18ac58::t_4c537fed9ad2d6 1442,1634
+server/events/apply_command_runner.go
+  s_1475eaaa18ac58::t_73db7309179999 7-8,32,50,55-68,215-224
+server/events/command_runner_test.go
+  s_1475eaaa18ac58::t_90673663f7579f 76,210,1458,1472,1474,1489-1554,1562-1563,1566,1568
+server/server.go
+  s_1475eaaa18ac58::t_38218b5535d845 849
+server/user_config.go
+  s_1475eaaa18ac58::t_74c0c7f179115f 46
+runatlantis.io/docs/server-configuration.md
+  s_1475eaaa18ac58::t_be75b2c3c983a3 489-501
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "b81a8b0f93d602c989f2be13e4aa9fd224afb0e2",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
