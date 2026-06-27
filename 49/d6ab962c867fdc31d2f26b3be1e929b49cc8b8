@@ -1,0 +1,20 @@
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_93790ce2d1e99b 858
+  s_243a1a1edc15e5::t_6c8951748095e7 299-308,550-557,856-857,859-863
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "49d6ab962c867fdc31d2f26b3be1e929b49cc8b8",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
