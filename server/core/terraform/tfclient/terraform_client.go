@@ -72,6 +72,8 @@ type DefaultClient struct {
 	// versionLocks serializes install/remove operations for each Terraform version.
 	// Use versionsLock to control access.
 	versionLocks map[string]*sync.Mutex
+	// downloadLock serializes downloader installs that share intermediate paths in binDir.
+	downloadLock *sync.Mutex
 
 	// versionsLock is used to ensure versions isn't being concurrently written to.
 	versionsLock *sync.Mutex
@@ -115,6 +117,7 @@ func NewClientWithDefaultVersion(
 	versions := make(map[string]string)
 	versionLocks := make(map[string]*sync.Mutex)
 	var versionsLock sync.Mutex
+	var downloadLock sync.Mutex
 
 	localPath, err := exec.LookPath(distribution.BinName())
 	if err != nil && defaultVersionStr == "" {
@@ -143,7 +146,7 @@ func NewClientWithDefaultVersion(
 		ensureVersionFunc := func() {
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
-			_, err := ensureVersion(log, distribution, versions, versionLocks, &versionsLock, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed, true)
+			_, err := ensureVersion(log, distribution, versions, versionLocks, &versionsLock, &downloadLock, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed, true)
 			if err != nil {
 				log.Err("could not download %s %s: %s", distribution.BinName(), defaultVersion.String(), err)
 			}
@@ -176,6 +179,7 @@ func NewClientWithDefaultVersion(
 		versionsLock:            &versionsLock,
 		versions:                versions,
 		versionLocks:            versionLocks,
+		downloadLock:            &downloadLock,
 		usePluginCache:          usePluginCache,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}, nil
@@ -331,7 +335,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Dis
 	}
 
 	d = c.effectiveDistribution(d)
-	_, err := ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
+	_, err := ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 	if err != nil {
 		return err
 	}
@@ -411,7 +415,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	} else {
 		var err error
 		d = c.effectiveDistribution(d)
-		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
+		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 		if err != nil {
 			return "", nil, err
 		}
@@ -494,6 +498,7 @@ func ensureVersion(
 	versions map[string]string,
 	versionLocks map[string]*sync.Mutex,
 	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binDir string,
 	downloadURL string,
@@ -504,7 +509,7 @@ func ensureVersion(
 		return "", errors.New("terraform distribution is nil")
 	}
 
-	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, versionLocks, versionsLock, v, binDir, downloadURL, downloadsAllowed)
+	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binDir, downloadURL, downloadsAllowed)
 	if err != nil {
 		return "", err
 	}
@@ -520,7 +525,7 @@ func ensureVersion(
 	}
 
 	log.Warn("%s binary %s failed execution validation, attempting to re-download", binName, binPath)
-	binPath, err = redownloadVersionBinary(log, dist, versions, versionLocks, versionsLock, v, binPath, binDir, downloadURL)
+	binPath, err = redownloadVersionBinary(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binPath, binDir, downloadURL)
 	if err != nil {
 		return "", err
 	}
@@ -552,6 +557,7 @@ func findOrDownloadVersionBinaryPath(
 	versions map[string]string,
 	versionLocks map[string]*sync.Mutex,
 	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binDir string,
 	downloadURL string,
@@ -595,7 +601,7 @@ func findOrDownloadVersionBinaryPath(
 	}
 
 	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
-	execPath, err := downloadVersionBinary(log, dist, v, binDir, downloadURL)
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
 	if err != nil {
 		return "", err
 	}
@@ -609,6 +615,7 @@ func redownloadVersionBinary(
 	versions map[string]string,
 	versionLocks map[string]*sync.Mutex,
 	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binPath string,
 	binDir string,
@@ -632,7 +639,7 @@ func redownloadVersionBinary(
 		}
 	}
 
-	execPath, err := downloadVersionBinary(log, dist, v, binDir, downloadURL)
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
 	if err != nil {
 		return "", err
 	}
@@ -643,10 +650,14 @@ func redownloadVersionBinary(
 func downloadVersionBinary(
 	log logging.SimpleLogging,
 	dist terraform.Distribution,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binDir string,
 	downloadURL string,
 ) (string, error) {
+	downloadLock.Lock()
+	defer downloadLock.Unlock()
+
 	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
 
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)

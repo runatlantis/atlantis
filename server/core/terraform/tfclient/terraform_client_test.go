@@ -480,6 +480,59 @@ func TestRunCommandWithVersion_SerializesConcurrentInstallsForSameVersion(t *tes
 	Equals(t, int32(1), downloader.calls.Load())
 }
 
+func TestRunCommandWithVersion_SerializesConcurrentDownloadsAcrossVersions(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+
+	firstVersion, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+	secondVersion, err := version.NewVersion("98.98.98")
+	Ok(t, err)
+
+	downloader := &trackingDownloader{delay: 500 * time.Millisecond}
+	distribution := terraform.NewDistributionTerraformWithDownloader(downloader)
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	runVersion := func(v *version.Version) <-chan error {
+		errCh := make(chan error, 1)
+		go func() {
+			output, err := c.RunCommandWithVersion(ctx, tmp, []string{"version"}, map[string]string{}, distribution, v, "")
+			if err != nil {
+				errCh <- err
+				return
+			}
+			expectedOutput := fmt.Sprintf("\nTerraform v%s\n\n", v.String())
+			if output != expectedOutput {
+				errCh <- fmt.Errorf("unexpected output: %q", output)
+				return
+			}
+			errCh <- nil
+		}()
+		return errCh
+	}
+
+	firstErr := runVersion(firstVersion)
+	waitForAtomicAtLeast(t, &downloader.active, 1, time.Second)
+	secondErr := runVersion(secondVersion)
+
+	Ok(t, <-firstErr)
+	Ok(t, <-secondErr)
+	Equals(t, int32(1), downloader.maxConcurrent.Load())
+	Equals(t, int32(2), downloader.calls.Load())
+}
+
 func TestEnsureVersion_ReusesConcurrentManagedBinaryRepair(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir := mkSubDirs(t)
@@ -769,6 +822,18 @@ func waitForFileSize(t *testing.T, path string, minSize int64, timeout time.Dura
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for %s to reach size %d", path, minSize)
+}
+
+func waitForAtomicAtLeast(t *testing.T, counter *atomic.Int32, min int32, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if counter.Load() >= min {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for counter to reach %d", min)
 }
 
 type trackingDownloader struct {
