@@ -1,0 +1,77 @@
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_462899eb394917 823-825
+  s_243a1a1edc15e5::t_f025b468a386ad 826
+  s_243a1a1edc15e5::t_4fb6fe073842d1 595
+server/events/models/models.go
+  s_243a1a1edc15e5::t_3a96890a3f3339 973-975
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_ba8b64477aea47 101-152
+server/events/pre_workflow_hooks_command_runner.go
+  s_243a1a1edc15e5::t_5fac11642da4a9 86
+server/core/runtime/post_workflow_hook_runner.go
+  s_243a1a1edc15e5::t_5a4e3d245f4965 63-66
+server/events/post_workflow_hooks_command_runner_test.go
+  s_243a1a1edc15e5::t_35f75c2ed80764 637-656,658-669,671,676-684,686-690
+  s_243a1a1edc15e5::t_d4f326675c8fa5 657,670,672-675,685
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_e507284a97a3f8 2249-2297
+  s_243a1a1edc15e5::t_b3cbcb99c65bff 723-727
+server/events/pre_workflow_hooks_command_runner_test.go
+  s_243a1a1edc15e5::t_033a2142d68912 590
+  s_243a1a1edc15e5::t_004db4ec26fcee 566-585,587-589,591-598,600,605-613,615-619
+  s_243a1a1edc15e5::t_41a4a92a0488b5 586,599,601-604,614
+server/events/post_workflow_hooks_command_runner.go
+  s_243a1a1edc15e5::t_c23c49f6d24000 88
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_e0363451ff2e8f 586
+  s_243a1a1edc15e5::t_1dd63c1eeeff20 214-252
+  s_243a1a1edc15e5::t_6bc30208964480 2995-3037
+  s_243a1a1edc15e5::t_1e4e16955dd8ca 2721
+  s_243a1a1edc15e5::t_4f7994d2f9b672 2948
+  s_243a1a1edc15e5::t_45781f190ed7bb 2700
+  s_243a1a1edc15e5::t_b8dbf9cf05c8b2 2719,2738-2739
+  s_243a1a1edc15e5::t_8172ce25821536 1671-1718
+  s_243a1a1edc15e5::t_9b978f6bcb2127 1107,1134,1164-1165
+server/core/runtime/pre_workflow_hook_runner.go
+  s_243a1a1edc15e5::t_d104098108aab6 62-65
+server/core/config/valid/repo_cfg.go
+  s_243a1a1edc15e5::t_4f2ff78d7bb70c 98-107
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_602b04198f33b2 673
+  s_243a1a1edc15e5::t_b33a2ee670dd80 41,638-641,643-656,658,666-672,674-683,686-689,691,929,1097,1167,1254,1937,1941-1942,1962
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_91ac24a55811f4 7,109-121,314-316,324-325
+server/events/command/context.go
+  s_243a1a1edc15e5::t_2c4a1883c5426a 69-73
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_15ad8b733d320d 132-133
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_2998d30e3c56a6 327-357
+server/core/runtime/post_workflow_hook_runner_test.go
+  s_243a1a1edc15e5::t_9c6e7f78f3018f 210-227
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_094a81bdd4a7b6 323-325
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_948b7271b68f1f 135-145
+server/core/runtime/pre_workflow_hook_runner_test.go
+  s_243a1a1edc15e5::t_21062d97a2e931 221-238
+server/events/project_command_builder.go
+  s_243a1a1edc15e5::t_84d86667990a0e 1102,1104-1105
+  s_243a1a1edc15e5::t_844d16d1b75a42 736
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "7c4a61036fd1cf57b13848c2aeb2e6332f2ba765",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
