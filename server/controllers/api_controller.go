@@ -716,9 +716,9 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 
 	for _, pr := range result.ProjectResults {
 		if pr.Error != nil {
-			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+			fmt.Fprintf(&output, "Error: %v\n", pr.Error)
 		} else if pr.Failure != "" {
-			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+			fmt.Fprintf(&output, "Failure: %s\n", pr.Failure)
 		} else if pr.PlanSuccess != nil {
 			output.WriteString(pr.PlanSuccess.TerraformOutput)
 			// Parse drift from plan output
@@ -799,9 +799,9 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	var output strings.Builder
 	for _, pr := range result.ProjectResults {
 		if pr.Error != nil {
-			output.WriteString(fmt.Sprintf("Error: %v\n", pr.Error))
+			fmt.Fprintf(&output, "Error: %v\n", pr.Error)
 		} else if pr.Failure != "" {
-			output.WriteString(fmt.Sprintf("Failure: %s\n", pr.Failure))
+			fmt.Fprintf(&output, "Failure: %s\n", pr.Failure)
 		} else if pr.ApplySuccess != "" {
 			output.WriteString(pr.ApplySuccess)
 		}
