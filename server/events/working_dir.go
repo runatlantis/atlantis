@@ -206,7 +206,10 @@ func (w *FileWorkspace) MergeAgain(
 	p models.PullRequest,
 	workspace string) (bool, error) {
 
-	if !w.CheckoutMerge {
+	// Synthetic API requests use negative pull numbers and can target branch,
+	// tag, or raw commit refs. They are checked out directly, not merged into a
+	// PR base branch.
+	if !w.CheckoutMerge || p.Num < 0 {
 		return false, nil
 	}
 
@@ -560,6 +563,10 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 // Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
+	if c.pr.Num < 0 {
+		return w.checkoutNonPRRef(logger, c, targetRef)
+	}
+
 	// We use both `<prSourceRemote>` and `origin` remotes, update them both.
 	// On the GitHub App path the source (fork) remote isn't used to fetch the PR
 	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
@@ -671,6 +678,12 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
+	if c.pr.Num < 0 {
+		// API refs may be branch names, tags, or raw commit SHAs. Fetch the ref
+		// directly instead of assuming it exists under refs/heads.
+		return w.cloneNonPRRef(logger, c, headCloneURL)
+	}
+
 	// if branch strategy, use depth=1
 	if !w.CheckoutMerge {
 		return w.wrappedGit(logger, c, "clone", "--depth=1", "--branch", c.pr.HeadBranch, "--single-branch", headCloneURL, c.dir)
@@ -701,6 +714,45 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 	}
 
 	return w.mergeToBaseBranch(logger, c)
+}
+
+func (w *FileWorkspace) cloneNonPRRef(logger logging.SimpleLogging, c wrappedGitContext, cloneURL string) error {
+	if err := w.wrappedGit(logger, c, "init"); err != nil {
+		return err
+	}
+	if err := w.wrappedGit(logger, c, "remote", "add", "origin", cloneURL); err != nil {
+		return err
+	}
+	if w.GpgNoSigningEnabled {
+		if err := w.wrappedGit(logger, c, "config", "--local", "commit.gpgsign", "false"); err != nil {
+			return err
+		}
+	}
+	return w.checkoutNonPRRef(logger, c, nonPRTargetRef(c.pr))
+}
+
+func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
+	if targetRef == "" {
+		return fmt.Errorf("checking out API ref: empty ref")
+	}
+	fetchArgs := []string{"fetch", "--depth=1", "origin", targetRef}
+	if w.CheckoutDepth > 0 {
+		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", targetRef}
+	}
+	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
+		return err
+	}
+	if err := w.wrappedGit(logger, c, "checkout", "--detach", "FETCH_HEAD"); err != nil {
+		return err
+	}
+	return w.cleanStalePlanFiles(logger, c)
+}
+
+func nonPRTargetRef(p models.PullRequest) string {
+	if p.HeadCommit != "" {
+		return p.HeadCommit
+	}
+	return p.HeadBranch
 }
 
 // There is a new upstream update that we need, and we want to update to it

@@ -108,6 +108,58 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
+	repoDir := initRepo(t)
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	branchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "drift-tag")
+
+	for _, tt := range []struct {
+		name string
+		ref  string
+	}{
+		{
+			name: "raw commit",
+			ref:  branchCommit,
+		},
+		{
+			name: "tag",
+			ref:  "drift-tag",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logging.NewNoopLogger(t)
+			overrideURL := fmt.Sprintf("file://%s", repoDir)
+			wd := &events.FileWorkspace{
+				DataDir:                     t.TempDir(),
+				CheckoutMerge:               true,
+				TestingOverrideHeadCloneURL: overrideURL,
+				TestingOverrideBaseCloneURL: overrideURL,
+				GpgNoSigningEnabled:         true,
+			}
+			pull := models.PullRequest{
+				Num:        -1,
+				BaseRepo:   models.Repo{},
+				BaseBranch: tt.ref,
+				HeadBranch: tt.ref,
+				HeadCommit: tt.ref,
+			}
+
+			cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+			Equals(t, branchCommit, actCommit)
+
+			merged, err := wd.MergeAgain(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			Equals(t, false, merged)
+		})
+	}
+}
+
 // Test that if we don't have any existing files, we check out the repo
 // successfully when we're using the merge method.
 func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
