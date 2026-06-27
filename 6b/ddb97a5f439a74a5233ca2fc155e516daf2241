@@ -1,0 +1,37 @@
+server/core/terraform/tfclient/terraform_client_test.go
+  s_12c46f3ee857ef::t_9a935605c41957 328-406,638,642
+  s_12c46f3ee857ef::t_c82a372ec04bf2 635-637
+  s_12c46f3ee857ef::t_d248615b0199b7 639-641
+  s_12c46f3ee857ef::t_9ca5809571c045 643-644
+  s_243a1a1edc15e5::t_4d39987e91ed3d 633-634
+server/core/terraform/tfclient/terraform_client.go
+  s_12c46f3ee857ef::t_9ec747f4b4cd9f 406,503,616,619-621
+  s_12c46f3ee857ef::t_37552d3d000701 141,327
+  s_12c46f3ee857ef::t_7f2402bbefcd21 480,487,510,514,541,547,556,564,577-582,603-615,617-618,622
+  s_12c46f3ee857ef::t_0e3f29b0f6a545 33-34,664-668,670-672
+  s_12c46f3ee857ef::t_079114b6820340 623
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "6bddb97a5f439a74a5233ca2fc155e516daf2241",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "unknown"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

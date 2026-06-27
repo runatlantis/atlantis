@@ -1,0 +1,23 @@
+server/core/terraform/tfclient/terraform_client_test.go
+  s_12c46f3ee857ef::t_f76ca0bba67ba1 321,341,353,356,358-362,376-378,381,385-424,427,432,434,437-440,510-512
+  s_12c46f3ee857ef::t_ee22d078292c8f 513
+server/core/terraform/tfclient/terraform_client.go
+  s_12c46f3ee857ef::t_f152114e5dca64 501-502,512,514-517,524-537,579-580,582-589
+  s_12c46f3ee857ef::t_6293b2b21719c9 499-500,503-504,506-510,518-519
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "80b9f2bb89cc2e24c96b95ad8a66c9dfbd3d5a4d",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
