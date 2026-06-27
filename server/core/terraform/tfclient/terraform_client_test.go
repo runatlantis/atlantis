@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -404,6 +405,52 @@ func TestRunCommandWithVersion_DoesNotHoldVersionLockDuringValidation(t *testing
 	Ok(t, fastErr)
 }
 
+func TestRunCommandWithVersion_SerializesConcurrentInstallsForSameVersion(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	downloader := &trackingDownloader{delay: 200 * time.Millisecond}
+	distribution := terraform.NewDistributionTerraformWithDownloader(downloader)
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	errCh := make(chan error, 2)
+	for range 2 {
+		go func() {
+			output, err := c.RunCommandWithVersion(ctx, tmp, []string{"version"}, map[string]string{}, distribution, v, "")
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if output != "\nTerraform v99.99.99\n\n" {
+				errCh <- fmt.Errorf("unexpected output: %q", output)
+				return
+			}
+			errCh <- nil
+		}()
+	}
+
+	for range 2 {
+		Ok(t, <-errCh)
+	}
+	Equals(t, int32(1), downloader.maxConcurrent.Load())
+	Equals(t, int32(1), downloader.calls.Load())
+}
+
 // Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -640,6 +687,33 @@ func waitForFile(t *testing.T, path string, timeout time.Duration) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for %s", path)
+}
+
+type trackingDownloader struct {
+	active        atomic.Int32
+	calls         atomic.Int32
+	delay         time.Duration
+	maxConcurrent atomic.Int32
+}
+
+func (d *trackingDownloader) Install(_ context.Context, dir string, _ string, v *version.Version) (string, error) {
+	active := d.active.Add(1)
+	defer d.active.Add(-1)
+	d.calls.Add(1)
+	d.recordMaxConcurrent(active)
+	time.Sleep(d.delay)
+
+	binPath := filepath.Join(dir, "terraform"+v.String())
+	return binPath, writeExecutable(binPath, fmt.Sprintf("echo '\nTerraform v%s\n'", v.String()))
+}
+
+func (d *trackingDownloader) recordMaxConcurrent(active int32) {
+	for {
+		current := d.maxConcurrent.Load()
+		if active <= current || d.maxConcurrent.CompareAndSwap(current, active) {
+			return
+		}
+	}
 }
 
 // returns parent, bindir, cachedir
