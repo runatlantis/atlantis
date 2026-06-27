@@ -161,6 +161,7 @@ var testFlags = map[string]any{
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
+	DisableAutomergeLabelFlag:        "no-auto-merge",
 	DisableUnlockLabelFlag:           "do-not-unlock",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,

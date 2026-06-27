@@ -73,6 +73,7 @@ type TestConfig struct {
 	discardApprovalOnPlan      bool
 	database                   db.Database
 	DisableUnlockLabel         string
+	DisableAutomergeLabel      string
 	PendingApplyStatus         bool
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
@@ -206,6 +207,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		pullReqStatusFetcher,
+		testConfig.DisableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner = events.NewApprovePoliciesCommandRunner(
@@ -1453,15 +1455,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with automerge then a VCS merge is performed")
 
-	vcsClient := setup(t)
-	pull := &github.PullRequest{
-		State: github.Ptr("open"),
-	}
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	autoMerger.GlobalAutomerge = true
-	defer func() { autoMerger.GlobalAutomerge = false }()
+	vcsClient, modelPull := setupApplyWithAutoMerge(t)
 
 	pullOptions := models.PullRequestOptions{
 		DeleteSourceBranchOnMerge: false,
@@ -1475,19 +1469,9 @@ func TestApplyWithAutoMerge_UsesGlobalMergeMethod(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with automerge and no --auto-merge-method" +
 		" comment flag, the server-side default merge method is used")
 
-	vcsClient := setup(t)
-	pull := &github.PullRequest{
-		State: github.Ptr("open"),
-	}
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	autoMerger.GlobalAutomerge = true
+	vcsClient, modelPull := setupApplyWithAutoMerge(t)
 	autoMerger.GlobalAutomergeMethod = "squash"
-	defer func() {
-		autoMerger.GlobalAutomerge = false
-		autoMerger.GlobalAutomergeMethod = ""
-	}()
+	t.Cleanup(func() { autoMerger.GlobalAutomergeMethod = "" })
 
 	pullOptions := models.PullRequestOptions{
 		DeleteSourceBranchOnMerge: false,
@@ -1502,19 +1486,9 @@ func TestApplyWithAutoMerge_CommentFlagOverridesGlobalMergeMethod(t *testing.T) 
 	t.Log("if \"atlantis apply\" is run with automerge and a --auto-merge-method" +
 		" comment flag, the comment flag overrides the server-side default")
 
-	vcsClient := setup(t)
-	pull := &github.PullRequest{
-		State: github.Ptr("open"),
-	}
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
-	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
-	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	autoMerger.GlobalAutomerge = true
+	vcsClient, modelPull := setupApplyWithAutoMerge(t)
 	autoMerger.GlobalAutomergeMethod = "squash"
-	defer func() {
-		autoMerger.GlobalAutomerge = false
-		autoMerger.GlobalAutomergeMethod = ""
-	}()
+	t.Cleanup(func() { autoMerger.GlobalAutomergeMethod = "" })
 
 	pullOptions := models.PullRequestOptions{
 		DeleteSourceBranchOnMerge: false,
@@ -1523,6 +1497,75 @@ func TestApplyWithAutoMerge_CommentFlagOverridesGlobalMergeMethod(t *testing.T) 
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply, AutoMergeMethod: "rebase"})
 	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+}
+
+func TestApplyWithAutoMerge_DisableAutomergeLabelStillMergesWhenLabelMissing(t *testing.T) {
+	t.Log("if disable-automerge-label is configured but the pull request does not have that label, automerge is performed")
+
+	disableAutomergeLabel := "no-auto-merge"
+	vcsClient, modelPull := setupApplyWithAutoMerge(t, func(testConfig *TestConfig) {
+		testConfig.DisableAutomergeLabel = disableAutomergeLabel
+	})
+	When(vcsClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn([]string{"safe-to-merge"}, nil)
+
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+	}
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+}
+
+func TestApplyWithAutoMerge_DisableAutomergeLabelSkipsMergeWhenLabelPresent(t *testing.T) {
+	t.Log("if disable-automerge-label is configured and the pull request has that label, automerge is not performed")
+
+	disableAutomergeLabel := "no-auto-merge"
+	vcsClient, modelPull := setupApplyWithAutoMerge(t, func(testConfig *TestConfig) {
+		testConfig.DisableAutomergeLabel = disableAutomergeLabel
+	})
+	When(vcsClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn([]string{disableAutomergeLabel, "need-help"}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+}
+
+func TestApplyWithAutoMerge_DisableAutomergeLabelSkipsMergeWhenLabelsCannotBeFetched(t *testing.T) {
+	t.Log("if disable-automerge-label is configured and pull request labels cannot be fetched, automerge is not performed")
+
+	disableAutomergeLabel := "no-auto-merge"
+	vcsClient, modelPull := setupApplyWithAutoMerge(t, func(testConfig *TestConfig) {
+		testConfig.DisableAutomergeLabel = disableAutomergeLabel
+	})
+	When(vcsClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn(nil, errors.New("err"))
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+}
+
+func setupApplyWithAutoMerge(t *testing.T, options ...func(testConfig *TestConfig)) (*vcsmocks.MockClient, models.PullRequest) {
+	t.Helper()
+
+	vcsClient := setup(t, options...)
+	pull := &github.PullRequest{
+		State: github.Ptr("open"),
+	}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	autoMerger.GlobalAutomerge = true
+	autoMerger.GlobalAutomergeMethod = ""
+	t.Cleanup(func() {
+		autoMerger.GlobalAutomerge = false
+		autoMerger.GlobalAutomergeMethod = ""
+	})
+
+	return vcsClient, modelPull
 }
 
 func TestRunApply_DiscardedProjects(t *testing.T) {
