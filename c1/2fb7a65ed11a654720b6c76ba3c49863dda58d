@@ -1,0 +1,19 @@
+runatlantis.io/docs/sending-notifications-via-webhooks.md
+  s_243a1a1edc15e5::t_c541076252cfb1 3,8,157-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c12fb7a65ed11a654720b6c76ba3c49863dda58d",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
