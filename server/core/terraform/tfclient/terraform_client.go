@@ -44,8 +44,8 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
-	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
+	// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
+	DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version
 }
 
 type DefaultClient struct {
@@ -290,7 +290,7 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 // DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
 // It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
 // It will then select the highest version that satisfies the constraint.
-func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
+func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
 	module, diags := tfconfig.LoadModule(projectDirectory)
 	if diags.HasErrors() {
 		log.Err("trying to detect required version: %s", diags.Error())
@@ -319,7 +319,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
+	downloadVersion, err := c.effectiveDistribution(d).ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
 		log.Err("%s", err)
 		return nil

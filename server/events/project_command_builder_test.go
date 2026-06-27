@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
@@ -3187,11 +3188,19 @@ projects:
   terraform_version: v0.12.6
 `
 
+	opentofuAtlantisYamlContent := `
+version: 3
+projects:
+- dir: project1
+  terraform_distribution: opentofu
+`
+
 	type testCase struct {
-		DirStructure  map[string]any
-		AtlantisYAML  string
-		ModifiedFiles []string
-		Exp           map[string]string
+		DirStructure    map[string]any
+		AtlantisYAML    string
+		ModifiedFiles   []string
+		Exp             map[string]string
+		ExpDistribution map[string]string
 	}
 
 	testCases := make(map[string]testCase)
@@ -3251,6 +3260,22 @@ projects:
 		},
 	}
 
+	testCases["opentofu project detects version with opentofu distribution"] = testCase{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
+				"main.tf": baseVersionConfig,
+			},
+			valid.DefaultAtlantisFile: opentofuAtlantisYamlContent,
+		},
+		ModifiedFiles: []string{"project1/main.tf"},
+		Exp: map[string]string{
+			"project1": "0.12.8",
+		},
+		ExpDistribution: map[string]string{
+			"project1": "tofu",
+		},
+	}
+
 	logger := logging.NewNoopLogger(t)
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
@@ -3274,8 +3299,12 @@ projects:
 			}
 
 			terraformClient := tfclientmocks.NewMockClient()
-			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[string]())).Then(func(params []Param) ReturnValues {
-				projectName := filepath.Base(params[1].(string))
+			detectedDistributions := map[string]string{}
+			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[terraform.Distribution](), Any[string]())).Then(func(params []Param) ReturnValues {
+				projectName := filepath.Base(params[2].(string))
+				if params[1] != nil {
+					detectedDistributions[projectName] = params[1].(terraform.Distribution).BinName()
+				}
 				testVersion := testCase.Exp[projectName]
 				if testVersion != "" {
 					v, _ := version.NewVersion(testVersion)
@@ -3330,6 +3359,9 @@ projects:
 				} else {
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
 				}
+			}
+			for project, expDistribution := range testCase.ExpDistribution {
+				Equals(t, expDistribution, detectedDistributions[project])
 			}
 		})
 	}

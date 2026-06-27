@@ -58,6 +58,9 @@ See [Terraform `required_version`](https://developer.hashicorp.com/terraform/lan
 ::: tip NOTE
 Atlantis will automatically download the latest version that fulfills the constraint specified.
 A `terraform_version` specified in the `atlantis.yaml` file takes precedence over both the [`--default-tf-version`](server-configuration.md#default-tf-version) flag and the `required_version` in the terraform hcl.
+When a project sets `terraform_distribution`, Atlantis resolves the `required_version`
+constraint against that distribution. For example, an OpenTofu project resolves to an
+OpenTofu version instead of a Terraform version.
 :::
 
 ::: tip NOTE

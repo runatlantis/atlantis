@@ -1033,7 +1033,7 @@ terraform {
 			tmpDir := DirStructure(t, testCase.DirStructure)
 
 			for project, expectedVersion := range testCase.Exp {
-				detectedVersion := c.DetectVersion(logger, filepath.Join(tmpDir, project))
+				detectedVersion := c.DetectVersion(logger, nil, filepath.Join(tmpDir, project))
 
 				expectNil := expectedVersion == "" || (!testCase.IsExact && !downloadsAllowed)
 				if expectNil {
@@ -1052,6 +1052,75 @@ terraform {
 		runDetectVersionTestCase(t, name+": Downloads Allowed", testCase, true)
 		runDetectVersionTestCase(t, name+": Downloads Disabled", testCase, false)
 	}
+}
+
+type constraintResolvingDistribution struct {
+	binName         string
+	resolvedVersion string
+	constraints     []string
+}
+
+func (d *constraintResolvingDistribution) BinName() string {
+	return d.binName
+}
+
+func (*constraintResolvingDistribution) Downloader() terraform.Downloader {
+	return nil
+}
+
+func (d *constraintResolvingDistribution) ResolveConstraint(_ context.Context, constraintStr string) (*version.Version, error) {
+	d.constraints = append(d.constraints, constraintStr)
+	return version.NewVersion(d.resolvedVersion)
+}
+
+func TestDetectVersion_UsesDistributionOverride(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	Ok(t, writeExecutable(filepath.Join(tmp, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", tmp, os.Getenv("PATH")))()
+	defaultDistribution := &constraintResolvingDistribution{
+		binName:         "terraform",
+		resolvedVersion: "1.15.7",
+	}
+	opentofuDistribution := &constraintResolvingDistribution{
+		binName:         "tofu",
+		resolvedVersion: "1.12.3",
+	}
+	c, err := tfclient.NewTestClient(
+		logger,
+		defaultDistribution,
+		binDir,
+		cacheDir,
+		"",
+		"",
+		"",
+		cmd.DefaultTFVersionFlag,
+		cmd.DefaultTFDownloadURL,
+		true,
+		true,
+		projectCmdOutputHandler,
+	)
+	Ok(t, err)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"project1": map[string]any{
+			"main.tf": `terraform {
+  required_version = ">= 1.5"
+}
+`,
+		},
+	})
+
+	detectedDefault := c.DetectVersion(logger, nil, filepath.Join(tmpDir, "project1"))
+	Assert(t, detectedDefault != nil, "TerraformVersion is nil.")
+	Equals(t, "1.15.7", detectedDefault.String())
+	Equals(t, []string{">= 1.5"}, defaultDistribution.constraints)
+
+	detectedOpenTofu := c.DetectVersion(logger, opentofuDistribution, filepath.Join(tmpDir, "project1"))
+	Assert(t, detectedOpenTofu != nil, "TerraformVersion is nil.")
+	Equals(t, "1.12.3", detectedOpenTofu.String())
+	Equals(t, []string{">= 1.5"}, opentofuDistribution.constraints)
 }
 
 func TestExtractExactRegex(t *testing.T) {

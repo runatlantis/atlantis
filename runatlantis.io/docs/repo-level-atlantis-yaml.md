@@ -278,6 +278,8 @@ projects:
 ```
 
 Atlantis will automatically download and use this distribution. Valid values are `terraform` and `opentofu`.
+If `terraform_version` is omitted and the project uses a `required_version` constraint, Atlantis resolves that
+constraint against the selected distribution.
 
 ### Terraform Versions
 
