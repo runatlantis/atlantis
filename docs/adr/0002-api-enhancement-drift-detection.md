@@ -679,7 +679,7 @@ before running a plan or exposing drift data.
 | ---------- | -------- | ------ | ------------- |
 | `GET /api/projects` | GET | Yes | List configured projects |
 | `GET /api/runs` | GET | Yes | List recent plan/apply runs |
-| `DELETE /api/locks/{id}` | DELETE | Yes | Force unlock a specific lock |
+| `DELETE /api/locks?id={lockID}` | DELETE | Yes | Force unlock a specific lock |
 
 **Projects Endpoint**:
 
@@ -702,15 +702,22 @@ type ProjectInfo struct {
 **Force Unlock Endpoint**:
 
 ```go
-// DELETE /api/locks/{id}
+// DELETE /api/locks?id=<url-escaped lock key from GET /api/locks>
 // Requires X-Atlantis-Token authentication
 func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
-    // Extract lock ID from path
     // Validate authentication
+    // Extract lock ID from the id query parameter. Atlantis lock keys contain
+    // slash separators, so they must not be modeled as a single path segment.
     // Call a.Locker.Unlock(lockID)
     // Return success/failure
 }
 ```
+
+The force-unlock endpoint must accept the exact lock key returned by
+`GET /api/locks` as `LockDetail.Name`. Those keys are generated as
+`<repo>/<path>/<workspace>/<project>` and contain `/`, so implementations must
+use a query parameter, request body field, or explicit catch-all route that
+preserves the full URL-escaped value before calling `Locker.Unlock(lockID)`.
 
 ---
 
@@ -759,7 +766,7 @@ func (a *APIController) ForceUnlock(w http.ResponseWriter, r *http.Request) {
 
 - [ ] Add `/api/projects` endpoint
 - [ ] Add `/api/runs` endpoint (if run history available)
-- [ ] Add `DELETE /api/locks/{id}` endpoint
+- [ ] Add `DELETE /api/locks?id={lockID}` endpoint
 - [ ] Update API documentation
 - [ ] Consider API versioning for future changes
 
