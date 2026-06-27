@@ -1,0 +1,50 @@
+server/events/vcs/github/testdata/fixtures.go
+  s_1475eaaa18ac58::t_d66d77661ded62 43
+server/events/event_parser_test.go
+  s_1475eaaa18ac58::t_c4918fed88ec4b 15,151,325,345,364,596,601,869,956,981-991,1218,1277-1324,1470,1589
+runatlantis.io/docs/sending-notifications-via-webhooks.md
+  s_1475eaaa18ac58::t_f0334a1262a9aa 90
+go.mod
+  s_1475eaaa18ac58::t_86d7fcf3245240 42
+server/events/webhooks/slack_client.go
+  s_1475eaaa18ac58::t_da7aebdc175ed2 10,17-20,118-129,132-161
+server/events/event_parser.go
+  s_1475eaaa18ac58::t_eae86b13e6d7e3 632,701,796,882,897-903,1013,1133,1196
+  s_1475eaaa18ac58::t_cff06711356ef8 464,479-491
+server/events/vcs/azuredevops/testdata/fixtures.go
+  s_1475eaaa18ac58::t_7c992c3526ea00 36
+server/events/models/models.go
+  s_1475eaaa18ac58::t_2dba1a15f68339 225-227
+go.sum
+  s_12c46f3ee857ef::t_e35a8c6f745a00 407-408
+server/events/webhooks/slack_client_internal_test.go
+  s_1475eaaa18ac58::t_0d26a0aaa35501 1-83
+server/events/vcs/bitbucketcloud/models.go
+  s_1475eaaa18ac58::t_2bfc71c33131cd 81-82,90-94
+server/events/vcs/bitbucketserver/models.go
+  s_1475eaaa18ac58::t_476d8b1dd19cd2 31-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "641eb08208ffb7c0d97f0ff7334788579086a8ca",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
