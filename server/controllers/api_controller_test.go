@@ -646,6 +646,87 @@ func TestAPIController_ApplyUpdatesPullStatusBetweenSequentialProjects(t *testin
 	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[1].Status)
 }
 
+func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+
+	var capturedPullStatus *models.PullStatus
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			capturedPullStatus = ctx.PullStatus
+			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
+			Equals(t, 1, len(capturedPullStatus.Projects))
+			Equals(t, models.ErroredPolicyCheckStatus, capturedPullStatus.Projects[0].Status)
+			Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
+			Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
+			Equals(t, false, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
+
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Apply,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+				PullStatus:  capturedPullStatus,
+			}}, nil}
+		})
+
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.CommandName == command.PolicyCheck {
+				return ReturnValues{command.ProjectCommandOutput{
+					Failure: "Some policy sets did not pass.",
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName:    "policy",
+								Passed:           false,
+								ReqApprovalCount: 1,
+							},
+						},
+					},
+				}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+			}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	Assert(t, capturedPullStatus != nil, "expected apply command builder to be called")
+	Equals(t, 1, len(capturedPullStatus.Projects))
+	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
+	Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, false, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
+}
+
 func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac, _, _ := setup(t)
 

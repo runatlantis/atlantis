@@ -38,7 +38,7 @@ func (d DriftSummary) TotalChanges() int {
 // NewDriftSummaryFromPlanStats creates a DriftSummary from PlanSuccessStats.
 // This leverages the existing plan output parsing infrastructure.
 func NewDriftSummaryFromPlanStats(stats PlanSuccessStats, summary string) DriftSummary {
-	hasDrift := stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0 || stats.Forget > 0
+	hasDrift := stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0 || stats.Forget > 0 || stats.ChangesOutside
 	return DriftSummary{
 		HasDrift:       hasDrift,
 		ToAdd:          stats.Add,

@@ -149,6 +149,18 @@ func TestNewDriftSummaryFromPlanStats(t *testing.T) {
 			},
 		},
 		{
+			name: "with only changes outside terraform",
+			stats: models.PlanSuccessStats{
+				ChangesOutside: true,
+			},
+			summary: "Objects have changed outside of Terraform",
+			expected: models.DriftSummary{
+				HasDrift:       true,
+				Summary:        "Objects have changed outside of Terraform",
+				ChangesOutside: true,
+			},
+		},
+		{
 			name: "mixed drift",
 			stats: models.PlanSuccessStats{
 				Add:     2,

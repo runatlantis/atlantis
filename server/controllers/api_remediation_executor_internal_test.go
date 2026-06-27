@@ -210,6 +210,11 @@ func TestAPIRemediationExecutor_ExecuteApplySeedsPullStatusForDependencies(t *te
 	Equals(t, 2, applyCalls)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[0].Status)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[1].Status)
+
+	_, capturedHookCmds := preWorkflowHooksCommandRunner.VerifyWasCalled(Times(5)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+	Equals(t, command.Plan, capturedHookCmds[0].Name)
 }
 
 func TestAPIRemediationExecutor_ExecutePlanPreservesNamedTargetWorkspace(t *testing.T) {

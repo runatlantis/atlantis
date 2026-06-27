@@ -506,14 +506,15 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 		ctx.PullStatus = &models.PullStatus{Pull: ctx.Pull}
 	}
 	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command != command.Plan {
+		if projectResult.Command != command.Plan && projectResult.Command != command.PolicyCheck && projectResult.Command != command.ApprovePolicies {
 			continue
 		}
 		upsertProjectStatus(ctx.PullStatus, models.ProjectStatus{
-			Workspace:   projectResult.Workspace,
-			RepoRelDir:  projectResult.RepoRelDir,
-			ProjectName: projectResult.ProjectName,
-			Status:      projectResult.PlanStatus(),
+			Workspace:    projectResult.Workspace,
+			RepoRelDir:   projectResult.RepoRelDir,
+			ProjectName:  projectResult.ProjectName,
+			PolicyStatus: projectResult.PolicyStatus(),
+			Status:       projectResult.PlanStatus(),
 		})
 	}
 }
@@ -525,10 +526,34 @@ func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectSta
 			status.RepoRelDir == project.RepoRelDir &&
 			status.ProjectName == project.ProjectName {
 			project.Status = status.Status
+			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
 			return
 		}
 	}
 	pullStatus.Projects = append(pullStatus.Projects, status)
+}
+
+func mergePolicyStatuses(existing []models.PolicySetStatus, incoming []models.PolicySetStatus) []models.PolicySetStatus {
+	if len(incoming) == 0 {
+		return existing
+	}
+	if len(existing) == 0 {
+		return incoming
+	}
+	for _, newPolicySet := range incoming {
+		updated := false
+		for idx, oldPolicySet := range existing {
+			if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+				existing[idx] = newPolicySet
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			existing = append(existing, newPolicySet)
+		}
+	}
+	return existing
 }
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
@@ -815,8 +840,9 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	}
 	defer e.controller.cleanupNonPRWorkingDir(ctx)
 
-	// Run pre-workflow hooks before project discovery
-	preHookCmd := &events.CommentCommand{Name: command.Apply}
+	// Run plan-scoped pre-workflow hooks before project discovery for the
+	// pre-apply plan.
+	preHookCmd := &events.CommentCommand{Name: command.Plan}
 	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
 		if e.controller.FailOnPreWorkflowHookError {
 			return "", fmt.Errorf("pre-workflow hook failed: %w", err)
