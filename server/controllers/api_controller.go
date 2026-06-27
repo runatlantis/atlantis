@@ -85,15 +85,18 @@ type APIRequest struct {
 	Type       string `validate:"required"`
 	PR         int
 	Projects   []string
-	Paths      []struct {
-		Directory string
-		Workspace string
-	}
+	Paths      []APIRequestPath
 	// DiscoverProjects enables auto-discovery when no projects or paths
 	// are specified. This triggers BuildPlanCommands with an empty
 	// CommentCommand so atlantis.yaml (or repo config) is used to find
 	// all projects. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
+}
+
+type APIRequestPath struct {
+	ProjectName string `json:"project_name,omitempty"`
+	Directory   string `json:"directory"`
+	Workspace   string `json:"workspace,omitempty"`
 }
 
 func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
@@ -107,9 +110,10 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 	for _, path := range a.Paths {
 		cc = append(cc, &events.CommentCommand{
-			Name:       cmdName,
-			RepoRelDir: strings.TrimRight(path.Directory, "/"),
-			Workspace:  path.Workspace,
+			Name:        cmdName,
+			ProjectName: path.ProjectName,
+			RepoRelDir:  strings.TrimRight(path.Directory, "/"),
+			Workspace:   path.Workspace,
 		})
 	}
 
@@ -650,9 +654,7 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 
 	code := http.StatusOK
 	switch result.Status {
-	case models.RemediationStatusFailed:
-		code = http.StatusInternalServerError
-	case models.RemediationStatusPartial:
+	case models.RemediationStatusFailed, models.RemediationStatusPartial:
 		code = http.StatusMultiStatus // 207 - some projects succeeded, some failed
 	}
 	responder.Success(w, r, code, apiResult)
@@ -676,13 +678,12 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		DiscoverProjects: true,
 	}
 
-	if projectName != "" {
-		request.Projects = []string{projectName}
-	} else if path != "" || workspace != "" {
-		request.Paths = []struct {
-			Directory string
-			Workspace string
-		}{{Directory: path, Workspace: workspace}}
+	if projectName != "" || path != "" || workspace != "" {
+		request.Paths = []APIRequestPath{{
+			ProjectName: projectName,
+			Directory:   path,
+			Workspace:   workspace,
+		}}
 	}
 
 	// Build the command context
@@ -740,13 +741,12 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		DiscoverProjects: true,
 	}
 
-	if projectName != "" {
-		request.Projects = []string{projectName}
-	} else if path != "" || workspace != "" {
-		request.Paths = []struct {
-			Directory string
-			Workspace string
-		}{{Directory: path, Workspace: workspace}}
+	if projectName != "" || path != "" || workspace != "" {
+		request.Paths = []APIRequestPath{{
+			ProjectName: projectName,
+			Directory:   path,
+			Workspace:   workspace,
+		}}
 	}
 
 	// Build the command context
@@ -1026,10 +1026,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(request.Paths) > 0 {
 		for _, p := range request.Paths {
-			apiRequest.Paths = append(apiRequest.Paths, struct {
-				Directory string
-				Workspace string
-			}{Directory: p.Directory, Workspace: p.Workspace})
+			apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{Directory: p.Directory, Workspace: p.Workspace})
 		}
 	}
 

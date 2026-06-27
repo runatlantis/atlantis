@@ -333,6 +333,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpParallelPlan            bool
 		ExpParallelApply           bool
 		ExpNoProjects              bool
+		API                        bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -424,6 +425,29 @@ projects:
 			ExpProjectName: "myproject",
 			ExpWorkspace:   "myworkspace",
 			ExpDir:         ".",
+		},
+		{
+			Description: "atlantis.yaml with projectname and workspace",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				ProjectName: "myproject",
+				Workspace:   "staging",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: otherproject
+  dir: production
+  workspace: production
+- name: myproject
+  dir: staging
+  workspace: staging
+  apply_requirements: [approved]`,
+			ExpApplyReqs:   []string{"approved"},
+			ExpProjectName: "myproject",
+			ExpWorkspace:   "staging",
+			ExpDir:         "staging",
+			API:            true,
 		},
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
@@ -655,9 +679,10 @@ projects:
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
 						Scope: scope,
+						API:   c.API,
 					}, &cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope, API: c.API}, &cmd)
 				}
 
 				if c.ExpErr != "" {

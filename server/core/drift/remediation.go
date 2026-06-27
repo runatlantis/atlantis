@@ -250,6 +250,18 @@ func (s *InMemoryRemediationService) remediateProject(req models.RemediationRequ
 		HasDrift: false,
 		Summary:  "Apply completed successfully",
 	}
+	if s.driftStorage != nil {
+		updatedDrift := proj
+		updatedDrift.Ref = req.Ref
+		updatedDrift.Drift = *result.DriftAfter
+		updatedDrift.Error = ""
+		updatedDrift.LastChecked = time.Now()
+		if err := s.driftStorage.Store(req.Repository, updatedDrift); err != nil {
+			result.Error = fmt.Sprintf("updating drift status after apply: %v", err)
+			result.Status = models.RemediationStatusFailed
+			return result
+		}
+	}
 
 	return result
 }

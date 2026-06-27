@@ -43,10 +43,7 @@ func TestAPIController_Plan(t *testing.T) {
 		vcsType    string
 		pr         int
 		projects   []string
-		paths      []struct {
-			Directory string
-			Workspace string
-		}
+		paths      []controllers.APIRequestPath
 	}{
 		{
 			repository: "Repo",
@@ -64,10 +61,7 @@ func TestAPIController_Plan(t *testing.T) {
 			repository: "Repo",
 			ref:        "main",
 			vcsType:    "Gitlab",
-			paths: []struct {
-				Directory string
-				Workspace string
-			}{
+			paths: []controllers.APIRequestPath{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
@@ -84,10 +78,7 @@ func TestAPIController_Plan(t *testing.T) {
 			vcsType:    "Gitlab",
 			pr:         1,
 			projects:   []string{"test"},
-			paths: []struct {
-				Directory string
-				Workspace string
-			}{
+			paths: []controllers.APIRequestPath{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
@@ -130,10 +121,7 @@ func TestAPIController_Apply(t *testing.T) {
 		vcsType    string
 		pr         int
 		projects   []string
-		paths      []struct {
-			Directory string
-			Workspace string
-		}
+		paths      []controllers.APIRequestPath
 	}{
 		{
 			repository: "Repo",
@@ -151,10 +139,7 @@ func TestAPIController_Apply(t *testing.T) {
 			repository: "Repo",
 			ref:        "main",
 			vcsType:    "Gitlab",
-			paths: []struct {
-				Directory string
-				Workspace string
-			}{
+			paths: []controllers.APIRequestPath{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
@@ -171,10 +156,7 @@ func TestAPIController_Apply(t *testing.T) {
 			vcsType:    "Gitlab",
 			pr:         1,
 			projects:   []string{"test"},
-			paths: []struct {
-				Directory string
-				Workspace string
-			}{
+			paths: []controllers.APIRequestPath{
 				{
 					Directory: ".",
 					Workspace: "myworkspace",
@@ -261,10 +243,7 @@ func TestAPIController_Plan_SkipsIgnoredPathsWithoutShiftingHookCommands(t *test
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
-		Paths: []struct {
-			Directory string
-			Workspace string
-		}{
+		Paths: []controllers.APIRequestPath{
 			{
 				Directory: "ignored",
 				Workspace: "ignored-workspace",
@@ -304,10 +283,7 @@ func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
-		Paths: []struct {
-			Directory string
-			Workspace string
-		}{
+		Paths: []controllers.APIRequestPath{
 			{
 				Directory: "ignored",
 				Workspace: "default",
@@ -343,10 +319,7 @@ func TestAPIController_Apply_AllIgnoredPathsNoOp(t *testing.T) {
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
-		Paths: []struct {
-			Directory string
-			Workspace string
-		}{
+		Paths: []controllers.APIRequestPath{
 			{
 				Directory: "ignored",
 				Workspace: "default",
@@ -1062,6 +1035,72 @@ func TestAPIController_Remediate(t *testing.T) {
 	Equals(t, "test-id", result.ID)
 	Equals(t, "success", result.Status)
 	Equals(t, 1, result.Summary.SuccessCount)
+}
+
+func TestAPIController_Remediate_ProjectFailuresReturnMultiStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker(gmockCtrl)
+	parser := NewMockEventParsing()
+	vcsClient := NewMockClient()
+	repoAllowlistChecker, _ := events.NewRepoAllowlistChecker("*")
+
+	remediationService := driftmocks.NewMockRemediationService()
+	mockResult := &models.RemediationResult{
+		ID:            "test-id",
+		Repository:    "owner/repo",
+		Ref:           "main",
+		Action:        models.RemediationAutoApply,
+		Status:        models.RemediationStatusFailed,
+		TotalProjects: 1,
+		FailureCount:  1,
+		Projects: []models.ProjectRemediationResult{
+			{
+				ProjectName: "project1",
+				Status:      models.RemediationStatusFailed,
+				Error:       "plan had errors",
+			},
+		},
+	}
+	When(remediationService.Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())).ThenReturn(mockResult, nil)
+
+	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Eq("owner/repo"))).ThenReturn("https://github.com/owner/repo.git", nil)
+	When(parser.ParseAPIPlanRequest(Any[models.VCSHostType](), Eq("owner/repo"), Any[string]())).ThenReturn(models.Repo{
+		FullName: "owner/repo",
+		VCSHost:  models.VCSHost{Hostname: "github.com"},
+	}, nil)
+
+	ac := controllers.APIController{
+		APISecret:            []byte(atlantisToken),
+		Logger:               logger,
+		Locker:               locker,
+		Parser:               parser,
+		VCSClient:            vcsClient,
+		RepoAllowlistChecker: repoAllowlistChecker,
+		RemediationService:   remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusMultiStatus, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.RemediationResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, "failed", result.Status)
+	Equals(t, 1, result.Summary.FailureCount)
+	Equals(t, "plan had errors", result.Projects[0].Error)
 }
 
 func TestAPIController_Remediate_NoService(t *testing.T) {

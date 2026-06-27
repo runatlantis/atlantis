@@ -939,13 +939,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		defaultRepoDir,
 		repoRelDir,
 		workspace,
+		ctx.API && cmd.RepoRelDir != "",
+		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
-func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string, filterProjectDir bool, filterProjectWorkspace bool) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
 	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
@@ -970,16 +972,30 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		if p.EnableRegExpCmd {
+		if p.EnableRegExpCmd || filterProjectDir || filterProjectWorkspace {
 			projectsCfg = repoCfg.FindProjectsByName(projectName)
 		} else {
 			if p := repoCfg.FindProjectByName(projectName); p != nil {
 				projectsCfg = append(projectsCfg, *p)
 			}
 		}
+		projectsWithName := len(projectsCfg)
+		if filterProjectDir {
+			cleanDir := filepath.Clean(dir)
+			projectsCfg = slices.DeleteFunc(projectsCfg, func(p valid.Project) bool {
+				return filepath.Clean(p.Dir) != cleanDir
+			})
+		}
+		if filterProjectWorkspace {
+			projectsCfg = slices.DeleteFunc(projectsCfg, func(p valid.Project) bool {
+				return p.Workspace != workspace
+			})
+		}
 		if len(projectsCfg) == 0 {
 			if p.SilenceNoProjects && len(repoConfig.Projects) > 0 {
 				ctx.Log.Debug("no project with name '%s' found but silencing the error", projectName)
+			} else if projectsWithName > 0 && (filterProjectDir || filterProjectWorkspace) {
+				err = fmt.Errorf("no project with name '%s' is defined in '%s' for dir: '%s' workspace: '%s'", projectName, repoCfgFile, dir, workspace)
 			} else {
 				err = fmt.Errorf("no project with name '%s' is defined in '%s'", projectName, repoCfgFile)
 			}
@@ -1073,7 +1089,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, err
 		}
 		defer unlockFn()
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, false, false, commentCmd.Verbose)
 		if err != nil {
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
@@ -1135,6 +1151,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		repoDir,
 		repoRelDir,
 		workspace,
+		ctx.API && cmd.RepoRelDir != "",
+		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
 }
@@ -1149,9 +1167,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	repoDir string,
 	repoRelDir string,
 	workspace string,
+	filterProjectDir bool,
+	filterProjectWorkspace bool,
 	verbose bool) ([]command.ProjectContext, error) {
 
-	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
+	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir, filterProjectDir, filterProjectWorkspace)
 	if err != nil {
 		return []command.ProjectContext{}, err
 	}
@@ -1191,11 +1211,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 		// Override any dir/workspace defined on the comment with what was
 		// defined in config. This shouldn't matter since we don't allow comments
 		// with both project name and dir/workspace.
-		repoRelDir = projCfg.RepoRelDir
-		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("Merging config for project at dir: '%s' workspace: '%s'", mp.Dir, mp.Workspace)
 			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
+			repoRelDir = projCfg.RepoRelDir
+			workspace = projCfg.Workspace
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
