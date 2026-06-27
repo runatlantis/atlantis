@@ -132,12 +132,23 @@ func TestProjectOutputWrapper(t *testing.T) {
 		RepoRelDir: ".",
 	}
 
+	const (
+		expErrorBanner          = "\r\nError:\r\nerror\r\n"
+		expMultilineErrorBanner = "\r\nError:\r\nerror\r\nmore detail\r\n"
+		expFailureBanner        = "\r\nFailure:\r\nfailure\r\n"
+		expMultilineFailure     = "\r\nFailure:\r\nfailure\r\nmore detail\r\n"
+	)
+
 	cases := []struct {
-		Description string
-		Failure     bool
-		Error       bool
-		Success     bool
-		CommandName command.Name
+		Description      string
+		Failure          bool
+		Error            bool
+		Success          bool
+		CommandName      command.Name
+		ErrorMessage     string
+		FailureMessage   string
+		ExpErrorBanner   string
+		ExpFailureBanner string
 	}{
 		{
 			Description: "plan success",
@@ -150,8 +161,28 @@ func TestProjectOutputWrapper(t *testing.T) {
 			CommandName: command.Plan,
 		},
 		{
+			Description:      "plan multiline failure",
+			Failure:          true,
+			CommandName:      command.Plan,
+			FailureMessage:   "failure\nmore detail",
+			ExpFailureBanner: expMultilineFailure,
+		},
+		{
 			Description: "plan error",
 			Error:       true,
+			CommandName: command.Plan,
+		},
+		{
+			Description:    "plan multiline error",
+			Error:          true,
+			CommandName:    command.Plan,
+			ErrorMessage:   "error\nmore detail",
+			ExpErrorBanner: expMultilineErrorBanner,
+		},
+		{
+			Description: "plan error and failure",
+			Error:       true,
+			Failure:     true,
 			CommandName: command.Plan,
 		},
 		{
@@ -167,6 +198,12 @@ func TestProjectOutputWrapper(t *testing.T) {
 		{
 			Description: "apply error",
 			Error:       true,
+			CommandName: command.Apply,
+		},
+		{
+			Description: "apply error and failure",
+			Error:       true,
+			Failure:     true,
 			CommandName: command.Apply,
 		},
 	}
@@ -192,16 +229,22 @@ func TestProjectOutputWrapper(t *testing.T) {
 					ApplySuccess: "exists",
 				}
 				expCommitStatus = models.SuccessCommitStatus
-			} else if c.Failure {
-				prjResult = command.ProjectCommandOutput{
-					Failure: "failure",
-				}
+			} else {
 				expCommitStatus = models.FailedCommitStatus
-			} else if c.Error {
-				prjResult = command.ProjectCommandOutput{
-					Error: errors.New("error"),
+				if c.Error {
+					errorMessage := "error"
+					if c.ErrorMessage != "" {
+						errorMessage = c.ErrorMessage
+					}
+					prjResult.Error = errors.New(errorMessage)
 				}
-				expCommitStatus = models.FailedCommitStatus
+				if c.Failure {
+					failureMessage := "failure"
+					if c.FailureMessage != "" {
+						failureMessage = c.FailureMessage
+					}
+					prjResult.Failure = failureMessage
+				}
 			}
 
 			When(mockProjectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(prjResult)
@@ -223,8 +266,226 @@ func TestProjectOutputWrapper(t *testing.T) {
 			case command.Apply:
 				mockProjectCommandRunner.VerifyWasCalledOnce().Apply(ctx)
 			}
+
+			// Assert the ordering and content of JobMessageSender.Send calls.
+			// Banners (if any) must be streamed before the OperationComplete signal
+			// so the xterm-based job page renders the final status.
+			inOrder := new(InOrderContext)
+			expectedSends := 0
+			if c.Error {
+				expectedBanner := c.ExpErrorBanner
+				if expectedBanner == "" {
+					expectedBanner = expErrorBanner
+				}
+				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expectedBanner, false)
+				expectedSends++
+			}
+			if c.Failure {
+				expectedBanner := c.ExpFailureBanner
+				if expectedBanner == "" {
+					expectedBanner = expFailureBanner
+				}
+				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expectedBanner, false)
+				expectedSends++
+			}
+			mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", true)
+			expectedSends++
+			mockJobMessageSender.VerifyWasCalled(Times(expectedSends)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 		})
 	}
+}
+
+func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	mockLocker := mocks.NewMockProjectLocker()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockPlan := mocks.NewMockStepRunner()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:       logging.NewNoopLogger(t),
+		Steps:     []valid.Step{{StepName: "plan"}},
+		Workspace: "default",
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		RepoRelDir: ".",
+	}
+
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockPlan.Run(ctx, nil, repoDir, map[string]string{})).
+		ThenReturn("already streamed output", errors.New("error\nmore detail"))
+
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:     mockJobURLSetter,
+		JobMessageSender: mockJobMessageSender,
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
+			Locker:                    mockLocker,
+			LockURLGenerator:          mockURLGenerator{},
+			PlanStepRunner:            mockPlan,
+			WorkingDir:                mockWorkingDir,
+			WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+			CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		},
+	}
+
+	result := runner.Plan(ctx)
+
+	ErrEquals(t, "error\nmore detail\nalready streamed output", result.Error)
+	inOrder := new(InOrderContext)
+	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "\r\nError:\r\nerror\r\nmore detail\r\n", false)
+	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", true)
+	mockJobMessageSender.VerifyWasCalled(Times(2)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
+}
+
+func TestProjectOutputWrapperDoesNotReplayCustomRunStepOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tfClient := tfclientmocks.NewMockClient()
+	tfDistribution := terraform.NewDistributionTerraformWithDownloader(tmocks.NewMockDownloader())
+	tfVersion, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	run := runtime.RunStepRunner{
+		TerraformExecutor:       tfClient,
+		DefaultTFDistribution:   tfDistribution,
+		DefaultTFVersion:        tfVersion,
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
+	}
+	mockLocker := mocks.NewMockProjectLocker()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	repoDir := t.TempDir()
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "output.txt"), []byte("already streamed output\n"), 0o600))
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{
+				StepName:   "run",
+				RunCommand: "cat output.txt; exit 1",
+			},
+		},
+		Workspace: "default",
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		RepoRelDir: ".",
+	}
+
+	When(tfClient.EnsureVersion(Any[logging.SimpleLogging](), Any[terraform.Distribution](), Any[*version.Version]())).
+		ThenReturn(nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:     mockJobURLSetter,
+		JobMessageSender: mockJobMessageSender,
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
+			Locker:                    mockLocker,
+			LockURLGenerator:          mockURLGenerator{},
+			RunStepRunner:             &run,
+			WorkingDir:                mockWorkingDir,
+			WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+			CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		},
+	}
+
+	result := runner.Plan(ctx)
+
+	ErrContains(t, "already streamed output", result.Error)
+	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(2)).
+		Send(Any[command.ProjectContext](), Any[string](), Any[bool]()).GetAllCapturedArguments()
+	Assert(t, strings.Contains(messages[0], "\r\nError:\r\nrunning 'sh -c' 'cat output.txt; exit 1'"), fmt.Sprintf("expected error summary banner, got %q", messages[0]))
+	Assert(t, !strings.Contains(messages[0], "already streamed output"), fmt.Sprintf("expected banner not to replay run output, got %q", messages[0]))
+	Equals(t, "", messages[1])
+	Equals(t, false, operationComplete[0])
+	Equals(t, true, operationComplete[1])
+}
+
+func TestProjectOutputWrapperPreservesNonStreamedEnvStepOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tfClient := tfclientmocks.NewMockClient()
+	tfDistribution := terraform.NewDistributionTerraformWithDownloader(tmocks.NewMockDownloader())
+	tfVersion, err := version.NewVersion("0.12.0")
+	Ok(t, err)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	run := runtime.RunStepRunner{
+		TerraformExecutor:       tfClient,
+		DefaultTFDistribution:   tfDistribution,
+		DefaultTFVersion:        tfVersion,
+		ProjectCmdOutputHandler: projectCmdOutputHandler,
+	}
+	env := runtime.EnvStepRunner{
+		RunStepRunner: &run,
+	}
+	mockLocker := mocks.NewMockProjectLocker()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	repoDir := t.TempDir()
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "output.txt"), []byte("not streamed output\n"), 0o600))
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		Steps: []valid.Step{
+			{
+				StepName:   "env",
+				EnvVarName: "dynamic_var",
+				RunCommand: "cat output.txt; exit 1",
+			},
+		},
+		Workspace: "default",
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		RepoRelDir: ".",
+	}
+
+	When(tfClient.EnsureVersion(Any[logging.SimpleLogging](), Any[terraform.Distribution](), Any[*version.Version]())).
+		ThenReturn(nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:     mockJobURLSetter,
+		JobMessageSender: mockJobMessageSender,
+		ProjectCommandRunner: &events.DefaultProjectCommandRunner{
+			Locker:                    mockLocker,
+			LockURLGenerator:          mockURLGenerator{},
+			RunStepRunner:             &run,
+			EnvStepRunner:             &env,
+			WorkingDir:                mockWorkingDir,
+			WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+			CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		},
+	}
+
+	result := runner.Plan(ctx)
+
+	ErrContains(t, "not streamed output", result.Error)
+	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(2)).
+		Send(Any[command.ProjectContext](), Any[string](), Any[bool]()).GetAllCapturedArguments()
+	Assert(t, strings.Contains(messages[0], "\r\nError:\r\n"), fmt.Sprintf("expected error banner, got %q", messages[0]))
+	Assert(t, strings.Contains(messages[0], "\r\nnot streamed output\r\n"), fmt.Sprintf("expected banner to include non-streamed output, got %q", messages[0]))
+	Equals(t, "", messages[1])
+	Equals(t, false, operationComplete[0])
+	Equals(t, true, operationComplete[1])
 }
 
 // Test what happens if there's no working dir. This signals that the project
