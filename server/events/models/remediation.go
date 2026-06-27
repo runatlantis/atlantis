@@ -71,6 +71,9 @@ type RemediationRequest struct {
 	StorageRepository string `json:"-"`
 	// Ref is the git reference (branch/tag/commit) to remediate. Required.
 	Ref string `json:"ref"`
+	// BaseBranch is required when ref is a raw commit SHA or refs/tags/... value.
+	// It preserves Atlantis repo-config branch filtering and undiverged checks.
+	BaseBranch string `json:"base_branch,omitempty"`
 	// Type is the VCS provider type (Github/Gitlab). Required.
 	Type string `json:"type"`
 	// Action specifies plan-only or auto-apply. Defaults to "plan".
@@ -100,6 +103,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
+		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA or tag ref"})
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})

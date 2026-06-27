@@ -147,6 +147,10 @@ type ProjectContext struct {
 	// SkipPRRequirements allows intentionally non-PR API workflows, such as drift
 	// detection/remediation, to skip PR-only requirements like approved and mergeable.
 	SkipPRRequirements bool
+
+	// SuppressVCSStatus prevents API workflows such as drift detection from
+	// publishing normal PR lifecycle commit statuses.
+	SuppressVCSStatus bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

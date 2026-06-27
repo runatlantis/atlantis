@@ -24,3 +24,27 @@ func TestRemediationResultCompletedAtJSON(t *testing.T) {
 	Ok(t, err)
 	Assert(t, strings.Contains(string(body), "completed_at"), "expected completed remediation to include completed_at: %s", body)
 }
+
+func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		ref  string
+	}{
+		{name: "sha", ref: "0123456789abcdef0123456789abcdef01234567"},
+		{name: "tag ref", ref: "refs/tags/v1.0.0"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        c.ref,
+				Type:       "Github",
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "base_branch", errs[0].Field)
+
+			request.BaseBranch = "main"
+			Equals(t, 0, len(request.Validate()))
+		})
+	}
+}

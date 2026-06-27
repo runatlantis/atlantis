@@ -59,6 +59,10 @@ type Context struct {
 	// to resolve explicit selectors without querying pull request modified files.
 	SkipPRModifiedFiles bool
 
+	// SuppressVCSStatus prevents API workflows such as drift detection from
+	// publishing normal PR lifecycle commit statuses.
+	SuppressVCSStatus bool
+
 	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
 	// pre-workflow hooks before project discovery.
 	PreWorkflowHooksAlreadyRun bool

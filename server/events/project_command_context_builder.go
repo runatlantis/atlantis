@@ -330,6 +330,7 @@ func newProjectCommandContext(ctx *command.Context,
 		TeamAllowlistChecker:       teamAllowlistChecker,
 		API:                        ctx.API,
 		SkipPRRequirements:         ctx.SkipPRRequirements,
+		SuppressVCSStatus:          ctx.SuppressVCSStatus,
 	}
 }
 

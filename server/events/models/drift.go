@@ -36,6 +36,23 @@ func (d DriftSummary) TotalChanges() int {
 	return d.ToAdd + d.ToChange + d.ToDestroy + d.ToImport + d.ToForget
 }
 
+func requiresBaseBranch(ref string) bool {
+	ref = strings.TrimSpace(ref)
+	if strings.HasPrefix(ref, "refs/tags/") {
+		return true
+	}
+	if len(ref) < 7 || len(ref) > 40 {
+		return false
+	}
+	for _, r := range ref {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // NewDriftSummaryFromPlanStats creates a DriftSummary from PlanSuccessStats.
 // This leverages the existing plan output parsing infrastructure.
 func NewDriftSummaryFromPlanStats(stats PlanSuccessStats, summary string) DriftSummary {
@@ -75,6 +92,13 @@ type ProjectDrift struct {
 	Workspace string `json:"workspace"`
 	// Ref is the git reference (branch/tag/commit) that was checked.
 	Ref string `json:"ref"`
+	// BaseBranch is the branch context used for repo config branch filters and
+	// requirements when Ref is a tag or commit SHA.
+	BaseBranch string `json:"base_branch,omitempty"`
+	// ResolvedCommit is the checked-out commit SHA that produced this drift
+	// record. Remediation uses it to avoid applying stale drift after a moving ref
+	// changes.
+	ResolvedCommit string `json:"resolved_commit,omitempty"`
 	// DetectionID links this drift result to the detection run that produced it.
 	DetectionID string `json:"detection_id,omitempty"`
 	// Drift contains the drift summary for this project.
@@ -130,6 +154,9 @@ type DriftDetectionRequest struct {
 	Repository string `json:"repository"`
 	// Ref is the git reference (branch/tag/commit) to check for drift. Required.
 	Ref string `json:"ref"`
+	// BaseBranch is required when ref is a raw commit SHA or refs/tags/... value.
+	// It preserves Atlantis repo-config branch filtering and undiverged checks.
+	BaseBranch string `json:"base_branch,omitempty"`
 	// Type is the VCS provider type (Github/Gitlab). Required.
 	Type string `json:"type"`
 	// Projects is a list of project names to check. If empty, all projects are checked.
@@ -147,6 +174,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	}
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
+		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA or tag ref"})
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})

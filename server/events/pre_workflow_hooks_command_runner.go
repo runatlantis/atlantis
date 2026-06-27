@@ -84,7 +84,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			API:                ctx.API,
 			ProjectName:        cmd.ProjectName,
 		},
-		preWorkflowHooks, repoDir)
+		preWorkflowHooks, repoDir, ctx.SuppressVCSStatus)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
@@ -114,6 +114,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	ctx models.WorkflowHookCommandContext,
 	preWorkflowHooks []*valid.WorkflowHook,
 	repoDir string,
+	suppressVCSStatus bool,
 ) error {
 	for i, hook := range preWorkflowHooks {
 		ctx.HookDescription = hook.StepDescription
@@ -148,28 +149,34 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
-			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			ctx.Log.Info("is api? %v", ctx.API)
-			if !ctx.API {
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 				ctx.Log.Info("is api? %v", ctx.API)
-				return err
+				if !ctx.API {
+					ctx.Log.Info("is api? %v", ctx.API)
+					return err
+				}
 			}
 		}
 
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+			if !suppressVCSStatus {
+				if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+					ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+				}
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			if !ctx.API {
-				return err
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+				if !ctx.API {
+					return err
+				}
 			}
 		}
 	}

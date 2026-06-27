@@ -298,19 +298,28 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 
 | Name       | Type     | Required | Description                                                              |
 |------------|----------|----------|--------------------------------------------------------------------------|
-| repository | string   | Yes      | Full repository name (e.g., `owner/repo`)                                |
-| ref        | string   | Yes      | Git reference (branch/tag/commit) to use for remediation                 |
-| type       | string   | Yes      | Type of the VCS provider (`Github`/`Gitlab`)                             |
-| action     | string   | No       | Remediation action: `plan` (default) or `apply`                          |
-| projects   | []string | No       | List of project names to remediate. If empty, uses drift detection data  |
-| workspaces | []string | No       | Filter remediation to specific workspaces                                |
-| drift_only | boolean  | No       | If true, only remediate projects with detected drift                     |
+| repository  | string   | Yes      | Full repository name (e.g., `owner/repo`)                                |
+| ref         | string   | Yes      | Git reference (branch/tag/commit) to use for remediation                 |
+| base_branch | string   | Required for raw commit SHA or `refs/tags/...` refs | Branch context used for Atlantis repo-config branch filters and undiverged checks |
+| type        | string   | Yes      | Type of the VCS provider (`Github`/`Gitlab`)                             |
+| action      | string   | No       | Remediation action: `plan` (default) or `apply`                          |
+| projects    | []string | No       | List of project names to remediate. If empty, uses drift detection data  |
+| workspaces  | []string | No       | Filter remediation to specific workspaces                                |
+| drift_only  | boolean  | No       | If true, only remediate projects with detected drift                     |
 
 ::: tip Actions
 
 * `plan`: Runs a plan to preview what would change (default, non-destructive)
 * `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`.
 
+:::
+
+::: warning Apply Requirements
+Drift remediation apply does not bypass repository `apply_requirements`. Requirements that need pull request state, such as `approved` or `mergeable`, fail closed for non-PR remediation requests. Use plan-only remediation or normal PR workflows for projects guarded by those requirements.
+:::
+
+::: tip Ref Safety
+When remediation uses cached drift for a moving ref such as `main`, Atlantis compares the current checkout commit with the commit that produced the cached drift record. If the ref has moved, rerun drift detection before using `action: "apply"`.
 :::
 
 #### Sample Request (Plan Only)
@@ -540,11 +549,12 @@ When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#d
 
 | Name       | Type                 | Required | Description                                                |
 |------------|----------------------|----------|------------------------------------------------------------|
-| repository | string               | Yes      | Full repository name (e.g., `owner/repo`)                  |
-| ref        | string               | Yes      | Git reference (branch/tag/commit) to check for drift       |
-| type       | string               | Yes      | Type of the VCS provider (`Github`/`Gitlab`)               |
-| projects   | []string             | No       | List of project names to check. If empty, all are checked  |
-| paths      | []DriftDetectionPath | No       | List of paths to check. If empty, project names are used   |
+| repository  | string               | Yes      | Full repository name (e.g., `owner/repo`)                  |
+| ref         | string               | Yes      | Git reference (branch/tag/commit) to check for drift       |
+| base_branch | string               | Required for raw commit SHA or `refs/tags/...` refs | Branch context used for Atlantis repo-config branch filters and undiverged checks |
+| type        | string               | Yes      | Type of the VCS provider (`Github`/`Gitlab`)               |
+| projects    | []string             | No       | List of project names to check. If empty, all are checked  |
+| paths       | []DriftDetectionPath | No       | List of paths to check. If empty, project names are used   |
 
 #### DriftDetectionPath
 
@@ -555,6 +565,14 @@ When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#d
 
 ::: tip NOTE
 At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects.
+:::
+
+::: tip Status Side Effects
+Drift detection suppresses normal Atlantis plan, policy check, apply, and hook commit statuses. Drift-specific webhook notifications can still be sent when drift webhooks are configured.
+:::
+
+::: tip Branch Context
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs and `refs/tags/...` refs, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request
@@ -768,10 +786,17 @@ Drift remediation must be enabled on the Atlantis server. If not enabled, this e
 |------|--------|----------|--------------------------------------------|
 | id   | string | Yes      | The unique identifier of the remediation   |
 
+#### Query Parameters
+
+| Name       | Type   | Required | Description                                  |
+|------------|--------|----------|----------------------------------------------|
+| repository | string | Yes      | Full repository name (e.g., `owner/repo`)    |
+| type       | string | Yes      | Type of the VCS provider (`Github`/`Gitlab`) |
+
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e29b-41d4-a716-446655440000' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e29b-41d4-a716-446655440000?repository=owner/repo&type=Github' \
 --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
@@ -830,8 +855,9 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 | Status Code | Error Code          | Description                                           |
 |-------------|---------------------|-------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Missing required `id` parameter                       |
+| 400         | VALIDATION_ERROR    | Missing required `id`, `repository`, or `type` parameter |
 | 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header          |
+| 403         | FORBIDDEN           | Repository is not in the allowlist                    |
 | 404         | NOT_FOUND           | Remediation result not found                          |
 | 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server        |
 | 500         | INTERNAL_ERROR      | Internal error retrieving remediation data            |
@@ -856,26 +882,19 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 
 ```json
 {
-  "success": true,
-  "data": {
-    "locks": [
-      {
-        "id": "owner/repo/./default",
-        "project_name": "terraform",
-        "repository": "owner/repo",
-        "path": ".",
-        "workspace": "default",
-        "pull_request_id": 123,
-        "pull_request_url": "https://github.com/owner/repo/pull/123",
-        "locked_by": "jdoe",
-        "locked_at": "2025-02-13T16:47:42.040856-08:00"
-      }
-    ],
-    "total_count": 1
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "Locks": [
+    {
+      "Name": "owner/repo/./default/terraform",
+      "ProjectName": "terraform",
+      "ProjectRepo": "owner/repo",
+      "ProjectRepoPath": ".",
+      "PullID": "123",
+      "PullURL": "https://github.com/owner/repo/pull/123",
+      "User": "jdoe",
+      "Workspace": "default",
+      "Time": "2025-02-13T16:47:42.040856-08:00"
+    }
+  ]
 }
 ```
 
@@ -883,14 +902,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 
 ```json
 {
-  "success": true,
-  "data": {
-    "locks": [],
-    "total_count": 0
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440001",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "Locks": []
 }
 ```
 

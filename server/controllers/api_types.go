@@ -152,6 +152,10 @@ type DriftProjectAPI struct {
 	Workspace string `json:"workspace"`
 	// Ref is the git reference that was checked.
 	Ref string `json:"ref"`
+	// BaseBranch is the branch context used for repo config branch filters.
+	BaseBranch string `json:"base_branch,omitempty"`
+	// ResolvedCommit is the checked-out commit SHA that produced this drift record.
+	ResolvedCommit string `json:"resolved_commit,omitempty"`
 	// DetectionID links this result to the detection run that produced it.
 	DetectionID string `json:"detection_id,omitempty"`
 	// HasDrift indicates whether drift was detected.
@@ -187,14 +191,16 @@ type DriftDetailsAPI struct {
 // NewDriftProjectAPI converts an internal ProjectDrift to its API representation.
 func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 	result := DriftProjectAPI{
-		ProjectName: pd.ProjectName,
-		Directory:   pd.Path,
-		Workspace:   pd.Workspace,
-		Ref:         pd.Ref,
-		DetectionID: pd.DetectionID,
-		HasDrift:    pd.Drift.HasDrift,
-		LastChecked: pd.LastChecked,
-		Error:       pd.Error,
+		ProjectName:    pd.ProjectName,
+		Directory:      pd.Path,
+		Workspace:      pd.Workspace,
+		Ref:            pd.Ref,
+		BaseBranch:     pd.BaseBranch,
+		ResolvedCommit: pd.ResolvedCommit,
+		DetectionID:    pd.DetectionID,
+		HasDrift:       pd.Drift.HasDrift,
+		LastChecked:    pd.LastChecked,
+		Error:          pd.Error,
 	}
 
 	if pd.Drift.HasDrift {

@@ -159,6 +159,26 @@ func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
 }
 
+func TestAPIController_PlanPublishesNormalCommitStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	commitStatusUpdater.VerifyWasCalled(Times(1)).
+		UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Plan))
+}
+
 func TestAPIController_NonPRSetupErrorCleansWorkingDir(t *testing.T) {
 	ac, _, _ := setup(t)
 	workingDir := ac.WorkingDir.(*MockWorkingDir)
@@ -1144,6 +1164,37 @@ func parseAPIError(t *testing.T, body []byte) *controllers.APIError {
 	return envelope.Error
 }
 
+func TestAPIResponseEnvelopeIncludesNullInactiveFields(t *testing.T) {
+	ac, _, _ := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	responseBody := w.Body.String()
+	Assert(t, strings.Contains(responseBody, "\"error\":null"), "success envelope must include error:null: %s", responseBody)
+
+	errReq, _ := http.NewRequest("GET", "/api/drift/status", nil)
+	errReq.Header.Set(atlantisTokenHeader, atlantisToken)
+	errW := httptest.NewRecorder()
+	ac.DriftStatus(errW, errReq)
+
+	Equals(t, http.StatusBadRequest, errW.Code)
+	errorBody := errW.Body.String()
+	Assert(t, strings.Contains(errorBody, "\"data\":null"), "error envelope must include data:null: %s", errorBody)
+}
+
 func TestAPIController_DriftStatus(t *testing.T) {
 	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
@@ -1778,20 +1829,18 @@ func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 // Phase 5: GetRemediationResult tests
 
 func TestAPIController_GetRemediationResult(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResult := &models.RemediationResult{
-		ID:            "test-id-123",
-		Repository:    "owner/repo",
-		Ref:           "main",
-		Action:        models.RemediationPlanOnly,
-		Status:        models.RemediationStatusSuccess,
-		TotalProjects: 1,
-		SuccessCount:  1,
+		ID:                "test-id-123",
+		Repository:        "owner/repo",
+		StorageRepository: "github.com/owner/repo",
+		Ref:               "main",
+		Action:            models.RemediationPlanOnly,
+		Status:            models.RemediationStatusSuccess,
+		TotalProjects:     1,
+		SuccessCount:      1,
 		Projects: []models.ProjectRemediationResult{
 			{
 				ProjectName: "project1",
@@ -1801,15 +1850,9 @@ func TestAPIController_GetRemediationResult(t *testing.T) {
 		},
 	}
 	When(remediationService.GetResult(Eq("test-id-123"))).ThenReturn(mockResult, nil)
+	ac.RemediationService = remediationService
 
-	ac := controllers.APIController{
-		APISecret:          []byte(atlantisToken),
-		Logger:             logger,
-		Locker:             locker,
-		RemediationService: remediationService,
-	}
-
-	req, _ := http.NewRequest("GET", "/api/drift/remediate/test-id-123", nil)
+	req, _ := http.NewRequest("GET", "/api/drift/remediate/test-id-123?repository=owner/repo&type=Github", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "test-id-123"})
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
@@ -1825,22 +1868,13 @@ func TestAPIController_GetRemediationResult(t *testing.T) {
 }
 
 func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	When(remediationService.GetResult(Eq("nonexistent-id"))).ThenReturn(nil, fmt.Errorf("remediation result not found: nonexistent-id"))
+	ac.RemediationService = remediationService
 
-	ac := controllers.APIController{
-		APISecret:          []byte(atlantisToken),
-		Logger:             logger,
-		Locker:             locker,
-		RemediationService: remediationService,
-	}
-
-	req, _ := http.NewRequest("GET", "/api/drift/remediate/nonexistent-id", nil)
+	req, _ := http.NewRequest("GET", "/api/drift/remediate/nonexistent-id?repository=owner/repo&type=Github", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "nonexistent-id"})
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
@@ -1851,6 +1885,60 @@ func TestAPIController_GetRemediationResult_NotFound(t *testing.T) {
 	response, _ := io.ReadAll(w.Result().Body)
 	apiErr := parseAPIError(t, response)
 	Equals(t, controllers.ErrCodeNotFound, apiErr.Code)
+}
+
+func TestAPIController_GetRemediationResult_RequiresRepositoryScope(t *testing.T) {
+	ac, _, _ := setup(t)
+	remediationService := driftmocks.NewMockRemediationService()
+	ac.RemediationService = remediationService
+
+	req, _ := http.NewRequest("GET", "/api/drift/remediate/test-id?type=Github", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "test-id"})
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.GetRemediationResult(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	remediationService.VerifyWasCalled(Never()).GetResult(Any[string]())
+}
+
+func TestAPIController_GetRemediationResult_RejectsNonAllowlistedRepoBeforeLookup(t *testing.T) {
+	ac, _, _ := setup(t)
+	repoAllowlistChecker, err := events.NewRepoAllowlistChecker("github.com/allowed/repo")
+	Ok(t, err)
+	ac.RepoAllowlistChecker = repoAllowlistChecker
+	remediationService := driftmocks.NewMockRemediationService()
+	ac.RemediationService = remediationService
+
+	req, _ := http.NewRequest("GET", "/api/drift/remediate/test-id?repository=owner/repo&type=Github", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "test-id"})
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.GetRemediationResult(w, req)
+
+	Equals(t, http.StatusForbidden, w.Code)
+	remediationService.VerifyWasCalled(Never()).GetResult(Any[string]())
+}
+
+func TestAPIController_GetRemediationResult_RejectsMismatchedRepo(t *testing.T) {
+	ac, _, _ := setup(t)
+	remediationService := driftmocks.NewMockRemediationService()
+	When(remediationService.GetResult(Eq("test-id"))).ThenReturn(&models.RemediationResult{
+		ID:                "test-id",
+		Repository:        "other/repo",
+		StorageRepository: "github.com/other/repo",
+		Ref:               "main",
+		Status:            models.RemediationStatusSuccess,
+	}, nil)
+	ac.RemediationService = remediationService
+
+	req, _ := http.NewRequest("GET", "/api/drift/remediate/test-id?repository=owner/repo&type=Github", nil)
+	req = mux.SetURLVars(req, map[string]string{"id": "test-id"})
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.GetRemediationResult(w, req)
+
+	Equals(t, http.StatusNotFound, w.Code)
 }
 
 func TestAPIController_GetRemediationResult_MissingID(t *testing.T) {
@@ -2100,6 +2188,32 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	Equals(t, "Repo", result.Repository)
 }
 
+func TestAPIController_DetectDriftSuppressesNormalCommitStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	commitStatusUpdater.VerifyWasCalled(Never()).
+		UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitStatusUpdater.VerifyWasCalled(Never()).
+		UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+}
+
 func TestAPIController_DetectDrift_PathScopedStoresDirectoryAndWorkspace(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 
@@ -2145,6 +2259,71 @@ func TestAPIController_DetectDrift_PathScopedStoresDirectoryAndWorkspace(t *test
 	Equals(t, "modules/app", stored.Path)
 	Equals(t, "staging", stored.Workspace)
 	Equals(t, "main", stored.Ref)
+}
+
+func TestAPIController_DetectDrift_SHARefRequiresBaseBranch(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "0123456789abcdef0123456789abcdef01234567",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "base_branch"), "expected base_branch validation error, got %#v", apiErr.Details)
+}
+
+func TestAPIController_DetectDrift_SHARefUsesBaseBranchAndStoresResolvedCommit(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	ref := "0123456789abcdef0123456789abcdef01234567"
+	var capturedCtx *command.Context
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "modules/app",
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	var stored models.ProjectDrift
+	When(driftStorage.Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			stored = args[1].(models.ProjectDrift)
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        ref,
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCtx != nil, "expected plan command context")
+	Equals(t, "main", capturedCtx.Pull.BaseBranch)
+	Equals(t, ref, capturedCtx.Pull.HeadBranch)
+	Equals(t, "main", stored.BaseBranch)
+	Equals(t, ref, stored.Ref)
+	Equals(t, ref, stored.ResolvedCommit)
 }
 
 func TestAPIController_DetectDrift_PartialProjectFailure(t *testing.T) {

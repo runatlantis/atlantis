@@ -188,6 +188,10 @@ func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.Project
 }
 
 func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput) command.ProjectCommandOutput {
+	if ctx.SuppressVCSStatus {
+		return execute(ctx)
+	}
+
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time

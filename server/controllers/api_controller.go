@@ -99,6 +99,7 @@ func (a *APIController) cleanupNonPRWorkingDir(ctx *command.Context) {
 type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
+	BaseBranch string `json:"base_branch,omitempty"`
 	Type       string `validate:"required"`
 	PR         int
 	Projects   []string
@@ -191,6 +192,13 @@ func sortCommandPairsByExecutionOrder(cmds []command.ProjectContext, commentComm
 		cmds[i] = pairs[i].cmd
 		commentCommands[i] = pairs[i].commentCommand
 	}
+}
+
+func apiRequestBaseBranch(ref, baseBranch string) string {
+	if strings.TrimSpace(baseBranch) != "" {
+		return baseBranch
+	}
+	return ref
 }
 
 func (a *APIController) apiReportLegacyError(w http.ResponseWriter, code int, err error) {
@@ -478,7 +486,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	if len(cmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
 		// When silence is enabled and no projects are found, don't set any VCS status
-		if !a.SilenceVCSStatusNoProjects {
+		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
 			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
@@ -496,8 +504,10 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	// Update the combined plan commit status to pending
-	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-		ctx.Log.Warn("unable to update plan commit status: %s", err)
+	if !ctx.SuppressVCSStatus {
+		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
 	}
 
 	var projectResults []command.ProjectResult
@@ -543,7 +553,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	if len(cmds) == 0 {
 		ctx.Log.Info("determined there was no project to run apply in")
 		// When silence is enabled and no projects are found, don't set any VCS status
-		if !a.SilenceVCSStatusNoProjects {
+		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
 			if err := a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update plan status: %s", err)
@@ -561,8 +571,10 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	}
 
 	// Update the combined apply commit status to pending
-	if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-		ctx.Log.Warn("unable to update apply commit status: %s", err)
+	if !ctx.SuppressVCSStatus {
+		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			ctx.Log.Warn("unable to update apply commit status: %s", err)
+		}
 	}
 
 	var projectResults []command.ProjectResult
@@ -708,7 +720,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	pull := models.PullRequest{
 		Num:        pullNum,
-		BaseBranch: request.Ref,
+		BaseBranch: apiRequestBaseBranch(request.Ref, request.BaseBranch),
 		HeadBranch: request.Ref,
 		HeadCommit: request.Ref,
 		BaseRepo:   baseRepo,
@@ -816,6 +828,7 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 	executor := &apiRemediationExecutor{
 		controller: a,
 		baseRepo:   baseRepo,
+		baseBranch: request.BaseBranch,
 		logger:     a.Logger,
 	}
 
@@ -844,6 +857,7 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 type apiRemediationExecutor struct {
 	controller *APIController
 	baseRepo   models.Repo
+	baseBranch string
 	logger     logging.SimpleLogging
 }
 
@@ -853,6 +867,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	request := &APIRequest{
 		Repository:       repository,
 		Ref:              ref,
+		BaseBranch:       e.baseBranchForRef(ref),
 		Type:             vcsType,
 		DiscoverProjects: true,
 	}
@@ -870,7 +885,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
 			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: ref,
+			BaseBranch: e.baseBranchForRef(ref),
 			HeadBranch: ref,
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
@@ -880,6 +895,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		API:                 true,
 		SkipPRRequirements:  true,
 		SkipPRModifiedFiles: true,
+		SuppressVCSStatus:   true,
 	}
 
 	// Setup working directory
@@ -921,6 +937,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 	request := &APIRequest{
 		Repository:       repository,
 		Ref:              ref,
+		BaseBranch:       e.baseBranchForRef(ref),
 		Type:             vcsType,
 		DiscoverProjects: len(projects) == 0,
 	}
@@ -936,7 +953,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
 			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: ref,
+			BaseBranch: e.baseBranchForRef(ref),
 			HeadBranch: ref,
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
@@ -944,8 +961,8 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		Scope:               e.controller.Scope,
 		Log:                 e.logger,
 		API:                 true,
-		SkipPRRequirements:  true,
 		SkipPRModifiedFiles: true,
+		SuppressVCSStatus:   true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -956,6 +973,9 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		return nil, fmt.Errorf("setup failed: %w", err)
 	}
 	defer e.controller.cleanupNonPRWorkingDir(ctx)
+	if err := validateCachedDriftCommit(projects, ctx.Pull.HeadCommit); err != nil {
+		return nil, err
+	}
 
 	preHookCmd := &events.CommentCommand{Name: command.Plan}
 	if err := e.controller.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
@@ -997,6 +1017,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	request := &APIRequest{
 		Repository:       repository,
 		Ref:              ref,
+		BaseBranch:       e.baseBranchForRef(ref),
 		Type:             vcsType,
 		DiscoverProjects: true,
 	}
@@ -1014,7 +1035,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
 			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: ref,
+			BaseBranch: e.baseBranchForRef(ref),
 			HeadBranch: ref,
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
@@ -1022,8 +1043,8 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		Scope:               e.controller.Scope,
 		Log:                 e.logger,
 		API:                 true,
-		SkipPRRequirements:  true,
 		SkipPRModifiedFiles: true,
+		SuppressVCSStatus:   true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1072,6 +1093,28 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	}
 
 	return output.String(), nil
+}
+
+func (e *apiRemediationExecutor) baseBranchForRef(ref string) string {
+	return apiRequestBaseBranch(ref, e.baseBranch)
+}
+
+func validateCachedDriftCommit(projects []models.ProjectDrift, checkedOutCommit string) error {
+	if checkedOutCommit == "" {
+		return nil
+	}
+	for _, project := range projects {
+		if project.ResolvedCommit == "" {
+			if project.DetectionID != "" || !project.LastChecked.IsZero() || project.Drift.HasDrift {
+				return fmt.Errorf("cached drift for project %q does not include a resolved commit; rerun drift detection before remediation apply", project.ProjectName)
+			}
+			continue
+		}
+		if project.ResolvedCommit != checkedOutCommit {
+			return fmt.Errorf("cached drift for project %q was detected at commit %s, but %s now resolves to %s; rerun drift detection before remediation apply", project.ProjectName, project.ResolvedCommit, project.Ref, checkedOutCommit)
+		}
+	}
+	return nil
 }
 
 func (e *apiRemediationExecutor) ensureApplyUnlocked() error {
@@ -1148,8 +1191,10 @@ func projectRemediationResultsFromPlan(projects []models.ProjectDrift, result *c
 			})
 			idx = len(remediationResults) - 1
 		}
-		planOutput, _ := planProjectRemediationOutput(projectResult)
-		remediationResults[idx].PlanOutput = planOutput
+		if projectResult.Command == command.Plan {
+			planOutput, _ := planProjectRemediationOutput(projectResult)
+			remediationResults[idx].PlanOutput = planOutput
+		}
 		if projectResult.Error != nil {
 			remediationResults[idx].Status = models.RemediationStatusFailed
 			remediationResults[idx].Error = projectResult.Error.Error()
@@ -1284,16 +1329,69 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Get the result
+	repository := r.URL.Query().Get("repository")
+	if repository == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "repository", Message: "repository parameter is required"})
+		return
+	}
+	vcsType := r.URL.Query().Get("type")
+	if vcsType == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "type", Message: "type parameter is required"})
+		return
+	}
+	baseRepo, ok := a.parseAllowlistedRepo(w, r, repository, vcsType)
+	if !ok {
+		return
+	}
+
+	// Get the result only after the requested repository has been authorized.
 	result, err := a.RemediationService.GetResult(id)
 	if err != nil {
 		responder.NotFound(w, r, fmt.Sprintf("remediation result not found: %v", err))
+		return
+	}
+	if !remediationResultMatchesRepo(result, baseRepo.ID(), repository) {
+		responder.NotFound(w, r, "remediation result not found")
 		return
 	}
 
 	// Convert to API DTO and return
 	apiResult := NewRemediationResultAPI(result)
 	responder.Success(w, r, http.StatusOK, apiResult)
+}
+
+func (a *APIController) parseAllowlistedRepo(w http.ResponseWriter, r *http.Request, repository, vcsType string) (models.Repo, bool) {
+	responder := a.getAPIMiddleware().Responder
+	VCSHostType, err := models.NewVCSHostType(vcsType)
+	if err != nil {
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
+		return models.Repo{}, false
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
+	if err != nil {
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
+		return models.Repo{}, false
+	}
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, repository, cloneURL)
+	if err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
+		return models.Repo{}, false
+	}
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		responder.Forbidden(w, r, "repository is not in the allowlist")
+		return models.Repo{}, false
+	}
+	return baseRepo, true
+}
+
+func remediationResultMatchesRepo(result *models.RemediationResult, storageRepository, repository string) bool {
+	if result.StorageRepository != "" {
+		return result.StorageRepository == storageRepository
+	}
+	return result.Repository == repository
 }
 
 // ListRemediationResults handles GET /api/drift/remediate requests.
@@ -1408,6 +1506,93 @@ func newDriftProjectIdentity(project models.ProjectDrift) driftProjectIdentity {
 	}
 }
 
+func driftProjectsFromCommandResult(result *command.Result, ref, baseBranch, resolvedCommit, detectionID string) []models.ProjectDrift {
+	if result == nil {
+		return []models.ProjectDrift{}
+	}
+
+	projects := make([]models.ProjectDrift, 0, len(result.ProjectResults))
+	indexByIdentity := map[driftProjectIdentity]int{}
+
+	for _, pr := range result.ProjectResults {
+		if pr.Command != command.Plan {
+			continue
+		}
+		projectDrift := newProjectDriftFromResult(pr, ref, baseBranch, resolvedCommit, detectionID)
+		indexByIdentity[newDriftProjectIdentity(projectDrift)] = len(projects)
+		projects = append(projects, projectDrift)
+	}
+
+	for _, pr := range result.ProjectResults {
+		if pr.Command != command.PolicyCheck {
+			continue
+		}
+		errMessage := projectResultErrorMessage(pr)
+		if errMessage == "" {
+			continue
+		}
+		projectDrift := newProjectDriftFromResult(pr, ref, baseBranch, resolvedCommit, detectionID)
+		projectDrift.Error = fmt.Sprintf("policy_check failed: %s", errMessage)
+		identity := newDriftProjectIdentity(projectDrift)
+		if idx, ok := indexByIdentity[identity]; ok {
+			if projects[idx].Error == "" {
+				projects[idx].Error = projectDrift.Error
+			} else {
+				projects[idx].Error = projects[idx].Error + "; " + projectDrift.Error
+			}
+			continue
+		}
+		indexByIdentity[identity] = len(projects)
+		projects = append(projects, projectDrift)
+	}
+
+	return projects
+}
+
+func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolvedCommit, detectionID string) models.ProjectDrift {
+	projectDrift := models.ProjectDrift{
+		ProjectName:    pr.ProjectName,
+		Path:           pr.RepoRelDir,
+		Workspace:      pr.Workspace,
+		Ref:            ref,
+		BaseBranch:     baseBranch,
+		ResolvedCommit: resolvedCommit,
+		DetectionID:    detectionID,
+		LastChecked:    time.Now(),
+	}
+
+	if pr.Error != nil {
+		projectDrift.Error = pr.Error.Error()
+		projectDrift.Drift = models.DriftSummary{HasDrift: false}
+	} else if pr.Failure != "" {
+		projectDrift.Error = pr.Failure
+		projectDrift.Drift = models.DriftSummary{HasDrift: false}
+	} else if pr.PlanSuccess != nil {
+		projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+	}
+
+	return projectDrift
+}
+
+func projectResultErrorMessage(pr command.ProjectResult) string {
+	if pr.Error != nil {
+		return pr.Error.Error()
+	}
+	return pr.Failure
+}
+
+func driftDetectionHasErrors(result *models.DriftDetectionResult) bool {
+	if result == nil {
+		return false
+	}
+	for _, project := range result.Projects {
+		if project.Error != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *APIController) reconcileDriftStorage(repository, ref string, detected map[driftProjectIdentity]struct{}) error {
 	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref})
 	if err != nil {
@@ -1499,6 +1684,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	apiRequest := &APIRequest{
 		Repository:       request.Repository,
 		Ref:              request.Ref,
+		BaseBranch:       request.BaseBranch,
 		Type:             request.Type,
 		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
 	}
@@ -1517,7 +1703,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
 			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: request.Ref,
+			BaseBranch: apiRequestBaseBranch(request.Ref, request.BaseBranch),
 			HeadBranch: request.Ref,
 			HeadCommit: request.Ref,
 			BaseRepo:   baseRepo,
@@ -1527,6 +1713,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		API:                 true,
 		SkipPRRequirements:  true,
 		SkipPRModifiedFiles: true,
+		SuppressVCSStatus:   true,
 	}
 
 	// Setup working directory
@@ -1560,41 +1747,13 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false
-
-	for _, pr := range result.ProjectResults {
-		if pr.Command != command.Plan {
-			continue
-		}
-		projectDrift := models.ProjectDrift{
-			ProjectName: pr.ProjectName,
-			Path:        pr.RepoRelDir,
-			Workspace:   pr.Workspace,
-			Ref:         request.Ref,
-			DetectionID: detectionResult.ID,
-			LastChecked: time.Now(),
-		}
-
-		if pr.Error != nil {
-			projectDrift.Error = pr.Error.Error()
-			projectDrift.Drift = models.DriftSummary{
-				HasDrift: false,
-			}
-		} else if pr.Failure != "" {
-			projectDrift.Error = pr.Failure
-			projectDrift.Drift = models.DriftSummary{
-				HasDrift: false,
-			}
-		} else if pr.PlanSuccess != nil {
-			projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
-		}
-
+	projectDrifts := driftProjectsFromCommandResult(result, request.Ref, apiRequestBaseBranch(request.Ref, request.BaseBranch), ctx.Pull.HeadCommit, detectionResult.ID)
+	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
-
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			storeFailed = true
 			a.Logger.Warn("failed to store drift data: %v", err)
 		}
-
 		detectionResult.AddProject(projectDrift)
 	}
 
@@ -1616,7 +1775,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	apiResult := NewDriftDetectionResultAPI(detectionResult)
 
 	code := http.StatusOK
-	if result.HasErrors() {
+	if driftDetectionHasErrors(detectionResult) {
 		code = http.StatusMultiStatus // 207 - some projects may have failed
 	}
 	responder.Success(w, r, code, apiResult)

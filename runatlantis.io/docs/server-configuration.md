@@ -629,7 +629,9 @@ ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
 
 Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
 This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
-rejected while read-only drift detection remains available. Defaults to `false`.
+rejected while read-only drift detection remains available. This flag does not bypass
+repository `apply_requirements`; requirements that need pull request state fail closed for
+non-PR remediation requests. Defaults to `false`.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 

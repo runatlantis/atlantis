@@ -78,15 +78,15 @@ func NewValidationError(message string, fields ...ValidationError) *APIError {
 	return err
 }
 
-// APIResponse is the standard envelope for all API responses.
+// APIResponse is the standard envelope for newer API responses.
 // Using a concrete type instead of generics for Go 1.18+ compatibility with json.Marshal.
 type APIResponse struct {
 	// Success indicates whether the request succeeded.
 	Success bool `json:"success"`
 	// Data contains the response payload on success.
-	Data any `json:"data,omitempty"`
+	Data any `json:"data"`
 	// Error contains error details on failure.
-	Error *APIError `json:"error,omitempty"`
+	Error *APIError `json:"error"`
 	// RequestID is a unique identifier for request tracing.
 	RequestID string `json:"request_id"`
 	// Timestamp is when the response was generated.
