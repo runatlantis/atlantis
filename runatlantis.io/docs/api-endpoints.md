@@ -713,19 +713,20 @@ Drift remediation must be enabled on the Atlantis server. If not enabled, this e
 | Name       | Type   | Required | Description                                                  |
 |------------|--------|----------|--------------------------------------------------------------|
 | repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
+| type       | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)                 |
 | limit      | int    | No       | Maximum number of results to return (default: 10, max: 100)  |
 
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo&type=Github' \
 --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
 #### Sample Request (with limit)
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo&limit=10' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=owner/repo&type=Github&limit=10' \
 --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
@@ -958,6 +959,7 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 | Name       | Type   | Required | Description                                                  |
 |------------|--------|----------|--------------------------------------------------------------|
 | repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
+| type       | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)                 |
 | project    | string | No       | Filter by project name                                       |
 | path       | string | No       | Filter by repository-relative project path                   |
 | workspace  | string | No       | Filter by Terraform workspace                                |
@@ -966,14 +968,14 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github' \
   --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 
 #### Sample Request (with filters)
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&project=vpc&path=modules/vpc&workspace=production&ref=main' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github&project=vpc&path=modules/vpc&workspace=production&ref=main' \
   --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 

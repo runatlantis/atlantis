@@ -81,7 +81,7 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 	if err != nil {
 		result.Error = err.Error()
 		result.Status = models.RemediationStatusFailed
-		result.Complete()
+		result.CompletedAt = time.Now()
 		s.storeResult(result)
 		return result, nil
 	}

@@ -4,6 +4,7 @@
 package drift_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -22,6 +23,24 @@ type recordingRemediationExecutor struct {
 	planCalls  []remediationExecutorCall
 	applyCalls []remediationExecutorCall
 	planDrift  *models.DriftSummary
+}
+
+type failingRemediationStorage struct{}
+
+func (f failingRemediationStorage) Store(string, models.ProjectDrift) error {
+	return nil
+}
+
+func (f failingRemediationStorage) Get(string, drift.GetOptions) ([]models.ProjectDrift, error) {
+	return nil, errors.New("storage unavailable")
+}
+
+func (f failingRemediationStorage) Delete(string, string) error {
+	return nil
+}
+
+func (f failingRemediationStorage) GetAll() (map[string][]models.ProjectDrift, error) {
+	return nil, nil
 }
 
 func (r *recordingRemediationExecutor) ExecutePlan(_, _, _, projectName, path, workspace string) (string, *models.DriftSummary, error) {
@@ -62,6 +81,25 @@ func TestInMemoryRemediationService_ExplicitProjectsHonorWorkspaceFilters(t *tes
 	Equals(t, 2, len(executor.planCalls))
 	Equals(t, remediationExecutorCall{projectName: "app", workspace: "staging"}, executor.planCalls[0])
 	Equals(t, remediationExecutorCall{projectName: "app", workspace: "production"}, executor.planCalls[1])
+}
+
+func TestInMemoryRemediationService_GetProjectsErrorPreservesFailureStatus(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(failingRemediationStorage{})
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		DriftOnly:  true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Equals(t, "failed to get drift data: storage unavailable", result.Error)
+	Equals(t, 0, result.TotalProjects)
+	Equals(t, 0, len(result.Projects))
+	Assert(t, !result.CompletedAt.IsZero(), "expected completed timestamp")
 }
 
 func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) {
