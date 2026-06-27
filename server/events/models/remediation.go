@@ -152,6 +152,9 @@ type RemediationResult struct {
 	ID string `json:"id"`
 	// Repository is the full repository name.
 	Repository string `json:"repository"`
+	// StorageRepository is the internal VCS-host-qualified repository key used
+	// to index remediation history. It is omitted from API responses.
+	StorageRepository string `json:"-"`
 	// Ref is the git reference that was remediated.
 	Ref string `json:"ref"`
 	// Action is the remediation action performed.

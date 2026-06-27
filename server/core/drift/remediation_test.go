@@ -198,3 +198,40 @@ func TestInMemoryRemediationService_UsesHostQualifiedStorageRepository(t *testin
 	Equals(t, remediationExecutorCall{projectName: "gitlab-app", path: "gitlab/app", workspace: "default"}, executor.planCalls[0])
 	Equals(t, "acme/infra", result.Repository)
 }
+
+func TestInMemoryRemediationService_ListResultsUsesHostQualifiedStorageRepository(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	githubResult, err := service.Remediate(models.RemediationRequest{
+		Repository:        "acme/infra",
+		StorageRepository: "github.com/acme/infra",
+		Ref:               "main",
+		Type:              "Github",
+		Projects:          []string{"app"},
+	}, executor)
+	Ok(t, err)
+
+	gitlabResult, err := service.Remediate(models.RemediationRequest{
+		Repository:        "acme/infra",
+		StorageRepository: "gitlab.com/acme/infra",
+		Ref:               "main",
+		Type:              "Gitlab",
+		Projects:          []string{"app"},
+	}, executor)
+	Ok(t, err)
+
+	githubResults, err := service.ListResults("github.com/acme/infra", 10)
+	Ok(t, err)
+	Equals(t, 1, len(githubResults))
+	Equals(t, githubResult.ID, githubResults[0].ID)
+
+	gitlabResults, err := service.ListResults("gitlab.com/acme/infra", 10)
+	Ok(t, err)
+	Equals(t, 1, len(gitlabResults))
+	Equals(t, gitlabResult.ID, gitlabResults[0].ID)
+
+	rawResults, err := service.ListResults("acme/infra", 10)
+	Ok(t, err)
+	Equals(t, 0, len(rawResults))
+}

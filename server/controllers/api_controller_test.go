@@ -11,6 +11,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -864,6 +867,39 @@ func testVCSHostname(vcsType models.VCSHostType) string {
 	}
 }
 
+func initAPIControllerGitRepo(t *testing.T) (string, string) {
+	t.Helper()
+	repoDir, err := os.MkdirTemp("", "api-controller-git-*")
+	Ok(t, err)
+	t.Cleanup(func() {
+		for i := 0; i < 5; i++ {
+			if err := os.RemoveAll(repoDir); err == nil {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	})
+	runAPIControllerGit(t, repoDir, "init", "--initial-branch=main")
+	runAPIControllerGit(t, repoDir, "config", "--local", "gc.auto", "0")
+	runAPIControllerGit(t, repoDir, "config", "--local", "maintenance.auto", "false")
+	runAPIControllerGit(t, repoDir, "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runAPIControllerGit(t, repoDir, "config", "--local", "user.name", "atlantisbot")
+	runAPIControllerGit(t, repoDir, "config", "--local", "commit.gpgsign", "false")
+	runAPIControllerGit(t, repoDir, "commit", "--allow-empty", "-m", "initial commit")
+	return repoDir, strings.TrimSpace(runAPIControllerGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func runAPIControllerGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...) // nolint: gosec
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("running git %s: %s: %v", strings.Join(args, " "), output, err)
+	}
+	return string(output)
+}
+
 // parseAPIResponse is a helper to extract data from the API envelope response.
 func parseAPIResponse(t *testing.T, body []byte, target any) {
 	t.Helper()
@@ -1522,10 +1558,7 @@ func TestAPIController_GetRemediationResult_NoService(t *testing.T) {
 // Phase 5: ListRemediationResults tests
 
 func TestAPIController_ListRemediationResults(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResults := []*models.RemediationResult{
@@ -1549,16 +1582,10 @@ func TestAPIController_ListRemediationResults(t *testing.T) {
 			FailureCount:  1,
 		},
 	}
-	When(remediationService.ListResults(Eq("owner/repo"), Eq(10))).ThenReturn(mockResults, nil)
+	When(remediationService.ListResults(Eq("github.com/owner/repo"), Eq(10))).ThenReturn(mockResults, nil)
+	ac.RemediationService = remediationService
 
-	ac := controllers.APIController{
-		APISecret:          []byte(atlantisToken),
-		Logger:             logger,
-		Locker:             locker,
-		RemediationService: remediationService,
-	}
-
-	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo", nil)
+	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo&type=Github", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListRemediationResults(w, req)
@@ -1573,10 +1600,7 @@ func TestAPIController_ListRemediationResults(t *testing.T) {
 }
 
 func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 
 	remediationService := driftmocks.NewMockRemediationService()
 	mockResults := []*models.RemediationResult{
@@ -1586,7 +1610,24 @@ func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
 			Status:     models.RemediationStatusSuccess,
 		},
 	}
-	When(remediationService.ListResults(Eq("owner/repo"), Eq(5))).ThenReturn(mockResults, nil)
+	When(remediationService.ListResults(Eq("github.com/owner/repo"), Eq(5))).ThenReturn(mockResults, nil)
+	ac.RemediationService = remediationService
+
+	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo&type=Github&limit=5", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.ListRemediationResults(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+}
+
+func TestAPIController_ListRemediationResults_MissingType(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker(gmockCtrl)
+
+	remediationService := driftmocks.NewMockRemediationService()
 
 	ac := controllers.APIController{
 		APISecret:          []byte(atlantisToken),
@@ -1595,12 +1636,17 @@ func TestAPIController_ListRemediationResults_WithLimit(t *testing.T) {
 		RemediationService: remediationService,
 	}
 
-	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo&limit=5", nil)
+	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListRemediationResults(w, req)
 
-	Equals(t, http.StatusOK, w.Code)
+	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
+	remediationService.VerifyWasCalled(Never()).ListResults(Any[string](), Any[int]())
 }
 
 func TestAPIController_ListRemediationResults_MissingRepository(t *testing.T) {
@@ -1631,22 +1677,13 @@ func TestAPIController_ListRemediationResults_MissingRepository(t *testing.T) {
 }
 
 func TestAPIController_ListRemediationResults_Empty(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 
 	remediationService := driftmocks.NewMockRemediationService()
-	When(remediationService.ListResults(Eq("owner/repo"), Eq(10))).ThenReturn([]*models.RemediationResult{}, nil)
+	When(remediationService.ListResults(Eq("github.com/owner/repo"), Eq(10))).ThenReturn([]*models.RemediationResult{}, nil)
+	ac.RemediationService = remediationService
 
-	ac := controllers.APIController{
-		APISecret:          []byte(atlantisToken),
-		Logger:             logger,
-		Locker:             locker,
-		RemediationService: remediationService,
-	}
-
-	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo", nil)
+	req, _ := http.NewRequest("GET", "/api/drift/remediate?repository=owner/repo&type=Github", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListRemediationResults(w, req)
@@ -1688,6 +1725,42 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	var result controllers.DriftDetectionResultAPI
 	parseAPIResponse(t, response, &result)
 	Equals(t, "Repo", result.Repository)
+}
+
+func TestAPIController_DetectDrift_ResolvesSyntheticRefBeforePlanReuse(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+
+	var capturedHeadCommit string
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			capturedHeadCommit = ctx.Pull.HeadCommit
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, headCommit, capturedHeadCommit)
 }
 
 func TestAPIController_DetectDrift_SkipsPolicyCheckResults(t *testing.T) {

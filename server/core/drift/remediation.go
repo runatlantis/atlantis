@@ -70,6 +70,7 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 
 	// Create result
 	result := models.NewRemediationResult(id, req.Repository, req.Ref, req.Action)
+	result.StorageRepository = remediationStorageRepository(req)
 	result.Status = models.RemediationStatusRunning
 
 	// Store initial result
@@ -308,15 +309,24 @@ func (s *InMemoryRemediationService) storeResult(result *models.RemediationResul
 
 	s.results[result.ID] = result
 
+	repositoryKey := remediationResultRepositoryKey(result)
+
 	// Track by repository
-	if _, ok := s.repoResults[result.Repository]; !ok {
-		s.repoResults[result.Repository] = []string{}
+	if _, ok := s.repoResults[repositoryKey]; !ok {
+		s.repoResults[repositoryKey] = []string{}
 	}
 
 	// Check if ID already exists in repo results
-	if !slices.Contains(s.repoResults[result.Repository], result.ID) {
-		s.repoResults[result.Repository] = append(s.repoResults[result.Repository], result.ID)
+	if !slices.Contains(s.repoResults[repositoryKey], result.ID) {
+		s.repoResults[repositoryKey] = append(s.repoResults[repositoryKey], result.ID)
 	}
+}
+
+func remediationResultRepositoryKey(result *models.RemediationResult) string {
+	if result.StorageRepository != "" {
+		return result.StorageRepository
+	}
+	return result.Repository
 }
 
 // GetResult retrieves a remediation result by ID.

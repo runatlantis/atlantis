@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -396,11 +399,36 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) err
 	defer unlockFn()
 
 	// ensure workingDir is present
-	_, err = a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
+	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
 	if err != nil {
 		return err
 	}
 
+	return resolveNonPRHeadCommit(ctx, repoDir)
+}
+
+func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
+	if ctx.Pull.Num > 0 || repoDir == "" {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking API checkout git metadata: %w", err)
+	}
+
+	cmd := exec.Command("git", "rev-parse", "HEAD") // nolint: gosec
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("resolving checked out API ref: %s: %w", strings.TrimSpace(string(output)), err)
+	}
+	headCommit := strings.TrimSpace(string(output))
+	if headCommit == "" {
+		return fmt.Errorf("resolving checked out API ref: empty commit")
+	}
+	ctx.Pull.HeadCommit = headCommit
 	return nil
 }
 
@@ -984,6 +1012,7 @@ func (a *APIController) GetRemediationResult(w http.ResponseWriter, r *http.Requ
 // It lists remediation results for a repository.
 // Query parameters:
 //   - repository: required, the full repository name (owner/repo)
+//   - type: required, the VCS provider type
 //   - limit: optional, maximum number of results to return (default: 10)
 //
 // This is an authenticated endpoint that requires the API secret.
@@ -1009,6 +1038,32 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 			ValidationError{Field: "repository", Message: "repository parameter is required"})
 		return
 	}
+	vcsType := r.URL.Query().Get("type")
+	if vcsType == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "type", Message: "type parameter is required"})
+		return
+	}
+	VCSHostType, err := models.NewVCSHostType(vcsType)
+	if err != nil {
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
+	if err != nil {
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
+		return
+	}
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, repository, cloneURL)
+	if err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
+		return
+	}
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		responder.Forbidden(w, r, "repository is not in the allowlist")
+		return
+	}
 
 	// Parse limit (default: 10)
 	limit := 10
@@ -1027,7 +1082,7 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get results
-	results, err := a.RemediationService.ListResults(repository, limit)
+	results, err := a.RemediationService.ListResults(baseRepo.ID(), limit)
 	if err != nil {
 		responder.InternalError(w, r, err)
 		return
