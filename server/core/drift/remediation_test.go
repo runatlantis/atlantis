@@ -114,3 +114,44 @@ func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) 
 	Equals(t, false, cached[0].Drift.HasDrift)
 	Equals(t, "Apply completed successfully", cached[0].Drift.Summary)
 }
+
+func TestInMemoryRemediationService_ExplicitProjectsPreserveCachedTargetMetadata(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	oldDrift := models.ProjectDrift{
+		ProjectName: "app",
+		Path:        "modules/app",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift: models.DriftSummary{
+			HasDrift: true,
+			ToChange: 1,
+		},
+		LastChecked: time.Now().Add(-time.Hour),
+	}
+	Ok(t, storage.Store("owner/repo", oldDrift))
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Projects:   []string{"app"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "modules/app", workspace: "default"}, executor.planCalls[0])
+	Equals(t, 1, len(executor.applyCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "modules/app", workspace: "default"}, executor.applyCalls[0])
+
+	cached, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "app", Ref: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(cached))
+	Equals(t, "modules/app", cached[0].Path)
+	Equals(t, "default", cached[0].Workspace)
+	Equals(t, false, cached[0].Drift.HasDrift)
+}

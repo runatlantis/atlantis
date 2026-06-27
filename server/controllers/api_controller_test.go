@@ -1197,6 +1197,41 @@ func TestAPIController_Remediate_MissingRepository(t *testing.T) {
 	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
+func TestAPIController_Remediate_EmptyProjectName(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker(gmockCtrl)
+
+	remediationService := driftmocks.NewMockRemediationService()
+
+	ac := controllers.APIController{
+		APISecret:          []byte(atlantisToken),
+		Logger:             logger,
+		Locker:             locker,
+		RemediationService: remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Projects:   []string{""},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
+	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
+}
+
 func TestAPIController_Remediate_APIDisabled(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)

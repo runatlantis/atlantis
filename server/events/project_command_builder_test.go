@@ -709,6 +709,76 @@ projects:
 	}
 }
 
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsModifiedFiles(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"project1": map[string]any{
+			"main.tf": nil,
+		},
+		"project2": map[string]any{
+			"main.tf": nil,
+		},
+		"modules": map[string]any{
+			"network": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: models.Repo{FullName: "owner/repo"},
+		Pull: models.PullRequest{
+			Num:      -1,
+			BaseRepo: models.Repo{FullName: "owner/repo"},
+		},
+		API: true,
+	}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+	Ok(t, err)
+
+	dirs := make([]string, 0, len(ctxs))
+	for _, ctx := range ctxs {
+		dirs = append(dirs, ctx.RepoRelDir)
+	}
+	sort.Strings(dirs)
+	Equals(t, []string{"project1", "project2"}, dirs)
+	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
 // Test that autodiscover.ignore_paths blocks targeted plan/apply -d commands
 // when the directory has no explicit project config (global config ignore_paths).
 func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testing.T) {

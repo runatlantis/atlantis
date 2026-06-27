@@ -3,7 +3,10 @@
 
 package models
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // RemediationAction specifies the type of remediation to perform.
 type RemediationAction string
@@ -102,6 +105,12 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 	if !r.Action.IsValid() {
 		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})
+	}
+	for _, project := range r.Projects {
+		if strings.TrimSpace(project) == "" {
+			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
+			break
+		}
 	}
 
 	return errors

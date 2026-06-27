@@ -134,19 +134,34 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	} else if len(req.Projects) > 0 {
 		// Specific projects requested
 		for _, projName := range req.Projects {
+			if s.driftStorage != nil {
+				drifts, err := s.driftStorage.Get(req.Repository, GetOptions{ProjectName: projName, Ref: req.Ref})
+				if err != nil {
+					return nil, fmt.Errorf("failed to get drift data for project %q: %w", projName, err)
+				}
+				for _, d := range drifts {
+					if s.matchesFilters(d, req) {
+						projects = append(projects, d)
+					}
+				}
+			}
 			if len(req.Workspaces) == 0 {
-				projects = append(projects, models.ProjectDrift{
-					ProjectName: projName,
-					Ref:         req.Ref,
-				})
+				if !hasRemediationTarget(projects, projName, "") {
+					projects = append(projects, models.ProjectDrift{
+						ProjectName: projName,
+						Ref:         req.Ref,
+					})
+				}
 				continue
 			}
 			for _, workspace := range req.Workspaces {
-				projects = append(projects, models.ProjectDrift{
-					ProjectName: projName,
-					Workspace:   workspace,
-					Ref:         req.Ref,
-				})
+				if !hasRemediationTarget(projects, projName, workspace) {
+					projects = append(projects, models.ProjectDrift{
+						ProjectName: projName,
+						Workspace:   workspace,
+						Ref:         req.Ref,
+					})
+				}
 			}
 		}
 	} else if s.driftStorage != nil {
@@ -165,6 +180,18 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	}
 
 	return projects, nil
+}
+
+func hasRemediationTarget(projects []models.ProjectDrift, projectName string, workspace string) bool {
+	for _, p := range projects {
+		if p.ProjectName != projectName {
+			continue
+		}
+		if workspace == "" || p.Workspace == workspace {
+			return true
+		}
+	}
+	return false
 }
 
 // matchesFilters checks if a project matches the request filters.

@@ -86,10 +86,8 @@ type APIRequest struct {
 	PR         int
 	Projects   []string
 	Paths      []APIRequestPath
-	// DiscoverProjects enables auto-discovery when no projects or paths
-	// are specified. This triggers BuildPlanCommands with an empty
-	// CommentCommand so atlantis.yaml (or repo config) is used to find
-	// all projects. Only drift detection and remediation set this.
+	// DiscoverProjects enables all-project discovery when no projects or paths
+	// are specified. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
 }
 
@@ -118,10 +116,11 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 
 	// When no specific projects or paths are provided and DiscoverProjects
-	// is set, use an empty CommentCommand to trigger auto-discovery.
+	// is set, enumerate all projects without consulting PR modified-file APIs.
 	if len(cc) == 0 && a.DiscoverProjects {
 		cc = append(cc, &events.CommentCommand{
-			Name: cmdName,
+			Name:                cmdName,
+			DiscoverAllProjects: true,
 		})
 	}
 
