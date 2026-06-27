@@ -45,6 +45,7 @@ server/controllers/api_remediation_executor_internal_test.go
 server/events/project_command_builder_test.go
   s_243a1a1edc15e5::t_41800f548aaba4 1926,1991-2009,2222-2224,2244-2246
   s_243a1a1edc15e5::t_46dc796f36d230 1917-1921,1923-1925
+  s_243a1a1edc15e5::t_9f8b0dde7d1e7f 1927-1928
 cmd/server_test.go
   s_243a1a1edc15e5::t_77f5fcd587a990 170
 server/events/command/context.go
