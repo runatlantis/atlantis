@@ -590,6 +590,85 @@ func TestAPIController_ApplyClearsPullReqStatusWhenPostPlanRefreshFails(t *testi
 		"expected apply commands to clear stale mergeable status")
 }
 
+func TestAPIController_ApplyUpdatesPullStatusBetweenSequentialProjects(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	pullStatus := &models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				ProjectName: "network",
+				RepoRelDir:  "network",
+				Workspace:   "default",
+				Status:      models.PlannedPlanStatus,
+			},
+			{
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   "default",
+				Status:      models.PlannedPlanStatus,
+			},
+		},
+	}
+
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			ctx.PullStatus = pullStatus
+			return ReturnValues{[]command.ProjectContext{
+				{
+					CommandName:   command.Apply,
+					ProjectName:   "network",
+					RepoRelDir:    "network",
+					Workspace:     "default",
+					PullStatus:    pullStatus,
+					ApplyCmd:      "atlantis apply -p network",
+					BaseRepo:      ctx.Pull.BaseRepo,
+					HeadRepo:      ctx.HeadRepo,
+					Pull:          ctx.Pull,
+					PullReqStatus: ctx.PullRequestStatus,
+				},
+				{
+					CommandName:   command.Apply,
+					ProjectName:   "app",
+					RepoRelDir:    "app",
+					Workspace:     "default",
+					PullStatus:    pullStatus,
+					DependsOn:     []string{"network"},
+					ApplyCmd:      "atlantis apply -p app",
+					BaseRepo:      ctx.Pull.BaseRepo,
+					HeadRepo:      ctx.HeadRepo,
+					Pull:          ctx.Pull,
+					PullReqStatus: ctx.PullRequestStatus,
+				},
+			}, nil}
+		})
+
+	applyCalls := 0
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+		applyCalls++
+		projectCtx := args[0].(command.ProjectContext)
+		if projectCtx.ProjectName == "app" {
+			Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
+		}
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"all"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	Equals(t, 2, applyCalls)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[1].Status)
+}
+
 func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac, _, _ := setup(t)
 
@@ -740,12 +819,14 @@ func TestAPIController_DriftStatus(t *testing.T) {
 	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
 
 	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
 		Logger:       logger,
 		Locker:       locker,
 		DriftStorage: driftStorage,
 	}
 
 	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
 
@@ -759,6 +840,32 @@ func TestAPIController_DriftStatus(t *testing.T) {
 	Equals(t, 1, result.Summary.ProjectsWithDrift)
 }
 
+func TestAPIController_DriftStatus_Unauthorized(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker(gmockCtrl)
+	driftStorage := driftmocks.NewMockStorage()
+
+	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusUnauthorized, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeUnauthorized, apiErr.Code)
+	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
+}
+
 func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -767,12 +874,14 @@ func TestAPIController_DriftStatus_NoStorage(t *testing.T) {
 
 	// Controller without drift storage
 	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
 		Logger:       logger,
 		Locker:       locker,
 		DriftStorage: nil,
 	}
 
 	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
 
@@ -791,12 +900,14 @@ func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
 	driftStorage := driftmocks.NewMockStorage()
 
 	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
 		Logger:       logger,
 		Locker:       locker,
 		DriftStorage: driftStorage,
 	}
 
 	req, _ := http.NewRequest("GET", "", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
 
@@ -831,19 +942,25 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
 
 	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
 		Logger:       logger,
 		Locker:       locker,
 		DriftStorage: driftStorage,
 	}
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo&project=project1&workspace=staging", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&project=project1&path=modules/vpc&workspace=staging&ref=main", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
 
 	// Verify the storage was called with correct options
-	driftStorage.VerifyWasCalledOnce().Get(Eq("owner/repo"), Any[drift.GetOptions]())
+	_, opts := driftStorage.VerifyWasCalledOnce().Get(Eq("owner/repo"), Any[drift.GetOptions]()).GetCapturedArguments()
+	Equals(t, "project1", opts.ProjectName)
+	Equals(t, "modules/vpc", opts.Path)
+	Equals(t, "staging", opts.Workspace)
+	Equals(t, "main", opts.Ref)
 }
 
 func TestAPIController_DriftStatus_Empty(t *testing.T) {
@@ -856,12 +973,14 @@ func TestAPIController_DriftStatus_Empty(t *testing.T) {
 	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn([]models.ProjectDrift{}, nil)
 
 	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
 		Logger:       logger,
 		Locker:       locker,
 		DriftStorage: driftStorage,
 	}
 
 	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
 

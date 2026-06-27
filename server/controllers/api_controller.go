@@ -218,12 +218,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ctx.CommandSkipped {
-		response, err := json.Marshal(result)
-		if err != nil {
-			a.apiReportError(w, http.StatusInternalServerError, err)
-			return
-		}
-		a.respond(w, logging.Warn, code, "%s", string(response))
+		responder.Success(w, r, http.StatusOK, NewCommandResultAPI(result, command.Apply.String()))
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
@@ -288,15 +283,21 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
-// DriftStatus returns the drift status for a repository.
-// This is a non-authenticated endpoint that returns cached drift detection results.
+// DriftStatus returns cached drift detection results for a repository.
+// This is an authenticated endpoint that requires the API secret.
 // Query parameters:
 //   - repository: required, the full repository name (owner/repo)
 //   - project: optional, filter by project name
+//   - path: optional, filter by repository-relative project path
 //   - workspace: optional, filter by workspace
+//   - ref: optional, filter by git ref
 func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
+
+	if !middleware.RequireAuth(w, r) {
+		return
+	}
 
 	// Check if drift storage is configured
 	if a.DriftStorage == nil {
@@ -314,7 +315,9 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 
 	opts := drift.GetOptions{
 		ProjectName: r.URL.Query().Get("project"),
+		Path:        r.URL.Query().Get("path"),
 		Workspace:   r.URL.Query().Get("workspace"),
+		Ref:         r.URL.Query().Get("ref"),
 	}
 
 	// Retrieve drift results from storage
@@ -450,10 +453,27 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
+		updatePullStatusFromProjectResult(ctx, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
+}
+
+func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
+	if ctx.PullStatus == nil {
+		return
+	}
+
+	for projectIdx := range ctx.PullStatus.Projects {
+		project := &ctx.PullStatus.Projects[projectIdx]
+		if result.Workspace == project.Workspace &&
+			result.RepoRelDir == project.RepoRelDir &&
+			result.ProjectName == project.ProjectName {
+			project.Status = result.PlanStatus()
+			return
+		}
+	}
 }
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {

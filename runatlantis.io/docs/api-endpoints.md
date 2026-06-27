@@ -940,7 +940,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 
 #### Description
 
-Return the drift status for a repository. This endpoint provides cached drift detection results from previous plan executions. Drift detection must be enabled on the server for this endpoint to work.
+Return the drift status for a repository. This endpoint provides cached drift detection results from previous plan executions. Drift detection must be enabled on the server for this endpoint to work and requires the configured API token.
 
 ::: tip Prerequisites
 Drift detection storage must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
@@ -952,18 +952,22 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 |------------|--------|----------|--------------------------------------------------------------|
 | repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
 | project    | string | No       | Filter by project name                                       |
+| path       | string | No       | Filter by repository-relative project path                   |
 | workspace  | string | No       | Filter by Terraform workspace                                |
+| ref        | string | No       | Filter by git reference                                      |
 
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo'
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo' \
+  --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 
 #### Sample Request (with filters)
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&project=vpc&workspace=production'
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&project=vpc&path=modules/vpc&workspace=production&ref=main' \
+  --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 
 #### Sample Response (with drift)
