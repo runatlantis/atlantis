@@ -157,7 +157,7 @@ Slack apply messages for pull requests include a `Branch` field using the pull r
 
 ## Drift detection webhooks
 
-When [drift detection](api-endpoints.md#post-apidriftdetect) is enabled (`--enable-drift-detection`), you can configure webhooks to be notified whenever infrastructure drift is detected. Drift webhooks are sent automatically after a `POST /api/drift/detect` request finds projects with drift.
+When [drift detection](api-endpoints.md#post-apidriftdetect) is enabled (`--enable-drift-detection`), you can configure webhooks to be notified whenever drift detection completes successfully. Drift webhooks are sent automatically after successful `POST /api/drift/detect` requests, including no-drift heartbeat results.
 
 ::: tip NOTE
 Drift webhooks use `event: drift` in the webhook configuration. They are independent from `event: apply` webhooks.
@@ -189,7 +189,7 @@ Unlike apply webhooks, drift webhooks do not support `workspace-regex` or `branc
 
 ### Slack drift message format
 
-When drift is detected, the Slack message includes:
+When drift detection completes successfully, the Slack message includes:
 
 * **Color**: Red if drift was found, green if no drift
 * **Text**: "Drift detected in owner/repo" or "No drift in owner/repo"

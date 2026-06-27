@@ -62,6 +62,10 @@ type Context struct {
 	// publishing normal PR lifecycle commit statuses.
 	SuppressVCSStatus bool
 
+	// SuppressJobOutput prevents API workflows such as drift detection from
+	// publishing raw command output to the public job stream.
+	SuppressJobOutput bool
+
 	// FailOnTeamAllowlistDenied makes project selection return an error when
 	// any selected project is denied by team allowlist filtering.
 	FailOnTeamAllowlistDenied bool
@@ -83,4 +87,9 @@ type Context struct {
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
+
+	// SkipAPIBaseBranchVerification preserves legacy no-PR API plan/apply
+	// behavior for tag/SHA refs that were not supplied with an explicit
+	// base_branch.
+	SkipAPIBaseBranchVerification bool
 }

@@ -420,6 +420,57 @@ func TestInMemoryRemediationService_PathSelectorsTargetCachedDrift(t *testing.T)
 	Equals(t, remediationExecutorCall{projectName: "app", path: "apps/prod", workspace: "default"}, executor.planCalls[0])
 }
 
+func TestInMemoryRemediationService_PathSelectorsNormalizeBeforeCacheLookup(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "modules/vpc",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		DriftOnly:  true,
+		Paths: []models.DriftDetectionPath{{
+			Directory: "modules/vpc/",
+		}},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "modules/vpc", workspace: "default"}, executor.planCalls[0])
+}
+
+func TestInMemoryRemediationService_PathSelectorsNormalizeFallbackTargets(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "modules/vpc/",
+		}},
+		Workspaces: []string{"prod"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{path: "modules/vpc", workspace: "prod"}, executor.planCalls[0])
+}
+
 func TestInMemoryRemediationService_PathSelectorsHonorTopLevelWorkspaceFallbacks(t *testing.T) {
 	service := drift.NewInMemoryRemediationService(nil)
 	executor := &recordingRemediationExecutor{}

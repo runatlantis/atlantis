@@ -103,6 +103,34 @@ func TestRemediationRequestValidateRejectsMalformedBaseBranch(t *testing.T) {
 	Equals(t, 0, len(request.Validate()))
 }
 
+func TestRemediationRequestValidateRejectsUnsupportedVCSTypes(t *testing.T) {
+	for _, vcsType := range []string{"BitbucketCloud", "BitbucketServer", "AzureDevops"} {
+		t.Run(vcsType, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       vcsType,
+			}
+
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "type", errs[0].Field)
+			Assert(t, strings.Contains(errs[0].Message, "Github, Gitlab, Gitea"), "unexpected message: %q", errs[0].Message)
+		})
+	}
+	for _, vcsType := range []string{"Github", "Gitlab", "Gitea"} {
+		t.Run(vcsType, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       vcsType,
+			}
+
+			Equals(t, 0, len(request.Validate()))
+		})
+	}
+}
+
 func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {
 	request := models.RemediationRequest{
 		Repository: "owner/repo",

@@ -234,6 +234,56 @@ func TestAPIController_NonPRSetupErrorCleansWorkingDir(t *testing.T) {
 	workingDir.VerifyWasCalled(Times(1)).Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
+func TestAPIController_PlanSetupErrorRedactsCredentials(t *testing.T) {
+	ac, _, _ := setup(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn("", errors.New("fatal: Authentication failed for 'https://user:super-secret@example.com/Repo.git'"))
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	responseBody := w.Body.String()
+	Assert(t, !strings.Contains(responseBody, "super-secret"), "response leaked token: %s", responseBody)
+	Assert(t, !strings.Contains(responseBody, "user:super-secret"), "response leaked credentials: %s", responseBody)
+	Assert(t, strings.Contains(responseBody, "redacted"), "response should preserve redacted URL context: %s", responseBody)
+}
+
+func TestAPIController_DetectDriftSetupErrorRedactsCredentials(t *testing.T) {
+	ac, _, _ := setup(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn("", errors.New("fatal: Authentication failed for 'https://user:super-secret@example.com/Repo.git'"))
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(nil)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	responseBody := w.Body.String()
+	Assert(t, !strings.Contains(responseBody, "super-secret"), "response leaked token: %s", responseBody)
+	Assert(t, !strings.Contains(responseBody, "user:super-secret"), "response leaked credentials: %s", responseBody)
+}
+
 func TestAPIController_LegacyPlanApplyErrorsReturnLegacyShape(t *testing.T) {
 	type legacyHandler struct {
 		name string
@@ -458,6 +508,46 @@ func TestAPIController_ApplyContinuesAfterPrePlanProjectError(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 	projectCommandRunner.VerifyWasCalled(Times(2)).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call func(*controllers.APIController, http.ResponseWriter, *http.Request)
+	}{
+		{name: "plan", call: (*controllers.APIController).Plan},
+		{name: "apply", call: (*controllers.APIController).Apply},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			repoDir, _ := initAPIControllerGitRepo(t)
+			workingDir := ac.WorkingDir.(*MockWorkingDir)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+				ThenReturn(repoDir, nil)
+			var capturedCtx *command.Context
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					capturedCtx = args[0].(*command.Context)
+					return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "v1.2.3",
+				Type:       "Gitlab",
+				Projects:   []string{"default"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			tc.call(ac, w, req)
+
+			Equals(t, http.StatusOK, w.Code)
+			Assert(t, capturedCtx != nil, "expected plan command builder to be called")
+			Assert(t, capturedCtx.SkipPRModifiedFiles, "synthetic no-PR legacy API commands must not query PR modified files")
+			Assert(t, capturedCtx.SkipAPIBaseBranchVerification, "tag refs without base_branch should preserve legacy no-PR behavior")
+		})
+	}
 }
 
 func TestAPIController_ApplyTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
@@ -1436,6 +1526,23 @@ func TestAPIController_DriftStatus_MissingType(t *testing.T) {
 	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
 }
 
+func TestAPIController_DriftStatus_UnsupportedVCSType(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+	vcsClient := ac.VCSClient.(*MockClient)
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=BitbucketCloud", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
+	Assert(t, strings.Contains(apiErr.Message, "unsupported VCS type"), "expected unsupported type error, got %q", apiErr.Message)
+	vcsClient.VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+}
+
 func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
@@ -2411,6 +2518,44 @@ func TestAPIController_DetectDriftSendsWebhookWhenDriftDetected(t *testing.T) {
 	Equals(t, events.DefaultWorkspace, sender.results[0].Projects[0].Workspace)
 }
 
+func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Your infrastructure matches the configuration."},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+	sender := &recordingDriftSender{}
+	ac.DriftWebhookSender = &webhooks.DriftWebhookSender{Webhooks: []webhooks.DriftSender{sender}}
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, 1, sender.calls)
+	Equals(t, 1, len(sender.results))
+	Equals(t, 0, sender.results[0].ProjectsWithDrift)
+	Equals(t, 1, len(sender.results[0].Projects))
+	Assert(t, !sender.results[0].Projects[0].HasDrift, "expected no-drift webhook project")
+}
+
 func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	var capturedCtx *command.Context
@@ -2497,6 +2642,48 @@ func TestAPIController_DetectDrift_PathScopedStoresDirectoryAndWorkspace(t *test
 	Equals(t, "modules/app", stored.Path)
 	Equals(t, "staging", stored.Workspace)
 	Equals(t, "main", stored.Ref)
+}
+
+func TestAPIController_DetectDrift_ProjectAndPathSelectorsStayCombined(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+
+	var capturedCmds []*events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			capturedCmds = append(capturedCmds, cmd)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: cmd.ProjectName,
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   cmd.Workspace,
+			}}, nil}
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+			Workspace: "prod",
+		}},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, 1, len(capturedCmds))
+	Equals(t, "app", capturedCmds[0].ProjectName)
+	Equals(t, "env", capturedCmds[0].RepoRelDir)
+	Equals(t, "prod", capturedCmds[0].Workspace)
 }
 
 func TestAPIController_DetectDrift_SHARefRequiresBaseBranch(t *testing.T) {

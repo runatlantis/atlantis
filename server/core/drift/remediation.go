@@ -7,7 +7,9 @@ package drift
 
 import (
 	"fmt"
+	pathpkg "path"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,6 +203,12 @@ func (s *InMemoryRemediationService) completeApplyProjectResults(req models.Reme
 
 // getProjectsToRemediate determines which projects to remediate based on the request.
 func (s *InMemoryRemediationService) getProjectsToRemediate(req models.RemediationRequest) ([]models.ProjectDrift, error) {
+	var err error
+	req, err = normalizeRemediationRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
 	var projects []models.ProjectDrift
 	storageRepository := remediationStorageRepository(req)
 
@@ -310,6 +318,32 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	}
 
 	return projects, nil
+}
+
+func normalizeRemediationRequest(req models.RemediationRequest) (models.RemediationRequest, error) {
+	for i := range req.Paths {
+		directory, err := normalizeRemediationPath(req.Paths[i].Directory)
+		if err != nil {
+			return req, err
+		}
+		req.Paths[i].Directory = directory
+	}
+	return req, nil
+}
+
+func normalizeRemediationPath(directory string) (string, error) {
+	trimmed := strings.TrimSpace(directory)
+	if trimmed == "" {
+		return "", fmt.Errorf("path directory cannot be empty")
+	}
+	if strings.Contains(trimmed, "\\") {
+		return "", fmt.Errorf("path directory %q is invalid", directory)
+	}
+	cleaned := pathpkg.Clean(trimmed)
+	if pathpkg.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("path directory %q is invalid", directory)
+	}
+	return cleaned, nil
 }
 
 func remediationStorageRepository(req models.RemediationRequest) string {

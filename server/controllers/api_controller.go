@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,6 +37,8 @@ import (
 const atlantisTokenHeader = "X-Atlantis-Token"
 
 var nonPRPullCounter atomic.Int64
+
+var apiErrorURLCredentialRE = regexp.MustCompile("(?i)(https?://)([^\\s/@]+:)?[^\\s/@]+@")
 
 type APIController struct {
 	APISecret                       []byte
@@ -223,6 +226,28 @@ func (a *APIController) apiReportLegacyError(w http.ResponseWriter, code int, er
 	})
 }
 
+func sanitizeAPIError(ctx *command.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	return errors.New(sanitizeAPIErrorString(ctx, err.Error()))
+}
+
+func sanitizeAPIErrorString(ctx *command.Context, message string) string {
+	if ctx != nil {
+		message = sanitizeRepoCloneURL(message, ctx.HeadRepo)
+		message = sanitizeRepoCloneURL(message, ctx.Pull.BaseRepo)
+	}
+	return apiErrorURLCredentialRE.ReplaceAllString(message, "$1<redacted>@")
+}
+
+func sanitizeRepoCloneURL(message string, repo models.Repo) string {
+	if repo.CloneURL == "" || repo.SanitizedCloneURL == "" {
+		return message
+	}
+	return strings.ReplaceAll(message, repo.CloneURL, repo.SanitizedCloneURL)
+}
+
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
@@ -395,6 +420,11 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 			ValidationError{Field: "type", Message: err.Error()})
 		return
 	}
+	if !models.IsSupportedDriftVCSHostType(VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "unsupported VCS type",
+			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
+		return
+	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
 	if err != nil {
 		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
@@ -455,13 +485,13 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	// ensure workingDir is present
 	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
 	if err != nil {
-		return err
+		return sanitizeAPIError(ctx, err)
 	}
 
 	if err := resolveNonPRHeadCommit(ctx, repoDir); err != nil {
-		return err
+		return sanitizeAPIError(ctx, err)
 	}
-	return verifyNonPRBaseBranchReachability(ctx, repoDir)
+	return sanitizeAPIError(ctx, verifyNonPRBaseBranchReachability(ctx, repoDir))
 }
 
 func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
@@ -504,6 +534,9 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 	if baseBranch == "" || headRef == "" {
 		return nil
 	}
+	if ctx.SkipAPIBaseBranchVerification {
+		return nil
+	}
 	if baseBranch == headRef && !models.RequiresBaseBranchForRef(headRef) {
 		return nil
 	}
@@ -514,19 +547,19 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 	remoteBaseRef := "refs/remotes/origin/" + baseRef
 	fetchRef := fmt.Sprintf("+refs/heads/%s:%s", baseRef, remoteBaseRef)
 	if output, err := fetchAPIBaseBranch(repoDir, fetchRef); err != nil {
-		return fmt.Errorf("verifying API base branch %q: %s: %w", baseBranch, strings.TrimSpace(output), err)
+		return fmt.Errorf("verifying API base branch %q: %s: %w", baseBranch, sanitizeAPIErrorString(ctx, strings.TrimSpace(output)), err)
 	}
 	if output, err := checkedOutCommitReachableFromAPIBase(repoDir, ctx.Pull.HeadCommit, remoteBaseRef); err == nil {
 		return nil
 	} else if !isShallowGitRepo(repoDir) {
-		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
+		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, sanitizeAPIErrorString(ctx, strings.TrimSpace(output)), err)
 	}
 
 	if _, err := unshallowAPIBaseBranch(repoDir, fetchRef); err != nil {
-		ctx.Log.Debug("unable to unshallow API checkout while verifying base branch: %v", err)
+		ctx.Log.Debug("unable to unshallow API checkout while verifying base branch: %v", sanitizeAPIError(ctx, err))
 	}
 	if output, err := checkedOutCommitReachableFromAPIBase(repoDir, ctx.Pull.HeadCommit, remoteBaseRef); err != nil {
-		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
+		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, sanitizeAPIErrorString(ctx, strings.TrimSpace(output)), err)
 	}
 	return nil
 }
@@ -847,6 +880,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
+	syntheticNonPR := request.PR <= 0
 	pullNum := request.PR
 	if pullNum <= 0 {
 		pullNum = nextNonPRPullNum()
@@ -859,12 +893,14 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		BaseRepo:   baseRepo,
 	}
 	ctx := &command.Context{
-		HeadRepo:                  baseRepo,
-		Pull:                      pull,
-		Scope:                     a.Scope,
-		Log:                       a.Logger,
-		API:                       true,
-		FailOnTeamAllowlistDenied: true,
+		HeadRepo:                      baseRepo,
+		Pull:                          pull,
+		Scope:                         a.Scope,
+		Log:                           a.Logger,
+		API:                           true,
+		SkipPRModifiedFiles:           syntheticNonPR,
+		FailOnTeamAllowlistDenied:     true,
+		SkipAPIBaseBranchVerification: syntheticNonPR && strings.TrimSpace(request.BaseBranch) == "" && models.RequiresBaseBranchForRef(request.Ref),
 	}
 	a.populatePullRequestStatus(ctx)
 	return &request, ctx, http.StatusOK, nil
@@ -1031,6 +1067,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		API:                       true,
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
+		SuppressJobOutput:         true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1099,6 +1136,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		API:                       true,
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
+		SuppressJobOutput:         true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1184,6 +1222,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		API:                       true,
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
+		SuppressJobOutput:         true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1524,6 +1563,11 @@ func (a *APIController) parseAllowlistedRepo(w http.ResponseWriter, r *http.Requ
 			ValidationError{Field: "type", Message: err.Error()})
 		return models.Repo{}, false
 	}
+	if !models.IsSupportedDriftVCSHostType(VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "unsupported VCS type",
+			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
+		return models.Repo{}, false
+	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
 	if err != nil {
 		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
@@ -1588,6 +1632,11 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	if err != nil {
 		responder.ValidationFailed(w, r, "invalid VCS type",
 			ValidationError{Field: "type", Message: err.Error()})
+		return
+	}
+	if !models.IsSupportedDriftVCSHostType(VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "unsupported VCS type",
+			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
 		return
 	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
@@ -1856,10 +1905,15 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
 	}
 
-	if len(request.Projects) > 0 {
+	if len(request.Projects) > 0 && len(request.Paths) > 0 {
+		for _, project := range request.Projects {
+			for _, p := range request.Paths {
+				apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{ProjectName: project, Directory: p.Directory, Workspace: p.Workspace})
+			}
+		}
+	} else if len(request.Projects) > 0 {
 		apiRequest.Projects = request.Projects
-	}
-	if len(request.Paths) > 0 {
+	} else if len(request.Paths) > 0 {
 		for _, p := range request.Paths {
 			apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{Directory: p.Directory, Workspace: p.Workspace})
 		}
@@ -1880,6 +1934,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		API:                       true,
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
+		SuppressJobOutput:         true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1935,8 +1990,9 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Send drift webhook notifications if drift was detected
-	if a.DriftWebhookSender != nil && detectionResult.ProjectsWithDrift > 0 {
+	// Send drift webhook notifications for completed detections, including
+	// no-drift heartbeat results.
+	if a.DriftWebhookSender != nil && !driftDetectionHasErrors(detectionResult) {
 		webhookResult := convertToDriftWebhookResult(detectionResult)
 		if err := a.DriftWebhookSender.Send(a.Logger, webhookResult); err != nil {
 			a.Logger.Warn("failed to send drift webhook: %v", err)

@@ -477,7 +477,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, true, c.projectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }

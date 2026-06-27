@@ -151,6 +151,10 @@ type ProjectContext struct {
 	// SuppressVCSStatus prevents API workflows such as drift detection from
 	// publishing normal PR lifecycle commit statuses.
 	SuppressVCSStatus bool
+
+	// SuppressJobOutput prevents API workflows such as drift detection from
+	// publishing raw command output to the public job stream.
+	SuppressJobOutput bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

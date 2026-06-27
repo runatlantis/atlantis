@@ -617,8 +617,8 @@ it does execute the normal plan lifecycle, including configured pre-workflow hoo
 custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
 will initialize in-memory storage for drift detection results and a remediation service,
 making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
-are configured (`event: drift`), notifications are sent to Slack or HTTP endpoints when drift
-is detected. Drift detection does not bypass team allowlists or PR-state
+are configured (`event: drift`), successful detection runs send notifications to Slack or HTTP endpoints,
+including no-drift heartbeat results. Drift detection does not bypass team allowlists or PR-state
 `plan_requirements` such as `approved` or `mergeable`; those checks fail closed when
 they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
 `--enable-drift-remediation`. Defaults to `false`.

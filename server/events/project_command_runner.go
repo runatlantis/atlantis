@@ -177,13 +177,17 @@ type ProjectOutputWrapper struct {
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	if !ctx.SuppressJobOutput {
+		p.JobMessageSender.Send(ctx, "", OperationComplete)
+	}
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	if !ctx.SuppressJobOutput {
+		p.JobMessageSender.Send(ctx, "", OperationComplete)
+	}
 	return result
 }
 
@@ -1036,7 +1040,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output, step.FilterRegexes)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, !ctx.SuppressJobOutput, step.Output, step.FilterRegexes)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out

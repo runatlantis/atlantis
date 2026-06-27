@@ -119,6 +119,44 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 }
 
+func TestDefaultProjectCommandRunner_PlanSuppressesCustomRunStepStreaming(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockRun := mocks.NewMockCustomStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             mockRun,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		Steps:             []valid.Step{{StepName: "run"}},
+		Workspace:         "default",
+		RepoRelDir:        ".",
+		SuppressJobOutput: true,
+	}
+	When(mockRun.Run(ctx, nil, "", repoDir, map[string]string{}, false, nil, nil)).ThenReturn("run", nil)
+
+	res := runner.Plan(ctx)
+
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, map[string]string{}, false, nil, nil)
+}
+
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
 	ctx := command.ProjectContext{
@@ -293,6 +331,32 @@ func TestProjectOutputWrapper(t *testing.T) {
 			mockJobMessageSender.VerifyWasCalled(Times(expectedSends)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 		})
 	}
+}
+
+func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		SuppressVCSStatus: true,
+		SuppressJobOutput: true,
+	}
+	expected := command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	When(mockProjectCommandRunner.Plan(ctx)).ThenReturn(expected)
+
+	runner := &events.ProjectOutputWrapper{
+		ProjectCommandRunner: mockProjectCommandRunner,
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+	}
+	result := runner.Plan(ctx)
+
+	Equals(t, expected, result)
+	mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Any[command.Name](), Any[models.CommitStatus](), Any[*command.ProjectCommandOutput]())
+	mockJobMessageSender.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 }
 
 func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {

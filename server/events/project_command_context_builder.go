@@ -331,6 +331,7 @@ func newProjectCommandContext(ctx *command.Context,
 		API:                        ctx.API,
 		SkipPRRequirements:         ctx.SkipPRRequirements,
 		SuppressVCSStatus:          ctx.SuppressVCSStatus,
+		SuppressJobOutput:          ctx.SuppressJobOutput,
 	}
 }
 

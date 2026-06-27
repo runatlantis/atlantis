@@ -779,6 +779,101 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfiguredProjects(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"app": map[string]any{
+			"main.tf": nil,
+		},
+		"db": map[string]any{
+			"main.tf": nil,
+		},
+		"release": map[string]any{
+			"main.tf": nil,
+		},
+	})
+	atlantisYAML := "version: 3\n" +
+		"projects:\n" +
+		"  - name: app\n" +
+		"    dir: app\n" +
+		"    workspace: prod\n" +
+		"    execution_order_group: 2\n" +
+		"    branch: /main/\n" +
+		"  - name: db\n" +
+		"    dir: db\n" +
+		"    workspace: default\n" +
+		"    execution_order_group: 1\n" +
+		"    branch: /main/\n" +
+		"  - name: release-only\n" +
+		"    dir: release\n" +
+		"    workspace: default\n" +
+		"    execution_order_group: 3\n" +
+		"    branch: /release/\n"
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(atlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	ctxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: models.Repo{FullName: "owner/repo"},
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "owner/repo"},
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+	Ok(t, err)
+
+	byName := make(map[string]command.ProjectContext, len(ctxs))
+	for _, ctx := range ctxs {
+		byName[ctx.ProjectName] = ctx
+	}
+	Equals(t, 2, len(byName))
+	Equals(t, "app", byName["app"].RepoRelDir)
+	Equals(t, "prod", byName["app"].Workspace)
+	Equals(t, 2, byName["app"].ExecutionOrderGroup)
+	Equals(t, "db", byName["db"].RepoRelDir)
+	Equals(t, "default", byName["db"].Workspace)
+	Equals(t, 1, byName["db"].ExecutionOrderGroup)
+	_, releaseIncluded := byName["release-only"]
+	Assert(t, !releaseIncluded, "branch-filtered release project should not be included for main")
+	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
 func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITeamAllowlist(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

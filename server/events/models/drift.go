@@ -64,6 +64,21 @@ func requiresBaseBranch(ref string) bool {
 	return RequiresBaseBranchForRef(ref)
 }
 
+// IsSupportedDriftVCSHostType reports whether the drift API can parse and
+// execute requests for a VCS provider today.
+func IsSupportedDriftVCSHostType(vcsType string) bool {
+	switch vcsType {
+	case "Github", "Gitlab", "Gitea":
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedDriftVCSTypeMessage() string {
+	return "type must be one of: Github, Gitlab, Gitea"
+}
+
 // NormalizeAPIRef normalizes branch refs used by drift and API command requests.
 func NormalizeAPIRef(ref string) string {
 	return strings.TrimPrefix(strings.TrimSpace(ref), "refs/heads/")
@@ -279,8 +294,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
-	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {
-		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, BitbucketCloud, BitbucketServer, AzureDevops, Gitea"})
+	} else if !IsSupportedDriftVCSHostType(r.Type) {
+		errors = append(errors, FieldError{Field: "type", Message: supportedDriftVCSTypeMessage()})
 	}
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {

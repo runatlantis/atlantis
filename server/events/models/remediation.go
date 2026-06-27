@@ -116,8 +116,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
-	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {
-		errors = append(errors, FieldError{Field: "type", Message: "type must be one of: Github, Gitlab, BitbucketCloud, BitbucketServer, AzureDevops, Gitea"})
+	} else if !IsSupportedDriftVCSHostType(r.Type) {
+		errors = append(errors, FieldError{Field: "type", Message: supportedDriftVCSTypeMessage()})
 	}
 	if !r.Action.IsValid() {
 		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})

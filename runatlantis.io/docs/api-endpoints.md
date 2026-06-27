@@ -301,7 +301,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 | repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                               |
 | ref         | string               | Yes         | Git reference (branch/tag/commit) to use for remediation                |
 | base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks     |
-| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                            |
+| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                    |
 | action      | string               | No          | Remediation action: `plan` (default) or `apply`                         |
 | projects    | []string             | No          | List of project names to remediate. If empty, uses drift detection data |
 | paths       | []DriftDetectionPath | No          | List of repo-relative directories/workspaces to remediate               |
@@ -565,7 +565,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 Trigger drift detection for projects in a repository. This endpoint initiates a plan operation to detect infrastructure drift without requiring a pull request. Results are stored for later retrieval via the drift status endpoints.
 
-When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) are configured (`event: drift`), webhook notifications are sent automatically to Slack channels and/or HTTP endpoints.
+When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) are configured (`event: drift`), successful detection runs send webhook notifications automatically to Slack channels and/or HTTP endpoints, including no-drift heartbeat results.
 
 ::: tip Prerequisites
 
@@ -580,7 +580,7 @@ When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#d
 | repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                           |
 | ref         | string               | Yes         | Git reference (branch/tag/commit) to check for drift                |
 | base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks |
-| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                        |
+| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                |
 | projects    | []string             | No          | List of project names to check. If empty, all are checked           |
 | paths       | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used            |
 
@@ -596,7 +596,7 @@ At least one of `projects` or `paths` should be specified for targeted detection
 :::
 
 ::: tip Status Side Effects
-Drift detection suppresses normal Atlantis plan, policy check, apply, and hook commit statuses. Drift-specific webhook notifications can still be sent when drift webhooks are configured.
+Drift detection suppresses normal Atlantis plan, policy check, apply, and hook commit statuses. Drift-specific webhook notifications can still be sent for successful detection runs, including no-drift heartbeat results, when drift webhooks are configured.
 
 Drift detection does not run Terraform apply, but it does execute the normal plan lifecycle. Configured pre-workflow hooks, custom workflows, custom plan steps, and Terraform plan commands can run server-side outside a pull request context.
 
@@ -713,7 +713,7 @@ Drift remediation must be enabled on the Atlantis server. If not enabled, this e
 | Name       | Type   | Required | Description                                                  |
 |------------|--------|----------|--------------------------------------------------------------|
 | repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
-| type       | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)                 |
+| type       | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`, `Gitea`)        |
 | limit      | int    | No       | Maximum number of results to return (default: 10, max: 100)  |
 
 #### Sample Request
@@ -823,7 +823,7 @@ Drift remediation must be enabled on the Atlantis server. If not enabled, this e
 | Name       | Type   | Required | Description                                  |
 |------------|--------|----------|----------------------------------------------|
 | repository | string | Yes      | Full repository name (e.g., `owner/repo`)    |
-| type       | string | Yes      | Type of the VCS provider (`Github`/`Gitlab`) |
+| type       | string | Yes      | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`) |
 
 #### Sample Request
 
@@ -953,7 +953,7 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 | Name        | Type   | Required | Description                                            |
 |-------------|--------|----------|--------------------------------------------------------|
 | repository  | string | Yes      | Full repository name (e.g., `owner/repo`)              |
-| type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)           |
+| type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`, `Gitea`)  |
 | project     | string | No       | Filter by project name                                 |
 | path        | string | No       | Filter by repository-relative project path             |
 | workspace   | string | No       | Filter by Terraform workspace                          |
