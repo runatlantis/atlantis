@@ -640,7 +640,7 @@ The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](r
 
 This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
+When `--restrict-file-list` is enabled, regex project plans are limited to matching projects with files modified in the pull request. Without `--restrict-file-list`, regex project commands can still run against all matching projects.
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
@@ -1409,8 +1409,7 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 ```
 
 `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
-This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
+When `--enable-regexp-cmd` is also enabled, regex project plans such as `atlantis plan -p .*` are scoped to matching projects with files modified in the pull request.
 Defaults to `false`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>
