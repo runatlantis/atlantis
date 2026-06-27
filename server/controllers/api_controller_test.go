@@ -1564,6 +1564,106 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	Equals(t, "Repo", result.Repository)
 }
 
+func TestAPIController_DetectDrift_SkipsPolicyCheckResults(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "modules/app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "modules/app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.CommandName == command.PolicyCheck {
+				return ReturnValues{command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+				},
+			}}
+		})
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	_, storedDrift := driftStorage.VerifyWasCalledOnce().
+		Store(Eq("Repo"), Any[models.ProjectDrift]()).
+		GetCapturedArguments()
+	Equals(t, "app", storedDrift.ProjectName)
+	Equals(t, "modules/app", storedDrift.Path)
+	Equals(t, events.DefaultWorkspace, storedDrift.Workspace)
+	Equals(t, true, storedDrift.Drift.HasDrift)
+	Equals(t, 1, storedDrift.Drift.ToAdd)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, "app", result.Projects[0].ProjectName)
+	Equals(t, true, result.Projects[0].HasDrift)
+	Equals(t, 1, result.Projects[0].Drift.ToAdd)
+}
+
+func TestAPIController_DetectDrift_CleansSyntheticWorkdir(t *testing.T) {
+	ac, _, _ := setup(t)
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+
+	_, _, pull := workingDir.VerifyWasCalledOnce().
+		Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]()).
+		GetCapturedArguments()
+	Assert(t, pull.Num < 0, "expected synthetic non-PR pull number, got %d", pull.Num)
+}
+
 func TestAPIController_DetectDrift_NoStorage(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)

@@ -79,6 +79,15 @@ func nextNonPRPullNum() int {
 	return -int((time.Now().UnixNano() & 0x3fffffff) + nonPRPullCounter.Add(1))
 }
 
+func (a *APIController) cleanupNonPRWorkingDir(ctx *command.Context) {
+	if ctx.Pull.Num > 0 {
+		return
+	}
+	if err := a.WorkingDir.Delete(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull); err != nil {
+		ctx.Log.Warn("cleaning up API working directory: %s", err)
+	}
+}
+
 type APIRequest struct {
 	Repository string `validate:"required"`
 	Ref        string `validate:"required"`
@@ -182,6 +191,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		responder.InternalError(w, r, err)
 		return
 	}
+	defer a.cleanupNonPRWorkingDir(ctx)
 
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
@@ -220,6 +230,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		responder.InternalError(w, r, err)
 		return
 	}
+	defer a.cleanupNonPRWorkingDir(ctx)
 
 	// We must first make the plan for all projects
 	result, err := a.apiPlan(request, ctx)
@@ -236,6 +247,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// The API apply endpoint runs plan first. Refresh PR status afterward so
 	// apply requirements evaluate the VCS state the plan phase just produced.
 	a.populatePullRequestStatus(ctx)
+	seedPullStatusFromPlanResult(ctx, result)
 
 	// We can now prepare and run the apply step
 	result, err = a.apiApply(request, ctx)
@@ -486,6 +498,39 @@ func updatePullStatusFromProjectResult(ctx *command.Context, result command.Proj
 	}
 }
 
+func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) {
+	if result == nil {
+		return
+	}
+	if ctx.PullStatus == nil {
+		ctx.PullStatus = &models.PullStatus{Pull: ctx.Pull}
+	}
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Command != command.Plan {
+			continue
+		}
+		upsertProjectStatus(ctx.PullStatus, models.ProjectStatus{
+			Workspace:   projectResult.Workspace,
+			RepoRelDir:  projectResult.RepoRelDir,
+			ProjectName: projectResult.ProjectName,
+			Status:      projectResult.PlanStatus(),
+		})
+	}
+}
+
+func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectStatus) {
+	for idx := range pullStatus.Projects {
+		project := &pullStatus.Projects[idx]
+		if status.Workspace == project.Workspace &&
+			status.RepoRelDir == project.RepoRelDir &&
+			status.ProjectName == project.ProjectName {
+			project.Status = status.Status
+			return
+		}
+	}
+	pullStatus.Projects = append(pullStatus.Projects, status)
+}
+
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
 		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
@@ -704,6 +749,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	if err := e.controller.apiSetup(ctx, command.Plan); err != nil {
 		return "", nil, fmt.Errorf("setup failed: %w", err)
 	}
+	defer e.controller.cleanupNonPRWorkingDir(ctx)
 
 	// Run pre-workflow hooks before project discovery
 	preHookCmd := &events.CommentCommand{Name: command.Plan}
@@ -767,6 +813,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
 		return "", fmt.Errorf("setup failed: %w", err)
 	}
+	defer e.controller.cleanupNonPRWorkingDir(ctx)
 
 	// Run pre-workflow hooks before project discovery
 	preHookCmd := &events.CommentCommand{Name: command.Apply}
@@ -787,6 +834,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		output, _ := planRemediationOutput(planResult)
 		return output.String(), fmt.Errorf("plan had errors")
 	}
+	seedPullStatusFromPlanResult(ctx, planResult)
 
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
@@ -1049,6 +1097,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.InternalError(w, r, fmt.Errorf("setup failed: %w", err))
 		return
 	}
+	defer a.cleanupNonPRWorkingDir(ctx)
 
 	// Run pre-workflow hooks before project discovery so hooks can
 	// dynamically generate atlantis.yaml or other config files.
@@ -1072,6 +1121,9 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
 
 	for _, pr := range result.ProjectResults {
+		if pr.Command != command.Plan {
+			continue
+		}
 		projectDrift := models.ProjectDrift{
 			ProjectName: pr.ProjectName,
 			Path:        pr.RepoRelDir,
