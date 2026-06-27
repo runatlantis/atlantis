@@ -1,0 +1,76 @@
+openapi: 3.0.3
+
+info:
+  title: Atlantis API
+  version: "0.1.0"
+  description: >
+    Public HTTP API for Atlantis.
+    This API is intended for automation and integrations.
+
+paths: {}
+
+components:
+  schemas:
+
+    PlanResponse:
+      type: object
+      required:
+        - project_results
+      properties:
+        error:
+          type: string
+          nullable: true
+          x-omitempty: true
+          description: >
+            Error that occurred before per-project planning began.
+            If set, project_results may be empty.
+
+        project_results:
+          type: array
+          description: Per-project Terraform plan results.
+          items:
+            $ref: "#/components/schemas/PlanProjectResponse"
+
+    PlanProjectResponse:
+      type: object
+      required:
+        - success
+        - repo_rel_dir
+        - workspace
+        - project_name
+      properties:
+        success:
+          type: boolean
+          description: >
+            Whether the Terraform plan for this project succeeded.
+            When false, error will be set and terraform_output will be omitted.
+            When true, terraform_output may be set and error will be omitted.
+
+        error:
+          type: string
+          nullable: true
+          x-omitempty: true
+          description: >
+            Error that occurred while planning this project.
+            Present only when success is false.
+
+        repo_rel_dir:
+          type: string
+          description: Repository-relative directory of the Terraform project.
+
+        workspace:
+          type: string
+          description: Terraform workspace used for the plan.
+
+        project_name:
+          type: string
+          description: Logical name of the project.
+
+        terraform_output:
+          type: string
+          nullable: true
+          x-omitempty: true
+          description: >
+            Raw Terraform plan output for this project.
+            Present only when success is true.
+
