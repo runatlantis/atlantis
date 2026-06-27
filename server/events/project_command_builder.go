@@ -849,6 +849,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, ErrIgnoredTargetedDir
 	}
 
+	var restrictedRegexProjects []valid.Project
+	var restrictedRegexRepoCfg *valid.RepoCfg
 	if p.RestrictFileList {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
@@ -884,7 +886,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 		if cmd.ProjectName != "" {
 			ctx.Log.Debug("Command project name specified: %s", cmd.ProjectName)
-			var notFoundFiles = []string{}
 			var repoConfig valid.RepoCfg
 
 			repoConfig, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
@@ -892,23 +893,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 				return pcc, err
 			}
 			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
-
-			for _, f := range modifiedFiles {
-				foundDir := false
-
-				for _, p := range repoCfgProjects {
-					if filepath.Dir(f) == p.Dir {
-						foundDir = true
-					}
-				}
-
-				if !foundDir {
-					notFoundFiles = append(notFoundFiles, filepath.Dir(f))
-				}
-			}
+			notFoundFiles := modifiedFilesOutsideProjects(modifiedFiles, repoCfgProjects)
 
 			if len(notFoundFiles) > 0 {
 				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
+			}
+			if p.EnableRegExpCmd && len(repoCfgProjects) > 1 {
+				restrictedRegexProjects = filterProjectsByModifiedFiles(repoCfgProjects, modifiedFiles)
+				if len(restrictedRegexProjects) == 0 {
+					return pcc, fmt.Errorf("no modified files match requested project %q", cmd.ProjectName)
+				}
+				restrictedRegexRepoCfg = &repoConfig
 			}
 		}
 	}
@@ -919,6 +914,20 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		if err != nil {
 			return pcc, err
 		}
+	}
+	if restrictedRegexRepoCfg != nil {
+		return p.buildProjectCommandCtxWithCfg(
+			ctx,
+			command.Plan,
+			"",
+			cmd.Flags,
+			defaultRepoDir,
+			repoRelDir,
+			workspace,
+			cmd.Verbose,
+			restrictedRegexProjects,
+			restrictedRegexRepoCfg,
+		)
 	}
 
 	return p.buildProjectCommandCtx(
@@ -1146,6 +1155,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	if err != nil {
 		return []command.ProjectContext{}, err
 	}
+	return p.buildProjectCommandCtxWithCfg(ctx, cmd, subCmd, commentFlags, repoDir, repoRelDir, workspace, verbose, matchingProjects, repoCfgPtr)
+}
+
+func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *command.Context,
+	cmd command.Name,
+	subCmd string,
+	commentFlags []string,
+	repoDir string,
+	repoRelDir string,
+	workspace string,
+	verbose bool,
+	matchingProjects []valid.Project,
+	repoCfgPtr *valid.RepoCfg) ([]command.ProjectContext, error) {
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
 	automerge := p.EnableAutoMerge
@@ -1245,6 +1267,37 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	})
 
 	return projCtxs, nil
+}
+
+func modifiedFilesOutsideProjects(modifiedFiles []string, projects []valid.Project) []string {
+	projectDirs := make(map[string]struct{}, len(projects))
+	for _, project := range projects {
+		projectDirs[filepath.Clean(project.Dir)] = struct{}{}
+	}
+
+	var notFoundFiles []string
+	for _, file := range modifiedFiles {
+		dir := filepath.Clean(filepath.Dir(file))
+		if _, ok := projectDirs[dir]; !ok {
+			notFoundFiles = append(notFoundFiles, filepath.Dir(file))
+		}
+	}
+	return notFoundFiles
+}
+
+func filterProjectsByModifiedFiles(projects []valid.Project, modifiedFiles []string) []valid.Project {
+	modifiedDirs := make(map[string]struct{}, len(modifiedFiles))
+	for _, file := range modifiedFiles {
+		modifiedDirs[filepath.Clean(filepath.Dir(file))] = struct{}{}
+	}
+
+	var filtered []valid.Project
+	for _, project := range projects {
+		if _, ok := modifiedDirs[filepath.Clean(project.Dir)]; ok {
+			filtered = append(filtered, project)
+		}
+	}
+	return filtered
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

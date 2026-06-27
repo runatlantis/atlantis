@@ -1824,9 +1824,12 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		Cmd                events.CommentCommand
+		EnableRegExpCmd    bool
 		ExpErr             string
 		ExpNoProjects      bool
 		ExpSkipFileList    bool
+		ExpProjectNames    []string
+		ExpCloneWorkspaces []string
 	}{
 		{
 			Description: "planning a file outside of the changed files",
@@ -1940,6 +1943,108 @@ projects:
 			},
 			ModifiedFiles: []string{"directory-1/main.tf"},
 		},
+		{
+			Description: "planning a regexp project only includes changed matching projects",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: ".*/shared",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles:   []string{"layers/cicd/shared/main.tf"},
+			ExpProjectNames: []string{"cicd/shared"},
+		},
+		{
+			Description: "planning a regexp project with non-default workspace clones the workspace before returning",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "staging",
+				ProjectName: ".*/shared",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+  workspace: staging
+- name: cicd/shared
+  dir: layers/cicd/shared
+  workspace: staging
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles:      []string{"layers/cicd/shared/main.tf"},
+			ExpProjectNames:    []string{"cicd/shared"},
+			ExpCloneWorkspaces: []string{"default", "staging"},
+		},
+		{
+			Description: "planning a regexp project outside of the changed files",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "athens/.*",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles: []string{"layers/cicd/shared/main.tf"},
+			ExpErr:        "the following directories are present in the pull request but not in the requested project:\nlayers/cicd/shared",
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
@@ -1981,7 +2086,7 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
 				userConfig.SkipCloneNoChanges,
-				userConfig.EnableRegExpCmd,
+				c.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
@@ -2016,9 +2121,98 @@ projects:
 				return
 			}
 			Ok(t, err)
-			Equals(t, 1, len(actCtxs))
+			if len(c.ExpCloneWorkspaces) > 0 {
+				_, _, _, cloneWorkspaces := workingDir.VerifyWasCalled(Times(len(c.ExpCloneWorkspaces))).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]()).GetAllCapturedArguments()
+				Equals(t, c.ExpCloneWorkspaces, cloneWorkspaces)
+			}
+			if len(c.ExpProjectNames) == 0 {
+				Equals(t, 1, len(actCtxs))
+				return
+			}
+			var actProjectNames []string
+			for _, actCtx := range actCtxs {
+				actProjectNames = append(actProjectNames, actCtx.ProjectName)
+			}
+			sort.Strings(actProjectNames)
+			Equals(t, c.ExpProjectNames, actProjectNames)
 		})
 	}
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanCommand_RegExpProjectWithoutRestrictFileList(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"layers": map[string]any{
+			"athens": map[string]any{
+				"shared": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			"cicd": map[string]any{
+				"shared": map[string]any{
+					"main.tf": nil,
+				},
+			},
+		},
+	})
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(`
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsmocks.NewMockClient(),
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		true,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		false,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+	)
+
+	actCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:   logger,
+		Scope: scope,
+	}, &events.CommentCommand{
+		Name:        command.Plan,
+		Workspace:   "default",
+		ProjectName: ".*/shared",
+	})
+
+	Ok(t, err)
+	var actProjectNames []string
+	for _, actCtx := range actCtxs {
+		actProjectNames = append(actProjectNames, actCtx.ProjectName)
+	}
+	sort.Strings(actProjectNames)
+	Equals(t, []string{"athens/shared", "cicd/shared"}, actProjectNames)
 }
 
 func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
