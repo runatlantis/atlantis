@@ -318,7 +318,7 @@ func TestEnsureVersion_downloaded(t *testing.T) {
 }
 
 // Test that EnsureVersion fails if the thing it downloads fails to run.
-func TestEnsureVersion_fails_if_cant_execute(t *testing.T) {
+func TestEnsureVersion_ErrsWhenDownloadedBinaryCannotExecute(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 	_, binDir, cacheDir := mkSubDirs(t)
@@ -338,7 +338,7 @@ func TestEnsureVersion_fails_if_cant_execute(t *testing.T) {
 
 	When(mockDownloader.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []Param) ReturnValues {
 		binPath := filepath.Join(params[1].(string), "terraform99.99.99")
-		err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 1"), 0700) // #nosec G306
+		err := writeExecutable(binPath, "exit 1")
 		return []ReturnValue{binPath, err}
 	})
 
@@ -350,11 +350,65 @@ func TestEnsureVersion_fails_if_cant_execute(t *testing.T) {
 }
 
 // Test that EnsureVersion fixes a broken binary.
-func TestEnsureVersion_fixes_broken_binary(t *testing.T) {
+func TestEnsureVersion_RedownloadsBrokenManagedBinary(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
-	_, binDir, cacheDir := mkSubDirs(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
 	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	mockDownloader := mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	downloadsAllowed := true
+	c, err := tfclient.NewTestClient(logger, distribution, binDir, cacheDir, "", "", "0.11.10", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, downloadsAllowed, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	Equals(t, "0.11.10", c.DefaultVersion().String())
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	binPath := filepath.Join(binDir, "terraform99.99.99")
+	Ok(t, writeExecutable(binPath, "exit 1"))
+
+	When(mockDownloader.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []Param) ReturnValues {
+		binPath := filepath.Join(params[1].(string), "terraform99.99.99")
+		err := writeExecutable(binPath, "echo '\nTerraform v99.99.99\n'")
+		return []ReturnValue{binPath, err}
+	})
+
+	err = c.EnsureVersion(logger, distribution, v)
+
+	Ok(t, err)
+
+	output, err := c.RunCommandWithVersion(ctx, tmp, []string{"terraform", "init"}, map[string]string{}, distribution, v, "")
+	Assert(t, err == nil, "err: %s: %s", err, output)
+	Equals(t, "\nTerraform v99.99.99\n\n", output)
+
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
+}
+
+func TestEnsureVersion_RedownloadsWithoutRemovingPathBinary(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	pathBinary := filepath.Join(pathDir, "terraform99.99.99")
+	Ok(t, writeExecutable(pathBinary, "exit 1"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
 
 	mockDownloader := mocks.NewMockDownloader()
 	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
@@ -370,19 +424,19 @@ func TestEnsureVersion_fixes_broken_binary(t *testing.T) {
 
 	When(mockDownloader.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []Param) ReturnValues {
 		binPath := filepath.Join(params[1].(string), "terraform99.99.99")
-		err := os.WriteFile(binPath, []byte("#!/bin/sh\nexit 1"), 0700) // #nosec G306
-		return []ReturnValue{binPath, err}
-	})
-
-	When(mockDownloader.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []Param) ReturnValues {
-		binPath := filepath.Join(params[1].(string), "terraform99.99.99")
-		err := os.WriteFile(binPath, []byte("#!/bin/sh\necho '\nTerraform v99.99.99'\n"), 0700) // #nosec G306
+		err := writeExecutable(binPath, "echo '\nTerraform v99.99.99\n'")
 		return []ReturnValue{binPath, err}
 	})
 
 	err = c.EnsureVersion(logger, distribution, v)
-
 	Ok(t, err)
+
+	_, err = os.Stat(pathBinary)
+	Ok(t, err)
+
+	output, err := c.RunCommandWithVersion(ctx, tmp, []string{"terraform", "init"}, map[string]string{}, distribution, v, "")
+	Assert(t, err == nil, "err: %s: %s", err, output)
+	Equals(t, "\nTerraform v99.99.99\n\n", output)
 
 	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
 }
@@ -451,6 +505,10 @@ func tempSetEnv(t *testing.T, key string, value string) func() {
 	orig := os.Getenv(key)
 	Ok(t, os.Setenv(key, value))
 	return func() { os.Setenv(key, orig) }
+}
+
+func writeExecutable(path string, body string) error {
+	return os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0700) // #nosec G306
 }
 
 // returns parent, bindir, cachedir

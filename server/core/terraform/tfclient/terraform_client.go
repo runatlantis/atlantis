@@ -488,7 +488,6 @@ func ensureVersion(
 	downloadsAllowed bool,
 	redownloadOnFailedExecution bool,
 ) (string, error) {
-
 	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, v, binDir, downloadURL, downloadsAllowed)
 	if err != nil {
 		return "", err
@@ -496,36 +495,44 @@ func ensureVersion(
 	if !redownloadOnFailedExecution {
 		return binPath, nil
 	}
-	// Try running a test command (i.e. `terraform version`). If it doesn't work, try deleting the binary and redownloading it
-	for attempt := range 2 {
 
-		_, err := getVersion(binPath, dist.BinName())
-		if err == nil {
-			// The command succeeded, the installed binary looks good
-			break
+	binName := dist.BinName()
+	if err := validateVersionBinary(binPath, binName); err == nil {
+		return binPath, nil
+	} else if !downloadsAllowed {
+		return "", invalidVersionBinaryError(binPath, binName, err)
+	}
+
+	log.Warn("%s binary %s failed execution validation, attempting to re-download", binName, binPath)
+	delete(versions, v.String())
+	if isManagedVersionBinary(binPath, binDir) {
+		if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("removing cached %s binary for redownload at %s: %w", binName, binPath, err)
 		}
-		if attempt == 0 && downloadsAllowed {
-			log.Warn("%s binary %s failed execution validation, attempting to re-download", dist.BinName(), binPath)
-			delete(versions, v.String())
-			err := os.Remove(binPath)
-			if err != nil {
-				return "", fmt.Errorf("removing binary for redownload %s: %v", binPath, err)
-			}
+	}
 
-			binPath, err = findOrDownloadVersionBinaryPath(log, dist, versions, v, binDir, downloadURL, downloadsAllowed)
-			if err != nil {
-				return "", err
-			}
-			continue
-		}
-		return "", fmt.Errorf(
-			"terraform binary at %s failed to execute: %w",
-			binPath,
-			err,
-		)
-
+	binPath, err = downloadVersionBinary(log, dist, versions, v, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	if err := validateVersionBinary(binPath, binName); err != nil {
+		return "", invalidVersionBinaryError(binPath, binName, err)
 	}
 	return binPath, nil
+}
+
+func validateVersionBinary(binPath string, binName string) error {
+	_, err := getVersion(binPath, binName)
+	return err
+}
+
+func invalidVersionBinaryError(binPath string, binName string, err error) error {
+	return fmt.Errorf("%s binary at %s failed to execute: %w", binName, binPath, err)
+}
+
+func isManagedVersionBinary(binPath string, binDir string) bool {
+	rel, err := filepath.Rel(binDir, binPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
 
 // findOrDownloadVersionBinaryPath returns the path to a terraform binary of version v.
@@ -569,11 +576,20 @@ func findOrDownloadVersionBinaryPath(
 	}
 
 	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
+	return downloadVersionBinary(log, dist, versions, v, binDir, downloadURL)
+}
 
+func downloadVersionBinary(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+) (string, error) {
 	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
 
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
-
 	if err != nil {
 		return "", fmt.Errorf("error downloading %s version %s: %w", dist.BinName(), v.String(), err)
 	}
