@@ -44,7 +44,9 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
-	// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
+	// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+	// Non-exact constraints are resolved using the provided distribution, or the client default distribution when nil.
+	// Returns nil if unable to determine the version.
 	DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version
 }
 
@@ -287,9 +289,10 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	return tfVersions
 }
 
-// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-// It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
-// It will then select the highest version that satisfies the constraint.
+// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+// If downloads are allowed, non-exact constraints are resolved against the provided distribution, or the client
+// default distribution when nil, and the highest satisfying version is selected.
+// Returns nil if unable to determine the version.
 func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
 	module, diags := tfconfig.LoadModule(projectDirectory)
 	if diags.HasErrors() {
