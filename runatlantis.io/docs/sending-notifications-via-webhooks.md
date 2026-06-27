@@ -87,6 +87,7 @@ Example payload:
     "HeadBranch": "feature/some-branch",
     "BaseBranch": "main",
     "Author": "octocat",
+    "Body": "This is the pull request description.",
     "State": 0,
     "BaseRepo": {
       "FullName": "octocat/Hello-World",

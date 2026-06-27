@@ -222,6 +222,9 @@ type PullRequest struct {
 	BaseBranch string
 	// Author is the username of the pull request author.
 	Author string
+	// Body is the description of the pull request. It may be empty when the VCS
+	// payload omits a description.
+	Body string
 	// State will be one of Open or Closed.
 	// Gitlab supports an additional "merged" state but Github doesn't so we map
 	// merged to Closed.

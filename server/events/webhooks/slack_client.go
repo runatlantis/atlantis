@@ -7,12 +7,17 @@ package webhooks
 import (
 	"fmt"
 
+	"github.com/rivo/uniseg"
 	"github.com/slack-go/slack"
 )
 
 const (
 	slackSuccessColour = "good"
 	slackFailureColour = "danger"
+	// maxDescriptionGraphemeClusters is a readability cap for the pull request
+	// description, counted in user-visible grapheme clusters. It includes the
+	// trailing ellipsis when the description is truncated.
+	maxDescriptionGraphemeClusters = 1000
 )
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_slack_client.go SlackClient
@@ -110,5 +115,47 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 			},
 		},
 	}
+
+	// Include the pull request description when present, rendered as a
+	// full-width field and truncated so a long description can't exceed Slack's
+	// message size limits.
+	if applyResult.Pull.Body != "" {
+		attachment.Fields = append(attachment.Fields, slack.AttachmentField{
+			Title: "Description",
+			Value: truncateGraphemeClusters(applyResult.Pull.Body, maxDescriptionGraphemeClusters),
+			Short: false,
+		})
+	}
+
 	return []slack.Attachment{attachment}
+}
+
+// truncateGraphemeClusters returns s unchanged when it has at most max
+// grapheme clusters. Otherwise it is cut at a cluster boundary to max-1
+// clusters with an ellipsis appended. It walks the string without allocating a
+// slice for the whole input.
+func truncateGraphemeClusters(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+
+	count := 0
+	keepUntil := 0
+	offset := 0
+	state := -1
+	rest := s
+	for len(rest) > 0 {
+		cluster, remaining, _, nextState := uniseg.FirstGraphemeClusterInString(rest, state)
+		if count == max-1 {
+			keepUntil = offset
+		}
+		if count == max {
+			return s[:keepUntil] + "…"
+		}
+		offset += len(cluster)
+		rest = remaining
+		state = nextState
+		count++
+	}
+	return s
 }
