@@ -773,6 +773,23 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 	vcsClient := NewMockClient()
 	workingDir := NewMockWorkingDir()
 	Ok(t, err)
+	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())).
+		Then(func(args []Param) ReturnValues {
+			repository := args[2].(string)
+			return ReturnValues{fmt.Sprintf("https://example.com/%s.git", repository), nil}
+		})
+	When(parser.ParseAPIPlanRequest(Any[models.VCSHostType](), Any[string](), Any[string]())).
+		Then(func(args []Param) ReturnValues {
+			vcsType := args[0].(models.VCSHostType)
+			repository := args[1].(string)
+			return ReturnValues{models.Repo{
+				FullName: repository,
+				VCSHost: models.VCSHost{
+					Hostname: testVCSHostname(vcsType),
+					Type:     vcsType,
+				},
+			}, nil}
+		})
 
 	workingDirLocker := NewMockWorkingDirLocker()
 	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name]())).
@@ -828,6 +845,25 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 	return ac, projectCommandBuilder, projectCommandRunner
 }
 
+func testVCSHostname(vcsType models.VCSHostType) string {
+	switch vcsType {
+	case models.Github:
+		return "github.com"
+	case models.Gitlab:
+		return "gitlab.com"
+	case models.BitbucketCloud:
+		return "bitbucket.org"
+	case models.BitbucketServer:
+		return "bitbucket.example.com"
+	case models.AzureDevops:
+		return "dev.azure.com"
+	case models.Gitea:
+		return "gitea.example.com"
+	default:
+		return "example.com"
+	}
+}
+
 // parseAPIResponse is a helper to extract data from the API envelope response.
 func parseAPIResponse(t *testing.T, body []byte, target any) {
 	t.Helper()
@@ -854,11 +890,7 @@ func parseAPIError(t *testing.T, body []byte) *controllers.APIError {
 }
 
 func TestAPIController_DriftStatus(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
-
+	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
 	checkTime := time.Now()
 	mockDrifts := []models.ProjectDrift{
@@ -874,16 +906,11 @@ func TestAPIController_DriftStatus(t *testing.T) {
 			LastChecked: checkTime,
 		},
 	}
-	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
+	When(driftStorage.Get(Eq("github.com/owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
 
-	ac := controllers.APIController{
-		APISecret:    []byte(atlantisToken),
-		Logger:       logger,
-		Locker:       locker,
-		DriftStorage: driftStorage,
-	}
+	ac.DriftStorage = driftStorage
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
@@ -976,11 +1003,35 @@ func TestAPIController_DriftStatus_MissingRepository(t *testing.T) {
 	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
 }
 
-func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
+func TestAPIController_DriftStatus_MissingType(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
 	locker := NewMockLocker(gmockCtrl)
+	driftStorage := driftmocks.NewMockStorage()
+
+	ac := controllers.APIController{
+		APISecret:    []byte(atlantisToken),
+		Logger:       logger,
+		Locker:       locker,
+		DriftStorage: driftStorage,
+	}
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeValidation, apiErr.Code)
+	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
+}
+
+func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
+	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
 
 	checkTime := time.Now()
@@ -997,16 +1048,11 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 			LastChecked: checkTime,
 		},
 	}
-	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
+	When(driftStorage.Get(Eq("github.com/owner/repo"), Any[drift.GetOptions]())).ThenReturn(mockDrifts, nil)
 
-	ac := controllers.APIController{
-		APISecret:    []byte(atlantisToken),
-		Logger:       logger,
-		Locker:       locker,
-		DriftStorage: driftStorage,
-	}
+	ac.DriftStorage = driftStorage
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo&project=project1&path=modules/vpc&workspace=staging&ref=main", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&project=project1&path=modules/vpc&workspace=staging&ref=main", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
@@ -1014,7 +1060,7 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	// Verify the storage was called with correct options
-	_, opts := driftStorage.VerifyWasCalledOnce().Get(Eq("owner/repo"), Any[drift.GetOptions]()).GetCapturedArguments()
+	_, opts := driftStorage.VerifyWasCalledOnce().Get(Eq("github.com/owner/repo"), Any[drift.GetOptions]()).GetCapturedArguments()
 	Equals(t, "project1", opts.ProjectName)
 	Equals(t, "modules/vpc", opts.Path)
 	Equals(t, "staging", opts.Workspace)
@@ -1022,22 +1068,14 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 }
 
 func TestAPIController_DriftStatus_Empty(t *testing.T) {
-	RegisterMockTestingT(t)
-	gmockCtrl := gomock.NewController(t)
-	logger := logging.NewNoopLogger(t)
-	locker := NewMockLocker(gmockCtrl)
+	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
 
-	When(driftStorage.Get(Eq("owner/repo"), Any[drift.GetOptions]())).ThenReturn([]models.ProjectDrift{}, nil)
+	When(driftStorage.Get(Eq("github.com/owner/repo"), Any[drift.GetOptions]())).ThenReturn([]models.ProjectDrift{}, nil)
 
-	ac := controllers.APIController{
-		APISecret:    []byte(atlantisToken),
-		Logger:       logger,
-		Locker:       locker,
-		DriftStorage: driftStorage,
-	}
+	ac.DriftStorage = driftStorage
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
@@ -1078,7 +1116,12 @@ func TestAPIController_Remediate(t *testing.T) {
 			},
 		},
 	}
-	When(remediationService.Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())).ThenReturn(mockResult, nil)
+	var capturedRequest models.RemediationRequest
+	When(remediationService.Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())).
+		Then(func(args []Param) ReturnValues {
+			capturedRequest = args[0].(models.RemediationRequest)
+			return ReturnValues{mockResult, nil}
+		})
 
 	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Eq("owner/repo"))).ThenReturn("https://github.com/owner/repo.git", nil)
 	When(parser.ParseAPIPlanRequest(Any[models.VCSHostType](), Eq("owner/repo"), Any[string]())).ThenReturn(models.Repo{
@@ -1116,6 +1159,8 @@ func TestAPIController_Remediate(t *testing.T) {
 	Equals(t, "test-id", result.ID)
 	Equals(t, "success", result.Status)
 	Equals(t, 1, result.Summary.SuccessCount)
+	Equals(t, "owner/repo", capturedRequest.Repository)
+	Equals(t, "github.com/owner/repo", capturedRequest.StorageRepository)
 }
 
 func TestAPIController_Remediate_ProjectFailuresReturnMultiStatus(t *testing.T) {
@@ -1697,7 +1742,7 @@ func TestAPIController_DetectDrift_SkipsPolicyCheckResults(t *testing.T) {
 	Equals(t, http.StatusOK, w.Code)
 
 	_, storedDrift := driftStorage.VerifyWasCalledOnce().
-		Store(Eq("Repo"), Any[models.ProjectDrift]()).
+		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]()).
 		GetCapturedArguments()
 	Equals(t, "app", storedDrift.ProjectName)
 	Equals(t, "modules/app", storedDrift.Path)

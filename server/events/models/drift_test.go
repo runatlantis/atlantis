@@ -195,6 +195,17 @@ func TestNewDriftSummaryFromPlanSuccess_Nil(t *testing.T) {
 	Equals(t, models.DriftSummary{}, result)
 }
 
+func TestNewDriftSummaryFromPlanSuccess_OutsideOnlyDriftIncludesNote(t *testing.T) {
+	result := models.NewDriftSummaryFromPlanSuccess(&models.PlanSuccess{
+		TerraformOutput: "Note: Objects have changed outside of Terraform\ndummy\nNo changes. Infrastructure is up-to-date.",
+	})
+
+	Equals(t, true, result.HasDrift)
+	Equals(t, true, result.ChangesOutside)
+	Equals(t, 0, result.TotalChanges())
+	Equals(t, "\n**Note: Objects have changed outside of Terraform**\nNo changes. Infrastructure is up-to-date.", result.Summary)
+}
+
 func TestNewDriftStatusResponse(t *testing.T) {
 	projects := []models.ProjectDrift{
 		{

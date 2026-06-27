@@ -309,6 +309,7 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 // This is an authenticated endpoint that requires the API secret.
 // Query parameters:
 //   - repository: required, the full repository name (owner/repo)
+//   - type: required, the VCS provider type
 //   - project: optional, filter by project name
 //   - path: optional, filter by repository-relative project path
 //   - workspace: optional, filter by workspace
@@ -334,6 +335,32 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 			ValidationError{Field: "repository", Message: "repository parameter is required"})
 		return
 	}
+	vcsType := r.URL.Query().Get("type")
+	if vcsType == "" {
+		responder.ValidationFailed(w, r, "missing required parameter",
+			ValidationError{Field: "type", Message: "type parameter is required"})
+		return
+	}
+	VCSHostType, err := models.NewVCSHostType(vcsType)
+	if err != nil {
+		responder.ValidationFailed(w, r, "invalid VCS type",
+			ValidationError{Field: "type", Message: err.Error()})
+		return
+	}
+	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
+	if err != nil {
+		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
+		return
+	}
+	baseRepo, err := a.Parser.ParseAPIPlanRequest(VCSHostType, repository, cloneURL)
+	if err != nil {
+		responder.ValidationFailed(w, r, fmt.Sprintf("failed to parse repository: %v", err))
+		return
+	}
+	if !a.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
+		responder.Forbidden(w, r, "repository is not in the allowlist")
+		return
+	}
 
 	opts := drift.GetOptions{
 		ProjectName: r.URL.Query().Get("project"),
@@ -343,7 +370,7 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve drift results from storage
-	drifts, err := a.DriftStorage.Get(repository, opts)
+	drifts, err := a.DriftStorage.Get(baseRepo.ID(), opts)
 	if err != nil {
 		responder.InternalError(w, r, err)
 		return
@@ -703,6 +730,7 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	request.StorageRepository = baseRepo.ID()
 
 	// Create executor that bridges to existing plan/apply infrastructure
 	executor := &apiRemediationExecutor{
@@ -1174,7 +1202,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Store drift data
-		if err := a.DriftStorage.Store(request.Repository, projectDrift); err != nil {
+		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			a.Logger.Warn("failed to store drift data: %v", err)
 		}
 

@@ -155,3 +155,46 @@ func TestInMemoryRemediationService_ExplicitProjectsPreserveCachedTargetMetadata
 	Equals(t, "default", cached[0].Workspace)
 	Equals(t, false, cached[0].Drift.HasDrift)
 }
+
+func TestInMemoryRemediationService_UsesHostQualifiedStorageRepository(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("github.com/acme/infra", models.ProjectDrift{
+		ProjectName: "github-app",
+		Path:        "github/app",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift: models.DriftSummary{
+			HasDrift: true,
+			ToChange: 1,
+		},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("gitlab.com/acme/infra", models.ProjectDrift{
+		ProjectName: "gitlab-app",
+		Path:        "gitlab/app",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift: models.DriftSummary{
+			HasDrift: true,
+			ToChange: 1,
+		},
+		LastChecked: time.Now(),
+	}))
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository:        "acme/infra",
+		StorageRepository: "gitlab.com/acme/infra",
+		Ref:               "main",
+		Type:              "Gitlab",
+		DriftOnly:         true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "gitlab-app", path: "gitlab/app", workspace: "default"}, executor.planCalls[0])
+	Equals(t, "acme/infra", result.Repository)
+}

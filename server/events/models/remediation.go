@@ -66,6 +66,9 @@ func (s RemediationStatus) IsTerminal() bool {
 type RemediationRequest struct {
 	// Repository is the full repository name (owner/repo). Required.
 	Repository string `json:"repository"`
+	// StorageRepository is the internal VCS-host-qualified repository key used
+	// for cached drift lookups. It is populated by the API controller.
+	StorageRepository string `json:"-"`
 	// Ref is the git reference (branch/tag/commit) to remediate. Required.
 	Ref string `json:"ref"`
 	// Type is the VCS provider type (Github/Gitlab). Required.

@@ -5,6 +5,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,6 +24,8 @@ import (
 const workingDirPrefix = "repos"
 
 const prSourceRemote = "source"
+
+var errInvalidManagedPath = errors.New("invalid managed path")
 
 // gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
 var gitLocks sync.Map
@@ -817,7 +820,7 @@ func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p mo
 		return err
 	}
 	logger.Info("Deleting repo pull directory: %s", repoPullDir)
-	return os.RemoveAll(repoPullDir)
+	return removeAllSubPath(filepath.Join(w.DataDir, workingDirPrefix), repoPullDir)
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
@@ -827,7 +830,35 @@ func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r model
 		return err
 	}
 	logger.Info("Deleting workspace directory: %s", workspaceDir)
-	return os.RemoveAll(workspaceDir)
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	return removeAllSubPath(pullDir, workspaceDir)
+}
+
+func removeAllSubPath(baseDir, targetDir string) error {
+	baseDir = filepath.Clean(baseDir)
+	targetDir = filepath.Clean(targetDir)
+	if err := utils.EnsureSubPath(baseDir, targetDir); err != nil {
+		return err
+	}
+	relativeTarget, err := filepath.Rel(baseDir, targetDir)
+	if err != nil {
+		return errInvalidManagedPath
+	}
+	if relativeTarget == "." {
+		return errInvalidManagedPath
+	}
+	root, err := os.OpenRoot(baseDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return root.RemoveAll(relativeTarget)
 }
 
 func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) (string, error) {

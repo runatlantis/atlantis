@@ -2221,6 +2221,40 @@ func initRepo(t *testing.T) string {
 	return repoDir
 }
 
+func TestFileWorkspace_DeleteRemovesOnlyManagedSubPaths(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+	wd := &events.FileWorkspace{
+		DataDir: dataDir,
+	}
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+
+	defaultWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	otherWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "other")
+	otherPullDir := filepath.Join(dataDir, "repos", "owner", "repo", "2", "default")
+	Ok(t, os.MkdirAll(defaultWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherPullDir, 0700))
+
+	Ok(t, wd.DeleteForWorkspace(logger, repo, pull, "default"))
+	_, err := os.Stat(defaultWorkspaceDir)
+	Assert(t, os.IsNotExist(err), "expected default workspace to be deleted")
+	_, err = os.Stat(otherWorkspaceDir)
+	Ok(t, err)
+	_, err = os.Stat(otherPullDir)
+	Ok(t, err)
+
+	Ok(t, wd.Delete(logger, repo, pull))
+	_, err = os.Stat(filepath.Join(dataDir, "repos", "owner", "repo", "1"))
+	Assert(t, os.IsNotExist(err), "expected pull directory to be deleted")
+	_, err = os.Stat(otherPullDir)
+	Ok(t, err)
+}
+
 func TestFileWorkspace_PathTraversal(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	dataDir := t.TempDir()

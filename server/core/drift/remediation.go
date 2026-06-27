@@ -107,6 +107,7 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 // getProjectsToRemediate determines which projects to remediate based on the request.
 func (s *InMemoryRemediationService) getProjectsToRemediate(req models.RemediationRequest) ([]models.ProjectDrift, error) {
 	var projects []models.ProjectDrift
+	storageRepository := remediationStorageRepository(req)
 
 	// Drift records are keyed by ref, so when reading from storage we restrict
 	// to the requested ref. This prevents remediating a project that drifted on
@@ -116,7 +117,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 
 	// If drift storage is available and DriftOnly is true, get projects with drift
 	if s.driftStorage != nil && req.DriftOnly {
-		drifts, err := s.driftStorage.Get(req.Repository, opts)
+		drifts, err := s.driftStorage.Get(storageRepository, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get drift data: %w", err)
 		}
@@ -135,7 +136,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 		// Specific projects requested
 		for _, projName := range req.Projects {
 			if s.driftStorage != nil {
-				drifts, err := s.driftStorage.Get(req.Repository, GetOptions{ProjectName: projName, Ref: req.Ref})
+				drifts, err := s.driftStorage.Get(storageRepository, GetOptions{ProjectName: projName, Ref: req.Ref})
 				if err != nil {
 					return nil, fmt.Errorf("failed to get drift data for project %q: %w", projName, err)
 				}
@@ -166,7 +167,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 		}
 	} else if s.driftStorage != nil {
 		// Get all projects from drift storage for the requested ref
-		drifts, err := s.driftStorage.Get(req.Repository, opts)
+		drifts, err := s.driftStorage.Get(storageRepository, opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get drift data: %w", err)
 		}
@@ -180,6 +181,13 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	}
 
 	return projects, nil
+}
+
+func remediationStorageRepository(req models.RemediationRequest) string {
+	if req.StorageRepository != "" {
+		return req.StorageRepository
+	}
+	return req.Repository
 }
 
 func hasRemediationTarget(projects []models.ProjectDrift, projectName string, workspace string) bool {
@@ -283,7 +291,7 @@ func (s *InMemoryRemediationService) remediateProject(req models.RemediationRequ
 		updatedDrift.Drift = *result.DriftAfter
 		updatedDrift.Error = ""
 		updatedDrift.LastChecked = time.Now()
-		if err := s.driftStorage.Store(req.Repository, updatedDrift); err != nil {
+		if err := s.driftStorage.Store(remediationStorageRepository(req), updatedDrift); err != nil {
 			result.Error = fmt.Sprintf("updating drift status after apply: %v", err)
 			result.Status = models.RemediationStatusFailed
 			return result

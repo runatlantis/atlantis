@@ -57,7 +57,11 @@ func NewDriftSummaryFromPlanSuccess(plan *PlanSuccess) DriftSummary {
 		return DriftSummary{}
 	}
 	stats := plan.Stats()
-	return NewDriftSummaryFromPlanStats(stats, plan.DiffSummary())
+	summary := plan.DiffSummary()
+	if stats.ChangesOutside {
+		summary = plan.Summary()
+	}
+	return NewDriftSummaryFromPlanStats(stats, summary)
 }
 
 // ProjectDrift represents the drift status for a specific project.
