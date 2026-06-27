@@ -1,0 +1,83 @@
+server/core/drift/mocks/mock_drift_storage.go
+  s_243a1a1edc15e5::t_f2e6981954d5a8 44-58,184-218
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_59ac231c4843f4 84-85
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_a4806fe145e475 1732-1753
+  s_243a1a1edc15e5::t_915ab27f09d041 142-161,263-282
+  s_243a1a1edc15e5::t_6563b53f1eeec0 519-521,526,528-529,531-533,853-855
+  s_243a1a1edc15e5::t_faa998ea5029ce 118-141,241-262,283-303
+  s_243a1a1edc15e5::t_73b48ee9422f3d 304,1860-1946
+  s_243a1a1edc15e5::t_e87fdbec17c918 305
+  s_243a1a1edc15e5::t_030017c2822cf0 787,790,810,838
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_335f1df0f1c933 1-26
+server/controllers/api_types.go
+  s_243a1a1edc15e5::t_59ac231c4843f4 386-388
+server/core/drift/storage_test.go
+  s_243a1a1edc15e5::t_8e48c7a2002c77 232-264
+server/events/command/project_context.go
+  s_243a1a1edc15e5::t_223f546c59c65d 144,146-149
+server/core/drift/parser.go
+  s_243a1a1edc15e5::t_59ac231c4843f4 38
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_66dfe5405345f0 738-740,754-781
+  s_243a1a1edc15e5::t_97f61b5c2de505 782
+server/events/command_requirement_handler_test.go
+  s_243a1a1edc15e5::t_a00d0c429c6d0b 166,170,174,198,248
+  s_243a1a1edc15e5::t_13801e51d7248a 156-163,167-169,185-187,189-191,195,197,235,237,247,251
+  s_243a1a1edc15e5::t_a2773fdf696335 146,164-165,184,188,192-194,196,236,238-246,249-250
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_ab021d35f67a4d 857-860,921-924,993-996,1479-1482
+  s_243a1a1edc15e5::t_39f666e4bb94a3 1514,1546,1553
+  s_243a1a1edc15e5::t_86fcf266344b7b 1349-1386,1557
+  s_243a1a1edc15e5::t_6f86dd19a86691 1558
+  s_243a1a1edc15e5::t_a7b1c34f5cc8f9 16,238,240,267,272-276,291,293,326-339,341,1309-1315,1320,1512-1513,1543-1544,1554-1556
+server/events/command_requirement_handler.go
+  s_243a1a1edc15e5::t_223f546c59c65d 66-68,73-74,83-85,90-91
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_59ac231c4843f4 166-167,195-196
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_6a4ddbf305761f 124-126,167-194
+  s_243a1a1edc15e5::t_1c3f354dc9b582 195-201
+  s_243a1a1edc15e5::t_d77e31cf68418a 127
+  s_243a1a1edc15e5::t_9d12e540396769 202-205
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_20b0a15f007d04 44-47,140
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_335f1df0f1c933 261-315
+server/server_test.go
+  s_243a1a1edc15e5::t_66919e953ea399 60-81
+server/events/command/context.go
+  s_243a1a1edc15e5::t_223f546c59c65d 53-57
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_59ac231c4843f4 7,156-167
+server/core/drift/parser_test.go
+  s_243a1a1edc15e5::t_408e5f9cb104ab 69
+  s_243a1a1edc15e5::t_5de8a14c867821 70-75
+server/core/drift/storage.go
+  s_243a1a1edc15e5::t_3a3b87ee1a1085 183
+  s_243a1a1edc15e5::t_f0b2024cc3ef7f 7,106,116-132
+  s_243a1a1edc15e5::t_62f03f74f083db 180-182
+  s_243a1a1edc15e5::t_73f44d5e509d3a 177-178
+  s_243a1a1edc15e5::t_70f2541b5bdcda 133-134
+  s_243a1a1edc15e5::t_16d32ae494eb52 30-34,161-176,179
+server/events/project_command_context_builder.go
+  s_243a1a1edc15e5::t_6fa5a61dc5d236 332
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "3ea927f38bc176e853ea20436ddade91c7e06069",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

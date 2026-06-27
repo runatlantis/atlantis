@@ -1,0 +1,42 @@
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_bdb3a779949e96 158-200
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_f64fa0e8957d8d 69-71
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_303bec69ff81b2 8,28-29,823,833-861
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_341f5ce3f76cdb 350,352-357
+  s_243a1a1edc15e5::t_cdb825337d5c45 312,338-349,351,358-363,373,733,1205
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_38e5bb57927cb5 110,120,139,170,186-192,294
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_47325bff697206 2224-2257
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_b18ebe21d84c6d 60-64
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_8c81839fe635ca 198-208
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_21a4828722b352 776-792,848-864
+  s_243a1a1edc15e5::t_9db0751d75fe6e 865,1006,1013-1032
+  s_243a1a1edc15e5::t_b4f38060598187 1119-1124,1162-1163
+  s_243a1a1edc15e5::t_b0365cc3561235 893,909,911,913,1034-1036,1051,1053,1055,1063,1071,1074,1076,1078
+  s_243a1a1edc15e5::t_1c216a78e3079e 1745
+  s_243a1a1edc15e5::t_223c8511e68316 866
+  s_243a1a1edc15e5::t_cbcdb85cc7786b 1033
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "67237b761db137ab3a11ad1c167047e5eb8ee611",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
