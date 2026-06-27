@@ -52,6 +52,8 @@ type PlanDetailsAPI struct {
 	ToDestroy int `json:"to_destroy"`
 	// ToImport is the number of resources to import.
 	ToImport int `json:"to_import"`
+	// ToForget is the number of resources to forget.
+	ToForget int `json:"to_forget"`
 	// Summary is a human-readable summary.
 	Summary string `json:"summary,omitempty"`
 }
@@ -88,6 +90,7 @@ func NewProjectResultAPI(pr command.ProjectResult) ProjectResultAPI {
 			ToChange:   stats.Change,
 			ToDestroy:  stats.Destroy,
 			ToImport:   stats.Import,
+			ToForget:   stats.Forget,
 			Summary:    pr.PlanSuccess.DiffSummary(),
 		}
 	}
@@ -171,6 +174,8 @@ type DriftDetailsAPI struct {
 	ToDestroy int `json:"to_destroy"`
 	// ToImport is the number of resources to import.
 	ToImport int `json:"to_import"`
+	// ToForget is the number of resources to forget.
+	ToForget int `json:"to_forget"`
 	// TotalChanges is the total number of changes.
 	TotalChanges int `json:"total_changes"`
 	// Summary is a human-readable summary.
@@ -198,6 +203,7 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 			ToChange:       pd.Drift.ToChange,
 			ToDestroy:      pd.Drift.ToDestroy,
 			ToImport:       pd.Drift.ToImport,
+			ToForget:       pd.Drift.ToForget,
 			TotalChanges:   pd.Drift.TotalChanges(),
 			Summary:        pd.Drift.Summary,
 			ChangesOutside: pd.Drift.ChangesOutside,
@@ -399,6 +405,7 @@ func NewRemediationResultAPI(rr *models.RemediationResult) RemediationResultAPI 
 				ToChange:       p.DriftBefore.ToChange,
 				ToDestroy:      p.DriftBefore.ToDestroy,
 				ToImport:       p.DriftBefore.ToImport,
+				ToForget:       p.DriftBefore.ToForget,
 				TotalChanges:   p.DriftBefore.TotalChanges(),
 				Summary:        p.DriftBefore.Summary,
 				ChangesOutside: p.DriftBefore.ChangesOutside,
@@ -411,6 +418,7 @@ func NewRemediationResultAPI(rr *models.RemediationResult) RemediationResultAPI 
 				ToChange:       p.DriftAfter.ToChange,
 				ToDestroy:      p.DriftAfter.ToDestroy,
 				ToImport:       p.DriftAfter.ToImport,
+				ToForget:       p.DriftAfter.ToForget,
 				TotalChanges:   p.DriftAfter.TotalChanges(),
 				Summary:        p.DriftAfter.Summary,
 				ChangesOutside: p.DriftAfter.ChangesOutside,

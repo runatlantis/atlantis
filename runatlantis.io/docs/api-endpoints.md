@@ -170,6 +170,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "summary": "Plan: 2 to add, 1 to change, 0 to destroy."
         }
       }
@@ -419,6 +420,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 1,
           "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
           "changes_outside": false
@@ -428,6 +430,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 1,
           "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
           "changes_outside": false
@@ -479,6 +482,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 1,
           "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
           "changes_outside": false
@@ -488,6 +492,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
           "to_change": 0,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 0,
           "summary": "Apply completed successfully",
           "changes_outside": false
@@ -654,6 +659,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
           "to_change": 2,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 3,
           "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
           "changes_outside": false
@@ -843,6 +849,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 1,
           "summary": "Plan: 0 to add, 1 to change, 0 to destroy.",
           "changes_outside": false
@@ -989,6 +996,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
           "to_change": 1,
           "to_destroy": 0,
           "to_import": 0,
+          "to_forget": 0,
           "total_changes": 3,
           "summary": "Plan: 2 to add, 1 to change, 0 to destroy.",
           "changes_outside": false

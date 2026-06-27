@@ -22,6 +22,8 @@ type DriftSummary struct {
 	ToDestroy int `json:"to_destroy"`
 	// ToImport is the number of resources to import (Terraform 1.5+).
 	ToImport int `json:"to_import"`
+	// ToForget is the number of resources to forget.
+	ToForget int `json:"to_forget"`
 	// Summary is a human-readable summary of the drift.
 	Summary string `json:"summary"`
 	// ChangesOutside indicates if Terraform detected changes made outside of Terraform.
@@ -30,19 +32,20 @@ type DriftSummary struct {
 
 // TotalChanges returns the total number of resource changes.
 func (d DriftSummary) TotalChanges() int {
-	return d.ToAdd + d.ToChange + d.ToDestroy + d.ToImport
+	return d.ToAdd + d.ToChange + d.ToDestroy + d.ToImport + d.ToForget
 }
 
 // NewDriftSummaryFromPlanStats creates a DriftSummary from PlanSuccessStats.
 // This leverages the existing plan output parsing infrastructure.
 func NewDriftSummaryFromPlanStats(stats PlanSuccessStats, summary string) DriftSummary {
-	hasDrift := stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0
+	hasDrift := stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0 || stats.Forget > 0
 	return DriftSummary{
 		HasDrift:       hasDrift,
 		ToAdd:          stats.Add,
 		ToChange:       stats.Change,
 		ToDestroy:      stats.Destroy,
 		ToImport:       stats.Import,
+		ToForget:       stats.Forget,
 		Summary:        summary,
 		ChangesOutside: stats.ChangesOutside,
 	}

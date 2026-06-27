@@ -134,10 +134,20 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	} else if len(req.Projects) > 0 {
 		// Specific projects requested
 		for _, projName := range req.Projects {
-			projects = append(projects, models.ProjectDrift{
-				ProjectName: projName,
-				Ref:         req.Ref,
-			})
+			if len(req.Workspaces) == 0 {
+				projects = append(projects, models.ProjectDrift{
+					ProjectName: projName,
+					Ref:         req.Ref,
+				})
+				continue
+			}
+			for _, workspace := range req.Workspaces {
+				projects = append(projects, models.ProjectDrift{
+					ProjectName: projName,
+					Workspace:   workspace,
+					Ref:         req.Ref,
+				})
+			}
 		}
 	} else if s.driftStorage != nil {
 		// Get all projects from drift storage for the requested ref

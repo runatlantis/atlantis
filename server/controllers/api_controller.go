@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -27,6 +28,8 @@ import (
 )
 
 const atlantisTokenHeader = "X-Atlantis-Token"
+
+var nonPRPullCounter atomic.Int64
 
 type APIController struct {
 	APISecret                      []byte
@@ -70,6 +73,10 @@ func (a *APIController) getAPIMiddleware() *APIMiddleware {
 		a.apiMiddleware = NewAPIMiddleware(a.APISecret, a.Logger)
 	})
 	return a.apiMiddleware
+}
+
+func nextNonPRPullNum() int {
+	return -int((time.Now().UnixNano() & 0x3fffffff) + nonPRPullCounter.Add(1))
 }
 
 type APIRequest struct {
@@ -519,8 +526,12 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
+	pullNum := request.PR
+	if pullNum <= 0 {
+		pullNum = nextNonPRPullNum()
+	}
 	pull := models.PullRequest{
-		Num:        request.PR,
+		Num:        pullNum,
 		BaseBranch: request.Ref,
 		HeadBranch: request.Ref,
 		HeadCommit: request.Ref,
@@ -678,7 +689,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	ctx := &command.Context{
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
-			Num:        0, // Non-PR workflow
+			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
 			BaseBranch: ref,
 			HeadBranch: ref,
 			HeadCommit: ref,
@@ -710,22 +721,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	}
 	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
-	// Extract output and drift summary
-	var output strings.Builder
-	var driftSummary *models.DriftSummary
-
-	for _, pr := range result.ProjectResults {
-		if pr.Error != nil {
-			fmt.Fprintf(&output, "Error: %v\n", pr.Error)
-		} else if pr.Failure != "" {
-			fmt.Fprintf(&output, "Failure: %s\n", pr.Failure)
-		} else if pr.PlanSuccess != nil {
-			output.WriteString(pr.PlanSuccess.TerraformOutput)
-			// Parse drift from plan output
-			summary := models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
-			driftSummary = &summary
-		}
-	}
+	output, driftSummary := planRemediationOutput(result)
 
 	if result.HasErrors() {
 		return output.String(), driftSummary, fmt.Errorf("plan had errors")
@@ -757,7 +753,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	ctx := &command.Context{
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
-			Num:        0, // Non-PR workflow
+			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
 			BaseBranch: ref,
 			HeadBranch: ref,
 			HeadCommit: ref,
@@ -783,11 +779,15 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	}
 
 	// First run plan (required before apply)
-	_, err := e.controller.apiPlan(request, ctx)
+	planResult, err := e.controller.apiPlan(request, ctx)
 	if err != nil {
 		return "", fmt.Errorf("plan failed: %w", err)
 	}
 	defer e.controller.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	if planResult.HasErrors() {
+		output, _ := planRemediationOutput(planResult)
+		return output.String(), fmt.Errorf("plan had errors")
+	}
 
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
@@ -795,7 +795,33 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		return "", err
 	}
 
-	// Extract output
+	output := applyRemediationOutput(result)
+
+	if result.HasErrors() {
+		return output.String(), fmt.Errorf("apply had errors")
+	}
+
+	return output.String(), nil
+}
+
+func planRemediationOutput(result *command.Result) (strings.Builder, *models.DriftSummary) {
+	var output strings.Builder
+	var driftSummary *models.DriftSummary
+	for _, pr := range result.ProjectResults {
+		if pr.Error != nil {
+			fmt.Fprintf(&output, "Error: %v\n", pr.Error)
+		} else if pr.Failure != "" {
+			fmt.Fprintf(&output, "Failure: %s\n", pr.Failure)
+		} else if pr.PlanSuccess != nil {
+			output.WriteString(pr.PlanSuccess.TerraformOutput)
+			summary := models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+			driftSummary = &summary
+		}
+	}
+	return output, driftSummary
+}
+
+func applyRemediationOutput(result *command.Result) strings.Builder {
 	var output strings.Builder
 	for _, pr := range result.ProjectResults {
 		if pr.Error != nil {
@@ -806,12 +832,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 			output.WriteString(pr.ApplySuccess)
 		}
 	}
-
-	if result.HasErrors() {
-		return output.String(), fmt.Errorf("apply had errors")
-	}
-
-	return output.String(), nil
+	return output
 }
 
 // GetRemediationResult handles GET /api/drift/remediate/{id} requests.
@@ -1016,7 +1037,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	ctx := &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
-			Num:        0, // Non-PR workflow
+			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
 			BaseBranch: request.Ref,
 			HeadBranch: request.Ref,
 			HeadCommit: request.Ref,
@@ -1116,6 +1137,8 @@ func convertToDriftWebhookResult(dr *models.DriftDetectionResult) webhooks.Drift
 			ToAdd:       p.Drift.ToAdd,
 			ToChange:    p.Drift.ToChange,
 			ToDestroy:   p.Drift.ToDestroy,
+			ToImport:    p.Drift.ToImport,
+			ToForget:    p.Drift.ToForget,
 			Summary:     p.Drift.Summary,
 			Error:       p.Error,
 		})

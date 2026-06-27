@@ -143,13 +143,13 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		// Non-PR API workflow tests - verifies PR-specific requirements are skipped
-		// when API=true and Pull.Num=0 (e.g., drift detection)
+		// when API=true and Pull.Num<=0 (e.g., drift detection)
 		{
 			name: "API call without PR skips approved requirement",
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,
-				Pull:              models.PullRequest{Num: 0},
+				Pull:              models.PullRequest{Num: -1},
 				ApplyRequirements: []string{raw.ApprovedRequirement},
 				PullReqStatus: models.PullReqStatus{
 					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
@@ -162,7 +162,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,
-				Pull:              models.PullRequest{Num: 0},
+				Pull:              models.PullRequest{Num: -2},
 				ApplyRequirements: []string{raw.MergeableRequirement},
 				PullReqStatus: models.PullReqStatus{
 					MergeableStatus: models.MergeableStatus{IsMergeable: false},

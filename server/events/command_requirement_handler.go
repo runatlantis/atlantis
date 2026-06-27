@@ -65,7 +65,7 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
 	// Check if this is a non-PR API call (e.g., drift detection)
 	// PR-specific requirements (approved, mergeable) should be skipped for these
-	isNonPRAPICall := ctx.API && ctx.Pull.Num == 0
+	isNonPRAPICall := ctx.API && ctx.Pull.Num <= 0
 
 	for _, req := range requirements {
 		switch req {

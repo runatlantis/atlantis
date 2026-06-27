@@ -31,6 +31,8 @@ type DriftProjectResult struct {
 	ToAdd       int    `json:"to_add"`
 	ToChange    int    `json:"to_change"`
 	ToDestroy   int    `json:"to_destroy"`
+	ToImport    int    `json:"to_import"`
+	ToForget    int    `json:"to_forget"`
 	Summary     string `json:"summary"`
 	Error       string `json:"error,omitempty"`
 }

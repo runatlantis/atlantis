@@ -35,5 +35,5 @@ func (p *Parser) HasDrift(plan *models.PlanSuccess) bool {
 		return false
 	}
 	stats := plan.Stats()
-	return stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0
+	return stats.Add > 0 || stats.Change > 0 || stats.Destroy > 0 || stats.Import > 0 || stats.Forget > 0
 }

@@ -475,7 +475,7 @@ func TestAPIController_PlanFetchesPullReqStatus(t *testing.T) {
 }
 
 func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
-	ac, _, _ := setup(t)
+	ac, projectCommandBuilder, _ := setup(t)
 	fetcher := NewMockPullReqStatusFetcher()
 	ac.PullReqStatusFetcher = fetcher
 
@@ -492,6 +492,10 @@ func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
 	ResponseContains(t, w, http.StatusOK, "")
 
 	fetcher.VerifyWasCalled(Never()).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	planCtx, _ := projectCommandBuilder.VerifyWasCalledOnce().
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Assert(t, planCtx.Pull.Num < 0, "expected non-PR API plan to use a negative synthetic pull number, got %d", planCtx.Pull.Num)
 }
 
 func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {

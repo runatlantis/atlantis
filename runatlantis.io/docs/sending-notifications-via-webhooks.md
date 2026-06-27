@@ -215,6 +215,8 @@ The HTTP webhook sends a POST request with the following JSON payload:
       "to_add": 1,
       "to_change": 2,
       "to_destroy": 0,
+      "to_import": 0,
+      "to_forget": 0,
       "summary": "Plan: 1 to add, 2 to change, 0 to destroy."
     },
     {
@@ -225,6 +227,8 @@ The HTTP webhook sends a POST request with the following JSON payload:
       "to_add": 0,
       "to_change": 0,
       "to_destroy": 0,
+      "to_import": 0,
+      "to_forget": 0,
       "summary": ""
     }
   ]

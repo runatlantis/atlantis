@@ -109,6 +109,26 @@ func TestNewDriftSummaryFromPlanStats(t *testing.T) {
 			},
 		},
 		{
+			name: "with forgets",
+			stats: models.PlanSuccessStats{
+				Add:     0,
+				Change:  0,
+				Destroy: 0,
+				Import:  0,
+				Forget:  2,
+			},
+			summary: "Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget",
+			expected: models.DriftSummary{
+				HasDrift:  true,
+				ToAdd:     0,
+				ToChange:  0,
+				ToDestroy: 0,
+				ToImport:  0,
+				ToForget:  2,
+				Summary:   "Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget",
+			},
+		},
+		{
 			name: "with changes outside terraform",
 			stats: models.PlanSuccessStats{
 				Add:            0,
@@ -135,15 +155,17 @@ func TestNewDriftSummaryFromPlanStats(t *testing.T) {
 				Change:  3,
 				Destroy: 1,
 				Import:  1,
+				Forget:  1,
 			},
-			summary: "Plan: 2 to add, 3 to change, 1 to destroy, 1 to import",
+			summary: "Plan: 1 to import, 2 to add, 3 to change, 1 to destroy, 1 to forget",
 			expected: models.DriftSummary{
 				HasDrift:  true,
 				ToAdd:     2,
 				ToChange:  3,
 				ToDestroy: 1,
 				ToImport:  1,
-				Summary:   "Plan: 2 to add, 3 to change, 1 to destroy, 1 to import",
+				ToForget:  1,
+				Summary:   "Plan: 1 to import, 2 to add, 3 to change, 1 to destroy, 1 to forget",
 			},
 		},
 	}

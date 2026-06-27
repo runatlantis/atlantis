@@ -60,6 +60,13 @@ func TestParser_HasDrift(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "has forgets",
+			plan: &models.PlanSuccess{
+				TerraformOutput: "Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+			},
+			expected: true,
+		},
+		{
 			name: "mixed drift",
 			plan: &models.PlanSuccess{
 				TerraformOutput: "Plan: 2 to add, 3 to change, 1 to destroy.",
@@ -81,7 +88,7 @@ func TestParser_ParsePlanOutput(t *testing.T) {
 
 	t.Run("with drift", func(t *testing.T) {
 		plan := &models.PlanSuccess{
-			TerraformOutput: "Plan: 2 to add, 3 to change, 1 to destroy.",
+			TerraformOutput: "Plan: 2 to add, 3 to change, 1 to destroy, 4 to forget.",
 		}
 		result := parser.ParsePlanOutput(plan)
 
@@ -89,6 +96,7 @@ func TestParser_ParsePlanOutput(t *testing.T) {
 		Equals(t, 2, result.ToAdd)
 		Equals(t, 3, result.ToChange)
 		Equals(t, 1, result.ToDestroy)
+		Equals(t, 4, result.ToForget)
 	})
 
 	t.Run("without drift", func(t *testing.T) {
@@ -117,16 +125,18 @@ func TestParser_ParsePlanStats(t *testing.T) {
 		Change:         3,
 		Destroy:        2,
 		Import:         1,
+		Forget:         4,
 		ChangesOutside: true,
 	}
 
-	result := parser.ParsePlanStats(stats, "Plan: 5 to add, 3 to change, 2 to destroy, 1 to import")
+	result := parser.ParsePlanStats(stats, "Plan: 1 to import, 5 to add, 3 to change, 2 to destroy, 4 to forget")
 
 	Equals(t, true, result.HasDrift)
 	Equals(t, 5, result.ToAdd)
 	Equals(t, 3, result.ToChange)
 	Equals(t, 2, result.ToDestroy)
 	Equals(t, 1, result.ToImport)
+	Equals(t, 4, result.ToForget)
 	Equals(t, true, result.ChangesOutside)
-	Equals(t, "Plan: 5 to add, 3 to change, 2 to destroy, 1 to import", result.Summary)
+	Equals(t, "Plan: 1 to import, 5 to add, 3 to change, 2 to destroy, 4 to forget", result.Summary)
 }
