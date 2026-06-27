@@ -1,0 +1,37 @@
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_d14b835aa42eed 509,513-517,529,536-558,843-845
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_a9774f512eb114 41
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_78505c72c6eb33 213-217
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_814ed90506110b 152-162
+  s_12c46f3ee857ef::t_8a1c411578ee72 151
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_d8e6660488582f 674-678
+  s_243a1a1edc15e5::t_e24c25f5b001f4 649-673,679-729
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "151e69e8e576b1720498d9a5b5d3e888b3595ab9",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
