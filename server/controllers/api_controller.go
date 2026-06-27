@@ -1317,10 +1317,7 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 				ValidationError{Field: "limit", Message: "must be a positive integer"})
 			return
 		}
-		limit = parsedLimit
-		if limit > 100 {
-			limit = 100
-		}
+		limit = min(parsedLimit, 100)
 	}
 
 	// Get results
