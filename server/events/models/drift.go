@@ -4,6 +4,7 @@
 package models
 
 import (
+	"path"
 	"strings"
 	"time"
 
@@ -103,6 +104,19 @@ func CheckedBaseBranchRef(baseBranch string) (string, bool) {
 		return "", false
 	}
 	return baseRef, true
+}
+
+// NormalizeAPIPath returns a clean repo-relative selector path for drift APIs.
+func NormalizeAPIPath(directory string) (string, bool) {
+	trimmed := strings.TrimSpace(directory)
+	if trimmed == "" || strings.Contains(trimmed, "\\") {
+		return "", false
+	}
+	cleaned := path.Clean(trimmed)
+	if cleaned == "" || path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", false
+	}
+	return cleaned, true
 }
 
 func isSafeBaseBranchRef(baseRef string) bool {
@@ -297,6 +311,9 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	} else if !IsSupportedDriftVCSHostType(r.Type) {
 		errors = append(errors, FieldError{Field: "type", Message: supportedDriftVCSTypeMessage()})
 	}
+	if len(r.Projects) > 0 && len(r.Paths) > 0 {
+		errors = append(errors, FieldError{Field: "paths", Message: "projects and paths cannot both be set"})
+	}
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
@@ -304,8 +321,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 		}
 	}
 	for _, path := range r.Paths {
-		if strings.TrimSpace(path.Directory) == "" {
-			errors = append(errors, FieldError{Field: "paths", Message: "path directories cannot be empty"})
+		if _, ok := NormalizeAPIPath(path.Directory); !ok {
+			errors = append(errors, FieldError{Field: "paths", Message: "path directories must be clean repo-relative paths"})
 			break
 		}
 	}

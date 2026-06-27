@@ -129,8 +129,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 		}
 	}
 	for _, path := range r.Paths {
-		if strings.TrimSpace(path.Directory) == "" {
-			errors = append(errors, FieldError{Field: "paths", Message: "path directories cannot be empty"})
+		if _, ok := NormalizeAPIPath(path.Directory); !ok {
+			errors = append(errors, FieldError{Field: "paths", Message: "path directories must be clean repo-relative paths"})
 			break
 		}
 		if path.Workspace != "" && len(r.Workspaces) > 0 && !slices.Contains(r.Workspaces, path.Workspace) {

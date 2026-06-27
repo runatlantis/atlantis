@@ -324,6 +324,37 @@ func TestDriftDetectionRequestValidateRejectsEmptySelectors(t *testing.T) {
 			},
 			field: "paths",
 		},
+		{
+			name: "parent path",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: "../env"}},
+			},
+			field: "paths",
+		},
+		{
+			name: "absolute path",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: "/env"}},
+			},
+			field: "paths",
+		},
+		{
+			name: "mixed projects and paths",
+			request: models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Projects:   []string{"app"},
+				Paths:      []models.DriftDetectionPath{{Directory: "env"}},
+			},
+			field: "paths",
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			errs := c.request.Validate()

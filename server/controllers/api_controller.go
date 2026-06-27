@@ -38,7 +38,7 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 
 var nonPRPullCounter atomic.Int64
 
-var apiErrorURLCredentialRE = regexp.MustCompile("(?i)(https?://)([^\\s/@]+:)?[^\\s/@]+@")
+var apiErrorURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\s/@]+@`)
 
 type APIController struct {
 	APISecret                       []byte
@@ -635,10 +635,27 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		}
 	}
 
-	var projectResults []command.ProjectResult
+	var planCmds []command.ProjectContext
+	var planCC []*events.CommentCommand
+	var policyCmds []command.ProjectContext
+	var policyCC []*events.CommentCommand
 	for i, cmd := range cmds {
+		switch cmd.CommandName {
+		case command.Plan:
+			planCmds = append(planCmds, cmd)
+			planCC = append(planCC, cc[i])
+		case command.PolicyCheck:
+			policyCmds = append(policyCmds, cmd)
+			policyCC = append(policyCC, cc[i])
+		default:
+			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
+		}
+	}
+
+	var projectResults []command.ProjectResult
+	for i, cmd := range planCmds {
 		if !ctx.PreWorkflowHooksAlreadyRun {
-			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
+			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
 			if err != nil {
 				if a.FailOnPreWorkflowHookError {
 					return nil, err
@@ -646,21 +663,32 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			}
 		}
 
-		var res command.ProjectResult
-		switch cmd.CommandName {
-		case command.Plan:
-			res = events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
-		case command.PolicyCheck:
-			if a.ProjectPolicyCheckCommandRunner == nil {
-				return nil, fmt.Errorf("policy check runner is not configured")
-			}
-			res = events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
-		default:
-			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
-		}
+		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
 		projectResults = append(projectResults, res)
 
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
+	}
+
+	result := &command.Result{ProjectResults: projectResults}
+	if !ctx.RunPolicyChecks || result.HasErrors() || len(planCmds) == 0 {
+		return result, nil
+	}
+
+	for i, cmd := range policyCmds {
+		if !ctx.PreWorkflowHooksAlreadyRun {
+			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, policyCC[i])
+			if err != nil {
+				if a.FailOnPreWorkflowHookError {
+					return nil, err
+				}
+			}
+		}
+		if a.ProjectPolicyCheckCommandRunner == nil {
+			return nil, fmt.Errorf("policy check runner is not configured")
+		}
+		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
+		projectResults = append(projectResults, res)
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, policyCC[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -880,7 +908,6 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
-	syntheticNonPR := request.PR <= 0
 	pullNum := request.PR
 	if pullNum <= 0 {
 		pullNum = nextNonPRPullNum()
@@ -898,9 +925,8 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		Scope:                         a.Scope,
 		Log:                           a.Logger,
 		API:                           true,
-		SkipPRModifiedFiles:           syntheticNonPR,
 		FailOnTeamAllowlistDenied:     true,
-		SkipAPIBaseBranchVerification: syntheticNonPR && strings.TrimSpace(request.BaseBranch) == "" && models.RequiresBaseBranchForRef(request.Ref),
+		SkipAPIBaseBranchVerification: request.PR <= 0 && strings.TrimSpace(request.BaseBranch) == "" && models.RequiresBaseBranchForRef(request.Ref),
 	}
 	a.populatePullRequestStatus(ctx)
 	return &request, ctx, http.StatusOK, nil
@@ -1068,6 +1094,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1137,6 +1164,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1223,6 +1251,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 	}
 
@@ -1905,17 +1934,12 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
 	}
 
-	if len(request.Projects) > 0 && len(request.Paths) > 0 {
-		for _, project := range request.Projects {
-			for _, p := range request.Paths {
-				apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{ProjectName: project, Directory: p.Directory, Workspace: p.Workspace})
-			}
-		}
-	} else if len(request.Projects) > 0 {
+	if len(request.Projects) > 0 {
 		apiRequest.Projects = request.Projects
 	} else if len(request.Paths) > 0 {
 		for _, p := range request.Paths {
-			apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{Directory: p.Directory, Workspace: p.Workspace})
+			dir, _ := models.NormalizeAPIPath(p.Directory)
+			apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{Directory: dir, Workspace: p.Workspace})
 		}
 	}
 
@@ -1935,6 +1959,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 	}
 

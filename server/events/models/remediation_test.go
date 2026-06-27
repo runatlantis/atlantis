@@ -132,16 +132,18 @@ func TestRemediationRequestValidateRejectsUnsupportedVCSTypes(t *testing.T) {
 }
 
 func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {
-	request := models.RemediationRequest{
-		Repository: "owner/repo",
-		Ref:        "main",
-		Type:       "Github",
-		Paths:      []models.DriftDetectionPath{{Directory: "   "}},
-	}
+	for _, directory := range []string{"   ", "../env", "/env"} {
+		request := models.RemediationRequest{
+			Repository: "owner/repo",
+			Ref:        "main",
+			Type:       "Github",
+			Paths:      []models.DriftDetectionPath{{Directory: directory}},
+		}
 
-	errs := request.Validate()
-	Assert(t, len(errs) > 0, "expected validation error")
-	Equals(t, "paths", errs[0].Field)
+		errs := request.Validate()
+		Assert(t, len(errs) > 0, "expected validation error")
+		Equals(t, "paths", errs[0].Field)
+	}
 }
 
 func TestRemediationRequestValidateRejectsConflictingPathAndTopLevelWorkspaces(t *testing.T) {

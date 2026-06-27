@@ -970,6 +970,9 @@ type WorkflowHookCommandContext struct {
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
+	// SuppressJobOutput prevents hook output from being published to the public
+	// job stream for API workflows such as drift detection.
+	SuppressJobOutput bool
 	// RepoRelDir is the directory of this project relative to the repo root.
 	RepoRelDir string
 	// User is the user that triggered this command.

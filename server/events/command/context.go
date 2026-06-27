@@ -66,6 +66,11 @@ type Context struct {
 	// publishing raw command output to the public job stream.
 	SuppressJobOutput bool
 
+	// RunPolicyChecks allows API workflows that explicitly model the full plan
+	// lifecycle, such as drift detection/remediation, to execute generated
+	// policy_check contexts after successful plan contexts.
+	RunPolicyChecks bool
+
 	// FailOnTeamAllowlistDenied makes project selection return an error when
 	// any selected project is denied by team allowlist filtering.
 	FailOnTeamAllowlistDenied bool

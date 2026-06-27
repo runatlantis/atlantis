@@ -592,7 +592,7 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 | workspace | string | No       | Terraform workspace (optional)                                  |
 
 ::: tip NOTE
-At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects.
+At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request.
 :::
 
 ::: tip Status Side Effects
@@ -820,10 +820,10 @@ Drift remediation must be enabled on the Atlantis server. If not enabled, this e
 
 #### Query Parameters
 
-| Name       | Type   | Required | Description                                  |
-|------------|--------|----------|----------------------------------------------|
-| repository | string | Yes      | Full repository name (e.g., `owner/repo`)    |
-| type       | string | Yes      | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`) |
+| Name       | Type   | Required | Description                                                 |
+|------------|--------|----------|-------------------------------------------------------------|
+| repository | string | Yes      | Full repository name (e.g., `owner/repo`)                   |
+| type       | string | Yes      | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)        |
 
 #### Sample Request
 

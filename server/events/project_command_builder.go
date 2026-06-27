@@ -733,7 +733,7 @@ func (p *DefaultProjectCommandBuilder) discoverAllProjectDirs(ctx *command.Conte
 		if !entry.IsDir() {
 			return nil
 		}
-		if entry.Name() == ".git" || entry.Name() == ".terraform" {
+		if entry.Name() == ".git" || entry.Name() == ".terraform" || entry.Name() == ".terragrunt-cache" {
 			return filepath.SkipDir
 		}
 
@@ -1099,8 +1099,10 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		if p.EnableRegExpCmd || filterProjectDir || filterProjectWorkspace {
+		if p.EnableRegExpCmd {
 			projectsCfg = repoCfg.FindProjectsByName(projectName)
+		} else if filterProjectDir || filterProjectWorkspace {
+			projectsCfg = repoCfg.FindProjectsByExactName(projectName)
 		} else {
 			if p := repoCfg.FindProjectByName(projectName); p != nil {
 				projectsCfg = append(projectsCfg, *p)

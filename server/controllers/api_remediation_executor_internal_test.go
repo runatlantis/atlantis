@@ -98,6 +98,58 @@ func TestSeedPullStatusFromPlanResultPreservesPlanStatusWhenPolicyCheckFollows(t
 	Equals(t, true, ctx.PullStatus.Projects[0].PolicyStatus[0].Passed)
 }
 
+func TestVerifyNonPRBaseBranchReachabilityRedactsCredentialedFetchErrors(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repoDir := t.TempDir()
+	runGitForTest(t, repoDir, "init")
+	runGitForTest(t, repoDir, "config", "user.email", "test@example.com")
+	runGitForTest(t, repoDir, "config", "user.name", "Test User")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "README.md"), []byte("test"), 0600))
+	runGitForTest(t, repoDir, "add", "README.md")
+	runGitForTest(t, repoDir, "commit", "-m", "init")
+	headCommit := strings.TrimSpace(runGitForTest(t, repoDir, "rev-parse", "HEAD"))
+	credentialedURL := "https://user:token@127.0.0.1:1/org/repo.git"
+	runGitForTest(t, repoDir, "remote", "add", "origin", credentialedURL)
+
+	repo := models.Repo{
+		FullName:          "owner/repo",
+		CloneURL:          credentialedURL,
+		SanitizedCloneURL: "https://<redacted>@127.0.0.1:1/org/repo.git",
+	}
+	ctx := &command.Context{
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: "missing",
+			HeadBranch: "main",
+			HeadCommit: headCommit,
+			BaseRepo:   repo,
+		},
+		Log: logger,
+	}
+
+	err := verifyNonPRBaseBranchReachability(ctx, repoDir)
+
+	Assert(t, err != nil, "expected fetch failure")
+	Assert(t, !strings.Contains(err.Error(), "user:token@"), "expected sanitized fetch error, got %q", err.Error())
+	Assert(t, !strings.Contains(err.Error(), "token@"), "expected sanitized fetch error, got %q", err.Error())
+	simulatedGitOutput := "fatal: unable to access 'https://user:token@127.0.0.1:1/org/repo.git/'"
+	sanitized := sanitizeAPIErrorString(ctx, simulatedGitOutput)
+	Assert(t, !strings.Contains(sanitized, "user:token@"), "expected sanitized output, got %q", sanitized)
+	Assert(t, strings.Contains(sanitized, "https://<redacted>@127.0.0.1:1/org/repo.git"), "expected redacted URL, got %q", sanitized)
+}
+
+func runGitForTest(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, output)
+	}
+	return string(output)
+}
+
 func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)

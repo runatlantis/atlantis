@@ -720,6 +720,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 		"project2": map[string]any{
 			"main.tf": nil,
 		},
+		".terragrunt-cache": map[string]any{
+			"cached-project": map[string]any{
+				"main.tf": nil,
+			},
+		},
 		"modules": map[string]any{
 			"network": map[string]any{
 				"main.tf": nil,
@@ -2240,6 +2245,55 @@ projects:
 				},
 			},
 			ModifiedFiles: []string{"directory-1/main.tf"},
+		},
+		{
+			Description: "API project path selector keeps project name exact when regexp commands disabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "prod.*",
+				RepoRelDir:  "prod-api",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: prod-api
+  dir: prod-api
+`,
+			DirectoryStructure: map[string]any{
+				"prod-api": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"prod-api/main.tf"},
+			ExpErr:        "no project with name 'prod.*' is defined in 'atlantis.yaml'",
+		},
+		{
+			Description: "API project path selector treats regexp metacharacters as literal when disabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "prod.api",
+				RepoRelDir:  "literal",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: prod.api
+  dir: literal
+- name: prodXapi
+  dir: other
+`,
+			DirectoryStructure: map[string]any{
+				"literal": map[string]any{
+					"main.tf": nil,
+				},
+				"other": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"literal/main.tf"},
+			ExpProjectNames: []string{"prod.api"},
 		},
 		{
 			Description: "planning a regexp project only includes changed matching projects",

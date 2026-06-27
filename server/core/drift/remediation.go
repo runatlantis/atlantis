@@ -7,9 +7,7 @@ package drift
 
 import (
 	"fmt"
-	pathpkg "path"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -322,28 +320,13 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 
 func normalizeRemediationRequest(req models.RemediationRequest) (models.RemediationRequest, error) {
 	for i := range req.Paths {
-		directory, err := normalizeRemediationPath(req.Paths[i].Directory)
-		if err != nil {
-			return req, err
+		directory, ok := models.NormalizeAPIPath(req.Paths[i].Directory)
+		if !ok {
+			return req, fmt.Errorf("path directory %q is invalid", req.Paths[i].Directory)
 		}
 		req.Paths[i].Directory = directory
 	}
 	return req, nil
-}
-
-func normalizeRemediationPath(directory string) (string, error) {
-	trimmed := strings.TrimSpace(directory)
-	if trimmed == "" {
-		return "", fmt.Errorf("path directory cannot be empty")
-	}
-	if strings.Contains(trimmed, "\\") {
-		return "", fmt.Errorf("path directory %q is invalid", directory)
-	}
-	cleaned := pathpkg.Clean(trimmed)
-	if pathpkg.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return "", fmt.Errorf("path directory %q is invalid", directory)
-	}
-	return cleaned, nil
 }
 
 func remediationStorageRepository(req models.RemediationRequest) string {
