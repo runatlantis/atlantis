@@ -6,6 +6,7 @@ package webhooks
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rivo/uniseg"
 	"github.com/slack-go/slack"
@@ -26,7 +27,7 @@ const (
 type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
-	PostMessage(channel string, applyResult ApplyResult) error
+	PostMessage(channel string, eventResult EventResult) error
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
@@ -60,8 +61,8 @@ func (d *DefaultSlackClient) TokenIsSet() bool {
 	return d.Token != ""
 }
 
-func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult) error {
-	attachments := d.createAttachments(applyResult)
+func (d *DefaultSlackClient) PostMessage(channel string, eventResult EventResult) error {
+	attachments := d.createAttachments(eventResult)
 	_, _, err := d.Slack.PostMessage(
 		channel,
 		slack.MsgOptionAsUser(true),
@@ -71,10 +72,10 @@ func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult
 	return err
 }
 
-func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.Attachment {
+func (d *DefaultSlackClient) createAttachments(eventResult EventResult) []slack.Attachment {
 	var colour string
 	var successWord string
-	if applyResult.Success {
+	if eventResult.Success {
 		colour = slackSuccessColour
 		successWord = "succeeded"
 	} else {
@@ -82,8 +83,14 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 		successWord = "failed"
 	}
 
-	text := fmt.Sprintf("Apply %s for <%s|%s>", successWord, applyResult.Pull.URL, applyResult.Repo.FullName)
-	directory := applyResult.Directory
+	eventName := string(eventResult.Event)
+	if eventName == "" {
+		eventName = "event"
+	}
+	eventName = strings.ToUpper(eventName[:1]) + eventName[1:]
+	text := fmt.Sprintf("%s %s for <%s|%s>", eventName, successWord, eventResult.Pull.URL, eventResult.Repo.FullName)
+
+	directory := eventResult.Directory
 	// Since "." looks weird, replace it with "/" to make it clear this is the root.
 	if directory == "." {
 		directory = "/"
@@ -95,17 +102,17 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 		Fields: []slack.AttachmentField{
 			{
 				Title: "Workspace",
-				Value: applyResult.Workspace,
+				Value: eventResult.Workspace,
 				Short: true,
 			},
 			{
 				Title: "Branch",
-				Value: applyResult.Pull.BaseBranch,
+				Value: eventResult.Pull.BaseBranch,
 				Short: true,
 			},
 			{
 				Title: "User",
-				Value: applyResult.User.Username,
+				Value: eventResult.User.Username,
 				Short: true,
 			},
 			{

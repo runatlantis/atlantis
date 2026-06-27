@@ -40,7 +40,7 @@ func (mock *MockSlackClient) AuthTest() error {
 	return _ret0
 }
 
-func (mock *MockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) error {
+func (mock *MockSlackClient) PostMessage(channel string, applyResult webhooks.EventResult) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSlackClient().")
 	}
@@ -124,7 +124,7 @@ func (c *MockSlackClient_AuthTest_OngoingVerification) GetCapturedArguments() {
 func (c *MockSlackClient_AuthTest_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult webhooks.ApplyResult) *MockSlackClient_PostMessage_OngoingVerification {
+func (verifier *VerifierMockSlackClient) PostMessage(channel string, applyResult webhooks.EventResult) *MockSlackClient_PostMessage_OngoingVerification {
 	_params := []pegomock.Param{channel, applyResult}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "PostMessage", _params, verifier.timeout)
 	return &MockSlackClient_PostMessage_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
@@ -135,12 +135,12 @@ type MockSlackClient_PostMessage_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSlackClient_PostMessage_OngoingVerification) GetCapturedArguments() (string, webhooks.ApplyResult) {
+func (c *MockSlackClient_PostMessage_OngoingVerification) GetCapturedArguments() (string, webhooks.EventResult) {
 	channel, applyResult := c.GetAllCapturedArguments()
 	return channel[len(channel)-1], applyResult[len(applyResult)-1]
 }
 
-func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.ApplyResult) {
+func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []webhooks.EventResult) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -150,9 +150,9 @@ func (c *MockSlackClient_PostMessage_OngoingVerification) GetAllCapturedArgument
 			}
 		}
 		if len(_params) > 1 {
-			_param1 = make([]webhooks.ApplyResult, len(c.methodInvocations))
+			_param1 = make([]webhooks.EventResult, len(c.methodInvocations))
 			for u, param := range _params[1] {
-				_param1[u] = param.(webhooks.ApplyResult)
+				_param1[u] = param.(webhooks.EventResult)
 			}
 		}
 	}
