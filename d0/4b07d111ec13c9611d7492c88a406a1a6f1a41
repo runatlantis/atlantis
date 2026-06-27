@@ -1,0 +1,21 @@
+server/events/vcs/common/instrumented_client_test.go
+  s_12c46f3ee857ef::t_702a777e4ecd84 1-89
+server/events/vcs/common/instrumented_client.go
+  s_12c46f3ee857ef::t_3c25dbe0e66be0 166-172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "d04b07d111ec13c9611d7492c88a406a1a6f1a41",
+  "prompts": {},
+  "sessions": {
+    "s_12c46f3ee857ef": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1cf2-7340-b7cb-507da941bace",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
