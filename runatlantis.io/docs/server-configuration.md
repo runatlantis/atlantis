@@ -795,6 +795,8 @@ Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
 
+GitHub team hierarchy is honored. If an allowlisted team has child teams, members of those child teams inherit the parent team's allowed commands.
+
 ::: tip
 If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
 

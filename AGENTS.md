@@ -60,6 +60,8 @@
 
 **VCS provider:** Create `server/events/vcs/<provider>/` → Implement `Client` interface (`server/events/vcs/common/common.go`) → Update `server/server.go`
 
+**VCS pagination:** When following provider-returned pagination links, validate the next URL against the configured provider API origin before issuing the request. Bitbucket Cloud diffstat pagination uses this guard in both modified-file and mergeability checks.
+
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
 **i18n changes:** Keep command routing/template selection keyed on stable command identifiers (`command.Name`), and use localized titles only for display text.
 
@@ -68,6 +70,8 @@
 **Combined VCS statuses:** `server/events/commit_status_updater.go` uses `models.ProjectCounts`. For failed apply/policy status text, count actual errored projects with `Errored`, not `Total - Success`, because planned or untouched projects may still be pending. For apply status text, `NoChanges` is a subset of `Success` and should be reported as up to date, not applied.
 
 **VCS status contexts:** Always pass generated commit status contexts through `truncateContext` before calling `UpdateStatus`. GitHub rejects contexts longer than 255 characters, and project names or workflow hook descriptions can exceed that limit.
+
+**GitHub team allowlist:** `GH_TEAM_ALLOWLIST` honors GitHub child-team membership. Keep hierarchy expansion available to both initial command authorization and later project filtering such as generated `policy_check` contexts.
 
 **Apply requirements:** API apply requests must populate `command.Context.PullRequestStatus` before evaluating apply requirements, and refresh it after the API plan phase. If pull status cannot be fetched, keep the fail-closed behavior for `approved` and `mergeable`.
 
