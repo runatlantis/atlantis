@@ -6,6 +6,7 @@ package controllers
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -201,6 +202,13 @@ func apiRequestBaseBranch(ref, baseBranch string) string {
 	return ref
 }
 
+func apiErrorStatusCode(err error) int {
+	if errors.Is(err, events.ErrTeamAllowlistDenied) {
+		return http.StatusForbidden
+	}
+	return http.StatusInternalServerError
+}
+
 func (a *APIController) apiReportLegacyError(w http.ResponseWriter, code int, err error) {
 	a.getAPIMiddleware().Responder.writeJSON(w, code, map[string]string{
 		"error": err.Error(),
@@ -226,7 +234,7 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
+		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
 	if !ctx.CommandSkipped {
@@ -260,7 +268,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We must first make the plan for all projects
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
+		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
 	if ctx.CommandSkipped {
@@ -282,7 +290,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We can now prepare and run the apply step
 	result, err = a.apiApply(request, ctx)
 	if err != nil {
-		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
+		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
 
@@ -521,38 +529,11 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 }
 
 func checkedAPIBaseBranchRef(baseBranch string) (string, error) {
-	baseRef := strings.TrimPrefix(strings.TrimSpace(baseBranch), "refs/heads/")
-	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.Contains(baseRef, ":") {
-		return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
-	}
-	lower := strings.ToLower(strings.TrimPrefix(baseRef, "refs/"))
-	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {
-		if strings.HasPrefix(lower, namespace+"/") {
-			return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
-		}
-	}
-	if !isSafeAPIBaseBranchRef(baseRef) {
+	baseRef, ok := models.CheckedBaseBranchRef(baseBranch)
+	if !ok {
 		return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
 	}
 	return baseRef, nil
-}
-
-func isSafeAPIBaseBranchRef(baseRef string) bool {
-	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.HasPrefix(baseRef, "/") || strings.HasSuffix(baseRef, "/") {
-		return false
-	}
-	if strings.ContainsAny(baseRef, " \t\r\n\\~^:?*[]") || strings.Contains(baseRef, "..") || strings.Contains(baseRef, "@{") || strings.Contains(baseRef, "//") {
-		return false
-	}
-	if strings.HasSuffix(baseRef, ".") || strings.HasSuffix(baseRef, ".lock") {
-		return false
-	}
-	for _, component := range strings.Split(baseRef, "/") {
-		if component == "" || strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
-			return false
-		}
-	}
-	return true
 }
 
 func isShallowGitRepo(repoDir string) bool {
@@ -851,11 +832,12 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		BaseRepo:   baseRepo,
 	}
 	ctx := &command.Context{
-		HeadRepo: baseRepo,
-		Pull:     pull,
-		Scope:    a.Scope,
-		Log:      a.Logger,
-		API:      true,
+		HeadRepo:                  baseRepo,
+		Pull:                      pull,
+		Scope:                     a.Scope,
+		Log:                       a.Logger,
+		API:                       true,
+		FailOnTeamAllowlistDenied: true,
 	}
 	a.populatePullRequestStatus(ctx)
 	return &request, ctx, http.StatusOK, nil
@@ -1015,12 +997,12 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:               e.controller.Scope,
-		Log:                 e.logger,
-		API:                 true,
-		SkipPRRequirements:  true,
-		SkipPRModifiedFiles: true,
-		SuppressVCSStatus:   true,
+		Scope:                     e.controller.Scope,
+		Log:                       e.logger,
+		API:                       true,
+		SkipPRModifiedFiles:       true,
+		SuppressVCSStatus:         true,
+		FailOnTeamAllowlistDenied: true,
 	}
 
 	// Setup working directory
@@ -1083,11 +1065,12 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:               e.controller.Scope,
-		Log:                 e.logger,
-		API:                 true,
-		SkipPRModifiedFiles: true,
-		SuppressVCSStatus:   true,
+		Scope:                     e.controller.Scope,
+		Log:                       e.logger,
+		API:                       true,
+		SkipPRModifiedFiles:       true,
+		SuppressVCSStatus:         true,
+		FailOnTeamAllowlistDenied: true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1857,12 +1840,12 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			HeadCommit: request.Ref,
 			BaseRepo:   baseRepo,
 		},
-		Scope:               a.Scope,
-		Log:                 a.Logger,
-		API:                 true,
-		SkipPRRequirements:  true,
-		SkipPRModifiedFiles: true,
-		SuppressVCSStatus:   true,
+		Scope:                     a.Scope,
+		Log:                       a.Logger,
+		API:                       true,
+		SkipPRModifiedFiles:       true,
+		SuppressVCSStatus:         true,
+		FailOnTeamAllowlistDenied: true,
 	}
 
 	// Setup working directory
@@ -1886,6 +1869,10 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	result, err := a.apiPlan(apiRequest, ctx)
 	if err != nil {
+		if errors.Is(err, events.ErrTeamAllowlistDenied) {
+			responder.Forbidden(w, r, err.Error())
+			return
+		}
 		responder.InternalError(w, r, err)
 		return
 	}

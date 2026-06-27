@@ -144,8 +144,8 @@ type ProjectContext struct {
 	// a PR comment.
 	API bool
 
-	// SkipPRRequirements allows intentionally non-PR API workflows, such as drift
-	// detection/remediation, to skip PR-only requirements like approved and mergeable.
+	// SkipPRRequirements allows explicitly opted-in non-PR API workflows to skip
+	// PR-only requirements like approved and mergeable.
 	SkipPRRequirements bool
 
 	// SuppressVCSStatus prevents API workflows such as drift detection from

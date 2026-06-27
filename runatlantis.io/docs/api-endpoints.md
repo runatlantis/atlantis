@@ -321,12 +321,16 @@ The `paths` field uses the same `DriftDetectionPath` object described under `POS
 Drift remediation apply does not bypass repository `apply_requirements`. Requirements that need pull request state, such as `approved` or `mergeable`, fail closed for non-PR remediation requests. Use plan-only remediation or normal PR workflows for projects guarded by those requirements.
 :::
 
+::: warning Plan Requirements
+Drift remediation plan-only actions and drift detection do not bypass PR-state `plan_requirements`. Requirements such as `approved` or `mergeable` cannot be satisfied without a pull request and fail closed.
+:::
+
 ::: tip Ref Safety
 When remediation uses cached drift for a moving ref such as `main`, Atlantis compares the current checkout commit with the commit that produced the cached drift record. If the ref has moved, rerun drift detection before using `action: "apply"`.
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, slash-containing ambiguous refs such as `release/v1.2.3` or `env/prod`, and bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request (Plan Only)
@@ -595,10 +599,12 @@ At least one of `projects` or `paths` should be specified for targeted detection
 Drift detection suppresses normal Atlantis plan, policy check, apply, and hook commit statuses. Drift-specific webhook notifications can still be sent when drift webhooks are configured.
 
 Drift detection does not run Terraform apply, but it does execute the normal plan lifecycle. Configured pre-workflow hooks, custom workflows, custom plan steps, and Terraform plan commands can run server-side outside a pull request context.
+
+Drift detection does not bypass team allowlists. If a configured team allowlist cannot authorize the API request, the request fails instead of scanning or reconciling an empty project set. PR-state `plan_requirements` such as `approved` or `mergeable` also fail closed for non-PR drift detection.
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, slash-containing ambiguous refs such as `release/v1.2.3` or `env/prod`, and bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request

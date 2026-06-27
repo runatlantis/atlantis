@@ -71,7 +71,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 		switch req {
 		case raw.ApprovedRequirement:
 			if skipPRRequirements {
-				ctx.Log.Info("skipping approval requirement for drift API call without PR number")
+				ctx.Log.Info("skipping approval requirement for opted-in API call without PR number")
 				continue
 			}
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
@@ -88,7 +88,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			}
 		case raw.MergeableRequirement:
 			if skipPRRequirements {
-				ctx.Log.Info("skipping mergeable requirement for drift API call without PR number")
+				ctx.Log.Info("skipping mergeable requirement for opted-in API call without PR number")
 				continue
 			}
 			mergeableStatus := ctx.PullReqStatus.MergeableStatus

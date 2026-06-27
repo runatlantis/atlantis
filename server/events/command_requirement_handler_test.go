@@ -157,7 +157,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "drift API call without PR skips approved requirement",
+			name: "explicit non-PR API opt-in skips approved requirement",
 			ctx: command.ProjectContext{
 				Log:                logging.NewNoopLogger(t),
 				API:                true,
@@ -185,7 +185,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "drift API call without PR skips mergeable requirement",
+			name: "explicit non-PR API opt-in skips mergeable requirement",
 			ctx: command.ProjectContext{
 				Log:                logging.NewNoopLogger(t),
 				API:                true,

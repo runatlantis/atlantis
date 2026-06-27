@@ -73,9 +73,6 @@ func (checker *DefaultTeamAllowlistChecker) IsCommandAllowedForTeam(_ models.Tea
 // IsCommandAllowedForAnyTeam returns true if any of the teams is allowed to execute the command
 // and false otherwise.
 func (checker *DefaultTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx models.TeamAllowlistCheckerContext, teams []string, command string) bool {
-	if ctx.API {
-		return true
-	}
 	if len(teams) == 0 {
 		for _, rule := range checker.rules {
 			for key, value := range rule {

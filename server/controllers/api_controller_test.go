@@ -140,6 +140,25 @@ func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, !strings.Contains(string(responseBody), "plan failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
+func TestAPIController_PlanTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, fmt.Errorf("failed to build command: %w", events.ErrTeamAllowlistDenied))
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusForbidden, "team allowlist denied")
+}
+
 func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
 	ac, _, _ := setup(t)
 
@@ -380,6 +399,25 @@ func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
 	Assert(t, strings.Contains(string(responseBody), "\"Error\":{}"), "expected legacy project Error object in response: %s", responseBody)
 	Assert(t, !strings.Contains(string(responseBody), "apply failed"), "legacy project Error must not be stringified: %s", responseBody)
+}
+
+func TestAPIController_ApplyTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, fmt.Errorf("failed to build command: %w", events.ErrTeamAllowlistDenied))
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusForbidden, "team allowlist denied")
 }
 
 func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {
@@ -1669,6 +1707,29 @@ func TestAPIController_Remediate_AutoApplyRequiresOptIn(t *testing.T) {
 	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
 }
 
+func TestAPIController_Remediate_InvalidBaseBranchReturnsBadRequest(t *testing.T) {
+	ac, _, _ := setup(t)
+	remediationService := driftmocks.NewMockRemediationService()
+	ac.RemediationService = remediationService
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		BaseBranch: "refs/pull/1/head",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/remediate", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "base_branch"), "expected base_branch validation error, got %#v", apiErr.Details)
+	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
+}
+
 func TestAPIController_Remediate_NoService(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -2163,7 +2224,14 @@ func TestAPIController_ListRemediationResults_Empty(t *testing.T) {
 
 func TestAPIController_DetectDrift(t *testing.T) {
 	// Use the setup function that properly configures all mocks
-	ac, _, _ := setup(t)
+	ac, projectCommandBuilder, _ := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			Assert(t, !ctx.SkipPRRequirements, "drift detection should fail closed for PR-state plan requirements")
+			Assert(t, ctx.FailOnTeamAllowlistDenied, "drift detection should fail closed on team allowlist denial")
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+		})
 
 	// Add drift storage to the controller
 	driftStorage := driftmocks.NewMockStorage()
@@ -2188,6 +2256,30 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	var result controllers.DriftDetectionResultAPI
 	parseAPIResponse(t, response, &result)
 	Equals(t, "Repo", result.Repository)
+}
+
+func TestAPIController_DetectDrift_TeamAllowlistDeniedReturnsForbidden(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	ac.DriftStorage = driftStorage
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, fmt.Errorf("failed to build command: %w", events.ErrTeamAllowlistDenied))
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusForbidden, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Equals(t, controllers.ErrCodeForbidden, apiErr.Code)
+	Assert(t, strings.Contains(apiErr.Message, "team allowlist denied"), "expected team allowlist error, got %q", apiErr.Message)
 }
 
 func TestAPIController_DetectDriftSuppressesNormalCommitStatus(t *testing.T) {
@@ -2270,6 +2362,27 @@ func TestAPIController_DetectDrift_SHARefRequiresBaseBranch(t *testing.T) {
 	body, _ := json.Marshal(models.DriftDetectionRequest{
 		Repository: "Repo",
 		Ref:        "0123456789abcdef0123456789abcdef01234567",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "base_branch"), "expected base_branch validation error, got %#v", apiErr.Details)
+}
+
+func TestAPIController_DetectDrift_InvalidBaseBranchReturnsBadRequest(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		BaseBranch: "refs/merge-requests/1/head",
 		Type:       "Gitlab",
 		Projects:   []string{"default"},
 	})

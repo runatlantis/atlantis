@@ -50,9 +50,8 @@ type Context struct {
 	// API is true if plan/apply by API endpoints
 	API bool
 
-	// SkipPRRequirements allows API workflows that are intentionally not tied to
-	// a pull request, such as drift detection/remediation, to skip PR-only
-	// requirements like approved and mergeable.
+	// SkipPRRequirements allows explicitly opted-in API workflows that are not
+	// tied to a pull request to skip PR-only requirements like approved and mergeable.
 	SkipPRRequirements bool
 
 	// SkipPRModifiedFiles allows non-PR API workflows, such as drift detection,
@@ -62,6 +61,10 @@ type Context struct {
 	// SuppressVCSStatus prevents API workflows such as drift detection from
 	// publishing normal PR lifecycle commit statuses.
 	SuppressVCSStatus bool
+
+	// FailOnTeamAllowlistDenied makes project selection return an error when
+	// any selected project is denied by team allowlist filtering.
+	FailOnTeamAllowlistDenied bool
 
 	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
 	// pre-workflow hooks before project discovery.

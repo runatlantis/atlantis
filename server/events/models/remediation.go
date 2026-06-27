@@ -109,6 +109,11 @@ func (r *RemediationRequest) Validate() []FieldError {
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
 		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
 	}
+	if r.BaseBranch != "" {
+		if _, ok := CheckedBaseBranchRef(r.BaseBranch); !ok {
+			errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is invalid"})
+		}
+	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
 	} else if r.Type != "Github" && r.Type != "Gitlab" && r.Type != "BitbucketCloud" && r.Type != "BitbucketServer" && r.Type != "AzureDevops" && r.Type != "Gitea" {

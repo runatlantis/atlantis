@@ -37,6 +37,8 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 		{name: "ambiguous prod ref", ref: "prod"},
 		{name: "ambiguous latest ref", ref: "latest"},
 		{name: "ambiguous stable ref", ref: "stable"},
+		{name: "slash tag-like ref", ref: "release/v1.2.3"},
+		{name: "slash ambiguous ref", ref: "env/prod"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			request := models.RemediationRequest{
@@ -55,7 +57,7 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 }
 
 func TestRemediationRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.T) {
-	for _, ref := range []string{"main", "master", "develop", "release/1.2", "feature/foo"} {
+	for _, ref := range []string{"main", "master", "develop", "refs/heads/release/1.2", "refs/heads/feature/foo"} {
 		t.Run(ref, func(t *testing.T) {
 			request := models.RemediationRequest{
 				Repository: "owner/repo",
@@ -66,6 +68,39 @@ func TestRemediationRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.
 			Equals(t, 0, len(request.Validate()))
 		})
 	}
+}
+
+func TestRemediationRequestValidateRejectsMalformedBaseBranch(t *testing.T) {
+	for _, baseBranch := range []string{
+		"refs/pull/1/head",
+		"pull/1/head",
+		"refs/merge-requests/1/head",
+		"refs/tags/prod",
+		"-main",
+		"--upload-pack=/tmp/x",
+		"foo:bar",
+		"   ",
+	} {
+		t.Run(baseBranch, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				BaseBranch: baseBranch,
+				Type:       "Github",
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "base_branch", errs[0].Field)
+		})
+	}
+
+	request := models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		BaseBranch: "release/1.2",
+		Type:       "Github",
+	}
+	Equals(t, 0, len(request.Validate()))
 }
 
 func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {

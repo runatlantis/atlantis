@@ -246,13 +246,16 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 						}
 					}
 				}
-				if !hasRemediationPathTarget(projects, path.Directory, workspace) {
-					projects = append(projects, models.ProjectDrift{
-						Path:       path.Directory,
-						Workspace:  workspace,
-						Ref:        req.Ref,
-						BaseBranch: remediationBaseBranch(req),
-					})
+				for _, projectName := range remediationPathProjectNames(req.Projects) {
+					if !hasRemediationPathTarget(projects, path.Directory, workspace, projectName) {
+						projects = append(projects, models.ProjectDrift{
+							ProjectName: projectName,
+							Path:        path.Directory,
+							Workspace:   workspace,
+							Ref:         req.Ref,
+							BaseBranch:  remediationBaseBranch(req),
+						})
+					}
 				}
 			}
 		}
@@ -336,6 +339,13 @@ func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []stri
 	return []string{""}, nil
 }
 
+func remediationPathProjectNames(projects []string) []string {
+	if len(projects) == 0 {
+		return []string{""}
+	}
+	return projects
+}
+
 func hasRemediationTarget(projects []models.ProjectDrift, projectName string, workspace string) bool {
 	for _, p := range projects {
 		if p.ProjectName != projectName {
@@ -348,9 +358,12 @@ func hasRemediationTarget(projects []models.ProjectDrift, projectName string, wo
 	return false
 }
 
-func hasRemediationPathTarget(projects []models.ProjectDrift, path string, workspace string) bool {
+func hasRemediationPathTarget(projects []models.ProjectDrift, path string, workspace string, projectName string) bool {
 	for _, p := range projects {
 		if p.Path != path {
+			continue
+		}
+		if projectName != "" && p.ProjectName != projectName {
 			continue
 		}
 		if workspace == "" || p.Workspace == workspace {
@@ -461,6 +474,15 @@ func findRemediationProjectForResult(projects []models.ProjectDrift, projectsByK
 	key := remediationProjectKey(result.ProjectName, result.Path, result.Workspace)
 	if proj, ok := projectsByKey[key]; ok {
 		return proj, key, true
+	}
+	for _, proj := range projects {
+		if proj.ProjectName != "" || proj.Path != result.Path {
+			continue
+		}
+		if proj.Workspace != "" && proj.Workspace != result.Workspace {
+			continue
+		}
+		return proj, remediationProjectKey(proj.ProjectName, proj.Path, proj.Workspace), true
 	}
 	for _, proj := range projects {
 		if proj.ProjectName == "" || proj.ProjectName != result.ProjectName || proj.Path != "" {

@@ -400,6 +400,27 @@ func TestInMemoryRemediationService_PathSelectorsHonorTopLevelWorkspaceFallbacks
 	Equals(t, remediationExecutorCall{path: "env", workspace: "stage"}, executor.planCalls[1])
 }
 
+func TestInMemoryRemediationService_PathSelectorsPreserveProjectFallbacks(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Projects:   []string{"app"},
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+		}},
+		Workspaces: []string{"prod"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "prod"}, executor.planCalls[0])
+}
+
 func TestInMemoryRemediationService_PathSelectorsHonorCachedWorkspaceFilters(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	for _, workspace := range []string{"prod", "stage", "dev"} {
@@ -452,6 +473,39 @@ func TestInMemoryRemediationService_PathSelectorRejectsConflictingWorkspaceFilte
 	Equals(t, models.RemediationStatusFailed, result.Status)
 	Assert(t, strings.Contains(result.Error, "path workspace"), "expected path workspace error, got %q", result.Error)
 	Equals(t, 0, len(executor.planCalls))
+}
+
+func TestInMemoryRemediationService_PathOnlyApplyMatchesResolvedProjectResult(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{
+		applyProjectResults: []models.ProjectRemediationResult{{
+			ProjectName: "app",
+			Path:        "env",
+			Workspace:   "prod",
+			Status:      models.RemediationStatusSuccess,
+			PlanOutput:  "plan",
+			ApplyOutput: "apply",
+		}},
+	}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+		}},
+		Workspaces: []string{"prod"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, "app", result.Projects[0].ProjectName)
+	Equals(t, "env", result.Projects[0].Path)
+	Equals(t, "prod", result.Projects[0].Workspace)
+	Equals(t, models.RemediationStatusSuccess, result.Projects[0].Status)
 }
 
 func TestInMemoryRemediationService_PathSelectorsUseMatchingBaseBranch(t *testing.T) {

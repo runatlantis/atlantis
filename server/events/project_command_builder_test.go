@@ -779,72 +779,92 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
-func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPIBypassesTeamAllowlist(t *testing.T) {
-	RegisterMockTestingT(t)
-	logger := logging.NewNoopLogger(t)
-	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
-	tmpDir := DirStructure(t, map[string]any{
-		"project1": map[string]any{
-			"main.tf": nil,
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITeamAllowlist(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		allowlist string
+		wantErr   bool
+	}{
+		{
+			name:      "restrictive allowlist fails closed",
+			allowlist: "platform:plan",
+			wantErr:   true,
 		},
-		"project2": map[string]any{
-			"main.tf": nil,
+		{
+			name:      "wildcard allowlist remains allowed",
+			allowlist: "*:plan",
 		},
-	})
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			logger := logging.NewNoopLogger(t)
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+			tmpDir := DirStructure(t, map[string]any{
+				"project1": map[string]any{
+					"main.tf": nil,
+				},
+				"project2": map[string]any{
+					"main.tf": nil,
+				},
+			})
 
-	workingDir := mocks.NewMockWorkingDir()
-	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
-		ThenReturn(tmpDir, nil)
-	vcsClient := vcsmocks.NewMockClient()
-	terraformClient := tfclientmocks.NewMockClient()
-	teamAllowlistChecker, err := command.NewTeamAllowlistChecker("platform:plan")
-	Ok(t, err)
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+				ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
+			teamAllowlistChecker, err := command.NewTeamAllowlistChecker(tc.allowlist)
+			Ok(t, err)
 
-	builder := events.NewProjectCommandBuilder(
-		false,
-		&config.ParserValidator{},
-		&events.DefaultProjectFinder{},
-		vcsClient,
-		workingDir,
-		events.NewDefaultWorkingDirLocker(),
-		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
-		&events.DefaultPendingPlanFinder{},
-		&events.CommentParser{ExecutableName: "atlantis"},
-		defaultUserConfig.SkipCloneNoChanges,
-		defaultUserConfig.EnableRegExpCmd,
-		defaultUserConfig.EnableAutoMerge,
-		defaultUserConfig.EnableParallelPlan,
-		defaultUserConfig.EnableParallelApply,
-		defaultUserConfig.AutoDetectModuleFiles,
-		defaultUserConfig.AutoplanFileList,
-		defaultUserConfig.RestrictFileList,
-		defaultUserConfig.SilenceNoProjects,
-		defaultUserConfig.IncludeGitUntrackedFiles,
-		defaultUserConfig.AutoDiscoverMode,
-		scope,
-		terraformClient,
-	)
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				defaultUserConfig.SkipCloneNoChanges,
+				defaultUserConfig.EnableRegExpCmd,
+				defaultUserConfig.EnableAutoMerge,
+				defaultUserConfig.EnableParallelPlan,
+				defaultUserConfig.EnableParallelApply,
+				defaultUserConfig.AutoDetectModuleFiles,
+				defaultUserConfig.AutoplanFileList,
+				defaultUserConfig.RestrictFileList,
+				defaultUserConfig.SilenceNoProjects,
+				defaultUserConfig.IncludeGitUntrackedFiles,
+				defaultUserConfig.AutoDiscoverMode,
+				scope,
+				terraformClient,
+			)
 
-	ctxs, err := builder.BuildPlanCommands(&command.Context{
-		Log:                  logger,
-		Scope:                scope,
-		HeadRepo:             models.Repo{FullName: "owner/repo"},
-		TeamAllowlistChecker: teamAllowlistChecker,
-		Pull: models.PullRequest{
-			Num:      -1,
-			BaseRepo: models.Repo{FullName: "owner/repo"},
-		},
-		API: true,
-	}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
-	Ok(t, err)
+			ctxs, err := builder.BuildPlanCommands(&command.Context{
+				Log:                       logger,
+				Scope:                     scope,
+				HeadRepo:                  models.Repo{FullName: "owner/repo"},
+				TeamAllowlistChecker:      teamAllowlistChecker,
+				FailOnTeamAllowlistDenied: true,
+				Pull:                      models.PullRequest{Num: -1, BaseRepo: models.Repo{FullName: "owner/repo"}},
+				API:                       true,
+			}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+			if tc.wantErr {
+				Assert(t, errors.Is(err, events.ErrTeamAllowlistDenied), "expected team allowlist error, got %v", err)
+				return
+			}
+			Ok(t, err)
 
-	dirs := make([]string, 0, len(ctxs))
-	for _, ctx := range ctxs {
-		dirs = append(dirs, ctx.RepoRelDir)
+			dirs := make([]string, 0, len(ctxs))
+			for _, ctx := range ctxs {
+				dirs = append(dirs, ctx.RepoRelDir)
+			}
+			sort.Strings(dirs)
+			Equals(t, []string{"project1", "project2"}, dirs)
+			vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+		})
 	}
-	sort.Strings(dirs)
-	Equals(t, []string{"project1", "project2"}, dirs)
-	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 // Test that autodiscover.ignore_paths blocks targeted plan/apply -d commands

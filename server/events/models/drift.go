@@ -64,6 +64,45 @@ func requiresBaseBranch(ref string) bool {
 	return RequiresBaseBranchForRef(ref)
 }
 
+// CheckedBaseBranchRef returns the normalized branch name for a safe API base_branch.
+func CheckedBaseBranchRef(baseBranch string) (string, bool) {
+	baseRef := strings.TrimPrefix(strings.TrimSpace(baseBranch), "refs/heads/")
+	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.Contains(baseRef, ":") {
+		return "", false
+	}
+	if strings.HasPrefix(baseRef, "refs/") {
+		return "", false
+	}
+	lower := strings.ToLower(strings.TrimPrefix(baseRef, "refs/"))
+	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {
+		if strings.HasPrefix(lower, namespace+"/") {
+			return "", false
+		}
+	}
+	if !isSafeBaseBranchRef(baseRef) {
+		return "", false
+	}
+	return baseRef, true
+}
+
+func isSafeBaseBranchRef(baseRef string) bool {
+	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.HasPrefix(baseRef, "/") || strings.HasSuffix(baseRef, "/") {
+		return false
+	}
+	if strings.ContainsAny(baseRef, " \t\r\n\\~^:?*[]") || strings.Contains(baseRef, "..") || strings.Contains(baseRef, "@{") || strings.Contains(baseRef, "//") {
+		return false
+	}
+	if strings.HasSuffix(baseRef, ".") || strings.HasSuffix(baseRef, ".lock") {
+		return false
+	}
+	for component := range strings.SplitSeq(baseRef, "/") {
+		if component == "" || strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
+			return false
+		}
+	}
+	return true
+}
+
 func isLikelyBareTagRef(ref string) bool {
 	if strings.Contains(ref, "/") || !strings.Contains(ref, ".") {
 		return false
@@ -86,8 +125,11 @@ func isLikelyBareTagRef(ref string) bool {
 
 func isAmbiguousBareRef(ref string) bool {
 	ref = strings.TrimSpace(ref)
-	if ref == "" || strings.Contains(ref, "/") {
+	if ref == "" {
 		return false
+	}
+	if strings.Contains(ref, "/") {
+		return true
 	}
 	switch strings.ToLower(ref) {
 	case "main", "master", "develop", "development", "dev", "trunk":
@@ -220,6 +262,11 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
 		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
+	}
+	if r.BaseBranch != "" {
+		if _, ok := CheckedBaseBranchRef(r.BaseBranch); !ok {
+			errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is invalid"})
+		}
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})

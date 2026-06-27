@@ -28,6 +28,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
+// ErrTeamAllowlistDenied indicates project selection was denied by team allowlist rules.
+var ErrTeamAllowlistDenied = errors.New("team allowlist denied command")
+
 const (
 	// DefaultRepoRelDir is the default directory we run commands in, relative
 	// to the root of the repo.
@@ -828,27 +831,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
-	return slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
-		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			return false
-		}
-		ctx := models.TeamAllowlistCheckerContext{
-			BaseRepo:           projCtx.BaseRepo,
-			CommandName:        projCtx.CommandName.String(),
-			EscapedCommentArgs: projCtx.EscapedCommentArgs,
-			HeadRepo:           projCtx.HeadRepo,
-			Log:                projCtx.Log,
-			Pull:               projCtx.Pull,
-			ProjectName:        projCtx.ProjectName,
-			RepoDir:            repoDir,
-			RepoRelDir:         projCtx.RepoRelDir,
-			User:               projCtx.User,
-			Verbose:            projCtx.Verbose,
-			Workspace:          projCtx.Workspace,
-			API:                projCtx.API,
-		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
-	}), nil
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -950,30 +933,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
-	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
-		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
-			return false
-		}
-		ctx := models.TeamAllowlistCheckerContext{
-			BaseRepo:           projCtx.BaseRepo,
-			CommandName:        projCtx.CommandName.String(),
-			EscapedCommentArgs: projCtx.EscapedCommentArgs,
-			HeadRepo:           projCtx.HeadRepo,
-			Log:                projCtx.Log,
-			Pull:               projCtx.Pull,
-			ProjectName:        projCtx.ProjectName,
-			RepoDir:            repoDir,
-			RepoRelDir:         projCtx.RepoRelDir,
-			User:               projCtx.User,
-			Verbose:            projCtx.Verbose,
-			Workspace:          projCtx.Workspace,
-			API:                projCtx.API,
-		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
-	})
-
-	return projCtxs, nil
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
@@ -1430,12 +1390,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 	}
 
 	// Filter projects to only include ones the user is authorized for
-	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+}
+
+func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {
+	authorized := make([]command.ProjectContext, 0, len(projCtxs))
+	for _, projCtx := range projCtxs {
 		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
-			return false
+			authorized = append(authorized, projCtx)
+			continue
 		}
-		ctx := models.TeamAllowlistCheckerContext{
+		allowlistCtx := models.TeamAllowlistCheckerContext{
 			BaseRepo:           projCtx.BaseRepo,
 			CommandName:        projCtx.CommandName.String(),
 			EscapedCommentArgs: projCtx.EscapedCommentArgs,
@@ -1450,10 +1415,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 			Workspace:          projCtx.Workspace,
 			API:                projCtx.API,
 		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
-	})
-
-	return projCtxs, nil
+		if projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(allowlistCtx, projCtx.User.Teams, projCtx.CommandName.String()) {
+			authorized = append(authorized, projCtx)
+			continue
+		}
+		if failOnDenied {
+			return nil, fmt.Errorf("%w: %s is not authorized for project %q in %q workspace %q", ErrTeamAllowlistDenied, projCtx.CommandName, projCtx.ProjectName, projCtx.RepoRelDir, projCtx.Workspace)
+		}
+	}
+	return authorized, nil
 }
 
 func modifiedFilesOutsideProjects(modifiedFiles []string, projects []valid.Project) []string {
