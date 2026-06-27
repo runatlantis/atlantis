@@ -103,6 +103,24 @@ func TestNewServer_EnableDriftRemediationWiresApplyOptIn(t *testing.T) {
 	Assert(t, s.APIController.EnableDriftRemediation, "expected drift remediation apply opt-in to be configured")
 }
 
+func TestNewServer_EnableDriftRemediationRequiresDriftDetection(t *testing.T) {
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(
+		server.UserConfig{
+			DataDir:                tmpDir,
+			AtlantisURL:            testAtlantisUrl,
+			LockingDBType:          testLockingDBType,
+			GithubHostname:         testGitHubHostName,
+			GithubUser:             testGitHubUser,
+			APISecret:              "token",
+			EnableDriftRemediation: true,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
+	ErrContains(t, "--enable-drift-remediation requires --enable-drift-detection", err)
+}
+
 // todo: test what happens if we set different flags. The generated config should be different.
 
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {

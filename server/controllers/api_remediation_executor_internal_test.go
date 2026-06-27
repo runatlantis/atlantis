@@ -66,6 +66,38 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsHonorsGlobalApplyLock(t *tes
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
+func TestSeedPullStatusFromPlanResultPreservesPlanStatusWhenPolicyCheckFollows(t *testing.T) {
+	ctx := &command.Context{}
+	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Infrastructure is up-to-date."},
+			},
+		},
+		{
+			Command:     command.PolicyCheck,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{{PolicySetName: "default", Passed: true}},
+				},
+			},
+		},
+	}})
+
+	Assert(t, ctx.PullStatus != nil, "expected pull status to be initialized")
+	Equals(t, 1, len(ctx.PullStatus.Projects))
+	Equals(t, models.PlannedNoChangesPlanStatus, ctx.PullStatus.Projects[0].Status)
+	Equals(t, 1, len(ctx.PullStatus.Projects[0].PolicyStatus))
+	Equals(t, true, ctx.PullStatus.Projects[0].PolicyStatus[0].Passed)
+}
+
 func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -276,10 +308,12 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[0].Status)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[1].Status)
 
-	_, capturedHookCmds := preWorkflowHooksCommandRunner.VerifyWasCalled(Times(1)).
+	_, capturedHookCmds := preWorkflowHooksCommandRunner.VerifyWasCalled(Times(3)).
 		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
 		GetAllCapturedArguments()
 	Equals(t, command.Plan, capturedHookCmds[0].Name)
+	Equals(t, command.Apply, capturedHookCmds[1].Name)
+	Equals(t, command.Apply, capturedHookCmds[2].Name)
 }
 
 func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t *testing.T) {

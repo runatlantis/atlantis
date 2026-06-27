@@ -169,6 +169,10 @@ var staticAssets embed.FS
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
+	if userConfig.EnableDriftRemediation && !userConfig.EnableDriftDetection {
+		return nil, errors.New("--enable-drift-remediation requires --enable-drift-detection")
+	}
+
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 

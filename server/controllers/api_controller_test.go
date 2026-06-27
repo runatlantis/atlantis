@@ -28,6 +28,7 @@ import (
 	. "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
@@ -36,6 +37,17 @@ import (
 
 const atlantisTokenHeader = "X-Atlantis-Token"
 const atlantisToken = "token"
+
+type recordingDriftSender struct {
+	calls   int
+	results []webhooks.DriftResult
+}
+
+func (r *recordingDriftSender) Send(_ logging.SimpleLogging, result webhooks.DriftResult) error {
+	r.calls++
+	r.results = append(r.results, result)
+	return nil
+}
 
 func TestAPIController_Plan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
@@ -401,6 +413,53 @@ func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, !strings.Contains(string(responseBody), "apply failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
+func TestAPIController_ApplyContinuesAfterPrePlanProjectError(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: cmd.ProjectName,
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Apply,
+				ProjectName: cmd.ProjectName,
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.ProjectName == "broken" {
+				return ReturnValues{command.ProjectCommandOutput{Error: errors.New("plan failed")}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."}}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"broken", "ready"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	projectCommandRunner.VerifyWasCalled(Times(2)).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
+}
+
 func TestAPIController_ApplyTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -440,7 +499,7 @@ func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
 }
 
-func TestAPIController_ApplyPlanFailureDoesNotRunApply(t *testing.T) {
+func TestAPIController_ApplyPlanFailureStillRunsApplyForLegacyCompatibility(t *testing.T) {
 	ac, _, projectCommandRunner := setup(t)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
 		Error: errors.New("plan failed"),
@@ -457,8 +516,8 @@ func TestAPIController_ApplyPlanFailureDoesNotRunApply(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Apply(w, req)
 
-	Equals(t, http.StatusInternalServerError, w.Code)
-	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	Equals(t, http.StatusOK, w.Code)
+	projectCommandRunner.VerifyWasCalled(Times(1)).Apply(Any[command.ProjectContext]())
 }
 
 // TestAPIController_Plan_PreWorkflowHooksReceiveCorrectCommand verifies that when
@@ -942,7 +1001,7 @@ func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
 			capturedPullStatus = ctx.PullStatus
 			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
 			Equals(t, 1, len(capturedPullStatus.Projects))
-			Equals(t, models.PassedPolicyCheckStatus, capturedPullStatus.Projects[0].Status)
+			Equals(t, models.PlannedNoChangesPlanStatus, capturedPullStatus.Projects[0].Status)
 			Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 			Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
 			Equals(t, true, capturedPullStatus.Projects[0].PolicyStatus[0].Passed)
@@ -958,7 +1017,7 @@ func TestAPIController_ApplyCarriesPolicyStatusFromPreApplyPlan(t *testing.T) {
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
 		ThenReturn(command.ProjectCommandOutput{
-			PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+			PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Infrastructure is up-to-date."},
 		})
 	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
 		ThenReturn(command.ProjectCommandOutput{
@@ -1238,7 +1297,7 @@ func TestAPIResponseEnvelopeIncludesNullInactiveFields(t *testing.T) {
 func TestAPIController_DriftStatus(t *testing.T) {
 	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
-	checkTime := time.Now()
+	checkTime := time.Date(2025, 1, 21, 10, 30, 0, 0, time.UTC)
 	mockDrifts := []models.ProjectDrift{
 		{
 			ProjectName: "project1",
@@ -1269,6 +1328,7 @@ func TestAPIController_DriftStatus(t *testing.T) {
 	Equals(t, "owner/repo", result.Repository)
 	Equals(t, 1, result.Summary.TotalProjects)
 	Equals(t, 1, result.Summary.ProjectsWithDrift)
+	Equals(t, checkTime, result.CheckedAt)
 }
 
 func TestAPIController_DriftStatus_Unauthorized(t *testing.T) {
@@ -1398,7 +1458,7 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 
 	ac.DriftStorage = driftStorage
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&project=project1&path=modules/vpc&workspace=staging&ref=main", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&project=project1&path=modules/vpc&workspace=staging&ref=refs/heads/main&base_branch=refs/heads/main", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
@@ -1411,6 +1471,7 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	Equals(t, "modules/vpc", opts.Path)
 	Equals(t, "staging", opts.Workspace)
 	Equals(t, "main", opts.Ref)
+	Equals(t, "main", opts.BaseBranch)
 }
 
 func TestAPIController_DriftStatus_Empty(t *testing.T) {
@@ -2308,6 +2369,89 @@ func TestAPIController_DetectDriftSuppressesNormalCommitStatus(t *testing.T) {
 		UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
 }
 
+func TestAPIController_DetectDriftSendsWebhookWhenDriftDetected(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+	sender := &recordingDriftSender{}
+	ac.DriftWebhookSender = &webhooks.DriftWebhookSender{Webhooks: []webhooks.DriftSender{sender}}
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, 1, sender.calls)
+	Equals(t, 1, len(sender.results))
+	Equals(t, "Repo", sender.results[0].Repository)
+	Equals(t, "main", sender.results[0].Ref)
+	Equals(t, 1, sender.results[0].ProjectsWithDrift)
+	Equals(t, 1, len(sender.results[0].Projects))
+	Equals(t, "app", sender.results[0].Projects[0].ProjectName)
+	Equals(t, "app", sender.results[0].Projects[0].Path)
+	Equals(t, events.DefaultWorkspace, sender.results[0].Projects[0].Workspace)
+}
+
+func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	var capturedCtx *command.Context
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	driftStorage := driftmocks.NewMockStorage()
+	var stored models.ProjectDrift
+	When(driftStorage.Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			stored = args[1].(models.ProjectDrift)
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "refs/heads/main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCtx != nil, "expected project builder to be called")
+	Equals(t, "main", capturedCtx.Pull.BaseBranch)
+	Equals(t, "main", capturedCtx.Pull.HeadBranch)
+	Equals(t, "main", stored.Ref)
+	Equals(t, "main", stored.BaseBranch)
+}
+
 func TestAPIController_DetectDrift_PathScopedStoresDirectoryAndWorkspace(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 
@@ -2657,6 +2801,46 @@ func TestAPIController_DetectDrift_FullDetectionRemovesStaleSameRefRecords(t *te
 	Ok(t, err)
 	Equals(t, 1, len(devRecords))
 	Equals(t, "other-ref", devRecords[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_FullDetectionDeletesStaleUnnamedWithoutDeletingNamedSamePath(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "",
+		Path:        "app",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "app", records[0].ProjectName)
+	Equals(t, "app", records[0].Path)
 }
 
 func TestAPIController_DetectDrift_ScopedDetectionKeepsUnrelatedRecords(t *testing.T) {

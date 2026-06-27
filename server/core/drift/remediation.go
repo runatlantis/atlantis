@@ -169,7 +169,7 @@ func (s *InMemoryRemediationService) completeApplyProjectResults(req models.Reme
 			updatedDrift.ProjectName = result.ProjectName
 			updatedDrift.Path = result.Path
 			updatedDrift.Workspace = result.Workspace
-			updatedDrift.Ref = req.Ref
+			updatedDrift.Ref = remediationRef(req)
 			updatedDrift.BaseBranch = remediationBaseBranch(req)
 			updatedDrift.Drift = *result.DriftAfter
 			updatedDrift.Error = ""
@@ -208,7 +208,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 	// to the requested ref. This prevents remediating a project that drifted on
 	// a different branch/commit than the one the caller asked about, which is
 	// especially risky for auto-apply.
-	opts := GetOptions{Ref: req.Ref, BaseBranch: remediationBaseBranch(req)}
+	opts := GetOptions{Ref: remediationRef(req), BaseBranch: remediationBaseBranch(req)}
 
 	// If drift storage is available and DriftOnly is true, get projects with drift
 	if s.driftStorage != nil && req.DriftOnly {
@@ -234,7 +234,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 				return nil, err
 			}
 			for _, workspace := range workspaces {
-				pathOpts := GetOptions{Path: path.Directory, Workspace: workspace, Ref: req.Ref, BaseBranch: remediationBaseBranch(req)}
+				pathOpts := GetOptions{Path: path.Directory, Workspace: workspace, Ref: remediationRef(req), BaseBranch: remediationBaseBranch(req)}
 				if s.driftStorage != nil {
 					drifts, err := s.driftStorage.Get(storageRepository, pathOpts)
 					if err != nil {
@@ -252,7 +252,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 							ProjectName: projectName,
 							Path:        path.Directory,
 							Workspace:   workspace,
-							Ref:         req.Ref,
+							Ref:         remediationRef(req),
 							BaseBranch:  remediationBaseBranch(req),
 						})
 					}
@@ -263,7 +263,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 		// Specific projects requested
 		for _, projName := range req.Projects {
 			if s.driftStorage != nil {
-				drifts, err := s.driftStorage.Get(storageRepository, GetOptions{ProjectName: projName, Ref: req.Ref, BaseBranch: remediationBaseBranch(req)})
+				drifts, err := s.driftStorage.Get(storageRepository, GetOptions{ProjectName: projName, Ref: remediationRef(req), BaseBranch: remediationBaseBranch(req)})
 				if err != nil {
 					return nil, fmt.Errorf("failed to get drift data for project %q: %w", projName, err)
 				}
@@ -277,7 +277,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 				if !hasRemediationTarget(projects, projName, "") {
 					projects = append(projects, models.ProjectDrift{
 						ProjectName: projName,
-						Ref:         req.Ref,
+						Ref:         remediationRef(req),
 						BaseBranch:  remediationBaseBranch(req),
 					})
 				}
@@ -288,7 +288,7 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 					projects = append(projects, models.ProjectDrift{
 						ProjectName: projName,
 						Workspace:   workspace,
-						Ref:         req.Ref,
+						Ref:         remediationRef(req),
 						BaseBranch:  remediationBaseBranch(req),
 					})
 				}
@@ -319,11 +319,15 @@ func remediationStorageRepository(req models.RemediationRequest) string {
 	return req.Repository
 }
 
+func remediationRef(req models.RemediationRequest) string {
+	return models.NormalizeAPIRef(req.Ref)
+}
+
 func remediationBaseBranch(req models.RemediationRequest) string {
 	if req.BaseBranch != "" {
-		return req.BaseBranch
+		return models.NormalizeAPIRef(req.BaseBranch)
 	}
-	return req.Ref
+	return models.NormalizeAPIRef(req.Ref)
 }
 
 func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []string) ([]string, error) {

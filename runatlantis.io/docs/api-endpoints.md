@@ -94,8 +94,8 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 At least one of `Projects` or `Paths` must be specified.
 :::
 
-::: warning Pre-Apply Plan Failures
-The API apply endpoint runs a plan before apply. If any targeted project returns a plan error in that pre-apply phase, Atlantis returns the plan result with a non-2xx status and does not run apply for any project in that request. This avoids applying an older pending plan after the latest plan failed.
+::: tip API Apply Plan Phase
+The legacy API apply endpoint runs a plan before apply and preserves its historical behavior for compatibility: project-level errors in that pre-apply phase do not by themselves skip the apply phase for other eligible pending plans. Drift remediation auto-apply is stricter and fails closed when its pre-apply plan has errors.
 :::
 
 #### Path

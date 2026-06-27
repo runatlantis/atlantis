@@ -64,9 +64,14 @@ func requiresBaseBranch(ref string) bool {
 	return RequiresBaseBranchForRef(ref)
 }
 
+// NormalizeAPIRef normalizes branch refs used by drift and API command requests.
+func NormalizeAPIRef(ref string) string {
+	return strings.TrimPrefix(strings.TrimSpace(ref), "refs/heads/")
+}
+
 // CheckedBaseBranchRef returns the normalized branch name for a safe API base_branch.
 func CheckedBaseBranchRef(baseBranch string) (string, bool) {
-	baseRef := strings.TrimPrefix(strings.TrimSpace(baseBranch), "refs/heads/")
+	baseRef := NormalizeAPIRef(baseBranch)
 	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.Contains(baseRef, ":") {
 		return "", false
 	}
@@ -212,15 +217,19 @@ type DriftStatusResponse struct {
 // NewDriftStatusResponse creates a DriftStatusResponse from a list of ProjectDrift.
 func NewDriftStatusResponse(repository string, projects []ProjectDrift) DriftStatusResponse {
 	driftCount := 0
+	var checkedAt time.Time
 	for _, p := range projects {
 		if p.Drift.HasDrift {
 			driftCount++
+		}
+		if p.LastChecked.After(checkedAt) {
+			checkedAt = p.LastChecked
 		}
 	}
 	return DriftStatusResponse{
 		Repository:        repository,
 		Projects:          projects,
-		CheckedAt:         time.Now(),
+		CheckedAt:         checkedAt,
 		TotalProjects:     len(projects),
 		ProjectsWithDrift: driftCount,
 	}

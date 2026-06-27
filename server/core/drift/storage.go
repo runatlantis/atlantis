@@ -54,6 +54,10 @@ type GetOptions struct {
 	// MaxAge filters out drift results older than this duration.
 	// If zero, no age filtering is applied.
 	MaxAge time.Duration
+	// Exact treats empty project/path/workspace/ref/base_branch fields as exact
+	// values instead of wildcards. This is useful for deleting a specific drift
+	// record whose identity legitimately contains empty fields.
+	Exact bool
 }
 
 // driftKey creates a unique key for a project drift entry.
@@ -179,12 +183,37 @@ func (s *InMemoryStorage) DeleteMatching(repository string, opts GetOptions) err
 	}
 
 	for key, drift := range repoData {
-		if matchesGetOptions(drift, opts, time.Now()) {
+		if matchesDeleteOptions(drift, opts, time.Now()) {
 			delete(repoData, key)
 		}
 	}
 
 	return nil
+}
+
+func matchesDeleteOptions(drift models.ProjectDrift, opts GetOptions, now time.Time) bool {
+	if !opts.Exact {
+		return matchesGetOptions(drift, opts, now)
+	}
+	if drift.ProjectName != opts.ProjectName {
+		return false
+	}
+	if drift.Path != opts.Path {
+		return false
+	}
+	if drift.Workspace != opts.Workspace {
+		return false
+	}
+	if drift.Ref != opts.Ref {
+		return false
+	}
+	if drift.BaseBranch != opts.BaseBranch {
+		return false
+	}
+	if opts.MaxAge > 0 && now.Sub(drift.LastChecked) > opts.MaxAge {
+		return false
+	}
+	return true
 }
 
 // GetAll retrieves all stored drift results across all repositories.

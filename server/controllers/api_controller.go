@@ -197,9 +197,17 @@ func sortCommandPairsByExecutionOrder(cmds []command.ProjectContext, commentComm
 
 func apiRequestBaseBranch(ref, baseBranch string) string {
 	if strings.TrimSpace(baseBranch) != "" {
-		return baseBranch
+		return normalizeAPIBranchRef(baseBranch)
 	}
-	return ref
+	return normalizeAPIBranchRef(ref)
+}
+
+func apiRequestStorageRef(ref string) string {
+	return normalizeAPIBranchRef(ref)
+}
+
+func normalizeAPIBranchRef(ref string) string {
+	return models.NormalizeAPIRef(ref)
 }
 
 func apiErrorStatusCode(err error) int {
@@ -276,11 +284,6 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
-
-	if result.HasErrors() {
-		responder.writeJSON(w, http.StatusInternalServerError, result)
-		return
-	}
 
 	// The API apply endpoint runs plan first. Refresh PR status afterward so
 	// apply requirements evaluate the VCS state the plan phase just produced.
@@ -411,8 +414,8 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 		ProjectName: r.URL.Query().Get("project"),
 		Path:        r.URL.Query().Get("path"),
 		Workspace:   r.URL.Query().Get("workspace"),
-		Ref:         r.URL.Query().Get("ref"),
-		BaseBranch:  r.URL.Query().Get("base_branch"),
+		Ref:         apiRequestStorageRef(r.URL.Query().Get("ref")),
+		BaseBranch:  normalizeAPIBranchRef(r.URL.Query().Get("base_branch")),
 	}
 
 	// Retrieve drift results from storage
@@ -730,14 +733,38 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 		if projectResult.Command != command.Plan && projectResult.Command != command.PolicyCheck && projectResult.Command != command.ApprovePolicies {
 			continue
 		}
-		upsertProjectStatus(ctx.PullStatus, models.ProjectStatus{
-			Workspace:    projectResult.Workspace,
-			RepoRelDir:   projectResult.RepoRelDir,
-			ProjectName:  projectResult.ProjectName,
-			PolicyStatus: projectResult.PolicyStatus(),
-			Status:       projectResult.PlanStatus(),
-		})
+		switch projectResult.Command {
+		case command.Plan:
+			upsertProjectStatus(ctx.PullStatus, models.ProjectStatus{
+				Workspace:    projectResult.Workspace,
+				RepoRelDir:   projectResult.RepoRelDir,
+				ProjectName:  projectResult.ProjectName,
+				PolicyStatus: projectResult.PolicyStatus(),
+				Status:       projectResult.PlanStatus(),
+			})
+		case command.PolicyCheck, command.ApprovePolicies:
+			upsertProjectPolicyStatus(ctx.PullStatus, projectResult)
+		}
 	}
+}
+
+func upsertProjectPolicyStatus(pullStatus *models.PullStatus, result command.ProjectResult) {
+	status := models.ProjectStatus{
+		Workspace:    result.Workspace,
+		RepoRelDir:   result.RepoRelDir,
+		ProjectName:  result.ProjectName,
+		PolicyStatus: result.PolicyStatus(),
+	}
+	for idx := range pullStatus.Projects {
+		project := &pullStatus.Projects[idx]
+		if status.Workspace == project.Workspace &&
+			status.RepoRelDir == project.RepoRelDir &&
+			status.ProjectName == project.ProjectName {
+			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
+			return
+		}
+	}
+	pullStatus.Projects = append(pullStatus.Projects, status)
 }
 
 func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectStatus) {
@@ -929,6 +956,8 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	request.Ref = apiRequestStorageRef(request.Ref)
+	request.BaseBranch = apiRequestBaseBranch(request.Ref, request.BaseBranch)
 	request.StorageRepository = baseRepo.ID()
 
 	// Create executor that bridges to existing plan/apply infrastructure
@@ -1106,6 +1135,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		return remediationResults, fmt.Errorf("plan had errors")
 	}
 	seedPullStatusFromPlanResult(ctx, planResult)
+	ctx.PreWorkflowHooksAlreadyRun = false
 
 	applyResult, err := e.controller.apiApply(request, ctx)
 	if err != nil {
@@ -1149,11 +1179,12 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:               e.controller.Scope,
-		Log:                 e.logger,
-		API:                 true,
-		SkipPRModifiedFiles: true,
-		SuppressVCSStatus:   true,
+		Scope:                     e.controller.Scope,
+		Log:                       e.logger,
+		API:                       true,
+		SkipPRModifiedFiles:       true,
+		SuppressVCSStatus:         true,
+		FailOnTeamAllowlistDenied: true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1188,6 +1219,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		return output.String(), fmt.Errorf("plan had errors")
 	}
 	seedPullStatusFromPlanResult(ctx, planResult)
+	ctx.PreWorkflowHooksAlreadyRun = false
 
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
@@ -1740,6 +1772,7 @@ func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string
 			Workspace:   project.Workspace,
 			Ref:         project.Ref,
 			BaseBranch:  project.BaseBranch,
+			Exact:       true,
 		}); err != nil {
 			return err
 		}
@@ -1811,12 +1844,14 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	normalizedRef := apiRequestStorageRef(request.Ref)
+	normalizedBaseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
 
 	// Build API request for plan
 	apiRequest := &APIRequest{
 		Repository:       request.Repository,
-		Ref:              request.Ref,
-		BaseBranch:       request.BaseBranch,
+		Ref:              normalizedRef,
+		BaseBranch:       normalizedBaseBranch,
 		Type:             request.Type,
 		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
 	}
@@ -1835,8 +1870,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
 			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: apiRequestBaseBranch(request.Ref, request.BaseBranch),
-			HeadBranch: request.Ref,
+			BaseBranch: normalizedBaseBranch,
+			HeadBranch: normalizedRef,
 			HeadCommit: request.Ref,
 			BaseRepo:   baseRepo,
 		},
@@ -1883,7 +1918,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false
-	projectDrifts := driftProjectsFromCommandResult(result, request.Ref, apiRequestBaseBranch(request.Ref, request.BaseBranch), ctx.Pull.HeadCommit, detectionResult.ID)
+	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
@@ -1895,7 +1930,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fullDetection && !storeFailed {
-		if err := a.reconcileDriftStorage(baseRepo.ID(), request.Ref, apiRequestBaseBranch(request.Ref, request.BaseBranch), detectedProjects); err != nil {
+		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}
 	}

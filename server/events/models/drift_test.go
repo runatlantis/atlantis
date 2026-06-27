@@ -190,6 +190,24 @@ func TestNewDriftSummaryFromPlanStats(t *testing.T) {
 	}
 }
 
+func TestNewDriftStatusResponseUsesMostRecentLastChecked(t *testing.T) {
+	oldCheck := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+	recentCheck := oldCheck.Add(2 * time.Hour)
+
+	response := models.NewDriftStatusResponse("owner/repo", []models.ProjectDrift{
+		{ProjectName: "old", LastChecked: oldCheck},
+		{ProjectName: "recent", LastChecked: recentCheck},
+	})
+
+	Equals(t, recentCheck, response.CheckedAt)
+}
+
+func TestNewDriftStatusResponseEmptyHasZeroCheckedAt(t *testing.T) {
+	response := models.NewDriftStatusResponse("owner/repo", nil)
+
+	Assert(t, response.CheckedAt.IsZero(), "expected empty status response to have zero checked_at")
+}
+
 func TestNewDriftSummaryFromPlanSuccess_Nil(t *testing.T) {
 	result := models.NewDriftSummaryFromPlanSuccess(nil)
 	Equals(t, models.DriftSummary{}, result)
