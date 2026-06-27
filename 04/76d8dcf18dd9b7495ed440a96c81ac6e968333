@@ -1,0 +1,71 @@
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_9464e59c580058 67-71,74
+  s_243a1a1edc15e5::t_d652a16b742c91 220,225-227,232
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_aa11a9dd83867b 176-177,180-181,186-187
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_b8dbe2c46baae4 97-98
+server/server.go
+  s_243a1a1edc15e5::t_330226ff797c5a 172-175
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_6dd8ce8f719b3a 69-77,79-100
+  s_243a1a1edc15e5::t_d483cfc22bf606 78
+  s_243a1a1edc15e5::t_2772d354b52636 311,315-316
+server/core/drift/storage_test.go
+  s_243a1a1edc15e5::t_395a0e1181e51e 265-299
+server/server_test.go
+  s_243a1a1edc15e5::t_2f477c37e89718 106-123
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_2309ca84458dc3 193-210
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_794a7b9c035dfe 756
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_f8f487a4bb2686 328,330
+  s_243a1a1edc15e5::t_e46e699a2bea91 172,211,237,255,266,280,291,322-323
+  s_243a1a1edc15e5::t_57aaff834f4977 324-325
+server/core/drift/storage.go
+  s_243a1a1edc15e5::t_7c382645753f3d 57-60,186,194-216
+  s_243a1a1edc15e5::t_b2ae84905bcadb 217-218
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_f4e9ed5fe625b3 959-960
+  s_243a1a1edc15e5::t_4699788dc02e85 1138,1182-1187,1222
+  s_243a1a1edc15e5::t_1d817045eb8de1 1847-1848,1853-1854,1873-1874,1921,1933
+  s_243a1a1edc15e5::t_d652a16b742c91 417-418,1775
+  s_243a1a1edc15e5::t_b65ec66561d199 736-747,751-767
+  s_243a1a1edc15e5::t_6796585619857d 200,202-209,768
+  s_243a1a1edc15e5::t_9464e59c580058 210
+  s_243a1a1edc15e5::t_25867ca2beff77 769
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_742d309180bb1b 41-50
+  s_243a1a1edc15e5::t_d483cfc22bf606 31,422-425,432-435,502,519-520,1004,1020
+  s_243a1a1edc15e5::t_1b3713fe1b241e 416-421,426-431,436-462
+  s_243a1a1edc15e5::t_78cc814ac6bb65 1331
+  s_243a1a1edc15e5::t_0d9c9d28b8d9ba 1461,1474
+  s_243a1a1edc15e5::t_e1e7669108b7fd 2372-2413
+  s_243a1a1edc15e5::t_0a95d123fe17e4 2414-2454
+  s_243a1a1edc15e5::t_0b9ecfb228c9d8 1300
+  s_243a1a1edc15e5::t_b5e3025dc856c3 2806-2845
+  s_243a1a1edc15e5::t_f58b1e44bd3b3d 51
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_868e105cd3e89b 28,107,241-268,270-275
+  s_243a1a1edc15e5::t_34e853e9b22841 276,593-619
+  s_243a1a1edc15e5::t_d483cfc22bf606 100-102
+  s_243a1a1edc15e5::t_0ee76aea416f10 269
+  s_243a1a1edc15e5::t_7059df449c6f3b 277
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0476d8dcf18dd9b7495ed440a96c81ac6e968333",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
