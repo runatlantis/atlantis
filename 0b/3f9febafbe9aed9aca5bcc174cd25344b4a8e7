@@ -1,0 +1,76 @@
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_a12b8d0bcf206a 67-81,297-298
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_44d8774b69080c 1541
+  s_243a1a1edc15e5::t_5c19142a5b8823 2647-2688
+  s_243a1a1edc15e5::t_ced28dc73aee35 1529-1540,1542-1545
+  s_243a1a1edc15e5::t_acdc9acbc4e3b2 259
+  s_243a1a1edc15e5::t_c7e8b8c707d3ff 237-258,260-286
+  s_243a1a1edc15e5::t_0e1e0c27443d48 513-552
+  s_243a1a1edc15e5::t_6a7cddc2826140 2521-2558
+server/events/project_command_context_builder_test.go
+  s_243a1a1edc15e5::t_c78ab822107e55 132-151,158-172
+  s_243a1a1edc15e5::t_0d14c53d89fc8e 152-157
+runatlantis.io/docs/server-configuration.md
+  s_243a1a1edc15e5::t_91c27ceef81171 620-621
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_91c27ceef81171 304,568,583,599,716,826,956
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_a12b8d0bcf206a 119-120
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_464a17e49b3e8c 1993-1995
+  s_243a1a1edc15e5::t_d5607751b9722c 537-539,883,903,1641
+  s_243a1a1edc15e5::t_0d14c53d89fc8e 896-902
+  s_243a1a1edc15e5::t_321c88a3cec43d 1908-1914,1916
+  s_243a1a1edc15e5::t_525d1e27a54cb5 16,41-42,229-249,488,492,494,550,555,559,562
+  s_243a1a1edc15e5::t_a12b8d0bcf206a 423-427,1566-1570,1637-1640
+  s_243a1a1edc15e5::t_8861a796078e58 1070,1139,1225,1937
+  s_243a1a1edc15e5::t_45374d5ed66a77 250
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_f7abc5d95164d8 10,12,206-211,323-347
+  s_243a1a1edc15e5::t_16c0cdeea83816 348
+server/events/command/context.go
+  s_243a1a1edc15e5::t_d5607751b9722c 90-94
+  s_243a1a1edc15e5::t_1b43ed5fbcfebf 65-68
+server/core/terraform/tfclient/terraform_client.go
+  s_243a1a1edc15e5::t_1b43ed5fbcfebf 480
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_c0c09295c35f24 336-363
+  s_243a1a1edc15e5::t_68c2f92dfeee9c 7
+server/events/project_command_context_builder.go
+  s_243a1a1edc15e5::t_1b43ed5fbcfebf 334
+server/events/project_command_runner.go
+  s_243a1a1edc15e5::t_1b43ed5fbcfebf 180-182,188-190,1043
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_c0c09295c35f24 106-133
+runatlantis.io/docs/sending-notifications-via-webhooks.md
+  s_243a1a1edc15e5::t_bb6ca0f4f8c280 160,192
+server/events/command/project_context.go
+  s_243a1a1edc15e5::t_1b43ed5fbcfebf 154-157
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_ce6fc756d624a0 423-473
+server/events/project_command_runner_test.go
+  s_243a1a1edc15e5::t_935fe9f3bfff7f 336-361
+  s_243a1a1edc15e5::t_a5160d997f5fd6 122-159
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_930bbc67098812 782-874
+  s_243a1a1edc15e5::t_8eb5160a16490b 780-781
+server/core/terraform/tfclient/terraform_client_internal_test.go
+  s_243a1a1edc15e5::t_f4697bcacce61f 233-263
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0b3f9febafbe9aed9aca5bcc174cd25344b4a8e7",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
