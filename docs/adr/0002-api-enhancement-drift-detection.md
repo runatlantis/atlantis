@@ -256,9 +256,16 @@ request status from a VCS event. Before building apply project contexts for
 `models.PullStatus` containing every selected project and its dependencies.
 Each entry should use the project config's `ProjectName`, `RepoRelDir`, and
 `Workspace`, and start as `models.PlannedPlanStatus` unless the current
-operation already knows it has no changes. The existing project pool executor
-can then update dependency entries to `AppliedPlanStatus` or
-`PlannedNoChangesPlanStatus` after earlier execution groups complete.
+operation already knows it has no changes.
+
+`APIController.apiApply` currently runs projects in a simple loop instead of
+using `project_command_pool_executor`, so the API apply path must update
+`ctx.PullStatus.Projects` immediately after each project apply result. The
+update should use the same `Workspace`, `RepoRelDir`, and `ProjectName` match
+as the pool executor and assign `result.PlanStatus()` so later project contexts
+see dependencies as `AppliedPlanStatus` or `PlannedNoChangesPlanStatus` after
+earlier applies succeed. Alternatively, route non-PR API applies through the
+pool executor so it owns the same status update behavior.
 
 `ValidateProjectDependencies` must also return a clear failure when
 `ctx.PullStatus` is nil for a project with dependencies, or when a declared
@@ -271,6 +278,7 @@ instead of panicking or treating the dependency as satisfied.
 - `server/events/command/project_context.go` - Add `API` field
 - `server/events/project_command_context_builder.go` - Propagate `API` flag
 - `server/events/project_command_builder.go` - Seed synthetic `PullStatus` for non-PR API applies
+- `server/controllers/api_controller.go` - Update synthetic `PullStatus` after each API apply result or route applies through the pool executor
 - `server/events/command_requirement_handler.go` - Skip PR-specific requirements
 - `server/events/command_requirement_handler_test.go` - Add test cases for PR-specific requirements and dependency failures
 - `server/events/project_command_builder_test.go` - Add non-PR API apply dependency status coverage
@@ -287,6 +295,18 @@ instead of panicking or treating the dependency as satisfied.
 | ----------------------- | -------- | ------------------------------------------------ |
 | `POST /api/plan`        | Enhanced | Support `PR: 0` or omitted for drift detection   |
 | `GET /api/drift/status` | New      | Get drift status for repository/projects         |
+
+**API Authentication**:
+
+All new `/api/drift/*` endpoints must enforce the same API authentication as
+`/api/plan` and `/api/apply` before parsing request input or returning drift
+data. Implementations should reuse the `X-Atlantis-Token` validation currently
+performed by `APIController.apiParseAndValidate`, or extract that check into a
+shared API-auth helper for handlers that do not accept the same request body.
+The handler must reject requests when the API secret is unset or the
+`X-Atlantis-Token` header does not match the configured secret. Do not rely on
+web basic auth for these endpoints, because `/api/*` routes are API routes and
+their handlers are responsible for API-token enforcement.
 
 **Enhanced Plan Endpoint for Drift Detection**:
 
@@ -336,10 +356,13 @@ type DriftRepositoryKey struct {
     Repository  string `json:"repository"`
 }
 
-// DriftProjectKey identifies an Atlantis project. ProjectName is optional in
-// atlantis.yaml, so Path and Workspace must be part of the storage key to avoid
-// collisions between unnamed projects in the same repository.
+// DriftProjectKey identifies a drift status record for an Atlantis project on
+// a specific ref. ProjectName is optional in atlantis.yaml, so Path and
+// Workspace must be part of the storage key to avoid collisions between
+// unnamed projects in the same repository. Ref must also be part of the key so
+// drift checks against different branches do not overwrite each other.
 type DriftProjectKey struct {
+    Ref         string `json:"ref"`
     ProjectName string `json:"project_name,omitempty"`
     Path        string `json:"path"`
     Workspace   string `json:"workspace"`
@@ -365,12 +388,13 @@ func ParseDriftFromPlan(planOutput string) DriftSummary {
 **New Drift Status Endpoint**:
 
 ```go
-// GET /api/drift/status?type=Github&hostname=github.com&repository=org/repo
+// GET /api/drift/status?type=Github&hostname=github.com&repository=org/repo&ref=main
 //   &project=myproject&path=.&workspace=default
 // type must use the canonical models.VCSHostType.String() value. Type,
-// hostname, and repository identify the VCS repository. Project, path, and
+// hostname, repository, and ref identify the VCS source. Project, path, and
 // workspace are optional filters; path and workspace identify unnamed Atlantis
-// projects.
+// projects. Ref is required so callers can distinguish drift runs for the same
+// project on different branches.
 type DriftStatusResponse struct {
     Repository DriftRepositoryKey `json:"repository"`
     Projects   []ProjectDrift    `json:"projects"`
@@ -397,7 +421,7 @@ That record must include the VCS repository identity (VCS type, hostname, and
 repository full name), the request source metadata (`Ref`), the project
 identity (`ProjectName`, `Path`, `Workspace`), the parsed drift summary, and
 `LastChecked`. `GET /api/drift/status` then filters and returns the persisted
-records for the requested VCS repository/project key.
+records for the requested VCS repository/ref/project key.
 The repository key must not include a separate derived `RepoID`; derive
 `models.Repo.ID()` from the same hostname and repository fields only when a log
 message or downstream API call needs that string.
@@ -413,7 +437,7 @@ With the endpoint shape above, storage is required.
 type DriftStorage interface {
     StoreDriftStatus(repo models.DriftRepositoryKey, status models.ProjectDrift) error
     GetDriftStatus(repo models.DriftRepositoryKey, key models.DriftProjectKey) (*models.ProjectDrift, error)
-    ListDriftStatus(repo models.DriftRepositoryKey) ([]models.ProjectDrift, error)
+    ListDriftStatus(repo models.DriftRepositoryKey, ref string) ([]models.ProjectDrift, error)
 }
 
 // In-memory implementation for initial version
@@ -429,6 +453,7 @@ type InMemoryDriftStorage struct {
 - `server/events/models/models.go` - Reuse or extend `NewPlanSuccessStats` for any new drift counters
 - `server/core/drift/storage.go` - Required drift status storage for `/api/drift/status`
 - `server/controllers/api_controller.go` - Add drift status endpoint
+- `server/controllers/api_controller_test.go` - Add status endpoint API-token coverage
 
 ---
 
@@ -610,6 +635,10 @@ type PullRequestInfo struct {
 }
 ```
 
+The remediation handler must enforce the shared API-token authentication before
+creating branches, commits, or PR/MRs. It must reject unauthenticated requests
+before running a plan or exposing drift data.
+
 **Remediation Workflow**:
 
 1. Run plan for each specified project (detect what needs to be applied)
@@ -636,6 +665,7 @@ type PullRequestInfo struct {
 - `server/events/vcs/gitea/client.go` - Implement for Gitea or return explicit unsupported errors
 - `server/events/vcs/mocks/mock_client.go` - Regenerate after changing `vcs.Client`
 - `server/controllers/api_controller.go` - Add remediation endpoint
+- `server/controllers/api_controller_test.go` - Add remediation endpoint API-token coverage
 
 ---
 
