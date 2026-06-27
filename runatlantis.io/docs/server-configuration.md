@@ -624,6 +624,7 @@ is detected. Destructive drift remediation apply actions also require
 ```bash
 atlantis server --enable-drift-detection --enable-drift-remediation
 # or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
 ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
 ```
 

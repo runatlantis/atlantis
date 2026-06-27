@@ -350,6 +350,7 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 //   - path: optional, filter by repository-relative project path
 //   - workspace: optional, filter by workspace
 //   - ref: optional, filter by git ref
+//   - base_branch: optional, filter by branch context
 func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
@@ -403,6 +404,7 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 		Path:        r.URL.Query().Get("path"),
 		Workspace:   r.URL.Query().Get("workspace"),
 		Ref:         r.URL.Query().Get("ref"),
+		BaseBranch:  r.URL.Query().Get("base_branch"),
 	}
 
 	// Retrieve drift results from storage
@@ -445,7 +447,10 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 		return err
 	}
 
-	return resolveNonPRHeadCommit(ctx, repoDir)
+	if err := resolveNonPRHeadCommit(ctx, repoDir); err != nil {
+		return err
+	}
+	return verifyNonPRBaseBranchReachability(ctx, repoDir)
 }
 
 func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
@@ -471,6 +476,76 @@ func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 	}
 	ctx.Pull.HeadCommit = headCommit
 	return nil
+}
+
+func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) error {
+	if ctx.Pull.Num > 0 || repoDir == "" {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("checking API checkout git metadata: %w", err)
+	}
+	baseBranch := strings.TrimSpace(ctx.Pull.BaseBranch)
+	headRef := strings.TrimSpace(ctx.Pull.HeadBranch)
+	if baseBranch == "" || headRef == "" || baseBranch == headRef {
+		return nil
+	}
+	baseRef, err := checkedAPIBaseBranchRef(baseBranch)
+	if err != nil {
+		return err
+	}
+	remoteBaseRef := "refs/remotes/origin/" + baseRef
+	fetchRef := fmt.Sprintf("+refs/heads/%s:%s", baseRef, remoteBaseRef)
+	if output, err := runAPIGit(repoDir, "fetch", "origin", "--", fetchRef); err != nil {
+		return fmt.Errorf("verifying API base branch %q: %s: %w", baseBranch, strings.TrimSpace(output), err)
+	}
+	if output, err := runAPIGit(repoDir, "merge-base", "--is-ancestor", ctx.Pull.HeadCommit, remoteBaseRef); err == nil {
+		return nil
+	} else if !isShallowGitRepo(repoDir) {
+		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
+	}
+
+	if _, err := runAPIGit(repoDir, "fetch", "--unshallow", "origin", "--", fetchRef); err != nil {
+		ctx.Log.Debug("unable to unshallow API checkout while verifying base branch: %v", err)
+	}
+	if output, err := runAPIGit(repoDir, "merge-base", "--is-ancestor", ctx.Pull.HeadCommit, remoteBaseRef); err != nil {
+		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
+	}
+	return nil
+}
+
+func checkedAPIBaseBranchRef(baseBranch string) (string, error) {
+	baseRef := strings.TrimPrefix(strings.TrimSpace(baseBranch), "refs/heads/")
+	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.Contains(baseRef, ":") {
+		return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
+	}
+	lower := strings.ToLower(strings.TrimPrefix(baseRef, "refs/"))
+	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {
+		if strings.HasPrefix(lower, namespace+"/") {
+			return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
+		}
+	}
+	if output, err := runAPIGit("", "check-ref-format", "--branch", baseRef); err != nil {
+		return "", fmt.Errorf("invalid API base_branch %q: %s: %w", baseBranch, strings.TrimSpace(output), err)
+	}
+	return baseRef, nil
+}
+
+func isShallowGitRepo(repoDir string) bool {
+	_, err := os.Stat(filepath.Join(repoDir, ".git", "shallow"))
+	return err == nil
+}
+
+func runAPIGit(repoDir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...) // nolint: gosec
+	if repoDir != "" {
+		cmd.Dir = repoDir
+	}
+	output, err := cmd.CombinedOutput()
+	return string(output), err
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
@@ -578,7 +653,21 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	}
 
 	var projectResults []command.ProjectResult
+	var currentExecutionGroup int
+	var currentGroupHasResult bool
+	var currentGroupHasErrors bool
+	var currentGroupAbortOnFailure bool
 	for i, cmd := range cmds {
+		if ctx.SuppressVCSStatus && currentGroupHasResult && cmd.ExecutionOrderGroup != currentExecutionGroup && currentGroupHasErrors && currentGroupAbortOnFailure {
+			ctx.Log.Info("abort on execution order when failed")
+			break
+		}
+		if !currentGroupHasResult || cmd.ExecutionOrderGroup != currentExecutionGroup {
+			currentExecutionGroup = cmd.ExecutionOrderGroup
+			currentGroupHasResult = true
+			currentGroupHasErrors = false
+			currentGroupAbortOnFailure = cmd.AbortOnExecutionOrderFail
+		}
 		if !ctx.PreWorkflowHooksAlreadyRun {
 			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 			if err != nil {
@@ -590,6 +679,9 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
+		if res.Error != nil || res.Failure != "" {
+			currentGroupHasErrors = true
+		}
 		updatePullStatusFromProjectResult(ctx, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
@@ -1005,6 +1097,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 	}
 	remediationResults = mergeApplyRemediationResults(remediationResults, applyResult)
 	if applyResult.HasErrors() {
+		markRunningRemediationResultsFailed(remediationResults, "apply skipped because an earlier execution group failed")
 		return remediationResults, fmt.Errorf("apply had errors")
 	}
 
@@ -1495,6 +1588,7 @@ type driftProjectIdentity struct {
 	path        string
 	workspace   string
 	ref         string
+	baseBranch  string
 }
 
 func newDriftProjectIdentity(project models.ProjectDrift) driftProjectIdentity {
@@ -1503,6 +1597,7 @@ func newDriftProjectIdentity(project models.ProjectDrift) driftProjectIdentity {
 		path:        project.Path,
 		workspace:   project.Workspace,
 		ref:         project.Ref,
+		baseBranch:  project.BaseBranch,
 	}
 }
 
@@ -1593,8 +1688,8 @@ func driftDetectionHasErrors(result *models.DriftDetectionResult) bool {
 	return false
 }
 
-func (a *APIController) reconcileDriftStorage(repository, ref string, detected map[driftProjectIdentity]struct{}) error {
-	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref})
+func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string, detected map[driftProjectIdentity]struct{}) error {
+	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref, BaseBranch: baseBranch})
 	if err != nil {
 		return err
 	}
@@ -1608,6 +1703,7 @@ func (a *APIController) reconcileDriftStorage(repository, ref string, detected m
 			Path:        project.Path,
 			Workspace:   project.Workspace,
 			Ref:         project.Ref,
+			BaseBranch:  project.BaseBranch,
 		}); err != nil {
 			return err
 		}
@@ -1758,7 +1854,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fullDetection && !storeFailed {
-		if err := a.reconcileDriftStorage(baseRepo.ID(), request.Ref, detectedProjects); err != nil {
+		if err := a.reconcileDriftStorage(baseRepo.ID(), request.Ref, apiRequestBaseBranch(request.Ref, request.BaseBranch), detectedProjects); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}
 	}

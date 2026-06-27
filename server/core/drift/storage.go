@@ -48,6 +48,9 @@ type GetOptions struct {
 	// by ref, so callers that want to act on a specific branch/commit
 	// should set this to avoid mixing data across refs.
 	Ref string
+	// BaseBranch filters by the branch context used for repo-config branch
+	// filters and undiverged checks.
+	BaseBranch string
 	// MaxAge filters out drift results older than this duration.
 	// If zero, no age filtering is applied.
 	MaxAge time.Duration
@@ -57,7 +60,7 @@ type GetOptions struct {
 // Includes the git ref so the same project on different branches
 // does not overwrite each other's drift data.
 func driftKey(drift models.ProjectDrift) string {
-	return drift.ProjectName + ":" + drift.Path + ":" + drift.Workspace + ":" + drift.Ref
+	return drift.ProjectName + ":" + drift.Path + ":" + drift.Workspace + ":" + drift.Ref + ":" + drift.BaseBranch
 }
 
 // InMemoryStorage is an in-memory implementation of drift Storage.
@@ -124,6 +127,9 @@ func matchesGetOptions(drift models.ProjectDrift, opts GetOptions, now time.Time
 		return false
 	}
 	if opts.Ref != "" && drift.Ref != opts.Ref {
+		return false
+	}
+	if opts.BaseBranch != "" && drift.BaseBranch != opts.BaseBranch {
 		return false
 	}
 	if opts.MaxAge > 0 && now.Sub(drift.LastChecked) > opts.MaxAge {

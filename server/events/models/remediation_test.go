@@ -32,6 +32,7 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 	}{
 		{name: "sha", ref: "0123456789abcdef0123456789abcdef01234567"},
 		{name: "tag ref", ref: "refs/tags/v1.0.0"},
+		{name: "bare tag", ref: "v1.0.0"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			request := models.RemediationRequest{
@@ -47,4 +48,27 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 			Equals(t, 0, len(request.Validate()))
 		})
 	}
+}
+
+func TestRemediationRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.T) {
+	request := models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+	}
+
+	Equals(t, 0, len(request.Validate()))
+}
+
+func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {
+	request := models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths:      []models.DriftDetectionPath{{Directory: "   "}},
+	}
+
+	errs := request.Validate()
+	Assert(t, len(errs) > 0, "expected validation error")
+	Equals(t, "paths", errs[0].Field)
 }

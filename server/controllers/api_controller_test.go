@@ -136,7 +136,8 @@ func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	responseBody, _ := io.ReadAll(w.Result().Body)
 	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy plan response must not use success envelope: %s", responseBody)
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
-	Assert(t, strings.Contains(string(responseBody), "plan failed"), "expected project error in response: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"Error\":{}"), "expected legacy project Error object in response: %s", responseBody)
+	Assert(t, !strings.Contains(string(responseBody), "plan failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
 func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
@@ -377,7 +378,8 @@ func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	responseBody, _ := io.ReadAll(w.Result().Body)
 	Assert(t, !strings.Contains(string(responseBody), "\"success\":true"), "legacy apply response must not use success envelope: %s", responseBody)
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
-	Assert(t, strings.Contains(string(responseBody), "apply failed"), "expected project error in response: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "\"Error\":{}"), "expected legacy project Error object in response: %s", responseBody)
+	Assert(t, !strings.Contains(string(responseBody), "apply failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
 func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {

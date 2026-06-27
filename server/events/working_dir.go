@@ -736,11 +736,11 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 		return fmt.Errorf("checking out API ref: empty ref")
 	}
 	if isUnsafeNonPRRef(targetRef) {
-		return fmt.Errorf("checking out API ref: pull request and merge request refs are not allowed")
+		return fmt.Errorf("checking out API ref: unsafe refs are not allowed")
 	}
-	fetchArgs := []string{"fetch", "--depth=1", "origin", targetRef}
+	fetchArgs := []string{"fetch", "--depth=1", "origin", "--", targetRef}
 	if w.CheckoutDepth > 0 {
-		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", targetRef}
+		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", "--", targetRef}
 	}
 	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
@@ -753,10 +753,16 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 
 func isUnsafeNonPRRef(ref string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(ref))
+	if strings.HasPrefix(normalized, "-") {
+		return true
+	}
 	if strings.Contains(normalized, ":") {
 		return true
 	}
 	normalized = strings.TrimLeft(normalized, "+")
+	if strings.HasPrefix(normalized, "-") {
+		return true
+	}
 	normalized = strings.TrimPrefix(normalized, "refs/")
 
 	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {

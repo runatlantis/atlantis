@@ -71,7 +71,7 @@ type RemediationRequest struct {
 	StorageRepository string `json:"-"`
 	// Ref is the git reference (branch/tag/commit) to remediate. Required.
 	Ref string `json:"ref"`
-	// BaseBranch is required when ref is a raw commit SHA or refs/tags/... value.
+	// BaseBranch is required when ref is a raw commit SHA or tag value.
 	// It preserves Atlantis repo-config branch filtering and undiverged checks.
 	BaseBranch string `json:"base_branch,omitempty"`
 	// Type is the VCS provider type (Github/Gitlab). Required.
@@ -82,6 +82,8 @@ type RemediationRequest struct {
 	// projects matching the request filters are remediated. To restrict to
 	// projects that actually have detected drift, set DriftOnly to true.
 	Projects []string `json:"projects,omitempty"`
+	// Paths is a list of repo-relative directories/workspaces to remediate.
+	Paths []DriftDetectionPath `json:"paths,omitempty"`
 	// Workspaces filters remediation to specific workspaces. If empty, all workspaces.
 	Workspaces []string `json:"workspaces,omitempty"`
 	// DriftOnly if true, only remediates projects that have detected drift.
@@ -117,6 +119,12 @@ func (r *RemediationRequest) Validate() []FieldError {
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
+			break
+		}
+	}
+	for _, path := range r.Paths {
+		if strings.TrimSpace(path.Directory) == "" {
+			errors = append(errors, FieldError{Field: "paths", Message: "path directories cannot be empty"})
 			break
 		}
 	}

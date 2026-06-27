@@ -170,6 +170,9 @@ func TestClone_SyntheticNonPRRefsRejectPRNamespaces(t *testing.T) {
 	overrideURL := fmt.Sprintf("file://%s", repoDir)
 
 	for _, ref := range []string{
+		"--upload-pack=/tmp/x",
+		"--depth=1",
+		"-c",
 		"pull/1/head",
 		"pull/1/merge",
 		"refs/pull/1/head",
@@ -198,7 +201,7 @@ func TestClone_SyntheticNonPRRefsRejectPRNamespaces(t *testing.T) {
 			}
 
 			_, err := wd.Clone(logger, models.Repo{}, pull, "default")
-			ErrContains(t, "pull request and merge request refs are not allowed", err)
+			ErrContains(t, "unsafe refs are not allowed", err)
 		})
 	}
 }

@@ -41,11 +41,34 @@ func requiresBaseBranch(ref string) bool {
 	if strings.HasPrefix(ref, "refs/tags/") {
 		return true
 	}
+	if isLikelyBareTagRef(ref) {
+		return true
+	}
 	if len(ref) < 7 || len(ref) > 40 {
 		return false
 	}
 	for _, r := range ref {
 		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isLikelyBareTagRef(ref string) bool {
+	if strings.Contains(ref, "/") || !strings.Contains(ref, ".") {
+		return false
+	}
+	trimmed := strings.TrimPrefix(strings.TrimPrefix(ref, "v"), "V")
+	if trimmed == ref && (ref == "" || ref[0] < '0' || ref[0] > '9') {
+		return false
+	}
+	if trimmed == "" || trimmed[0] < '0' || trimmed[0] > '9' {
+		return false
+	}
+	for _, r := range trimmed {
+		if (r >= '0' && r <= '9') || r == '.' || r == '-' || r == '_' {
 			continue
 		}
 		return false
@@ -154,7 +177,7 @@ type DriftDetectionRequest struct {
 	Repository string `json:"repository"`
 	// Ref is the git reference (branch/tag/commit) to check for drift. Required.
 	Ref string `json:"ref"`
-	// BaseBranch is required when ref is a raw commit SHA or refs/tags/... value.
+	// BaseBranch is required when ref is a raw commit SHA or tag value.
 	// It preserves Atlantis repo-config branch filtering and undiverged checks.
 	BaseBranch string `json:"base_branch,omitempty"`
 	// Type is the VCS provider type (Github/Gitlab). Required.

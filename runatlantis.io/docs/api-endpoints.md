@@ -296,16 +296,19 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 
 #### Parameters
 
-| Name        | Type     | Required    | Description                                                             |
-|-------------|----------|-------------|-------------------------------------------------------------------------|
-| repository  | string   | Yes         | Full repository name (e.g., `owner/repo`)                               |
-| ref         | string   | Yes         | Git reference (branch/tag/commit) to use for remediation                |
-| base_branch | string   | Conditional | Branch context for repo-config branch filters and undiverged checks     |
-| type        | string   | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                            |
-| action      | string   | No          | Remediation action: `plan` (default) or `apply`                         |
-| projects    | []string | No          | List of project names to remediate. If empty, uses drift detection data |
-| workspaces  | []string | No          | Filter remediation to specific workspaces                               |
-| drift_only  | boolean  | No          | If true, only remediate projects with detected drift                    |
+| Name        | Type                 | Required    | Description                                                             |
+|-------------|----------------------|-------------|-------------------------------------------------------------------------|
+| repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                               |
+| ref         | string               | Yes         | Git reference (branch/tag/commit) to use for remediation                |
+| base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks     |
+| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`)                            |
+| action      | string               | No          | Remediation action: `plan` (default) or `apply`                         |
+| projects    | []string             | No          | List of project names to remediate. If empty, uses drift detection data |
+| paths       | []DriftDetectionPath | No          | List of repo-relative directories/workspaces to remediate               |
+| workspaces  | []string             | No          | Filter remediation to specific workspaces                               |
+| drift_only  | boolean              | No          | If true, only remediate projects with detected drift                    |
+
+The `paths` field uses the same `DriftDetectionPath` object described under `POST /api/drift/detect`.
 
 ::: tip Actions
 
@@ -320,6 +323,10 @@ Drift remediation apply does not bypass repository `apply_requirements`. Require
 
 ::: tip Ref Safety
 When remediation uses cached drift for a moving ref such as `main`, Atlantis compares the current checkout commit with the commit that produced the cached drift record. If the ref has moved, rerun drift detection before using `action: "apply"`.
+:::
+
+::: tip Branch Context
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, and bare semantic-version tag refs such as `v1.2.3`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request (Plan Only)
@@ -350,6 +357,23 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
     "action": "apply",
     "projects": ["vpc", "ec2"],
     "workspaces": ["production"]
+}'
+```
+
+#### Sample Request (Specific Paths)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "action": "plan",
+    "paths": [
+        {"directory": "modules/vpc", "workspace": "production"}
+    ]
 }'
 ```
 
@@ -560,7 +584,7 @@ When drift is found and [drift webhooks](sending-notifications-via-webhooks.md#d
 
 | Name      | Type   | Required | Description                                                     |
 |-----------|--------|----------|-----------------------------------------------------------------|
-| directory | string | No       | Relative path to the Terraform directory                        |
+| directory | string | Yes      | Relative path to the Terraform directory                        |
 | workspace | string | No       | Terraform workspace (optional)                                  |
 
 ::: tip NOTE
@@ -572,7 +596,7 @@ Drift detection suppresses normal Atlantis plan, policy check, apply, and hook c
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs and `refs/tags/...` refs, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, and bare semantic-version tag refs such as `v1.2.3`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request
@@ -918,14 +942,15 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 
 #### Query Parameters
 
-| Name       | Type   | Required | Description                                                  |
-|------------|--------|----------|--------------------------------------------------------------|
-| repository | string | Yes      | Full repository name (e.g., `owner/repo`)                    |
-| type       | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)                 |
-| project    | string | No       | Filter by project name                                       |
-| path       | string | No       | Filter by repository-relative project path                   |
-| workspace  | string | No       | Filter by Terraform workspace                                |
-| ref        | string | No       | Filter by git reference                                      |
+| Name        | Type   | Required | Description                                            |
+|-------------|--------|----------|--------------------------------------------------------|
+| repository  | string | Yes      | Full repository name (e.g., `owner/repo`)              |
+| type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`)           |
+| project     | string | No       | Filter by project name                                 |
+| path        | string | No       | Filter by repository-relative project path             |
+| workspace   | string | No       | Filter by Terraform workspace                          |
+| ref         | string | No       | Filter by git reference                                |
+| base_branch | string | No       | Filter by branch context used when drift was detected  |
 
 #### Sample Request
 
@@ -937,7 +962,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 #### Sample Request (with filters)
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github&project=vpc&path=modules/vpc&workspace=production&ref=main' \
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github&project=vpc&path=modules/vpc&workspace=production&ref=main&base_branch=main' \
   --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 

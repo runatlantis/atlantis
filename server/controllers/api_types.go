@@ -251,18 +251,21 @@ func NewDriftStatusAPI(ds models.DriftStatusResponse) DriftStatusAPI {
 		CheckedAt:  ds.CheckedAt,
 	}
 
-	var withErrors int
+	var withErrors, withoutDrift int
 	for _, p := range ds.Projects {
 		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
 		if p.Error != "" {
 			withErrors++
+		}
+		if !p.Drift.HasDrift && p.Error == "" {
+			withoutDrift++
 		}
 	}
 
 	result.Summary = DriftSummaryAPI{
 		TotalProjects:        ds.TotalProjects,
 		ProjectsWithDrift:    ds.ProjectsWithDrift,
-		ProjectsWithoutDrift: ds.TotalProjects - ds.ProjectsWithDrift - withErrors,
+		ProjectsWithoutDrift: withoutDrift,
 		ProjectsWithErrors:   withErrors,
 	}
 
@@ -292,18 +295,21 @@ func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionR
 		DetectedAt: dr.DetectedAt,
 	}
 
-	var withErrors int
+	var withErrors, withoutDrift int
 	for _, p := range dr.Projects {
 		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
 		if p.Error != "" {
 			withErrors++
+		}
+		if !p.Drift.HasDrift && p.Error == "" {
+			withoutDrift++
 		}
 	}
 
 	result.Summary = DriftSummaryAPI{
 		TotalProjects:        dr.TotalProjects,
 		ProjectsWithDrift:    dr.ProjectsWithDrift,
-		ProjectsWithoutDrift: dr.TotalProjects - dr.ProjectsWithDrift - withErrors,
+		ProjectsWithoutDrift: withoutDrift,
 		ProjectsWithErrors:   withErrors,
 	}
 

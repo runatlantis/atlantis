@@ -282,6 +282,129 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 	Equals(t, command.Plan, capturedHookCmds[0].Name)
 }
 
+func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(t.TempDir(), nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			executionOrderGroup := 0
+			if cmd.ProjectName == "app" {
+				executionOrderGroup = 1
+			}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:         command.Plan,
+				ProjectName:         cmd.ProjectName,
+				RepoRelDir:          cmd.RepoRelDir,
+				Workspace:           cmd.Workspace,
+				ExecutionOrderGroup: executionOrderGroup,
+			}}, nil}
+		})
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			executionOrderGroup := 0
+			if cmd.ProjectName == "app" {
+				executionOrderGroup = 1
+			}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:               command.Apply,
+				ProjectName:               cmd.ProjectName,
+				RepoRelDir:                cmd.RepoRelDir,
+				Workspace:                 cmd.Workspace,
+				ExecutionOrderGroup:       executionOrderGroup,
+				AbortOnExecutionOrderFail: true,
+			}}, nil}
+		})
+
+	projectCommandRunner := NewMockProjectCommandRunner()
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+	})
+	applyOrder := []string{}
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+		projectCtx := args[0].(command.ProjectContext)
+		applyOrder = append(applyOrder, projectCtx.ProjectName)
+		if projectCtx.ProjectName == "network" {
+			return ReturnValues{command.ProjectCommandOutput{Error: errors.New("network apply failed")}}
+		}
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+	})
+
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                         locker,
+			ApplyLockChecker:               applyLockChecker,
+			Logger:                         logger,
+			Scope:                          metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:          projectCommandBuilder,
+			ProjectPlanCommandRunner:       projectCommandRunner,
+			ProjectApplyCommandRunner:      projectCommandRunner,
+			PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+			WorkingDir:                     workingDir,
+			WorkingDirLocker:               workingDirLocker,
+			CommitStatusUpdater:            commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{
+		{
+			ProjectName: "network",
+			Path:        "network",
+			Workspace:   events.DefaultWorkspace,
+		},
+		{
+			ProjectName: "app",
+			Path:        "app",
+			Workspace:   events.DefaultWorkspace,
+		},
+	})
+
+	Assert(t, err != nil, "expected apply failure")
+	Assert(t, strings.Contains(err.Error(), "apply had errors"), "expected apply error, got %v", err)
+	Equals(t, []string{"network"}, applyOrder)
+	Equals(t, 2, len(results))
+	Equals(t, models.RemediationStatusFailed, results[0].Status)
+	Equals(t, "network apply failed", results[0].Error)
+	Equals(t, models.RemediationStatusFailed, results[1].Status)
+	Equals(t, "apply skipped because an earlier execution group failed", results[1].Error)
+}
+
 func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -381,6 +504,57 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	Ok(t, err)
 	Equals(t, 1, len(results))
 	Equals(t, models.RemediationStatusSuccess, results[0].Status)
+}
+
+func TestVerifyNonPRBaseBranchReachability(t *testing.T) {
+	repoDir, mainCommit, tagCommit, unrelatedCommit := initReachabilityGitRepo(t)
+	logger := logging.NewNoopLogger(t)
+
+	cases := []struct {
+		name       string
+		headRef    string
+		headCommit string
+		wantErr    string
+	}{
+		{
+			name:       "raw SHA reachable from base branch",
+			headRef:    mainCommit,
+			headCommit: mainCommit,
+		},
+		{
+			name:       "bare tag reachable from base branch",
+			headRef:    "v1.0.0",
+			headCommit: tagCommit,
+		},
+		{
+			name:       "raw SHA not reachable from base branch",
+			headRef:    unrelatedCommit,
+			headCommit: unrelatedCommit,
+			wantErr:    "is not reachable from base_branch",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := &command.Context{
+				Log: logger,
+				Pull: models.PullRequest{
+					Num:        -1,
+					HeadBranch: tc.headRef,
+					HeadCommit: tc.headCommit,
+					BaseBranch: "main",
+				},
+			}
+
+			err := verifyNonPRBaseBranchReachability(ctx, repoDir)
+			if tc.wantErr == "" {
+				Ok(t, err)
+				return
+			}
+			Assert(t, err != nil, "expected reachability error")
+			Assert(t, strings.Contains(err.Error(), tc.wantErr), "expected %q in %v", tc.wantErr, err)
+		})
+	}
 }
 
 func TestAPIRemediationExecutor_ExecuteApplyProjectsRejectsStaleCachedDrift(t *testing.T) {
@@ -677,7 +851,7 @@ func TestAPIRemediationExecutor_ExecutePlanPreservesNamedTargetWorkspace(t *test
 
 func initRemediationGitRepo(t *testing.T) (string, string) {
 	t.Helper()
-	repoDir := t.TempDir()
+	repoDir := remediationGitTempDir(t)
 	runRemediationGit(t, repoDir, "init", "-q")
 	runRemediationGit(t, repoDir, "config", "user.email", "test@example.com")
 	runRemediationGit(t, repoDir, "config", "user.name", "Atlantis Test")
@@ -689,10 +863,55 @@ func initRemediationGitRepo(t *testing.T) (string, string) {
 	return repoDir, strings.TrimSpace(out)
 }
 
+func initReachabilityGitRepo(t *testing.T) (string, string, string, string) {
+	t.Helper()
+	rootDir := remediationGitTempDir(t)
+	originDir := filepath.Join(rootDir, "origin.git")
+	repoDir := filepath.Join(rootDir, "work")
+	Ok(t, os.MkdirAll(repoDir, 0700))
+	runRemediationGit(t, "", "init", "--bare", originDir)
+	runRemediationGit(t, repoDir, "init", "-q")
+	runRemediationGit(t, repoDir, "config", "user.email", "test@example.com")
+	runRemediationGit(t, repoDir, "config", "user.name", "Atlantis Test")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"app\" {}\n"), 0600))
+	runRemediationGit(t, repoDir, "add", "main.tf")
+	runRemediationGit(t, repoDir, "commit", "-q", "-m", "initial")
+	tagCommit := strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
+	runRemediationGit(t, repoDir, "tag", "v1.0.0")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"app\" { triggers = { value = \"main\" } }\n"), 0600))
+	runRemediationGit(t, repoDir, "add", "main.tf")
+	runRemediationGit(t, repoDir, "commit", "-q", "-m", "main update")
+	mainCommit := strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
+	runRemediationGit(t, repoDir, "branch", "-M", "main")
+	runRemediationGit(t, repoDir, "remote", "add", "origin", "file://"+originDir)
+	runRemediationGit(t, repoDir, "push", "-q", "origin", "main", "v1.0.0")
+
+	runRemediationGit(t, repoDir, "checkout", "--orphan", "untrusted")
+	runRemediationGit(t, repoDir, "rm", "-q", "-f", "main.tf")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"untrusted\" {}\n"), 0600))
+	runRemediationGit(t, repoDir, "add", "main.tf")
+	runRemediationGit(t, repoDir, "commit", "-q", "-m", "untrusted")
+	unrelatedCommit := strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
+
+	return repoDir, mainCommit, tagCommit, unrelatedCommit
+}
+
+func remediationGitTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", t.Name())
+	Ok(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(dir)
+	})
+	return dir
+}
+
 func runRemediationGit(t *testing.T, repoDir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
-	cmd.Dir = repoDir
+	if repoDir != "" {
+		cmd.Dir = repoDir
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %s: %s: %v", strings.Join(args, " "), strings.TrimSpace(string(out)), err)

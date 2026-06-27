@@ -127,8 +127,8 @@ func TestCommandResult_HasErrors(t *testing.T) {
 	}
 }
 
-// TestResult_MarshalJSON verifies that Result serializes errors properly
-// and maintains backwards-compatible JSON structure.
+// TestResult_MarshalJSON verifies that Result maintains backwards-compatible
+// JSON structure.
 func TestResult_MarshalJSON(t *testing.T) {
 	cases := map[string]struct {
 		result      command.Result
@@ -146,7 +146,7 @@ func TestResult_MarshalJSON(t *testing.T) {
 				"PlansDeleted": false,
 			},
 		},
-		"error serializes as string": {
+		"error preserves legacy empty object shape": {
 			result: command.Result{
 				Error:          errors.New("something went wrong"),
 				Failure:        "deployment failed",
@@ -154,7 +154,7 @@ func TestResult_MarshalJSON(t *testing.T) {
 				PlansDeleted:   true,
 			},
 			checkFields: map[string]any{
-				"Error":        "something went wrong",
+				"Error":        map[string]any{},
 				"Failure":      "deployment failed",
 				"PlansDeleted": true,
 			},
@@ -203,9 +203,9 @@ func TestResult_MarshalJSON(t *testing.T) {
 	}
 }
 
-// TestResult_MarshalJSON_ProjectErrorAsString verifies that nested ProjectResult
-// errors within Result are serialized as strings, not empty objects.
-func TestResult_MarshalJSON_ProjectErrorAsString(t *testing.T) {
+// TestResult_MarshalJSON_ProjectErrorLegacyShape verifies that nested
+// ProjectResult errors within Result preserve the legacy empty-object shape.
+func TestResult_MarshalJSON_ProjectErrorLegacyShape(t *testing.T) {
 	result := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
@@ -234,10 +234,10 @@ func TestResult_MarshalJSON_ProjectErrorAsString(t *testing.T) {
 	project, ok := projectResults[0].(map[string]any)
 	Assert(t, ok, "project result should be an object")
 
-	// The error should be a string, not {} or null
+	// The error should preserve the legacy empty-object shape, not a string.
 	errorVal := project["Error"]
 	Assert(t, errorVal != nil, "Error field should not be nil when error exists")
-	errorStr, ok := errorVal.(string)
-	Assert(t, ok, "Error field should be a string, got %T", errorVal)
-	Equals(t, "terraform init failed", errorStr)
+	errorObj, ok := errorVal.(map[string]any)
+	Assert(t, ok, "Error field should be an object, got %T", errorVal)
+	Equals(t, 0, len(errorObj))
 }

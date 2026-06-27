@@ -306,7 +306,7 @@ func TestProjectResult_MarshalJSON(t *testing.T) {
 				"Workspace":  "default",
 			},
 		},
-		"error serializes as string not empty object": {
+		"error preserves legacy empty object shape": {
 			pr: command.ProjectResult{
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error:   errors.New("terraform plan failed: resource not found"),
@@ -317,7 +317,7 @@ func TestProjectResult_MarshalJSON(t *testing.T) {
 				Workspace:  "production",
 			},
 			checkFields: map[string]any{
-				"Error":      "terraform plan failed: resource not found",
+				"Error":      map[string]any{},
 				"Failure":    "plan execution error",
 				"RepoRelDir": "modules/vpc",
 				"Workspace":  "production",
@@ -411,12 +411,12 @@ func TestProjectResult_MarshalJSON_FlatStructure(t *testing.T) {
 		Assert(t, exists, "field %q should exist at top level of JSON", field)
 	}
 
-	// Verify error is string, not empty object
+	// Verify error preserves the legacy encoding of a non-nil error interface.
 	errorVal := parsed["Error"]
 	Assert(t, errorVal != nil, "Error should not be nil")
-	errorStr, ok := errorVal.(string)
-	Assert(t, ok, "Error should be string, got %T: %v", errorVal, errorVal)
-	Equals(t, "test error", errorStr)
+	errorObj, ok := errorVal.(map[string]any)
+	Assert(t, ok, "Error should be an object, got %T: %v", errorVal, errorVal)
+	Equals(t, 0, len(errorObj))
 
 	// Verify PlanSuccess is an object with expected fields
 	planSuccess, ok := parsed["PlanSuccess"].(map[string]any)

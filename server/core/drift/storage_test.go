@@ -322,6 +322,75 @@ func TestInMemoryStorage_StoreDifferentRefs(t *testing.T) {
 	Equals(t, 2, len(results))
 }
 
+func TestInMemoryStorage_StoreDifferentBaseBranches(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "v1.0.0",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 1},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "v1.0.0",
+		BaseBranch:  "release",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 5},
+		LastChecked: time.Now(),
+	}))
+
+	results, err := storage.Get("owner/repo", drift.GetOptions{})
+	Ok(t, err)
+	Equals(t, 2, len(results))
+
+	mainResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "v1.0.0", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(mainResults))
+	Equals(t, "main", mainResults[0].BaseBranch)
+	Equals(t, 1, mainResults[0].Drift.ToAdd)
+}
+
+func TestInMemoryStorage_DeleteMatchingHonorsBaseBranch(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "v1.0.0",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "v1.0.0",
+		BaseBranch:  "release",
+		LastChecked: time.Now(),
+	}))
+
+	err := storage.DeleteMatching("owner/repo", drift.GetOptions{
+		ProjectName: "project1",
+		Path:        "path1",
+		Workspace:   "default",
+		Ref:         "v1.0.0",
+		BaseBranch:  "main",
+	})
+	Ok(t, err)
+
+	mainResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "v1.0.0", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 0, len(mainResults))
+	releaseResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "v1.0.0", BaseBranch: "release"})
+	Ok(t, err)
+	Equals(t, 1, len(releaseResults))
+}
+
 func TestInMemoryStorage_GetAllEmpty(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 
