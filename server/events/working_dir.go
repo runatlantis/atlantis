@@ -99,9 +99,10 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
-	// GithubAppEnabled is true and a PR number is supplied, we should fetch
-	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
-	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
+	// GithubAppEnabled enables GitHub App-specific PR fetching for GitHub repos.
+	// When this is true for a GitHub PR with a pull number, merge checkouts fetch
+	// "pull/PR_NUMBER/head" from "origin". Other VCS hosts still fetch
+	// "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
@@ -280,7 +281,7 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
 	}
-	if w.usesPRSourceRemote(p) {
+	if w.usesPRSourceRemote(headRepo, p) {
 		cmds = append(cmds,
 			[]string{"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL},
 			[]string{"git", "remote", "update"},
@@ -561,7 +562,7 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
 	// origin and avoid fetching a possibly inaccessible fork.
 	fetchArgs := []string{"fetch", "--all"}
-	if !w.usesPRSourceRemote(c.pr) {
+	if !w.usesPRSourceRemote(c.head, c.pr) {
 		fetchArgs = []string{"fetch", "origin"}
 	}
 	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
@@ -641,8 +642,8 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 // skip creating/updating it. Fetching the head repo otherwise only slows down
 // "git remote update"/"git fetch --all" and, when the App installation can't
 // read the fork, fails and makes recheckDiverged spuriously assume divergence.
-func (w *FileWorkspace) usesPRSourceRemote(p models.PullRequest) bool {
-	return !w.GithubAppEnabled || p.Num <= 0
+func (w *FileWorkspace) usesPRSourceRemote(head models.Repo, p models.PullRequest) bool {
+	return head.VCSHost.Type != models.Github || !w.GithubAppEnabled || p.Num <= 0
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
@@ -685,7 +686,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if w.usesPRSourceRemote(c.pr) {
+	if w.usesPRSourceRemote(c.head, c.pr) {
 		if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
 			return err
 		}
@@ -745,7 +746,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := prSourceRemote
-	if w.GithubAppEnabled && c.pr.Num > 0 {
+	if c.head.VCSHost.Type == models.Github && w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
 	}
