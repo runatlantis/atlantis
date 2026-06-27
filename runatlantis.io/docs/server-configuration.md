@@ -612,11 +612,24 @@ atlantis server --enable-drift-detection
 ATLANTIS_ENABLE_DRIFT_DETECTION=true
 ```
 
-Enable drift detection and remediation API endpoints. When enabled, Atlantis will initialize
-in-memory storage for drift detection results and a remediation service, making the
-`/api/drift/*` endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+Enable read-only drift detection API endpoints. When enabled, Atlantis will initialize
+in-memory storage for drift detection results and a remediation service, making drift
+detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
 are configured (`event: drift`), notifications are sent to Slack or HTTP endpoints when drift
-is detected. Defaults to `false`.
+is detected. Destructive drift remediation apply actions also require
+`--enable-drift-remediation`. Defaults to `false`.
+
+### `--enable-drift-remediation`
+
+```bash
+atlantis server --enable-drift-detection --enable-drift-remediation
+# or
+ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
+```
+
+Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
+This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
+rejected while read-only drift detection remains available. Defaults to `false`.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 

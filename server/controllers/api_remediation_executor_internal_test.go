@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -19,6 +20,48 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 	"go.uber.org/mock/gomock"
 )
+
+func TestAPIRemediationExecutor_ExecuteApplyProjectsHonorsGlobalApplyLock(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{Locked: true}, nil)
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	projectCommandRunner := NewMockProjectCommandRunner()
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			ApplyLockChecker:          applyLockChecker,
+			ProjectCommandBuilder:     projectCommandBuilder,
+			ProjectPlanCommandRunner:  projectCommandRunner,
+			ProjectApplyCommandRunner: projectCommandRunner,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   events.DefaultWorkspace,
+	}})
+
+	Assert(t, err != nil, "expected apply lock error")
+	Assert(t, strings.Contains(err.Error(), "apply is disabled globally"), "expected apply lock error, got %v", err)
+	Equals(t, 0, len(results))
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
 
 func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -34,6 +77,8 @@ func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *t
 
 	locker := NewMockLocker(gmockCtrl)
 	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
 	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
@@ -66,6 +111,7 @@ func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *t
 
 	controller := &APIController{
 		Locker:                         locker,
+		ApplyLockChecker:               applyLockChecker,
 		Logger:                         logger,
 		Scope:                          metricstest.NewLoggingScope(t, logger, "null"),
 		ProjectCommandBuilder:          projectCommandBuilder,
@@ -106,6 +152,8 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 
 	locker := NewMockLocker(gmockCtrl)
 	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
 	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
@@ -187,6 +235,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 
 	controller := &APIController{
 		Locker:                         locker,
+		ApplyLockChecker:               applyLockChecker,
 		Logger:                         logger,
 		Scope:                          metricstest.NewLoggingScope(t, logger, "null"),
 		ProjectCommandBuilder:          projectCommandBuilder,
@@ -224,10 +273,101 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[0].Status)
 	Equals(t, models.AppliedPlanStatus, capturedPullStatus.Projects[1].Status)
 
-	_, capturedHookCmds := preWorkflowHooksCommandRunner.VerifyWasCalled(Times(5)).
+	_, capturedHookCmds := preWorkflowHooksCommandRunner.VerifyWasCalled(Times(1)).
 		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
 		GetAllCapturedArguments()
 	Equals(t, command.Plan, capturedHookCmds[0].Name)
+}
+
+func TestAPIRemediationExecutor_ExecuteApplyProjectsPolicyFailureSkipsApply(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(t.TempDir(), nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+
+	projectCommandRunner := NewMockProjectCommandRunner()
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+	})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Failure: "policy failed",
+	})
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                          locker,
+			ApplyLockChecker:                applyLockChecker,
+			Logger:                          logger,
+			Scope:                           metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:           projectCommandBuilder,
+			ProjectPlanCommandRunner:        projectCommandRunner,
+			ProjectPolicyCheckCommandRunner: projectCommandRunner,
+			ProjectApplyCommandRunner:       projectCommandRunner,
+			PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
+			WorkingDir:                      workingDir,
+			WorkingDirLocker:                workingDirLocker,
+			CommitStatusUpdater:             commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   events.DefaultWorkspace,
+	}})
+
+	Assert(t, err != nil, "expected policy failure")
+	Equals(t, 1, len(results))
+	Equals(t, models.RemediationStatusFailed, results[0].Status)
+	Equals(t, "policy failed", results[0].Error)
+	projectCommandRunner.VerifyWasCalled(Times(1)).PolicyCheck(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
 func TestProjectRemediationResultsFromPlanReconcilesProjectOnlyTargets(t *testing.T) {

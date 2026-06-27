@@ -37,24 +37,27 @@ const atlantisTokenHeader = "X-Atlantis-Token"
 var nonPRPullCounter atomic.Int64
 
 type APIController struct {
-	APISecret                      []byte
-	Locker                         locking.Locker `validate:"required"`
-	DriftStorage                   drift.Storage
-	RemediationService             drift.RemediationService
-	Logger                         logging.SimpleLogging            `validate:"required"`
-	Parser                         events.EventParsing              `validate:"required"`
-	ProjectCommandBuilder          events.ProjectCommandBuilder     `validate:"required"`
-	ProjectPlanCommandRunner       events.ProjectPlanCommandRunner  `validate:"required"`
-	ProjectApplyCommandRunner      events.ProjectApplyCommandRunner `validate:"required"`
-	FailOnPreWorkflowHookError     bool
-	PreWorkflowHooksCommandRunner  events.PreWorkflowHooksCommandRunner  `validate:"required"`
-	PostWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner `validate:"required"`
-	RepoAllowlistChecker           *events.RepoAllowlistChecker          `validate:"required"`
-	Scope                          tally.Scope                           `validate:"required"`
-	VCSClient                      vcs.Client                            `validate:"required"`
-	WorkingDir                     events.WorkingDir                     `validate:"required"`
-	WorkingDirLocker               events.WorkingDirLocker               `validate:"required"`
-	CommitStatusUpdater            events.CommitStatusUpdater            `validate:"required"`
+	APISecret                       []byte
+	Locker                          locking.Locker `validate:"required"`
+	DriftStorage                    drift.Storage
+	RemediationService              drift.RemediationService
+	ApplyLockChecker                locking.ApplyLockChecker
+	EnableDriftRemediation          bool
+	Logger                          logging.SimpleLogging           `validate:"required"`
+	Parser                          events.EventParsing             `validate:"required"`
+	ProjectCommandBuilder           events.ProjectCommandBuilder    `validate:"required"`
+	ProjectPlanCommandRunner        events.ProjectPlanCommandRunner `validate:"required"`
+	ProjectPolicyCheckCommandRunner events.ProjectPolicyCheckCommandRunner
+	ProjectApplyCommandRunner       events.ProjectApplyCommandRunner `validate:"required"`
+	FailOnPreWorkflowHookError      bool
+	PreWorkflowHooksCommandRunner   events.PreWorkflowHooksCommandRunner  `validate:"required"`
+	PostWorkflowHooksCommandRunner  events.PostWorkflowHooksCommandRunner `validate:"required"`
+	RepoAllowlistChecker            *events.RepoAllowlistChecker          `validate:"required"`
+	Scope                           tally.Scope                           `validate:"required"`
+	VCSClient                       vcs.Client                            `validate:"required"`
+	WorkingDir                      events.WorkingDir                     `validate:"required"`
+	WorkingDirLocker                events.WorkingDirLocker               `validate:"required"`
+	CommitStatusUpdater             events.CommitStatusUpdater            `validate:"required"`
 	// PullReqStatusFetcher is optional. When set and the API request supplies a
 	// PR number, it is used to populate command.Context.PullRequestStatus so
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
@@ -190,21 +193,10 @@ func sortCommandPairsByExecutionOrder(cmds []command.ProjectContext, commentComm
 	}
 }
 
-// apiHandleParseError maps HTTP status codes from apiParseAndValidate to API responses.
-func (a *APIController) apiHandleParseError(w http.ResponseWriter, r *http.Request, responder *APIResponder, code int, err error) {
-	switch code {
-	case http.StatusBadRequest:
-		// Validation or parsing errors
-		responder.ValidationFailed(w, r, err.Error())
-	case http.StatusUnauthorized:
-		responder.Unauthorized(w, r, err.Error())
-	case http.StatusForbidden:
-		responder.Forbidden(w, r, err.Error())
-	case http.StatusServiceUnavailable:
-		responder.ServiceUnavailable(w, r, err.Error())
-	default:
-		responder.InternalError(w, r, err)
-	}
+func (a *APIController) apiReportLegacyError(w http.ResponseWriter, code int, err error) {
+	a.getAPIMiddleware().Responder.writeJSON(w, code, map[string]string{
+		"error": err.Error(),
+	})
 }
 
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
@@ -213,20 +205,20 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiHandleParseError(w, r, responder, code, err)
+		a.apiReportLegacyError(w, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Plan)
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 	defer a.cleanupNonPRWorkingDir(ctx)
 
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if !ctx.CommandSkipped {
@@ -246,13 +238,13 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 
 	request, ctx, code, err := a.apiParseAndValidate(r)
 	if err != nil {
-		a.apiHandleParseError(w, r, responder, code, err)
+		a.apiReportLegacyError(w, code, err)
 		return
 	}
 
 	err = a.apiSetup(ctx, command.Apply)
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 	defer a.cleanupNonPRWorkingDir(ctx)
@@ -260,7 +252,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We must first make the plan for all projects
 	result, err := a.apiPlan(request, ctx)
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 	if ctx.CommandSkipped {
@@ -282,7 +274,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	// We can now prepare and run the apply step
 	result, err = a.apiApply(request, ctx)
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -319,7 +311,7 @@ func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 
 	locks, err := a.Locker.List()
 	if err != nil {
-		responder.InternalError(w, r, err)
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
 		return
 	}
 
@@ -419,7 +411,15 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 	responder.Success(w, r, http.StatusOK, apiResult)
 }
 
-func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) error {
+func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (err error) {
+	if ctx.Pull.Num <= 0 {
+		defer func() {
+			if err != nil {
+				a.cleanupNonPRWorkingDir(ctx)
+			}
+		}()
+	}
+
 	pull := ctx.Pull
 	baseRepo := ctx.Pull.BaseRepo
 	headRepo := ctx.HeadRepo
@@ -502,14 +502,27 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
-		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
-		if err != nil {
-			if a.FailOnPreWorkflowHookError {
-				return nil, err
+		if !ctx.PreWorkflowHooksAlreadyRun {
+			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
+			if err != nil {
+				if a.FailOnPreWorkflowHookError {
+					return nil, err
+				}
 			}
 		}
 
-		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+		var res command.ProjectResult
+		switch cmd.CommandName {
+		case command.Plan:
+			res = events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+		case command.PolicyCheck:
+			if a.ProjectPolicyCheckCommandRunner == nil {
+				return nil, fmt.Errorf("policy check runner is not configured")
+			}
+			res = events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
+		default:
+			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
+		}
 		projectResults = append(projectResults, res)
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
@@ -554,10 +567,12 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 	var projectResults []command.ProjectResult
 	for i, cmd := range cmds {
-		err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
-		if err != nil {
-			if a.FailOnPreWorkflowHookError {
-				return nil, err
+		if !ctx.PreWorkflowHooksAlreadyRun {
+			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
+			if err != nil {
+				if a.FailOnPreWorkflowHookError {
+					return nil, err
+				}
 			}
 		}
 
@@ -767,6 +782,10 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 
 	// Apply default values
 	request.ApplyDefaults()
+	if request.Action == models.RemediationAutoApply && !a.EnableDriftRemediation {
+		responder.ServiceUnavailable(w, r, "drift remediation apply is not enabled")
+		return
+	}
 
 	// Check if the repo is allowlisted
 	VCSHostType, err := models.NewVCSHostType(request.Type)
@@ -810,12 +829,14 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 	// Convert to API DTO and return
 	apiResult := NewRemediationResultAPI(result)
 
-	code := http.StatusOK
 	switch result.Status {
-	case models.RemediationStatusFailed, models.RemediationStatusPartial:
-		code = http.StatusMultiStatus // 207 - some projects succeeded, some failed
+	case models.RemediationStatusFailed:
+		responder.Error(w, r, http.StatusConflict, NewAPIError(ErrCodeConflict, "drift remediation failed").WithDetails(apiResult))
+	case models.RemediationStatusPartial:
+		responder.Success(w, r, http.StatusMultiStatus, apiResult)
+	default:
+		responder.Success(w, r, http.StatusOK, apiResult)
 	}
-	responder.Success(w, r, code, apiResult)
 }
 
 // apiRemediationExecutor implements drift.RemediationExecutor using the API controller's
@@ -854,10 +875,11 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:              e.controller.Scope,
-		Log:                e.logger,
-		API:                true,
-		SkipPRRequirements: true,
+		Scope:               e.controller.Scope,
+		Log:                 e.logger,
+		API:                 true,
+		SkipPRRequirements:  true,
+		SkipPRModifiedFiles: true,
 	}
 
 	// Setup working directory
@@ -874,6 +896,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		}
 		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
+	ctx.PreWorkflowHooksAlreadyRun = true
 
 	// Execute plan
 	result, err := e.controller.apiPlan(request, ctx)
@@ -918,10 +941,15 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:              e.controller.Scope,
-		Log:                e.logger,
-		API:                true,
-		SkipPRRequirements: true,
+		Scope:               e.controller.Scope,
+		Log:                 e.logger,
+		API:                 true,
+		SkipPRRequirements:  true,
+		SkipPRModifiedFiles: true,
+	}
+
+	if err := e.ensureApplyUnlocked(); err != nil {
+		return nil, err
 	}
 
 	if err := e.controller.apiSetup(ctx, command.Apply); err != nil {
@@ -936,6 +964,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		}
 		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
+	ctx.PreWorkflowHooksAlreadyRun = true
 
 	planResult, err := e.controller.apiPlan(request, ctx)
 	if err != nil {
@@ -990,10 +1019,15 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 			HeadCommit: ref,
 			BaseRepo:   e.baseRepo,
 		},
-		Scope:              e.controller.Scope,
-		Log:                e.logger,
-		API:                true,
-		SkipPRRequirements: true,
+		Scope:               e.controller.Scope,
+		Log:                 e.logger,
+		API:                 true,
+		SkipPRRequirements:  true,
+		SkipPRModifiedFiles: true,
+	}
+
+	if err := e.ensureApplyUnlocked(); err != nil {
+		return "", err
 	}
 
 	// Setup working directory
@@ -1011,6 +1045,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		}
 		e.logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
+	ctx.PreWorkflowHooksAlreadyRun = true
 
 	// First run plan (required before apply)
 	planResult, err := e.controller.apiPlan(request, ctx)
@@ -1037,6 +1072,20 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	}
 
 	return output.String(), nil
+}
+
+func (e *apiRemediationExecutor) ensureApplyUnlocked() error {
+	if e.controller.ApplyLockChecker == nil {
+		return nil
+	}
+	lock, err := e.controller.ApplyLockChecker.CheckApplyLock()
+	if err != nil {
+		return fmt.Errorf("checking global apply lock: %w", err)
+	}
+	if lock.Locked {
+		return fmt.Errorf("apply is disabled globally")
+	}
+	return nil
 }
 
 func planRemediationOutput(result *command.Result) (strings.Builder, *models.DriftSummary) {
@@ -1473,10 +1522,11 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			HeadCommit: request.Ref,
 			BaseRepo:   baseRepo,
 		},
-		Scope:              a.Scope,
-		Log:                a.Logger,
-		API:                true,
-		SkipPRRequirements: true,
+		Scope:               a.Scope,
+		Log:                 a.Logger,
+		API:                 true,
+		SkipPRRequirements:  true,
+		SkipPRModifiedFiles: true,
 	}
 
 	// Setup working directory
@@ -1496,6 +1546,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		}
 		a.Logger.Warn("pre-workflow hook error (continuing): %v", err)
 	}
+	ctx.PreWorkflowHooksAlreadyRun = true
 
 	result, err := a.apiPlan(apiRequest, ctx)
 	if err != nil {

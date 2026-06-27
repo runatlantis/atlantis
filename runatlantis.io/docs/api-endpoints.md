@@ -10,7 +10,7 @@ If you build integrations against these endpoints, when upgrading Atlantis you s
 
 ## Response Format
 
-All API responses use a consistent envelope format:
+The newer drift API endpoints use a consistent envelope format:
 
 ```json
 {
@@ -22,7 +22,9 @@ All API responses use a consistent envelope format:
 }
 ```
 
-### Response Fields
+Existing legacy endpoints keep their historical response bodies for compatibility. This includes `POST /api/plan`, `POST /api/apply`, and the existing lock endpoints. Legacy command endpoints return `command.Result` at the top level on success or project failure, and return a top-level `{ "error": "..." }` body for request/auth/setup errors.
+
+### Envelope Response Fields
 
 | Field      | Type    | Description                                                    |
 |------------|---------|----------------------------------------------------------------|
@@ -32,9 +34,9 @@ All API responses use a consistent envelope format:
 | request_id | string  | Unique identifier for request tracing                          |
 | timestamp  | string  | ISO 8601 timestamp of when the response was generated          |
 
-### Error Response Format
+### Envelope Error Response Format
 
-When an error occurs, the response includes structured error information:
+When an error occurs on an endpoint that uses the envelope, the response includes structured error information:
 
 ```json
 {
@@ -92,13 +94,8 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 At least one of `Projects` or `Paths` must be specified.
 :::
 
-::: tip Non-PR Workflows (Drift Detection)
-When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
-
-* PR-specific requirements (`approved`, `mergeable`) are automatically skipped
-* Security requirements (`policies_passed`, `undiverged`) are still enforced
-* This enables drift detection and other automation workflows without an associated pull request
-
+::: warning Pre-Apply Plan Failures
+The API apply endpoint runs a plan before apply. If any targeted project returns a plan error in that pre-apply phase, Atlantis returns the plan result with a non-2xx status and does not run apply for any project in that request. This avoids applying an older pending plan after the latest plan failed.
 :::
 
 #### Path
@@ -153,53 +150,31 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 
 ```json
 {
-  "success": true,
-  "data": {
-    "command": "plan",
-    "projects": [
-      {
-        "project_name": "",
-        "directory": ".",
-        "workspace": "default",
-        "command": "plan",
-        "status": "success",
-        "output": "<terraform plan output>",
-        "plan": {
-          "has_changes": true,
-          "to_add": 2,
-          "to_change": 1,
-          "to_destroy": 0,
-          "to_import": 0,
-          "to_forget": 0,
-          "summary": "Plan: 2 to add, 1 to change, 0 to destroy."
-        }
-      }
-    ],
-    "total_projects": 1,
-    "success_count": 1,
-    "failure_count": 0,
-    "executed_at": "2025-01-21T10:30:00Z"
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "Error": null,
+  "Failure": "",
+  "ProjectResults": [
+    {
+      "Error": null,
+      "Failure": "",
+      "PlanSuccess": {
+        "TerraformOutput": "<terraform plan output>"
+      },
+      "RepoRelDir": ".",
+      "Workspace": "default",
+      "ProjectName": ""
+    }
+  ],
+  "PlansDeleted": false
 }
 ```
 
 #### Sample Response (Error)
 
-When an error occurs, the response includes structured error information:
+When a request/auth/setup error occurs, the legacy endpoint returns a top-level error body:
 
 ```json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "at least one of 'Projects' or 'Paths' must be specified"
-  },
-  "request_id": "550e8400-e29b-41d4-a716-446655440001",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "error": "request \"{}\" is missing fields"
 }
 ```
 
@@ -209,27 +184,18 @@ When a project-level error occurs:
 
 ```json
 {
-  "success": true,
-  "data": {
-    "command": "plan",
-    "projects": [
-      {
-        "project_name": "vpc",
-        "directory": "modules/vpc",
-        "workspace": "production",
-        "command": "plan",
-        "status": "error",
-        "error": "terraform plan failed: resource not found"
-      }
-    ],
-    "total_projects": 1,
-    "success_count": 0,
-    "failure_count": 1,
-    "executed_at": "2025-01-21T10:30:00Z"
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440002",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "Error": null,
+  "Failure": "",
+  "ProjectResults": [
+    {
+      "Error": "terraform plan failed: resource not found",
+      "Failure": "",
+      "RepoRelDir": "modules/vpc",
+      "Workspace": "production",
+      "ProjectName": "vpc"
+    }
+  ],
+  "PlansDeleted": false
 }
 ```
 
@@ -260,15 +226,6 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
-:::
-
-::: tip Non-PR Workflows (Drift Detection)
-When `PR` is omitted or set to `0`, Atlantis operates in non-PR mode. In this mode:
-
-* PR-specific requirements (`approved`, `mergeable`) are automatically skipped
-* Security requirements (`policies_passed`, `undiverged`) are still enforced
-* This enables drift detection and other automation workflows without an associated pull request
-
 :::
 
 #### Path
@@ -304,32 +261,24 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 
 ```json
 {
-  "success": true,
-  "data": {
-    "command": "apply",
-    "projects": [
-      {
-        "project_name": "",
-        "directory": ".",
-        "workspace": "default",
-        "command": "apply",
-        "status": "success",
-        "output": "Apply complete! Resources: 2 added, 1 changed, 0 destroyed."
-      }
-    ],
-    "total_projects": 1,
-    "success_count": 1,
-    "failure_count": 0,
-    "executed_at": "2025-01-21T10:30:00Z"
-  },
-  "error": null,
-  "request_id": "550e8400-e29b-41d4-a716-446655440000",
-  "timestamp": "2025-01-21T10:30:00Z"
+  "Error": null,
+  "Failure": "",
+  "ProjectResults": [
+    {
+      "Error": null,
+      "Failure": "",
+      "ApplySuccess": "Apply complete! Resources: 2 added, 1 changed, 0 destroyed.",
+      "RepoRelDir": ".",
+      "Workspace": "default",
+      "ProjectName": ""
+    }
+  ],
+  "PlansDeleted": false
 }
 ```
 
 ::: tip Error Response Format
-Error responses follow the same envelope format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
+Error responses follow the same legacy format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
 :::
 
 ### POST /api/drift/remediate
@@ -360,7 +309,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 ::: tip Actions
 
 * `plan`: Runs a plan to preview what would change (default, non-destructive)
-* `apply`: Runs both plan and apply to automatically fix drift (destructive)
+* `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`.
 
 :::
 
@@ -569,7 +518,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 | 400         | Invalid request (missing required fields, invalid action, or API disabled) |
 | 401         | Invalid or missing `X-Atlantis-Token` header                               |
 | 403         | Repository not in allowed list                                             |
-| 503         | Drift remediation is not enabled on the server                             |
+| 409         | Remediation ran but all targeted projects failed                           |
+| 503         | Drift remediation or remediation apply is not enabled on the server        |
 | 500         | Internal error during remediation                                          |
 
 ### POST /api/drift/detect

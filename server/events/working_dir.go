@@ -753,6 +753,9 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 
 func isUnsafeNonPRRef(ref string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(ref))
+	if strings.Contains(normalized, ":") {
+		return true
+	}
 	normalized = strings.TrimLeft(normalized, "+")
 	normalized = strings.TrimPrefix(normalized, "refs/")
 

@@ -55,6 +55,14 @@ type Context struct {
 	// requirements like approved and mergeable.
 	SkipPRRequirements bool
 
+	// SkipPRModifiedFiles allows non-PR API workflows, such as drift detection,
+	// to resolve explicit selectors without querying pull request modified files.
+	SkipPRModifiedFiles bool
+
+	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
+	// pre-workflow hooks before project discovery.
+	PreWorkflowHooksAlreadyRun bool
+
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
 

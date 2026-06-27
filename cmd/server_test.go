@@ -167,6 +167,7 @@ var testFlags = map[string]any{
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
 	EnableDriftDetectionFlag:         false,
+	EnableDriftRemediationFlag:       false,
 	EnableProfilingAPI:               false,
 }
 

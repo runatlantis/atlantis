@@ -1018,7 +1018,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 	var restrictedRegexProjects []valid.Project
 	var restrictedRegexRepoCfg *valid.RepoCfg
-	if p.RestrictFileList {
+	if p.RestrictFileList && !ctx.SkipPRModifiedFiles {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {

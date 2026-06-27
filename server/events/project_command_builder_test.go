@@ -1914,17 +1914,18 @@ projects:
 // with the RestrictFileList
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFileList(t *testing.T) {
 	cases := []struct {
-		Description        string
-		AtlantisYAML       string
-		DirectoryStructure map[string]any
-		ModifiedFiles      []string
-		Cmd                events.CommentCommand
-		EnableRegExpCmd    bool
-		ExpErr             string
-		ExpNoProjects      bool
-		ExpSkipFileList    bool
-		ExpProjectNames    []string
-		ExpCloneWorkspaces []string
+		Description         string
+		AtlantisYAML        string
+		DirectoryStructure  map[string]any
+		ModifiedFiles       []string
+		Cmd                 events.CommentCommand
+		EnableRegExpCmd     bool
+		ExpErr              string
+		ExpNoProjects       bool
+		ExpSkipFileList     bool
+		SkipPRModifiedFiles bool
+		ExpProjectNames     []string
+		ExpCloneWorkspaces  []string
 	}{
 		{
 			Description: "planning a file outside of the changed files",
@@ -1986,6 +1987,25 @@ autodiscover:
 			ModifiedFiles:   []string{"directory-2/main.tf"},
 			ExpNoProjects:   true,
 			ExpSkipFileList: true,
+		},
+		{
+			Description: "API drift targeted path skips pull request modified file filtering",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "directory-1",
+				Workspace:  "default",
+			},
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:       []string{"directory-2/main.tf"},
+			ExpSkipFileList:     true,
+			SkipPRModifiedFiles: true,
 		},
 		{
 			Description: "planning a project outside of the requested changed files",
@@ -2199,8 +2219,9 @@ projects:
 			var err error
 			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
-				Log:   logger,
-				Scope: scope,
+				Log:                 logger,
+				Scope:               scope,
+				SkipPRModifiedFiles: c.SkipPRModifiedFiles,
 			}, &cmd)
 
 			if c.ExpNoProjects {
@@ -2219,6 +2240,9 @@ projects:
 			if len(c.ExpCloneWorkspaces) > 0 {
 				_, _, _, cloneWorkspaces := workingDir.VerifyWasCalled(Times(len(c.ExpCloneWorkspaces))).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]()).GetAllCapturedArguments()
 				Equals(t, c.ExpCloneWorkspaces, cloneWorkspaces)
+			}
+			if c.ExpSkipFileList {
+				vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 			}
 			if len(c.ExpProjectNames) == 0 {
 				Equals(t, 1, len(actCtxs))
