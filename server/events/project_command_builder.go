@@ -845,7 +845,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 			User:               projCtx.User,
 			Verbose:            projCtx.Verbose,
 			Workspace:          projCtx.Workspace,
-			API:                false,
+			API:                projCtx.API,
 		}
 		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
 	}), nil
@@ -968,7 +968,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			User:               projCtx.User,
 			Verbose:            projCtx.Verbose,
 			Workspace:          projCtx.Workspace,
-			API:                false,
+			API:                projCtx.API,
 		}
 		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
 	})
@@ -1448,7 +1448,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 			User:               projCtx.User,
 			Verbose:            projCtx.Verbose,
 			Workspace:          projCtx.Workspace,
-			API:                false,
+			API:                projCtx.API,
 		}
 		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
 	})

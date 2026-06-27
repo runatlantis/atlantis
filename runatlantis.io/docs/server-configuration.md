@@ -612,9 +612,11 @@ atlantis server --enable-drift-detection
 ATLANTIS_ENABLE_DRIFT_DETECTION=true
 ```
 
-Enable read-only drift detection API endpoints. When enabled, Atlantis will initialize
-in-memory storage for drift detection results and a remediation service, making drift
-detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+Enable drift detection API endpoints. Drift detection does not run Terraform apply, but
+it does execute the normal plan lifecycle, including configured pre-workflow hooks,
+custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
+will initialize in-memory storage for drift detection results and a remediation service,
+making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
 are configured (`event: drift`), notifications are sent to Slack or HTTP endpoints when drift
 is detected. Destructive drift remediation apply actions also require
 `--enable-drift-remediation`. Defaults to `false`.

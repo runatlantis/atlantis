@@ -188,7 +188,7 @@ When a project-level error occurs:
   "Failure": "",
   "ProjectResults": [
     {
-      "Error": "terraform plan failed: resource not found",
+      "Error": {},
       "Failure": "",
       "RepoRelDir": "modules/vpc",
       "Workspace": "production",
@@ -202,7 +202,7 @@ When a project-level error occurs:
 ::: tip Project Status Values
 
 * `success`: Project command completed successfully
-* `error`: An error occurred (check `error` field)
+* `error`: An error occurred. Legacy plan/apply responses preserve the historical Go error JSON shape: non-nil project `Error` values are encoded as `{}`, and nil values are encoded as `null`.
 * `failed`: A failure occurred (check `failure` field)
 
 :::
@@ -326,7 +326,7 @@ When remediation uses cached drift for a moving ref such as `main`, Atlantis com
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, and bare semantic-version tag refs such as `v1.2.3`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request (Plan Only)
@@ -593,10 +593,12 @@ At least one of `projects` or `paths` should be specified for targeted detection
 
 ::: tip Status Side Effects
 Drift detection suppresses normal Atlantis plan, policy check, apply, and hook commit statuses. Drift-specific webhook notifications can still be sent when drift webhooks are configured.
+
+Drift detection does not run Terraform apply, but it does execute the normal plan lifecycle. Configured pre-workflow hooks, custom workflows, custom plan steps, and Terraform plan commands can run server-side outside a pull request context.
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, and bare semantic-version tag refs such as `v1.2.3`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
 :::
 
 #### Sample Request

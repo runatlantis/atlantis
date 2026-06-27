@@ -32,7 +32,11 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 	}{
 		{name: "sha", ref: "0123456789abcdef0123456789abcdef01234567"},
 		{name: "tag ref", ref: "refs/tags/v1.0.0"},
-		{name: "bare tag", ref: "v1.0.0"},
+		{name: "tag ref without semver", ref: "refs/tags/prod"},
+		{name: "bare semver tag", ref: "v1.0.0"},
+		{name: "ambiguous prod ref", ref: "prod"},
+		{name: "ambiguous latest ref", ref: "latest"},
+		{name: "ambiguous stable ref", ref: "stable"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			request := models.RemediationRequest{
@@ -51,13 +55,17 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 }
 
 func TestRemediationRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.T) {
-	request := models.RemediationRequest{
-		Repository: "owner/repo",
-		Ref:        "main",
-		Type:       "Github",
-	}
+	for _, ref := range []string{"main", "master", "develop", "release/1.2", "feature/foo"} {
+		t.Run(ref, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        ref,
+				Type:       "Github",
+			}
 
-	Equals(t, 0, len(request.Validate()))
+			Equals(t, 0, len(request.Validate()))
+		})
+	}
 }
 
 func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {
@@ -66,6 +74,23 @@ func TestRemediationRequestValidateRejectsEmptyPathSelectors(t *testing.T) {
 		Ref:        "main",
 		Type:       "Github",
 		Paths:      []models.DriftDetectionPath{{Directory: "   "}},
+	}
+
+	errs := request.Validate()
+	Assert(t, len(errs) > 0, "expected validation error")
+	Equals(t, "paths", errs[0].Field)
+}
+
+func TestRemediationRequestValidateRejectsConflictingPathAndTopLevelWorkspaces(t *testing.T) {
+	request := models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+			Workspace: "dev",
+		}},
+		Workspaces: []string{"prod"},
 	}
 
 	errs := request.Validate()

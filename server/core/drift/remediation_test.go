@@ -5,6 +5,7 @@ package drift_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -376,6 +377,81 @@ func TestInMemoryRemediationService_PathSelectorsTargetCachedDrift(t *testing.T)
 	Equals(t, models.RemediationStatusSuccess, result.Status)
 	Equals(t, 1, len(executor.planCalls))
 	Equals(t, remediationExecutorCall{projectName: "app", path: "apps/prod", workspace: "default"}, executor.planCalls[0])
+}
+
+func TestInMemoryRemediationService_PathSelectorsHonorTopLevelWorkspaceFallbacks(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+		}},
+		Workspaces: []string{"prod", "stage"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 2, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{path: "env", workspace: "prod"}, executor.planCalls[0])
+	Equals(t, remediationExecutorCall{path: "env", workspace: "stage"}, executor.planCalls[1])
+}
+
+func TestInMemoryRemediationService_PathSelectorsHonorCachedWorkspaceFilters(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	for _, workspace := range []string{"prod", "stage", "dev"} {
+		Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+			ProjectName: "app",
+			Path:        "env",
+			Workspace:   workspace,
+			Ref:         "main",
+			BaseBranch:  "main",
+			Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+			LastChecked: time.Now(),
+		}))
+	}
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+		}},
+		Workspaces: []string{"prod", "stage"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 2, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "prod"}, executor.planCalls[0])
+	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "stage"}, executor.planCalls[1])
+}
+
+func TestInMemoryRemediationService_PathSelectorRejectsConflictingWorkspaceFilter(t *testing.T) {
+	service := drift.NewInMemoryRemediationService(nil)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+			Workspace: "dev",
+		}},
+		Workspaces: []string{"prod"},
+	}, executor)
+
+	Ok(t, err)
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Assert(t, strings.Contains(result.Error, "path workspace"), "expected path workspace error, got %q", result.Error)
+	Equals(t, 0, len(executor.planCalls))
 }
 
 func TestInMemoryRemediationService_PathSelectorsUseMatchingBaseBranch(t *testing.T) {

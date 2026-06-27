@@ -36,12 +36,16 @@ func (d DriftSummary) TotalChanges() int {
 	return d.ToAdd + d.ToChange + d.ToDestroy + d.ToImport + d.ToForget
 }
 
-func requiresBaseBranch(ref string) bool {
+// RequiresBaseBranchForRef reports whether a drift API ref needs an explicit branch context.
+func RequiresBaseBranchForRef(ref string) bool {
 	ref = strings.TrimSpace(ref)
 	if strings.HasPrefix(ref, "refs/tags/") {
 		return true
 	}
-	if isLikelyBareTagRef(ref) {
+	if strings.HasPrefix(ref, "refs/heads/") {
+		return false
+	}
+	if isLikelyBareTagRef(ref) || isAmbiguousBareRef(ref) {
 		return true
 	}
 	if len(ref) < 7 || len(ref) > 40 {
@@ -54,6 +58,10 @@ func requiresBaseBranch(ref string) bool {
 		return false
 	}
 	return true
+}
+
+func requiresBaseBranch(ref string) bool {
+	return RequiresBaseBranchForRef(ref)
 }
 
 func isLikelyBareTagRef(ref string) bool {
@@ -74,6 +82,19 @@ func isLikelyBareTagRef(ref string) bool {
 		return false
 	}
 	return true
+}
+
+func isAmbiguousBareRef(ref string) bool {
+	ref = strings.TrimSpace(ref)
+	if ref == "" || strings.Contains(ref, "/") {
+		return false
+	}
+	switch strings.ToLower(ref) {
+	case "main", "master", "develop", "development", "dev", "trunk":
+		return false
+	default:
+		return true
+	}
 }
 
 // NewDriftSummaryFromPlanStats creates a DriftSummary from PlanSuccessStats.
@@ -198,7 +219,7 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
-		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA or tag ref"})
+		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})

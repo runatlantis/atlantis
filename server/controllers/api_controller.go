@@ -490,7 +490,10 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 	}
 	baseBranch := strings.TrimSpace(ctx.Pull.BaseBranch)
 	headRef := strings.TrimSpace(ctx.Pull.HeadBranch)
-	if baseBranch == "" || headRef == "" || baseBranch == headRef {
+	if baseBranch == "" || headRef == "" {
+		return nil
+	}
+	if baseBranch == headRef && !models.RequiresBaseBranchForRef(headRef) {
 		return nil
 	}
 	baseRef, err := checkedAPIBaseBranchRef(baseBranch)
@@ -499,19 +502,19 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 	}
 	remoteBaseRef := "refs/remotes/origin/" + baseRef
 	fetchRef := fmt.Sprintf("+refs/heads/%s:%s", baseRef, remoteBaseRef)
-	if output, err := runAPIGit(repoDir, "fetch", "origin", "--", fetchRef); err != nil {
+	if output, err := fetchAPIBaseBranch(repoDir, fetchRef); err != nil {
 		return fmt.Errorf("verifying API base branch %q: %s: %w", baseBranch, strings.TrimSpace(output), err)
 	}
-	if output, err := runAPIGit(repoDir, "merge-base", "--is-ancestor", ctx.Pull.HeadCommit, remoteBaseRef); err == nil {
+	if output, err := checkedOutCommitReachableFromAPIBase(repoDir, ctx.Pull.HeadCommit, remoteBaseRef); err == nil {
 		return nil
 	} else if !isShallowGitRepo(repoDir) {
 		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
 	}
 
-	if _, err := runAPIGit(repoDir, "fetch", "--unshallow", "origin", "--", fetchRef); err != nil {
+	if _, err := unshallowAPIBaseBranch(repoDir, fetchRef); err != nil {
 		ctx.Log.Debug("unable to unshallow API checkout while verifying base branch: %v", err)
 	}
-	if output, err := runAPIGit(repoDir, "merge-base", "--is-ancestor", ctx.Pull.HeadCommit, remoteBaseRef); err != nil {
+	if output, err := checkedOutCommitReachableFromAPIBase(repoDir, ctx.Pull.HeadCommit, remoteBaseRef); err != nil {
 		return fmt.Errorf("checked out API ref %q at commit %s is not reachable from base_branch %q: %s: %w", headRef, ctx.Pull.HeadCommit, baseBranch, strings.TrimSpace(output), err)
 	}
 	return nil
@@ -528,10 +531,28 @@ func checkedAPIBaseBranchRef(baseBranch string) (string, error) {
 			return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
 		}
 	}
-	if output, err := runAPIGit("", "check-ref-format", "--branch", baseRef); err != nil {
-		return "", fmt.Errorf("invalid API base_branch %q: %s: %w", baseBranch, strings.TrimSpace(output), err)
+	if !isSafeAPIBaseBranchRef(baseRef) {
+		return "", fmt.Errorf("invalid API base_branch %q", baseBranch)
 	}
 	return baseRef, nil
+}
+
+func isSafeAPIBaseBranchRef(baseRef string) bool {
+	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.HasPrefix(baseRef, "/") || strings.HasSuffix(baseRef, "/") {
+		return false
+	}
+	if strings.ContainsAny(baseRef, " \t\r\n\\~^:?*[]") || strings.Contains(baseRef, "..") || strings.Contains(baseRef, "@{") || strings.Contains(baseRef, "//") {
+		return false
+	}
+	if strings.HasSuffix(baseRef, ".") || strings.HasSuffix(baseRef, ".lock") {
+		return false
+	}
+	for _, component := range strings.Split(baseRef, "/") {
+		if component == "" || strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
+			return false
+		}
+	}
+	return true
 }
 
 func isShallowGitRepo(repoDir string) bool {
@@ -539,11 +560,23 @@ func isShallowGitRepo(repoDir string) bool {
 	return err == nil
 }
 
-func runAPIGit(repoDir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...) // nolint: gosec
-	if repoDir != "" {
-		cmd.Dir = repoDir
-	}
+func fetchAPIBaseBranch(repoDir string, fetchRef string) (string, error) {
+	cmd := exec.Command("git", "fetch", "origin", "--", fetchRef) //nolint:gosec // fetchRef is constructed from a validated base branch.
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
+func unshallowAPIBaseBranch(repoDir string, fetchRef string) (string, error) {
+	cmd := exec.Command("git", "fetch", "--unshallow", "origin", "--", fetchRef) //nolint:gosec // fetchRef is constructed from a validated base branch.
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	return string(output), err
+}
+
+func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, remoteBaseRef string) (string, error) {
+	cmd := exec.Command("git", "merge-base", "--is-ancestor", headCommit, remoteBaseRef) //nolint:gosec // refs are resolved from the checked-out commit and validated base branch.
+	cmd.Dir = repoDir
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
@@ -1339,6 +1372,19 @@ func findProjectRemediationResult(results []models.ProjectRemediationResult, pro
 		}
 	}
 	for i := range results {
+		if results[i].ProjectName != "" || results[i].Path != path {
+			continue
+		}
+		if results[i].Workspace != "" && results[i].Workspace != workspace {
+			continue
+		}
+		results[i].ProjectName = projectName
+		if results[i].Workspace == "" {
+			results[i].Workspace = workspace
+		}
+		return i
+	}
+	for i := range results {
 		if results[i].ProjectName == "" || results[i].ProjectName != projectName || results[i].Path != "" {
 			continue
 		}
@@ -1676,6 +1722,13 @@ func projectResultErrorMessage(pr command.ProjectResult) string {
 	return pr.Failure
 }
 
+func appendDriftProjectError(existing, additional string) string {
+	if existing == "" {
+		return additional
+	}
+	return existing + "; " + additional
+}
+
 func driftDetectionHasErrors(result *models.DriftDetectionResult) bool {
 	if result == nil {
 		return false
@@ -1848,6 +1901,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			storeFailed = true
+			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
 			a.Logger.Warn("failed to store drift data: %v", err)
 		}
 		detectionResult.AddProject(projectDrift)

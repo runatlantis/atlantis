@@ -229,25 +229,31 @@ func (s *InMemoryRemediationService) getProjectsToRemediate(req models.Remediati
 		}
 	} else if len(req.Paths) > 0 {
 		for _, path := range req.Paths {
-			pathOpts := GetOptions{Path: path.Directory, Workspace: path.Workspace, Ref: req.Ref, BaseBranch: remediationBaseBranch(req)}
-			if s.driftStorage != nil {
-				drifts, err := s.driftStorage.Get(storageRepository, pathOpts)
-				if err != nil {
-					return nil, fmt.Errorf("failed to get drift data for path %q: %w", path.Directory, err)
-				}
-				for _, d := range drifts {
-					if s.matchesFilters(d, req) {
-						projects = append(projects, d)
+			workspaces, err := remediationPathWorkspaces(path, req.Workspaces)
+			if err != nil {
+				return nil, err
+			}
+			for _, workspace := range workspaces {
+				pathOpts := GetOptions{Path: path.Directory, Workspace: workspace, Ref: req.Ref, BaseBranch: remediationBaseBranch(req)}
+				if s.driftStorage != nil {
+					drifts, err := s.driftStorage.Get(storageRepository, pathOpts)
+					if err != nil {
+						return nil, fmt.Errorf("failed to get drift data for path %q: %w", path.Directory, err)
+					}
+					for _, d := range drifts {
+						if s.matchesFilters(d, req) {
+							projects = append(projects, d)
+						}
 					}
 				}
-			}
-			if !hasRemediationPathTarget(projects, path.Directory, path.Workspace) {
-				projects = append(projects, models.ProjectDrift{
-					Path:       path.Directory,
-					Workspace:  path.Workspace,
-					Ref:        req.Ref,
-					BaseBranch: remediationBaseBranch(req),
-				})
+				if !hasRemediationPathTarget(projects, path.Directory, workspace) {
+					projects = append(projects, models.ProjectDrift{
+						Path:       path.Directory,
+						Workspace:  workspace,
+						Ref:        req.Ref,
+						BaseBranch: remediationBaseBranch(req),
+					})
+				}
 			}
 		}
 	} else if len(req.Projects) > 0 {
@@ -315,6 +321,19 @@ func remediationBaseBranch(req models.RemediationRequest) string {
 		return req.BaseBranch
 	}
 	return req.Ref
+}
+
+func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []string) ([]string, error) {
+	if path.Workspace != "" {
+		if len(workspaces) > 0 && !slices.Contains(workspaces, path.Workspace) {
+			return nil, fmt.Errorf("path workspace %q must be included in workspaces", path.Workspace)
+		}
+		return []string{path.Workspace}, nil
+	}
+	if len(workspaces) > 0 {
+		return workspaces, nil
+	}
+	return []string{""}, nil
 }
 
 func hasRemediationTarget(projects []models.ProjectDrift, projectName string, workspace string) bool {

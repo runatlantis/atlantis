@@ -4,6 +4,7 @@
 package models
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -106,7 +107,7 @@ func (r *RemediationRequest) Validate() []FieldError {
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
-		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA or tag ref"})
+		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
 	}
 	if r.Type == "" {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
@@ -125,6 +126,10 @@ func (r *RemediationRequest) Validate() []FieldError {
 	for _, path := range r.Paths {
 		if strings.TrimSpace(path.Directory) == "" {
 			errors = append(errors, FieldError{Field: "paths", Message: "path directories cannot be empty"})
+			break
+		}
+		if path.Workspace != "" && len(r.Workspaces) > 0 && !slices.Contains(r.Workspaces, path.Workspace) {
+			errors = append(errors, FieldError{Field: "paths", Message: "path workspace must be included in workspaces"})
 			break
 		}
 	}

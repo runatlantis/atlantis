@@ -514,6 +514,7 @@ func TestVerifyNonPRBaseBranchReachability(t *testing.T) {
 		name       string
 		headRef    string
 		headCommit string
+		baseBranch string
 		wantErr    string
 	}{
 		{
@@ -532,6 +533,13 @@ func TestVerifyNonPRBaseBranchReachability(t *testing.T) {
 			headCommit: unrelatedCommit,
 			wantErr:    "is not reachable from base_branch",
 		},
+		{
+			name:       "ambiguous ref matching base branch still verifies reachability",
+			headRef:    "prod",
+			headCommit: mainCommit,
+			baseBranch: "prod",
+			wantErr:    "verifying API base branch",
+		},
 	}
 
 	for _, tc := range cases {
@@ -544,6 +552,9 @@ func TestVerifyNonPRBaseBranchReachability(t *testing.T) {
 					HeadCommit: tc.headCommit,
 					BaseBranch: "main",
 				},
+			}
+			if tc.baseBranch != "" {
+				ctx.Pull.BaseBranch = tc.baseBranch
 			}
 
 			err := verifyNonPRBaseBranchReachability(ctx, repoDir)
@@ -727,6 +738,37 @@ func TestProjectRemediationResultsFromPlanReconcilesProjectOnlyTargets(t *testin
 	}}})
 
 	Equals(t, 1, len(results))
+	Equals(t, "apps/app", results[0].Path)
+	Equals(t, events.DefaultWorkspace, results[0].Workspace)
+	Equals(t, models.RemediationStatusRunning, results[0].Status)
+
+	results = mergeApplyRemediationResults(results, &command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectName: "app",
+		RepoRelDir:  "apps/app",
+		Workspace:   events.DefaultWorkspace,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			ApplySuccess: "success",
+		},
+	}}})
+	Equals(t, 1, len(results))
+	Equals(t, models.RemediationStatusSuccess, results[0].Status)
+}
+
+func TestProjectRemediationResultsFromPlanReconcilesPathOnlyTargets(t *testing.T) {
+	results := projectRemediationResultsFromPlan([]models.ProjectDrift{{
+		Path:      "apps/app",
+		Workspace: events.DefaultWorkspace,
+	}}, &command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectName: "app",
+		RepoRelDir:  "apps/app",
+		Workspace:   events.DefaultWorkspace,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+		},
+	}}})
+
+	Equals(t, 1, len(results))
+	Equals(t, "app", results[0].ProjectName)
 	Equals(t, "apps/app", results[0].Path)
 	Equals(t, events.DefaultWorkspace, results[0].Workspace)
 	Equals(t, models.RemediationStatusRunning, results[0].Status)

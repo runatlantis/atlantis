@@ -2389,6 +2389,68 @@ func TestAPIController_DetectDrift_PartialProjectFailure(t *testing.T) {
 	Equals(t, true, stored["ok"].Drift.HasDrift)
 }
 
+func TestAPIController_DetectDrift_StorageFailureIsProjectError(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "stored",
+				RepoRelDir:  "stored",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.Plan,
+				ProjectName: "unstored",
+				RepoRelDir:  "unstored",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			projectDrift := args[1].(models.ProjectDrift)
+			if projectDrift.ProjectName == "unstored" {
+				return ReturnValues{errors.New("store unavailable")}
+			}
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"all"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusMultiStatus, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 2, result.Summary.TotalProjects)
+	Equals(t, 1, result.Summary.ProjectsWithErrors)
+	var unstored controllers.DriftProjectAPI
+	for _, project := range result.Projects {
+		if project.ProjectName == "unstored" {
+			unstored = project
+			break
+		}
+	}
+	Assert(t, strings.Contains(unstored.Error, "storing drift result: store unavailable"), "expected storage error, got %q", unstored.Error)
+	Equals(t, true, unstored.HasDrift)
+}
+
 func TestAPIController_DetectDrift_PolicyCheckContextsUsePolicyRunner(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -2443,6 +2505,7 @@ func TestAPIController_DetectDrift_FullDetectionRemovesStaleSameRefRecords(t *te
 		Path:        "stale",
 		Workspace:   events.DefaultWorkspace,
 		Ref:         "main",
+		BaseBranch:  "main",
 		LastChecked: time.Now(),
 	}))
 	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
@@ -2450,6 +2513,7 @@ func TestAPIController_DetectDrift_FullDetectionRemovesStaleSameRefRecords(t *te
 		Path:        "other-ref",
 		Workspace:   events.DefaultWorkspace,
 		Ref:         "dev",
+		BaseBranch:  "dev",
 		LastChecked: time.Now(),
 	}))
 

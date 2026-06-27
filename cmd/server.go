@@ -680,7 +680,7 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	EnableDriftDetectionFlag: {
-		description:  "Enable read-only drift detection API endpoints.",
+		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
 		defaultValue: false,
 	},
 	EnableDriftRemediationFlag: {

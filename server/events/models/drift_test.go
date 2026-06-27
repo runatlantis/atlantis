@@ -321,7 +321,11 @@ func TestDriftDetectionRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *test
 	}{
 		{name: "sha", ref: "0123456789abcdef0123456789abcdef01234567"},
 		{name: "tag ref", ref: "refs/tags/v1.0.0"},
-		{name: "bare tag", ref: "v1.0.0"},
+		{name: "tag ref without semver", ref: "refs/tags/prod"},
+		{name: "bare semver tag", ref: "v1.0.0"},
+		{name: "ambiguous prod ref", ref: "prod"},
+		{name: "ambiguous latest ref", ref: "latest"},
+		{name: "ambiguous stable ref", ref: "stable"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			request := models.DriftDetectionRequest{
@@ -340,11 +344,15 @@ func TestDriftDetectionRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *test
 }
 
 func TestDriftDetectionRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.T) {
-	request := models.DriftDetectionRequest{
-		Repository: "owner/repo",
-		Ref:        "main",
-		Type:       "Github",
-	}
+	for _, ref := range []string{"main", "master", "develop", "release/1.2", "feature/foo"} {
+		t.Run(ref, func(t *testing.T) {
+			request := models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        ref,
+				Type:       "Github",
+			}
 
-	Equals(t, 0, len(request.Validate()))
+			Equals(t, 0, len(request.Validate()))
+		})
+	}
 }
