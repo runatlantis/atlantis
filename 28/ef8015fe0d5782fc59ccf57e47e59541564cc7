@@ -1,0 +1,84 @@
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_f1e84b32faa9ac 44-46,59-71,74-75
+  s_243a1a1edc15e5::t_24017991765ef8 180
+  s_243a1a1edc15e5::t_957a99231b9748 72-73
+  s_243a1a1edc15e5::t_e64f4207aab8b5 76-78
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_2e7ed9dcd1e4a9 146-151,286-296,302-307,342,413
+  s_243a1a1edc15e5::t_9ddcddc53d5a60 267-282,284-285,343-405,408-409,411-412,414,416-417,420,429,441
+  s_243a1a1edc15e5::t_511a33b31fb6f1 204,213,283,406-407,410,415,418-419,421
+server/controllers/api_types_summary_test.go
+  s_243a1a1edc15e5::t_9ddcddc53d5a60 1-51
+server/events/command/project_result.go
+  s_243a1a1edc15e5::t_c4535def380995 6
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_d65b0eed364dbf 285-407,509-557,866-867,872-896,912-914
+  s_243a1a1edc15e5::t_b80cc19f1b438c 558,854,868-871,897-907
+  s_243a1a1edc15e5::t_4058e939d86629 559
+  s_243a1a1edc15e5::t_acd1f1c5fe8161 908
+runatlantis.io/docs/server-configuration.md
+  s_243a1a1edc15e5::t_626d699ecada71 627
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_24017991765ef8 74
+  s_243a1a1edc15e5::t_c1c182a659feda 85-86,123-127
+  s_243a1a1edc15e5::t_0094ae4ace7251 128
+server/core/drift/storage.go
+  s_243a1a1edc15e5::t_8f0dcb17cbbe5d 51-53,63,132
+  s_243a1a1edc15e5::t_497274f01137ee 133-134
+server/events/command/project_result_test.go
+  s_243a1a1edc15e5::t_582b958c721d0b 309,320,414,417-419
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_9fb782e6ec60cb 450-453,481-484,491-549
+  s_243a1a1edc15e5::t_c31721a2a99033 353,407
+  s_243a1a1edc15e5::t_d65b0eed364dbf 1100
+  s_243a1a1edc15e5::t_3a6b8829a7bdb7 1691-1692
+  s_243a1a1edc15e5::t_8ef7b8e8d0dfe3 682-684
+  s_243a1a1edc15e5::t_3c04a14f17e457 656-659,661-670
+  s_243a1a1edc15e5::t_9415b0be0aaf3c 485-490
+  s_243a1a1edc15e5::t_74d761ae561f5f 1591,1600
+  s_243a1a1edc15e5::t_ed2e98c3541cff 550,1706,1857
+server/controllers/api_types.go
+  s_243a1a1edc15e5::t_065711b77453ba 254,260-262,268,298,304-306,312
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_e386518e210456 35,52-74
+server/core/drift/storage_test.go
+  s_243a1a1edc15e5::t_9ddcddc53d5a60 325-393
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_4629d6e0270728 324,341-349
+  s_243a1a1edc15e5::t_09f9faa6a1e53c 350
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_a8283d1a214ee0 311
+  s_243a1a1edc15e5::t_dd5231b0e705e6 587,945-953
+  s_243a1a1edc15e5::t_626d699ecada71 299-309,328-331,363-376,599,965
+  s_243a1a1edc15e5::t_af8ac29069b5b3 310
+  s_243a1a1edc15e5::t_7fe6e702d448af 377-379
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_c2170da2b363df 167,173
+  s_243a1a1edc15e5::t_265047527adb37 211,230-252,257,272,283,313-319,332-343,359-371,373-374
+  s_243a1a1edc15e5::t_2c2b643a6cbdd4 372
+server/events/command/result_test.go
+  s_243a1a1edc15e5::t_2e7ed9dcd1e4a9 130-131,149
+  s_243a1a1edc15e5::t_4ab18a07113e87 157,206-208,237,240-242
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_7dae736c840453 739,741,743,756-758,763-765
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_c089daa82ba9a1 173-175,204
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_06808a45377022 139-140,381-382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "28ef8015fe0d5782fc59ccf57e47e59541564cc7",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
