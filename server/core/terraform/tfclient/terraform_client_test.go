@@ -285,6 +285,46 @@ func TestRunCommandWithVersion_DLsTF(t *testing.T) {
 	Equals(t, "\nTerraform v99.99.99\n\n", output)
 }
 
+func TestRunCommandWithVersion_RedownloadsBrokenManagedBinary(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+
+	binPath := filepath.Join(binDir, "terraform99.99.99")
+	Ok(t, writeExecutable(binPath, "exit 1"))
+
+	mockDownloader := mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	When(mockDownloader.Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)).Then(func(params []Param) ReturnValues {
+		binPath := filepath.Join(params[1].(string), "terraform99.99.99")
+		err := writeExecutable(binPath, "echo '\nTerraform v99.99.99\n'")
+		return []ReturnValue{binPath, err}
+	})
+
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, true, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	output, err := c.RunCommandWithVersion(ctx, tmp, []string{"terraform", "init"}, map[string]string{}, distribution, v, "")
+
+	Assert(t, err == nil, "err: %s: %s", err, output)
+	Equals(t, "\nTerraform v99.99.99\n\n", output)
+	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
+}
+
 // Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
