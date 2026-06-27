@@ -7,6 +7,7 @@ package tfclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -329,6 +330,7 @@ func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Dis
 		v = c.defaultVersion
 	}
 
+	d = c.effectiveDistribution(d)
 	_, err := ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 	if err != nil {
 		return err
@@ -408,6 +410,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 		binPath = c.overrideTF
 	} else {
 		var err error
+		d = c.effectiveDistribution(d)
 		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 		if err != nil {
 			return "", nil, err
@@ -432,6 +435,13 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	envVars = append(envVars, os.Environ()...)
 	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
 	return tfCmd, envVars, nil
+}
+
+func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terraform.Distribution {
+	if d != nil {
+		return d
+	}
+	return c.distribution
 }
 
 // RunCommandAsync runs terraform with args. It immediately returns an
@@ -490,6 +500,10 @@ func ensureVersion(
 	downloadsAllowed bool,
 	redownloadOnFailedExecution bool,
 ) (string, error) {
+	if dist == nil {
+		return "", errors.New("terraform distribution is nil")
+	}
+
 	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, versionLocks, versionsLock, v, binDir, downloadURL, downloadsAllowed)
 	if err != nil {
 		return "", err
