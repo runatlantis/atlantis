@@ -111,6 +111,8 @@ Example payload:
 }
 ```
 
+For apply events from pull requests, `Pull.HeadBranch` is the source branch from the pull request and `Pull.Body` is the pull request description when the VCS provider supplies one.
+
 ## Using Slack hooks
 
 For this you'll need to:
@@ -150,3 +152,5 @@ webhooks:
   kind: slack
   channel: my-channel-id
 ```
+
+Slack apply messages for pull requests include a `Branch` field using the pull request head branch, and include a `Description` field when the pull request has a description.
