@@ -1,0 +1,41 @@
+server/events/command_runner_test.go
+  s_1475eaaa18ac58::t_40f6f4c72c5ecd 1140-1143,1145-1157,1164-1165,1169-1213
+  s_1475eaaa18ac58::t_8f92963fa63b70 1214
+  s_1475eaaa18ac58::t_a149586b776d67 75,194
+server/events/apply_command_runner.go
+  s_1475eaaa18ac58::t_d5bed125a5d181 188-192
+  s_1475eaaa18ac58::t_f5f91195a54b9b 185-187
+  s_1475eaaa18ac58::t_8932b14feef4ac 193-194
+  s_1475eaaa18ac58::t_295bd73c697b29 7-8,32,50,55-68
+runatlantis.io/docs/server-configuration.md
+  s_1475eaaa18ac58::t_512c4b6429a169 479-481
+  s_1475eaaa18ac58::t_1f7e9992c9e8c1 476-478
+  s_1475eaaa18ac58::t_b8d6d28cb3680e 482-484
+  s_1475eaaa18ac58::t_b4c7fbd9b2bcce 485
+cmd/server.go
+  s_1475eaaa18ac58::t_111d1f0950e505 73,299-302
+cmd/server_test.go
+  s_1475eaaa18ac58::t_580fddf96fb8ef 160
+server/controllers/events/events_controller_e2e_test.go
+  s_1475eaaa18ac58::t_6b40de6206dc38 1442,1634
+server/server.go
+  s_1475eaaa18ac58::t_3c86b6bb102cf6 842
+server/user_config.go
+  s_1475eaaa18ac58::t_5bca6b2cfe7d7a 45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "6d166df9b895bcb18a7ff9dcdb61affa1dd12c9e",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
