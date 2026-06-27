@@ -746,7 +746,7 @@ func getVersion(tfBinary string, binName string) (*version.Version, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCommandTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, tfBinary, "version") // #nosec
-	cmd.Env = append(os.Environ(), "CHECKPOINT_DISABLE=1")
+	cmd.Env = terraformVersionEnv(os.Environ())
 	versionOutBytes, err := cmd.Output()
 	versionOutput := string(versionOutBytes)
 	if ctx.Err() == context.DeadlineExceeded {
@@ -760,6 +760,18 @@ func getVersion(tfBinary string, binName string) (*version.Version, error) {
 		return nil, fmt.Errorf("could not parse %s version from %s", binName, versionOutput)
 	}
 	return version.NewVersion(match[1])
+}
+
+func terraformVersionEnv(env []string) []string {
+	out := make([]string, 0, len(env)+3)
+	for _, envVar := range env {
+		key, _, ok := strings.Cut(envVar, "=")
+		if ok && (key == "CHECKPOINT_DISABLE" || key == "TF_CLI_ARGS" || key == "TF_CLI_ARGS_version") {
+			continue
+		}
+		out = append(out, envVar)
+	}
+	return append(out, "CHECKPOINT_DISABLE=1", "TF_CLI_ARGS=", "TF_CLI_ARGS_version=")
 }
 
 // rcFileContents is a format string to be used with Sprintf that can be used

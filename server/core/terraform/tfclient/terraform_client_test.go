@@ -355,6 +355,48 @@ func TestRunCommandWithVersion_UsesClientDistributionWhenArgNil(t *testing.T) {
 	Equals(t, "\nTerraform v99.99.99\n\n", output)
 }
 
+func TestRunCommandWithVersion_ValidatesVersionWithoutInheritedCLIArgs(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo 'Terraform v0.11.10'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+	defer tempSetEnv(t, "TF_CLI_ARGS", "-json")()
+	defer tempSetEnv(t, "TF_CLI_ARGS_version", "-json")()
+
+	v, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+	Ok(t, writeExecutable(filepath.Join(binDir, "terraform99.99.99"), `if [ "$1" = "version" ]; then
+	if [ -n "${TF_CLI_ARGS:-}" ] || [ -n "${TF_CLI_ARGS_version:-}" ]; then
+		echo "poisoned cli args"
+		exit 1
+	fi
+	echo 'Terraform v99.99.99'
+	exit 0
+fi
+echo ran "$1"`))
+
+	mockDownloader := mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, false, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	output, err := c.RunCommandWithVersion(ctx, tmp, []string{"plan"}, map[string]string{}, distribution, v, "")
+
+	Assert(t, err == nil, "err: %s: %s", err, output)
+	Equals(t, "ran plan\n", output)
+	mockDownloader.VerifyWasCalled(Never())
+}
+
 func TestRunCommandWithVersion_DoesNotHoldVersionLockDuringValidation(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tmp, binDir, cacheDir := mkSubDirs(t)
