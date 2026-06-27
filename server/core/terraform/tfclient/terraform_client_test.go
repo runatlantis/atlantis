@@ -325,6 +325,85 @@ func TestRunCommandWithVersion_RedownloadsBrokenManagedBinary(t *testing.T) {
 	mockDownloader.VerifyWasCalledEventually(Once(), 2*time.Second).Install(context.Background(), binDir, cmd.DefaultTFDownloadURL, v)
 }
 
+func TestRunCommandWithVersion_DoesNotHoldVersionLockDuringValidation(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	tmp, binDir, cacheDir := mkSubDirs(t)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+
+	pathDir := filepath.Join(tmp, "path")
+	Ok(t, os.MkdirAll(pathDir, 0700))
+	Ok(t, writeExecutable(filepath.Join(pathDir, "terraform"), "echo '\nTerraform v0.11.10\n'"))
+	defer tempSetEnv(t, "PATH", fmt.Sprintf("%s:%s", pathDir, os.Getenv("PATH")))()
+
+	slowVersion, err := version.NewVersion("99.99.99")
+	Ok(t, err)
+	fastVersion, err := version.NewVersion("98.98.98")
+	Ok(t, err)
+
+	startedFile := filepath.Join(tmp, "slow-validation-started")
+	Ok(t, writeExecutable(
+		filepath.Join(binDir, "terraform99.99.99"),
+		fmt.Sprintf("printf started > %q\nsleep 2\nexit 1", startedFile),
+	))
+	Ok(t, writeExecutable(filepath.Join(binDir, "terraform98.98.98"), "echo '\nTerraform v98.98.98\n'"))
+
+	mockDownloader := mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+	c, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", cmd.DefaultTFVersionFlag, cmd.DefaultTFDownloadURL, false, true, projectCmdOutputHandler)
+	Ok(t, err)
+
+	slowDone := make(chan error, 1)
+	go func() {
+		_, err := c.RunCommandWithVersion(ctx, tmp, []string{"version"}, map[string]string{}, distribution, slowVersion, "")
+		slowDone <- err
+	}()
+	waitForFile(t, startedFile, time.Second)
+
+	fastDone := make(chan error, 1)
+	go func() {
+		output, err := c.RunCommandWithVersion(ctx, tmp, []string{"version"}, map[string]string{}, distribution, fastVersion, "")
+		if err != nil {
+			fastDone <- err
+			return
+		}
+		if output != "\nTerraform v98.98.98\n\n" {
+			fastDone <- fmt.Errorf("unexpected output: %q", output)
+			return
+		}
+		fastDone <- nil
+	}()
+
+	var fastErr error
+	timedOut := false
+	select {
+	case fastErr = <-fastDone:
+	case <-time.After(750 * time.Millisecond):
+		timedOut = true
+	}
+
+	var slowErr error
+	select {
+	case slowErr = <-slowDone:
+	case <-time.After(3 * time.Second):
+		t.Fatal("slow validation did not finish")
+	}
+	ErrContains(t, "failed to execute", slowErr)
+
+	if timedOut {
+		select {
+		case fastErr = <-fastDone:
+		case <-time.After(time.Second):
+		}
+		t.Fatalf("second Terraform command blocked behind slow version validation: %v", fastErr)
+	}
+	Ok(t, fastErr)
+}
+
 // Test that EnsureVersion downloads terraform.
 func TestEnsureVersion_downloaded(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -549,6 +628,18 @@ func tempSetEnv(t *testing.T, key string, value string) func() {
 
 func writeExecutable(path string, body string) error {
 	return os.WriteFile(path, []byte("#!/bin/sh\n"+body), 0700) // #nosec G306
+}
+
+func waitForFile(t *testing.T, path string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", path)
 }
 
 // returns parent, bindir, cachedir
