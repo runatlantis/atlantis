@@ -1828,6 +1828,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 		ExpNoProjects      bool
 		ExpSkipFileList    bool
 		ExpProjectNames    []string
+		ExpCloneWorkspaces []string
 	}{
 		{
 			Description: "planning a file outside of the changed files",
@@ -1975,6 +1976,42 @@ projects:
 			ExpProjectNames: []string{"cicd/shared"},
 		},
 		{
+			Description: "planning a regexp project with non-default workspace clones the workspace before returning",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "staging",
+				ProjectName: ".*/shared",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+  workspace: staging
+- name: cicd/shared
+  dir: layers/cicd/shared
+  workspace: staging
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles:      []string{"layers/cicd/shared/main.tf"},
+			ExpProjectNames:    []string{"cicd/shared"},
+			ExpCloneWorkspaces: []string{"default", "staging"},
+		},
+		{
 			Description: "planning a regexp project outside of the changed files",
 			Cmd: events.CommentCommand{
 				Name:        command.Plan,
@@ -2083,6 +2120,10 @@ projects:
 				return
 			}
 			Ok(t, err)
+			if len(c.ExpCloneWorkspaces) > 0 {
+				_, _, _, cloneWorkspaces := workingDir.VerifyWasCalled(Times(len(c.ExpCloneWorkspaces))).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]()).GetAllCapturedArguments()
+				Equals(t, c.ExpCloneWorkspaces, cloneWorkspaces)
+			}
 			if len(c.ExpProjectNames) == 0 {
 				Equals(t, 1, len(actCtxs))
 				return

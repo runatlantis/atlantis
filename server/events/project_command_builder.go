@@ -849,14 +849,14 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, ErrIgnoredTargetedDir
 	}
 
+	var restrictedRegexProjects []valid.Project
+	var restrictedRegexRepoCfg *valid.RepoCfg
 	if p.RestrictFileList {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
 			return nil, err
 		}
-		var restrictedRegexProjects []valid.Project
-		var restrictedRegexRepoCfg *valid.RepoCfg
 
 		if p.IncludeGitUntrackedFiles {
 			ctx.Log.Debug(("'include-git-untracked-files' option is set, getting untracked files"))
@@ -906,20 +906,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 				restrictedRegexRepoCfg = &repoConfig
 			}
 		}
-		if restrictedRegexRepoCfg != nil {
-			return p.buildProjectCommandCtxWithCfg(
-				ctx,
-				command.Plan,
-				"",
-				cmd.Flags,
-				defaultRepoDir,
-				repoRelDir,
-				workspace,
-				cmd.Verbose,
-				restrictedRegexProjects,
-				restrictedRegexRepoCfg,
-			)
-		}
 	}
 
 	if DefaultWorkspace != workspace {
@@ -928,6 +914,20 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		if err != nil {
 			return pcc, err
 		}
+	}
+	if restrictedRegexRepoCfg != nil {
+		return p.buildProjectCommandCtxWithCfg(
+			ctx,
+			command.Plan,
+			"",
+			cmd.Flags,
+			defaultRepoDir,
+			repoRelDir,
+			workspace,
+			cmd.Verbose,
+			restrictedRegexProjects,
+			restrictedRegexRepoCfg,
+		)
 	}
 
 	return p.buildProjectCommandCtx(
