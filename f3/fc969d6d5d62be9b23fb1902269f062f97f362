@@ -1,0 +1,27 @@
+server/events/project_command_builder_test.go
+  s_1475eaaa18ac58::t_fa752683f5d725 1977-2009
+  s_1475eaaa18ac58::t_e7c3920a42f15c 1826,1830,1944-1976,2051,2086-2095,2100-2173
+  s_1475eaaa18ac58::t_686cfd1578dbb3 2174-2175
+runatlantis.io/docs/server-configuration.md
+  s_1475eaaa18ac58::t_744dde324a05f7 643,1412
+server/events/project_command_builder.go
+  s_1475eaaa18ac58::t_0f51fdc38a8b7c 858-859,896,901-921
+  s_1475eaaa18ac58::t_91389dfd6d780c 1158-1170
+  s_1475eaaa18ac58::t_8c4904c86404e9 1272-1302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "f3fc969d6d5d62be9b23fb1902269f062f97f362",
+  "prompts": {},
+  "sessions": {
+    "s_1475eaaa18ac58": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff30-1211-7fc3-afde-a939642409a3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
