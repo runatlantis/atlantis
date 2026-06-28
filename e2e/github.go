@@ -191,8 +191,13 @@ func (g GithubClient) CreatePullRequest(ctx context.Context, title, branchName s
 }
 
 // GetAtlantisStatus checks all commit statuses matching the given prefix.
-// It returns "success" only when all matching statuses report success.
-// If expectedCount > 0, it waits until exactly that many statuses appear.
+// When expectedCount > 0, enforces exact match:
+//   - 0 matched → "" (not started)
+//   - fewer than expected → "pending"
+//   - more than expected → "unexpected_count" (terminal failure)
+//   - exactly expected → aggregate individual states
+//
+// When expectedCount == 0, at least one matching status must succeed.
 func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string, statusPrefix string, expectedCount int) (string, error) {
 	combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
 	if err != nil {
@@ -210,9 +215,19 @@ func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string, 
 		return "", nil
 	}
 
-	// If we expect a specific count, don't report terminal until we have them all.
-	if expectedCount > 0 && len(matched) < expectedCount {
-		return "pending", nil
+	if expectedCount > 0 {
+		if len(matched) < expectedCount {
+			return "pending", nil
+		}
+		if len(matched) > expectedCount {
+			var contexts []string
+			for _, s := range matched {
+				contexts = append(contexts, s.GetContext())
+			}
+			log.Printf("unexpected status count: got %d, expected %d. Contexts: %v",
+				len(matched), expectedCount, contexts)
+			return "unexpected_count", nil
+		}
 	}
 
 	hasFailure := false
@@ -237,6 +252,22 @@ func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string, 
 	return "success", nil
 }
 
+// GetPRComments returns all issue comment bodies on the pull request.
+// Atlantis posts plan/apply output as issue comments on GitHub.
+func (g GithubClient) GetPRComments(ctx context.Context, pullNumber int) ([]string, error) {
+	comments, _, err := g.client.Issues.ListComments(ctx, g.ownerName, g.repoName, pullNumber, &github.IssueListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing PR comments: %w", err)
+	}
+	var bodies []string
+	for _, c := range comments {
+		bodies = append(bodies, c.GetBody())
+	}
+	return bodies, nil
+}
+
 func (g GithubClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
 	_, _, err := g.client.PullRequests.Edit(ctx, g.ownerName, g.repoName, pullRequestNumber, &github.PullRequest{State: github.Ptr("closed")})
 	if err != nil {
@@ -255,7 +286,7 @@ func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error
 }
 
 func (g GithubClient) IsAtlantisInProgress(state string) bool {
-	for _, s := range []string{"success", "error", "failure"} {
+	for _, s := range []string{"success", "error", "failure", "unexpected_count"} {
 		if state == s {
 			return false
 		}
@@ -268,5 +299,5 @@ func (g GithubClient) DidAtlantisSucceed(state string) bool {
 }
 
 func (g GithubClient) DidAtlantisFail(state string) bool {
-	return state == "failure" || state == "error"
+	return state == "failure" || state == "error" || state == "unexpected_count"
 }

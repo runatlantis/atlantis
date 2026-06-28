@@ -109,9 +109,9 @@ func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName s
 	return mr.WebURL, mr.IID, nil
 }
 
-// GetAtlantisStatus for GitLab uses pipeline status which already aggregates all jobs.
-// The statusPrefix and expectedCount params are accepted for interface compatibility
-// but GitLab pipelines inherently represent the aggregate result.
+// GetAtlantisStatus for GitLab uses pipeline status which aggregates all jobs.
+// GitLab pipelines cannot distinguish per-project plan counts, so
+// expectedCount is ignored. Count-sensitive cases must use VCSGitHub.
 func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string, statusPrefix string, expectedCount int) (string, error) {
 	pipelineInfos, _, err := g.client.MergeRequests.ListMergeRequestPipelines(g.projectId, g.branchToMR[branchName])
 	if err != nil {
@@ -120,14 +120,31 @@ func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string, 
 	if len(pipelineInfos) == 0 {
 		return "", nil
 	}
-	// Use the most recent pipeline.
-	pipelineInfo := pipelineInfos[len(pipelineInfos)-1]
+	// GitLab returns pipelines newest-first (descending ID order).
+	// Use the first entry to get the most recent pipeline.
+	pipelineInfo := pipelineInfos[0]
 	pipeline, _, err := g.client.Pipelines.GetPipeline(g.projectId, pipelineInfo.ID)
 	if err != nil {
 		return "", err
 	}
 
 	return pipeline.Status, nil
+}
+
+// GetPRComments returns all MR note bodies for the merge request.
+// Atlantis posts plan/apply output as MR notes on GitLab.
+func (g GitlabClient) GetPRComments(ctx context.Context, pullNumber int) ([]string, error) {
+	notes, _, err := g.client.Notes.ListMergeRequestNotes(g.projectId, pullNumber, &gitlab.ListMergeRequestNotesOptions{
+		ListOptions: gitlab.ListOptions{PerPage: 100},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing MR notes: %w", err)
+	}
+	var bodies []string
+	for _, n := range notes {
+		bodies = append(bodies, n.Body)
+	}
+	return bodies, nil
 }
 
 func (g GitlabClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {

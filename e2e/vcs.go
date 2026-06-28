@@ -13,8 +13,11 @@ type VCSClient interface {
 	CreatePullRequest(ctx context.Context, title, branchName string) (string, int, error)
 	// GetAtlantisStatus returns the aggregate state of all commit statuses
 	// matching the given prefix. Returns "success" only when all matched
-	// statuses succeed. expectedCount=0 means "at least one."
+	// statuses succeed. If expectedCount > 0, fails when the actual count
+	// differs (too few = pending, too many = "unexpected_count").
 	GetAtlantisStatus(ctx context.Context, branchName string, statusPrefix string, expectedCount int) (string, error)
+	// GetPRComments returns all comment bodies on the PR/MR.
+	GetPRComments(ctx context.Context, pullNumber int) ([]string, error)
 	ClosePullRequest(ctx context.Context, pullRequestNumber int) error
 	DeleteBranch(ctx context.Context, branchName string) error
 	IsAtlantisInProgress(state string) bool

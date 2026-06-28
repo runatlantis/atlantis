@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -127,10 +128,15 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	}
 
 	state := "not started"
+	var statusErr error
 	i := 0
 	for ; i < maxPolls && t.vcsClient.IsAtlantisInProgress(state); i++ {
 		time.Sleep(pollInterval)
-		state, _ = t.vcsClient.GetAtlantisStatus(ctx, branchName, statusPrefix, tc.ExpectedStatusCount)
+		state, statusErr = t.vcsClient.GetAtlantisStatus(ctx, branchName, statusPrefix, tc.ExpectedStatusCount)
+		if statusErr != nil {
+			log.Printf("[%s] error polling status: %v", tc.Name, statusErr)
+			continue
+		}
 		if state == "" {
 			log.Printf("[%s] atlantis run hasn't started yet", tc.Name)
 			continue
@@ -138,7 +144,11 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 		log.Printf("[%s] atlantis status: %s", tc.Name, state)
 	}
 	if i == maxPolls {
-		state = "timed out"
+		if statusErr != nil {
+			state = fmt.Sprintf("timed out (last error: %v)", statusErr)
+		} else {
+			state = "timed out"
+		}
 	}
 
 	log.Printf("[%s] final status: %q", tc.Name, state)
@@ -155,7 +165,28 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 		}
 	}
 
+	// Assert expected comment substring if configured.
+	if tc.ExpectedCommentSubstring != "" {
+		if err := assertCommentContains(ctx, t.vcsClient, pullID, tc.Name, tc.ExpectedCommentSubstring); err != nil {
+			return result, err
+		}
+	}
+
 	return result, nil
+}
+
+func assertCommentContains(ctx context.Context, client VCSClient, pullNumber int, caseName, expected string) error {
+	comments, err := client.GetPRComments(ctx, pullNumber)
+	if err != nil {
+		return fmt.Errorf("[%s] failed to fetch comments for marker assertion: %v", caseName, err)
+	}
+	for _, body := range comments {
+		if strings.Contains(body, expected) {
+			log.Printf("[%s] found expected marker in comment: %q", caseName, expected)
+			return nil
+		}
+	}
+	return fmt.Errorf("[%s] expected comment containing %q not found in %d comments", caseName, expected, len(comments))
 }
 
 func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchName string) error {

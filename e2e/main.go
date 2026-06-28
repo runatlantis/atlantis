@@ -123,7 +123,7 @@ func runCases(ctx context.Context, vcsClient VCSClient, hookID int64, cloneDirRo
 	var results []*E2EResult
 	var testErrors *multierror.Error
 
-	defer vcsClient.DeleteAtlantisHook(ctx, hookID) //nolint: errcheck
+	defer vcsClient.DeleteAtlantisHook(ctx, hookID) // nolint: errcheck
 
 	for _, tc := range cases {
 		log.Printf("━━━ starting: %s ━━━", tc.Name)
