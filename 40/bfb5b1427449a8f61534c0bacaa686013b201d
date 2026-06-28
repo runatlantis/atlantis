@@ -1,0 +1,37 @@
+.github/workflows/go-lint.yml
+  s_cb1708bb6cf5d5::t_89b20b90ebe2f7 87
+  s_cb1708bb6cf5d5::t_354c1898956e17 78
+  s_cb1708bb6cf5d5::t_13e6f8ab2113c3 44-47,63,74-77,79-86
+e2e/github.go
+  s_cb1708bb6cf5d5::t_ce3ce4b499ac4c 90
+  s_cb1708bb6cf5d5::t_d71b06f58716e8 263
+  s_cb1708bb6cf5d5::t_8e46ea50446da8 14
+  s_cb1708bb6cf5d5::t_5ceb7363de426c 71
+e2e/gitlab.go
+  s_cb1708bb6cf5d5::t_96a86f69971d6c 13
+  s_cb1708bb6cf5d5::t_109d6ef3fe20bb 181
+e2e/main.go
+  s_cb1708bb6cf5d5::t_6bf51e0de32c3a 152,158,161-178,190,192-195,197-214,216-217,219-225,228-231,233-235,237-246
+  s_cb1708bb6cf5d5::t_ddd00897be9889 13-14,50-52,61,151,153-157,159-160,179-189,191,196,215,218,226-227,232,236,247
+e2e/main_test.go
+  s_cb1708bb6cf5d5::t_bd7a92c59255ee 1-165
+e2e/e2e.go
+  s_cb1708bb6cf5d5::t_d29b0b28dfa5bf 83
+  s_cb1708bb6cf5d5::t_c2945ce7b4f723 95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "40bfb5b1427449a8f61534c0bacaa686013b201d",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": null
+    }
+  }
+}
