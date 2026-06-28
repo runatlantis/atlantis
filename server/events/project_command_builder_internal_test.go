@@ -601,7 +601,7 @@ projects:
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
-				AutoplanWhenModified: []string{"**/*.tf*", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				AutoplanWhenModified: []string{"**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
 				HeadRepo:             models.Repo{},
 				Log:                  logger,
 				Scope:                statsScope,

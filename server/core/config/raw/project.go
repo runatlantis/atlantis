@@ -26,10 +26,12 @@ const (
 )
 
 // terraformProjectIndicators are configuration files that suggest a directory
-// should be treated as a Terraform/Terragrunt project.
+// should be treated as a Terraform/Terragrunt/OpenTofu project.
 var terraformProjectIndicators = []string{
 	"*.tf",
 	"*.tf.json",
+	"*.tofu",
+	"*.tofu.json",
 	"terragrunt.hcl",
 }
 

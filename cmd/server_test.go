@@ -1375,3 +1375,10 @@ func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
 	Ok(t, err)
 	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
 }
+
+func TestDefaultAutoplanFileList_ContainsExpectedPatterns(t *testing.T) {
+	// Pin the public server default independently of the constant.
+	// If a pattern is accidentally removed, this test fails.
+	expected := "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	Equals(t, expected, DefaultAutoplanFileList)
+}

@@ -181,9 +181,10 @@ Notes:
 - Accepts a comma separated list, ex. `pattern1,pattern2`.
 - Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 - List of file patterns will be used by both automatic and manually run plans.
-- When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
-   (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
+- When not set, defaults to all `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
+   (`--autoplan-file-list='**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
 - Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+- The default is global (not distribution-aware). Both Terraform and OpenTofu installs will match `.tofu` changes. If you do not use OpenTofu, you can override the default to exclude `.tofu` patterns.
 - A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
 Examples:
@@ -211,6 +212,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: tip NOTE
+Module dependency indexing uses Terraform config inspection and may not fully support `.tofu` / `.tofu.json` files. Module calls defined only in `.tofu` files or shared module directories containing only `.tofu` files may not be traced. Direct file-change autoplanning for `.tofu` projects works regardless. Use explicit `autoplan.when_modified` patterns as a workaround. See [OpenTofu .tofu file support](terraform-versions.md#opentofu-tofu-file-support) for details.
+:::
 
 ### `--autoplan-modules-from-projects` <Badge text="v0.26.0+" type="info"/>
 

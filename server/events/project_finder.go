@@ -5,7 +5,6 @@
 package events
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -340,8 +339,8 @@ func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 		modulesSplit := strings.SplitN(dirWithTrailingSlash, "modules/", 2)
 		modulesParent := modulesSplit[0]
 
-		// Now we check whether there is a main.tf in the parent.
-		if _, err := fs.Stat(files, filepath.Join(modulesParent, "main.tf")); errors.Is(err, fs.ErrNotExist) {
+		// Check whether the parent contains a Terraform/OpenTofu project file.
+		if !hasProjectIndicator(files, modulesParent) {
 			return ""
 		}
 		return path.Clean(modulesParent)
@@ -354,6 +353,35 @@ func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 
 func isModule(dir string) bool {
 	return strings.Contains("/"+dir+"/", "/modules/")
+}
+
+// hasProjectIndicator checks whether a directory in the given filesystem
+// contains a Terraform/OpenTofu/Terragrunt project file. Aligned with
+// raw.IsTerraformProjectDir indicators: *.tf, *.tf.json, *.tofu, *.tofu.json,
+// terragrunt.hcl.
+func hasProjectIndicator(files fs.FS, dir string) bool {
+	dir = path.Clean(dir)
+	if dir == "" {
+		dir = "."
+	}
+	entries, err := fs.ReadDir(files, dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".tf") ||
+			strings.HasSuffix(name, ".tf.json") ||
+			strings.HasSuffix(name, ".tofu") ||
+			strings.HasSuffix(name, ".tofu.json") ||
+			name == "terragrunt.hcl" {
+			return true
+		}
+	}
+	return false
 }
 
 // unique de-duplicates strs.
