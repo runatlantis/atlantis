@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -69,7 +70,6 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	}
 	filePath := filepath.Join(cloneDir, tc.Dir, mutateFile)
 
-	// Ensure parent directory exists (for cases writing to subdirs).
 	if err := os.MkdirAll(filepath.Dir(filePath), 0700); err != nil {
 		return result, fmt.Errorf("failed to create parent dir for %q: %v", filePath, err)
 	}
@@ -122,17 +122,13 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	// Wait for Atlantis to receive webhook and start processing.
 	time.Sleep(initialWait)
 
-	statusPrefix := tc.StatusPrefix
-	if statusPrefix == "" {
-		statusPrefix = "atlantis/plan"
-	}
-
+	// Poll aggregate "atlantis/plan" status until terminal.
 	state := "not started"
 	var statusErr error
 	i := 0
 	for ; i < maxPolls && t.vcsClient.IsAtlantisInProgress(state); i++ {
 		time.Sleep(pollInterval)
-		state, statusErr = t.vcsClient.GetAtlantisStatus(ctx, branchName, statusPrefix, tc.ExpectedStatusCount)
+		state, statusErr = t.vcsClient.GetAtlantisStatus(ctx, branchName)
 		if statusErr != nil {
 			log.Printf("[%s] error polling status: %v", tc.Name, statusErr)
 			continue
@@ -154,7 +150,7 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	log.Printf("[%s] final status: %q", tc.Name, state)
 	result.testResult = state
 
-	// Evaluate result against expectations.
+	// Evaluate aggregate result against expectations.
 	if tc.ExpectFailure {
 		if !t.vcsClient.DidAtlantisFail(state) {
 			return result, fmt.Errorf("[%s] expected failure but got %q", tc.Name, state)
@@ -162,6 +158,13 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	} else {
 		if !t.vcsClient.DidAtlantisSucceed(state) {
 			return result, fmt.Errorf("[%s] expected success but got %q", tc.Name, state)
+		}
+	}
+
+	// Assert per-project status contexts if configured.
+	if len(tc.ExpectedStatusContexts) > 0 {
+		if err := assertProjectStatuses(ctx, t.vcsClient, branchName, tc); err != nil {
+			return result, err
 		}
 	}
 
@@ -173,6 +176,56 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	}
 
 	return result, nil
+}
+
+// assertProjectStatuses verifies that the expected per-project status contexts
+// are present and (optionally) that no unexpected project statuses exist.
+func assertProjectStatuses(ctx context.Context, client VCSClient, branchName string, tc TestCase) error {
+	projectStatuses, err := client.GetProjectStatuses(ctx, branchName)
+	if err != nil {
+		return fmt.Errorf("[%s] failed to get project statuses: %v", tc.Name, err)
+	}
+
+	// GetProjectStatuses returns nil on GitLab (unsupported).
+	if projectStatuses == nil {
+		log.Printf("[%s] skipping project status assertion (not supported on this VCS)", tc.Name)
+		return nil
+	}
+
+	// Check all expected contexts are present and successful.
+	for _, expected := range tc.ExpectedStatusContexts {
+		state, ok := projectStatuses[expected]
+		if !ok {
+			var found []string
+			for k := range projectStatuses {
+				found = append(found, k)
+			}
+			sort.Strings(found)
+			return fmt.Errorf("[%s] expected status context %q not found. Found: %v",
+				tc.Name, expected, found)
+		}
+		if state != "success" {
+			return fmt.Errorf("[%s] status context %q has state %q, expected success",
+				tc.Name, expected, state)
+		}
+	}
+
+	// Check no unexpected project statuses appear.
+	if tc.ForbidExtraProjectStatuses {
+		expectedSet := make(map[string]bool)
+		for _, e := range tc.ExpectedStatusContexts {
+			expectedSet[e] = true
+		}
+		for ctx := range projectStatuses {
+			if !expectedSet[ctx] {
+				return fmt.Errorf("[%s] unexpected project status %q (expected only %v)",
+					tc.Name, ctx, tc.ExpectedStatusContexts)
+			}
+		}
+	}
+
+	log.Printf("[%s] project status contexts verified: %v", tc.Name, tc.ExpectedStatusContexts)
+	return nil
 }
 
 func assertCommentContains(ctx context.Context, client VCSClient, pullNumber int, caseName, expected string) error {

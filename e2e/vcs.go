@@ -11,11 +11,13 @@ type VCSClient interface {
 	CreateAtlantisWebhook(ctx context.Context, hookURL string) (int64, error)
 	DeleteAtlantisHook(ctx context.Context, hookID int64) error
 	CreatePullRequest(ctx context.Context, title, branchName string) (string, int, error)
-	// GetAtlantisStatus returns the aggregate state of all commit statuses
-	// matching the given prefix. Returns "success" only when all matched
-	// statuses succeed. If expectedCount > 0, fails when the actual count
-	// differs (too few = pending, too many = "unexpected_count").
-	GetAtlantisStatus(ctx context.Context, branchName string, statusPrefix string, expectedCount int) (string, error)
+	// GetAtlantisStatus polls for plan completion. Returns aggregate terminal
+	// state across all matching statuses. Used for the polling loop only.
+	GetAtlantisStatus(ctx context.Context, branchName string) (string, error)
+	// GetProjectStatuses returns all per-project Atlantis status contexts and
+	// their states. Contexts have the form "atlantis/plan: <project>".
+	// Used for post-completion assertions. Returns nil on GitLab (unsupported).
+	GetProjectStatuses(ctx context.Context, branchName string) (map[string]string, error)
 	// GetPRComments returns all comment bodies on the PR/MR.
 	GetPRComments(ctx context.Context, pullNumber int) ([]string, error)
 	ClosePullRequest(ctx context.Context, pullRequestNumber int) error
