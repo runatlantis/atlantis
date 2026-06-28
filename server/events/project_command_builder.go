@@ -1019,13 +1019,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			if err != nil {
 				return pcc, err
 			}
+			exactAPIProjectIdentity := ctx.API && (cmd.RepoRelDir != "" || cmd.Workspace != "")
 			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
+			if exactAPIProjectIdentity {
+				repoCfgProjects = repoConfig.FindProjectsByExactName(cmd.ProjectName)
+			}
 			notFoundFiles := modifiedFilesOutsideProjects(modifiedFiles, repoCfgProjects)
 
 			if len(notFoundFiles) > 0 {
 				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
 			}
-			if p.EnableRegExpCmd && len(repoCfgProjects) > 1 {
+			if p.EnableRegExpCmd && !exactAPIProjectIdentity && len(repoCfgProjects) > 1 {
 				restrictedRegexProjects = filterProjectsByModifiedFiles(repoCfgProjects, modifiedFiles)
 				if len(restrictedRegexProjects) == 0 {
 					return pcc, fmt.Errorf("no modified files match requested project %q", cmd.ProjectName)
@@ -1099,10 +1103,10 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		if p.EnableRegExpCmd {
-			projectsCfg = repoCfg.FindProjectsByName(projectName)
-		} else if filterProjectDir || filterProjectWorkspace {
+		if filterProjectDir || filterProjectWorkspace {
 			projectsCfg = repoCfg.FindProjectsByExactName(projectName)
+		} else if p.EnableRegExpCmd {
+			projectsCfg = repoCfg.FindProjectsByName(projectName)
 		} else {
 			if p := repoCfg.FindProjectByName(projectName); p != nil {
 				projectsCfg = append(projectsCfg, *p)

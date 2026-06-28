@@ -166,8 +166,8 @@ var testFlags = map[string]any{
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
-	EnableDriftDetectionFlag:         false,
-	EnableDriftRemediationFlag:       false,
+	EnableDriftDetectionFlag:         true,
+	EnableDriftRemediationFlag:       true,
 	EnableProfilingAPI:               false,
 }
 

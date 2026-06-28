@@ -589,6 +589,7 @@ func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.
 
 			Equals(t, http.StatusOK, w.Code)
 			Assert(t, capturedCtx != nil, "expected plan command builder to be called")
+			Equals(t, 0, capturedCtx.Pull.Num)
 			Assert(t, !capturedCtx.SkipPRModifiedFiles, "synthetic no-PR legacy API commands must preserve restrict-file-list behavior")
 			Assert(t, capturedCtx.SkipAPIBaseBranchVerification, "tag refs without base_branch should preserve legacy no-PR behavior")
 		})
@@ -938,7 +939,7 @@ func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
 	planCtx, _ := projectCommandBuilder.VerifyWasCalledOnce().
 		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
 		GetCapturedArguments()
-	Assert(t, planCtx.Pull.Num < 0, "expected non-PR API plan to use a negative synthetic pull number, got %d", planCtx.Pull.Num)
+	Equals(t, 0, planCtx.Pull.Num)
 }
 
 func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
@@ -1601,7 +1602,7 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 
 	ac.DriftStorage = driftStorage
 
-	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&project=project1&path=modules/vpc&workspace=staging&ref=refs/heads/main&base_branch=refs/heads/main", nil)
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&project=project1&path=./modules/vpc/&workspace=staging&ref=refs/heads/main&base_branch=refs/heads/main", nil)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DriftStatus(w, req)
@@ -1615,6 +1616,20 @@ func TestAPIController_DriftStatus_WithFilters(t *testing.T) {
 	Equals(t, "staging", opts.Workspace)
 	Equals(t, "main", opts.Ref)
 	Equals(t, "main", opts.BaseBranch)
+}
+
+func TestAPIController_DriftStatus_InvalidPathFilter(t *testing.T) {
+	ac, _, _ := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	ac.DriftStorage = driftStorage
+
+	req, _ := http.NewRequest("GET", "?repository=owner/repo&type=Github&path=../env", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
 }
 
 func TestAPIController_DriftStatus_Empty(t *testing.T) {
@@ -1979,6 +1994,56 @@ func TestAPIController_Remediate_InvalidBaseBranchReturnsBadRequest(t *testing.T
 	Equals(t, http.StatusBadRequest, w.Code)
 	apiErr := parseAPIError(t, w.Body.Bytes())
 	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "base_branch"), "expected base_branch validation error, got %#v", apiErr.Details)
+	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
+}
+
+func TestAPIController_Remediate_InvalidRefReturnsBadRequest(t *testing.T) {
+	ac, _, _ := setup(t)
+	remediationService := driftmocks.NewMockRemediationService()
+	ac.RemediationService = remediationService
+	vcsClient := ac.VCSClient.(*MockClient)
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "refs/pull/123/head",
+		BaseBranch: "main",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/remediate", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "ref"), "expected ref validation error, got %#v", apiErr.Details)
+	vcsClient.VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
+}
+
+func TestAPIController_Remediate_InvalidWorkspaceReturnsBadRequest(t *testing.T) {
+	ac, _, _ := setup(t)
+	remediationService := driftmocks.NewMockRemediationService()
+	ac.RemediationService = remediationService
+	vcsClient := ac.VCSClient.(*MockClient)
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+		Paths:      []models.DriftDetectionPath{{Directory: "env", Workspace: "../../tmp/plan"}},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/remediate", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "paths"), "expected paths validation error, got %#v", apiErr.Details)
+	vcsClient.VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
 	remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
 }
 
@@ -2792,6 +2857,53 @@ func TestAPIController_DetectDrift_InvalidBaseBranchReturnsBadRequest(t *testing
 	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "base_branch"), "expected base_branch validation error, got %#v", apiErr.Details)
 }
 
+func TestAPIController_DetectDrift_InvalidRefReturnsBadRequest(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+	vcsClient := ac.VCSClient.(*MockClient)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "refs/pull/123/head",
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "ref"), "expected ref validation error, got %#v", apiErr.Details)
+	vcsClient.VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+func TestAPIController_DetectDrift_InvalidWorkspaceReturnsBadRequest(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+	vcsClient := ac.VCSClient.(*MockClient)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths:      []models.DriftDetectionPath{{Directory: "env", Workspace: "../../tmp/plan"}},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	apiErr := parseAPIError(t, w.Body.Bytes())
+	Assert(t, strings.Contains(fmt.Sprintf("%v", apiErr.Details), "paths"), "expected paths validation error, got %#v", apiErr.Details)
+	vcsClient.VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
 func TestAPIController_DetectDrift_SHARefUsesBaseBranchAndStoresResolvedCommit(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	ref := "0123456789abcdef0123456789abcdef01234567"
@@ -3244,6 +3356,40 @@ func TestAPIController_DetectDrift_NonFatalPreHookFailureSkipsStaleReconciliatio
 	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
 	When(preWorkflowHooksRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn(errors.New("generate config failed"))
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "cached", records[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_ZeroProjectFullDetectionKeepsStaleRecords(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "cached",
+		Path:        "cached",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
 
 	body, _ := json.Marshal(models.DriftDetectionRequest{
 		Repository: "Repo",

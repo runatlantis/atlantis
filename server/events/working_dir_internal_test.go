@@ -3,7 +3,11 @@
 
 package events
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/runatlantis/atlantis/server/events/models"
+)
 
 func TestIsUnsafeNonPRRef(t *testing.T) {
 	for _, tc := range []struct {
@@ -13,8 +17,10 @@ func TestIsUnsafeNonPRRef(t *testing.T) {
 	}{
 		{name: "GitHub pull head", ref: "pull/123/head", want: true},
 		{name: "GitHub refs pull merge", ref: "refs/pull/123/merge", want: true},
+		{name: "GitHub plus refs pull head", ref: "+refs/pull/123/head", want: true},
 		{name: "GitLab merge request head", ref: "merge-requests/123/head", want: true},
 		{name: "GitLab refs merge request merge", ref: "refs/merge-requests/123/merge", want: true},
+		{name: "GitLab plus refs merge request merge", ref: "+refs/merge-requests/123/merge", want: true},
 		{name: "GitHub pull refspec", ref: "refs/pull/123/head:refs/tmp/x", want: true},
 		{name: "GitHub short pull refspec", ref: "pull/123/head:refs/tmp/x", want: true},
 		{name: "GitLab merge request refspec", ref: "refs/merge-requests/123/head:refs/tmp/x", want: true},
@@ -23,8 +29,8 @@ func TestIsUnsafeNonPRRef(t *testing.T) {
 		{name: "sha", ref: "0123456789abcdef0123456789abcdef01234567", want: false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := isUnsafeNonPRRef(tc.ref); got != tc.want {
-				t.Fatalf("isUnsafeNonPRRef(%q) = %t, want %t", tc.ref, got, tc.want)
+			if got := models.IsUnsafeAPIRef(tc.ref); got != tc.want {
+				t.Fatalf("models.IsUnsafeAPIRef(%q) = %t, want %t", tc.ref, got, tc.want)
 			}
 		})
 	}

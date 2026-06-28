@@ -2107,6 +2107,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 		DirectoryStructure  map[string]any
 		ModifiedFiles       []string
 		Cmd                 events.CommentCommand
+		API                 bool
 		EnableRegExpCmd     bool
 		ExpErr              string
 		ExpNoProjects       bool
@@ -2296,6 +2297,34 @@ projects:
 			ExpProjectNames: []string{"prod.api"},
 		},
 		{
+			Description: "API project path selector keeps cached project name exact when regexp commands enabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "prod",
+				ProjectName: "app.prod",
+				RepoRelDir:  "env",
+			},
+			API:             true,
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: app.prod
+  dir: env
+  workspace: prod
+- name: app-prod
+  dir: env
+  workspace: prod
+`,
+			DirectoryStructure: map[string]any{
+				"env": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"env/main.tf"},
+			ExpProjectNames: []string{"app.prod"},
+		},
+		{
 			Description: "planning a regexp project only includes changed matching projects",
 			Cmd: events.CommentCommand{
 				Name:        command.Plan,
@@ -2458,6 +2487,7 @@ projects:
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
 				Log:                 logger,
 				Scope:               scope,
+				API:                 c.API,
 				SkipPRModifiedFiles: c.SkipPRModifiedFiles,
 			}, &cmd)
 

@@ -5,6 +5,7 @@ package models
 
 import (
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,6 +81,47 @@ func supportedDriftVCSTypeMessage() string {
 	return "type must be one of: Github, Gitlab, Gitea"
 }
 
+// IsUnsafeAPIRef reports whether a caller-controlled non-PR API ref can target
+// provider pull/merge request namespaces or alter git fetch behavior.
+func IsUnsafeAPIRef(ref string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(ref))
+	if strings.HasPrefix(normalized, "-") || strings.HasPrefix(normalized, "+") {
+		return true
+	}
+	if strings.Contains(normalized, ":") {
+		return true
+	}
+	normalized = strings.TrimPrefix(normalized, "refs/")
+
+	for _, namespace := range []string{"pull", "merge-requests", "pull-requests"} {
+		if hasUnsafePRNamespace(normalized, namespace) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasUnsafePRNamespace(ref, namespace string) bool {
+	rest, ok := strings.CutPrefix(ref, namespace+"/")
+	if !ok {
+		return false
+	}
+	id, rest, ok := strings.Cut(rest, "/")
+	if !ok {
+		return false
+	}
+	if _, err := strconv.Atoi(id); err != nil {
+		return false
+	}
+	action, _, _ := strings.Cut(rest, "/")
+	switch action {
+	case "head", "merge", "from", "to":
+		return true
+	default:
+		return false
+	}
+}
+
 // NormalizeAPIRef normalizes branch refs used by drift and API command requests.
 func NormalizeAPIRef(ref string) string {
 	return strings.TrimPrefix(strings.TrimSpace(ref), "refs/heads/")
@@ -87,6 +129,9 @@ func NormalizeAPIRef(ref string) string {
 
 // CheckedBaseBranchRef returns the normalized branch name for a safe API base_branch.
 func CheckedBaseBranchRef(baseBranch string) (string, bool) {
+	if IsUnsafeAPIRef(baseBranch) {
+		return "", false
+	}
 	baseRef := NormalizeAPIRef(baseBranch)
 	if baseRef == "" || strings.HasPrefix(baseRef, "-") || strings.Contains(baseRef, ":") {
 		return "", false
@@ -117,6 +162,22 @@ func NormalizeAPIPath(directory string) (string, bool) {
 		return "", false
 	}
 	return cleaned, true
+}
+
+// IsValidAPIWorkspace reports whether an explicit drift/remediation workspace
+// selector is safe to use for plan-file path construction.
+func IsValidAPIWorkspace(workspace string) bool {
+	trimmed := strings.TrimSpace(workspace)
+	if trimmed == "" || trimmed != workspace {
+		return false
+	}
+	if workspace == "." || workspace == ".." {
+		return false
+	}
+	if strings.ContainsAny(workspace, "/\\") || strings.Contains(workspace, "..") {
+		return false
+	}
+	return true
 }
 
 func isSafeBaseBranchRef(baseRef string) bool {
@@ -298,6 +359,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	}
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	} else if IsUnsafeAPIRef(r.Ref) {
+		errors = append(errors, FieldError{Field: "ref", Message: "ref is invalid"})
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
 		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
 	}
@@ -325,8 +388,11 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 			errors = append(errors, FieldError{Field: "paths", Message: "path directories must be clean repo-relative paths"})
 			break
 		}
+		if path.Workspace != "" && !IsValidAPIWorkspace(path.Workspace) {
+			errors = append(errors, FieldError{Field: "paths", Message: "path workspaces are invalid"})
+			break
+		}
 	}
-
 	return errors
 }
 

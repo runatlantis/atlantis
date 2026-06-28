@@ -440,9 +440,20 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	pathFilter := r.URL.Query().Get("path")
+	if pathFilter != "" {
+		var ok bool
+		pathFilter, ok = models.NormalizeAPIPath(pathFilter)
+		if !ok {
+			responder.ValidationFailed(w, r, "invalid path filter",
+				ValidationError{Field: "path", Message: "path must be a clean repo-relative path"})
+			return
+		}
+	}
+
 	opts := drift.GetOptions{
 		ProjectName: r.URL.Query().Get("project"),
-		Path:        r.URL.Query().Get("path"),
+		Path:        pathFilter,
 		Workspace:   r.URL.Query().Get("workspace"),
 		Ref:         apiRequestStorageRef(r.URL.Query().Get("ref")),
 		BaseBranch:  normalizeAPIBranchRef(r.URL.Query().Get("base_branch")),
@@ -908,12 +919,8 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
-	pullNum := request.PR
-	if pullNum <= 0 {
-		pullNum = nextNonPRPullNum()
-	}
 	pull := models.PullRequest{
-		Num:        pullNum,
+		Num:        request.PR,
 		BaseBranch: apiRequestBaseBranch(request.Ref, request.BaseBranch),
 		HeadBranch: request.Ref,
 		HeadCommit: request.Ref,
@@ -2016,7 +2023,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectionResult.AddProject(projectDrift)
 	}
 
-	if fullDetection && !storeFailed && !preHookFailed {
+	if fullDetection && len(detectedProjects) > 0 && !storeFailed && !preHookFailed {
 		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}

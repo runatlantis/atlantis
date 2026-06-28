@@ -106,6 +106,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 	if r.Ref == "" {
 		errors = append(errors, FieldError{Field: "ref", Message: "ref is required"})
+	} else if IsUnsafeAPIRef(r.Ref) {
+		errors = append(errors, FieldError{Field: "ref", Message: "ref is invalid"})
 	} else if requiresBaseBranch(r.Ref) && strings.TrimSpace(r.BaseBranch) == "" {
 		errors = append(errors, FieldError{Field: "base_branch", Message: "base_branch is required when ref is a commit SHA, tag, or ambiguous bare ref"})
 	}
@@ -133,8 +135,18 @@ func (r *RemediationRequest) Validate() []FieldError {
 			errors = append(errors, FieldError{Field: "paths", Message: "path directories must be clean repo-relative paths"})
 			break
 		}
+		if path.Workspace != "" && !IsValidAPIWorkspace(path.Workspace) {
+			errors = append(errors, FieldError{Field: "paths", Message: "path workspaces are invalid"})
+			break
+		}
 		if path.Workspace != "" && len(r.Workspaces) > 0 && !slices.Contains(r.Workspaces, path.Workspace) {
 			errors = append(errors, FieldError{Field: "paths", Message: "path workspace must be included in workspaces"})
+			break
+		}
+	}
+	for _, workspace := range r.Workspaces {
+		if !IsValidAPIWorkspace(workspace) {
+			errors = append(errors, FieldError{Field: "workspaces", Message: "workspaces are invalid"})
 			break
 		}
 	}

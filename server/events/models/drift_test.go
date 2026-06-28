@@ -469,3 +469,60 @@ func TestDriftDetectionRequestValidateRejectsMalformedBaseBranch(t *testing.T) {
 	}
 	Equals(t, 0, len(request.Validate()))
 }
+
+func TestDriftDetectionRequestValidateRejectsUnsafeRefs(t *testing.T) {
+	for _, ref := range []string{
+		"refs/pull/123/head",
+		"refs/pull/123/merge",
+		"pull/123/head",
+		"pull/123/merge",
+		"+refs/pull/123/head",
+		"refs/merge-requests/123/head",
+		"refs/merge-requests/123/merge",
+		"merge-requests/123/head",
+		"merge-requests/123/merge",
+		"+refs/merge-requests/123/head",
+		"main:refs/tmp/main",
+		"--upload-pack=/tmp/x",
+	} {
+		t.Run(ref, func(t *testing.T) {
+			request := models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        ref,
+				BaseBranch: "main",
+				Type:       "Github",
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "ref", errs[0].Field)
+		})
+	}
+}
+
+func TestDriftDetectionRequestValidateRejectsInvalidPathWorkspaces(t *testing.T) {
+	for _, workspace := range []string{"../../tmp/plan", "prod/stage", "..", ".", " prod", "prod "} {
+		t.Run(workspace, func(t *testing.T) {
+			request := models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: "env", Workspace: workspace}},
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "paths", errs[0].Field)
+		})
+	}
+
+	for _, workspace := range []string{"default", "prod", "dev-us-east-1"} {
+		t.Run("valid "+workspace, func(t *testing.T) {
+			request := models.DriftDetectionRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: "env", Workspace: workspace}},
+			}
+			Equals(t, 0, len(request.Validate()))
+		})
+	}
+}
