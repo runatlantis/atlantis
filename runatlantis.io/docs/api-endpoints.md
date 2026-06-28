@@ -335,7 +335,7 @@ API path selectors are literal normalized repo-relative paths; glob patterns suc
 ::: tip Actions
 
 * `plan`: Runs a plan to preview what would change (default, non-destructive)
-* `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`, plus cached drift from a previous detection run for each targeted project/path/workspace.
+* `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`, plus cached drift with `has_drift: true` from a previous detection run for each targeted project/path/workspace.
 
 :::
 
@@ -356,11 +356,11 @@ When remediation uses cached drift for a moving ref such as `main`, Atlantis com
 :::
 
 ::: tip Cached Drift Required
-Remediation `action: "apply"` only applies cached drift records for the same repository, ref, `base_branch`, project/path, and workspace. Use `action: "plan"` for uncached previews, then run drift detection before applying.
+Remediation `action: "apply"` only applies cached drift records with `has_drift: true` for the same repository, ref, `base_branch`, project/path, and workspace. Use `action: "plan"` for uncached previews, then run drift detection before applying.
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. For tags with slash names, use the explicit `refs/tags/...` form.
+For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. Ambiguous bare refs such as `prod`, `latest`, `stable`, or `v1.2.3` require `base_branch` but are still fetched as branch names. For raw commit SHAs and explicit `refs/tags/...` refs, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. Use the explicit `refs/tags/...` form for tags.
 :::
 
 #### Sample Request (Plan Only)
@@ -390,7 +390,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
     "type": "Github",
     "action": "apply",
     "projects": ["vpc", "ec2"],
-    "workspaces": ["production"]
+    "workspaces": ["production"],
+    "drift_only": true
 }'
 ```
 
@@ -636,7 +637,7 @@ Drift detection does not bypass team allowlists. If a configured team allowlist 
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. For tags with slash names, use the explicit `refs/tags/...` form.
+For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. Ambiguous bare refs such as `prod`, `latest`, `stable`, or `v1.2.3` require `base_branch` but are still fetched as branch names. For raw commit SHAs and explicit `refs/tags/...` refs, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. Use the explicit `refs/tags/...` form for tags.
 :::
 
 #### Sample Request
@@ -737,7 +738,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 List remediation results for a repository. Returns a paginated list of past remediation operations. This is an authenticated endpoint that requires the API secret.
 
 ::: tip Prerequisites
-Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
+Drift detection must be enabled on the Atlantis server. Destructive remediation apply additionally requires `--enable-drift-remediation`.
 :::
 
 #### Query Parameters
@@ -827,12 +828,12 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 
 #### Error Responses
 
-| Status Code | Error Code          | Description                                    |
-|-------------|---------------------|------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Missing required `repository` parameter        |
-| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header   |
-| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server |
-| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data     |
+| Status Code | Error Code          | Description                                             |
+|-------------|---------------------|---------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Missing required `repository` parameter                 |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header            |
+| 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server    |
+| 500         | INTERNAL_ERROR      | Internal error retrieving remediation data              |
 
 ### GET /api/drift/remediate/{id}
 
@@ -841,7 +842,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 Get a specific remediation result by ID. Returns detailed information about a past remediation operation including per-project results. This is an authenticated endpoint that requires the API secret.
 
 ::: tip Prerequisites
-Drift remediation must be enabled on the Atlantis server. If not enabled, this endpoint returns a `503 Service Unavailable` error.
+Drift detection must be enabled on the Atlantis server. Destructive remediation apply additionally requires `--enable-drift-remediation`.
 :::
 
 #### Path Parameters
@@ -923,7 +924,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 | 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header                 |
 | 403         | FORBIDDEN           | Repository is not in the allowlist                           |
 | 404         | NOT_FOUND           | Remediation result not found                                 |
-| 503         | SERVICE_UNAVAILABLE | Drift remediation is not enabled on the server               |
+| 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server         |
 | 500         | INTERNAL_ERROR      | Internal error retrieving remediation data                   |
 
 ## Other Endpoints

@@ -879,6 +879,88 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfig
 	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
+func TestDefaultProjectCommandBuilder_PathSelectorRespectsBranchFilteredProjects(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"env": map[string]any{
+			"main.tf": nil,
+		},
+	})
+	atlantisYAML := "version: 3\n" +
+		"projects:\n" +
+		"  - name: app\n" +
+		"    dir: env\n" +
+		"    workspace: default\n" +
+		"    branch: /main/\n"
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(atlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	terraformClient := tfclientmocks.NewMockClient()
+	repo := models.Repo{FullName: "owner/repo"}
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	mainCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: "main",
+			BaseRepo:   repo,
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, RepoRelDir: "env"})
+	Ok(t, err)
+	Equals(t, 1, len(mainCtxs))
+	Equals(t, "app", mainCtxs[0].ProjectName)
+	Equals(t, "env", mainCtxs[0].RepoRelDir)
+
+	featureCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        -2,
+			BaseBranch: "feature/foo",
+			BaseRepo:   repo,
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, RepoRelDir: "env"})
+	ErrContains(t, "on branch: 'feature/foo'", err)
+	Equals(t, 0, len(featureCtxs))
+}
+
 func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITeamAllowlist(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

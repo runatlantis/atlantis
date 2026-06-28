@@ -754,10 +754,23 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 
 func nonPRFetchRef(targetRef string) string {
 	ref := strings.TrimSpace(targetRef)
-	if strings.HasPrefix(ref, "refs/heads/") || strings.HasPrefix(ref, "refs/tags/") || models.RequiresBaseBranchForRef(ref) {
+	if strings.HasPrefix(ref, "refs/heads/") || strings.HasPrefix(ref, "refs/tags/") || isRawCommitRef(ref) {
 		return ref
 	}
 	return "refs/heads/" + ref
+}
+
+func isRawCommitRef(ref string) bool {
+	if len(ref) < 7 || len(ref) > 40 {
+		return false
+	}
+	for _, r := range ref {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func nonPRTargetRef(p models.PullRequest) string {

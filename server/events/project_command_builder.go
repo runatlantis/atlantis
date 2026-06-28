@@ -1152,6 +1152,17 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// Exact directory matching
 	projCfgs := repoCfg.FindProjectsByDirWorkspace(dir, workspace)
 	if len(projCfgs) == 0 {
+		if filterProjectDir {
+			configuredOnAnotherBranch, branchErr := p.pathConfiguredOnlyOnAnotherBranch(ctx, repoDir, repoConfig, dir)
+			if branchErr != nil {
+				err = branchErr
+				return
+			}
+			if configuredOnAnotherBranch {
+				err = fmt.Errorf("no project is defined in '%s' for dir: '%s' on branch: '%s'", repoCfgFile, dir, ctx.Pull.BaseBranch)
+				return
+			}
+		}
 		return
 	}
 	if len(projCfgs) > 1 {
@@ -1160,6 +1171,18 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	}
 	projectsCfg = projCfgs
 	return
+}
+
+func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *command.Context, repoDir string, repoConfig valid.RepoCfg, dir string) (bool, error) {
+	cleanDir := filepath.Clean(dir)
+	if len(repoConfig.FindProjectsByDir(cleanDir)) > 0 {
+		return false, nil
+	}
+	unfilteredRepoConfig, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), "")
+	if err != nil {
+		return false, err
+	}
+	return len(unfilteredRepoConfig.FindProjectsByDir(cleanDir)) > 0, nil
 }
 
 // buildAllProjectCommandsByPlan builds contexts for a command for every project that has

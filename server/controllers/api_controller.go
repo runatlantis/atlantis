@@ -1975,6 +1975,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	detectionStartedAt := time.Now()
 	normalizedRef := apiRequestStorageRef(request.Ref)
 	normalizedBaseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
 
@@ -2053,7 +2054,6 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Process results and store drift data
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
-	detectionStartedAt := detectionResult.DetectedAt
 	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false

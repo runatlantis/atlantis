@@ -125,6 +125,18 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "slash branch file")
 	slashBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 	runCmd(t, repoDir, "git", "tag", "feature/foo", mainCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "prod", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "prod-branch-file")
+	runCmd(t, repoDir, "git", "add", "prod-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "prod branch file")
+	prodBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "prod", mainCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "v1.2.3", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "semver-branch-file")
+	runCmd(t, repoDir, "git", "add", "semver-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "semver branch file")
+	semverBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "v1.2.3", mainCommit)
 
 	for _, tt := range []struct {
 		name           string
@@ -145,6 +157,16 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 			name:           "slash branch with same-named tag",
 			ref:            "feature/foo",
 			expectedCommit: slashBranchCommit,
+		},
+		{
+			name:           "ambiguous branch with same-named tag",
+			ref:            "prod",
+			expectedCommit: prodBranchCommit,
+		},
+		{
+			name:           "semver-like branch with same-named tag",
+			ref:            "v1.2.3",
+			expectedCommit: semverBranchCommit,
 		},
 		{
 			name:           "explicit branch ref",

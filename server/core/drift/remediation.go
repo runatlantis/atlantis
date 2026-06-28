@@ -90,7 +90,14 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 	}
 
 	if len(projects) == 0 {
-		result.Complete()
+		if req.Action == models.RemediationAutoApply {
+			result.Status = models.RemediationStatusFailed
+			result.Error = "cached drift with has_drift=true is required before remediation apply; run drift detection for the same ref, base_branch, project, path, and workspace first"
+			completedAt := time.Now()
+			result.CompletedAt = &completedAt
+		} else {
+			result.Complete()
+		}
 		s.storeResult(result)
 		return result, nil
 	}
@@ -379,10 +386,12 @@ func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []stri
 
 func requireCachedApplyTargets(projects []models.ProjectDrift) error {
 	for _, project := range projects {
-		if project.ResolvedCommit != "" && !project.LastChecked.IsZero() {
-			continue
+		if project.ResolvedCommit == "" || project.LastChecked.IsZero() {
+			return fmt.Errorf("cached drift with a resolved commit is required before remediation apply for %s; run drift detection for the same ref, base_branch, project, path, and workspace first", remediationTargetDescription(project))
 		}
-		return fmt.Errorf("cached drift with a resolved commit is required before remediation apply for %s; run drift detection for the same ref, base_branch, project, path, and workspace first", remediationTargetDescription(project))
+		if !project.Drift.HasDrift {
+			return fmt.Errorf("cached drift with has_drift=true is required before remediation apply for %s; rerun drift detection or use action: plan for a non-destructive preview", remediationTargetDescription(project))
+		}
 	}
 	return nil
 }

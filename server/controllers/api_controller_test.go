@@ -3833,6 +3833,43 @@ func TestAPIController_DetectDrift_ReconciliationKeepsNewerRecords(t *testing.T)
 	Equals(t, "newer", records[0].ProjectName)
 }
 
+func TestAPIController_DetectDrift_ReconciliationUsesDetectionStartTime(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			time.Sleep(10 * time.Millisecond)
+			Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+				ProjectName: "newer",
+				Path:        "newer",
+				Workspace:   events.DefaultWorkspace,
+				Ref:         "main",
+				BaseBranch:  "main",
+				Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+				LastChecked: time.Now(),
+			}))
+			return ReturnValues{[]command.ProjectContext{}, nil}
+		})
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "newer", records[0].ProjectName)
+}
+
 func TestAPIController_DetectDrift_ZeroProjectScopedDetectionKeepsStaleRecords(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	storage := drift.NewInMemoryStorage()

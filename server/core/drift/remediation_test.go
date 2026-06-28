@@ -312,6 +312,59 @@ func TestInMemoryRemediationService_AutoApplyRequiresCachedDriftBeforeExecutor(t
 	Equals(t, 0, len(cached))
 }
 
+func TestInMemoryRemediationService_AutoApplyWithoutCachedTargetsFails(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Assert(t, strings.Contains(result.Error, "cached drift with has_drift=true is required"), "expected cached drift error, got %q", result.Error)
+	Equals(t, 0, len(executor.planCalls))
+	Equals(t, 0, len(executor.applyCalls))
+	Equals(t, 0, len(executor.applyProjectCalls))
+}
+
+func TestInMemoryRemediationService_AutoApplyRequiresCachedPositiveDrift(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: false, Summary: "No changes."},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Projects:   []string{"app"},
+		Action:     models.RemediationAutoApply,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Equals(t, 0, len(executor.planCalls))
+	Equals(t, 0, len(executor.applyCalls))
+	Equals(t, 0, len(executor.applyProjectCalls))
+	Equals(t, 1, len(result.Projects))
+	Equals(t, models.RemediationStatusFailed, result.Projects[0].Status)
+	Assert(t, strings.Contains(result.Projects[0].Error, "cached drift with has_drift=true is required"), "expected positive drift error, got %q", result.Projects[0].Error)
+}
+
 func TestInMemoryRemediationService_PlanOnlyExplicitWithoutCachedDriftStillRuns(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	service := drift.NewInMemoryRemediationService(storage)
