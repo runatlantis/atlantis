@@ -9,7 +9,12 @@ on:
       - '**/go.mod'
       - '**/go.sum'
       - 'Makefile'
+      - 'scripts/**'
       - '.github/workflows/code-coverage.yml'
+      - 'server/events/templates/**'
+      - 'server/i18n/**'
+      - '**/testdata/**'
+      - 'testdata/**'
   pull_request:
     branches:
       - main
@@ -23,10 +28,15 @@ on:
       - '**/go.mod'
       - '**/go.sum'
       - 'Makefile'
+      - 'scripts/**'
       - '.github/workflows/code-coverage.yml'
+      - 'server/events/templates/**'
+      - 'server/i18n/**'
+      - '**/testdata/**'
+      - 'testdata/**'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -38,13 +48,9 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     container: ghcr.io/runatlantis/testing-env:latest@sha256:dc683c36e7fb8f26fcc8628fdcf328f42d3b1903e130aebb8484223fbdedfd98
     steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
-        with:
-          egress-policy: audit
-
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -92,7 +98,13 @@ jobs:
       contents: read
       code-quality: write
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
       - name: Download coverage artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
