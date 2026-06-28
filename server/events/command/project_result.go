@@ -3,9 +3,7 @@
 
 package command
 
-import (
-	"github.com/runatlantis/atlantis/server/events/models"
-)
+import "github.com/runatlantis/atlantis/server/events/models"
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {

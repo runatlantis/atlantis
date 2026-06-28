@@ -38,12 +38,20 @@ type DefaultCommandRequirementHandler struct {
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
 	for _, dependOnProject := range ctx.DependsOn {
+		dependencyFound := false
 
 		for _, project := range ctx.PullStatus.Projects {
 
-			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
+			if project.ProjectName != dependOnProject {
+				continue
+			}
+			dependencyFound = true
+			if project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
 				return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", project.ProjectName), nil
 			}
+		}
+		if ctx.FailOnMissingDependencies && !dependencyFound {
+			return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", dependOnProject), nil
 		}
 	}
 
@@ -63,19 +71,34 @@ func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string,
 }
 
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
+	// Only explicitly opted-in non-PR API workflows, such as drift detection and
+	// remediation, may skip PR-only requirements.
+	skipPRRequirements := ctx.API && ctx.Pull.Num <= 0 && ctx.SkipPRRequirements
+
 	for _, req := range requirements {
 		switch req {
 		case raw.ApprovedRequirement:
+			if skipPRRequirements {
+				ctx.Log.Info("skipping approval requirement for opted-in API call without PR number")
+				continue
+			}
 			if !ctx.PullReqStatus.ApprovalStatus.IsApproved {
 				return fmt.Sprintf("Pull request must be approved according to the project's approval rules before running %s.", cmd), nil
 			}
 		// this should come before mergeability check since mergeability is a superset of this check.
 		case valid.PoliciesPassedCommandReq:
 			// We should rely on this function instead of plan status, since plan status after a failed apply will not carry the policy error over.
+			if ctx.API && ctx.Pull.Num <= 0 && ctx.RunPolicyChecks && len(ctx.ProjectPolicyStatus) == 0 {
+				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
+			}
 			if !ctx.PolicyCleared() {
 				return fmt.Sprintf("All policies must pass for project before running %s.", cmd), nil
 			}
 		case raw.MergeableRequirement:
+			if skipPRRequirements {
+				ctx.Log.Info("skipping mergeable requirement for opted-in API call without PR number")
+				continue
+			}
 			mergeableStatus := ctx.PullReqStatus.MergeableStatus
 			if !mergeableStatus.IsMergeable && (cmd != command.Apply || !a.mergeableIgnoringOtherProjectPlans(ctx, mergeableStatus)) {
 				suffix := ""

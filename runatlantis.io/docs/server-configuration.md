@@ -604,6 +604,40 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
+### `--enable-drift-detection`
+
+```bash
+atlantis server --enable-drift-detection
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+```
+
+Enable drift detection API endpoints. Drift detection does not run Terraform apply, but
+it does execute the normal plan lifecycle, including configured pre-workflow hooks,
+custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
+will initialize in-memory storage for drift detection results and a remediation service,
+making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+are configured (`event: drift`), successful detection runs send notifications to Slack or HTTP endpoints,
+including no-drift heartbeat results. Drift detection does not bypass team allowlists or PR-state
+`plan_requirements` such as `approved` or `mergeable`; those checks fail closed when
+they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
+`--enable-drift-remediation`. Defaults to `false`.
+
+### `--enable-drift-remediation`
+
+```bash
+atlantis server --enable-drift-detection --enable-drift-remediation
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
+```
+
+Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
+This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
+rejected while read-only drift detection remains available. This flag does not bypass
+repository `apply_requirements`; requirements that need pull request state fail closed for
+non-PR remediation requests. Defaults to `false`.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash

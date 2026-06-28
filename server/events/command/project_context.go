@@ -82,6 +82,9 @@ type ProjectContext struct {
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
+	// RunPolicyChecks is true for API workflows that explicitly execute policy
+	// checks and should fail closed if policy status is missing.
+	RunPolicyChecks bool
 
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
@@ -139,6 +142,30 @@ type ProjectContext struct {
 
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
+
+	// API indicates this command was triggered via the API endpoint rather than
+	// a PR comment.
+	API bool
+
+	// SkipPRRequirements allows explicitly opted-in non-PR API workflows to skip
+	// PR-only requirements like approved and mergeable.
+	SkipPRRequirements bool
+
+	// SuppressVCSStatus prevents API workflows such as drift detection from
+	// publishing normal PR lifecycle commit statuses.
+	SuppressVCSStatus bool
+
+	// SuppressJobOutput prevents API workflows such as drift detection from
+	// publishing raw command output to the public job stream.
+	SuppressJobOutput bool
+
+	// SuppressApplyWebhooks prevents synthetic API workflows such as drift
+	// remediation from sending legacy event: apply webhooks.
+	SuppressApplyWebhooks bool
+
+	// FailOnMissingDependencies makes apply dependency validation fail when a
+	// configured dependency is not present in PullStatus.
+	FailOnMissingDependencies bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

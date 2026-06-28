@@ -328,6 +328,13 @@ func newProjectCommandContext(ctx *command.Context,
 		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
 		SilencePRComments:          projCfg.SilencePRComments,
 		TeamAllowlistChecker:       teamAllowlistChecker,
+		API:                        ctx.API,
+		SkipPRRequirements:         ctx.SkipPRRequirements,
+		RunPolicyChecks:            ctx.RunPolicyChecks,
+		SuppressVCSStatus:          ctx.SuppressVCSStatus,
+		SuppressJobOutput:          ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
+		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
 	}
 }
 
