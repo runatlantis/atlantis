@@ -1,0 +1,19 @@
+.github/workflows/code-coverage.yml
+  s_cb1708bb6cf5d5::t_599cb740a4d43a 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "dde01905b0b7c8d419976a32f7d8cecbedb5a75b",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
