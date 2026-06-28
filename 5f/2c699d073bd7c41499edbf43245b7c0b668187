@@ -1,0 +1,19 @@
+e2e/testcase.go
+  s_cb1708bb6cf5d5::t_1a40a70e5e5f24 112-114,116-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "5f2c699d073bd7c41499edbf43245b7c0b668187",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
