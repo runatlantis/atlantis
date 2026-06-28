@@ -1083,6 +1083,8 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 | Status Code | Error Code          | Description                                  |
 |-------------|---------------------|----------------------------------------------|
 | 400         | VALIDATION_ERROR    | Missing required `repository` parameter      |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header |
+| 403         | FORBIDDEN           | Repository is not in the allowlist           |
 | 503         | SERVICE_UNAVAILABLE | Drift detection is not enabled on the server |
 | 500         | INTERNAL_ERROR      | Internal error retrieving drift data         |
 

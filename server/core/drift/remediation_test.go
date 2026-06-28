@@ -53,6 +53,30 @@ func (f failingRemediationStorage) GetAll() (map[string][]models.ProjectDrift, e
 	return nil, nil
 }
 
+type staticRemediationStorage struct {
+	drifts []models.ProjectDrift
+}
+
+func (s staticRemediationStorage) Store(string, models.ProjectDrift) error {
+	return nil
+}
+
+func (s staticRemediationStorage) Get(string, drift.GetOptions) ([]models.ProjectDrift, error) {
+	return s.drifts, nil
+}
+
+func (s staticRemediationStorage) Delete(string, string) error {
+	return nil
+}
+
+func (s staticRemediationStorage) DeleteMatching(string, drift.GetOptions) error {
+	return nil
+}
+
+func (s staticRemediationStorage) GetAll() (map[string][]models.ProjectDrift, error) {
+	return nil, nil
+}
+
 func (r *recordingRemediationExecutor) ExecutePlan(_, ref, _ string, projectName, path, workspace string) (string, *models.DriftSummary, error) {
 	r.planRefs = append(r.planRefs, ref)
 	r.planCalls = append(r.planCalls, remediationExecutorCall{
@@ -363,6 +387,148 @@ func TestInMemoryRemediationService_AutoApplyRequiresCachedPositiveDrift(t *test
 	Equals(t, 1, len(result.Projects))
 	Equals(t, models.RemediationStatusFailed, result.Projects[0].Status)
 	Assert(t, strings.Contains(result.Projects[0].Error, "cached drift with has_drift=true is required"), "expected positive drift error, got %q", result.Projects[0].Error)
+}
+
+func TestInMemoryRemediationService_AutoApplyDeduplicatesProjectSelectors(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		DetectionID:    "detection-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Projects:   []string{"app", "app"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.applyProjectCalls))
+	Equals(t, 1, len(executor.applyProjectCalls[0]))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "app", workspace: "default"}, executor.applyProjectCalls[0][0])
+}
+
+func TestInMemoryRemediationService_AutoApplyDeduplicatesPathSelectors(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "env",
+		Workspace:      "prod",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		DetectionID:    "detection-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Paths: []models.DriftDetectionPath{
+			{Directory: "env", Workspace: "prod"},
+			{Directory: "env", Workspace: "prod"},
+		},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.applyProjectCalls))
+	Equals(t, 1, len(executor.applyProjectCalls[0]))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "prod"}, executor.applyProjectCalls[0][0])
+}
+
+func TestInMemoryRemediationService_AutoApplyDeduplicatesMixedSelectors(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "env",
+		Workspace:      "prod",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		DetectionID:    "detection-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Projects:   []string{"app"},
+		Paths: []models.DriftDetectionPath{
+			{Directory: "env", Workspace: "prod"},
+			{Directory: "env", Workspace: "prod"},
+		},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.applyProjectCalls))
+	Equals(t, 1, len(executor.applyProjectCalls[0]))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "prod"}, executor.applyProjectCalls[0][0])
+}
+
+func TestInMemoryRemediationService_AutoApplyRejectsConflictingDuplicateTargets(t *testing.T) {
+	checkedAt := time.Now()
+	service := drift.NewInMemoryRemediationService(staticRemediationStorage{drifts: []models.ProjectDrift{
+		{
+			ProjectName:    "app",
+			Path:           "app",
+			Workspace:      "default",
+			Ref:            "main",
+			BaseBranch:     "main",
+			ResolvedCommit: "commit-a",
+			DetectionID:    "detection-a",
+			Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+			LastChecked:    checkedAt,
+		},
+		{
+			ProjectName:    "app",
+			Path:           "app",
+			Workspace:      "default",
+			Ref:            "main",
+			BaseBranch:     "main",
+			ResolvedCommit: "commit-b",
+			DetectionID:    "detection-a",
+			Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+			LastChecked:    checkedAt,
+		},
+	}})
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		DriftOnly:  true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Assert(t, strings.Contains(result.Error, "conflicting cached drift records"), "expected conflict error, got %q", result.Error)
+	Equals(t, 0, len(executor.applyProjectCalls))
 }
 
 func TestInMemoryRemediationService_PlanOnlyExplicitWithoutCachedDriftStillRuns(t *testing.T) {

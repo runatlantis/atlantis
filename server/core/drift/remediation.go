@@ -88,6 +88,15 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 		s.storeResult(result)
 		return result, nil
 	}
+	projects, err = deduplicateRemediationTargets(req, projects)
+	if err != nil {
+		result.Error = err.Error()
+		result.Status = models.RemediationStatusFailed
+		completedAt := time.Now()
+		result.CompletedAt = &completedAt
+		s.storeResult(result)
+		return result, nil
+	}
 
 	if len(projects) == 0 {
 		if req.Action == models.RemediationAutoApply {
@@ -382,6 +391,63 @@ func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []stri
 		return workspaces, nil
 	}
 	return []string{defaultWorkspace}, nil
+}
+
+type remediationTargetIdentity struct {
+	Repository  string
+	Type        string
+	Ref         string
+	BaseBranch  string
+	ProjectName string
+	Path        string
+	Workspace   string
+}
+
+func deduplicateRemediationTargets(req models.RemediationRequest, projects []models.ProjectDrift) ([]models.ProjectDrift, error) {
+	if len(projects) < 2 {
+		return projects, nil
+	}
+	deduped := make([]models.ProjectDrift, 0, len(projects))
+	seen := make(map[remediationTargetIdentity]models.ProjectDrift, len(projects))
+	for _, project := range projects {
+		identity := newRemediationTargetIdentity(req, project)
+		if existing, ok := seen[identity]; ok {
+			if !sameRemediationSafetyMetadata(existing, project) {
+				return nil, fmt.Errorf("conflicting cached drift records for %s; rerun drift detection before remediation", remediationTargetDescription(project))
+			}
+			continue
+		}
+		seen[identity] = project
+		deduped = append(deduped, project)
+	}
+	return deduped, nil
+}
+
+func newRemediationTargetIdentity(req models.RemediationRequest, project models.ProjectDrift) remediationTargetIdentity {
+	ref := project.Ref
+	if ref == "" {
+		ref = remediationRef(req)
+	}
+	baseBranch := project.BaseBranch
+	if baseBranch == "" {
+		baseBranch = remediationBaseBranch(req)
+	}
+	return remediationTargetIdentity{
+		Repository:  remediationStorageRepository(req),
+		Type:        req.Type,
+		Ref:         ref,
+		BaseBranch:  baseBranch,
+		ProjectName: project.ProjectName,
+		Path:        project.Path,
+		Workspace:   project.Workspace,
+	}
+}
+
+func sameRemediationSafetyMetadata(a, b models.ProjectDrift) bool {
+	return a.ResolvedCommit == b.ResolvedCommit &&
+		a.DetectionID == b.DetectionID &&
+		a.LastChecked.Equal(b.LastChecked) &&
+		a.Drift.HasDrift == b.Drift.HasDrift
 }
 
 func requireCachedApplyTargets(projects []models.ProjectDrift) error {

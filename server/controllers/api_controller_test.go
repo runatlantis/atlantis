@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -3868,6 +3869,97 @@ func TestAPIController_DetectDrift_ReconciliationUsesDetectionStartTime(t *testi
 	Ok(t, err)
 	Equals(t, 1, len(records))
 	Equals(t, "newer", records[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_FullDetectionSerializesByRepoRefBase(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+
+	firstEntered := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondEntered := make(chan struct{})
+	var mu sync.Mutex
+	buildCalls := 0
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			mu.Lock()
+			buildCalls++
+			call := buildCalls
+			mu.Unlock()
+
+			switch call {
+			case 1:
+				close(firstEntered)
+				<-releaseFirst
+				return ReturnValues{[]command.ProjectContext{{
+					CommandName: command.Plan,
+					ProjectName: "stale",
+					RepoRelDir:  "stale",
+					Workspace:   events.DefaultWorkspace,
+				}}, nil}
+			case 2:
+				close(secondEntered)
+				return ReturnValues{[]command.ProjectContext{{
+					CommandName: command.Plan,
+					ProjectName: "fresh",
+					RepoRelDir:  "fresh",
+					Workspace:   events.DefaultWorkspace,
+				}}, nil}
+			default:
+				return ReturnValues{[]command.ProjectContext{}, nil}
+			}
+		})
+
+	runDetect := func(done chan<- *httptest.ResponseRecorder) {
+		body, _ := json.Marshal(models.DriftDetectionRequest{
+			Repository: "Repo",
+			Ref:        "main",
+			Type:       "Gitlab",
+		})
+		req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+		req.Header.Set(atlantisTokenHeader, atlantisToken)
+		w := httptest.NewRecorder()
+		ac.DetectDrift(w, req)
+		done <- w
+	}
+	waitResponse := func(done <-chan *httptest.ResponseRecorder) *httptest.ResponseRecorder {
+		select {
+		case w := <-done:
+			return w
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for drift detection")
+			return nil
+		}
+	}
+
+	firstDone := make(chan *httptest.ResponseRecorder, 1)
+	secondDone := make(chan *httptest.ResponseRecorder, 1)
+	go runDetect(firstDone)
+	select {
+	case <-firstEntered:
+	case <-time.After(time.Second):
+		t.Fatal("first full detection did not start")
+	}
+
+	go runDetect(secondDone)
+	select {
+	case <-secondEntered:
+		t.Fatal("second full detection entered project discovery before first detection finished")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(releaseFirst)
+	firstResponse := waitResponse(firstDone)
+	secondResponse := waitResponse(secondDone)
+	Equals(t, http.StatusOK, firstResponse.Code)
+	Equals(t, http.StatusOK, secondResponse.Code)
+
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "fresh", records[0].ProjectName)
 }
 
 func TestAPIController_DetectDrift_ZeroProjectScopedDetectionKeepsStaleRecords(t *testing.T) {

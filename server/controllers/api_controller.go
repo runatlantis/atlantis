@@ -75,8 +75,16 @@ type APIController struct {
 
 	// apiMiddleware provides common authentication and response utilities.
 	// Initialized lazily via getAPIMiddleware() with sync.Once for thread safety.
-	apiMiddleware     *APIMiddleware
-	apiMiddlewareOnce sync.Once
+	apiMiddleware           *APIMiddleware
+	apiMiddlewareOnce       sync.Once
+	driftFullDetectionLocks sync.Map
+}
+
+type driftFullDetectionLockKey struct {
+	Repository string
+	Type       string
+	Ref        string
+	BaseBranch string
 }
 
 // getAPIMiddleware returns the APIMiddleware, initializing it lazily with sync.Once.
@@ -89,6 +97,19 @@ func (a *APIController) getAPIMiddleware() *APIMiddleware {
 
 func nextNonPRPullNum() int {
 	return -int((time.Now().UnixNano() & 0x3fffffff) + nonPRPullCounter.Add(1))
+}
+
+func (a *APIController) lockFullDriftDetection(repository, vcsType, ref, baseBranch string) func() {
+	key := driftFullDetectionLockKey{
+		Repository: repository,
+		Type:       vcsType,
+		Ref:        ref,
+		BaseBranch: baseBranch,
+	}
+	lock, _ := a.driftFullDetectionLocks.LoadOrStore(key, &sync.Mutex{})
+	mu := lock.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 func (a *APIController) cleanupNonPRWorkingDir(ctx *command.Context) {
@@ -1975,9 +1996,14 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
-	detectionStartedAt := time.Now()
 	normalizedRef := apiRequestStorageRef(request.Ref)
 	normalizedBaseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
+	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
+	if fullDetection {
+		unlockFullDetection := a.lockFullDriftDetection(baseRepo.ID(), request.Type, normalizedRef, normalizedBaseBranch)
+		defer unlockFullDetection()
+	}
+	detectionStartedAt := time.Now()
 
 	// Build API request for plan
 	apiRequest := &APIRequest{
@@ -2054,7 +2080,6 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Process results and store drift data
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
-	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
