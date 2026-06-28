@@ -764,6 +764,42 @@ func TestIsTerraformProjectDir(t *testing.T) {
 			},
 			exp: false,
 		},
+		{
+			description: ".tofu file",
+			files: map[string]string{
+				"main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu.json file",
+			files: map[string]string{
+				"main.tofu.json": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu and .tf together",
+			files: map[string]string{
+				"main.tf":       "Some content",
+				"versions.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: "hidden .tofu file still matches indicator glob",
+			files: map[string]string{
+				".main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu in subdirectory only",
+			files: map[string]string{
+				"subdir/main.tofu": "Some content",
+			},
+			exp: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

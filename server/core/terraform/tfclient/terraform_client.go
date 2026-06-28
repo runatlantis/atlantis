@@ -294,16 +294,13 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 // default distribution when nil, and the highest satisfying version is selected.
 // Returns nil if unable to determine the version.
 func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
-	module, diags := tfconfig.LoadModule(projectDirectory)
-	if diags.HasErrors() {
-		log.Err("trying to detect required version: %s", diags.Error())
-	}
+	requiredCore := c.detectRequiredCore(log, d, projectDirectory)
 
-	if len(module.RequiredCore) != 1 {
-		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+	if len(requiredCore) != 1 {
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(requiredCore))
 		return nil
 	}
-	requiredVersionSetting := module.RequiredCore[0]
+	requiredVersionSetting := requiredCore[0]
 	log.Debug("Found required_version setting of %q", requiredVersionSetting)
 
 	if !c.downloadAllowed {
@@ -329,6 +326,33 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Dis
 	}
 
 	return downloadVersion
+}
+
+// detectRequiredCore returns the required_version constraints from configuration files.
+// For OpenTofu distribution, it uses a local parser that supports .tofu/.tofu.json files
+// with proper precedence (.tofu overrides same-basename .tf). For Terraform distribution,
+// it uses hashicorp/terraform-config-inspect which only reads .tf/.tf.json files.
+func (c *DefaultClient) detectRequiredCore(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) []string {
+	dist := c.effectiveDistribution(d)
+	if dist.BinName() == "tofu" {
+		constraints, err := detectRequiredCoreFromTofu(projectDirectory)
+		if err != nil {
+			log.Err("trying to detect required version from OpenTofu config: %s", err)
+		}
+		if len(constraints) == 0 && err != nil {
+			return nil
+		}
+		return constraints
+	}
+
+	module, diags := tfconfig.LoadModule(projectDirectory)
+	if diags.HasErrors() {
+		log.Err("trying to detect required version: %s", diags.Error())
+	}
+	if module == nil {
+		return nil
+	}
+	return module.RequiredCore
 }
 
 // See Client.EnsureVersion.

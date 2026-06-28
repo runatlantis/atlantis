@@ -63,6 +63,45 @@ constraint against that distribution. For example, an OpenTofu project resolves 
 OpenTofu version instead of a Terraform version.
 :::
 
+## OpenTofu `.tofu` file support
+
+When the effective distribution is OpenTofu, Atlantis reads `required_version`
+from `.tofu` and `.tofu.json` files in addition to `.tf` and `.tf.json`. The effective
+distribution is OpenTofu when either:
+
+- A project sets `terraform_distribution: opentofu` in `atlantis.yaml`
+- The server default is `--default-tf-distribution=opentofu` and the project does not override it
+
+If a project explicitly sets `terraform_distribution: terraform`, Atlantis uses the
+Terraform version-detection path (`.tf` / `.tf.json` only) even if the server default is OpenTofu.
+
+OpenTofu file precedence is respected: a `.tofu` file overrides a same-basename `.tf`
+file, and `.tofu.json` overrides a same-basename `.tf.json` file. Files with different
+basenames both contribute constraints independently.
+
+Terraform distribution is unaffected and continues to read only `.tf` / `.tf.json` files.
+
+::: warning Known limitation
+Module autoplanning (`--autoplan-modules`) dependency indexing still relies on
+`terraform-config-inspect` and does not fully understand `.tofu` / `.tofu.json`:
+
+1. Module source blocks defined only in `.tofu` / `.tofu.json` files are not indexed.
+   Projects using these files for `module {}` blocks will not be planned when shared
+   modules change.
+2. Shared module directories containing only `.tofu` / `.tofu.json` files may not be
+   recognized as modules by the dependency index.
+
+Direct file-change autoplanning (without `--autoplan-modules`) is fully supported for
+`.tofu` projects. As a workaround for module dependencies, include shared module paths
+in explicit `autoplan.when_modified` patterns, or keep module source declarations in
+`.tf` files until full `.tofu` module indexing is implemented.
+
+Additionally, Terraform Cloud workspace detection (`cloud { workspaces { ... } }`) still
+scans only `.tf` files. If your workspace config is defined only in `.tofu` / `.tofu.json`,
+Atlantis may fall back to the default workspace. Workaround: keep workspace config in a
+`.tf` file, or configure the workspace explicitly in `atlantis.yaml`.
+:::
+
 ::: tip NOTE
 The Atlantis [latest docker image](https://github.com/runatlantis/atlantis/pkgs/container/atlantis/9854680?tag=latest) tends to have recent versions of Terraform, but there may be a delay as new versions are released. The highest version of Terraform allowed in your code is the version specified by `DEFAULT_TERRAFORM_VERSION` in the image your server is running.
 :::

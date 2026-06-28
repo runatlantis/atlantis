@@ -218,6 +218,7 @@ Note:
 - The paths are relative to the project's directory.
 - `when_modified` will be used by both automatic and manually run plans.
 - `when_modified` will continue to work for manually run plans even when autoplan is disabled.
+- The default `when_modified` includes `**/*.tf*`, `**/*.tofu`, `**/*.tofu.json`, `**/terragrunt.hcl`, and `**/.terraform.lock.hcl`. Custom `when_modified` overrides these defaults entirely.
 
 ### Supporting Terraform Workspaces
 
@@ -511,7 +512,9 @@ when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 | Key           | Type            | Default        | Required | Description                                                                                                                                                                                                                                                     |
 | ------------- | --------------- | -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | enabled       | boolean         | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                               |
-| when_modified | array\[string\] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
+| when_modified | array\[string\] | see below      | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
+
+Default `when_modified` patterns: `["**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"]`. Custom `when_modified` values override these defaults entirely. The default is global (not distribution-aware).
 
 ### RepoLocks
 

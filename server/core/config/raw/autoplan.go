@@ -13,6 +13,8 @@ import (
 // autoplan behavior for changes inside existing projects.
 var terraformAutoplanIndicators = []string{
 	"*.tf*",
+	"*.tofu",
+	"*.tofu.json",
 	"terragrunt.hcl",
 	".terraform.lock.hcl",
 }
