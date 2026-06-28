@@ -563,7 +563,7 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 // Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	if c.pr.Num < 0 {
+	if c.pr.Num < 0 && c.pr.HardenedNonPRRefCheckout {
 		return w.checkoutNonPRRef(logger, c, targetRef)
 	}
 
@@ -678,7 +678,7 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		baseCloneURL = w.TestingOverrideBaseCloneURL
 	}
 
-	if c.pr.Num < 0 {
+	if c.pr.Num < 0 && c.pr.HardenedNonPRRefCheckout {
 		// API refs may be branch names, tags, or raw commit SHAs. Fetch the ref
 		// directly instead of assuming it exists under refs/heads.
 		return w.cloneNonPRRef(logger, c, headCloneURL)

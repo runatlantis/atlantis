@@ -309,6 +309,8 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 | drift_only  | boolean              | No          | If true, only remediate projects with detected drift                    |
 
 The `paths` field uses the same `DriftDetectionPath` object described under `POST /api/drift/detect`.
+For remediation, a path selector without `workspace` targets the default Terraform workspace only.
+Use the top-level `workspaces` field or path-level `workspace` values to remediate non-default workspaces.
 
 ::: tip Actions
 
@@ -589,7 +591,7 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 | Name      | Type   | Required | Description                                                     |
 |-----------|--------|----------|-----------------------------------------------------------------|
 | directory | string | Yes      | Relative path to the Terraform directory                        |
-| workspace | string | No       | Terraform workspace (optional)                                  |
+| workspace | string | No       | Terraform workspace. If omitted, the default workspace is used. |
 
 ::: tip NOTE
 At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request.

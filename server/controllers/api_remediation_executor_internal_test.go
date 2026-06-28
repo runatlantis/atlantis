@@ -66,6 +66,52 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsHonorsGlobalApplyLock(t *tes
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
+func TestAPIRemediationExecutor_ExecuteApplyProjectsFailsClosedOnApplyLockError(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, errors.New("lock backend unavailable"))
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	projectCommandRunner := NewMockProjectCommandRunner()
+	workingDir := NewMockWorkingDir()
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			ApplyLockChecker:          applyLockChecker,
+			ProjectCommandBuilder:     projectCommandBuilder,
+			ProjectPlanCommandRunner:  projectCommandRunner,
+			ProjectApplyCommandRunner: projectCommandRunner,
+			WorkingDir:                workingDir,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   events.DefaultWorkspace,
+	}})
+
+	Assert(t, err != nil, "expected apply lock backend error")
+	Assert(t, strings.Contains(err.Error(), "checking global apply lock"), "expected apply lock check error, got %v", err)
+	Equals(t, 0, len(results))
+	workingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
 func TestSeedPullStatusFromPlanResultPreservesPlanStatusWhenPolicyCheckFollows(t *testing.T) {
 	ctx := &command.Context{}
 	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
@@ -366,6 +412,107 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 	Equals(t, command.Plan, capturedHookCmds[0].Name)
 	Equals(t, command.Apply, capturedHookCmds[1].Name)
 	Equals(t, command.Apply, capturedHookCmds[2].Name)
+}
+
+func TestAPIRemediationExecutor_ExecuteApplyProjectsFailsOnOmittedDependency(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(t.TempDir(), nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:               command.Apply,
+				ProjectName:               "app",
+				RepoRelDir:                "app",
+				Workspace:                 events.DefaultWorkspace,
+				DependsOn:                 []string{"network"},
+				PullStatus:                ctx.PullStatus,
+				FailOnMissingDependencies: ctx.FailOnMissingDependencies,
+			}}, nil}
+		})
+
+	projectCommandRunner := NewMockProjectCommandRunner()
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes."},
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+		projectCtx := args[0].(command.ProjectContext)
+		failure, err := (&events.DefaultCommandRequirementHandler{}).ValidateProjectDependencies(projectCtx)
+		if err != nil {
+			return ReturnValues{command.ProjectCommandOutput{Error: err}}
+		}
+		if failure != "" {
+			return ReturnValues{command.ProjectCommandOutput{Failure: failure}}
+		}
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+	})
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                         locker,
+			ApplyLockChecker:               applyLockChecker,
+			Logger:                         logger,
+			Scope:                          metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:          projectCommandBuilder,
+			ProjectPlanCommandRunner:       projectCommandRunner,
+			ProjectApplyCommandRunner:      projectCommandRunner,
+			PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+			WorkingDir:                     workingDir,
+			WorkingDirLocker:               workingDirLocker,
+			CommitStatusUpdater:            commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   events.DefaultWorkspace,
+	}})
+
+	Assert(t, err != nil, "expected omitted dependency to fail remediation apply")
+	Equals(t, 1, len(results))
+	Equals(t, models.RemediationStatusFailed, results[0].Status)
+	Assert(t, strings.Contains(results[0].Error, "network"), "expected dependency name in failure, got %q", results[0].Error)
 }
 
 func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t *testing.T) {

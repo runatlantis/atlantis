@@ -925,7 +925,6 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		Scope:                         a.Scope,
 		Log:                           a.Logger,
 		API:                           true,
-		FailOnTeamAllowlistDenied:     true,
 		SkipAPIBaseBranchVerification: request.PR <= 0 && strings.TrimSpace(request.BaseBranch) == "" && models.RequiresBaseBranchForRef(request.Ref),
 	}
 	a.populatePullRequestStatus(ctx)
@@ -1082,11 +1081,12 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	ctx := &command.Context{
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
-			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: e.baseBranchForRef(ref),
-			HeadBranch: ref,
-			HeadCommit: ref,
-			BaseRepo:   e.baseRepo,
+			Num:                      nextNonPRPullNum(), // Synthetic non-PR workflow ID.
+			BaseBranch:               e.baseBranchForRef(ref),
+			HeadBranch:               ref,
+			HeadCommit:               ref,
+			BaseRepo:                 e.baseRepo,
+			HardenedNonPRRefCheckout: true,
 		},
 		Scope:                     e.controller.Scope,
 		Log:                       e.logger,
@@ -1152,11 +1152,12 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 	ctx := &command.Context{
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
-			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: e.baseBranchForRef(ref),
-			HeadBranch: ref,
-			HeadCommit: ref,
-			BaseRepo:   e.baseRepo,
+			Num:                      nextNonPRPullNum(), // Synthetic non-PR workflow ID.
+			BaseBranch:               e.baseBranchForRef(ref),
+			HeadBranch:               ref,
+			HeadCommit:               ref,
+			BaseRepo:                 e.baseRepo,
+			HardenedNonPRRefCheckout: true,
 		},
 		Scope:                     e.controller.Scope,
 		Log:                       e.logger,
@@ -1166,6 +1167,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		SuppressJobOutput:         true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
+		FailOnMissingDependencies: true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1239,11 +1241,12 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	ctx := &command.Context{
 		HeadRepo: e.baseRepo,
 		Pull: models.PullRequest{
-			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: e.baseBranchForRef(ref),
-			HeadBranch: ref,
-			HeadCommit: ref,
-			BaseRepo:   e.baseRepo,
+			Num:                      nextNonPRPullNum(), // Synthetic non-PR workflow ID.
+			BaseBranch:               e.baseBranchForRef(ref),
+			HeadBranch:               ref,
+			HeadCommit:               ref,
+			BaseRepo:                 e.baseRepo,
+			HardenedNonPRRefCheckout: true,
 		},
 		Scope:                     e.controller.Scope,
 		Log:                       e.logger,
@@ -1253,6 +1256,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		SuppressJobOutput:         true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
+		FailOnMissingDependencies: true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1947,11 +1951,12 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	ctx := &command.Context{
 		HeadRepo: baseRepo,
 		Pull: models.PullRequest{
-			Num:        nextNonPRPullNum(), // Synthetic non-PR workflow ID.
-			BaseBranch: normalizedBaseBranch,
-			HeadBranch: normalizedRef,
-			HeadCommit: request.Ref,
-			BaseRepo:   baseRepo,
+			Num:                      nextNonPRPullNum(), // Synthetic non-PR workflow ID.
+			BaseBranch:               normalizedBaseBranch,
+			HeadBranch:               normalizedRef,
+			HeadCommit:               request.Ref,
+			BaseRepo:                 baseRepo,
+			HardenedNonPRRefCheckout: true,
 		},
 		Scope:                     a.Scope,
 		Log:                       a.Logger,
@@ -1972,8 +1977,10 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Run pre-workflow hooks before project discovery so hooks can
 	// dynamically generate atlantis.yaml or other config files.
+	preHookFailed := false
 	preHookCmd := &events.CommentCommand{Name: command.Plan}
 	if err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, preHookCmd); err != nil {
+		preHookFailed = true
 		if a.FailOnPreWorkflowHookError {
 			responder.InternalError(w, r, fmt.Errorf("pre-workflow hook failed: %w", err))
 			return
@@ -2009,7 +2016,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectionResult.AddProject(projectDrift)
 	}
 
-	if fullDetection && !storeFailed {
+	if fullDetection && !storeFailed && !preHookFailed {
 		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}

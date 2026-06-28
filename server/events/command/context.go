@@ -75,6 +75,11 @@ type Context struct {
 	// any selected project is denied by team allowlist filtering.
 	FailOnTeamAllowlistDenied bool
 
+	// FailOnMissingDependencies makes apply dependency validation fail when a
+	// dependency is absent from PullStatus. Drift remediation uses this to avoid
+	// applying a selected subset without its configured dependencies.
+	FailOnMissingDependencies bool
+
 	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
 	// pre-workflow hooks before project discovery.
 	PreWorkflowHooksAlreadyRun bool

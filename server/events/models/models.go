@@ -220,6 +220,10 @@ type PullRequest struct {
 	// BaseBranch is the name of the base branch (the branch that the pull
 	// request is getting merged into).
 	BaseBranch string
+	// HardenedNonPRRefCheckout makes synthetic non-PR API checkouts fetch the
+	// requested ref directly instead of treating it as a branch checkout. This is
+	// used by drift/remediation requests that accept branch, tag, and SHA refs.
+	HardenedNonPRRefCheckout bool
 	// Author is the username of the pull request author.
 	Author string
 	// Body is the description of the pull request. It may be empty when the VCS

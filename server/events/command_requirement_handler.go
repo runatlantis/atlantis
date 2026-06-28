@@ -38,12 +38,20 @@ type DefaultCommandRequirementHandler struct {
 
 func (a *DefaultCommandRequirementHandler) ValidateProjectDependencies(ctx command.ProjectContext) (failure string, err error) {
 	for _, dependOnProject := range ctx.DependsOn {
+		dependencyFound := false
 
 		for _, project := range ctx.PullStatus.Projects {
 
-			if project.ProjectName == dependOnProject && project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
+			if project.ProjectName != dependOnProject {
+				continue
+			}
+			dependencyFound = true
+			if project.Status != models.AppliedPlanStatus && project.Status != models.PlannedNoChangesPlanStatus {
 				return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", project.ProjectName), nil
 			}
+		}
+		if ctx.FailOnMissingDependencies && !dependencyFound {
+			return fmt.Sprintf("Can't apply your project unless you apply its dependencies: [%s]", dependOnProject), nil
 		}
 	}
 

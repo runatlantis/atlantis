@@ -152,10 +152,14 @@ func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, !strings.Contains(string(responseBody), "plan failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
-func TestAPIController_PlanTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
+func TestAPIController_PlanDoesNotFailClosedOnTeamAllowlistByDefault(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
+	var capturedCtx *command.Context
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn(nil, fmt.Errorf("failed to build command: %w", events.ErrTeamAllowlistDenied))
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{}, nil}
+		})
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -168,7 +172,9 @@ func TestAPIController_PlanTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Plan(w, req)
 
-	ResponseContains(t, w, http.StatusForbidden, "team allowlist denied")
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCtx != nil, "expected BuildPlanCommands to be called")
+	Assert(t, !capturedCtx.FailOnTeamAllowlistDenied, "legacy plan must not opt into drift fail-closed team allowlist behavior")
 }
 
 func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
@@ -589,10 +595,14 @@ func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.
 	}
 }
 
-func TestAPIController_ApplyTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
+func TestAPIController_ApplyDoesNotFailClosedOnTeamAllowlistByDefault(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
+	var capturedCtx *command.Context
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn(nil, fmt.Errorf("failed to build command: %w", events.ErrTeamAllowlistDenied))
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{}, nil}
+		})
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -605,7 +615,9 @@ func TestAPIController_ApplyTeamAllowlistDeniedReturnsForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	ac.Apply(w, req)
 
-	ResponseContains(t, w, http.StatusForbidden, "team allowlist denied")
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCtx != nil, "expected BuildPlanCommands to be called")
+	Assert(t, !capturedCtx.FailOnTeamAllowlistDenied, "legacy apply must not opt into drift fail-closed team allowlist behavior")
 }
 
 func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {
@@ -3035,6 +3047,55 @@ func TestAPIController_DetectDrift_SkipsPolicyChecksWhenPlanFails(t *testing.T) 
 	Equals(t, "terraform plan failed", stored.Error)
 }
 
+func TestAPIController_DetectDrift_PolicyCheckFailureIsVisibleAndSuppressesWebhook(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "modules/app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "modules/app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+		})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{Failure: "policy denied"})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+	sender := &recordingDriftSender{}
+	ac.DriftWebhookSender = &webhooks.DriftWebhookSender{Webhooks: []webhooks.DriftSender{sender}}
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusMultiStatus, w.Code)
+	_, stored := driftStorage.VerifyWasCalledOnce().
+		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]()).
+		GetCapturedArguments()
+	Assert(t, strings.Contains(stored.Error, "policy_check failed: policy denied"), "expected policy error in stored drift, got %q", stored.Error)
+	Equals(t, 0, sender.calls)
+}
+
 func TestAPIController_DetectDrift_FullDetectionRemovesStaleSameRefRecords(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	storage := drift.NewInMemoryStorage()
@@ -3162,6 +3223,43 @@ func TestAPIController_DetectDrift_ScopedDetectionKeepsUnrelatedRecords(t *testi
 	mainRecords, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main"})
 	Ok(t, err)
 	Equals(t, 2, len(mainRecords))
+}
+
+func TestAPIController_DetectDrift_NonFatalPreHookFailureSkipsStaleReconciliation(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "cached",
+		Path:        "cached",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+	When(preWorkflowHooksRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(errors.New("generate config failed"))
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "cached", records[0].ProjectName)
 }
 
 func TestAPIController_DetectDrift_ResolvesSyntheticRefBeforePlanReuse(t *testing.T) {

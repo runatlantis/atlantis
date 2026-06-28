@@ -145,11 +145,12 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 				GpgNoSigningEnabled:         true,
 			}
 			pull := models.PullRequest{
-				Num:        -1,
-				BaseRepo:   models.Repo{},
-				BaseBranch: tt.ref,
-				HeadBranch: tt.ref,
-				HeadCommit: tt.ref,
+				Num:                      -1,
+				BaseRepo:                 models.Repo{},
+				BaseBranch:               tt.ref,
+				HeadBranch:               tt.ref,
+				HeadCommit:               tt.ref,
+				HardenedNonPRRefCheckout: true,
 			}
 
 			cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
@@ -199,17 +200,50 @@ func TestClone_SyntheticNonPRRefsRejectPRNamespaces(t *testing.T) {
 				GpgNoSigningEnabled:         true,
 			}
 			pull := models.PullRequest{
-				Num:        -1,
-				BaseRepo:   models.Repo{},
-				BaseBranch: ref,
-				HeadBranch: ref,
-				HeadCommit: ref,
+				Num:                      -1,
+				BaseRepo:                 models.Repo{},
+				BaseBranch:               ref,
+				HeadBranch:               ref,
+				HeadCommit:               ref,
+				HardenedNonPRRefCheckout: true,
 			}
 
 			_, err := wd.Clone(logger, models.Repo{}, pull, "default")
 			ErrContains(t, "unsafe refs are not allowed", err)
 		})
 	}
+}
+
+func TestClone_LegacySyntheticNonPRBranchKeepsBranchCheckout(t *testing.T) {
+	repoDir := initRepo(t)
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	branchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	logger := logging.NewNoopLogger(t)
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     t.TempDir(),
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+	}
+	pull := models.PullRequest{
+		Num:        -1,
+		BaseRepo:   models.Repo{},
+		BaseBranch: "branch",
+		HeadBranch: "branch",
+		HeadCommit: "branch",
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
+	Ok(t, err)
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, branchCommit, actCommit)
+	actBranch := strings.TrimSpace(runCmd(t, cloneDir, "git", "symbolic-ref", "--short", "HEAD"))
+	Equals(t, "branch", actBranch)
 }
 
 // Test that if we don't have any existing files, we check out the repo

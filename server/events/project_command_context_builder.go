@@ -332,6 +332,7 @@ func newProjectCommandContext(ctx *command.Context,
 		SkipPRRequirements:         ctx.SkipPRRequirements,
 		SuppressVCSStatus:          ctx.SuppressVCSStatus,
 		SuppressJobOutput:          ctx.SuppressJobOutput,
+		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
 	}
 }
 

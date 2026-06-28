@@ -15,6 +15,8 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
+const defaultWorkspace = "default"
+
 // RemediationService handles drift remediation operations.
 type RemediationService interface {
 	// Remediate executes drift remediation for the given projects.
@@ -357,7 +359,7 @@ func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []stri
 	if len(workspaces) > 0 {
 		return workspaces, nil
 	}
-	return []string{""}, nil
+	return []string{defaultWorkspace}, nil
 }
 
 func remediationPathProjectNames(projects []string) []string {
@@ -387,7 +389,7 @@ func hasRemediationPathTarget(projects []models.ProjectDrift, path string, works
 		if projectName != "" && p.ProjectName != projectName {
 			continue
 		}
-		if workspace == "" || p.Workspace == workspace {
+		if p.Workspace == workspace {
 			return true
 		}
 	}
@@ -416,6 +418,9 @@ func (s *InMemoryRemediationService) matchesFilters(proj models.ProjectDrift, re
 				continue
 			}
 			if path.Workspace != "" && proj.Workspace != path.Workspace {
+				continue
+			}
+			if path.Workspace == "" && len(req.Workspaces) == 0 && proj.Workspace != defaultWorkspace {
 				continue
 			}
 			matched = true

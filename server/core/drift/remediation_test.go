@@ -546,6 +546,37 @@ func TestInMemoryRemediationService_PathSelectorsHonorCachedWorkspaceFilters(t *
 	Equals(t, remediationExecutorCall{projectName: "app", path: "env", workspace: "stage"}, executor.planCalls[1])
 }
 
+func TestInMemoryRemediationService_PathSelectorWithoutWorkspaceTargetsDefaultOnly(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "app",
+		Path:        "env",
+		Workspace:   "prod",
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Paths: []models.DriftDetectionPath{{
+			Directory: "env",
+		}},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{path: "env", workspace: "default"}, executor.planCalls[0])
+	Equals(t, 1, len(result.Projects))
+	Assert(t, result.Projects[0].DriftBefore == nil, "default workspace fallback must not consume cached prod drift")
+}
+
 func TestInMemoryRemediationService_PathSelectorRejectsConflictingWorkspaceFilter(t *testing.T) {
 	service := drift.NewInMemoryRemediationService(nil)
 	executor := &recordingRemediationExecutor{}

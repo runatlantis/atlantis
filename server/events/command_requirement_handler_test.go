@@ -770,6 +770,18 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
 			wantErr:     assert.NoError,
 		},
+		{
+			name: "Fail missing dependency when strict dependency status is required",
+			ctx: command.ProjectContext{
+				DependsOn:                 []string{"project1"},
+				FailOnMissingDependencies: true,
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project1]",
+			wantErr:     assert.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

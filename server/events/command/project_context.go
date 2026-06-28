@@ -155,6 +155,10 @@ type ProjectContext struct {
 	// SuppressJobOutput prevents API workflows such as drift detection from
 	// publishing raw command output to the public job stream.
 	SuppressJobOutput bool
+
+	// FailOnMissingDependencies makes apply dependency validation fail when a
+	// configured dependency is not present in PullStatus.
+	FailOnMissingDependencies bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

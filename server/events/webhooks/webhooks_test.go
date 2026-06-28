@@ -82,6 +82,22 @@ func TestNewWebhooksManager_InvalidBranchAndWorkspaceRegex(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
 
+func TestNewWebhooksManager_DriftConfigSkipsApplyRegexParsing(t *testing.T) {
+	RegisterMockTestingT(t)
+	clients := validClients()
+	configs := []webhooks.Config{{
+		Event:          webhooks.DriftEvent,
+		WorkspaceRegex: "(",
+		BranchRegex:    "(",
+		Kind:           webhooks.HttpKind,
+		URL:            "https://example.com/drift",
+	}}
+
+	manager, err := webhooks.NewMultiWebhookSender(configs, clients)
+	Ok(t, err)
+	Equals(t, 0, len(manager.Webhooks)) // nolint: staticcheck
+}
+
 func TestNewWebhooksManager_NoEvent(t *testing.T) {
 	t.Log("When the event key is not specified in a config, an error is returned")
 	RegisterMockTestingT(t)
