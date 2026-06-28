@@ -1,0 +1,52 @@
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_a189c49dbe78af 172-174
+  s_243a1a1edc15e5::t_27f48bcad72bbf 883
+  s_243a1a1edc15e5::t_661760aba718bf 1112-1113,1186-1187,1277-1278,1988-1989
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_73271a552ce48e 406
+  s_243a1a1edc15e5::t_525a2d7421450a 2025-2069
+  s_243a1a1edc15e5::t_fdbb634f0a8de5 130-139,144-168,525-533,538-570
+  s_243a1a1edc15e5::t_3bb3c9d25bdb9c 143,537
+  s_243a1a1edc15e5::t_27e4d87f384bcd 571,2894-2934
+  s_243a1a1edc15e5::t_9862aa20e3ead5 140-142,534-536
+  s_243a1a1edc15e5::t_a9b2a93fc54a2f 572
+server/events/command/context.go
+  s_243a1a1edc15e5::t_f2fb2ef4ec56ec 83-91
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_218025e4a9c386 425
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_9cf28059be6479 121,135-137,160-161
+  s_243a1a1edc15e5::t_261e88febd6c5f 113,120,123-127,130-132,140-142,145-159,162,187
+  s_243a1a1edc15e5::t_572296afdc759e 122
+server/controllers/api_controller_internal_test.go
+  s_243a1a1edc15e5::t_b3b9b4a191ebab 1-102
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_80c30bf2202ff0 741-742,744,755-760
+  s_243a1a1edc15e5::t_f477d0a4b40864 761-762
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_38f5ff1df051d5 227,232,234-235
+server/events/project_command_builder.go
+  s_243a1a1edc15e5::t_a495785a0eeed9 1106
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_955d33a465c3a1 336,610
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_cae725112f7dd9 2112,2300-2329,2519-2523
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_78056b07ac417f 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "6290cfb430450eb585874fa384ef9466cb63ddc1",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
