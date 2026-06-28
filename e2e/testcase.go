@@ -109,14 +109,16 @@ var testCases = []TestCase{
 		VCS:                        VCSGitHub,
 		Status:                     CaseActive,
 	},
-	// GitLab smoke: same fixtures but only asserts aggregate pipeline success.
-	// Cannot assert per-project status contexts on GitLab.
+	// GitLab smoke: asserts aggregate pipeline success plus plan comment marker.
+	// Cannot assert per-project status contexts on GitLab, but verifying the
+	// Atlantis MR note contains the project header prevents 0/0 false positives.
 	{
-		Name:       "standalone-gitlab",
-		Dir:        "standalone",
-		MutateFile: "e2e_trigger.tf",
-		VCS:        VCSGitLab,
-		Status:     CaseActive,
+		Name:                     "standalone-gitlab",
+		Dir:                      "standalone",
+		MutateFile:               "e2e_trigger.tf",
+		ExpectedCommentSubstring: "dir: `standalone` workspace: `default`",
+		VCS:                      VCSGitLab,
+		Status:                   CaseActive,
 	},
 
 	// ─── Multi-project: single project change ───
