@@ -1103,7 +1103,7 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		if filterProjectDir || filterProjectWorkspace {
+		if filterProjectDir || filterProjectWorkspace || ctx.ExactProjectNameMatching {
 			projectsCfg = repoCfg.FindProjectsByExactName(projectName)
 		} else if p.EnableRegExpCmd {
 			projectsCfg = repoCfg.FindProjectsByName(projectName)

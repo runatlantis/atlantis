@@ -127,6 +127,45 @@ func TestAPIController_Plan(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 }
 
+func TestAPIController_PlanPreservesCallerProjectOrder(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			commentCommand := args[1].(*events.CommentCommand)
+			orderGroup := 2
+			if commentCommand.ProjectName == "first-group" {
+				orderGroup = 1
+			}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:               command.Plan,
+				ProjectName:               commentCommand.ProjectName,
+				ExecutionOrderGroup:       orderGroup,
+				AbortOnExecutionOrderFail: true,
+			}}, nil}
+		})
+	var planOrder []string
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			planOrder = append(planOrder, projectCtx.ProjectName)
+			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"second-group", "first-group"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, []string{"second-group", "first-group"}, planOrder)
+}
+
 func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	ac, _, projectCommandRunner := setup(t)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
@@ -364,7 +403,7 @@ func TestAPIController_LegacyPlanApplyErrorsReturnLegacyShape(t *testing.T) {
 				body:       string(validBody),
 				secret:     atlantisToken,
 				apiSecret:  nil,
-				statusCode: http.StatusServiceUnavailable,
+				statusCode: http.StatusBadRequest,
 			},
 			{
 				name:       "malformed JSON",
@@ -481,6 +520,54 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyPreservesCallerProjectOrder(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	buildCommands := func(args []Param) ReturnValues {
+		commentCommand := args[1].(*events.CommentCommand)
+		orderGroup := 2
+		if commentCommand.ProjectName == "first-group" {
+			orderGroup = 1
+		}
+		return ReturnValues{[]command.ProjectContext{{
+			CommandName:               commentCommand.Name,
+			ProjectName:               commentCommand.ProjectName,
+			ExecutionOrderGroup:       orderGroup,
+			AbortOnExecutionOrderFail: true,
+		}}, nil}
+	}
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(buildCommands)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(buildCommands)
+
+	var planOrder, applyOrder []string
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			planOrder = append(planOrder, projectCtx.ProjectName)
+			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+		})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			applyOrder = append(applyOrder, projectCtx.ProjectName)
+			return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"second-group", "first-group"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, []string{"second-group", "first-group"}, planOrder)
+	Equals(t, []string{"second-group", "first-group"}, applyOrder)
 }
 
 func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
@@ -1935,6 +2022,51 @@ func TestAPIController_Remediate_ServiceFailureWithoutProjectsReturnsInternalErr
 	Equals(t, controllers.ErrCodeInternal, apiErr.Code)
 }
 
+func TestAPIController_RemediateProjectSelectorsUseExactMatching(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	ac.RemediationService = drift.NewInMemoryRemediationService(drift.NewInMemoryStorage())
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(t.TempDir(), nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	var capturedCtx *command.Context
+	var capturedCmd *events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			capturedCmd = args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app.prod",
+				RepoRelDir:  "env",
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Your infrastructure matches the configuration."},
+	})
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+		Projects:   []string{"app.prod"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/remediate", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCtx != nil, "expected project command builder context")
+	Assert(t, capturedCtx.ExactProjectNameMatching, "remediation API project selectors must use exact matching")
+	Assert(t, capturedCmd != nil, "expected remediation project selector")
+	Equals(t, "app.prod", capturedCmd.ProjectName)
+}
+
 func TestAPIController_Remediate_PartialFailuresReturnMultiStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -2757,6 +2889,47 @@ func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {
 	Equals(t, 0, sender.results[0].ProjectsWithDrift)
 	Equals(t, 1, len(sender.results[0].Projects))
 	Assert(t, !sender.results[0].Projects[0].HasDrift, "expected no-drift webhook project")
+}
+
+func TestAPIController_DetectDriftEmptySelectorsDiscoverAllProjects(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	var capturedCtx *command.Context
+	var capturedCmd *events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			capturedCmd = args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCmd != nil, "expected project command builder to be called")
+	Assert(t, capturedCmd.DiscoverAllProjects, "expected empty drift selectors to request full project discovery")
+	Assert(t, capturedCtx != nil, "expected command context")
+	Assert(t, capturedCtx.ExactProjectNameMatching, "expected drift API project selectors to use exact matching")
+	Assert(t, capturedCtx.SortByExecutionOrder, "expected drift API contexts to opt into execution-order sorting")
 }
 
 func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {

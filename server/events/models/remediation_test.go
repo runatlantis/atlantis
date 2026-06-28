@@ -37,8 +37,6 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 		{name: "ambiguous prod ref", ref: "prod"},
 		{name: "ambiguous latest ref", ref: "latest"},
 		{name: "ambiguous stable ref", ref: "stable"},
-		{name: "slash tag-like ref", ref: "release/v1.2.3"},
-		{name: "slash ambiguous ref", ref: "env/prod"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			request := models.RemediationRequest{
@@ -57,7 +55,7 @@ func TestRemediationRequestValidateRequiresBaseBranchForSHAAndTagRefs(t *testing
 }
 
 func TestRemediationRequestValidateBranchRefDoesNotRequireBaseBranch(t *testing.T) {
-	for _, ref := range []string{"main", "master", "develop", "refs/heads/release/1.2", "refs/heads/feature/foo"} {
+	for _, ref := range []string{"main", "master", "develop", "feature/foo", "release/2026-06", "refs/heads/release/1.2", "refs/heads/feature/foo"} {
 		t.Run(ref, func(t *testing.T) {
 			request := models.RemediationRequest{
 				Repository: "owner/repo",

@@ -80,6 +80,15 @@ type Context struct {
 	// applying a selected subset without its configured dependencies.
 	FailOnMissingDependencies bool
 
+	// ExactProjectNameMatching treats API project selectors as exact project
+	// identities even when regex command selection is enabled.
+	ExactProjectNameMatching bool
+
+	// SortByExecutionOrder sorts API-selected project commands by configured
+	// execution order. Drift remediation uses this to preserve dependency
+	// ordering without changing legacy API request order.
+	SortByExecutionOrder bool
+
 	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
 	// pre-workflow hooks before project discovery.
 	PreWorkflowHooksAlreadyRun bool

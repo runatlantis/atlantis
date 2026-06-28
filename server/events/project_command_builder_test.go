@@ -2109,6 +2109,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 		Cmd                 events.CommentCommand
 		API                 bool
 		EnableRegExpCmd     bool
+		ExactProjectNames   bool
 		ExpErr              string
 		ExpNoProjects       bool
 		ExpSkipFileList     bool
@@ -2295,6 +2296,36 @@ projects:
 			},
 			ModifiedFiles:   []string{"literal/main.tf"},
 			ExpProjectNames: []string{"prod.api"},
+		},
+		{
+			Description: "API exact project selector treats regexp metacharacters as literal when regexp commands enabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "app.prod",
+			},
+			API:                 true,
+			EnableRegExpCmd:     true,
+			ExactProjectNames:   true,
+			SkipPRModifiedFiles: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: app.prod
+  dir: literal
+- name: appXprod
+  dir: other
+`,
+			DirectoryStructure: map[string]any{
+				"literal": map[string]any{
+					"main.tf": nil,
+				},
+				"other": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ExpProjectNames: []string{"app.prod"},
+			ExpSkipFileList: true,
 		},
 		{
 			Description: "API project path selector keeps cached project name exact when regexp commands enabled",
@@ -2485,10 +2516,11 @@ projects:
 			var err error
 			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
-				Log:                 logger,
-				Scope:               scope,
-				API:                 c.API,
-				SkipPRModifiedFiles: c.SkipPRModifiedFiles,
+				Log:                      logger,
+				Scope:                    scope,
+				API:                      c.API,
+				SkipPRModifiedFiles:      c.SkipPRModifiedFiles,
+				ExactProjectNameMatching: c.ExactProjectNames,
 			}, &cmd)
 
 			if c.ExpNoProjects {

@@ -169,7 +169,9 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		return nil, nil, events.ErrIgnoredTargetedDir
 	}
 
-	sortCommandPairsByExecutionOrder(cmds, keptCommentCommands)
+	if ctx.SortByExecutionOrder {
+		sortCommandPairsByExecutionOrder(cmds, keptCommentCommands)
+	}
 	return cmds, keptCommentCommands, nil
 }
 
@@ -878,7 +880,7 @@ func mergePolicyStatuses(existing []models.PolicySetStatus, incoming []models.Po
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
-		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
+		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
 	}
 
 	// Validate the secret token using constant-time comparison to prevent timing attacks
@@ -1107,6 +1109,8 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		SuppressJobOutput:         true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
+		ExactProjectNameMatching:  true,
+		SortByExecutionOrder:      true,
 	}
 
 	// Setup working directory
@@ -1179,6 +1183,8 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 		FailOnMissingDependencies: true,
+		ExactProjectNameMatching:  true,
+		SortByExecutionOrder:      true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1268,6 +1274,8 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 		FailOnMissingDependencies: true,
+		ExactProjectNameMatching:  true,
+		SortByExecutionOrder:      true,
 	}
 
 	if err := e.ensureApplyUnlocked(); err != nil {
@@ -1977,6 +1985,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		SuppressJobOutput:         true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
+		ExactProjectNameMatching:  true,
+		SortByExecutionOrder:      true,
 	}
 
 	// Setup working directory

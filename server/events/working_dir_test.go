@@ -110,28 +110,56 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 
 func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 	repoDir := initRepo(t)
+	mainCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "main"))
 	runCmd(t, repoDir, "git", "checkout", "branch")
 	runCmd(t, repoDir, "touch", "branch-file")
 	runCmd(t, repoDir, "git", "add", "branch-file")
 	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
 	branchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 	runCmd(t, repoDir, "git", "tag", "drift-tag")
+	runCmd(t, repoDir, "git", "tag", "branch", mainCommit)
+	runCmd(t, repoDir, "git", "tag", "main", branchCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature/foo", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "slash-branch-file")
+	runCmd(t, repoDir, "git", "add", "slash-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "slash branch file")
+	slashBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "feature/foo", mainCommit)
 
 	for _, tt := range []struct {
-		name string
-		ref  string
+		name           string
+		ref            string
+		expectedCommit string
 	}{
 		{
-			name: "branch",
-			ref:  "branch",
+			name:           "main branch with same-named tag",
+			ref:            "main",
+			expectedCommit: mainCommit,
 		},
 		{
-			name: "raw commit",
-			ref:  branchCommit,
+			name:           "branch with same-named tag",
+			ref:            "branch",
+			expectedCommit: branchCommit,
 		},
 		{
-			name: "tag",
-			ref:  "drift-tag",
+			name:           "slash branch with same-named tag",
+			ref:            "feature/foo",
+			expectedCommit: slashBranchCommit,
+		},
+		{
+			name:           "explicit branch ref",
+			ref:            "refs/heads/feature/foo",
+			expectedCommit: slashBranchCommit,
+		},
+		{
+			name:           "raw commit",
+			ref:            branchCommit,
+			expectedCommit: branchCommit,
+		},
+		{
+			name:           "explicit tag ref",
+			ref:            "refs/tags/drift-tag",
+			expectedCommit: branchCommit,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -156,7 +184,7 @@ func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
 			cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
 			Ok(t, err)
 			actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
-			Equals(t, branchCommit, actCommit)
+			Equals(t, tt.expectedCommit, actCommit)
 
 			merged, err := wd.MergeAgain(logger, models.Repo{}, pull, "default")
 			Ok(t, err)

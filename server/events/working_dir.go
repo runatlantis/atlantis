@@ -738,9 +738,10 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 	if models.IsUnsafeAPIRef(targetRef) {
 		return fmt.Errorf("checking out API ref: unsafe refs are not allowed")
 	}
-	fetchArgs := []string{"fetch", "--depth=1", "origin", "--", targetRef}
+	fetchRef := nonPRFetchRef(targetRef)
+	fetchArgs := []string{"fetch", "--depth=1", "origin", "--", fetchRef}
 	if w.CheckoutDepth > 0 {
-		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", "--", targetRef}
+		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", "--", fetchRef}
 	}
 	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
@@ -749,6 +750,14 @@ func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrapped
 		return err
 	}
 	return w.cleanStalePlanFiles(logger, c)
+}
+
+func nonPRFetchRef(targetRef string) string {
+	ref := strings.TrimSpace(targetRef)
+	if strings.HasPrefix(ref, "refs/heads/") || strings.HasPrefix(ref, "refs/tags/") || models.RequiresBaseBranchForRef(ref) {
+		return ref
+	}
+	return "refs/heads/" + ref
 }
 
 func nonPRTargetRef(p models.PullRequest) string {

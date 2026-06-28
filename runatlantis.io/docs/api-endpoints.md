@@ -333,7 +333,7 @@ When remediation uses cached drift for a moving ref such as `main`, Atlantis com
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, slash-containing ambiguous refs such as `release/v1.2.3` or `env/prod`, and bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. For tags with slash names, use the explicit `refs/tags/...` form.
 :::
 
 #### Sample Request (Plan Only)
@@ -607,7 +607,7 @@ Drift detection does not bypass team allowlists. If a configured team allowlist 
 :::
 
 ::: tip Branch Context
-For branch refs such as `main`, Atlantis uses `ref` as the branch context. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, slash-containing ambiguous refs such as `release/v1.2.3` or `env/prod`, and bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch.
+For branch refs such as `main`, `feature/foo`, or `refs/heads/feature/foo`, Atlantis uses `ref` as the branch context and fetches the branch namespace explicitly. For raw commit SHAs, `refs/tags/...` refs, semantic-version tags such as `v1.2.3`, and ambiguous bare tag refs such as `prod`, `latest`, or `stable`, provide `base_branch` so repo-config branch filters and undiverged checks are evaluated against the intended branch. For tags with slash names, use the explicit `refs/tags/...` form.
 :::
 
 #### Sample Request

@@ -224,13 +224,15 @@ func isAmbiguousBareRef(ref string) bool {
 		return false
 	}
 	if strings.Contains(ref, "/") {
-		return true
+		return false
 	}
 	switch strings.ToLower(ref) {
 	case "main", "master", "develop", "development", "dev", "trunk":
 		return false
-	default:
+	case "prod", "production", "latest", "stable", "release":
 		return true
+	default:
+		return false
 	}
 }
 
