@@ -54,8 +54,8 @@ type Context struct {
 	// tied to a pull request to skip PR-only requirements like approved and mergeable.
 	SkipPRRequirements bool
 
-	// SkipPRModifiedFiles allows non-PR API workflows, such as drift detection,
-	// to resolve explicit selectors without querying pull request modified files.
+	// SkipPRModifiedFiles allows synthetic non-PR API workflows to resolve
+	// explicit selectors without querying pull request modified files.
 	SkipPRModifiedFiles bool
 
 	// SuppressVCSStatus prevents API workflows such as drift detection from
@@ -70,9 +70,8 @@ type Context struct {
 	// remediation from sending legacy event: apply webhooks.
 	SuppressApplyWebhooks bool
 
-	// RunPolicyChecks allows API workflows that explicitly model the full plan
-	// lifecycle, such as drift detection/remediation, to execute generated
-	// policy_check contexts after successful plan contexts.
+	// RunPolicyChecks allows API workflows that model the full plan lifecycle
+	// to execute generated policy_check contexts after successful plan contexts.
 	RunPolicyChecks bool
 
 	// FailOnTeamAllowlistDenied makes project selection return an error when
@@ -89,8 +88,7 @@ type Context struct {
 	ExactProjectNameMatching bool
 
 	// SortByExecutionOrder sorts API-selected project commands by configured
-	// execution order. Drift remediation uses this to preserve dependency
-	// ordering without changing legacy API request order.
+	// execution order.
 	SortByExecutionOrder bool
 
 	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
@@ -110,9 +108,4 @@ type Context struct {
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
-
-	// SkipAPIBaseBranchVerification preserves legacy no-PR API plan/apply
-	// behavior for tag/SHA refs that were not supplied with an explicit
-	// base_branch.
-	SkipAPIBaseBranchVerification bool
 }

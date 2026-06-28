@@ -251,7 +251,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "legacy API call without PR preserves policies_passed behavior when policy checks were not run",
+			name: "API call without policy execution uses existing policy status semantics",
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,

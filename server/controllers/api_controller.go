@@ -552,9 +552,6 @@ func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) err
 	if baseBranch == "" || headRef == "" {
 		return nil
 	}
-	if ctx.SkipAPIBaseBranchVerification {
-		return nil
-	}
 	if baseBranch == headRef && !models.RequiresBaseBranchForRef(headRef) {
 		return nil
 	}
@@ -884,7 +881,7 @@ func mergePolicyStatuses(existing []models.PolicySetStatus, incoming []models.Po
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
-		return nil, nil, http.StatusBadRequest, fmt.Errorf("ignoring request since API is disabled")
+		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
 	}
 
 	// Validate the secret token using constant-time comparison to prevent timing attacks
@@ -925,20 +922,31 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		return nil, nil, http.StatusForbidden, fmt.Errorf("repo not allowlisted")
 	}
 
+	pullNum := request.PR
+	syntheticNonPR := request.PR <= 0
+	if syntheticNonPR {
+		pullNum = nextNonPRPullNum()
+	}
+
 	pull := models.PullRequest{
-		Num:        request.PR,
-		BaseBranch: apiRequestBaseBranch(request.Ref, request.BaseBranch),
-		HeadBranch: request.Ref,
-		HeadCommit: request.Ref,
-		BaseRepo:   baseRepo,
+		Num:                      pullNum,
+		BaseBranch:               apiRequestBaseBranch(request.Ref, request.BaseBranch),
+		HeadBranch:               request.Ref,
+		HeadCommit:               request.Ref,
+		BaseRepo:                 baseRepo,
+		HardenedNonPRRefCheckout: syntheticNonPR,
 	}
 	ctx := &command.Context{
-		HeadRepo:                      baseRepo,
-		Pull:                          pull,
-		Scope:                         a.Scope,
-		Log:                           a.Logger,
-		API:                           true,
-		SkipAPIBaseBranchVerification: request.PR <= 0 && strings.TrimSpace(request.BaseBranch) == "" && models.RequiresBaseBranchForRef(request.Ref),
+		HeadRepo:                  baseRepo,
+		Pull:                      pull,
+		Scope:                     a.Scope,
+		Log:                       a.Logger,
+		API:                       true,
+		SkipPRModifiedFiles:       syntheticNonPR,
+		FailOnTeamAllowlistDenied: true,
+		RunPolicyChecks:           true,
+		SortByExecutionOrder:      true,
+		ExactProjectNameMatching:  true,
 	}
 	a.populatePullRequestStatus(ctx)
 	return &request, ctx, http.StatusOK, nil

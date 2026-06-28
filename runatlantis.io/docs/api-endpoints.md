@@ -22,7 +22,7 @@ The newer drift API endpoints use a consistent envelope format:
 }
 ```
 
-Existing legacy endpoints keep their historical response bodies for compatibility. This includes `POST /api/plan`, `POST /api/apply`, and the existing lock endpoints. Legacy command endpoints return `command.Result` at the top level on success or project failure, and return a top-level `{ "error": "..." }` body for request/auth/setup errors.
+The command and lock endpoints currently return their original top-level bodies rather than the drift API envelope. This includes `POST /api/plan`, `POST /api/apply`, and the existing lock endpoints. Command endpoints return `command.Result` at the top level on success or project failure, and return a top-level `{ "error": "..." }` body for request/auth/setup errors.
 
 ### Envelope Response Fields
 
@@ -94,8 +94,18 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 At least one of `Projects` or `Paths` must be specified.
 :::
 
+::: tip No-PR API Requests
+When `PR` is omitted or set to `0`, Atlantis runs the request as an isolated synthetic non-PR workflow. Synthetic API workflows use generated pull identities for working directories and locks, perform hardened branch-qualified checkout, skip pull-request modified-file lookups, fail closed on team allowlist denial, and sort selected projects by configured execution order.
+
+For tag, commit SHA, or ambiguous non-branch refs, provide `base_branch` so Atlantis can verify the checked ref is reachable from the intended base branch. Branch names such as `main` or `feature/foo` are fetched as `refs/heads/<branch>`.
+:::
+
+::: tip Policy Checks
+When policy checks are enabled and project selection generates `policy_check` contexts, API plan/apply requests run policy checks after successful plan contexts. API apply requests with `apply_requirements: [policies_passed]` require successful policy status before applying.
+:::
+
 ::: tip API Apply Plan Phase
-The legacy API apply endpoint runs a plan before apply and preserves its historical behavior for compatibility: project-level errors in that pre-apply phase do not by themselves skip the apply phase for other eligible pending plans. Drift remediation auto-apply is stricter and fails closed when its pre-apply plan has errors.
+The API apply endpoint runs a plan before apply. Project-level errors in that pre-apply phase do not by themselves skip the apply phase for other eligible pending plans. Drift remediation auto-apply is stricter and fails closed when its pre-apply plan has errors.
 :::
 
 #### Path
@@ -279,6 +289,14 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 
 ::: tip Error Response Format
 Error responses follow the same legacy format as the plan endpoint. See the [plan error response example](#sample-response-error) for details.
+:::
+
+## Drift Detection And Remediation (Alpha)
+
+:::warning ALPHA FEATURE - SUBJECT TO CHANGE
+The drift detection, drift status, remediation, remediation history, and drift webhook APIs are alpha features. Their request fields, response schemas, storage semantics, webhook payloads, and safety gates may change before the feature is promoted to stable.
+
+Drift detection runs Terraform plan workflows and can execute configured hooks or custom plan steps. Destructive remediation apply requires both `--enable-drift-detection` and `--enable-drift-remediation`.
 :::
 
 ### POST /api/drift/remediate
@@ -564,11 +582,11 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 | Status Code | Description                                                                |
 |-------------|----------------------------------------------------------------------------|
-| 400         | Invalid request (missing required fields, invalid action, or API disabled) |
+| 400         | Invalid request (missing required fields or invalid action)                |
 | 401         | Invalid or missing `X-Atlantis-Token` header                               |
 | 403         | Repository not in allowed list                                             |
 | 409         | Remediation ran but all targeted projects failed                           |
-| 503         | Drift remediation or remediation apply is not enabled on the server        |
+| 503         | API, drift remediation, or remediation apply is not enabled on the server  |
 | 500         | Internal error during remediation                                          |
 
 ### POST /api/drift/detect

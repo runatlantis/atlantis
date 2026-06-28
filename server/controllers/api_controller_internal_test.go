@@ -62,7 +62,7 @@ func TestVerifyNonPRBaseBranchReachabilityRejectsUnreachableCommitAfterUnshallow
 	ErrContains(t, "is not reachable from base_branch", err)
 }
 
-func TestResolveNonPRHeadCommitSkipsLegacyZeroPull(t *testing.T) {
+func TestResolveNonPRHeadCommitSkipsNonSyntheticPull(t *testing.T) {
 	repoDir := initReachabilityRepo(t)
 	ctx := &command.Context{
 		Pull: models.PullRequest{

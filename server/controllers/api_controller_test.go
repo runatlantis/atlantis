@@ -128,7 +128,7 @@ func TestAPIController_Plan(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
 }
 
-func TestAPIController_PlanPreservesCallerProjectOrder(t *testing.T) {
+func TestAPIController_PlanSortsByExecutionOrder(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
@@ -164,7 +164,7 @@ func TestAPIController_PlanPreservesCallerProjectOrder(t *testing.T) {
 	ac.Plan(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
-	Equals(t, []string{"second-group", "first-group"}, planOrder)
+	Equals(t, []string{"first-group", "second-group"}, planOrder)
 }
 
 func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
@@ -192,7 +192,7 @@ func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, !strings.Contains(string(responseBody), "plan failed"), "legacy project Error must not be stringified: %s", responseBody)
 }
 
-func TestAPIController_PlanDoesNotFailClosedOnTeamAllowlistByDefault(t *testing.T) {
+func TestAPIController_PlanFailsClosedOnTeamAllowlistDenial(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	var capturedCtx *command.Context
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -214,7 +214,7 @@ func TestAPIController_PlanDoesNotFailClosedOnTeamAllowlistByDefault(t *testing.
 
 	Equals(t, http.StatusOK, w.Code)
 	Assert(t, capturedCtx != nil, "expected BuildPlanCommands to be called")
-	Assert(t, !capturedCtx.FailOnTeamAllowlistDenied, "legacy plan must not opt into drift fail-closed team allowlist behavior")
+	Assert(t, capturedCtx.FailOnTeamAllowlistDenied, "API plan should fail closed on team allowlist denial")
 }
 
 func TestAPIController_PlanSuccessReturnsLegacyShape(t *testing.T) {
@@ -257,7 +257,7 @@ func TestAPIController_PlanPublishesNormalCommitStatus(t *testing.T) {
 		UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.PendingCommitStatus), Eq(command.Plan))
 }
 
-func TestAPIController_PlanSkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
+func TestAPIController_PlanRunsPolicyChecksForAPI(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -275,6 +275,10 @@ func TestAPIController_PlanSkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
 				Workspace:   events.DefaultWorkspace,
 			},
 		}, nil)
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+			PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+		}})
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -291,16 +295,18 @@ func TestAPIController_PlanSkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
 	responseBody, _ := io.ReadAll(w.Result().Body)
 	var result command.Result
 	Ok(t, json.Unmarshal(responseBody, &result))
-	Equals(t, 1, len(result.ProjectResults))
+	Equals(t, 2, len(result.ProjectResults))
 	Equals(t, command.Plan, result.ProjectResults[0].Command)
-	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(Any[command.ProjectContext]())
+	Equals(t, command.PolicyCheck, result.ProjectResults[1].Command)
+	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
 }
 
-func TestAPIController_LegacyNonPRSetupErrorDoesNotCleanSharedWorkingDir(t *testing.T) {
+func TestAPIController_NonPRSetupErrorCleansSyntheticWorkingDir(t *testing.T) {
 	ac, _, _ := setup(t)
 	workingDir := ac.WorkingDir.(*MockWorkingDir)
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
 		ThenReturn("", errors.New("clone failed"))
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(nil)
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -314,7 +320,7 @@ func TestAPIController_LegacyNonPRSetupErrorDoesNotCleanSharedWorkingDir(t *test
 	ac.Plan(w, req)
 
 	Equals(t, http.StatusInternalServerError, w.Code)
-	workingDir.VerifyWasCalled(Never()).Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+	workingDir.VerifyWasCalled(Once()).Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestAPIController_PlanSetupErrorRedactsCredentials(t *testing.T) {
@@ -402,7 +408,7 @@ func TestAPIController_LegacyPlanApplyErrorsReturnLegacyShape(t *testing.T) {
 				body:       string(validBody),
 				secret:     atlantisToken,
 				apiSecret:  nil,
-				statusCode: http.StatusBadRequest,
+				statusCode: http.StatusServiceUnavailable,
 			},
 			{
 				name:       "malformed JSON",
@@ -521,7 +527,7 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
 }
 
-func TestAPIController_ApplyPreservesCallerProjectOrder(t *testing.T) {
+func TestAPIController_ApplySortsByExecutionOrder(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	buildCommands := func(args []Param) ReturnValues {
 		commentCommand := args[1].(*events.CommentCommand)
@@ -565,8 +571,8 @@ func TestAPIController_ApplyPreservesCallerProjectOrder(t *testing.T) {
 	ac.Apply(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
-	Equals(t, []string{"second-group", "first-group"}, planOrder)
-	Equals(t, []string{"second-group", "first-group"}, applyOrder)
+	Equals(t, []string{"first-group", "second-group"}, planOrder)
+	Equals(t, []string{"first-group", "second-group"}, applyOrder)
 }
 
 func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
@@ -641,7 +647,7 @@ func TestAPIController_ApplyContinuesAfterPrePlanProjectError(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
 }
 
-func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.T) {
+func TestAPIController_NoPRRequestsUseSyntheticHardenedAPIContext(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		call func(*controllers.APIController, http.ResponseWriter, *http.Request)
@@ -664,7 +670,7 @@ func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.
 
 			body, _ := json.Marshal(controllers.APIRequest{
 				Repository: "Repo",
-				Ref:        "v1.2.3",
+				Ref:        "main",
 				Type:       "Gitlab",
 				Projects:   []string{"default"},
 			})
@@ -675,14 +681,18 @@ func TestAPIController_LegacyNoPRTagRefPreservesSyntheticAPIBehavior(t *testing.
 
 			Equals(t, http.StatusOK, w.Code)
 			Assert(t, capturedCtx != nil, "expected plan command builder to be called")
-			Equals(t, 0, capturedCtx.Pull.Num)
-			Assert(t, !capturedCtx.SkipPRModifiedFiles, "synthetic no-PR legacy API commands must preserve restrict-file-list behavior")
-			Assert(t, capturedCtx.SkipAPIBaseBranchVerification, "tag refs without base_branch should preserve legacy no-PR behavior")
+			Assert(t, capturedCtx.Pull.Num < 0, "expected no-PR API request to use an isolated synthetic pull number")
+			Assert(t, capturedCtx.Pull.HardenedNonPRRefCheckout, "expected no-PR API request to use hardened checkout")
+			Assert(t, capturedCtx.SkipPRModifiedFiles, "expected no-PR API request to skip PR modified-file lookups")
+			Assert(t, capturedCtx.FailOnTeamAllowlistDenied, "expected no-PR API request to fail closed on team allowlist denial")
+			Assert(t, capturedCtx.RunPolicyChecks, "expected API request to run policy checks when generated")
+			Assert(t, capturedCtx.SortByExecutionOrder, "expected API request to honor execution-order sorting")
+			Assert(t, capturedCtx.ExactProjectNameMatching, "expected API project selectors to use exact names")
 		})
 	}
 }
 
-func TestAPIController_ApplyDoesNotFailClosedOnTeamAllowlistByDefault(t *testing.T) {
+func TestAPIController_ApplyFailsClosedOnTeamAllowlistDenial(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	var capturedCtx *command.Context
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -704,7 +714,7 @@ func TestAPIController_ApplyDoesNotFailClosedOnTeamAllowlistByDefault(t *testing
 
 	Equals(t, http.StatusOK, w.Code)
 	Assert(t, capturedCtx != nil, "expected BuildPlanCommands to be called")
-	Assert(t, !capturedCtx.FailOnTeamAllowlistDenied, "legacy apply must not opt into drift fail-closed team allowlist behavior")
+	Assert(t, capturedCtx.FailOnTeamAllowlistDenied, "API apply should fail closed on team allowlist denial")
 }
 
 func TestAPIController_ApplySuccessReturnsLegacyShape(t *testing.T) {
@@ -1025,7 +1035,8 @@ func TestAPIController_PlanSkipsPullReqStatusWhenNoPR(t *testing.T) {
 	planCtx, _ := projectCommandBuilder.VerifyWasCalledOnce().
 		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
 		GetCapturedArguments()
-	Equals(t, 0, planCtx.Pull.Num)
+	Assert(t, planCtx.Pull.Num < 0, "expected no-PR API request to use an isolated synthetic pull number")
+	Assert(t, planCtx.Pull.HardenedNonPRRefCheckout, "expected no-PR API request to use hardened checkout")
 }
 
 func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
@@ -1203,7 +1214,7 @@ func TestAPIController_ApplyUpdatesPullStatusBetweenSequentialProjects(t *testin
 	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[1].Status)
 }
 
-func TestAPIController_ApplySkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
+func TestAPIController_ApplySeedsPolicyStatusFromAPIPlan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -1230,7 +1241,9 @@ func TestAPIController_ApplySkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
 			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
 			Equals(t, 1, len(capturedPullStatus.Projects))
 			Equals(t, models.PlannedNoChangesPlanStatus, capturedPullStatus.Projects[0].Status)
-			Equals(t, 0, len(capturedPullStatus.Projects[0].PolicyStatus))
+			Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
+			Equals(t, "policy", capturedPullStatus.Projects[0].PolicyStatus[0].PolicySetName)
+			Assert(t, capturedPullStatus.Projects[0].PolicyStatus[0].Passed, "expected policy status to pass")
 
 			return ReturnValues{[]command.ProjectContext{{
 				CommandName: command.Apply,
@@ -1245,6 +1258,10 @@ func TestAPIController_ApplySkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
 		ThenReturn(command.ProjectCommandOutput{
 			PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Infrastructure is up-to-date."},
 		})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+			PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+		}})
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -1260,8 +1277,8 @@ func TestAPIController_ApplySkipsInlinePolicyChecksForLegacyAPI(t *testing.T) {
 
 	Assert(t, capturedPullStatus != nil, "expected apply command builder to be called")
 	Equals(t, 1, len(capturedPullStatus.Projects))
-	Equals(t, 0, len(capturedPullStatus.Projects[0].PolicyStatus))
-	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(Any[command.ProjectContext]())
+	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
+	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {
@@ -1325,6 +1342,7 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 	scope := metricstest.NewLoggingScope(t, logger, "null")
 	vcsClient := NewMockClient()
 	workingDir := NewMockWorkingDir()
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(nil)
 	Ok(t, err)
 	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())).
 		Then(func(args []Param) ReturnValues {
