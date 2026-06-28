@@ -1,0 +1,22 @@
+e2e/main.go
+  s_cb1708bb6cf5d5::t_4d08231437106f 158,161-168,172-173,180-191,195-204,217-222,236-270,284-285,310
+e2e/main_test.go
+  s_cb1708bb6cf5d5::t_b2d9b2ab9c9b29 14,22-25,28-35,38-44,47-53,63-95,102-132,135-159
+  s_cb1708bb6cf5d5::t_a41738e7545e91 96-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c7348edd5fb87abb24aeb93fe4340989b59c102e",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
