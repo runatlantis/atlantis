@@ -1,0 +1,26 @@
+server/core/terraform/tfclient/terraform_client.go
+  s_e24b0665842422::t_a9d0150a0f054e 297,299-300,303
+  s_e24b0665842422::t_ea495ff35d089c 331-352
+server/core/terraform/tfclient/tofu_version.go
+  s_e24b0665842422::t_3b0b6daa98dffc 1-169
+server/core/config/raw/project.go
+  s_e24b0665842422::t_57eeab59a7e70e 29,33-34
+server/core/terraform/tfclient/tofu_version_test.go
+  s_e24b0665842422::t_b82208fbe1dd3e 1-366
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "a3b7be35fa4e96aa6a6c94859161676fdf553d0b",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
