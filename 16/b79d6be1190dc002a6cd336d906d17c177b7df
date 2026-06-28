@@ -1,0 +1,69 @@
+server/events/project_finder_test.go
+  s_e24b0665842422::t_2ea3b63839b24a 99,103,105,111,117,121,123,127,129,133,135,138-155,201-210
+  s_e24b0665842422::t_f98349818800a0 120,122,124-126,128,130-132,134,136-137
+  s_e24b0665842422::t_bb9d2e90fa0018 118-119,156-195
+server/events/project_command_builder_internal_test.go
+  s_e24b0665842422::t_83384b0ef252d3 682,901,1151,1304,1548
+server/events/testdata/test-repos/workspace-tf-json-only/main.tf.json
+  s_e24b0665842422::t_76517ebb94c88c 1-10
+server/controllers/events/events_controller_e2e_test.go
+  s_e24b0665842422::t_d1bacbbf630ef2 1492
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tofu
+  s_e24b0665842422::t_18b1872343b94d 1-8
+server/events/project_finder.go
+  s_e24b0665842422::t_146c1da4a67cca 41
+  s_e24b0665842422::t_97bdd2b3cabbd4 16
+  s_e24b0665842422::t_714531648fddd1 75,79-80,92-94,102,104-105,109-110,114-115,122-123,130-147
+  s_e24b0665842422::t_10d7861280b31b 69,76-78,81-91,106-108,111-112,116-121,124-129
+  s_e24b0665842422::t_beeb483e3a04d3 413-414,428
+server/events/testdata/test-repos/workspace-json-precedence/main.tofu.json
+  s_e24b0665842422::t_73c1689b316878 1-10
+server/events/testdata/test-repos/workspace-tofu-only/main.tofu
+  s_e24b0665842422::t_eead7c0a9a2fbb 1-8
+server/events/project_command_builder.go
+  s_e24b0665842422::t_5032f8c5eb9224 291-292
+  s_e24b0665842422::t_7f23be55b45811 152
+  s_e24b0665842422::t_7b4f3186097022 690,723
+  s_e24b0665842422::t_b8ed9728437f27 122
+  s_e24b0665842422::t_67aad3b5fabfc6 175
+  s_e24b0665842422::t_a18f100e4c3f18 90
+server/core/config/raw/project.go
+  s_e24b0665842422::t_d552391a2523a4 38-42,44-49
+  s_e24b0665842422::t_c1d611442b937f 82-83
+  s_e24b0665842422::t_2f688761956d32 43
+server/events/testdata/test-repos/workspace-json-precedence/main.tf.json
+  s_e24b0665842422::t_61d348941785e6 1-10
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tf
+  s_e24b0665842422::t_7e353dca0bf3b1 1-8
+server/core/config/raw/project_test.go
+  s_e24b0665842422::t_52f1fb7fde4ebf 825-851
+server/server.go
+  s_e24b0665842422::t_6379564b87a1bd 697
+server/events/testdata/test-repos/workspace-malformed-tofu/main.tofu
+  s_e24b0665842422::t_30658da98971d8 1
+server/events/testdata/test-repos/workspace-tofu-json-only/main.tofu.json
+  s_e24b0665842422::t_9aee77d7e0f76f 1-10
+server/events/project_command_builder_test.go
+  s_e24b0665842422::t_e52abeaf35dd38 2717
+  s_e24b0665842422::t_7f70727979d883 280,671,763,850,930,1026,1115,1202,1274,1388,1452,1517,1588,1649,1711,1786,1847,1923,1981,2066,2175,2613,3083,3182,3290,3398,3507,3593,3690,3782,3871,4062,4207,4292,4381,4512,4624
+  s_e24b0665842422::t_67aad3b5fabfc6 40,53
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_3608c330e7056b 100-103
+  s_e24b0665842422::t_3cea2f42eea48f 99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "16b79d6be1190dc002a6cd336d906d17c177b7df",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": null
+    }
+  }
+}
