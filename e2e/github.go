@@ -24,7 +24,6 @@ type GithubClient struct {
 	ownerName string
 	repoName  string
 	token     string
-	// transport is set when using GitHub App auth; nil for PAT auth.
 	transport *ghinstallation.Transport
 }
 
@@ -38,12 +37,10 @@ func NewGithubClient() *GithubClient {
 		repoName = "atlantis-tests"
 	}
 
-	// Try GitHub App auth first
 	if appIDStr := os.Getenv("ATLANTIS_GH_APP_ID"); appIDStr != "" {
 		return newGithubAppClient(appIDStr, ownerName, repoName)
 	}
 
-	// Fall back to PAT auth
 	return newGithubPATClient(ownerName, repoName)
 }
 
@@ -57,7 +54,6 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("ATLANTIS_GH_APP_KEY cannot be empty when ATLANTIS_GH_APP_ID is set")
 	}
 
-	// Create an app-level transport to look up the installation for this repo
 	appTransport, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(appKey))
 	if err != nil {
 		log.Fatalf("creating GitHub App transport: %v", err)
@@ -85,7 +81,6 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		log.Fatalf("creating GitHub App installation client: %v", err)
 	}
 
-	// Derive bot username from app slug
 	username := ""
 	if slug := os.Getenv("ATLANTIS_GH_APP_SLUG"); slug != "" {
 		username = fmt.Sprintf("%s[bot]", slug)
@@ -133,7 +128,6 @@ func newGithubPATClient(ownerName, repoName string) *GithubClient {
 func (g GithubClient) Clone(cloneDir string) error {
 	var repoURL string
 	if g.transport != nil {
-		// GitHub App auth: get a fresh installation token for git clone
 		token, err := g.transport.Token(context.Background())
 		if err != nil {
 			return fmt.Errorf("getting installation token for clone: %w", err)
@@ -157,7 +151,6 @@ func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string)
 		ContentType: &contentType,
 		URL:         &hookURL,
 	}
-	// create atlantis hook
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "push"},
 		Config: hookConfig,
@@ -194,38 +187,65 @@ func (g GithubClient) CreatePullRequest(ctx context.Context, title, branchName s
 		return "", 0, fmt.Errorf("error while creating new pull request: %v", err)
 	}
 
-	// set pull request url
 	return pull.GetHTMLURL(), pull.GetNumber(), nil
-
 }
 
-func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string) (string, error) {
-	// check repo status
+// GetAtlantisStatus checks all commit statuses matching the given prefix.
+// It returns "success" only when all matching statuses report success.
+// If expectedCount > 0, it waits until exactly that many statuses appear.
+func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string, statusPrefix string, expectedCount int) (string, error) {
 	combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
 	if err != nil {
 		return "", err
 	}
 
+	var matched []*github.RepoStatus
 	for _, status := range combinedStatus.Statuses {
-		if status.GetContext() == "atlantis/plan" {
-			return status.GetState(), nil
+		if strings.HasPrefix(status.GetContext(), statusPrefix) {
+			matched = append(matched, status)
 		}
 	}
 
-	return "", nil
+	if len(matched) == 0 {
+		return "", nil
+	}
+
+	// If we expect a specific count, don't report terminal until we have them all.
+	if expectedCount > 0 && len(matched) < expectedCount {
+		return "pending", nil
+	}
+
+	hasFailure := false
+	hasPending := false
+	for _, s := range matched {
+		switch s.GetState() {
+		case "success":
+			continue
+		case "failure", "error":
+			hasFailure = true
+		default:
+			hasPending = true
+		}
+	}
+
+	if hasFailure {
+		return "failure", nil
+	}
+	if hasPending {
+		return "pending", nil
+	}
+	return "success", nil
 }
 
 func (g GithubClient) ClosePullRequest(ctx context.Context, pullRequestNumber int) error {
-	// clean up
 	_, _, err := g.client.PullRequests.Edit(ctx, g.ownerName, g.repoName, pullRequestNumber, &github.PullRequest{State: github.Ptr("closed")})
 	if err != nil {
 		return fmt.Errorf("error while closing new pull request: %v", err)
 	}
 	return nil
-
 }
-func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error {
 
+func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error {
 	deleteBranchName := fmt.Sprintf("%s/%s", "heads", branchName)
 	_, err := g.client.Git.DeleteRef(ctx, g.ownerName, g.repoName, deleteBranchName)
 	if err != nil {
@@ -245,4 +265,8 @@ func (g GithubClient) IsAtlantisInProgress(state string) bool {
 
 func (g GithubClient) DidAtlantisSucceed(state string) bool {
 	return state == "success"
+}
+
+func (g GithubClient) DidAtlantisFail(state string) bool {
+	return state == "failure" || state == "error"
 }

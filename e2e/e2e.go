@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -17,133 +18,147 @@ type E2ETester struct {
 	vcsClient    VCSClient
 	hookID       int64
 	cloneDirRoot string
-	projectType  Project
+	testCase     TestCase
 }
 
 type E2EResult struct {
-	projectType    string
+	testCase       string
 	pullRequestURL string
+	branchName     string
 	testResult     string
+	err            error
 }
 
-var testFileData = `
-resource "null_resource" "hello" {
-}
-`
+const (
+	pollInterval = 2 * time.Second
+	maxPolls     = 30
+	initialWait  = 2 * time.Second
+)
 
-// nolint: gosec
 func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
-	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, t.projectType.Name)
-	branchName := fmt.Sprintf("%s-%s", t.projectType.Name, time.Now().Format("20060102150405"))
-	testFileName := fmt.Sprintf("%s.tf", t.projectType.Name)
-	e2eResult := &E2EResult{}
-	e2eResult.projectType = t.projectType.Name
+	tc := t.testCase
+	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, tc.Name)
+	branchName := fmt.Sprintf("e2e-%s-%s", tc.Name, time.Now().Format("20060102150405"))
 
-	// create the directory and parents if necessary
+	result := &E2EResult{
+		testCase:   tc.Name,
+		branchName: branchName,
+	}
+
 	log.Printf("creating dir %q", cloneDir)
 	if err := os.MkdirAll(cloneDir, 0700); err != nil {
-		return e2eResult, fmt.Errorf("failed to create dir %q prior to cloning, attempting to continue: %v", cloneDir, err)
+		return result, fmt.Errorf("failed to create dir %q: %v", cloneDir, err)
 	}
 
-	err := t.vcsClient.Clone(cloneDir)
-	if err != nil {
-		return e2eResult, err
+	if err := t.vcsClient.Clone(cloneDir); err != nil {
+		return result, err
 	}
 
-	// checkout a new branch for the project
 	log.Printf("checking out branch %q", branchName)
 	checkoutCmd := exec.Command("git", "checkout", "-b", branchName)
 	checkoutCmd.Dir = cloneDir
 	if output, err := checkoutCmd.CombinedOutput(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git checkout branch %q: %v: %s", branchName, err, string(output))
+		return result, fmt.Errorf("failed to git checkout branch %q: %v: %s", branchName, err, string(output))
 	}
 
-	// write a file for running the tests
-	randomData := []byte(testFileData)
-	filePath := fmt.Sprintf("%s/%s/%s", cloneDir, t.projectType.Name, testFileName)
-	log.Printf("creating file to commit %q", filePath)
-	err = os.WriteFile(filePath, randomData, 0644)
-	if err != nil {
-		return e2eResult, fmt.Errorf("couldn't write file %s: %v", filePath, err)
+	// Determine file to mutate.
+	mutateFile := tc.MutateFile
+	if mutateFile == "" {
+		mutateFile = fmt.Sprintf("%s.tf", tc.Name)
+	}
+	filePath := filepath.Join(cloneDir, tc.Dir, mutateFile)
+
+	// Ensure parent directory exists (for cases writing to subdirs).
+	if err := os.MkdirAll(filepath.Dir(filePath), 0700); err != nil {
+		return result, fmt.Errorf("failed to create parent dir for %q: %v", filePath, err)
 	}
 
-	// add the file
-	log.Printf("git add file %q", filePath)
+	content := tc.MutateContent
+	if content == "" {
+		content = defaultMutateContent
+	}
+
+	log.Printf("writing mutation file %q", filePath)
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return result, fmt.Errorf("couldn't write file %s: %v", filePath, err)
+	}
+
+	log.Printf("git add %q", filePath)
 	addCmd := exec.Command("git", "add", filePath)
 	addCmd.Dir = cloneDir
 	if output, err := addCmd.CombinedOutput(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git add file %q: %v: %s", filePath, err, string(output))
+		return result, fmt.Errorf("failed to git add file %q: %v: %s", filePath, err, string(output))
 	}
 
-	// commit the file
-	log.Printf("git commit file %q", filePath)
-	commitCmd := exec.Command("git", "commit", "-am", "test commit")
+	log.Printf("git commit")
+	commitCmd := exec.Command("git", "commit", "-am", fmt.Sprintf("e2e: %s", tc.Name))
 	commitCmd.Dir = cloneDir
 	if output, err := commitCmd.CombinedOutput(); err != nil {
-		return e2eResult, fmt.Errorf("failed to run git commit in %q: %v: %v", cloneDir, err, string(output))
+		return result, fmt.Errorf("failed to git commit in %q: %v: %s", cloneDir, err, string(output))
 	}
 
-	// push the branch to remote
 	log.Printf("git push branch %q", branchName)
 	pushCmd := exec.Command("git", "push", "origin", branchName)
 	pushCmd.Dir = cloneDir
 	if output, err := pushCmd.CombinedOutput(); err != nil {
-		return e2eResult, fmt.Errorf("failed to git push branch %q: %v: %s", branchName, err, string(output))
+		return result, fmt.Errorf("failed to git push branch %q: %v: %s", branchName, err, string(output))
 	}
 
-	// create a new pr
-	title := fmt.Sprintf("This is a test pull request for atlantis e2e test for %s project type", t.projectType.Name)
-	url, pullId, err := t.vcsClient.CreatePullRequest(ctx, title, branchName)
-
+	title := fmt.Sprintf("[E2E] %s", tc.Name)
+	url, pullID, err := t.vcsClient.CreatePullRequest(ctx, title, branchName)
 	if err != nil {
-		return e2eResult, err
+		return result, err
 	}
-
-	// set pull request url
-	e2eResult.pullRequestURL = url
-
+	result.pullRequestURL = url
 	log.Printf("created pull request %s", url)
 
-	// defer closing pull request and delete remote branch
 	defer func() {
-		err := cleanUp(ctx, t, pullId, branchName)
-		if err != nil {
-			log.Printf("Failed to cleanup: %v", err)
+		if cleanErr := cleanUp(ctx, t, pullID, branchName); cleanErr != nil {
+			log.Printf("cleanup failed: %v", cleanErr)
 		}
 	}()
 
-	// wait for atlantis to respond to webhook and autoplan.
-	time.Sleep(2 * time.Second)
+	// Wait for Atlantis to receive webhook and start processing.
+	time.Sleep(initialWait)
+
+	statusPrefix := tc.StatusPrefix
+	if statusPrefix == "" {
+		statusPrefix = "atlantis/plan"
+	}
 
 	state := "not started"
-	// waiting for atlantis run and finish
-	maxLoops := 20
 	i := 0
-	for ; i < maxLoops && t.vcsClient.IsAtlantisInProgress(state); i++ {
-		time.Sleep(2 * time.Second)
-		state, _ = t.vcsClient.GetAtlantisStatus(ctx, branchName)
+	for ; i < maxPolls && t.vcsClient.IsAtlantisInProgress(state); i++ {
+		time.Sleep(pollInterval)
+		state, _ = t.vcsClient.GetAtlantisStatus(ctx, branchName, statusPrefix, tc.ExpectedStatusCount)
 		if state == "" {
-			log.Println("atlantis run hasn't started")
+			log.Printf("[%s] atlantis run hasn't started yet", tc.Name)
 			continue
 		}
-		log.Printf("atlantis run is in %s state", state)
+		log.Printf("[%s] atlantis status: %s", tc.Name, state)
 	}
-	if i == maxLoops {
+	if i == maxPolls {
 		state = "timed out"
 	}
 
-	log.Printf("atlantis run finished with status %q", state)
-	e2eResult.testResult = state
-	// check if atlantis run was a success
-	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return e2eResult, fmt.Errorf("atlantis run project type %q failed with %q status", t.projectType.Name, state)
+	log.Printf("[%s] final status: %q", tc.Name, state)
+	result.testResult = state
+
+	// Evaluate result against expectations.
+	if tc.ExpectFailure {
+		if !t.vcsClient.DidAtlantisFail(state) {
+			return result, fmt.Errorf("[%s] expected failure but got %q", tc.Name, state)
+		}
+	} else {
+		if !t.vcsClient.DidAtlantisSucceed(state) {
+			return result, fmt.Errorf("[%s] expected success but got %q", tc.Name, state)
+		}
 	}
 
-	return e2eResult, nil
+	return result, nil
 }
 
 func cleanUp(ctx context.Context, t *E2ETester, pullRequestNumber int, branchName string) error {
-	// clean up
 	err := t.vcsClient.ClosePullRequest(ctx, pullRequestNumber)
 	if err != nil {
 		return err
