@@ -3283,6 +3283,16 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3391,6 +3401,14 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3499,6 +3517,14 @@ autodiscover:
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3608,6 +3634,13 @@ autodiscover:
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -4738,4 +4771,117 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Equals(t, c.ExpRepoRelDir, actCtx.RepoRelDir)
 		})
 	}
+}
+
+func TestValidatePlansForApply_NoPlansNoStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		PullStatus: nil,
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansAllNoChanges(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansWithPendingStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected error for missing plan file")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "expected missing plan message, got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansButNoPullStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		PullStatus: nil,
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error when no pull status")
+	Assert(t, strings.Contains(err.Error(), "no recorded plan status"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansStaleCommit(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected stale plan error")
+	Assert(t, strings.Contains(err.Error(), "plans are from commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansMissingFromStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error for unmatched plan")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansMatchCurrentStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "staging", Status: models.PassedPolicyCheckStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "staging"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
 }

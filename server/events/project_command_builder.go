@@ -1243,6 +1243,12 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		plans = filteredPlans
 	}
 
+	if commentCmd.Name == command.Apply {
+		if err := ValidatePlansForApply(ctx, plans); err != nil {
+			return nil, err
+		}
+	}
+
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		// Lock all the directories we need to run the command in
@@ -1263,6 +1269,98 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	})
 
 	return cmds, nil
+}
+
+// ValidatePlansForApply ensures discovered plans are valid for the current PR head.
+func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
+	if len(plans) > 0 {
+		return validateFoundPlans(ctx, plans)
+	}
+	return validateNoPlansFound(ctx)
+}
+
+func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
+	if ctx.PullStatus == nil {
+		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
+	}
+
+	if ctx.Pull.HeadCommit != "" && ctx.PullStatus.Pull.HeadCommit != "" &&
+		ctx.PullStatus.Pull.HeadCommit != ctx.Pull.HeadCommit {
+		return fmt.Errorf(
+			"plans are from commit %s but current head is %s; run `atlantis plan` to update",
+			ctx.PullStatus.Pull.HeadCommit[:min(7, len(ctx.PullStatus.Pull.HeadCommit))],
+			ctx.Pull.HeadCommit[:min(7, len(ctx.Pull.HeadCommit))],
+		)
+	}
+
+	for _, plan := range plans {
+		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if proj == nil {
+			return fmt.Errorf(
+				"plan file found for dir %q workspace %q but no matching plan status exists; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace,
+			)
+		}
+		if !isApplyablePlanStatus(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q has status %q and cannot be applied; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, proj.Status.String(),
+			)
+		}
+	}
+
+	return nil
+}
+
+func validateNoPlansFound(ctx *command.Context) error {
+	if ctx.PullStatus == nil {
+		return nil
+	}
+
+	if ctx.Pull.HeadCommit != "" && ctx.PullStatus.Pull.HeadCommit != "" &&
+		ctx.PullStatus.Pull.HeadCommit != ctx.Pull.HeadCommit {
+		return nil
+	}
+
+	for _, proj := range ctx.PullStatus.Projects {
+		if isApplyablePlanStatus(proj.Status) {
+			return fmt.Errorf(
+				"plan file is missing for dir %q workspace %q; run `atlantis plan` again",
+				proj.RepoRelDir, proj.Workspace,
+			)
+		}
+	}
+
+	return nil
+}
+
+func isApplyablePlanStatus(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func findProjectInPullStatus(pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	cleanDir := filepath.Clean(repoRelDir)
+	for i := range pullStatus.Projects {
+		proj := &pullStatus.Projects[i]
+		if proj.Workspace != workspace || filepath.Clean(proj.RepoRelDir) != cleanDir {
+			continue
+		}
+		if projectName != "" {
+			if proj.ProjectName == projectName {
+				return proj
+			}
+			continue
+		}
+		if proj.ProjectName == "" {
+			return proj
+		}
+	}
+	return nil
 }
 
 // buildProjectCommand builds an command for the single project
