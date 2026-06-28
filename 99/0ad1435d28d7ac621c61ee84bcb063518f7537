@@ -1,0 +1,33 @@
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_3dc2dbe1b39949 2001-2006
+  s_243a1a1edc15e5::t_d45b2799e2ec89 78-87,102-112
+  s_243a1a1edc15e5::t_ccaf4169739a21 113-114
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_73a2a6c0151ac5 3874-3896,3901-3904,3909-3964
+  s_243a1a1edc15e5::t_15f3fdbf1f517c 18
+  s_243a1a1edc15e5::t_88f3abb310a8d4 3897-3900,3905-3908
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_c5a5a679cbfef1 1086-1087
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_055d238cc44b01 56-79,392-532
+  s_243a1a1edc15e5::t_5d70efdfa335e4 533
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_921339b79daa59 91-99,396-451
+  s_243a1a1edc15e5::t_89d0ee67dfab1a 452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "990ad1435d28d7ac621c61ee84bcb063518f7537",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
