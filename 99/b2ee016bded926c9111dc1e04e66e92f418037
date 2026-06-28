@@ -1,0 +1,65 @@
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_84094d5cf45fc2 516
+  s_243a1a1edc15e5::t_add7242bc7d3b2 1033,1035-1036
+  s_243a1a1edc15e5::t_913c7a4598bb35 1116,1190,1282
+server/events/project_command_context_builder_test.go
+  s_243a1a1edc15e5::t_508e11dff31628 158,165,174
+  s_243a1a1edc15e5::t_eb8d7f5298e05d 152-157
+server/events/webhooks/drift_test.go
+  s_243a1a1edc15e5::t_857ddb0308fab4 7,73-86
+  s_243a1a1edc15e5::t_96258f6694bb4b 87-88
+server/events/project_command_context_builder.go
+  s_243a1a1edc15e5::t_0f972991f11138 336
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_a29576566fcbe3 99-106,126
+  s_243a1a1edc15e5::t_98c4e50a5460c9 380-399
+  s_243a1a1edc15e5::t_c8b9785b4f8675 353-359
+  s_243a1a1edc15e5::t_fcb30b7ddeb92e 489
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_cc3c68342be9c5 214,224,255,265
+  s_243a1a1edc15e5::t_eb8d7f5298e05d 209-213,215-216,219-223,225-226,250-254,256-257,260-264,266-267
+  s_243a1a1edc15e5::t_4072bf98ad44da 638-648
+  s_243a1a1edc15e5::t_b9b93dfc3dbfce 288,291,302-305,307-308,315,318,325,330-331
+  s_243a1a1edc15e5::t_039b4120dbd0ad 27-28,56-57,78-79
+  s_243a1a1edc15e5::t_ffc07570765831 748-779
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_d39a5e124b0e30 1982,2001-2003
+server/events/webhooks/drift_http.go
+  s_243a1a1edc15e5::t_21b5f3cd5ca5be 20-21
+server/controllers/api_controller_internal_test.go
+  s_243a1a1edc15e5::t_3b1e300fe39c11 65-91
+  s_243a1a1edc15e5::t_29b6fef53bb281 12,94,96,108,114,118-137
+  s_243a1a1edc15e5::t_c2f33712927d98 138
+server/events/project_command_runner_test.go
+  s_243a1a1edc15e5::t_bf0e2eb2eeb6c7 28,1055-1101
+  s_243a1a1edc15e5::t_074ed268fe6f93 1102-1103
+server/events/command/context.go
+  s_243a1a1edc15e5::t_75e95787b8d281 69-72
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_5b641367f073e2 322
+server/events/project_command_runner.go
+  s_243a1a1edc15e5::t_f50c878be59e08 873-883
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_37b27589a569d9 75-78
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_6efb6a8a993fe6 320,340-343,967-971,973-975
+  s_243a1a1edc15e5::t_dd82c81a5d70fc 328-331
+server/events/command/project_context.go
+  s_243a1a1edc15e5::t_6800dc6518b33e 162-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "99b2ee016bded926c9111dc1e04e66e92f418037",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
