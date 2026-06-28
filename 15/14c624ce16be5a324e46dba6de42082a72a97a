@@ -1,0 +1,34 @@
+e2e/testcase.go
+  s_cb1708bb6cf5d5::t_5f0f9889419739 1-4
+  s_cb1708bb6cf5d5::t_75f1db31dba8fe 5-191
+e2e/gitlab.go
+  s_cb1708bb6cf5d5::t_ff30963e210bce 18-23,112-115,120-121,123-124,142,163-165
+  s_cb1708bb6cf5d5::t_97968fa41221e8 166
+e2e/e2e.go
+  s_cb1708bb6cf5d5::t_fc9a20e7d21728 13,21,25,27,29,32-36,39-46,50,53-54,61,64-78,81-86,90,93-94,97,104,107-108,110,112,116-117,121-127,131-133,135,138,140,144-155,158
+e2e/github.go
+  s_cb1708bb6cf5d5::t_cedca9b2aebd39 193-196,202,204-227,231-237,248,269-271
+  s_cb1708bb6cf5d5::t_96bfac1ce85e09 272
+e2e/main.go
+  s_cb1708bb6cf5d5::t_62ef3fe93224ff 10,32-34,36,49-50,57,65-80,82,85,89-119,122-123,126-135,137-143,147
+e2e/.gitignore
+  s_cb1708bb6cf5d5::t_da6bbb9f1e1c1c 2
+e2e/vcs.go
+  s_cb1708bb6cf5d5::t_0506d70e72ae27 14-17,22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "1514c624ce16be5a324e46dba6de42082a72a97a",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
