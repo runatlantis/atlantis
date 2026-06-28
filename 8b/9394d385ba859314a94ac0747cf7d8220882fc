@@ -1,0 +1,39 @@
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_3cea2f42eea48f 99-101
+server/events/testdata/test-repos/workspace-tofu-json-only/main.tofu.json
+  s_e24b0665842422::t_9aee77d7e0f76f 1-10
+server/events/project_finder.go
+  s_e24b0665842422::t_97bdd2b3cabbd4 16
+  s_e24b0665842422::t_714531648fddd1 75-90,98-108,110-114,116-133
+  s_e24b0665842422::t_beeb483e3a04d3 399-400,414
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tofu
+  s_e24b0665842422::t_18b1872343b94d 1-8
+server/core/config/raw/project.go
+  s_e24b0665842422::t_d552391a2523a4 38-42,44-49
+  s_e24b0665842422::t_2f688761956d32 43
+  s_e24b0665842422::t_c1d611442b937f 82-83
+server/core/config/raw/project_test.go
+  s_e24b0665842422::t_52f1fb7fde4ebf 825-851
+server/events/project_finder_test.go
+  s_e24b0665842422::t_f98349818800a0 116-130
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tf
+  s_e24b0665842422::t_7e353dca0bf3b1 1-8
+server/events/testdata/test-repos/workspace-tofu-only/main.tofu
+  s_e24b0665842422::t_eead7c0a9a2fbb 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "8b9394d385ba859314a94ac0747cf7d8220882fc",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
