@@ -216,10 +216,10 @@ func assertProjectStatuses(ctx context.Context, client VCSClient, branchName str
 		for _, e := range tc.ExpectedStatusContexts {
 			expectedSet[e] = true
 		}
-		for ctx := range projectStatuses {
-			if !expectedSet[ctx] {
+		for statusCtx := range projectStatuses {
+			if !expectedSet[statusCtx] {
 				return fmt.Errorf("[%s] unexpected project status %q (expected only %v)",
-					tc.Name, ctx, tc.ExpectedStatusContexts)
+					tc.Name, statusCtx, tc.ExpectedStatusContexts)
 			}
 		}
 	}

@@ -218,9 +218,9 @@ func (g GithubClient) GetProjectStatuses(ctx context.Context, branchName string)
 
 	result := make(map[string]string)
 	for _, status := range combinedStatus.Statuses {
-		ctx := status.GetContext()
-		if strings.HasPrefix(ctx, projectStatusPrefix) {
-			result[ctx] = status.GetState()
+		statusCtx := status.GetContext()
+		if strings.HasPrefix(statusCtx, projectStatusPrefix) {
+			result[statusCtx] = status.GetState()
 		}
 	}
 	return result, nil
