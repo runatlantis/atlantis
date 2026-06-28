@@ -155,27 +155,53 @@ func cleanDir(path string) error {
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(cleanPath) //nolint:gosec // path confined to approved temp root by validateCleanPath
+	return os.RemoveAll(cleanPath) //nolint:gosec // path confined to known temp root by validateCleanPath
 }
 
-// approvedTempRoots returns the canonical paths of directories under which
-// E2E workspace cleanup is permitted.
+// knownSafeTempRoots are the fixed filesystem temp directories.
+// os.TempDir() is NOT included unconditionally because TMPDIR can be set
+// to arbitrary paths (e.g. $HOME), which would expand the allowlist unsafely.
+var knownSafeTempRoots = []string{"/tmp", "/var/tmp"}
+
+// approvedTempRoots returns canonical paths of directories under which
+// E2E workspace cleanup is permitted. Only includes os.TempDir() if it
+// itself resolves under a known safe root.
 func approvedTempRoots() []string {
 	seen := make(map[string]bool)
 	var roots []string
-	for _, r := range []string{"/tmp", "/var/tmp", os.TempDir()} {
+
+	for _, r := range knownSafeTempRoots {
 		canon := canonicalize(r)
 		if canon != "" && !seen[canon] {
 			seen[canon] = true
 			roots = append(roots, canon)
 		}
 	}
+
+	// Include os.TempDir() only if it resolves under a known safe root.
+	if td := canonicalize(os.TempDir()); td != "" && !seen[td] {
+		for _, root := range roots {
+			if isPathBelow(root, td) {
+				seen[td] = true
+				roots = append(roots, td)
+				break
+			}
+		}
+	}
+
 	return roots
 }
 
-// validateCleanPath ensures path is a proper child of an approved temp root.
-// Returns the cleaned absolute path for deletion, or an error if the path
-// is not confined to an approved workspace.
+// validateCleanPath ensures path is a proper child of an approved temp root
+// and does not overlap with protected runtime paths.
+//
+// Order of checks:
+// 1. Reject empty/whitespace
+// 2. Resolve to clean absolute path
+// 3. Canonicalize for validation
+// 4. Reject if overlaps protected runtime paths (cwd, repo root, home)
+// 5. Reject if equals an approved temp root
+// 6. Accept only if strictly below an approved temp root
 func validateCleanPath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("clone dir must not be empty")
@@ -186,9 +212,14 @@ func validateCleanPath(path string) (string, error) {
 		return "", fmt.Errorf("resolving clone dir: %w", err)
 	}
 	cleanPath := filepath.Clean(absPath)
-
 	candidateCanon := canonicalizeForValidation(cleanPath)
 
+	// Reject overlap with protected runtime paths.
+	if err := rejectProtectedPaths(candidateCanon); err != nil {
+		return "", err
+	}
+
+	// Check allowlist.
 	roots := approvedTempRoots()
 	for _, root := range roots {
 		if candidateCanon == root {
@@ -202,8 +233,41 @@ func validateCleanPath(path string) (string, error) {
 	return "", fmt.Errorf("path %q is not under an approved temp root %v", cleanPath, roots)
 }
 
-// canonicalize resolves symlinks for an existing path. Returns cleaned absolute
-// path or empty string if resolution fails.
+// rejectProtectedPaths returns an error if candidateCanon overlaps any
+// protected runtime path (cwd, repo root, home directory).
+// "Overlaps" means the candidate equals, contains, or is contained by a protected path.
+func rejectProtectedPaths(candidateCanon string) error {
+	var protected []string
+
+	if cwd, err := os.Getwd(); err == nil {
+		cwdCanon := canonicalizeForValidation(filepath.Clean(cwd))
+		protected = append(protected, cwdCanon)
+		// Repo root (parent of e2e/ working dir).
+		repoRoot := canonicalizeForValidation(filepath.Clean(filepath.Dir(cwd)))
+		protected = append(protected, repoRoot)
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		protected = append(protected, canonicalizeForValidation(filepath.Clean(home)))
+	}
+
+	for _, p := range protected {
+		if pathsOverlap(candidateCanon, p) {
+			return fmt.Errorf("refusing to clean %q: overlaps protected path %q", candidateCanon, p)
+		}
+	}
+	return nil
+}
+
+// pathsOverlap returns true if a equals b, a is below b, or b is below a.
+func pathsOverlap(a, b string) bool {
+	if a == b {
+		return true
+	}
+	return isPathBelow(a, b) || isPathBelow(b, a)
+}
+
+// canonicalize resolves symlinks for an existing path.
 func canonicalize(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -217,8 +281,8 @@ func canonicalize(path string) string {
 }
 
 // canonicalizeForValidation resolves the candidate path for comparison.
-// If the full path does not exist, resolves the nearest existing ancestor
-// and appends the remaining suffix.
+// If the path does not exist, resolves the nearest existing ancestor
+// and appends the unresolved suffix.
 func canonicalizeForValidation(path string) string {
 	resolved, err := filepath.EvalSymlinks(path)
 	if err == nil {
@@ -243,5 +307,5 @@ func isPathBelow(base, candidate string) bool {
 	if rel == "." {
 		return false
 	}
-	return !strings.HasPrefix(rel, "..")
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }

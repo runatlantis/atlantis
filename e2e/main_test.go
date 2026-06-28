@@ -10,8 +10,8 @@ import (
 )
 
 func TestValidateCleanPath(t *testing.T) {
-	tempDir := os.TempDir()
 	cwd, _ := os.Getwd()
+	home := mustHomeDir()
 
 	tests := []struct {
 		name    string
@@ -19,118 +19,38 @@ func TestValidateCleanPath(t *testing.T) {
 		wantErr bool
 		skip    string
 	}{
-		// Allowed paths
-		{
-			name:    "default workspace under /tmp",
-			path:    "/tmp/atlantis-tests",
-			wantErr: false,
-		},
-		{
-			name:    "nested workspace under /tmp",
-			path:    "/tmp/atlantis-tests/deep/clone",
-			wantErr: false,
-		},
-		{
-			name:    "child of os.TempDir",
-			path:    filepath.Join(tempDir, "e2e-workspace"),
-			wantErr: false,
-		},
+		// Allowed
+		{name: "default workspace", path: "/tmp/atlantis-tests", wantErr: false},
+		{name: "nested under /tmp", path: "/tmp/atlantis-tests/deep/clone", wantErr: false},
+		{name: "dotdot-prefixed name under /tmp", path: "/tmp/..foo", wantErr: false},
 
 		// Rejected: empty/whitespace
-		{
-			name:    "empty string",
-			path:    "",
-			wantErr: true,
-		},
-		{
-			name:    "whitespace only",
-			path:    "   ",
-			wantErr: true,
-		},
+		{name: "empty", path: "", wantErr: true},
+		{name: "whitespace", path: "   ", wantErr: true},
 
-		// Rejected: dangerous roots
-		{
-			name:    "filesystem root",
-			path:    "/",
-			wantErr: true,
-		},
-		{
-			name:    "dot (current dir)",
-			path:    ".",
-			wantErr: true,
-		},
-		{
-			name:    "dotdot (parent dir)",
-			path:    "..",
-			wantErr: true,
-		},
-		{
-			name:    "double dotdot",
-			path:    "../..",
-			wantErr: true,
-		},
+		// Rejected: roots and traversal
+		{name: "filesystem root", path: "/", wantErr: true},
+		{name: "dot", path: ".", wantErr: true},
+		{name: "dotdot", path: "..", wantErr: true},
+		{name: "double dotdot", path: "../..", wantErr: true},
 
 		// Rejected: temp roots themselves
-		{
-			name:    "/tmp itself",
-			path:    "/tmp",
-			wantErr: true,
-		},
-		{
-			name:    "/var/tmp itself",
-			path:    "/var/tmp",
-			wantErr: true,
-		},
-		{
-			name:    "os.TempDir itself",
-			path:    tempDir,
-			wantErr: true,
-		},
+		{name: "/tmp itself", path: "/tmp", wantErr: true},
+		{name: "/var/tmp itself", path: "/var/tmp", wantErr: true},
 
-		// Rejected: cwd and parent
-		{
-			name:    "current working directory",
-			path:    cwd,
-			wantErr: true,
-		},
-		{
-			name:    "parent of cwd (repo root)",
-			path:    filepath.Dir(cwd),
-			wantErr: true,
-		},
-
-		// Rejected: home directory
-		{
-			name:    "home directory",
-			path:    mustHomeDir(),
-			wantErr: true,
-		},
+		// Rejected: protected runtime paths
+		{name: "cwd", path: cwd, wantErr: true},
+		{name: "parent of cwd", path: filepath.Dir(cwd), wantErr: true},
+		{name: "home directory", path: home, wantErr: true},
 
 		// Rejected: arbitrary paths outside temp roots
-		{
-			name:    "arbitrary absolute path",
-			path:    "/opt/some-dir",
-			wantErr: true,
-		},
-		{
-			name:    "user-relative path outside temp",
-			path:    filepath.Join(mustHomeDir(), "foo"),
-			wantErr: true,
-		},
+		{name: "arbitrary /opt path", path: "/opt/some-dir", wantErr: true},
+		{name: "child of home", path: filepath.Join(home, "foo"), wantErr: true},
 
-		// macOS symlink: /private/tmp
-		{
-			name:    "/private/tmp itself",
-			path:    "/private/tmp",
-			wantErr: true,
-			skip:    skipUnlessDarwin(),
-		},
-		{
-			name:    "child of /private/tmp is allowed",
-			path:    "/private/tmp/atlantis-tests",
-			wantErr: false,
-			skip:    skipUnlessDarwin(),
-		},
+		// macOS /private/tmp
+		{name: "/private/tmp itself", path: "/private/tmp", wantErr: true, skip: skipUnlessDarwin()},
+		{name: "child of /private/tmp", path: "/private/tmp/atlantis-tests", wantErr: false, skip: skipUnlessDarwin()},
+		{name: "/private/var/tmp itself", path: "/private/var/tmp", wantErr: true, skip: skipUnlessDarwin()},
 	}
 
 	for _, tt := range tests {
@@ -140,10 +60,103 @@ func TestValidateCleanPath(t *testing.T) {
 			}
 			_, err := validateCleanPath(tt.path)
 			if tt.wantErr && err == nil {
-				t.Errorf("validateCleanPath(%q) = nil error, want rejection", tt.path)
+				t.Errorf("validateCleanPath(%q) = nil, want error", tt.path)
 			}
 			if !tt.wantErr && err != nil {
-				t.Errorf("validateCleanPath(%q) = %v, want allowed", tt.path, err)
+				t.Errorf("validateCleanPath(%q) = %v, want nil", tt.path, err)
+			}
+		})
+	}
+}
+
+func TestValidateCleanPath_UnsafeTMPDIR(t *testing.T) {
+	home := mustHomeDir()
+
+	tests := []struct {
+		name   string
+		tmpdir string
+		path   string
+	}{
+		{name: "TMPDIR=home", tmpdir: home, path: filepath.Join(home, "workspace")},
+		{name: "TMPDIR=/opt/tmp", tmpdir: "/opt/tmp", path: "/opt/tmp/workspace"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("TMPDIR", tt.tmpdir)
+			_, err := validateCleanPath(tt.path)
+			if err == nil {
+				t.Errorf("validateCleanPath(%q) with TMPDIR=%q should be rejected", tt.path, tt.tmpdir)
+			}
+		})
+	}
+}
+
+func TestValidateCleanPath_CheckoutUnderTmp(t *testing.T) {
+	// Create test dirs explicitly under /tmp so they are under approved roots.
+	tmpRoot, err := os.MkdirTemp("/tmp", "atlantis-e2e-validate-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(tmpRoot) }) //nolint:errcheck
+
+	fakeRepo := filepath.Join(tmpRoot, "atlantis")
+	fakeE2E := filepath.Join(fakeRepo, "e2e")
+	if err := os.MkdirAll(fakeE2E, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	if err := os.Chdir(fakeE2E); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(origDir) }) //nolint:errcheck
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{name: "dot from checkout under tmp", path: ".", wantErr: true},
+		{name: "dotdot from checkout under tmp", path: "..", wantErr: true},
+		{name: "fake repo root", path: fakeRepo, wantErr: true},
+		{name: "fake e2e dir", path: fakeE2E, wantErr: true},
+		{name: "child inside fake repo", path: filepath.Join(fakeRepo, "subdir"), wantErr: true},
+		{name: "sibling of fake repo is allowed", path: filepath.Join(tmpRoot, "other-workspace"), wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := validateCleanPath(tt.path)
+			if tt.wantErr && err == nil {
+				t.Errorf("validateCleanPath(%q) = nil, want error (checkout under /tmp)", tt.path)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("validateCleanPath(%q) = %v, want nil", tt.path, err)
+			}
+		})
+	}
+}
+
+func TestIsPathBelow(t *testing.T) {
+	tests := []struct {
+		base      string
+		candidate string
+		want      bool
+	}{
+		{"/tmp", "/tmp/child", true},
+		{"/tmp", "/tmp/deep/nested", true},
+		{"/tmp", "/tmp/..foo", true},
+		{"/tmp", "/tmp", false},
+		{"/tmp", "/tmp/../etc", false},
+		{"/tmp", "/other", false},
+		{"/tmp", "/", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.candidate, func(t *testing.T) {
+			got := isPathBelow(tt.base, tt.candidate)
+			if got != tt.want {
+				t.Errorf("isPathBelow(%q, %q) = %v, want %v", tt.base, tt.candidate, got, tt.want)
 			}
 		})
 	}
