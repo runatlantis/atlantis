@@ -1881,6 +1881,60 @@ func TestAPIController_Remediate_ProjectFailuresReturnNon2xx(t *testing.T) {
 	Assert(t, apiErr.Details != nil, "expected failed remediation details")
 }
 
+func TestAPIController_Remediate_ServiceFailureWithoutProjectsReturnsInternalError(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	locker := NewMockLocker(gmockCtrl)
+	parser := NewMockEventParsing()
+	vcsClient := NewMockClient()
+	repoAllowlistChecker, _ := events.NewRepoAllowlistChecker("*")
+
+	remediationService := driftmocks.NewMockRemediationService()
+	mockResult := &models.RemediationResult{
+		ID:         "test-id",
+		Repository: "owner/repo",
+		Ref:        "main",
+		Action:     models.RemediationPlanOnly,
+		Status:     models.RemediationStatusFailed,
+		Error:      "failed to load cached drift: storage unavailable",
+	}
+	When(remediationService.Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())).ThenReturn(mockResult, nil)
+
+	When(vcsClient.GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Eq("owner/repo"))).ThenReturn("https://github.com/owner/repo.git", nil)
+	When(parser.ParseAPIPlanRequest(Any[models.VCSHostType](), Eq("owner/repo"), Any[string]())).ThenReturn(models.Repo{
+		FullName: "owner/repo",
+		VCSHost:  models.VCSHost{Hostname: "github.com"},
+	}, nil)
+
+	ac := controllers.APIController{
+		APISecret:            []byte(atlantisToken),
+		Logger:               logger,
+		Locker:               locker,
+		Parser:               parser,
+		VCSClient:            vcsClient,
+		RepoAllowlistChecker: repoAllowlistChecker,
+		RemediationService:   remediationService,
+	}
+
+	body, _ := json.Marshal(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationPlanOnly,
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Remediate(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	apiErr := parseAPIError(t, response)
+	Equals(t, controllers.ErrCodeInternal, apiErr.Code)
+}
+
 func TestAPIController_Remediate_PartialFailuresReturnMultiStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
@@ -3374,7 +3428,84 @@ func TestAPIController_DetectDrift_NonFatalPreHookFailureSkipsStaleReconciliatio
 	Equals(t, "cached", records[0].ProjectName)
 }
 
-func TestAPIController_DetectDrift_ZeroProjectFullDetectionKeepsStaleRecords(t *testing.T) {
+func TestAPIController_DetectDrift_CommandBuildFailureSkipsStaleReconciliation(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "cached",
+		Path:        "cached",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, errors.New("project discovery failed"))
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(records))
+	Equals(t, "cached", records[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_ZeroProjectFullDetectionReconcilesStaleRecords(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	sender := &recordingDriftSender{}
+	ac.DriftWebhookSender = &webhooks.DriftWebhookSender{Webhooks: []webhooks.DriftSender{sender}}
+	repositoryKey := "gitlab.com/Repo"
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "cached",
+		Path:        "cached",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked: time.Now(),
+	}))
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 0, result.Summary.TotalProjects)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 0, len(records))
+	Equals(t, 1, sender.calls)
+	Equals(t, 1, len(sender.results))
+	Equals(t, "main", sender.results[0].Ref)
+	Equals(t, 0, sender.results[0].TotalProjects)
+}
+
+func TestAPIController_DetectDrift_ZeroProjectScopedDetectionKeepsStaleRecords(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	storage := drift.NewInMemoryStorage()
 	ac.DriftStorage = storage
@@ -3395,6 +3526,7 @@ func TestAPIController_DetectDrift_ZeroProjectFullDetectionKeepsStaleRecords(t *
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
+		Projects:   []string{"missing"},
 	})
 	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
 	req.Header.Set(atlantisTokenHeader, atlantisToken)

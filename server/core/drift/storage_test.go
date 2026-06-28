@@ -75,6 +75,84 @@ func TestInMemoryStorage_StoreOverwrite(t *testing.T) {
 	Equals(t, false, results[0].Drift.HasDrift)
 }
 
+func TestInMemoryStorage_StoreUsesDelimiterSafeKeys(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "a:b",
+		Path:        "c",
+		Workspace:   "default",
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 1},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "a",
+		Path:        "b:c",
+		Workspace:   "default",
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 2},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "p",
+		Path:        "env",
+		Workspace:   "w:x",
+		Ref:         "r",
+		BaseBranch:  "b",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 3},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "p",
+		Path:        "env",
+		Workspace:   "w",
+		Ref:         "x:r",
+		BaseBranch:  "b",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 4},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "q",
+		Path:        "env",
+		Workspace:   "default",
+		Ref:         "r:b",
+		BaseBranch:  "c",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 5},
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "q",
+		Path:        "env",
+		Workspace:   "default",
+		Ref:         "r",
+		BaseBranch:  "b:c",
+		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 6},
+		LastChecked: time.Now(),
+	}))
+
+	results, err := storage.Get("owner/repo", drift.GetOptions{})
+	Ok(t, err)
+	Equals(t, 6, len(results))
+
+	projectPath, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "a:b", Path: "c", Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(projectPath))
+	Equals(t, 1, projectPath[0].Drift.ToAdd)
+
+	workspaceRef, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "p", Workspace: "w", Ref: "x:r", BaseBranch: "b"})
+	Ok(t, err)
+	Equals(t, 1, len(workspaceRef))
+	Equals(t, 4, workspaceRef[0].Drift.ToAdd)
+
+	refBase, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "q", Ref: "r", BaseBranch: "b:c"})
+	Ok(t, err)
+	Equals(t, 1, len(refBase))
+	Equals(t, 6, refBase[0].Drift.ToAdd)
+}
+
 func TestInMemoryStorage_GetEmpty(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 
@@ -260,6 +338,43 @@ func TestInMemoryStorage_DeleteMatching(t *testing.T) {
 	devResults, err := storage.Get("owner/repo", drift.GetOptions{Ref: "dev"})
 	Ok(t, err)
 	Equals(t, 1, len(devResults))
+}
+
+func TestInMemoryStorage_DeleteMatchingUsesDelimiterSafeKeys(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "a:b",
+		Path:        "c",
+		Workspace:   "default",
+		Ref:         "main",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName: "a",
+		Path:        "b:c",
+		Workspace:   "default",
+		Ref:         "main",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+
+	err := storage.DeleteMatching("owner/repo", drift.GetOptions{
+		ProjectName: "a:b",
+		Path:        "c",
+		Workspace:   "default",
+		Ref:         "main",
+		BaseBranch:  "main",
+		Exact:       true,
+	})
+	Ok(t, err)
+
+	deleted, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "a:b", Path: "c", Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 0, len(deleted))
+	remaining, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "a", Path: "b:c", Ref: "main", BaseBranch: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(remaining))
 }
 
 func TestInMemoryStorage_DeleteMatchingExactDoesNotTreatEmptyProjectNameAsWildcard(t *testing.T) {

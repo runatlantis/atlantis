@@ -129,6 +129,10 @@ func (r *RemediationRequest) Validate() []FieldError {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
 			break
 		}
+		if isRegexpProjectSelector(project) {
+			errors = append(errors, FieldError{Field: "projects", Message: "project names must be exact; use paths to target multiple projects"})
+			break
+		}
 	}
 	for _, path := range r.Paths {
 		if _, ok := NormalizeAPIPath(path.Directory); !ok {
@@ -152,6 +156,10 @@ func (r *RemediationRequest) Validate() []FieldError {
 	}
 
 	return errors
+}
+
+func isRegexpProjectSelector(project string) bool {
+	return strings.ContainsAny(project, "*[]()|^$+?{}\\")
 }
 
 // ApplyDefaults applies default values to optional fields.

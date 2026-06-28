@@ -169,6 +169,30 @@ func TestRemediationRequestValidateRejectsInvalidWorkspaces(t *testing.T) {
 	Equals(t, 0, len(request.Validate()))
 }
 
+func TestRemediationRequestValidateRejectsRegexProjectSelectors(t *testing.T) {
+	for _, project := range []string{"app-.*", "^app$", "app[0-9]", "app|db"} {
+		t.Run(project, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Projects:   []string{project},
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "projects", errs[0].Field)
+		})
+	}
+
+	request := models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Projects:   []string{"app.prod"},
+	}
+	Equals(t, 0, len(request.Validate()))
+}
+
 func TestRemediationRequestValidateRejectsUnsupportedVCSTypes(t *testing.T) {
 	for _, vcsType := range []string{"BitbucketCloud", "BitbucketServer", "AzureDevops"} {
 		t.Run(vcsType, func(t *testing.T) {

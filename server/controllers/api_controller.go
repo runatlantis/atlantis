@@ -1048,6 +1048,10 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 
 	switch result.Status {
 	case models.RemediationStatusFailed:
+		if len(result.Projects) == 0 && result.Error != "" {
+			responder.InternalError(w, r, errors.New(result.Error))
+			return
+		}
 		responder.Error(w, r, http.StatusConflict, NewAPIError(ErrCodeConflict, "drift remediation failed").WithDetails(apiResult))
 	case models.RemediationStatusPartial:
 		responder.Success(w, r, http.StatusMultiStatus, apiResult)
@@ -2023,7 +2027,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		detectionResult.AddProject(projectDrift)
 	}
 
-	if fullDetection && len(detectedProjects) > 0 && !storeFailed && !preHookFailed {
+	if fullDetection && !storeFailed && !preHookFailed && !driftDetectionHasErrors(detectionResult) {
 		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}
@@ -2032,7 +2036,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	// Send drift webhook notifications for completed detections, including
 	// no-drift heartbeat results.
 	if a.DriftWebhookSender != nil && !driftDetectionHasErrors(detectionResult) {
-		webhookResult := convertToDriftWebhookResult(detectionResult)
+		webhookResult := convertToDriftWebhookResult(detectionResult, normalizedRef)
 		if err := a.DriftWebhookSender.Send(a.Logger, webhookResult); err != nil {
 			a.Logger.Warn("failed to send drift webhook: %v", err)
 		}
@@ -2049,7 +2053,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 }
 
 // convertToDriftWebhookResult converts a DriftDetectionResult to a webhook DriftResult.
-func convertToDriftWebhookResult(dr *models.DriftDetectionResult) webhooks.DriftResult {
+func convertToDriftWebhookResult(dr *models.DriftDetectionResult, requestRef string) webhooks.DriftResult {
 	projects := make([]webhooks.DriftProjectResult, 0, len(dr.Projects))
 	for _, p := range dr.Projects {
 		projects = append(projects, webhooks.DriftProjectResult{
@@ -2066,7 +2070,7 @@ func convertToDriftWebhookResult(dr *models.DriftDetectionResult) webhooks.Drift
 			Error:       p.Error,
 		})
 	}
-	var ref string
+	ref := requestRef
 	if len(dr.Projects) > 0 {
 		ref = dr.Projects[0].Ref
 	}

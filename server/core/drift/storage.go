@@ -60,25 +60,39 @@ type GetOptions struct {
 	Exact bool
 }
 
+type driftCacheKey struct {
+	ProjectName string
+	Path        string
+	Workspace   string
+	Ref         string
+	BaseBranch  string
+}
+
 // driftKey creates a unique key for a project drift entry.
 // Includes the git ref so the same project on different branches
 // does not overwrite each other's drift data.
-func driftKey(drift models.ProjectDrift) string {
-	return drift.ProjectName + ":" + drift.Path + ":" + drift.Workspace + ":" + drift.Ref + ":" + drift.BaseBranch
+func driftKey(drift models.ProjectDrift) driftCacheKey {
+	return driftCacheKey{
+		ProjectName: drift.ProjectName,
+		Path:        drift.Path,
+		Workspace:   drift.Workspace,
+		Ref:         drift.Ref,
+		BaseBranch:  drift.BaseBranch,
+	}
 }
 
 // InMemoryStorage is an in-memory implementation of drift Storage.
 // Drift results are lost on server restart.
 type InMemoryStorage struct {
 	mu sync.RWMutex
-	// data maps repository -> (project key -> ProjectDrift)
-	data map[string]map[string]models.ProjectDrift
+	// data maps repository -> (project identity -> ProjectDrift)
+	data map[string]map[driftCacheKey]models.ProjectDrift
 }
 
 // NewInMemoryStorage creates a new in-memory drift storage.
 func NewInMemoryStorage() *InMemoryStorage {
 	return &InMemoryStorage{
-		data: make(map[string]map[string]models.ProjectDrift),
+		data: make(map[string]map[driftCacheKey]models.ProjectDrift),
 	}
 }
 
@@ -88,7 +102,7 @@ func (s *InMemoryStorage) Store(repository string, drift models.ProjectDrift) er
 	defer s.mu.Unlock()
 
 	if s.data[repository] == nil {
-		s.data[repository] = make(map[string]models.ProjectDrift)
+		s.data[repository] = make(map[driftCacheKey]models.ProjectDrift)
 	}
 
 	key := driftKey(drift)

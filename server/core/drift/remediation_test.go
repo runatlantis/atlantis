@@ -381,6 +381,46 @@ func TestInMemoryRemediationService_ExplicitProjectsPreserveCachedTargetMetadata
 	Equals(t, false, cached[0].Drift.HasDrift)
 }
 
+func TestInMemoryRemediationService_ExplicitProjectNamesWithDotsMatchExactly(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app.prod",
+		Path:           "modules/app-prod",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "appXprod",
+		Path:           "modules/app-x-prod",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository: "owner/repo",
+		Ref:        "main",
+		Type:       "Github",
+		Action:     models.RemediationAutoApply,
+		Projects:   []string{"app.prod"},
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "app.prod", path: "modules/app-prod", workspace: "default"}, executor.planCalls[0])
+}
+
 func TestInMemoryRemediationService_PathSelectorsTargetCachedDrift(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	Ok(t, storage.Store("owner/repo", models.ProjectDrift{

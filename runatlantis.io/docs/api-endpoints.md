@@ -311,6 +311,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 The `paths` field uses the same `DriftDetectionPath` object described under `POST /api/drift/detect`.
 For remediation, a path selector without `workspace` targets the default Terraform workspace only.
 Use the top-level `workspaces` field or path-level `workspace` values to remediate non-default workspaces.
+Project selectors for remediation are exact project names. Regular expression project selectors are not supported for remediation; use explicit project names or path selectors when targeting multiple projects.
 
 ::: tip Actions
 
