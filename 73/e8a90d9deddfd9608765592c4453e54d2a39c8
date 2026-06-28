@@ -1,0 +1,29 @@
+e2e/e2e.go
+  s_2c773facc6e482::t_c7f3ea9975a4ac 219-220,222
+e2e/github.go
+  s_cb1708bb6cf5d5::t_5394a810f2aa63 221-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "73e8a90d9deddfd9608765592c4453e54d2a39c8",
+  "prompts": {},
+  "sessions": {
+    "s_2c773facc6e482": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0f7b-8dd7-7e63-bacf-e9600814e20a",
+        "model": "unknown"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "unknown"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
