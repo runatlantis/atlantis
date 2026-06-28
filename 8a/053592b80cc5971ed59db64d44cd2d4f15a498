@@ -1,0 +1,38 @@
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_69695d42bb54a1 1884-1937
+  s_243a1a1edc15e5::t_937da6be887660 3431-3464
+  s_243a1a1edc15e5::t_e5f656534b1230 3465-3508,3529
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_d26ec6442da452 132-135,161-162
+  s_243a1a1edc15e5::t_e4c6dd4306fe2e 163-164
+server/core/drift/storage.go
+  s_243a1a1edc15e5::t_11af7acd13fc04 63-70,74-81,95,105
+  s_243a1a1edc15e5::t_698a7118fa1670 88-89
+server/core/drift/storage_test.go
+  s_243a1a1edc15e5::t_9050c3f31648c7 343-379
+  s_243a1a1edc15e5::t_03529da45148e0 78-155
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_4a2854c7b66260 384-423
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_17204e4528a450 172-195
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_9e00e1b2fb2b88 1051-1054,2030,2039,2056,2073
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_85758adbcc4eb3 314
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "8a053592b80cc5971ed59db64d44cd2d4f15a498",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
