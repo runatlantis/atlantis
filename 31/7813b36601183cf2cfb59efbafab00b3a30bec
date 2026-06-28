@@ -1,0 +1,32 @@
+server/core/terraform/tfclient/tofu_version.go
+  s_e24b0665842422::t_8fc9e5e5199812 184-187,190-195
+runatlantis.io/docs/autoplanning.md
+  s_e24b0665842422::t_7942b4a23aa4a2 9,13
+server/events/project_finder_internal_test.go
+  s_e24b0665842422::t_9696cb793dfdf2 47-58,61-64
+  s_e24b0665842422::t_c75369c8c0c32a 59-60
+server/core/terraform/tfclient/tofu_version_test.go
+  s_e24b0665842422::t_34381bab70b84e 578-672
+  s_e24b0665842422::t_3221eeb1d71f7f 7
+  s_e24b0665842422::t_b2443700ca442c 64-87
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_70194345e85cac 66-75
+server/events/project_finder.go
+  s_e24b0665842422::t_dfd7139b2f6dd0 343,346-347
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "317813b36601183cf2cfb59efbafab00b3a30bec",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
