@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	multierror "github.com/hashicorp/go-multierror"
@@ -219,12 +220,15 @@ func validateCleanPath(path string) (string, error) {
 		return "", err
 	}
 
-	// Check allowlist.
+	// Check allowlist in two phases: reject root equality first (regardless
+	// of ordering), then accept children. This prevents a nested os.TempDir()
+	// root from being accepted as a child of a parent root before its own
+	// equality check runs.
 	roots := approvedTempRoots()
+	if slices.Contains(roots, candidateCanon) {
+		return "", fmt.Errorf("refusing to clean temp root itself %q", cleanPath)
+	}
 	for _, root := range roots {
-		if candidateCanon == root {
-			return "", fmt.Errorf("refusing to clean temp root itself %q", cleanPath)
-		}
 		if isPathBelow(root, candidateCanon) {
 			return cleanPath, nil
 		}

@@ -92,6 +92,32 @@ func TestValidateCleanPath_UnsafeTMPDIR(t *testing.T) {
 	}
 }
 
+func TestValidateCleanPath_NestedTMPDIRRoot(t *testing.T) {
+	// Regression: TMPDIR=/tmp/session should not allow CLONE_DIR=/tmp/session
+	// even though /tmp/session is a child of approved root /tmp. The nested
+	// root itself must be rejected by equality check before child acceptance.
+	nestedRoot, err := os.MkdirTemp("/tmp", "atlantis-e2e-tmpdir-root-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(nestedRoot) }) //nolint:errcheck
+
+	t.Setenv("TMPDIR", nestedRoot)
+
+	// The nested root itself must be rejected.
+	_, err = validateCleanPath(nestedRoot)
+	if err == nil {
+		t.Errorf("validateCleanPath(%q) with TMPDIR=%q should reject the root itself", nestedRoot, nestedRoot)
+	}
+
+	// A child of the nested root must be allowed.
+	child := filepath.Join(nestedRoot, "workspace")
+	_, err = validateCleanPath(child)
+	if err != nil {
+		t.Errorf("validateCleanPath(%q) with TMPDIR=%q should allow child: %v", child, nestedRoot, err)
+	}
+}
+
 func TestValidateCleanPath_CheckoutUnderTmp(t *testing.T) {
 	// Create test dirs explicitly under /tmp so they are under approved roots.
 	tmpRoot, err := os.MkdirTemp("/tmp", "atlantis-e2e-validate-*")
