@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"slices"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -177,12 +178,7 @@ func (g GitlabClient) DeleteBranch(ctx context.Context, branchName string) error
 }
 
 func (g GitlabClient) IsAtlantisInProgress(state string) bool {
-	for _, s := range []string{"success", "failed", "canceled", "skipped"} {
-		if state == s {
-			return false
-		}
-	}
-	return true
+	return !slices.Contains([]string{"success", "failed", "canceled", "skipped"}, state)
 }
 
 func (g GitlabClient) DidAtlantisSucceed(state string) bool {

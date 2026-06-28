@@ -80,7 +80,7 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	}
 
 	log.Printf("writing mutation file %q", filePath)
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
 		return result, fmt.Errorf("couldn't write file %s: %v", filePath, err)
 	}
 
@@ -92,7 +92,7 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 	}
 
 	log.Printf("git commit")
-	commitCmd := exec.Command("git", "commit", "-am", fmt.Sprintf("e2e: %s", tc.Name))
+	commitCmd := exec.Command("git", "commit", "-am", fmt.Sprintf("e2e: %s", tc.Name)) //nolint:gosec // test case name is code-controlled
 	commitCmd.Dir = cloneDir
 	if output, err := commitCmd.CombinedOutput(); err != nil {
 		return result, fmt.Errorf("failed to git commit in %q: %v: %s", cloneDir, err, string(output))

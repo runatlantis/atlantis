@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	multierror "github.com/hashicorp/go-multierror"
 )
@@ -45,9 +47,9 @@ func main() {
 		cloneDirRoot = "/tmp/atlantis-tests"
 	}
 
-	log.Printf("cleaning workspace %s", cloneDirRoot)
-	if err := os.RemoveAll(cloneDirRoot); err != nil {
-		log.Fatalf("failed to clean dir %q: %v", cloneDirRoot, err)
+	log.Print("cleaning workspace")
+	if err := cleanDir(cloneDirRoot); err != nil {
+		log.Fatalf("failed to clean dir: %v", err)
 	}
 
 	vcsClient, err := getVCSClient()
@@ -56,7 +58,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	log.Printf("creating atlantis webhook with %s url", atlantisURL)
+	log.Print("creating atlantis webhook")
 	hookID, err := vcsClient.CreateAtlantisWebhook(ctx, atlantisURL)
 	if err != nil {
 		log.Fatalf("error creating atlantis webhook: %v", err)
@@ -145,4 +147,101 @@ func runCases(ctx context.Context, vcsClient VCSClient, hookID int64, cloneDirRo
 	}
 
 	return results, testErrors.ErrorOrNil()
+}
+
+// cleanDir validates the path is confined to an approved temp workspace and removes it.
+func cleanDir(path string) error {
+	cleanPath, err := validateCleanPath(path)
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(cleanPath) //nolint:gosec // path confined to approved temp root by validateCleanPath
+}
+
+// approvedTempRoots returns the canonical paths of directories under which
+// E2E workspace cleanup is permitted.
+func approvedTempRoots() []string {
+	seen := make(map[string]bool)
+	var roots []string
+	for _, r := range []string{"/tmp", "/var/tmp", os.TempDir()} {
+		canon := canonicalize(r)
+		if canon != "" && !seen[canon] {
+			seen[canon] = true
+			roots = append(roots, canon)
+		}
+	}
+	return roots
+}
+
+// validateCleanPath ensures path is a proper child of an approved temp root.
+// Returns the cleaned absolute path for deletion, or an error if the path
+// is not confined to an approved workspace.
+func validateCleanPath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("clone dir must not be empty")
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("resolving clone dir: %w", err)
+	}
+	cleanPath := filepath.Clean(absPath)
+
+	candidateCanon := canonicalizeForValidation(cleanPath)
+
+	roots := approvedTempRoots()
+	for _, root := range roots {
+		if candidateCanon == root {
+			return "", fmt.Errorf("refusing to clean temp root itself %q", cleanPath)
+		}
+		if isPathBelow(root, candidateCanon) {
+			return cleanPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("path %q is not under an approved temp root %v", cleanPath, roots)
+}
+
+// canonicalize resolves symlinks for an existing path. Returns cleaned absolute
+// path or empty string if resolution fails.
+func canonicalize(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return filepath.Clean(abs)
+	}
+	return filepath.Clean(resolved)
+}
+
+// canonicalizeForValidation resolves the candidate path for comparison.
+// If the full path does not exist, resolves the nearest existing ancestor
+// and appends the remaining suffix.
+func canonicalizeForValidation(path string) string {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return filepath.Clean(resolved)
+	}
+
+	parent := filepath.Dir(path)
+	base := filepath.Base(path)
+	if parent == path {
+		return filepath.Clean(path)
+	}
+	resolvedParent := canonicalizeForValidation(parent)
+	return filepath.Join(resolvedParent, base)
+}
+
+// isPathBelow returns true if candidate is strictly below base (not equal).
+func isPathBelow(base, candidate string) bool {
+	rel, err := filepath.Rel(base, candidate)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return false
+	}
+	return !strings.HasPrefix(rel, "..")
 }
