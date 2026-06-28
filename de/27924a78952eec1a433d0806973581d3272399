@@ -1,0 +1,53 @@
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_ba3a80e8af1b82 2004,2021,2863,2880
+  s_243a1a1edc15e5::t_507459e1a12002 2860-2862,2864-2879,2881-2886,2888-2902,2904-2906
+  s_243a1a1edc15e5::t_d79a36c3077a45 942
+  s_243a1a1edc15e5::t_9d1347ed6653da 1605,1621-1632
+  s_243a1a1edc15e5::t_86d07e4c8b2ad2 2029,2046,2887,2903
+  s_243a1a1edc15e5::t_12f6e1c27aa14e 592
+  s_243a1a1edc15e5::t_340027158a9a13 2000-2003,2005-2020,2022-2028,2030-2045,2047-2049
+  s_243a1a1edc15e5::t_cfcb7ecc2b166c 1633,3377-3410
+  s_243a1a1edc15e5::t_f35e2dc07ba504 1634
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_e534935c1a19ce 443-453,456,923,2026
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_8c70ef145b90e0 738
+server/events/working_dir_internal_test.go
+  s_243a1a1edc15e5::t_2984b18ac9a1d5 20,23
+  s_243a1a1edc15e5::t_7ef7bf7568526b 6-10,32-33
+server/events/models/drift_test.go
+  s_243a1a1edc15e5::t_e96c0a41fd9810 472-528
+server/events/models/drift.go
+  s_243a1a1edc15e5::t_63d248b39e123e 8,84-124,132-134,167-182,362-363,391-394
+cmd/server_test.go
+  s_243a1a1edc15e5::t_a2d40cc848c013 169-170
+server/events/project_command_builder_test.go
+  s_243a1a1edc15e5::t_a4664a4b20c0ae 2307,2490
+  s_243a1a1edc15e5::t_f39e4fb5a121db 2110
+  s_243a1a1edc15e5::t_acfa599560ff4f 2316,2324
+  s_243a1a1edc15e5::t_975cd81b6f7a29 2300-2306,2308-2315,2317-2323,2325-2326
+  s_243a1a1edc15e5::t_90b3bd8a8ac9e1 2299
+server/events/models/remediation_test.go
+  s_243a1a1edc15e5::t_1b37fd94172d4d 106-171
+server/events/project_command_builder.go
+  s_243a1a1edc15e5::t_58e33079cb4818 1022,1024-1026,1032
+  s_243a1a1edc15e5::t_f21d7ef9a2e5ee 1106,1108-1109
+server/events/models/remediation.go
+  s_243a1a1edc15e5::t_26f0cb9b3a9195 109-110,138-141,145-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "de27924a78952eec1a433d0806973581d3272399",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
