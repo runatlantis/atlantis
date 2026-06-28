@@ -822,3 +822,30 @@ func TestIsTerraformProjectDir(t *testing.T) {
 		})
 	}
 }
+
+func TestIsProjectIndicatorFile(t *testing.T) {
+	cases := []struct {
+		name string
+		exp  bool
+	}{
+		{"main.tf", true},
+		{"versions.tf", true},
+		{"main.tf.json", true},
+		{"versions.tf.json", true},
+		{"main.tofu", true},
+		{"versions.tofu", true},
+		{"main.tofu.json", true},
+		{"versions.tofu.json", true},
+		{"terragrunt.hcl", true},
+		{"README.md", false},
+		{"main.go", false},
+		{"terraform.tfstate", false},
+		{".terraform.lock.hcl", false},
+		{"vars.tfvars", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, raw.IsProjectIndicatorFile(c.name))
+		})
+	}
+}
