@@ -1,0 +1,83 @@
+server/events/testdata/test-repos/workspace-tf-plus-malformed-tofu/main.tf
+  s_e24b0665842422::t_5890bcf2e6035e 1-8
+server/events/testdata/test-repos/workspace-json-precedence/main.tofu.json
+  s_e24b0665842422::t_73c1689b316878 1-10
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_fac91ed158a61c 99-104
+  s_e24b0665842422::t_d0f83ef9c15d1d 105-107
+server/events/testdata/test-repos/workspace-json-precedence/main.tf.json
+  s_e24b0665842422::t_61d348941785e6 1-10
+server/events/testdata/test-repos/workspace-malformed-tf-json/main.tf.json
+  s_e24b0665842422::t_5890bcf2e6035e 1
+server/events/project_finder.go
+  s_e24b0665842422::t_beeb483e3a04d3 413-414,428
+  s_e24b0665842422::t_146c1da4a67cca 41
+  s_e24b0665842422::t_97bdd2b3cabbd4 16
+  s_e24b0665842422::t_10d7861280b31b 69,76-78,81-91,106-108,111-112,116-121,124-129
+  s_e24b0665842422::t_714531648fddd1 75,79-80,92-94,102,104-105,109-110,114-115,122-123,130-147
+server/events/testdata/test-repos/workspace-tofu-only/main.tofu
+  s_e24b0665842422::t_eead7c0a9a2fbb 1-8
+server/events/project_command_builder.go
+  s_e24b0665842422::t_7f23be55b45811 152
+  s_e24b0665842422::t_5032f8c5eb9224 291-292
+  s_e24b0665842422::t_67aad3b5fabfc6 175
+  s_e24b0665842422::t_a18f100e4c3f18 90
+  s_e24b0665842422::t_b8ed9728437f27 122
+  s_e24b0665842422::t_7b4f3186097022 690,723
+server/events/testdata/test-repos/workspace-tofu-json-only/main.tofu.json
+  s_e24b0665842422::t_9aee77d7e0f76f 1-10
+server/events/project_command_builder_internal_test.go
+  s_e24b0665842422::t_83384b0ef252d3 682,901,1151,1304,1548
+server/core/config/raw/project.go
+  s_e24b0665842422::t_d552391a2523a4 38-42,44-49
+  s_e24b0665842422::t_c1d611442b937f 82-83
+  s_e24b0665842422::t_2f688761956d32 43
+server/events/testdata/test-repos/workspace-malformed-tofu-json/main.tofu.json
+  s_e24b0665842422::t_5890bcf2e6035e 1
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tofu
+  s_e24b0665842422::t_18b1872343b94d 1-8
+server/events/testdata/test-repos/workspace-tf-json-only/main.tf.json
+  s_e24b0665842422::t_76517ebb94c88c 1-10
+server/events/testdata/test-repos/workspace-malformed-tofu/main.tofu
+  s_e24b0665842422::t_30658da98971d8 1
+server/events/testdata/test-repos/workspace-tofu-overrides-tf/main.tf
+  s_e24b0665842422::t_7e353dca0bf3b1 1-8
+server/events/project_command_builder_test.go
+  s_e24b0665842422::t_e52abeaf35dd38 2809
+  s_e24b0665842422::t_7f70727979d883 280,763,855,942,1022,1118,1207,1294,1366,1480,1544,1609,1680,1741,1803,1878,1939,2015,2073,2158,2267,2705,3175,3274,3382,3490,3599,3685,3782,3874,3963,4154,4299,4384,4473,4604,4716
+  s_e24b0665842422::t_1a53e836b15dba 318-323,327-409
+  s_e24b0665842422::t_730df3d96c9a04 324-326
+  s_e24b0665842422::t_67aad3b5fabfc6 40,53
+server/core/config/raw/project_test.go
+  s_e24b0665842422::t_52f1fb7fde4ebf 825-851
+server/controllers/events/events_controller_e2e_test.go
+  s_e24b0665842422::t_d1bacbbf630ef2 1492
+server/server.go
+  s_e24b0665842422::t_6379564b87a1bd 697
+server/events/testdata/test-repos/workspace-tf-plus-malformed-tofu/main.tofu
+  s_e24b0665842422::t_5890bcf2e6035e 1
+server/events/project_finder_test.go
+  s_e24b0665842422::t_f98349818800a0 146,148,150-152,154,156-158,160,162-163
+  s_e24b0665842422::t_faad12022eac92 256,260
+  s_e24b0665842422::t_98818aa74827aa 45
+  s_e24b0665842422::t_00398f642d466d 235-236,240-255,257-259,261-310
+  s_e24b0665842422::t_a5a9f829cbc702 8,12,22-44,238
+  s_e24b0665842422::t_2ea3b63839b24a 125,129,131,137,143,147,149,153,155,159,161,164-181,227-234
+  s_e24b0665842422::t_bb9d2e90fa0018 144-145,182-221
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "d7bca20c22d7a3616955bcbf748dd1db1c6a7f6c",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": null
+    }
+  }
+}
