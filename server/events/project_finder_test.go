@@ -260,14 +260,14 @@ func TestDetermineWorkspaceFromHCL_MalformedFiles(t *testing.T) {
 			"",
 		},
 		{
-			"Terraform: malformed .tf.json → warns and returns default",
+			"Terraform: malformed .tf.json → parse fails silently, returns default",
 			"workspace-malformed-tf-json",
 			"",
 			"default",
 			"",
 		},
 		{
-			"OpenTofu: malformed .tf.json → warns and returns default",
+			"OpenTofu: malformed .tf.json → parse fails silently, returns default",
 			"workspace-malformed-tf-json",
 			"opentofu",
 			"default",
@@ -281,7 +281,7 @@ func TestDetermineWorkspaceFromHCL_MalformedFiles(t *testing.T) {
 			"",
 		},
 		{
-			"OpenTofu: malformed .tofu.json → warns and returns default",
+			"OpenTofu: malformed .tofu.json → parse fails silently, returns default",
 			"workspace-malformed-tofu-json",
 			"opentofu",
 			"default",
