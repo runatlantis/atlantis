@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -67,7 +68,7 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 
 	installation, _, err := appClient.Apps.GetRepositoryInstallation(ctx, ownerName, repoName)
 	if err != nil {
-		log.Fatalf("getting GitHub App installation for %s/%s: %v", ownerName, repoName, err)
+		log.Fatalf("getting GitHub App installation for %s/%s: %v", ownerName, repoName, err) //nolint:gosec // env-sourced org/repo names
 	}
 
 	installationID := installation.GetID()
@@ -86,7 +87,7 @@ func newGithubAppClient(appIDStr, ownerName, repoName string) *GithubClient {
 		username = fmt.Sprintf("%s[bot]", slug)
 	}
 
-	log.Printf("using GitHub App auth (app ID: %d, installation ID: %d, user: %s)", appID, installationID, username)
+	log.Printf("using GitHub App auth (app ID: %d, installation ID: %d, user: %s)", appID, installationID, username) //nolint:gosec // diagnostic log
 
 	return &GithubClient{
 		client:    ghClient,
@@ -259,12 +260,7 @@ func (g GithubClient) DeleteBranch(ctx context.Context, branchName string) error
 }
 
 func (g GithubClient) IsAtlantisInProgress(state string) bool {
-	for _, s := range []string{"success", "error", "failure"} {
-		if state == s {
-			return false
-		}
-	}
-	return true
+	return !slices.Contains([]string{"success", "error", "failure"}, state)
 }
 
 func (g GithubClient) DidAtlantisSucceed(state string) bool {
