@@ -1,0 +1,21 @@
+server/core/terraform/tfclient/tofu_version.go
+  s_e24b0665842422::t_8f81f413795f1f 14,29-30,37,39,56,61,72,74,88-90,104-105,116
+server/core/terraform/tfclient/terraform_client.go
+  s_e24b0665842422::t_cc2610d42e5f43 350-352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "7a3f8a5cbeda6f9f9063cda62351a0dbeda4ba22",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
