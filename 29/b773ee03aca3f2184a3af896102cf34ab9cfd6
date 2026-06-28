@@ -1,0 +1,63 @@
+server/core/drift/remediation.go
+  s_243a1a1edc15e5::t_38f0b83946ae3f 392
+  s_243a1a1edc15e5::t_a34d0a8c38ede2 423
+  s_243a1a1edc15e5::t_09dfe287e60e2e 18-19,362
+  s_243a1a1edc15e5::t_ad0e5fede5bbd1 424-425
+server/events/command/context.go
+  s_243a1a1edc15e5::t_2dec0979a76a69 78-82
+server/events/project_command_context_builder.go
+  s_243a1a1edc15e5::t_93a3d486d895eb 335
+server/events/command_requirement_handler.go
+  s_243a1a1edc15e5::t_81d44d4624a967 41,45-49,53-54
+  s_243a1a1edc15e5::t_a49bfb08925cfc 55
+server/controllers/api_remediation_executor_internal_test.go
+  s_243a1a1edc15e5::t_9521d183cb328c 417-453,460-517
+  s_243a1a1edc15e5::t_1764ddf8bb3684 454-459
+  s_243a1a1edc15e5::t_001f710840df59 69-114
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_9e960524c91921 1980,1983,2019
+  s_243a1a1edc15e5::t_a066aca269d21a 1089,1160,1170,1249,1959
+  s_243a1a1edc15e5::t_1764ddf8bb3684 1084-1088,1155-1159,1244-1248,1954-1958
+  s_243a1a1edc15e5::t_b812504686326f 1259
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_14086218b60919 312-313,594
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_0a08a48b475e4b 155,157,159-162,175-177,598,600,602-605,618-620
+  s_243a1a1edc15e5::t_c2680dd639f9eb 3050-3098
+  s_243a1a1edc15e5::t_ea73a14a948042 3228-3264
+server/events/working_dir.go
+  s_243a1a1edc15e5::t_d36893da871b10 566,681
+server/events/command_requirement_handler_test.go
+  s_243a1a1edc15e5::t_c521739ec3899b 773-775,777-784
+  s_243a1a1edc15e5::t_1764ddf8bb3684 776
+server/events/command/project_context.go
+  s_243a1a1edc15e5::t_d71753bd009f6f 158-161
+server/events/working_dir_test.go
+  s_243a1a1edc15e5::t_895b92ed612f3b 153,208,217-246
+  s_243a1a1edc15e5::t_1764ddf8bb3684 148-152,203-207
+  s_243a1a1edc15e5::t_77ff3de7d26670 247-248
+server/core/drift/remediation_test.go
+  s_243a1a1edc15e5::t_2e3f5edbca34a2 549-579
+server/events/webhooks/webhooks_test.go
+  s_243a1a1edc15e5::t_ae49f505940245 85-100
+server/events/models/models.go
+  s_243a1a1edc15e5::t_4b6b2764887fc2 223-226
+server/events/webhooks/webhooks.go
+  s_243a1a1edc15e5::t_9e544344f02922 71-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "29b773ee03aca3f2184a3af896102cf34ab9cfd6",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
