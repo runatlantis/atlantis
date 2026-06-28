@@ -92,7 +92,7 @@ func nextNonPRPullNum() int {
 }
 
 func (a *APIController) cleanupNonPRWorkingDir(ctx *command.Context) {
-	if ctx.Pull.Num > 0 {
+	if ctx.Pull.Num >= 0 {
 		return
 	}
 	if err := a.WorkingDir.Delete(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull); err != nil {
@@ -427,6 +427,11 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
 		return
 	}
+	if !models.IsValidAPIRepositoryForType(repository, VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "invalid repository",
+			ValidationError{Field: "repository", Message: "repository must be a valid repository path for the VCS type"})
+		return
+	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
 	if err != nil {
 		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
@@ -476,7 +481,7 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (err error) {
-	if ctx.Pull.Num <= 0 {
+	if ctx.Pull.Num < 0 {
 		defer func() {
 			if err != nil {
 				a.cleanupNonPRWorkingDir(ctx)
@@ -701,7 +706,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		}
 		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, policyCC[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -1620,6 +1624,11 @@ func (a *APIController) parseAllowlistedRepo(w http.ResponseWriter, r *http.Requ
 			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
 		return models.Repo{}, false
 	}
+	if !models.IsValidAPIRepositoryForType(repository, VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "invalid repository",
+			ValidationError{Field: "repository", Message: "repository must be a valid repository path for the VCS type"})
+		return models.Repo{}, false
+	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
 	if err != nil {
 		responder.InternalError(w, r, fmt.Errorf("failed to get clone URL: %w", err))
@@ -1689,6 +1698,11 @@ func (a *APIController) ListRemediationResults(w http.ResponseWriter, r *http.Re
 	if !models.IsSupportedDriftVCSHostType(VCSHostType.String()) {
 		responder.ValidationFailed(w, r, "unsupported VCS type",
 			ValidationError{Field: "type", Message: "type must be one of: Github, Gitlab, Gitea"})
+		return
+	}
+	if !models.IsValidAPIRepositoryForType(repository, VCSHostType.String()) {
+		responder.ValidationFailed(w, r, "invalid repository",
+			ValidationError{Field: "repository", Message: "repository must be a valid repository path for the VCS type"})
 		return
 	}
 	cloneURL, err := a.VCSClient.GetCloneURL(a.Logger, VCSHostType, repository)
@@ -1857,7 +1871,7 @@ func driftDetectionHasErrors(result *models.DriftDetectionResult) bool {
 	return false
 }
 
-func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string, detected map[driftProjectIdentity]struct{}) error {
+func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string, detected map[driftProjectIdentity]struct{}, startedAt time.Time) error {
 	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref, BaseBranch: baseBranch})
 	if err != nil {
 		return err
@@ -1865,6 +1879,9 @@ func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string
 
 	for _, project := range existing {
 		if _, ok := detected[newDriftProjectIdentity(project)]; ok {
+			continue
+		}
+		if project.LastChecked.After(startedAt) {
 			continue
 		}
 		if err := a.DriftStorage.DeleteMatching(repository, drift.GetOptions{
@@ -2023,6 +2040,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 
 	// Process results and store drift data
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
+	detectionStartedAt := detectionResult.DetectedAt
 	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false
@@ -2038,7 +2056,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fullDetection && !storeFailed && !preHookFailed && !driftDetectionHasErrors(detectionResult) {
-		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects); err != nil {
+		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects, detectionStartedAt); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}
 	}

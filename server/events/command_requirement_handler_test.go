@@ -233,11 +233,12 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
-			name: "API call without PR fails policies_passed when no policy status exists",
+			name: "opted-in API call without PR fails policies_passed when no policy status exists",
 			ctx: command.ProjectContext{
 				Log:               logging.NewNoopLogger(t),
 				API:               true,
 				Pull:              models.PullRequest{Num: -1},
+				RunPolicyChecks:   true,
 				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
 				PolicySets: valid.PolicySets{
 					PolicySets: []valid.PolicySet{{
@@ -247,6 +248,23 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 				},
 			},
 			wantFailure: "All policies must pass for project before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "legacy API call without PR preserves policies_passed behavior when policy checks were not run",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{{
+						Name:         "policy1",
+						ApproveCount: 1,
+					}},
+				},
+			},
+			wantFailure: "",
 			wantErr:     assert.NoError,
 		},
 		{

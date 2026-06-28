@@ -5,9 +5,11 @@ package webhooks_test
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/webhooks"
@@ -77,4 +79,45 @@ func TestDriftHttpWebhook_Send500(t *testing.T) {
 	err := hook.Send(logging.NewNoopLogger(t), driftResult)
 	Assert(t, err != nil, "expected error on 500")
 	ErrContains(t, "status 500", err)
+}
+
+func TestDriftHttpWebhook_Send500RedactsURLCredentials(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("failed https://user:secret@example.com/hooks/sensitive?token=super-secret"))
+	}))
+	defer server.Close()
+
+	urlWithCredentials := strings.Replace(server.URL, "http://", "http://user:secret@", 1) + "/hooks/sensitive?token=super-secret"
+	hook := webhooks.DriftHttpWebhook{
+		Client: &webhooks.HttpClient{Client: http.DefaultClient},
+		URL:    urlWithCredentials,
+	}
+
+	err := hook.Send(logging.NewNoopLogger(t), driftResult)
+	Assert(t, err != nil, "expected error on 500")
+	errText := err.Error()
+	Assert(t, !strings.Contains(errText, "user:secret"), "error leaked basic auth credentials: %s", errText)
+	Assert(t, !strings.Contains(errText, "super-secret"), "error leaked query token: %s", errText)
+	Assert(t, !strings.Contains(errText, "/hooks/sensitive"), "error leaked path: %s", errText)
+	ErrContains(t, "status 500", err)
+}
+
+type failingRoundTripper struct{}
+
+func (f failingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, errors.New("request failed for " + req.URL.String())
+}
+
+func TestDriftHttpWebhook_SendRequestErrorRedactsURLCredentials(t *testing.T) {
+	hook := webhooks.DriftHttpWebhook{
+		Client: &webhooks.HttpClient{Client: &http.Client{Transport: failingRoundTripper{}}},
+		URL:    "https://user:secret@example.com/hooks/sensitive?access_token=super-secret",
+	}
+
+	err := hook.Send(logging.NewNoopLogger(t), driftResult)
+	Assert(t, err != nil, "expected request error")
+	errText := err.Error()
+	Assert(t, !strings.Contains(errText, "user:secret"), "error leaked basic auth credentials: %s", errText)
+	Assert(t, !strings.Contains(errText, "super-secret"), "error leaked query token: %s", errText)
 }

@@ -77,6 +77,32 @@ func IsSupportedDriftVCSHostType(vcsType string) bool {
 	}
 }
 
+// IsValidAPIRepositoryForType reports whether repository has a shape that can
+// be safely handed to the configured VCS client for drift APIs.
+func IsValidAPIRepositoryForType(repository, vcsType string) bool {
+	repository = strings.TrimSpace(repository)
+	if repository == "" || strings.ContainsAny(repository, " \t\r\n\\") {
+		return false
+	}
+	if strings.HasPrefix(repository, "/") || strings.HasSuffix(repository, "/") || strings.Contains(repository, "//") {
+		return false
+	}
+	parts := strings.Split(repository, "/")
+	for _, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	switch vcsType {
+	case "Github", "Gitea":
+		return len(parts) == 2
+	case "Gitlab":
+		return len(parts) >= 1
+	default:
+		return false
+	}
+}
+
 func supportedDriftVCSTypeMessage() string {
 	return "type must be one of: Github, Gitlab, Gitea"
 }
@@ -154,11 +180,11 @@ func CheckedBaseBranchRef(baseBranch string) (string, bool) {
 // NormalizeAPIPath returns a clean repo-relative selector path for drift APIs.
 func NormalizeAPIPath(directory string) (string, bool) {
 	trimmed := strings.TrimSpace(directory)
-	if trimmed == "" || strings.Contains(trimmed, "\\") {
+	if trimmed == "" || strings.Contains(trimmed, "\\") || strings.ContainsAny(trimmed, "*?[]{}") {
 		return "", false
 	}
 	cleaned := path.Clean(trimmed)
-	if cleaned == "" || path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+	if cleaned == "" || path.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.ContainsAny(cleaned, "*?[]{}") {
 		return "", false
 	}
 	return cleaned, true
@@ -375,6 +401,8 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
 	} else if !IsSupportedDriftVCSHostType(r.Type) {
 		errors = append(errors, FieldError{Field: "type", Message: supportedDriftVCSTypeMessage()})
+	} else if r.Repository != "" && !IsValidAPIRepositoryForType(r.Repository, r.Type) {
+		errors = append(errors, FieldError{Field: "repository", Message: "repository must be a valid repository path for the VCS type"})
 	}
 	if len(r.Projects) > 0 && len(r.Paths) > 0 {
 		errors = append(errors, FieldError{Field: "paths", Message: "projects and paths cannot both be set"})

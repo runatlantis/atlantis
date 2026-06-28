@@ -312,6 +312,7 @@ The `paths` field uses the same `DriftDetectionPath` object described under `POS
 For remediation, a path selector without `workspace` targets the default Terraform workspace only.
 Use the top-level `workspaces` field or path-level `workspace` values to remediate non-default workspaces.
 Project selectors for remediation are exact project names. Regular expression project selectors are not supported for remediation; use explicit project names or path selectors when targeting multiple projects.
+API path selectors are literal normalized repo-relative paths; glob patterns such as `envs/*` are not supported.
 
 ::: tip Actions
 
@@ -593,6 +594,8 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 |-----------|--------|----------|-----------------------------------------------------------------|
 | directory | string | Yes      | Relative path to the Terraform directory                        |
 | workspace | string | No       | Terraform workspace. If omitted, the default workspace is used. |
+
+Path selectors are literal normalized repo-relative paths. Glob patterns such as `envs/*` are not supported.
 
 ::: tip NOTE
 At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request.
@@ -958,7 +961,7 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 | repository  | string | Yes      | Full repository name (e.g., `owner/repo`)              |
 | type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`, `Gitea`)  |
 | project     | string | No       | Filter by project name                                 |
-| path        | string | No       | Filter by repository-relative project path             |
+| path        | string | No       | Filter by literal normalized repository-relative project path |
 | workspace   | string | No       | Filter by Terraform workspace                          |
 | ref         | string | No       | Filter by git reference                                |
 | base_branch | string | No       | Filter by branch context used when drift was detected  |

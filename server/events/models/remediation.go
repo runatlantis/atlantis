@@ -120,6 +120,8 @@ func (r *RemediationRequest) Validate() []FieldError {
 		errors = append(errors, FieldError{Field: "type", Message: "type is required"})
 	} else if !IsSupportedDriftVCSHostType(r.Type) {
 		errors = append(errors, FieldError{Field: "type", Message: supportedDriftVCSTypeMessage()})
+	} else if r.Repository != "" && !IsValidAPIRepositoryForType(r.Repository, r.Type) {
+		errors = append(errors, FieldError{Field: "repository", Message: "repository must be a valid repository path for the VCS type"})
 	}
 	if !r.Action.IsValid() {
 		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})

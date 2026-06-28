@@ -250,3 +250,42 @@ func TestRemediationRequestValidateRejectsConflictingPathAndTopLevelWorkspaces(t
 	Assert(t, len(errs) > 0, "expected validation error")
 	Equals(t, "paths", errs[0].Field)
 }
+
+func TestRemediationRequestValidateRejectsGlobPathSelectors(t *testing.T) {
+	for _, directory := range []string{"envs/*", "envs/pro?", "envs/[prod]", "envs/{prod}"} {
+		t.Run(directory, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: "owner/repo",
+				Ref:        "main",
+				Type:       "Github",
+				Paths:      []models.DriftDetectionPath{{Directory: directory}},
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "paths", errs[0].Field)
+		})
+	}
+}
+
+func TestRemediationRequestValidateRejectsMalformedRepositories(t *testing.T) {
+	for _, repository := range []string{"owner", "/repo", "owner/", "owner//repo", "owner/../repo", "owner repo/name"} {
+		t.Run(repository, func(t *testing.T) {
+			request := models.RemediationRequest{
+				Repository: repository,
+				Ref:        "main",
+				Type:       "Github",
+			}
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "repository", errs[0].Field)
+		})
+	}
+
+	github := models.RemediationRequest{Repository: "owner/repo/extra", Ref: "main", Type: "Github"}
+	errs := github.Validate()
+	Assert(t, len(errs) > 0, "expected GitHub repository validation error")
+	Equals(t, "repository", errs[0].Field)
+
+	gitlab := models.RemediationRequest{Repository: "group/subgroup/repo", Ref: "main", Type: "Gitlab"}
+	Equals(t, 0, len(gitlab.Validate()))
+}
