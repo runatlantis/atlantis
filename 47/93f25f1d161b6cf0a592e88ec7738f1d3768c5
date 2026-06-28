@@ -1,0 +1,34 @@
+e2e/github.go
+  s_cb1708bb6cf5d5::t_81b698c9dab86c 239
+  s_cb1708bb6cf5d5::t_820c9d05f6d1db 95
+  s_cb1708bb6cf5d5::t_82787531e947c1 75
+  s_cb1708bb6cf5d5::t_0ec3834b54d7ac 14
+e2e/gitlab.go
+  s_cb1708bb6cf5d5::t_6a41765c39832a 163
+  s_cb1708bb6cf5d5::t_3b544b5d01ed7d 13
+.github/workflows/go-lint.yml
+  s_cb1708bb6cf5d5::t_8b071ab6500b06 44-47,63,74-85
+  s_cb1708bb6cf5d5::t_3c7ab2bd7682bb 86
+e2e/main.go
+  s_cb1708bb6cf5d5::t_e847290477a9ca 61
+  s_cb1708bb6cf5d5::t_c89325c6f9b25d 58
+  s_cb1708bb6cf5d5::t_6daa99186904cf 93
+  s_cb1708bb6cf5d5::t_13f61128ecdab3 99
+  s_cb1708bb6cf5d5::t_57657ebef07009 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "4793f25f1d161b6cf0a592e88ec7738f1d3768c5",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
