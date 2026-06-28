@@ -1,0 +1,43 @@
+server/controllers/api_controller_test.go
+  s_243a1a1edc15e5::t_588b771739445d 688
+  s_243a1a1edc15e5::t_f7184e8cfdb439 650,673,684-687,689-690,695,717
+  s_243a1a1edc15e5::t_03d8499a039b68 131,167,530,574-575
+  s_243a1a1edc15e5::t_4c4098af949080 260,298,300-301
+  s_243a1a1edc15e5::t_d38a5b8957f65a 195,217,304,309,323
+  s_243a1a1edc15e5::t_e14b13461e2e9e 1217,1244-1246,1261-1264,1280-1281
+  s_243a1a1edc15e5::t_43c22763faf822 1345
+  s_243a1a1edc15e5::t_9f53871cff60ce 278-281
+  s_243a1a1edc15e5::t_f846cdc780a82b 411,1038-1039
+runatlantis.io/docs/api-endpoints.md
+  s_243a1a1edc15e5::t_445b123df47e82 585,589
+  s_243a1a1edc15e5::t_21f72d9c4a31a8 103-106
+  s_243a1a1edc15e5::t_a8147bd99e55be 294-301
+  s_243a1a1edc15e5::t_c6e593c2935f3e 25,97-102,108
+server/events/command/context.go
+  s_243a1a1edc15e5::t_19cb76caabf242 73-74
+  s_243a1a1edc15e5::t_9c57cac49048c1 57-58,91
+server/controllers/api_controller.go
+  s_243a1a1edc15e5::t_558096ac79c622 947
+  s_243a1a1edc15e5::t_4f331df9f32933 884,925-930,932,937
+  s_243a1a1edc15e5::t_48181952fe5761 933-936,940-946,948-949
+server/controllers/api_controller_internal_test.go
+  s_243a1a1edc15e5::t_10d5691472958b 65
+server/events/command_requirement_handler_test.go
+  s_243a1a1edc15e5::t_979c1f9413a18e 254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "256a744eb5a9316943b3364b03cd64613daa41a8",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
