@@ -1,0 +1,28 @@
+runatlantis.io/docs/autoplanning.md
+  s_e24b0665842422::t_3d6adc62c39972 13
+server/events/project_finder.go
+  s_e24b0665842422::t_cc7e5c447d41ef 359-361,377,379-380
+server/events/project_finder_internal_test.go
+  s_e24b0665842422::t_6688bdc1dc6ff4 92-94,97-103,106-109
+  s_e24b0665842422::t_fdf966b2678050 95-96,104-105
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_6ad819d7df6138 82-94
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_e24b0665842422::t_49ddc5c988902e 515
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "13962d73c6cf6dc0d237356e3490c0d5206fe0e1",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
