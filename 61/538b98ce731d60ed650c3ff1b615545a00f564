@@ -1,0 +1,31 @@
+server/events/project_finder.go
+  s_e24b0665842422::t_3712c84e05ecb8 361-364
+  s_e24b0665842422::t_3c14cf6785c962 358-360,365-382
+  s_e24b0665842422::t_df68f13817c09f 342-343
+server/events/project_finder_internal_test.go
+  s_e24b0665842422::t_e18e85791b522a 68-69,77-78,86-87
+  s_e24b0665842422::t_175dc5c19dc6aa 65-67,70-76,79-85,88-91
+runatlantis.io/docs/server-configuration.md
+  s_e24b0665842422::t_c3d3c8a5aae746 184-185,187
+runatlantis.io/docs/repo-level-atlantis-yaml.md
+  s_e24b0665842422::t_3aa53aebc6363e 221
+runatlantis.io/docs/terraform-versions.md
+  s_e24b0665842422::t_079b8c1d364176 68-77,81-86
+  s_e24b0665842422::t_577e78e01e7ef6 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "61538b98ce731d60ed650c3ff1b615545a00f564",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
