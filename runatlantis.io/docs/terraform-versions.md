@@ -96,10 +96,15 @@ Direct file-change autoplanning (without `--autoplan-modules`) is fully supporte
 in explicit `autoplan.when_modified` patterns, or keep module source declarations in
 `.tf` files until full `.tofu` module indexing is implemented.
 
-Additionally, Terraform Cloud workspace detection (`cloud { workspaces { ... } }`) still
-scans only `.tf` files. If your workspace config is defined only in `.tofu` / `.tofu.json`,
-Atlantis may fall back to the default workspace. Workaround: keep workspace config in a
-`.tf` file, or configure the workspace explicitly in `atlantis.yaml`.
+Terraform Cloud workspace detection (`cloud { workspaces { ... } }`) supports `.tf`,
+`.tf.json`, `.tofu`, and `.tofu.json` files for **autodiscovered projects**. `.tofu` and
+`.tofu.json` are only scanned when the server default distribution
+(`--default-tf-distribution`) is OpenTofu. Same-basename precedence applies in OpenTofu
+mode: `.tofu` overrides `main.tf`, `.tofu.json` overrides `main.tf.json`. Projects with
+Terraform server default read `.tf` and `.tf.json` but ignore `.tofu` / `.tofu.json`.
+
+For explicitly configured projects in `atlantis.yaml`, set the `workspace:` field directly
+— workspace HCL scanning is not used for configured projects regardless of distribution.
 :::
 
 ::: tip NOTE

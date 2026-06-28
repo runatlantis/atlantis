@@ -35,6 +35,18 @@ var terraformProjectIndicators = []string{
 	"terragrunt.hcl",
 }
 
+// IsProjectIndicatorFile returns true if the given filename matches any of the
+// project indicator patterns. This is the canonical check shared by full project
+// discovery and module-parent autodiscovery.
+func IsProjectIndicatorFile(name string) bool {
+	for _, indicator := range terraformProjectIndicators {
+		if doublestar.MatchUnvalidated(indicator, name) {
+			return true
+		}
+	}
+	return false
+}
+
 type Project struct {
 	Name                      *string    `yaml:"name,omitempty"`
 	Branch                    *string    `yaml:"branch,omitempty"`
@@ -67,10 +79,8 @@ func IsTerraformProjectDir(dir string) (bool, error) {
 		if entry.IsDir() {
 			continue
 		}
-		for _, indicator := range terraformProjectIndicators {
-			if doublestar.MatchUnvalidated(indicator, entry.Name()) {
-				return true, nil
-			}
+		if IsProjectIndicatorFile(entry.Name()) {
+			return true, nil
 		}
 	}
 	return false, nil

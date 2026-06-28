@@ -694,6 +694,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverModeFlag,

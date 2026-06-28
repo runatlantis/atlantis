@@ -37,6 +37,7 @@ var defaultUserConfig = struct {
 	AutoDetectModuleFiles    string
 	AutoplanFileList         string
 	RestrictFileList         bool
+	DefaultTFDistribution    string
 	SilenceNoProjects        bool
 	IncludeGitUntrackedFiles bool
 	AutoDiscoverMode         string
@@ -49,6 +50,7 @@ var defaultUserConfig = struct {
 	AutoDetectModuleFiles:    "",
 	AutoplanFileList:         "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	RestrictFileList:         false,
+	DefaultTFDistribution:    "",
 	SilenceNoProjects:        false,
 	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
@@ -275,6 +277,7 @@ terraform {
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -307,6 +310,98 @@ terraform {
 				Equals(t, expCtx.ProjectName, actCtx.ProjectName)
 				Equals(t, expCtx.RepoRelDir, actCtx.RepoRelDir)
 				Equals(t, expCtx.Workspace, actCtx.Workspace)
+			}
+		})
+	}
+}
+
+func TestDefaultProjectCommandBuilder_OpenTofuWorkspaceDetection(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	cases := []struct {
+		description       string
+		distribution      string
+		dirStructure      map[string]any
+		expectedWorkspace string
+	}{
+		{
+			"OpenTofu server default detects workspace from .tofu",
+			"opentofu",
+			map[string]any{
+				"main.tofu": `terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces { name = "tofu-workspace" }
+  }
+}`,
+			},
+			"tofu-workspace",
+		},
+		{
+			"Terraform server default ignores .tofu workspace",
+			"",
+			map[string]any{
+				"main.tofu": `terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces { name = "tofu-workspace" }
+  }
+}`,
+			},
+			"default",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, c.dirStructure)
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.dirStructure, ""), nil)
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				false, false, false, false, false,
+				"",
+				"**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
+				c.distribution,
+				false, false,
+				"auto",
+				scope,
+				terraformClient,
+			)
+
+			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+				PullRequestStatus: models.PullReqStatus{MergeableStatus: models.MergeableStatus{IsMergeable: true}},
+				Log:               logger,
+				Scope:             scope,
+				Pull:              models.PullRequest{BaseRepo: models.Repo{}},
+			})
+			Ok(t, err)
+			if c.expectedWorkspace == "default" {
+				// With only .tofu and Terraform distribution, project may not be discovered
+				// or workspace falls back to default
+				for _, ctx := range ctxs {
+					Equals(t, "default", ctx.Workspace)
+				}
+			} else {
+				Assert(t, len(ctxs) > 0, "expected at least one project context")
+				Equals(t, c.expectedWorkspace, ctxs[0].Workspace)
 			}
 		})
 	}
@@ -665,6 +760,7 @@ projects:
 					userConfig.AutoDetectModuleFiles,
 					userConfig.AutoplanFileList,
 					userConfig.RestrictFileList,
+					userConfig.DefaultTFDistribution,
 					c.Silenced,
 					userConfig.IncludeGitUntrackedFiles,
 					c.AutoDiscoverModeUserCfg,
@@ -756,6 +852,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 		defaultUserConfig.AutoDetectModuleFiles,
 		defaultUserConfig.AutoplanFileList,
 		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
@@ -842,6 +939,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfig
 		defaultUserConfig.AutoDetectModuleFiles,
 		defaultUserConfig.AutoplanFileList,
 		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
@@ -921,6 +1019,7 @@ func TestDefaultProjectCommandBuilder_PathSelectorRespectsBranchFilteredProjects
 		defaultUserConfig.AutoDetectModuleFiles,
 		defaultUserConfig.AutoplanFileList,
 		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
@@ -1016,6 +1115,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITea
 				defaultUserConfig.AutoDetectModuleFiles,
 				defaultUserConfig.AutoplanFileList,
 				defaultUserConfig.RestrictFileList,
+				defaultUserConfig.DefaultTFDistribution,
 				defaultUserConfig.SilenceNoProjects,
 				defaultUserConfig.IncludeGitUntrackedFiles,
 				defaultUserConfig.AutoDiscoverMode,
@@ -1104,6 +1204,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1190,6 +1291,7 @@ func TestDefaultProjectCommandBuilder_BuildWorkspaceOnlyCommand_IgnorePathsNotSk
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1261,6 +1363,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWit
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1374,6 +1477,7 @@ projects:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1437,6 +1541,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesHeadCommitForRe
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1501,6 +1606,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirRespectsGlobProject
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1571,6 +1677,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFailsOpenWhenRemote
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1631,6 +1738,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirAllowsAuthoritative
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1692,6 +1800,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesGlobalIgnoreWhe
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1766,6 +1875,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1826,6 +1936,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1901,6 +2012,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithLo
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -1958,6 +2070,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithou
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -2042,6 +2155,7 @@ autodiscover:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -2150,6 +2264,7 @@ projects:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -2587,6 +2702,7 @@ projects:
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -2690,6 +2806,7 @@ projects:
 		defaultUserConfig.AutoDetectModuleFiles,
 		defaultUserConfig.AutoplanFileList,
 		false,
+		"",
 		defaultUserConfig.SilenceNoProjects,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
@@ -3055,6 +3172,7 @@ projects:
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -3153,6 +3271,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3260,6 +3379,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3367,6 +3487,7 @@ autodiscover:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3475,6 +3596,7 @@ autodiscover:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3560,6 +3682,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3656,6 +3779,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgno
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3747,6 +3871,7 @@ projects:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -3835,6 +3960,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -4025,6 +4151,7 @@ projects:
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -4169,6 +4296,7 @@ projects:
 			userConfig.AutoDetectModuleFiles,
 			userConfig.AutoplanFileList,
 			userConfig.RestrictFileList,
+			userConfig.DefaultTFDistribution,
 			userConfig.SilenceNoProjects,
 			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
@@ -4253,6 +4381,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -4341,6 +4470,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
@@ -4471,6 +4601,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
@@ -4582,6 +4713,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,

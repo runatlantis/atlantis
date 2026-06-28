@@ -87,6 +87,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	DefaultTFDistribution string,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
@@ -118,6 +119,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDetectModuleFiles,
 			AutoplanFileList,
 			RestrictFileList,
+			DefaultTFDistribution,
 			SilenceNoProjects,
 			IncludeGitUntrackedFiles,
 			AutoDiscoverMode,
@@ -147,6 +149,7 @@ func NewProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	DefaultTFDistribution string,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
@@ -169,6 +172,7 @@ func NewProjectCommandBuilder(
 		AutoDetectModuleFiles:    AutoDetectModuleFiles,
 		AutoplanFileList:         AutoplanFileList,
 		RestrictFileList:         RestrictFileList,
+		DefaultTFDistribution:    DefaultTFDistribution,
 		SilenceNoProjects:        SilenceNoProjects,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
 		AutoDiscoverMode:         AutoDiscoverMode,
@@ -284,6 +288,8 @@ type DefaultProjectCommandBuilder struct {
 	EnableDiffMarkdownFormat bool
 	// User config option: Block plan requests from projects outside the files modified in the pull request.
 	RestrictFileList bool
+	// User config option: The default Terraform/OpenTofu distribution for projects without explicit config.
+	DefaultTFDistribution string
 	// User config option: Ignore PR if none of the modified files are part of a project.
 	SilenceNoProjects bool
 	// User config option: Include git untracked files in the modified file list.
@@ -681,7 +687,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: '%s'", mp.Path)
 			absProjectDir := filepath.Join(repoDir, mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir, p.DefaultTFDistribution)
 			if err != nil {
 				return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
 			}
@@ -714,7 +720,7 @@ func (p *DefaultProjectCommandBuilder) getAllMergedProjectCfgs(ctx *command.Cont
 	ctx.Log.Info("automatically discovered %d additional project(s): %v", len(projectDirs), projectDirs)
 	for _, projectDir := range projectDirs {
 		absProjectDir := filepath.Join(repoDir, projectDir)
-		workspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
+		workspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir, p.DefaultTFDistribution)
 		if err != nil {
 			return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
 		}

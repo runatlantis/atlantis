@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 
 	"github.com/moby/patternmatcher"
@@ -37,7 +38,7 @@ type ProjectFinder interface {
 	// absRepoDir is the path to the cloned repo on disk.
 	DetermineProjectsViaConfig(log logging.SimpleLogging, modifiedFiles []string, config valid.RepoCfg, absRepoDir string, moduleInfo ModuleProjects) ([]valid.Project, error)
 
-	DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error)
+	DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string, distribution string) (string, error)
 }
 
 var rootBlockSchema = &hcl.BodySchema{
@@ -65,12 +66,32 @@ var cloudBlockSchema = &hcl.BodySchema{
 	},
 }
 
-func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string) (string, error) {
+func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLogging, absRepoDir string, distribution string) (string, error) {
 	log.Info("Looking for Terraform Cloud workspace from configuration in '%s'", absRepoDir)
 	infos, err := os.ReadDir(absRepoDir)
 	if err != nil {
 		return "", err
 	}
+
+	isOpenTofu := distribution == "opentofu"
+
+	// Collect .tofu basenames for precedence (only relevant in OpenTofu mode).
+	tofuFiles := make(map[string]bool)
+	tofuJSONFiles := make(map[string]bool)
+	if isOpenTofu {
+		for _, info := range infos {
+			if info.IsDir() {
+				continue
+			}
+			name := info.Name()
+			if base, ok := strings.CutSuffix(name, ".tofu.json"); ok {
+				tofuJSONFiles[base] = true
+			} else if base, ok := strings.CutSuffix(name, ".tofu"); ok {
+				tofuFiles[base] = true
+			}
+		}
+	}
+
 	parser := hclparse.NewParser()
 	for _, info := range infos {
 		if info.IsDir() {
@@ -78,19 +99,52 @@ func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLoggi
 		}
 
 		name := info.Name()
-		if strings.HasSuffix(name, ".tf") {
-			fullPath := filepath.Join(absRepoDir, name)
-			file, _ := parser.ParseHCLFile(fullPath)
-			workspace, err := findTFCloudWorkspaceFromFile(file)
-			if err != nil {
-				log.Warn("%s", err.Error())
-				return DefaultWorkspace, nil
-			}
+		var file *hcl.File
 
-			if len(workspace) > 0 {
-				log.Debug("found configured Terraform Cloud workspace with name %q", workspace)
-				return workspace, nil
+		switch {
+		case strings.HasSuffix(name, ".tofu.json"):
+			if !isOpenTofu {
+				continue
 			}
+			file, _ = parser.ParseJSONFile(filepath.Join(absRepoDir, name))
+		case strings.HasSuffix(name, ".tofu"):
+			if !isOpenTofu {
+				continue
+			}
+			file, _ = parser.ParseHCLFile(filepath.Join(absRepoDir, name))
+		case strings.HasSuffix(name, ".tf.json"):
+			if isOpenTofu {
+				base, _ := strings.CutSuffix(name, ".tf.json")
+				if tofuJSONFiles[base] {
+					continue
+				}
+			}
+			file, _ = parser.ParseJSONFile(filepath.Join(absRepoDir, name))
+		case strings.HasSuffix(name, ".tf"):
+			if isOpenTofu {
+				base, _ := strings.CutSuffix(name, ".tf")
+				if tofuFiles[base] {
+					continue
+				}
+			}
+			file, _ = parser.ParseHCLFile(filepath.Join(absRepoDir, name))
+		default:
+			continue
+		}
+
+		if file == nil {
+			continue
+		}
+
+		workspace, err := findTFCloudWorkspaceFromFile(file)
+		if err != nil {
+			log.Warn("%s", err.Error())
+			return DefaultWorkspace, nil
+		}
+
+		if len(workspace) > 0 {
+			log.Debug("found configured Terraform Cloud workspace with name %q", workspace)
+			return workspace, nil
 		}
 	}
 
@@ -356,9 +410,8 @@ func isModule(dir string) bool {
 }
 
 // hasProjectIndicator checks whether a directory in the given filesystem
-// contains a Terraform/OpenTofu/Terragrunt project file. Aligned with
-// raw.IsTerraformProjectDir indicators: *.tf, *.tf.json, *.tofu, *.tofu.json,
-// terragrunt.hcl.
+// contains a Terraform/OpenTofu/Terragrunt project file, using the canonical
+// indicator list from raw.IsProjectIndicatorFile.
 func hasProjectIndicator(files fs.FS, dir string) bool {
 	dir = path.Clean(dir)
 	if dir == "" {
@@ -372,12 +425,7 @@ func hasProjectIndicator(files fs.FS, dir string) bool {
 		if e.IsDir() {
 			continue
 		}
-		name := e.Name()
-		if strings.HasSuffix(name, ".tf") ||
-			strings.HasSuffix(name, ".tf.json") ||
-			strings.HasSuffix(name, ".tofu") ||
-			strings.HasSuffix(name, ".tofu.json") ||
-			name == "terragrunt.hcl" {
+		if raw.IsProjectIndicatorFile(e.Name()) {
 			return true
 		}
 	}
