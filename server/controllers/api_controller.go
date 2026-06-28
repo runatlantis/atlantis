@@ -513,7 +513,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 }
 
 func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
-	if ctx.Pull.Num > 0 || repoDir == "" {
+	if ctx.Pull.Num >= 0 || repoDir == "" {
 		return nil
 	}
 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
@@ -1030,8 +1030,10 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	executionRef := request.Ref
 	request.Ref = apiRequestStorageRef(request.Ref)
-	request.BaseBranch = apiRequestBaseBranch(request.Ref, request.BaseBranch)
+	request.ExecutionRef = executionRef
+	request.BaseBranch = apiRequestBaseBranch(executionRef, request.BaseBranch)
 	request.StorageRepository = baseRepo.ID()
 
 	// Create executor that bridges to existing plan/apply infrastructure
@@ -1111,6 +1113,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		SuppressApplyWebhooks:     true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 		ExactProjectNameMatching:  true,
@@ -1184,6 +1187,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		SuppressApplyWebhooks:     true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 		FailOnMissingDependencies: true,
@@ -1275,6 +1279,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 		SkipPRModifiedFiles:       true,
 		SuppressVCSStatus:         true,
 		SuppressJobOutput:         true,
+		SuppressApplyWebhooks:     true,
 		RunPolicyChecks:           true,
 		FailOnTeamAllowlistDenied: true,
 		FailOnMissingDependencies: true,

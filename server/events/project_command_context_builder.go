@@ -333,6 +333,7 @@ func newProjectCommandContext(ctx *command.Context,
 		RunPolicyChecks:            ctx.RunPolicyChecks,
 		SuppressVCSStatus:          ctx.SuppressVCSStatus,
 		SuppressJobOutput:          ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
 		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
 	}
 }

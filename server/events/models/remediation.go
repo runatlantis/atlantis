@@ -72,6 +72,10 @@ type RemediationRequest struct {
 	StorageRepository string `json:"-"`
 	// Ref is the git reference (branch/tag/commit) to remediate. Required.
 	Ref string `json:"ref"`
+	// ExecutionRef is the original git reference used for checkout/fetch. It is
+	// populated by the API controller so storage can use normalized Ref while git
+	// still receives an explicit ref such as refs/heads/main when supplied.
+	ExecutionRef string `json:"-"`
 	// BaseBranch is required when ref is a raw commit SHA or tag value.
 	// It preserves Atlantis repo-config branch filtering and undiverged checks.
 	BaseBranch string `json:"base_branch,omitempty"`

@@ -1979,7 +1979,7 @@ func TestAPIController_Remediate(t *testing.T) {
 
 	body, _ := json.Marshal(models.RemediationRequest{
 		Repository: "owner/repo",
-		Ref:        "main",
+		Ref:        "refs/heads/main",
 		Type:       "Github",
 		Action:     models.RemediationPlanOnly,
 	})
@@ -1998,6 +1998,9 @@ func TestAPIController_Remediate(t *testing.T) {
 	Equals(t, "success", result.Status)
 	Equals(t, 1, result.Summary.SuccessCount)
 	Equals(t, "owner/repo", capturedRequest.Repository)
+	Equals(t, "main", capturedRequest.Ref)
+	Equals(t, "refs/heads/main", capturedRequest.ExecutionRef)
+	Equals(t, "main", capturedRequest.BaseBranch)
 	Equals(t, "github.com/owner/repo", capturedRequest.StorageRepository)
 }
 

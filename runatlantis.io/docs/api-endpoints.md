@@ -317,12 +317,16 @@ API path selectors are literal normalized repo-relative paths; glob patterns suc
 ::: tip Actions
 
 * `plan`: Runs a plan to preview what would change (default, non-destructive)
-* `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`.
+* `apply`: Runs both plan and apply to automatically fix drift (destructive). This action requires both `--enable-drift-detection` and `--enable-drift-remediation`, plus cached drift from a previous detection run for each targeted project/path/workspace.
 
 :::
 
 ::: warning Apply Requirements
 Drift remediation apply does not bypass repository `apply_requirements`. Requirements that need pull request state, such as `approved` or `mergeable`, fail closed for non-PR remediation requests. Use plan-only remediation or normal PR workflows for projects guarded by those requirements.
+:::
+
+::: tip Webhooks
+Drift remediation apply does not trigger legacy `event: apply` webhooks. Use drift webhooks for drift workflow notifications.
 :::
 
 ::: warning Plan Requirements
@@ -331,6 +335,10 @@ Drift remediation plan-only actions and drift detection do not bypass PR-state `
 
 ::: tip Ref Safety
 When remediation uses cached drift for a moving ref such as `main`, Atlantis compares the current checkout commit with the commit that produced the cached drift record. If the ref has moved, rerun drift detection before using `action: "apply"`.
+:::
+
+::: tip Cached Drift Required
+Remediation `action: "apply"` only applies cached drift records for the same repository, ref, `base_branch`, project/path, and workspace. Use `action: "plan"` for uncached previews, then run drift detection before applying.
 :::
 
 ::: tip Branch Context
@@ -956,15 +964,15 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 
 #### Query Parameters
 
-| Name        | Type   | Required | Description                                            |
-|-------------|--------|----------|--------------------------------------------------------|
-| repository  | string | Yes      | Full repository name (e.g., `owner/repo`)              |
-| type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`, `Gitea`)  |
-| project     | string | No       | Filter by project name                                 |
+| Name        | Type   | Required | Description                                                   |
+|-------------|--------|----------|---------------------------------------------------------------|
+| repository  | string | Yes      | Full repository name (e.g., `owner/repo`)                     |
+| type        | string | Yes      | VCS provider type (e.g., `Github`, `Gitlab`, `Gitea`)         |
+| project     | string | No       | Filter by project name                                        |
 | path        | string | No       | Filter by literal normalized repository-relative project path |
-| workspace   | string | No       | Filter by Terraform workspace                          |
-| ref         | string | No       | Filter by git reference                                |
-| base_branch | string | No       | Filter by branch context used when drift was detected  |
+| workspace   | string | No       | Filter by Terraform workspace                                 |
+| ref         | string | No       | Filter by git reference                                       |
+| base_branch | string | No       | Filter by branch context used when drift was detected         |
 
 #### Sample Request
 

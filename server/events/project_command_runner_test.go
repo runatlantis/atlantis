@@ -25,6 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -1049,6 +1050,55 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
 	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+}
+
+func TestDefaultProjectCommandRunner_ApplySuppressesApplyWebhooks(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+	ctx := command.ProjectContext{
+		Log:                   logging.NewNoopLogger(t),
+		Steps:                 []valid.Step{{StepName: "apply"}},
+		Workspace:             "default",
+		RepoRelDir:            ".",
+		SuppressApplyWebhooks: true,
+	}
+	expEnvs := map[string]string{}
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+
+	Equals(t, "apply", res.ApplySuccess)
+	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+	mockSender.VerifyWasCalled(Never()).Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]())
 }
 
 // Test run and env steps. We don't use mocks for this test since we're

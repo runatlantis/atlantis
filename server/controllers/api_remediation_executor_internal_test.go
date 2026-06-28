@@ -319,6 +319,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
 			cmd := args[1].(*events.CommentCommand)
+			Assert(t, ctx.SuppressApplyWebhooks, "expected remediation apply to suppress legacy apply webhooks")
 			capturedPullStatus = ctx.PullStatus
 			Assert(t, capturedPullStatus != nil, "expected pull status before building apply commands")
 			Equals(t, 2, len(capturedPullStatus.Projects))

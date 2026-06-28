@@ -149,18 +149,20 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
 
 	apiCtx := &command.Context{
-		Log:                 logging.NewNoopLogger(t),
-		API:                 true,
-		SkipPRRequirements:  true,
-		SkipPRModifiedFiles: true,
-		SuppressVCSStatus:   true,
-		SuppressJobOutput:   true,
+		Log:                   logging.NewNoopLogger(t),
+		API:                   true,
+		SkipPRRequirements:    true,
+		SkipPRModifiedFiles:   true,
+		SuppressVCSStatus:     true,
+		SuppressJobOutput:     true,
+		SuppressApplyWebhooks: true,
 	}
 	apiResult := subject.BuildProjectContext(apiCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
 	assert.True(t, apiResult[0].API)
 	assert.True(t, apiResult[0].SkipPRRequirements)
 	assert.True(t, apiResult[0].SuppressVCSStatus)
 	assert.True(t, apiResult[0].SuppressJobOutput)
+	assert.True(t, apiResult[0].SuppressApplyWebhooks)
 
 	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
 	normalCtx := &command.Context{Log: logging.NewNoopLogger(t)}
@@ -169,4 +171,5 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 	assert.False(t, normalResult[0].SkipPRRequirements)
 	assert.False(t, normalResult[0].SuppressVCSStatus)
 	assert.False(t, normalResult[0].SuppressJobOutput)
+	assert.False(t, normalResult[0].SuppressApplyWebhooks)
 }

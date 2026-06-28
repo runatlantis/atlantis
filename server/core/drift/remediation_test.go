@@ -24,6 +24,8 @@ type recordingRemediationExecutor struct {
 	planCalls           []remediationExecutorCall
 	applyCalls          []remediationExecutorCall
 	applyProjectCalls   [][]remediationExecutorCall
+	planRefs            []string
+	applyProjectRefs    []string
 	applyProjectResults []models.ProjectRemediationResult
 	applyProjectErr     error
 	planDrift           *models.DriftSummary
@@ -51,7 +53,8 @@ func (f failingRemediationStorage) GetAll() (map[string][]models.ProjectDrift, e
 	return nil, nil
 }
 
-func (r *recordingRemediationExecutor) ExecutePlan(_, _, _, projectName, path, workspace string) (string, *models.DriftSummary, error) {
+func (r *recordingRemediationExecutor) ExecutePlan(_, ref, _ string, projectName, path, workspace string) (string, *models.DriftSummary, error) {
+	r.planRefs = append(r.planRefs, ref)
 	r.planCalls = append(r.planCalls, remediationExecutorCall{
 		projectName: projectName,
 		path:        path,
@@ -72,7 +75,8 @@ func (r *recordingRemediationExecutor) ExecuteApply(_, _, _, projectName, path, 
 	return "apply", nil
 }
 
-func (r *recordingRemediationExecutor) ExecuteApplyProjects(_, _, _ string, projects []models.ProjectDrift) ([]models.ProjectRemediationResult, error) {
+func (r *recordingRemediationExecutor) ExecuteApplyProjects(_, ref, _ string, projects []models.ProjectDrift) ([]models.ProjectRemediationResult, error) {
+	r.applyProjectRefs = append(r.applyProjectRefs, ref)
 	calls := make([]remediationExecutorCall, 0, len(projects))
 	results := make([]models.ProjectRemediationResult, 0, len(projects))
 	for _, project := range projects {
@@ -202,22 +206,24 @@ func TestInMemoryRemediationService_AutoApplyRefreshesCachedDrift(t *testing.T) 
 func TestInMemoryRemediationService_AutoApplyUsesSingleProjectBatch(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
-		ProjectName: "network",
-		Path:        "network",
-		Workspace:   "default",
-		Ref:         "main",
-		BaseBranch:  "main",
-		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
-		LastChecked: time.Now(),
+		ProjectName:    "network",
+		Path:           "network",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
 	}))
 	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
-		ProjectName: "app",
-		Path:        "app",
-		Workspace:   "default",
-		Ref:         "main",
-		BaseBranch:  "main",
-		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
-		LastChecked: time.Now(),
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
 	}))
 
 	service := drift.NewInMemoryRemediationService(storage)
@@ -241,20 +247,24 @@ func TestInMemoryRemediationService_AutoApplyUsesSingleProjectBatch(t *testing.T
 func TestInMemoryRemediationService_AutoApplyExecutorErrorWithoutResultsFailsTargets(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
-		ProjectName: "app",
-		Path:        "app",
-		Workspace:   "default",
-		Ref:         "main",
-		BaseBranch:  "main",
-		Drift:       models.DriftSummary{HasDrift: true, ToAdd: 1},
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToAdd: 1},
+		LastChecked:    time.Now(),
 	}))
 	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
-		ProjectName: "db",
-		Path:        "db",
-		Workspace:   "default",
-		Ref:         "main",
-		BaseBranch:  "main",
-		Drift:       models.DriftSummary{HasDrift: true, ToChange: 1},
+		ProjectName:    "db",
+		Path:           "db",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
 	}))
 	service := drift.NewInMemoryRemediationService(storage)
 	executor := &recordingRemediationExecutor{applyProjectErr: errors.New("apply locked")}
@@ -275,19 +285,10 @@ func TestInMemoryRemediationService_AutoApplyExecutorErrorWithoutResultsFailsTar
 	}
 }
 
-func TestInMemoryRemediationService_AutoApplyReconcilesResolvedProjectPath(t *testing.T) {
+func TestInMemoryRemediationService_AutoApplyRequiresCachedDriftBeforeExecutor(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	service := drift.NewInMemoryRemediationService(storage)
-	executor := &recordingRemediationExecutor{
-		applyProjectResults: []models.ProjectRemediationResult{{
-			ProjectName: "app",
-			Path:        "apps/app",
-			Workspace:   "default",
-			Status:      models.RemediationStatusSuccess,
-			PlanOutput:  "plan",
-			ApplyOutput: "apply",
-		}},
-	}
+	executor := &recordingRemediationExecutor{}
 
 	result, err := service.Remediate(models.RemediationRequest{
 		Repository: "owner/repo",
@@ -298,41 +299,36 @@ func TestInMemoryRemediationService_AutoApplyReconcilesResolvedProjectPath(t *te
 	}, executor)
 	Ok(t, err)
 
-	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, models.RemediationStatusFailed, result.Status)
+	Equals(t, 0, len(executor.planCalls))
+	Equals(t, 0, len(executor.applyCalls))
+	Equals(t, 0, len(executor.applyProjectCalls))
 	Equals(t, 1, len(result.Projects))
-	Equals(t, models.RemediationStatusSuccess, result.Projects[0].Status)
-	Equals(t, "apps/app", result.Projects[0].Path)
-	Equals(t, "default", result.Projects[0].Workspace)
+	Equals(t, models.RemediationStatusFailed, result.Projects[0].Status)
+	Assert(t, strings.Contains(result.Projects[0].Error, "cached drift with a resolved commit is required"), "expected cached drift error, got %q", result.Projects[0].Error)
 
 	cached, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "app", Ref: "main"})
 	Ok(t, err)
 	Equals(t, 0, len(cached))
 }
 
-func TestInMemoryRemediationService_ExplicitApplyWithoutCachedDriftDoesNotPoisonCache(t *testing.T) {
+func TestInMemoryRemediationService_PlanOnlyExplicitWithoutCachedDriftStillRuns(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 	service := drift.NewInMemoryRemediationService(storage)
-	executor := &recordingRemediationExecutor{
-		applyProjectResults: []models.ProjectRemediationResult{{
-			ProjectName: "app",
-			Path:        "apps/app",
-			Workspace:   "default",
-			Status:      models.RemediationStatusSuccess,
-			PlanOutput:  "plan",
-			ApplyOutput: "apply",
-		}},
-	}
+	executor := &recordingRemediationExecutor{}
 
 	result, err := service.Remediate(models.RemediationRequest{
 		Repository: "owner/repo",
 		Ref:        "main",
 		Type:       "Github",
 		Projects:   []string{"app"},
-		Action:     models.RemediationAutoApply,
+		Action:     models.RemediationPlanOnly,
 	}, executor)
 	Ok(t, err)
 
 	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, 0, len(executor.applyCalls))
 	cached, err := storage.Get("owner/repo", drift.GetOptions{ProjectName: "app", Ref: "main"})
 	Ok(t, err)
 	Equals(t, 0, len(cached))
@@ -639,7 +635,17 @@ func TestInMemoryRemediationService_PathSelectorRejectsConflictingWorkspaceFilte
 }
 
 func TestInMemoryRemediationService_PathOnlyApplyMatchesResolvedProjectResult(t *testing.T) {
-	service := drift.NewInMemoryRemediationService(nil)
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		Path:           "env",
+		Workspace:      "prod",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToChange: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
 	executor := &recordingRemediationExecutor{
 		applyProjectResults: []models.ProjectRemediationResult{{
 			ProjectName: "app",
@@ -737,6 +743,38 @@ func TestInMemoryRemediationService_NormalizesBranchRefsForCacheLookup(t *testin
 	Equals(t, models.RemediationStatusSuccess, result.Status)
 	Equals(t, 1, len(executor.planCalls))
 	Equals(t, remediationExecutorCall{projectName: "app", path: "apps/app", workspace: "default"}, executor.planCalls[0])
+}
+
+func TestInMemoryRemediationService_PreservesExecutionRefForAutoApply(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("owner/repo", models.ProjectDrift{
+		ProjectName:    "app",
+		Path:           "apps/app",
+		Workspace:      "default",
+		Ref:            "main",
+		BaseBranch:     "main",
+		ResolvedCommit: "commit-a",
+		Drift:          models.DriftSummary{HasDrift: true, ToAdd: 1},
+		LastChecked:    time.Now(),
+	}))
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository:   "owner/repo",
+		Ref:          "main",
+		ExecutionRef: "refs/heads/main",
+		Type:         "Github",
+		Action:       models.RemediationAutoApply,
+		DriftOnly:    true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.applyProjectRefs))
+	Equals(t, "refs/heads/main", executor.applyProjectRefs[0])
+	Equals(t, 1, len(executor.applyProjectCalls))
+	Equals(t, remediationExecutorCall{projectName: "app", path: "apps/app", workspace: "default"}, executor.applyProjectCalls[0][0])
 }
 
 func TestInMemoryRemediationService_UsesHostQualifiedStorageRepository(t *testing.T) {

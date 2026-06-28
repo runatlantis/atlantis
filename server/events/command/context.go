@@ -66,6 +66,10 @@ type Context struct {
 	// publishing raw command output to the public job stream.
 	SuppressJobOutput bool
 
+	// SuppressApplyWebhooks prevents synthetic API workflows such as drift
+	// remediation from sending legacy event: apply webhooks.
+	SuppressApplyWebhooks bool
+
 	// RunPolicyChecks allows API workflows that explicitly model the full plan
 	// lifecycle, such as drift detection/remediation, to execute generated
 	// policy_check contexts after successful plan contexts.

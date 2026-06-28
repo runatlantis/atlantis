@@ -4,6 +4,7 @@
 package webhooks_test
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -67,6 +68,22 @@ func TestDriftWebhookSender_Send_MultipleSuccess(t *testing.T) {
 	for _, s := range senders {
 		s.VerifyWasCalledOnce().Send(logger, driftResult)
 	}
+}
+
+func TestDriftWebhookSender_Send_ContinuesAfterSenderFailure(t *testing.T) {
+	RegisterMockTestingT(t)
+	failing := mocks.NewMockDriftSender()
+	succeeding := mocks.NewMockDriftSender()
+	manager := webhooks.DriftWebhookSender{
+		Webhooks: []webhooks.DriftSender{failing, succeeding},
+	}
+	logger := logging.NewNoopLogger(t)
+	When(failing.Send(logger, driftResult)).ThenReturn(errors.New("sending drift webhook to \"https://example.com\": redacted failure"))
+
+	err := manager.Send(logger, driftResult)
+	Ok(t, err)
+	failing.VerifyWasCalledOnce().Send(logger, driftResult)
+	succeeding.VerifyWasCalledOnce().Send(logger, driftResult)
 }
 
 func TestDriftWebhookSender_Send_NoWebhooksNoOp(t *testing.T) {

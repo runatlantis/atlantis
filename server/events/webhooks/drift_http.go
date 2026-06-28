@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	driftWebhookURLRE           = regexp.MustCompile("https?://[^\\s'\"]+")
-	driftWebhookURLCredentialRE = regexp.MustCompile("(?i)(https?://)([^\\s/@]+:)?[^\\s/@]+@")
+	driftWebhookURLRE           = regexp.MustCompile(`https?://[^\s'"]+`)
+	driftWebhookURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\s/@]+@`)
 )
 
 // DriftHttpWebhook sends drift notifications to an HTTP endpoint.

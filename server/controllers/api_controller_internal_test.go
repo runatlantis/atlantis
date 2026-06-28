@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -61,10 +62,38 @@ func TestVerifyNonPRBaseBranchReachabilityRejectsUnreachableCommitAfterUnshallow
 	ErrContains(t, "is not reachable from base_branch", err)
 }
 
+func TestResolveNonPRHeadCommitSkipsLegacyZeroPull(t *testing.T) {
+	repoDir := initReachabilityRepo(t)
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			Num:        0,
+			HeadCommit: "main",
+		},
+	}
+
+	Ok(t, resolveNonPRHeadCommit(ctx, repoDir))
+	Equals(t, "main", ctx.Pull.HeadCommit)
+}
+
+func TestResolveNonPRHeadCommitUpdatesSyntheticNegativePull(t *testing.T) {
+	repoDir := initReachabilityRepo(t)
+	headCommit := strings.TrimSpace(runControllerGit(t, repoDir, "rev-parse", "HEAD"))
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadCommit: "main",
+		},
+	}
+
+	Ok(t, resolveNonPRHeadCommit(ctx, repoDir))
+	Equals(t, headCommit, ctx.Pull.HeadCommit)
+}
+
 func initReachabilityRepo(t *testing.T) string {
 	t.Helper()
-	repoDir := t.TempDir()
+	repoDir := newReachabilityGitTempDir(t, "reachability-origin-*")
 	runControllerGit(t, repoDir, "init", "--initial-branch=main")
+	disableReachabilityGitMaintenance(t, repoDir)
 	runControllerGit(t, repoDir, "config", "user.email", "atlantisbot@runatlantis.io")
 	runControllerGit(t, repoDir, "config", "user.name", "atlantisbot")
 	runControllerGit(t, repoDir, "config", "commit.gpgsign", "false")
@@ -76,13 +105,35 @@ func initReachabilityRepo(t *testing.T) string {
 
 func cloneShallowRef(t *testing.T, origin string, ref string) string {
 	t.Helper()
-	cloneDir := filepath.Join(t.TempDir(), "clone")
+	cloneDir := filepath.Join(newReachabilityGitTempDir(t, "reachability-clone-*"), "clone")
 	cmd := exec.Command("git", "clone", "--depth=1", "--branch", ref, "file://"+origin, cloneDir) //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("running git clone: %s: %v", output, err)
 	}
+	disableReachabilityGitMaintenance(t, cloneDir)
 	return cloneDir
+}
+
+func newReachabilityGitTempDir(t *testing.T, pattern string) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", pattern)
+	Ok(t, err)
+	t.Cleanup(func() {
+		for range 5 {
+			if err := os.RemoveAll(dir); err == nil {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	})
+	return dir
+}
+
+func disableReachabilityGitMaintenance(t *testing.T, repoDir string) {
+	t.Helper()
+	runControllerGit(t, repoDir, "config", "--local", "gc.auto", "0")
+	runControllerGit(t, repoDir, "config", "--local", "maintenance.auto", "false")
 }
 
 func runControllerGit(t *testing.T, dir string, args ...string) string {

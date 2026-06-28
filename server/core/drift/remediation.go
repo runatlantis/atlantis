@@ -96,6 +96,14 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 	}
 
 	if req.Action == models.RemediationAutoApply {
+		if err := requireCachedApplyTargets(projects); err != nil {
+			for _, projectResult := range failedProjectRemediationResults(projects, err.Error()) {
+				result.AddProjectResult(projectResult)
+			}
+			result.Complete()
+			s.storeResult(result)
+			return result, nil
+		}
 		for _, projectResult := range s.remediateProjectsWithApply(req, projects, executor) {
 			result.AddProjectResult(projectResult)
 		}
@@ -115,7 +123,7 @@ func (s *InMemoryRemediationService) Remediate(req models.RemediationRequest, ex
 }
 
 func (s *InMemoryRemediationService) remediateProjectsWithApply(req models.RemediationRequest, projects []models.ProjectDrift, executor RemediationExecutor) []models.ProjectRemediationResult {
-	results, err := executor.ExecuteApplyProjects(req.Repository, req.Ref, req.Type, projects)
+	results, err := executor.ExecuteApplyProjects(req.Repository, remediationExecutionRef(req), req.Type, projects)
 	if err != nil && len(results) == 0 {
 		return failedProjectRemediationResults(projects, err.Error())
 	}
@@ -342,6 +350,13 @@ func remediationRef(req models.RemediationRequest) string {
 	return models.NormalizeAPIRef(req.Ref)
 }
 
+func remediationExecutionRef(req models.RemediationRequest) string {
+	if req.ExecutionRef != "" {
+		return req.ExecutionRef
+	}
+	return req.Ref
+}
+
 func remediationBaseBranch(req models.RemediationRequest) string {
 	if req.BaseBranch != "" {
 		return models.NormalizeAPIRef(req.BaseBranch)
@@ -360,6 +375,26 @@ func remediationPathWorkspaces(path models.DriftDetectionPath, workspaces []stri
 		return workspaces, nil
 	}
 	return []string{defaultWorkspace}, nil
+}
+
+func requireCachedApplyTargets(projects []models.ProjectDrift) error {
+	for _, project := range projects {
+		if project.ResolvedCommit != "" && !project.LastChecked.IsZero() {
+			continue
+		}
+		return fmt.Errorf("cached drift with a resolved commit is required before remediation apply for %s; run drift detection for the same ref, base_branch, project, path, and workspace first", remediationTargetDescription(project))
+	}
+	return nil
+}
+
+func remediationTargetDescription(project models.ProjectDrift) string {
+	if project.ProjectName != "" {
+		return fmt.Sprintf("project %q", project.ProjectName)
+	}
+	if project.Path != "" {
+		return fmt.Sprintf("path %q workspace %q", project.Path, project.Workspace)
+	}
+	return "selected project"
 }
 
 func remediationPathProjectNames(projects []string) []string {
@@ -451,7 +486,7 @@ func (s *InMemoryRemediationService) remediateProject(req models.RemediationRequ
 	// Execute plan
 	planOutput, driftSummary, err := executor.ExecutePlan(
 		req.Repository,
-		req.Ref,
+		remediationExecutionRef(req),
 		req.Type,
 		proj.ProjectName,
 		proj.Path,
