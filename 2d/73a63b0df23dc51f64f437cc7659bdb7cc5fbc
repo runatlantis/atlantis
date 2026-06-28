@@ -1,0 +1,32 @@
+server/core/terraform/tfclient/tofu_version_test.go
+  s_e24b0665842422::t_333691ce8919ee 21-22,30,32,35-36,38-40,43-44,46,48-70,75-77,79-86,88-90,93-100,103,105-120,122-124,126-135,138-159,163,165-168,170-174,177-184,187,189-192,194-195,198-204,207-210,212-214,216-219,221-222,225-231,233-235,237-243,246,248-251,253-254,256-263,266-274,277-280,282-284,286-289,292-300,303-306,308-310,312-318,321-329,332-340
+server/core/config/raw/project_test.go
+  s_e24b0665842422::t_2f5362e056a983 790,794
+  s_e24b0665842422::t_169a8f876e0b95 767-789,791-793,795-802
+server/events/project_command_builder_internal_test.go
+  s_e24b0665842422::t_9d8d31dd877c83 604
+server/core/config/raw/autoplan_test.go
+  s_e24b0665842422::t_90830df3a383eb 156
+server/core/terraform/tfclient/tofu_version.go
+  s_e24b0665842422::t_f3e98739dfbe41 8,24-25,40-42,56-58,78,81,83,85-89,94-97,101-108,132-135
+server/core/config/raw/autoplan.go
+  s_e24b0665842422::t_8f27e00152ac5b 16-17
+cmd/server.go
+  s_e24b0665842422::t_030a24368a2e0f 173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2d73a63b0df23dc51f64f437cc7659bdb7cc5fbc",
+  "prompts": {},
+  "sessions": {
+    "s_e24b0665842422": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b2c23a33-f986-498f-aa1a-13066945274a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
