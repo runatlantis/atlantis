@@ -929,7 +929,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 ## Other Endpoints
 
-The endpoints listed in this section are non-destructive and therefore don't require authentication nor special secret token.
+Most endpoints listed in this section are non-destructive and therefore don't require authentication nor a special secret token. `GET /api/drift/status` is an authenticated drift API read endpoint and requires `X-Atlantis-Token`.
 
 ### GET /api/locks
 
