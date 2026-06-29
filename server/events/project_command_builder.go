@@ -1507,12 +1507,6 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
-	if err != nil {
-		return projCtx, err
-	}
-	defer unlockFn()
-
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
@@ -1526,6 +1520,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
 		return projCtx, ErrIgnoredTargetedDir
 	}
+
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
 
 	projCtx, err = p.buildProjectCommandCtx(
 		ctx,

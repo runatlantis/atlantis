@@ -234,6 +234,28 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
+	finalLivePull, err := a.refreshLivePullIdentity(ctx)
+	if err != nil {
+		ctx.Log.Err("fetching live pull request after apply: %s", err)
+		ctx.CommandHasErrors = true
+		result.Error = fmt.Errorf("fetching live pull request after apply: %w", err)
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
+		return
+	}
+	if err := livePullIdentityChangedDuringApply(livePull, finalLivePull); err != nil {
+		ctx.Log.Warn("apply result is stale because %s", err)
+		ctx.CommandHasErrors = true
+		result.Error = err
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
+		return
+	}
+	livePull = finalLivePull
 	ctx.CommandHasErrors = result.HasErrors()
 
 	a.pullUpdater.updatePull(
@@ -281,6 +303,26 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+func livePullIdentityChangedDuringApply(before models.PullRequest, after models.PullRequest) error {
+	if before.HeadCommit != "" && after.HeadCommit != "" && before.HeadCommit != after.HeadCommit {
+		return fmt.Errorf(
+			"%w: pull request head changed from %s to %s while apply was running; run `atlantis plan` before apply",
+			errStaleCommandHead,
+			shortSHA(before.HeadCommit),
+			shortSHA(after.HeadCommit),
+		)
+	}
+	if before.BaseBranch != "" && after.BaseBranch != "" && before.BaseBranch != after.BaseBranch {
+		return fmt.Errorf(
+			"%w: pull request base branch changed from %q to %q while apply was running; run `atlantis plan` before apply",
+			errStaleCommandHead,
+			before.BaseBranch,
+			after.BaseBranch,
+		)
+	}
+	return nil
 }
 
 func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {

@@ -46,7 +46,7 @@ func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.Project
 	if err != nil {
 		return fmt.Errorf("fetching live pull request: %w", err)
 	}
-	return validateCommandStartHead(ctx, livePull.HeadCommit)
+	return validateCommandStartIdentity(ctx, livePull)
 }
 
 func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
@@ -89,7 +89,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
 			return err
 		}
-		if err := validateCommandStartHead(ctx, livePull.HeadCommit); err != nil {
+		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
 			return err
 		}
 	} else if err := pullStatusFreshnessError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
@@ -143,14 +143,28 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 }
 
 func validateCommandStartHead(ctx command.ProjectContext, liveHead string) error {
-	if liveHead == "" || ctx.Pull.HeadCommit == "" || !looksLikeCommitSHA(ctx.Pull.HeadCommit) || ctx.Pull.HeadCommit == liveHead {
+	return validateCommandStartIdentity(ctx, models.PullRequest{HeadCommit: liveHead})
+}
+
+func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.PullRequest) error {
+	if livePull.HeadCommit != "" && ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != livePull.HeadCommit {
+		return fmt.Errorf(
+			"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
+			errStaleCommandHead,
+			shortSHA(ctx.Pull.HeadCommit),
+			shortSHA(livePull.HeadCommit),
+		)
+	}
+	commandBase := strings.TrimSpace(ctx.Pull.BaseBranch)
+	liveBase := strings.TrimSpace(livePull.BaseBranch)
+	if commandBase == "" || liveBase == "" || commandBase == liveBase {
 		return nil
 	}
 	return fmt.Errorf(
-		"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
+		"%w: pull request base branch changed from %q to %q; run `atlantis plan` before apply",
 		errStaleCommandHead,
-		shortSHA(ctx.Pull.HeadCommit),
-		shortSHA(liveHead),
+		commandBase,
+		liveBase,
 	)
 }
 

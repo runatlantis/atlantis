@@ -5,6 +5,7 @@ package events
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
@@ -247,6 +248,63 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 
 func TestDBUpdater_SameHeadDifferentBaseApplyFailureDoesNotOverwriteCurrentBaseStatus(t *testing.T) {
 	assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t)
+}
+
+func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+	updater := &DBUpdater{Database: database}
+	stalePull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	currentPull := stalePull
+	currentPull.BaseBranch = "release"
+	_, err = database.UpdatePullWithResults(currentPull, []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			Workspace:   DefaultWorkspace,
+			RepoRelDir:  "dirA",
+			ProjectName: "projA",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
+		{
+			Command:     command.Apply,
+			Workspace:   DefaultWorkspace,
+			RepoRelDir:  "dirA",
+			ProjectName: "projA",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("%w: pull request base branch changed", errStaleCommandHead),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pullStatus.Pull.BaseBranch != currentPull.BaseBranch {
+		t.Fatalf("expected DBUpdater to preserve current base %q, got %q", currentPull.BaseBranch, pullStatus.Pull.BaseBranch)
+	}
+	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	if project == nil {
+		t.Fatal("expected current project status to remain")
+	}
+	if project.Status != models.PlannedPlanStatus {
+		t.Fatalf("expected current project status %q, got %q", models.PlannedPlanStatus, project.Status)
+	}
 }
 
 func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T) {

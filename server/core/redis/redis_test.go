@@ -966,6 +966,66 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 	}, maybeStatus.Projects)
 }
 
+func TestRedis_UpdateSameCommitBackfillsMissingBaseBranch(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := rdb.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "main"
+	status, err := rdb.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, "main", status.Pull.BaseBranch)
+	Equals(t, 2, len(status.Projects))
+
+	maybeStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, "main", maybeStatus.Pull.BaseBranch)
+	Equals(t, 2, len(maybeStatus.Projects))
+}
+
 // Test that if we update an existing pull status via Apply and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge_Apply(t *testing.T) {

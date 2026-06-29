@@ -1091,7 +1091,7 @@ func TestApplyPlanValidator_RejectsWhenLiveBaseChangedSinceCommandStart(t *testi
 	Ok(t, err)
 }
 
-func TestApplyPlanValidator_UsesLiveBaseBranchNotCommandStartBase(t *testing.T) {
+func TestApplyPlanValidator_TargetedApplySameHeadDifferentBaseReturnsStaleCommandError(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
 	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -1122,7 +1122,11 @@ func TestApplyPlanValidator_UsesLiveBaseBranchNotCommandStartBase(t *testing.T) 
 
 	err = validator.ValidateProjectPlan(ctx, repoDir)
 
-	Ok(t, err)
+	Assert(t, err != nil, "expected same-head base retarget to be stale")
+	Assert(t, strings.Contains(err.Error(), "pull request base branch changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "current-base plan", string(contents))
 }
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
@@ -1131,6 +1135,44 @@ func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequireme
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDependencyValidation(t *testing.T) {
 	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_TargetedBaseRetargetClassifiedBeforeRequirements(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"}},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale base command error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request base branch changed"), "got: %s", res.Error)
+	mockWorkingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDirNotExist(t *testing.T) {
