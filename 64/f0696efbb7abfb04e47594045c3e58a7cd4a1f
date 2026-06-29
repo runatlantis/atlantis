@@ -1,0 +1,33 @@
+e2e/e2e.go
+  s_7ae3c68faf0427::t_8fc1ef4cf51cbe 41-51
+e2e/github.go
+  s_7ae3c68faf0427::t_bb3e90a1e88dbe 194-204,208-212,216-217,219-225,227-236,240
+e2e/gitlab.go
+  s_7ae3c68faf0427::t_750dd0a9135a65 113-122,150-157
+e2e/on_apply_lock.go
+  s_7ae3c68faf0427::t_68699101be8ecd 1-403
+e2e/on_apply_lock_test.go
+  s_7ae3c68faf0427::t_5cee2591ef93bd 1-92
+e2e/testcase.go
+  s_7ae3c68faf0427::t_1231a047efaf43 23-30,71-73,96-99,265-274
+e2e/vcs.go
+  s_7ae3c68faf0427::t_c520720368e891 7-16,23-24,28-33
+scripts/e2e.sh
+  s_7ae3c68faf0427::t_aa962a54cda1d6 43,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "64f0696efbb7abfb04e47594045c3e58a7cd4a1f",
+  "prompts": {},
+  "sessions": {
+    "s_7ae3c68faf0427": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f11a4-0d42-7b41-aedc-d865ac2fad94",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
