@@ -1,0 +1,33 @@
+server/events/state_command_runner.go
+  s_bf2529fc29caf9::t_dc3bfca12645df 47-48,50
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_9ca3573c98fe70 1365,1375-1392,1409,1412-1424,1428
+server/events/plan_command_runner.go
+  s_bf2529fc29caf9::t_4df830d311311d 127,232,347-351
+server/events/import_command_runner.go
+  s_bf2529fc29caf9::t_6c1b04da43cfc4 7-8,80-81,83
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_0e21d2488a7e25 4816-4828,4863-4879,4973-4993
+  s_bf2529fc29caf9::t_f406d4e83bcba6 4994
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_ce839fc61090d6 1517-1575
+  s_bf2529fc29caf9::t_5440fdb7ad92da 1023-1205
+  s_bf2529fc29caf9::t_ea6dccbb8f4cb1 462-494,511,515
+  s_bf2529fc29caf9::t_9baa2cfb007065 568-600
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0e74ed61217b707344574d40d0606a9c774d7339",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
