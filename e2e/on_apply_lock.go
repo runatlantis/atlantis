@@ -223,7 +223,7 @@ func pollAtlantisCommandStatusAfter(ctx context.Context, client VCSClient, branc
 	statusContext := atlantisCommandStatusContext(command)
 	state := "not started"
 	var statusErr error
-	for i := 0; i < lifecycleCommandMaxPolls; i++ {
+	for range lifecycleCommandMaxPolls {
 		time.Sleep(pollInterval)
 		status, err := client.GetCommitStatus(ctx, branchName, statusContext)
 		if err != nil {
@@ -284,7 +284,7 @@ func enableOnApplyRepoLocksForFixture(cloneDir string) error {
 	if patched == string(contents) {
 		return nil
 	}
-	if err := os.WriteFile(path, []byte(patched), info.Mode().Perm()); err != nil {
+	if err := os.WriteFile(path, []byte(patched), info.Mode().Perm()); err != nil { //nolint:gosec // path is the fixed atlantis.yaml file in an E2E temp clone.
 		return fmt.Errorf("writing atlantis.yaml: %w", err)
 	}
 	return nil
@@ -331,7 +331,7 @@ func enableOnApplyRepoLocksForFixtureContent(contents string) (string, error) {
 func findProjectBlock(lines []string, projectName string) (int, int, error) {
 	start := -1
 	end := -1
-	for i := 0; i < len(lines); i++ {
+	for i := range len(lines) {
 		if !strings.HasPrefix(lines[i], "  - ") {
 			continue
 		}
@@ -367,7 +367,7 @@ func isTopLevelYAMLSection(line string) bool {
 func assertLockConflictComment(ctx context.Context, client VCSClient, pullNumber int, caseName string) error {
 	var comments []string
 	var commentsErr error
-	for i := 0; i < lifecycleCommandMaxPolls; i++ {
+	for range lifecycleCommandMaxPolls {
 		comments, commentsErr = client.GetPRComments(ctx, pullNumber)
 		if commentsErr != nil {
 			log.Printf("[%s] error polling PR comments for lock conflict: %v", caseName, commentsErr)
