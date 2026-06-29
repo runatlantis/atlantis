@@ -1553,6 +1553,9 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			WorkingDir: workingDir,
 		},
 		CancellationTracker: cancellationTracker,
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher: database,
+		},
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -1599,6 +1602,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
 		workingDir,
+		locker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,

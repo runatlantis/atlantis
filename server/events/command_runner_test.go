@@ -7,6 +7,8 @@ package events_test
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
@@ -174,6 +177,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
+		events.NewDefaultWorkingDirLocker(),
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -492,6 +496,10 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	planCommandRunner.SilenceNoProjects = true
 
 	tmp := t.TempDir()
+	oldPlanDir := filepath.Join(tmp, "old-project")
+	Ok(t, os.MkdirAll(oldPlanDir, 0700))
+	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
+	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
@@ -509,15 +517,68 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
+		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
+	}, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	_, err = os.Stat(oldPlanPath)
+	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
 	Equals(t, 0, len(pullStatus.Projects))
+}
+
+func TestRunCommentCommandPlan_NoProjectsDoesNotUnlockActiveLocks(t *testing.T) {
+	vcsClient := setup(t)
+	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, true)
+
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	var pull github.PullRequest
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+}
+
+func TestRunCommentCommandPlan_NoProjectsEmptyPullStatusWriteFailureIsUserVisible(t *testing.T) {
+	vcsClient := setup(t)
+	planCommandRunner.SilenceNoProjects = true
+
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected empty PullStatus write failure to mark command errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "writing empty plan status"), "got: %s", comment)
 }
 
 func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
@@ -1203,6 +1264,313 @@ func TestImportOrStateRm_DoesNotDiscardPlanStatusOnErrorOrFailure(t *testing.T) 
 	}
 }
 
+func TestImportOrStateRm_DiscardsOnlyExistingPullStatusProject(t *testing.T) {
+	cases := []struct {
+		name       string
+		cmd        events.CommentCommand
+		projectCmd command.ProjectContext
+		output     command.ProjectCommandOutput
+	}{
+		{
+			name: "import",
+			cmd:  events.CommentCommand{Name: command.Import, ProjectName: "projB"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.Import,
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projB",
+			},
+			output: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		},
+		{
+			name: "state rm",
+			cmd:  events.CommentCommand{Name: command.State, SubName: "rm", ProjectName: "projB"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.State,
+				SubCommand:  "rm",
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projB",
+			},
+			output: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = setup(t)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
+				plannedProjectResult("dir1", events.DefaultWorkspace, "projB"),
+			})
+			Ok(t, err)
+
+			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			Ok(t, err)
+			Equals(t, models.PlannedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projA").Status)
+			Equals(t, models.DiscardedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projB").Status)
+		})
+	}
+}
+
+func TestImportOrStateRm_DoesNotCreateDiscardedStatusWithoutPullStatus(t *testing.T) {
+	cases := []struct {
+		name       string
+		cmd        events.CommentCommand
+		projectCmd command.ProjectContext
+		output     command.ProjectCommandOutput
+	}{
+		{
+			name: "import",
+			cmd:  events.CommentCommand{Name: command.Import, ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.Import,
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		},
+		{
+			name: "state rm",
+			cmd:  events.CommentCommand{Name: command.State, SubName: "rm", ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.State,
+				SubCommand:  "rm",
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = setup(t)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+
+			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			Ok(t, err)
+			Assert(t, pullStatus == nil, "expected no PullStatus to be created")
+		})
+	}
+}
+
+func TestImportOrStateRm_DoesNotCreateDiscardedStatusForMissingProject(t *testing.T) {
+	cases := []struct {
+		name       string
+		cmd        events.CommentCommand
+		projectCmd command.ProjectContext
+		output     command.ProjectCommandOutput
+	}{
+		{
+			name: "import",
+			cmd:  events.CommentCommand{Name: command.Import, ProjectName: "projB"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.Import,
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projB",
+			},
+			output: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		},
+		{
+			name: "state rm",
+			cmd:  events.CommentCommand{Name: command.State, SubName: "rm", ProjectName: "projB"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.State,
+				SubCommand:  "rm",
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projB",
+			},
+			output: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = setup(t)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
+			})
+			Ok(t, err)
+
+			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			Ok(t, err)
+			Equals(t, 1, len(pullStatus.Projects))
+			Equals(t, models.PlannedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projA").Status)
+		})
+	}
+}
+
+func TestImportOrStateRm_DoesNotDiscardStaleHeadPullStatus(t *testing.T) {
+	cases := []struct {
+		name       string
+		cmd        events.CommentCommand
+		projectCmd command.ProjectContext
+		output     command.ProjectCommandOutput
+	}{
+		{
+			name: "import",
+			cmd:  events.CommentCommand{Name: command.Import, ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.Import,
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		},
+		{
+			name: "state rm",
+			cmd:  events.CommentCommand{Name: command.State, SubName: "rm", ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.State,
+				SubCommand:  "rm",
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = setup(t)
+			stalePull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "old123"}
+			currentPull := stalePull
+			currentPull.HeadCommit = "new123"
+			_, err := dbUpdater.Database.UpdatePullWithResults(stalePull, []command.ProjectResult{
+				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
+			})
+			Ok(t, err)
+
+			runImportOrStateRmResult(t, currentPull, tc.cmd, tc.projectCmd, tc.output)
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(currentPull)
+			Ok(t, err)
+			Assert(t, pullStatus != nil, "expected stale PullStatus to remain")
+			Equals(t, "old123", pullStatus.Pull.HeadCommit)
+			Equals(t, models.PlannedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projA").Status)
+		})
+	}
+}
+
+func runImportOrStateRmResult(t *testing.T, pull models.PullRequest, cmd events.CommentCommand, projectCmd command.ProjectContext, output command.ProjectCommandOutput) {
+	t.Helper()
+	logger := logging.NewNoopLogger(t)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logger,
+		Scope:    metricstest.NewLoggingScope(t, logger, "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCmd.BaseRepo = testdata.GithubRepo
+	projectCmd.Pull = pull
+
+	switch cmd.Name {
+	case command.Import:
+		When(pullReqStatusFetcher.FetchPullStatus(logger, pull)).ThenReturn(models.PullReqStatus{}, nil)
+		When(projectCommandBuilder.BuildImportCommands(ctx, &cmd)).ThenReturn([]command.ProjectContext{projectCmd}, nil)
+		When(projectCommandRunner.Import(projectCmd)).ThenReturn(output)
+		importCommandRunner.Run(ctx, &cmd)
+	case command.State:
+		When(projectCommandBuilder.BuildStateRmCommands(ctx, &cmd)).ThenReturn([]command.ProjectContext{projectCmd}, nil)
+		When(projectCommandRunner.StateRm(projectCmd)).ThenReturn(output)
+		stateCommandRunner.Run(ctx, &cmd)
+	default:
+		t.Fatalf("unsupported command %q", cmd.Name)
+	}
+}
+
+func plannedProjectResult(repoRelDir, workspace, projectName string) command.ProjectResult {
+	return command.ProjectResult{
+		Command:     command.Plan,
+		RepoRelDir:  repoRelDir,
+		Workspace:   workspace,
+		ProjectName: projectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		},
+	}
+}
+
+func projectStatus(t *testing.T, pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) models.ProjectStatus {
+	t.Helper()
+	for _, project := range pullStatus.Projects {
+		if project.Workspace == workspace && project.RepoRelDir == repoRelDir && project.ProjectName == projectName {
+			return project
+		}
+	}
+	t.Fatalf("missing project status for dir %q workspace %q project %q", repoRelDir, workspace, projectName)
+	return models.ProjectStatus{}
+}
+
+type failUnlockByPullLocker struct {
+	t *testing.T
+}
+
+func (l failUnlockByPullLocker) TryLock(models.Project, string, models.PullRequest, models.User) (locking.TryLockResponse, error) {
+	return locking.TryLockResponse{}, nil
+}
+
+func (l failUnlockByPullLocker) Unlock(string) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
+func (l failUnlockByPullLocker) List() (map[string]models.ProjectLock, error) {
+	return nil, nil
+}
+
+func (l failUnlockByPullLocker) UnlockByPull(string, int) ([]models.ProjectLock, error) {
+	l.t.Fatalf("no-project cleanup must not call UnlockByPull")
+	return nil, nil
+}
+
+func (l failUnlockByPullLocker) GetLock(string) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
+func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locking.Locker, silenceNoProjects bool) {
+	planCommandRunner = events.NewPlanCommandRunner(
+		false,
+		false,
+		vcsClient,
+		pendingPlanFinder,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		commitUpdater,
+		projectCommandBuilder,
+		projectCommandRunner,
+		cancellationTracker,
+		dbUpdater,
+		pullUpdater,
+		policyCheckCommandRunner,
+		autoMerger,
+		1,
+		silenceNoProjects,
+		dbUpdater.Database,
+		locker,
+		false,
+		pullReqStatusFetcher,
+		false,
+	)
+	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
+}
+
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
@@ -1511,7 +1879,7 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 }
 
 func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
@@ -1546,6 +1914,10 @@ func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
+	oldPlanDir := filepath.Join(tmp, "old-project")
+	Ok(t, os.MkdirAll(oldPlanDir, 0700))
+	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
+	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
@@ -1562,15 +1934,64 @@ func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{}, nil)
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
+		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
+	}, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	_, err = os.Stat(oldPlanPath)
+	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
 	Equals(t, 0, len(pullStatus.Projects))
+}
+
+func TestRunAutoplan_NoProjectsDoesNotUnlockActiveLocks(t *testing.T) {
+	vcsClient := setup(t)
+	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, false)
+
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+}
+
+func TestRunAutoplan_NoProjectsEmptyPullStatusWriteFailureIsUserVisible(t *testing.T) {
+	vcsClient := setup(t)
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.AutoTrigger,
+	}
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	Assert(t, ctx.CommandHasErrors, "expected empty PullStatus write failure to mark autoplan errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "writing empty plan status"), "got: %s", comment)
 }
 
 func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_False(t *testing.T) {
@@ -1596,7 +2017,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.PendingCommitStatus), Eq(command.Plan))
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -1624,7 +2045,7 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Eq(models.FailedCommitStatus), Eq(command.Plan))
@@ -1656,7 +2077,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
@@ -1676,7 +2097,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = true
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(Any[string]())
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 	// gomock will fail if lockingLocker.UnlockByPull is called unexpectedly (no EXPECT set)
 }
 
@@ -1715,7 +2136,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 }
 
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
@@ -1735,7 +2156,7 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, ProjectName: "default"})
-	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(tmp)
 }
 
 // Test that if one plan fails and we are using automerge, that
@@ -1788,7 +2209,7 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalled(Times(2)).Find(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
@@ -1817,7 +2238,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }

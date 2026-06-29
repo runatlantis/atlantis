@@ -37,6 +37,14 @@ func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, res
 }
 
 func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) error {
+	pullStatus, err := c.Database.GetPullStatus(pull)
+	if err != nil {
+		return err
+	}
+	if pullStatus == nil || !pullStatusHeadMatchesPull(pull, pullStatus.Pull) {
+		return nil
+	}
+
 	var discarded []command.ProjectResult
 	for _, res := range results {
 		if res.Error != nil || res.Failure != "" {
@@ -45,11 +53,15 @@ func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.
 		if res.ImportSuccess == nil && res.StateRmSuccess == nil {
 			continue
 		}
+		proj := findProjectInPullStatus(pullStatus, res.Workspace, res.RepoRelDir, res.ProjectName)
+		if proj == nil || !statusAllowedForDiscoveredPlan(proj.Status) {
+			continue
+		}
 		discarded = append(discarded, res)
 	}
 	if len(discarded) == 0 {
 		return nil
 	}
-	_, err := c.updateDB(ctx, pull, discarded)
+	_, err = c.updateDB(ctx, pull, discarded)
 	return err
 }

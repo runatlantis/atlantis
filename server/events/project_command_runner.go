@@ -305,6 +305,7 @@ type DefaultProjectCommandRunner struct {
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
+	ApplyPlanValidator        ApplyPlanValidator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -867,6 +868,12 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", err
 	}
 	defer unlockFn()
+
+	if p.ApplyPlanValidator != nil {
+		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+			return "", "", err
+		}
+	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 

@@ -1334,10 +1334,7 @@ func validateNoPlansFound(ctx *command.Context) error {
 // pullStatusMatchesHead returns true if PullStatus is for the current PR head.
 // Returns true if either commit is empty (unit test ergonomics or legacy data).
 func pullStatusMatchesHead(ctx *command.Context) bool {
-	if ctx.Pull.HeadCommit == "" || ctx.PullStatus.Pull.HeadCommit == "" {
-		return true
-	}
-	return ctx.PullStatus.Pull.HeadCommit == ctx.Pull.HeadCommit
+	return pullStatusHeadMatchesPull(ctx.Pull, ctx.PullStatus.Pull)
 }
 
 func shortSHA(sha string) string {
