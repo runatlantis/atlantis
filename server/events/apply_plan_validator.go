@@ -53,13 +53,6 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		return fmt.Errorf("fetching live pull request head: %w", err)
 	}
 	if liveHead != "" {
-		if ctx.Pull.HeadCommit != "" && ctx.Pull.HeadCommit != liveHead {
-			return fmt.Errorf(
-				"pull request head changed from %s to %s; run `atlantis plan` before apply",
-				shortSHA(ctx.Pull.HeadCommit),
-				shortSHA(liveHead),
-			)
-		}
 		if pullStatus.Pull.HeadCommit == "" {
 			return fmt.Errorf("recorded plan status has no head commit; run `atlantis plan` before apply")
 		}
@@ -67,6 +60,13 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 			return fmt.Errorf(
 				"recorded plan status is from commit %s but live pull request head is %s; run `atlantis plan` before apply",
 				shortSHA(pullStatus.Pull.HeadCommit),
+				shortSHA(liveHead),
+			)
+		}
+		if ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != liveHead {
+			return fmt.Errorf(
+				"pull request head changed from %s to %s; run `atlantis plan` before apply",
+				shortSHA(ctx.Pull.HeadCommit),
 				shortSHA(liveHead),
 			)
 		}
@@ -125,15 +125,15 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 }
 
 func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContext) (*models.PullStatus, error) {
+	if ctx.API && ctx.PullStatus != nil {
+		return ctx.PullStatus, nil
+	}
 	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
 	if err != nil {
 		return nil, err
 	}
 	if pullStatus != nil {
 		return pullStatus, nil
-	}
-	if ctx.API && ctx.PullStatus != nil {
-		return ctx.PullStatus, nil
 	}
 	return nil, nil
 }
@@ -223,6 +223,19 @@ func rejectProjectPlan(planPath string, format string, args ...any) error {
 		return fmt.Errorf("%w; deleting rejected plan file %q: %v", err, planPath, removeErr)
 	}
 	return err
+}
+
+func looksLikeCommitSHA(s string) bool {
+	if len(s) < 7 || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func pullStatusHeadMatchesPull(pull models.PullRequest, statusPull models.PullRequest) bool {

@@ -81,6 +81,7 @@ type TestConfig struct {
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
 	workingDirLocker           events.WorkingDirLocker
+	livePullHeadFetcher        events.LivePullHeadFetcher
 }
 
 type configuredPreWorkflowHooksCommandRunner struct {
@@ -217,6 +218,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.silenceVCSStatusNoProjects,
 		workingDirLocker,
 		pullReqStatusFetcher,
+		testConfig.livePullHeadFetcher,
 		testConfig.DisableAutomergeLabel,
 	)
 

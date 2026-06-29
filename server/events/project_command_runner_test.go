@@ -960,6 +960,8 @@ func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(
 func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	ctx := command.ProjectContext{
 		Log:         logging.NewNoopLogger(t),
 		CommandName: command.Apply,
@@ -968,7 +970,7 @@ func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 		ProjectName: "projA",
 		Pull: models.PullRequest{
 			Num:        1,
-			HeadCommit: "old123",
+			HeadCommit: oldHead,
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
@@ -976,12 +978,12 @@ func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
-	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: "new123"}}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: newHead}}
 
 	err = validator.ValidateProjectPlan(ctx, repoDir)
 
 	Assert(t, err != nil, "expected live head change error")
-	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "recorded plan status is from commit"), "got: %s", err)
 	_, err = os.Stat(planPath)
 	Ok(t, err)
 }
@@ -989,9 +991,11 @@ func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	currentPull := models.PullRequest{
 		Num:        1,
-		HeadCommit: "new123",
+		HeadCommit: newHead,
 		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 	}
 	ctx := command.ProjectContext{
@@ -1002,7 +1006,7 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 		ProjectName: "projA",
 		Pull: models.PullRequest{
 			Num:        currentPull.Num,
-			HeadCommit: "old123",
+			HeadCommit: oldHead,
 			BaseRepo:   currentPull.BaseRepo,
 		},
 	}
@@ -1024,9 +1028,11 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyFails(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	currentPull := models.PullRequest{
 		Num:        1,
-		HeadCommit: "new123",
+		HeadCommit: newHead,
 		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 	}
 	project := command.ProjectContext{
@@ -1037,7 +1043,7 @@ func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyF
 		ProjectName: "projA",
 		Pull: models.PullRequest{
 			Num:        currentPull.Num,
-			HeadCommit: "old123",
+			HeadCommit: oldHead,
 			BaseRepo:   currentPull.BaseRepo,
 		},
 	}
@@ -1131,6 +1137,180 @@ func TestApplyPlanValidator_UsesInMemoryPullStatusForAPIApply(t *testing.T) {
 	}
 
 	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIApplyWithBranchRefDoesNotCompareRefStringToLiveSHA(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api branch plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: models.PullRequest{
+			Num:        ctx.Pull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   ctx.Pull.BaseRepo,
+		},
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIApplyWithResolvedCommitComparesToLiveSHA(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api resolved plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: models.PullRequest{
+			Num:        ctx.Pull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   ctx.Pull.BaseRepo,
+		},
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected stale resolved API commit to fail")
+	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, string(planContents), string(contents))
+}
+
+func TestApplyPlanValidator_APIApplyPrefersSeededPullStatusOverStaleDB(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	staleHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("fresh api plan")
+	stalePull := models.PullRequest{
+		Num:        1,
+		HeadCommit: staleHead,
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	Ok(t, err)
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        stalePull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   stalePull.BaseRepo,
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIApplyUsesDBWhenNoSeededPullStatusExists(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api db plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
 
 	Ok(t, err)
 }
@@ -1379,6 +1559,8 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
 	db := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	runner := &events.DefaultProjectCommandRunner{
 		Locker:                    mockLocker,
 		LockURLGenerator:          mockURLGenerator{},
@@ -1386,7 +1568,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 		WorkingDir:                mockWorkingDir,
 		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
-		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: "new123"}},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: newHead}},
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
@@ -1398,7 +1580,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 		ProjectName: "projA",
 		Pull: models.PullRequest{
 			Num:        1,
-			HeadCommit: "old123",
+			HeadCommit: oldHead,
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
@@ -1413,7 +1595,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected live head change error")
-	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "recorded plan status is from commit"), "got: %s", res.Error)
 	_, err = os.Stat(planPath)
 	Ok(t, err)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())

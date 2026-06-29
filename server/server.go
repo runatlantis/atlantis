@@ -862,6 +862,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceVCSStatusNoProjects,
 		workingDirLocker,
 		pullReqStatusFetcher,
+		livePullHeadFetcher,
 		userConfig.DisableAutomergeLabel,
 	)
 

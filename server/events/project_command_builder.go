@@ -1297,6 +1297,19 @@ func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
 }
 
 func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
+	return ValidatePlansForApplyWithCurrentHead(ctx, plans, hasActivePlan, ctx.Pull.HeadCommit)
+}
+
+// ValidatePlansForApplyWithCurrentHead validates plans against an authoritative
+// current head. This lets apply refresh the live PR head under the apply lock
+// before generic builder validation instead of trusting the command-start pull
+// snapshot.
+func ValidatePlansForApplyWithCurrentHead(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentHead string) error {
+	if currentHead != "" {
+		ctxCopy := *ctx
+		ctxCopy.Pull.HeadCommit = currentHead
+		ctx = &ctxCopy
+	}
 	if hasActivePlan {
 		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
 	}

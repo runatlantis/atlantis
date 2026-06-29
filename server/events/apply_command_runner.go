@@ -31,6 +31,7 @@ func NewApplyCommandRunner(
 	silenceVCSStatusNoProjects bool,
 	workingDirLocker WorkingDirLocker,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
+	livePullHeadFetcher LivePullHeadFetcher,
 	disableAutomergeLabel string,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
@@ -50,6 +51,7 @@ func NewApplyCommandRunner(
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		workingDirLocker:           workingDirLocker,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
+		livePullHeadFetcher:        livePullHeadFetcher,
 		disableAutomergeLabel:      disableAutomergeLabel,
 	}
 }
@@ -69,6 +71,7 @@ type ApplyCommandRunner struct {
 	parallelPoolSize      int
 	workingDirLocker      WorkingDirLocker
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
+	livePullHeadFetcher   LivePullHeadFetcher
 	disableAutomergeLabel string
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
@@ -141,6 +144,16 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching current plan status: %w", err)})
 		return
 	}
+	if err := a.refreshLivePullHead(ctx); err != nil {
+		ctx.Log.Err("fetching live pull request head: %s", err)
+		ctx.CommandHasErrors = true
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching live pull request head: %w", err)})
+		return
+	}
+	pull = ctx.Pull
 
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
@@ -245,6 +258,26 @@ func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models
 		return err
 	}
 	ctx.PullStatus = pullStatus
+	return nil
+}
+
+func (a *ApplyCommandRunner) refreshLivePullHead(ctx *command.Context) error {
+	if a.livePullHeadFetcher == nil {
+		return nil
+	}
+	liveHead, err := a.livePullHeadFetcher.GetLiveHeadCommit(command.ProjectContext{
+		Log:        ctx.Log,
+		Pull:       ctx.Pull,
+		PullStatus: ctx.PullStatus,
+		API:        ctx.API,
+	})
+	if err != nil {
+		return err
+	}
+	if liveHead == "" {
+		return fmt.Errorf("live pull request head is empty")
+	}
+	ctx.Pull.HeadCommit = liveHead
 	return nil
 }
 

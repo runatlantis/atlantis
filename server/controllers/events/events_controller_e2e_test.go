@@ -1637,6 +1637,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		false,
 		locker,
 		e2ePullReqStatusFetcher,
+		nil,
 		disableAutomergeLabel,
 	)
 

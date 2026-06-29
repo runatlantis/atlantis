@@ -4973,6 +4973,28 @@ func TestValidatePlansForApply_PlansStaleCommitFails(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "plans are from commit"), "got: %s", err)
 }
 
+func TestValidatePlansForApply_GenericAcceptsPullStatusMatchingLiveHeadWhenCommandHeadIsStale(t *testing.T) {
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: oldHead},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: liveHead},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApplyWithCurrentHead(ctx, plans, false, liveHead)
+
+	Ok(t, err)
+}
+
 func TestValidatePlansForApply_PlanMissingFromStatusFails(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),

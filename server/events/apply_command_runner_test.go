@@ -367,6 +367,74 @@ func TestApplyCommandRunner_RefreshesPullStatusAfterApplyLock(t *testing.T) {
 	Assert(t, !ctx.CommandHasErrors, "expected refreshed PullStatus apply to succeed")
 }
 
+func TestApplyCommandRunner_GenericApplyUsesLiveHeadForBuilderValidation(t *testing.T) {
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Equals(t, liveHead, ctx.Pull.HeadCommit)
+		Equals(t, liveHead, ctx.PullStatus.Pull.HeadCommit)
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected live-head refreshed apply build to succeed")
+}
+
+func TestApplyCommandRunner_GenericApplyDoesNotRejectCurrentPlanAfterPullStatusRefresh(t *testing.T) {
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		err := events.ValidatePlansForApply(ctx, []events.PendingPlan{{
+			RepoRelDir:  "dirA",
+			Workspace:   events.DefaultWorkspace,
+			ProjectName: "projA",
+		}})
+		if err != nil {
+			return ReturnValues{nil, err}
+		}
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected current live-head plan to pass builder validation after refresh")
+}
+
 func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t *testing.T) {
 	realDB := newTestBoltDB(t)
 	locker := events.NewDefaultWorkingDirLocker()
