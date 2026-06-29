@@ -1,0 +1,67 @@
+server/events/plan_command_runner.go
+  s_bf2529fc29caf9::t_897bfb23df581f 374,463-470,503-505
+  s_bf2529fc29caf9::t_5cd81213b5f869 7,9,11,139,244-245,247-256,305,333-335,373,375,377-379,381,462,473-476,480,485-486,492,500,506-508,512,515,518,532-550,552,555,557,559
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_20df6fef79f510 1247-1251,1282-1285,1289,1326,1339-1340
+  s_bf2529fc29caf9::t_70e4e14c769465 1341-1342
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_975ff1642a99ed 1054,1105,1162,1280
+  s_bf2529fc29caf9::t_8ea3d41a3f0aa4 1203,1244-1279,1281-1309
+  s_bf2529fc29caf9::t_022ad412787fdc 956,1183,1342-1414
+  s_bf2529fc29caf9::t_b9036330435955 12,846-850,870-955
+  s_bf2529fc29caf9::t_eb9339bc0b917d 1322-1325
+  s_bf2529fc29caf9::t_16f262b990f241 976,1016-1053,1055-1104,1106-1161,1163-1182
+  s_bf2529fc29caf9::t_230eece7511fc2 957
+  s_bf2529fc29caf9::t_b4e0f60f627496 1184
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_f134079a4e06f5 4829-4842
+server/events/working_dir_locker.go
+  s_bf2529fc29caf9::t_b2047b199dff5a 28-29,63-73
+  s_bf2529fc29caf9::t_b22c1c9e5cbfde 74-75
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_e6434b6c81300f 619-621,739-765,2034
+  s_bf2529fc29caf9::t_eb9339bc0b917d 627,1647-1650,2038
+  s_bf2529fc29caf9::t_18db483e3a5195 494-513,556-596,613-616,618,624,2022-2033,2035-2037
+  s_bf2529fc29caf9::t_2cc41b24a8ac81 617
+  s_bf2529fc29caf9::t_cc1986c10a7968 622-623
+  s_bf2529fc29caf9::t_81757141b3cc7e 625-626
+  s_bf2529fc29caf9::t_1a1db189d6cf42 628
+  s_bf2529fc29caf9::t_ae3fdc4681256d 2039
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_640a6a67a33eff 36,39,48,53-60
+  s_bf2529fc29caf9::t_0670e46cd91d7e 79-100
+  s_bf2529fc29caf9::t_0613870052e2d6 14,29
+server/events/plan_command_runner_internal_test.go
+  s_bf2529fc29caf9::t_3c4c459c580db2 7,402,406
+  s_bf2529fc29caf9::t_a3d77aadb20711 242-289,399
+  s_bf2529fc29caf9::t_eb9339bc0b917d 202,204,207,216-218,220-221,292-293,296-298,382-388,390-396,398
+  s_95969ab555385a::t_bd5e27e29fbb49 400-401
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_f2a096807b338a 1044-1048
+server/events/mocks/mock_working_dir_locker.go
+  s_bf2529fc29caf9::t_7449ad8e81df7e 28-42,107-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "b16bc1dd0500e282ff1e0fff2ffbbf1974b87ab1",
+  "prompts": {},
+  "sessions": {
+    "s_95969ab555385a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f0f28-2475-71d3-9c59-621e8ee33528",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

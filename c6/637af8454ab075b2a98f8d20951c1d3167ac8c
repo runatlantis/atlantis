@@ -1,0 +1,28 @@
+server/events/project_command_builder_test.go
+  s_cb1708bb6cf5d5::t_d9686ccfeba339 3404-3411
+  s_cb1708bb6cf5d5::t_619ede2a64e9c8 3286-3295
+  s_cb1708bb6cf5d5::t_0b406d2d9f90f6 3520-3527
+  s_cb1708bb6cf5d5::t_e2f0aabc934c49 3637-3643
+  s_cb1708bb6cf5d5::t_b5e2a15ab770a5 4775-4887
+server/events/project_command_builder.go
+  s_cb1708bb6cf5d5::t_af5e4d77b62e39 1247
+  s_cb1708bb6cf5d5::t_9b7da17d9233ac 1274-1275
+  s_cb1708bb6cf5d5::t_3126c118aaac17 1246,1248-1251,1276-1364
+  s_cb1708bb6cf5d5::t_349b41808ac15b 1365
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "c6637af8454ab075b2a98f8d20951c1d3167ac8c",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
