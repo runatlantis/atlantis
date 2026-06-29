@@ -1,0 +1,21 @@
+server/events/project_command_builder.go
+  s_cb1708bb6cf5d5::t_8665cceae943ca 1352-1355,1358-1359
+server/events/project_command_builder_test.go
+  s_cb1708bb6cf5d5::t_8f4d6c45fe172e 4973
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "45cbe24ee1b16f114c8f1d0719bdbe6c452c6f97",
+  "prompts": {},
+  "sessions": {
+    "s_cb1708bb6cf5d5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b42e188b-c833-4cc9-bf32-5fd9aae3183f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

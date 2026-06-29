@@ -1,0 +1,75 @@
+server/controllers/events/events_controller_e2e_test.go
+  s_bf2529fc29caf9::t_8d35188af85eba 1638
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_4e946e87b25156 877-878
+  s_bf2529fc29caf9::t_f45abf2ae747df 879-884
+server/events/command/project_context.go
+  s_bf2529fc29caf9::t_70122c1545d452 81-83
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_9fc469288e3b13 31,50,69,136-147
+  s_bf2529fc29caf9::t_c3994f1e530596 148-149
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_d6ff55deccf071 3229-3230,3233-3234,3239-3240,3243-3244,3326-3328
+  s_bf2529fc29caf9::t_be5eeb69e9fd2c 727-732,811-813
+  s_bf2529fc29caf9::t_f71bf220c345c2 781
+  s_bf2529fc29caf9::t_88b52a59830f56 4844,4858-4890
+  s_bf2529fc29caf9::t_23533e06abe8f1 16
+  s_bf2529fc29caf9::t_40de4b4d0225e4 3329
+  s_bf2529fc29caf9::t_f3765cf5885b95 4891
+server/events/mocks/mock_working_dir_locker.go
+  s_bf2529fc29caf9::t_7363a2d3d42fc5 62-80,226-253,257-259,261
+  s_bf2529fc29caf9::t_9bcca1ed472bb3 254-256,260,262-266
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_e04ec05d9ef615 135,151-168
+  s_bf2529fc29caf9::t_eb681fde01536c 46-69,107-119,123-134
+  s_bf2529fc29caf9::t_c176f09bc65c45 7-8,10,24-27,29-30
+  s_bf2529fc29caf9::t_8f970f96e1d83b 136
+server/server.go
+  s_bf2529fc29caf9::t_5060ce1d5892b2 635-636
+  s_bf2529fc29caf9::t_98896a72724767 629-634,637,784,863
+server/events/plan_command_runner.go
+  s_bf2529fc29caf9::t_cc0bd06021965a 394-405
+  s_bf2529fc29caf9::t_9b5a2cd6780bf1 115-119,220-224
+server/events/working_dir_locker.go
+  s_bf2529fc29caf9::t_a013df3cb513d0 23-25,66-84,89-93,97,126-132,136-139
+  s_bf2529fc29caf9::t_716ad8e274fa89 100
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_13247e5ea9354a 1543-1545
+  s_bf2529fc29caf9::t_2a0f77f14b63b3 1268-1276,1511,1524-1542,1546-1550
+  s_bf2529fc29caf9::t_7adfd48a1495e4 1295-1297
+server/events/live_pull_head_fetcher.go
+  s_bf2529fc29caf9::t_8b6af7cf72e22b 26-27,81-90
+  s_bf2529fc29caf9::t_f12d3a5ef74184 1-25,28-80,91-94
+server/events/vcs/bitbucketcloud/client.go
+  s_bf2529fc29caf9::t_a35812c1f8b32f 243-258
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_7637285e691316 801-832
+  s_bf2529fc29caf9::t_1b5f0d8ced0f96 83,175-178
+  s_bf2529fc29caf9::t_5cbf80ffa5f58c 772-800
+  s_bf2529fc29caf9::t_731d7eacbb8463 185,218
+server/events/vcs/bitbucketserver/client.go
+  s_bf2529fc29caf9::t_6b30c4cdd2640c 200-219
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_e4c841efdd7b04 1076-1121
+  s_bf2529fc29caf9::t_5e69e702b956c1 960-1017
+  s_bf2529fc29caf9::t_def6c8a8db2561 1533-1546
+  s_bf2529fc29caf9::t_44f6eb7371ce44 1182-1291
+  s_bf2529fc29caf9::t_fde3c3b897b69e 8-9
+  s_bf2529fc29caf9::t_a84085a0684cc1 1552-1556
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "872c24dbbeb90aef48b673142c83a98517211fdc",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
