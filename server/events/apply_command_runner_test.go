@@ -268,11 +268,12 @@ func TestApplyCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 		Trigger:  command.CommentTrigger,
 	}
 
-	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(ctx, cmd)).ThenReturn(true)
 
 	applyCommandRunner.Run(ctx, cmd)
 	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
 
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
@@ -280,6 +281,61 @@ func TestApplyCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
+func TestApplyCommandRunner_IgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T) {
+	assertIgnoredTargetedDirSkipsBeforeApplyLock(t, nil, nil)
+}
+
+func TestApplyCommandRunner_IgnoredTargetedDirSkipsWhenPlanInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	assertIgnoredTargetedDirSkipsBeforeApplyLock(t, locker, &modelPull)
+}
+
+func TestApplyCommandRunner_IgnoredTargetedDirSkipsWhenApplyLockBackendFails(t *testing.T) {
+	assertIgnoredTargetedDirSkipsBeforeApplyLock(t, nil, nil, func(tc *TestConfig) {
+		tc.applyLockCheckerErr = errors.New("lock backend unavailable")
+	})
+}
+
+func assertIgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T, locker events.WorkingDirLocker, pull *models.PullRequest, options ...func(*TestConfig)) {
+	t.Helper()
+	configOptions := append([]func(*TestConfig){func(tc *TestConfig) {
+		if locker != nil {
+			tc.workingDirLocker = locker
+		}
+	}}, options...)
+	vcsClient := setup(t, configOptions...)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	if pull != nil {
+		modelPull = *pull
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.ShouldIgnoreTargetedDir(ctx, cmd)).ThenReturn(true)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to skip")
+	Assert(t, !ctx.CommandHasErrors, "expected ignored targeted dir not to fail")
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
 }
 
 func TestApplyCommandRunner_TargetedApplyBlocksWhenPlanInFlight(t *testing.T) {
@@ -631,6 +687,79 @@ func TestApplyCommandRunner_TargetedStaleApplyDependencyFailurePreservesLivePull
 	Ok(t, err)
 	Equals(t, liveHead, pullStatus.Pull.HeadCommit)
 	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[0].Status)
+}
+
+func TestApplyCommandRunner_DoesNotAutomergeAfterStaleApplyError(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", command.ProjectCommandOutput{
+		Error: errors.New("mergeable requirement failed"),
+	})
+}
+
+func TestApplyCommandRunner_DoesNotAutomergeWhenDBUpdaterSkippedStaleApplyResult(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", command.ProjectCommandOutput{
+		ApplySuccess: "stale apply result",
+	})
+}
+
+func TestApplyCommandRunner_AutomergeRequiresResultWithoutErrors(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", command.ProjectCommandOutput{
+		Error: errors.New("apply failed"),
+	})
+}
+
+func TestApplyCommandRunner_AutomergeRequiresReturnedPullStatusMatchesLiveHead(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t, "cccccccccccccccccccccccccccccccccccccccc", command.ProjectCommandOutput{
+		ApplySuccess: "applied old command",
+	})
+}
+
+func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t *testing.T, liveHead string, applyOutput command.ProjectCommandOutput) {
+	t.Helper()
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	recordedHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: recordedHead}
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{{
+		Command:     command.Apply,
+		RepoRelDir:  "dirA",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "projA",
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			ApplySuccess: "already applied",
+		},
+	}})
+	Ok(t, err)
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
+
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dirA",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "projA",
+		AutomergeEnabled:  true,
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              ctx.Pull,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(applyOutput)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
 }
 
 func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t *testing.T) {

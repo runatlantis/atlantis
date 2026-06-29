@@ -81,15 +81,16 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 				shortSHA(liveHead),
 			)
 		}
+		currentPull := ctx.Pull
+		currentPull.HeadCommit = liveHead
+		if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+			return err
+		}
 		if err := validateCommandStartHead(ctx, liveHead); err != nil {
 			return err
 		}
-	} else if !pullStatusHeadMatchesPull(ctx.Pull, pullStatus.Pull) {
-		return rejectProjectPlan(planPath,
-			"recorded plan status is from commit %s but current head is %s; run `atlantis plan` before apply",
-			shortSHA(pullStatus.Pull.HeadCommit),
-			shortSHA(ctx.Pull.HeadCommit),
-		)
+	} else if err := pullStatusFreshnessError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
+		return rejectProjectPlan(planPath, "%s", err)
 	}
 
 	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
@@ -264,9 +265,34 @@ func looksLikeCommitSHA(s string) bool {
 	return true
 }
 
-func pullStatusHeadMatchesPull(pull models.PullRequest, statusPull models.PullRequest) bool {
-	if pull.HeadCommit == "" || statusPull.HeadCommit == "" {
-		return true
+func pullStatusFreshForPull(pull models.PullRequest, statusPull models.PullRequest) bool {
+	return pullStatusFreshnessError(pull, statusPull, "recorded plan status") == nil
+}
+
+func pullStatusFreshnessError(pull models.PullRequest, statusPull models.PullRequest, subject string) error {
+	verb := "is"
+	if subject == "plans" {
+		verb = "are"
 	}
-	return statusPull.HeadCommit == pull.HeadCommit
+	if pull.HeadCommit != "" && statusPull.HeadCommit != "" && statusPull.HeadCommit != pull.HeadCommit {
+		return fmt.Errorf(
+			"%s %s from commit %s but current head is %s; run `atlantis plan` before apply",
+			subject,
+			verb,
+			shortSHA(statusPull.HeadCommit),
+			shortSHA(pull.HeadCommit),
+		)
+	}
+	currentBase := strings.TrimSpace(pull.BaseBranch)
+	statusBase := strings.TrimSpace(statusPull.BaseBranch)
+	if currentBase != "" && statusBase != "" && statusBase != currentBase {
+		return fmt.Errorf(
+			"%s %s for base branch %q but current base branch is %q; run `atlantis plan` before apply",
+			subject,
+			verb,
+			statusBase,
+			currentBase,
+		)
+	}
+	return nil
 }

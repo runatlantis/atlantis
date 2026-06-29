@@ -16,6 +16,17 @@ type DBUpdater struct {
 }
 
 func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	if staleApplyResultForCurrentPull(pull, results) {
+		pullStatus, err := c.Database.GetPullStatus(pull)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+		if pullStatus != nil && !pullStatusFreshForPull(pull, pullStatus.Pull) {
+			ctx.Log.Debug("ignoring stale apply result from pull head %q base %q because current plan status is for head %q base %q", pull.HeadCommit, pull.BaseBranch, pullStatus.Pull.HeadCommit, pullStatus.Pull.BaseBranch)
+			return *pullStatus, nil
+		}
+	}
+
 	// Filter out results that errored due to the directory not existing. We
 	// don't store these in the database because they would never be "apply-able"
 	// and so the pull request would always have errors.
@@ -42,16 +53,6 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 			return *pullStatus, nil
 		}
 		return models.PullStatus{Pull: pull}, nil
-	}
-	if staleApplyResultForCurrentPull(pull, filtered) {
-		pullStatus, err := c.Database.GetPullStatus(pull)
-		if err != nil {
-			return models.PullStatus{}, err
-		}
-		if pullStatus != nil && pullStatus.Pull.HeadCommit != "" && pull.HeadCommit != "" && pullStatus.Pull.HeadCommit != pull.HeadCommit {
-			ctx.Log.Debug("ignoring stale apply result from pull head %q because current plan status is for head %q", pull.HeadCommit, pullStatus.Pull.HeadCommit)
-			return *pullStatus, nil
-		}
 	}
 	ctx.Log.Debug("updating DB with pull results")
 	return c.Database.UpdatePullWithResults(pull, filtered)
@@ -81,7 +82,7 @@ func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.
 	if err != nil {
 		return err
 	}
-	if pullStatus == nil || !pullStatusHeadMatchesPull(pull, pullStatus.Pull) {
+	if pullStatus == nil || !pullStatusFreshForPull(pull, pullStatus.Pull) {
 		return nil
 	}
 

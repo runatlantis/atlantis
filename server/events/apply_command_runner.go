@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -89,6 +90,10 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var projectCmds []command.ProjectContext
 	var projectCmdsErr error
+
+	if a.ShouldSkipPreWorkflowHooks(ctx, cmd) {
+		return
+	}
 
 	locked, err := a.IsLocked()
 	if err != nil {
@@ -238,6 +243,22 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	a.updateCommitStatus(ctx, pullStatus)
 
+	if result.HasErrors() || applyResultHasStaleCommandHead(result.ProjectResults) {
+		return
+	}
+	if err := pullStatusFreshnessError(pull, pullStatus.Pull, "recorded apply status"); err != nil {
+		ctx.Log.Warn("not automerging because %s", err)
+		return
+	}
+	currentPull := pull
+	if liveHead != "" {
+		currentPull.HeadCommit = liveHead
+	}
+	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+		ctx.Log.Warn("not automerging because %s", err)
+		return
+	}
+
 	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
 		if len(a.disableAutomergeLabel) > 0 {
 			labels, err := a.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
@@ -251,6 +272,15 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {
+	for _, result := range results {
+		if errors.Is(result.Error, errStaleCommandHead) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models.PullRequest) error {

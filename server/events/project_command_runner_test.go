@@ -1025,12 +1025,82 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 	Equals(t, "current plan", string(contents))
 }
 
+func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.BaseBranch = "release"
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected base branch mismatch")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale-base plan file to be deleted")
+}
+
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
 	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
 }
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDependencyValidation(t *testing.T) {
 	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDirNotExist(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead}},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  "deleted-dir",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale command-head error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	mockWorkingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
 func assertTargetedStaleCommandClassifiedBeforeApplyValidation(t *testing.T) {

@@ -827,6 +827,12 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, failure string, err error) {
+	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
+		if err := validator.ValidateCommandStartHead(ctx); err != nil {
+			return "", "", err
+		}
+	}
+
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -840,12 +846,6 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
-	}
-
-	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
-		if err := validator.ValidateCommandStartHead(ctx); err != nil {
-			return "", "", err
-		}
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)

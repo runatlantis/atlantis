@@ -4815,6 +4815,49 @@ func TestValidatePlansForApply_NoPlansStalePullStatusFails(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
 }
 
+func TestValidatePlansForApply_RejectsPlansFromDifferentBaseBranch(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected base branch mismatch error")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "release"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "main"), "got: %s", err)
+}
+
+func TestPullStatusFreshness_AllowsMissingLegacyBaseBranchWhenHeadMatches(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Ok(t, err)
+}
+
 func TestValidatePlansForApply_NoPlansCurrentEmptyProjectsPasses(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),

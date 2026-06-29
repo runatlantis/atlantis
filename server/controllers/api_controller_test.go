@@ -1373,6 +1373,7 @@ func TestAPIController_ApplySeedsPolicyStatusFromAPIPlan(t *testing.T) {
 	Equals(t, 1, len(capturedPullStatus.Projects))
 	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Once()).Apply(Any[command.ProjectContext]())
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {

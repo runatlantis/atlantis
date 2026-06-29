@@ -1324,12 +1324,8 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
 	}
 
-	if !pullStatusMatchesHead(ctx) {
-		return fmt.Errorf(
-			"plans are from commit %s but current head is %s; run `atlantis plan` to update",
-			shortSHA(ctx.PullStatus.Pull.HeadCommit),
-			shortSHA(ctx.Pull.HeadCommit),
-		)
+	if err := pullStatusFreshnessError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+		return err
 	}
 
 	planKeys := make(map[applyPlanKey]struct{}, len(plans))
@@ -1358,21 +1354,11 @@ func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
-	if !pullStatusMatchesHead(ctx) {
-		return fmt.Errorf(
-			"recorded plan status is from commit %s but current head is %s; run `atlantis plan` before apply",
-			shortSHA(ctx.PullStatus.Pull.HeadCommit),
-			shortSHA(ctx.Pull.HeadCommit),
-		)
+	if err := pullStatusFreshnessError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
+		return err
 	}
 
 	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
-}
-
-// pullStatusMatchesHead returns true if PullStatus is for the current PR head.
-// Returns true if either commit is empty (unit test ergonomics or legacy data).
-func pullStatusMatchesHead(ctx *command.Context) bool {
-	return pullStatusHeadMatchesPull(ctx.Pull, ctx.PullStatus.Pull)
 }
 
 func shortSHA(sha string) string {
