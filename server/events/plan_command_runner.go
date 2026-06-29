@@ -406,27 +406,12 @@ func (p *PlanCommandRunner) deletePlansAndPlanLocks(ctx *command.Context, projec
 }
 
 func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) {
-	var onPlanProjectCmds []command.ProjectContext
+	unlocked := make(map[string]bool)
 	for _, projCtx := range projectCmds {
-		if projCtx.RepoLocksMode == valid.RepoLocksOnPlanMode {
-			onPlanProjectCmds = append(onPlanProjectCmds, projCtx)
+		if projCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
+			continue
 		}
-	}
 
-	if len(onPlanProjectCmds) == 0 {
-		return
-	}
-
-	if len(onPlanProjectCmds) == len(projectCmds) {
-		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
-		if err != nil {
-			ctx.Log.Err("deleting locks: %s", err)
-		}
-		return
-	}
-
-	unlocked := make(map[string]bool, len(onPlanProjectCmds))
-	for _, projCtx := range onPlanProjectCmds {
 		lockKey := GenerateLockID(projCtx)
 		if unlocked[lockKey] {
 			continue

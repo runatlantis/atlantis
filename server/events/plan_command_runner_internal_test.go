@@ -41,13 +41,13 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                     string
-		projectCmds              []command.ProjectContext
-		expectUnlockByPull       bool
-		expectedUnlockByPullRepo string
-		expectedUnlockByPullNum  int
-		expectedUnlockKeys       []string
+		name               string
+		projectCmds        []command.ProjectContext
+		expectedUnlockKeys []string
 	}{
+		{
+			name: "empty selection deletes plans without deleting locks",
+		},
 		{
 			name:        "on_apply deletes plans without deleting pull locks",
 			projectCmds: []command.ProjectContext{onApplyProject},
@@ -57,15 +57,22 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			projectCmds: []command.ProjectContext{disabledProject},
 		},
 		{
-			name:                     "on_plan keeps pull-wide cleanup",
-			projectCmds:              []command.ProjectContext{onPlanProject},
-			expectUnlockByPull:       true,
-			expectedUnlockByPullRepo: repo.FullName,
-			expectedUnlockByPullNum:  pull.Num,
+			name:        "all selected on_plan unlocks selected keys only",
+			projectCmds: []command.ProjectContext{onPlanProject},
+			expectedUnlockKeys: []string{
+				"owner/repo/terraform/default/prod",
+			},
 		},
 		{
 			name:        "mixed mode unlocks only on_plan project",
 			projectCmds: []command.ProjectContext{onPlanProject, onApplyProject},
+			expectedUnlockKeys: []string{
+				"owner/repo/terraform/default/prod",
+			},
+		},
+		{
+			name:        "duplicate selected on_plan lock key unlocks once",
+			projectCmds: []command.ProjectContext{onPlanProject, onPlanProject},
 			expectedUnlockKeys: []string{
 				"owner/repo/terraform/default/prod",
 			},
@@ -91,15 +98,7 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			if len(finder.deletedPullDirs) != 1 || finder.deletedPullDirs[0] != pullDir {
 				t.Fatalf("expected DeletePlans(%q), got %#v", pullDir, finder.deletedPullDirs)
 			}
-			if tt.expectUnlockByPull {
-				if len(locker.unlockByPullCalls) != 1 {
-					t.Fatalf("expected one UnlockByPull call, got %#v", locker.unlockByPullCalls)
-				}
-				call := locker.unlockByPullCalls[0]
-				if call.repoFullName != tt.expectedUnlockByPullRepo || call.pullNum != tt.expectedUnlockByPullNum {
-					t.Fatalf("expected UnlockByPull(%q, %d), got UnlockByPull(%q, %d)", tt.expectedUnlockByPullRepo, tt.expectedUnlockByPullNum, call.repoFullName, call.pullNum)
-				}
-			} else if len(locker.unlockByPullCalls) != 0 {
+			if len(locker.unlockByPullCalls) != 0 {
 				t.Fatalf("expected no UnlockByPull calls, got %#v", locker.unlockByPullCalls)
 			}
 			if !equalStringSlices(locker.unlockKeys, tt.expectedUnlockKeys) {
