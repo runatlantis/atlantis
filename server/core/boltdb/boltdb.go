@@ -202,6 +202,38 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 	return nil, err
 }
 
+// UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
+func (b *BoltDB) UnlockIfOwnedByPull(p models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	var lock models.ProjectLock
+	foundLock := false
+	key := b.lockKey(p, workspace)
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.locksBucketName)
+		serialized := bucket.Get([]byte(key))
+		if serialized == nil {
+			return nil
+		}
+		if err := json.Unmarshal(serialized, &lock); err != nil {
+			return fmt.Errorf("failed to deserialize lock: %w", err)
+		}
+		if lock.Pull.Num != pullNum {
+			return nil
+		}
+		if err := bucket.Delete([]byte(key)); err != nil {
+			return err
+		}
+		foundLock = true
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	if foundLock {
+		return &lock, nil
+	}
+	return nil, nil
+}
+
 // List lists all current locks.
 func (b *BoltDB) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock

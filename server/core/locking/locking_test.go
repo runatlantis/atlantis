@@ -77,6 +77,48 @@ func TestUnlock(t *testing.T) {
 	Equals(t, &pl, lock)
 }
 
+func TestUnlockIfOwnedByPull_InvalidKey(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	l := locking.NewClient(database)
+
+	_, err := l.UnlockIfOwnedByPull("invalidkey", "owner/repo", 1)
+	Assert(t, err != nil, "expected err")
+	Assert(t, strings.Contains(err.Error(), "invalid key format"), "expected err")
+}
+
+func TestUnlockIfOwnedByPull_RepoMismatch(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	l := locking.NewClient(database)
+
+	lock, err := l.UnlockIfOwnedByPull("owner/repo/path/workspace/projectName", "other/repo", 1)
+	Ok(t, err)
+	var expected *models.ProjectLock
+	Equals(t, expected, lock)
+}
+
+func TestUnlockIfOwnedByPull_Err(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	database.EXPECT().UnlockIfOwnedByPull(project, workspace, 1).Return(nil, errExpected)
+	l := locking.NewClient(database)
+
+	_, err := l.UnlockIfOwnedByPull("owner/repo/path/workspace/projectName", "owner/repo", 1)
+	Equals(t, errExpected, err)
+}
+
+func TestUnlockIfOwnedByPull(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	database.EXPECT().UnlockIfOwnedByPull(project, workspace, 1).Return(&pl, nil)
+	l := locking.NewClient(database)
+
+	lock, err := l.UnlockIfOwnedByPull("owner/repo/path/workspace/projectName", "owner/repo", 1)
+	Ok(t, err)
+	Equals(t, &pl, lock)
+}
+
 func TestList_Err(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	database := mocks.NewMockDatabase(ctrl)
@@ -161,6 +203,14 @@ func TestUnlockByPull_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
 	_, err := l.UnlockByPull("owner/repo", 1)
 	Ok(t, err)
+}
+
+func TestUnlockIfOwnedByPull_NoOpLocker(t *testing.T) {
+	l := locking.NewNoOpLocker()
+	lock, err := l.UnlockIfOwnedByPull("owner/repo/path/workspace/projectName", "owner/repo", 1)
+	Ok(t, err)
+	var expected *models.ProjectLock
+	Equals(t, expected, lock)
 }
 
 func TestGetLock_NoOpLocker(t *testing.T) {

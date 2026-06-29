@@ -219,6 +219,21 @@ func (mr *MockDatabaseMockRecorder) UnlockCommand(cmdName any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockCommand", reflect.TypeOf((*MockDatabase)(nil).UnlockCommand), cmdName)
 }
 
+// UnlockIfOwnedByPull mocks base method.
+func (m *MockDatabase) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnlockIfOwnedByPull", project, workspace, pullNum)
+	ret0, _ := ret[0].(*models.ProjectLock)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UnlockIfOwnedByPull indicates an expected call of UnlockIfOwnedByPull.
+func (mr *MockDatabaseMockRecorder) UnlockIfOwnedByPull(project, workspace, pullNum any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockIfOwnedByPull", reflect.TypeOf((*MockDatabase)(nil).UnlockIfOwnedByPull), project, workspace, pullNum)
+}
+
 // UpdateProjectStatus mocks base method.
 func (m *MockDatabase) UpdateProjectStatus(pull models.PullRequest, workspace, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	m.ctrl.T.Helper()

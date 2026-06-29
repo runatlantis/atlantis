@@ -422,21 +422,8 @@ func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []
 }
 
 func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, lockKey string) {
-	lock, err := p.lockingLocker.GetLock(lockKey)
-	if err != nil {
-		ctx.Log.Err("getting lock %q: %s", lockKey, err)
-		return
-	}
-	if lock == nil {
-		return
-	}
-	if lock.Pull.Num != ctx.Pull.Num {
-		ctx.Log.Debug("not deleting lock %q because it is owned by pull %d, not pull %d", lockKey, lock.Pull.Num, ctx.Pull.Num)
-		return
-	}
-
-	if _, err := p.lockingLocker.Unlock(lockKey); err != nil {
-		ctx.Log.Err("deleting lock %q: %s", lockKey, err)
+	if _, err := p.lockingLocker.UnlockIfOwnedByPull(lockKey, ctx.Pull.BaseRepo.FullName, ctx.Pull.Num); err != nil {
+		ctx.Log.Err("deleting lock %q for pull %d: %s", lockKey, ctx.Pull.Num, err)
 	}
 }
 
