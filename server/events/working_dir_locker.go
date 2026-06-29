@@ -91,7 +91,7 @@ func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum in
 }
 
 func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name) (command.Name, bool) {
-	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
 	for key, currentLock := range d.locks {
 		if strings.HasPrefix(key, prefix) && currentLock == cmdName {
 			return currentLock, true
@@ -106,7 +106,7 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 	defer d.mutex.Unlock()
 
 	// Find and remove all locks for this pull request
-	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
 	for key := range d.locks {
 		if strings.HasPrefix(key, prefix) {
 			delete(d.locks, key)
@@ -131,9 +131,13 @@ func (d *DefaultWorkingDirLocker) unlockPull(repoFullName string, pullNum int) {
 }
 
 func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
-	return strings.TrimRight(fmt.Sprintf("%s/%d/%s/%s/%s", repo, pull, workspace, path, projectName), "/")
+	return strings.TrimRight(fmt.Sprintf("%s%s/%s/%s", d.pullLockPrefix(repo, pull), workspace, path, projectName), "/")
 }
 
 func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {
-	return fmt.Sprintf("%s/%d/.pull", repo, pull)
+	return d.pullLockPrefix(repo, pull) + ".pull"
+}
+
+func (d *DefaultWorkingDirLocker) pullLockPrefix(repo string, pull int) string {
+	return fmt.Sprintf("%d:%s/%d/", len(repo), repo, pull)
 }

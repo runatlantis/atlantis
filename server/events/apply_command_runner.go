@@ -144,7 +144,8 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching current plan status: %w", err)})
 		return
 	}
-	if err := a.refreshLivePullHead(ctx); err != nil {
+	liveHead, err := a.refreshLivePullHead(ctx)
+	if err != nil {
 		ctx.Log.Err("fetching live pull request head: %s", err)
 		ctx.CommandHasErrors = true
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -153,7 +154,10 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching live pull request head: %w", err)})
 		return
 	}
-	pull = ctx.Pull
+	if liveHead != "" && !cmd.IsForSpecificProject() {
+		ctx.Pull.HeadCommit = liveHead
+		pull = ctx.Pull
+	}
 
 	// Get the mergeable status before we set any build statuses of our own.
 	// We do this here because when we set a "Pending" status, if users have
@@ -261,9 +265,9 @@ func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models
 	return nil
 }
 
-func (a *ApplyCommandRunner) refreshLivePullHead(ctx *command.Context) error {
+func (a *ApplyCommandRunner) refreshLivePullHead(ctx *command.Context) (string, error) {
 	if a.livePullHeadFetcher == nil {
-		return nil
+		return "", nil
 	}
 	liveHead, err := a.livePullHeadFetcher.GetLiveHeadCommit(command.ProjectContext{
 		Log:        ctx.Log,
@@ -272,13 +276,12 @@ func (a *ApplyCommandRunner) refreshLivePullHead(ctx *command.Context) error {
 		API:        ctx.API,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if liveHead == "" {
-		return fmt.Errorf("live pull request head is empty")
+		return "", fmt.Errorf("live pull request head is empty")
 	}
-	ctx.Pull.HeadCommit = liveHead
-	return nil
+	return liveHead, nil
 }
 
 func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {

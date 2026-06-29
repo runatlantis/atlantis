@@ -527,7 +527,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 		return sanitizeAPIError(ctx, err)
 	}
 
-	if err := resolveNonPRHeadCommit(ctx, repoDir); err != nil {
+	if err := resolveAPIHeadCommit(ctx, repoDir); err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
 	return sanitizeAPIError(ctx, verifyNonPRBaseBranchReachability(ctx, repoDir))
@@ -537,6 +537,13 @@ func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 	if ctx.Pull.Num >= 0 || repoDir == "" {
 		return nil
 	}
+	return resolveAPIHeadCommit(ctx, repoDir)
+}
+
+func resolveAPIHeadCommit(ctx *command.Context, repoDir string) error {
+	if repoDir == "" {
+		return nil
+	}
 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -544,18 +551,32 @@ func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 		return fmt.Errorf("checking API checkout git metadata: %w", err)
 	}
 
-	cmd := exec.Command("git", "rev-parse", "HEAD") // nolint: gosec
-	cmd.Dir = repoDir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("resolving checked out API ref: %s: %w", strings.TrimSpace(string(output)), err)
+	if ctx.Pull.Num > 0 {
+		if headCommit, err := checkedOutAPICommit(repoDir, "HEAD^2"); err == nil && headCommit != "" {
+			ctx.Pull.HeadCommit = headCommit
+			return nil
+		}
 	}
-	headCommit := strings.TrimSpace(string(output))
-	if headCommit == "" {
-		return fmt.Errorf("resolving checked out API ref: empty commit")
+	headCommit, err := checkedOutAPICommit(repoDir, "HEAD")
+	if err != nil {
+		return err
 	}
 	ctx.Pull.HeadCommit = headCommit
 	return nil
+}
+
+func checkedOutAPICommit(repoDir string, ref string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", ref) // nolint: gosec
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("resolving checked out API ref %q: %s: %w", ref, strings.TrimSpace(string(output)), err)
+	}
+	headCommit := strings.TrimSpace(string(output))
+	if headCommit == "" {
+		return "", fmt.Errorf("resolving checked out API ref %q: empty commit", ref)
+	}
+	return headCommit, nil
 }
 
 func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) error {
@@ -856,11 +877,24 @@ func upsertProjectPolicyStatus(pullStatus *models.PullStatus, result command.Pro
 		if status.Workspace == project.Workspace &&
 			status.RepoRelDir == project.RepoRelDir &&
 			status.ProjectName == project.ProjectName {
+			project.Status = planStatusAfterPolicyCheck(project.Status, result)
 			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
 			return
 		}
 	}
+	status.Status = result.PlanStatus()
 	pullStatus.Projects = append(pullStatus.Projects, status)
+}
+
+func planStatusAfterPolicyCheck(existing models.ProjectPlanStatus, result command.ProjectResult) models.ProjectPlanStatus {
+	policyStatus := result.PlanStatus()
+	if policyStatus == models.ErroredPolicyCheckStatus {
+		return policyStatus
+	}
+	if existing == models.PlannedPlanStatus || existing == models.ErroredPolicyCheckStatus {
+		return policyStatus
+	}
+	return existing
 }
 
 func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectStatus) {

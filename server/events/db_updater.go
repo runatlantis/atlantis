@@ -4,6 +4,8 @@
 package events
 
 import (
+	"errors"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -18,12 +20,28 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 	// don't store these in the database because they would never be "apply-able"
 	// and so the pull request would always have errors.
 	var filtered []command.ProjectResult
+	skippedStaleCommandHead := false
 	for _, r := range results {
 		if _, ok := r.Error.(DirNotExistErr); ok {
 			ctx.Log.Debug("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
 			continue
 		}
+		if errors.Is(r.Error, errStaleCommandHead) {
+			ctx.Log.Debug("ignoring stale command-head result from project at dir %q workspace %q project %q", r.RepoRelDir, r.Workspace, r.ProjectName)
+			skippedStaleCommandHead = true
+			continue
+		}
 		filtered = append(filtered, r)
+	}
+	if skippedStaleCommandHead && len(filtered) == 0 {
+		pullStatus, err := c.Database.GetPullStatus(pull)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+		if pullStatus != nil {
+			return *pullStatus, nil
+		}
+		return models.PullStatus{Pull: pull}, nil
 	}
 	ctx.Log.Debug("updating DB with pull results")
 	return c.Database.UpdatePullWithResults(pull, filtered)

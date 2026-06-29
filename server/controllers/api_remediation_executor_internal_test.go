@@ -144,6 +144,65 @@ func TestSeedPullStatusFromPlanResultPreservesPlanStatusWhenPolicyCheckFollows(t
 	Equals(t, true, ctx.PullStatus.Projects[0].PolicyStatus[0].Passed)
 }
 
+func TestSeedPullStatusFromPlanResult_RecordsErroredPolicyCheckStatus(t *testing.T) {
+	ctx := &command.Context{}
+	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+			},
+		},
+		{
+			Command:     command.PolicyCheck,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("policy check failed"),
+			},
+		},
+	}})
+
+	Assert(t, ctx.PullStatus != nil, "expected pull status to be initialized")
+	Equals(t, 1, len(ctx.PullStatus.Projects))
+	Equals(t, models.ErroredPolicyCheckStatus, ctx.PullStatus.Projects[0].Status)
+}
+
+func TestSeedPullStatusFromPlanResult_RecordsPassedPolicyCheckStatusForChangedPlan(t *testing.T) {
+	ctx := &command.Context{}
+	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+			},
+		},
+		{
+			Command:     command.PolicyCheck,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{{PolicySetName: "default", Passed: true}},
+				},
+			},
+		},
+	}})
+
+	Assert(t, ctx.PullStatus != nil, "expected pull status to be initialized")
+	Equals(t, 1, len(ctx.PullStatus.Projects))
+	Equals(t, models.PassedPolicyCheckStatus, ctx.PullStatus.Projects[0].Status)
+	Equals(t, 1, len(ctx.PullStatus.Projects[0].PolicyStatus))
+}
+
 func TestVerifyNonPRBaseBranchReachabilityRedactsCredentialedFetchErrors(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	repoDir := t.TempDir()

@@ -5,6 +5,8 @@ package events_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -433,6 +436,109 @@ func TestApplyCommandRunner_GenericApplyDoesNotRejectCurrentPlanAfterPullStatusR
 	applyCommandRunner.Run(ctx, cmd)
 
 	Assert(t, !ctx.CommandHasErrors, "expected current live-head plan to pass builder validation after refresh")
+}
+
+func TestApplyCommandRunner_TargetedApplyPreservesCommandStartHeadAfterLiveRefresh(t *testing.T) {
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Equals(t, oldHead, ctx.Pull.HeadCommit)
+		Equals(t, liveHead, ctx.PullStatus.Pull.HeadCommit)
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected targeted build to preserve command-start head without failing build")
+}
+
+func TestApplyCommandRunner_TargetedApplyParsedBeforePushDoesNotApplyNewHeadPlan(t *testing.T) {
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, "dirA", runtime.GetPlanFilename(events.DefaultWorkspace, "projA"))
+	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
+	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   database,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:      command.Apply,
+		RepoRelDir:       "dirA",
+		Workspace:        events.DefaultWorkspace,
+		ProjectName:      "projA",
+		Pull:             ctx.Pull,
+		PullStatus:       ctx.PullStatus,
+		ExpectedPlanHash: "",
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		projectCtx.Pull = ctx.Pull
+		projectCtx.PullStatus = ctx.PullStatus
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+		projCtx := args[0].(command.ProjectContext)
+		Equals(t, oldHead, projCtx.Pull.HeadCommit)
+		err := validator.ValidateProjectPlan(projCtx, filepath.Join(repoDir, projCtx.RepoRelDir))
+		return ReturnValues{command.ProjectCommandOutput{Error: err}}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected stale targeted apply to fail")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "current plan", string(contents))
+	pullStatus, err := database.GetPullStatus(currentPull)
+	Ok(t, err)
+	Equals(t, liveHead, pullStatus.Pull.HeadCommit)
+	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[0].Status)
+	err = events.ValidatePlansForApply(&command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       currentPull,
+		PullStatus: pullStatus,
+	}, []events.PendingPlan{{
+		RepoDir:     repoDir,
+		RepoRelDir:  projectCtx.RepoRelDir,
+		Workspace:   projectCtx.Workspace,
+		ProjectName: projectCtx.ProjectName,
+	}})
+	Ok(t, err)
 }
 
 func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t *testing.T) {

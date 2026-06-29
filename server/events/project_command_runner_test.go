@@ -1282,6 +1282,47 @@ func TestApplyPlanValidator_APIApplyPrefersSeededPullStatusOverStaleDB(t *testin
 	Ok(t, err)
 }
 
+func TestApplyPlanValidator_APIInMemoryErroredPolicyCheckStatusRejectsApply(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api policy errored plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.ErroredPolicyCheckStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected policy-check errored status to reject API apply")
+	Assert(t, strings.Contains(err.Error(), "policy checks have errored"), "got: %s", err)
+}
+
 func TestApplyPlanValidator_APIApplyUsesDBWhenNoSeededPullStatusExists(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()

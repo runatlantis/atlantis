@@ -6,6 +6,7 @@ package events
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,8 @@ type DefaultApplyPlanValidator struct {
 	PullStatusFetcher   PullStatusFetcher
 	LivePullHeadFetcher LivePullHeadFetcher
 }
+
+var errStaleCommandHead = errors.New("stale command head")
 
 func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
 	if v == nil || v.PullStatusFetcher == nil {
@@ -65,7 +68,8 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		}
 		if ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != liveHead {
 			return fmt.Errorf(
-				"pull request head changed from %s to %s; run `atlantis plan` before apply",
+				"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
+				errStaleCommandHead,
 				shortSHA(ctx.Pull.HeadCommit),
 				shortSHA(liveHead),
 			)
