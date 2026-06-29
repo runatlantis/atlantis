@@ -191,7 +191,10 @@ func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, 
 	title := fmt.Sprintf("[E2E] %s %s", tc.Name, label)
 	url, pullID, err := t.vcsClient.CreatePullRequest(ctx, title, branchName)
 	if err != nil {
-		if deleteErr := deleteRemoteBranch(cloneDir, branchName); deleteErr != nil {
+		cleanupCtx, cancel := newLifecycleCleanupContext(ctx)
+		defer cancel()
+
+		if deleteErr := deleteRemoteBranch(cleanupCtx, cloneDir, branchName); deleteErr != nil {
 			return nil, fmt.Errorf("creating pull request after pushing branch %q: %w; additionally failed to delete pushed branch: %v", branchName, err, deleteErr)
 		}
 		return nil, err
@@ -269,8 +272,18 @@ func runGit(dir string, args ...string) error {
 	return nil
 }
 
-func deleteRemoteBranch(cloneDir, branchName string) error {
-	return runGit(cloneDir, "push", "origin", "--delete", branchName)
+func runGitContext(ctx context.Context, dir string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...) //nolint:gosec // arguments are test-controlled branch/file names.
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, string(output))
+	}
+	return nil
+}
+
+func deleteRemoteBranch(ctx context.Context, cloneDir, branchName string) error {
+	return runGitContext(ctx, cloneDir, "push", "origin", "--delete", branchName)
 }
 
 func e2eRunNonce() string {
