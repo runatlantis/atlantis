@@ -1,0 +1,53 @@
+name: Update top issues ranking
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Tracking issue number to update. Overrides TOP_ISSUES_TRACKING_ISSUE when set.
+        required: false
+        type: string
+  schedule:
+    - cron: '15 10 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: github.repository == 'runatlantis/atlantis'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TOP_ISSUES_TRACKING_ISSUE: ${{ vars.TOP_ISSUES_TRACKING_ISSUE }}
+      TOP_ISSUES_TRACKING_ISSUE_INPUT: ${{ github.event.inputs.issue_number }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .github/scripts/update_top_issues_ranking/go.mod
+          cache-dependency-path: .github/scripts/update_top_issues_ranking/go.sum
+
+      - name: Update top issues ranking
+        run: |
+          issue_number="${TOP_ISSUES_TRACKING_ISSUE_INPUT:-${TOP_ISSUES_TRACKING_ISSUE:-}}"
+          if [ -z "$issue_number" ] || [ "$issue_number" = "0" ]; then
+            echo "::error::Create the tracking issue, then set the TOP_ISSUES_TRACKING_ISSUE repository variable or pass issue_number when running workflow_dispatch."
+            exit 1
+          fi
+
+          cd .github/scripts/update_top_issues_ranking
+          go run . \
+            --owner runatlantis \
+            --repo atlantis \
+            --issue-number "$issue_number"
