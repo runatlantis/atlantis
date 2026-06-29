@@ -1,0 +1,46 @@
+server/core/locking/locking_test.go
+  s_703da21b40698b::t_ca69f63404c03c 80-121,208-214
+  s_703da21b40698b::t_6f7e6636aef65b 215
+server/core/db/db.go
+  s_703da21b40698b::t_a9a616349e36d4 21
+server/core/redis/redis.go
+  s_703da21b40698b::t_cd702038b17f9e 34-51,249-270
+  s_703da21b40698b::t_1dfa19ed26d6f1 271-273
+server/core/boltdb/boltdb_test.go
+  s_703da21b40698b::t_9a4bb1ffb07924 452-500
+server/events/plan_command_runner_internal_test.go
+  s_703da21b40698b::t_17d7e0a6633944 49-56,60,63-67,92-93,96-99,102-104,114-115,124-125,133-150,176-183,185-186,207-212,215-220,225,233-243,282-288,291
+  s_703da21b40698b::t_4f57a315c0bdef 289-290,292-293
+server/core/boltdb/boltdb.go
+  s_703da21b40698b::t_cd702038b17f9e 205-236
+server/events/plan_command_runner.go
+  s_703da21b40698b::t_a9a616349e36d4 425-426
+server/events/command_runner_test.go
+  s_703da21b40698b::t_a9a616349e36d4 143-144
+server/core/locking/locking.go
+  s_703da21b40698b::t_a9a616349e36d4 37,82-92,171-173
+  s_703da21b40698b::t_61351f306ad1ed 81,170
+  s_703da21b40698b::t_5f338dcc3a80fd 174
+server/core/redis/redis_test.go
+  s_703da21b40698b::t_9a4bb1ffb07924 505-553
+server/core/db/mocks/mock_database.go
+  s_703da21b40698b::t_396a2d60df4c8f 222-236
+server/core/locking/mocks/mock_locker.go
+  s_703da21b40698b::t_6c0163b8193e94 118-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "47755197d94f02458f70e8bb1e3d1379f9a9f7a6",
+  "prompts": {},
+  "sessions": {
+    "s_703da21b40698b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10b7-876a-7eb2-af0b-4b346035c257",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
