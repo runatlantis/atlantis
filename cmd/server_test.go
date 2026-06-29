@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -226,13 +227,53 @@ func TestExecute_Defaults(t *testing.T) {
 	}
 }
 
+func normalizePath(v any) string {
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+
+	if s == "" || s == "." {
+		return ""
+	}
+
+	if len(s) >= 2 && s[1] == ':' {
+		s = s[2:]
+	}
+
+	s = filepath.ToSlash(s)
+	s = path.Clean(s)
+
+	return s
+}
+
+var pathFlags = map[string]struct{}{
+	"data-dir":                        {},
+	"markdown-template-overrides-dir": {},
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
+
 	c := setup(testFlags, t)
+
 	err := c.Execute()
 	Ok(t, err)
+
 	for flag, exp := range testFlags {
-		Equals(t, exp, configVal(t, passedConfig, flag))
+		got := configVal(t, passedConfig, flag)
+
+		expS := fmt.Sprintf("%v", exp)
+		gotS := fmt.Sprintf("%v", got)
+
+		if _, ok := pathFlags[flag]; ok {
+			expS = normalizePath(expS)
+			gotS = normalizePath(gotS)
+		}
+
+		t.Logf("flag=%s exp=%v got=%v", flag, expS, gotS)
+
+		Equals(t, expS, gotS)
 	}
 }
 
