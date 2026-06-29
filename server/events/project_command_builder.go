@@ -1349,11 +1349,14 @@ func shortSHA(sha string) string {
 }
 
 // statusAllowedForDiscoveredPlan returns true if a discovered .tfplan file
-// with this status is valid to apply. Includes PlannedNoChangesPlanStatus
-// because a no-op plan can still leave a .tfplan file on disk.
+// with this status is valid to build an apply command for. Includes
+// PlannedNoChangesPlanStatus (no-op plan can leave a .tfplan on disk) and
+// ErroredPolicyCheckStatus (let apply build the command and fail through
+// existing per-project apply-requirement handling).
 func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
 	switch status {
-	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus, models.PlannedNoChangesPlanStatus:
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus, models.ErroredPolicyCheckStatus:
 		return true
 	default:
 		return false

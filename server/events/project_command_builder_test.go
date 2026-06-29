@@ -4942,7 +4942,6 @@ func TestValidatePlansForApply_FoundPlanWithInvalidStatusFails(t *testing.T) {
 		models.AppliedPlanStatus,
 		models.DiscardedPlanStatus,
 		models.ErroredPlanStatus,
-		models.ErroredPolicyCheckStatus,
 	}
 	for _, status := range invalidStatuses {
 		t.Run(status.String(), func(t *testing.T) {
@@ -4971,6 +4970,7 @@ func TestValidatePlansForApply_FoundPlanWithAllowedStatusPasses(t *testing.T) {
 		models.PassedPolicyCheckStatus,
 		models.ErroredApplyStatus,
 		models.PlannedNoChangesPlanStatus,
+		models.ErroredPolicyCheckStatus,
 	}
 	for _, status := range allowedStatuses {
 		t.Run(status.String(), func(t *testing.T) {
