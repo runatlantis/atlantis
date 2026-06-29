@@ -1272,6 +1272,8 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 }
 
 // ValidatePlansForApply ensures discovered plans are valid for the current PR head.
+// When plans are found, validates each against current-head PullStatus.
+// When no plans are found, fails if no current PullStatus exists or if it is stale.
 func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
 	if len(plans) > 0 {
 		return validateFoundPlans(ctx, plans)
@@ -1284,12 +1286,11 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
 	}
 
-	if ctx.Pull.HeadCommit != "" && ctx.PullStatus.Pull.HeadCommit != "" &&
-		ctx.PullStatus.Pull.HeadCommit != ctx.Pull.HeadCommit {
+	if !pullStatusMatchesHead(ctx) {
 		return fmt.Errorf(
 			"plans are from commit %s but current head is %s; run `atlantis plan` to update",
-			ctx.PullStatus.Pull.HeadCommit[:min(7, len(ctx.PullStatus.Pull.HeadCommit))],
-			ctx.Pull.HeadCommit[:min(7, len(ctx.Pull.HeadCommit))],
+			shortSHA(ctx.PullStatus.Pull.HeadCommit),
+			shortSHA(ctx.Pull.HeadCommit),
 		)
 	}
 
@@ -1297,11 +1298,11 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
 		if proj == nil {
 			return fmt.Errorf(
-				"plan file found for dir %q workspace %q but no matching plan status exists; run `atlantis plan`",
-				plan.RepoRelDir, plan.Workspace,
+				"plan file found for dir %q workspace %q project %q but no matching plan status exists; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName,
 			)
 		}
-		if !isApplyablePlanStatus(proj.Status) {
+		if !statusAllowedForDiscoveredPlan(proj.Status) {
 			return fmt.Errorf(
 				"plan for dir %q workspace %q has status %q and cannot be applied; run `atlantis plan`",
 				plan.RepoRelDir, plan.Workspace, proj.Status.String(),
@@ -1314,29 +1315,45 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 
 func validateNoPlansFound(ctx *command.Context) error {
 	if ctx.PullStatus == nil {
-		return nil
+		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
-	if ctx.Pull.HeadCommit != "" && ctx.PullStatus.Pull.HeadCommit != "" &&
-		ctx.PullStatus.Pull.HeadCommit != ctx.Pull.HeadCommit {
-		return nil
+	if !pullStatusMatchesHead(ctx) {
+		return fmt.Errorf(
+			"recorded plan status is from commit %s but current head is %s; run `atlantis plan` before apply",
+			shortSHA(ctx.PullStatus.Pull.HeadCommit),
+			shortSHA(ctx.Pull.HeadCommit),
+		)
 	}
 
-	for _, proj := range ctx.PullStatus.Projects {
-		if isApplyablePlanStatus(proj.Status) {
-			return fmt.Errorf(
-				"plan file is missing for dir %q workspace %q; run `atlantis plan` again",
-				proj.RepoRelDir, proj.Workspace,
-			)
-		}
-	}
-
+	// Current-head PullStatus exists. Allow empty result — the DB is authoritative
+	// on whether projects need plans. This preserves import/state-rm flows where
+	// plans are intentionally discarded without updating status to DiscardedPlanStatus.
 	return nil
 }
 
-func isApplyablePlanStatus(status models.ProjectPlanStatus) bool {
+// pullStatusMatchesHead returns true if PullStatus is for the current PR head.
+// Returns true if either commit is empty (unit test ergonomics or legacy data).
+func pullStatusMatchesHead(ctx *command.Context) bool {
+	if ctx.Pull.HeadCommit == "" || ctx.PullStatus.Pull.HeadCommit == "" {
+		return true
+	}
+	return ctx.PullStatus.Pull.HeadCommit == ctx.Pull.HeadCommit
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// statusAllowedForDiscoveredPlan returns true if a discovered .tfplan file
+// with this status is valid to apply. Includes PlannedNoChangesPlanStatus
+// because a no-op plan can still leave a .tfplan file on disk.
+func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
 	switch status {
-	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus:
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus, models.PlannedNoChangesPlanStatus:
 		return true
 	default:
 		return false
