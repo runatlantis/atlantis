@@ -1362,10 +1362,28 @@ func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
 	}
 }
 
-func statusRequiresApplyPlanFile(status models.ProjectPlanStatus) bool {
+func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool {
 	switch status {
 	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
 		models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusBlocksGenericApplyWithoutPlan(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.ErroredPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusIsSafeWithoutPlanFile(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedNoChangesPlanStatus, models.AppliedPlanStatus, models.DiscardedPlanStatus:
 		return true
 	default:
 		return false
@@ -1388,14 +1406,26 @@ func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
 
 func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
 	for _, proj := range pullStatus.Projects {
-		if !statusRequiresApplyPlanFile(proj.Status) {
-			continue
-		}
 		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
 			continue
 		}
+		if statusRequiresPlanFileForGenericApply(proj.Status) {
+			return fmt.Errorf(
+				"plan file is missing for dir %q workspace %q project %q with status %q; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+			)
+		}
+		if statusBlocksGenericApplyWithoutPlan(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q errored and cannot be applied without a plan file; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+			)
+		}
+		if statusIsSafeWithoutPlanFile(proj.Status) {
+			continue
+		}
 		return fmt.Errorf(
-			"plan file is missing for dir %q workspace %q project %q with status %q; run `atlantis plan`",
+			"plan for dir %q workspace %q project %q has status %q and cannot be applied without a plan file; run `atlantis plan`",
 			proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
 		)
 	}

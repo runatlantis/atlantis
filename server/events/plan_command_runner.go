@@ -125,7 +125,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		p.replacePullStatusWithEmptyProjects(ctx, pull)
+		p.clearPlansLocksAndPullStatusForNoProjects(ctx, pull)
 		if !p.silenceVCSStatusNoPlans && !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
@@ -222,7 +222,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !cmd.IsForSpecificProject() {
-			p.replacePullStatusWithEmptyProjects(ctx, pull)
+			p.clearPlansLocksAndPullStatusForNoProjects(ctx, pull)
 		}
 		if !p.silenceVCSStatusNoProjects {
 			if cmd.IsForSpecificProject() {
@@ -329,7 +329,11 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) replacePullStatusWithEmptyProjects(ctx *command.Context, pull models.PullRequest) {
+func (p *PlanCommandRunner) clearPlansLocksAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) {
+	p.deletePlans(ctx)
+	if _, err := p.lockingLocker.UnlockByPull(pull.BaseRepo.FullName, pull.Num); err != nil {
+		ctx.Log.Err("deleting locks: %s", err)
+	}
 	if _, err := p.dbUpdater.replaceDB(ctx, pull, nil); err != nil {
 		ctx.Log.Err("writing empty plan status: %s", err)
 	}

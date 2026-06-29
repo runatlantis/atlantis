@@ -43,10 +43,11 @@ func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.CommandSkipped {
 		return
 	}
-	v.pullUpdater.updatePull(ctx, cmd, result)
 	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
-		ctx.Log.Err("writing discarded plan status: %s", err)
+		result.Error = fmt.Errorf("writing discarded plan status: %w", err)
+		ctx.CommandHasErrors = true
 	}
+	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
 func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) command.Result {

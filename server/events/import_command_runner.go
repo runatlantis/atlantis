@@ -4,6 +4,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
@@ -74,10 +76,11 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	} else {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Import)
 	}
-	v.pullUpdater.updatePull(ctx, cmd, result)
 	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
-		ctx.Log.Err("writing discarded plan status: %s", err)
+		result.Error = fmt.Errorf("writing discarded plan status: %w", err)
+		ctx.CommandHasErrors = true
 	}
+	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
 func (v *ImportCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {

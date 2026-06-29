@@ -4813,6 +4813,19 @@ func TestValidatePlansForApply_NoPlansCurrentEmptyProjectsPasses(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
 func TestValidatePlansForApply_NoPlansCurrentAllNoChangesPasses(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
@@ -4845,6 +4858,23 @@ func TestValidatePlansForApply_NoPlansCurrentApplyableStatusFails(t *testing.T) 
 	Assert(t, err != nil, "expected missing plan error")
 	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
 	Assert(t, strings.Contains(err.Error(), "proj1"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected errored plan status to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
 }
 
 func TestValidatePlansForApply_PlansButNoPullStatusFails(t *testing.T) {
@@ -4938,6 +4968,28 @@ func TestValidatePlansForApply_FoundSubsetOfCurrentStatusFails(t *testing.T) {
 	err := events.ValidatePlansForApply(ctx, plans)
 	Assert(t, err != nil, "expected missing plan error for DB project without plan file")
 	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FoundSubsetWithErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected errored plan status without plan file to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
 }
 
 func TestValidatePlansForApply_FoundNoChangePlanPasses(t *testing.T) {
