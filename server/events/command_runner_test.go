@@ -140,8 +140,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	// Allow incidental calls to CheckApplyLock (called internally during apply operations).
 	// Tests that need specific return values should set applyLockCheckerReturn/applyLockCheckerErr in TestConfig.
 	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
-	// Allow incidental calls to UnlockByPull (called during plan operations to clean up locks)
-	lockingLocker.EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	// Plan cleanup checks selected on_plan locks before deciding whether to unlock them.
+	lockingLocker.EXPECT().GetLock(gomock.Any()).Return(nil, nil).AnyTimes()
 
 	dbUpdater = &events.DBUpdater{
 		Database: testConfig.database,
