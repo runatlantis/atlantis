@@ -1,0 +1,32 @@
+server/events/project_locker.go
+  s_703da21b40698b::t_6144f0132f81c7 83
+server/events/plan_command_runner_internal_test.go
+  s_703da21b40698b::t_4087354f4b36f8 56-64,70,73-78,103-104,107-110,113-115,125-126,135-139,147-148,157-169,176-192,197-200,210,227-228
+  s_703da21b40698b::t_90f24ac9a3865b 253-256,279-282,286-287,318-327,340-341,345
+server/core/locking/locking.go
+  s_703da21b40698b::t_bb57b7af625311 37,81-82,164
+server/core/locking/locking_test.go
+  s_703da21b40698b::t_9dc7221ff4df4f 80,83,86-87,90,93,96,98,101,104-106,109,111,202
+server/events/plan_command_runner.go
+  s_703da21b40698b::t_529c5a3f5432d4 420-422,426-427
+server/events/project_locker_test.go
+  s_703da21b40698b::t_6e048e08b7da9c 126,165,201
+server/core/locking/mocks/mock_locker.go
+  s_703da21b40698b::t_2d943c588fd43c 120,122,129,131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "e94a6a6e29a10d95424fd2144623a65eb45c92a3",
+  "prompts": {},
+  "sessions": {
+    "s_703da21b40698b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10b7-876a-7eb2-af0b-4b346035c257",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
