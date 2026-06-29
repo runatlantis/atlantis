@@ -1,0 +1,22 @@
+server/events/plan_command_runner_internal_test.go
+  s_703da21b40698b::t_ed6d2281e3a0bd 1-223
+server/events/plan_command_runner.go
+  s_703da21b40698b::t_ed6d2281e3a0bd 7,18,152,158,272,280,403-439
+  s_703da21b40698b::t_4d40e33f09a881 440
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "82e3d14d458cb72c5492411116fd9e72f5e7839d",
+  "prompts": {},
+  "sessions": {
+    "s_703da21b40698b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10b7-876a-7eb2-af0b-4b346035c257",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
