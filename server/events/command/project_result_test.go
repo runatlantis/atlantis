@@ -173,6 +173,25 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
 		},
+		{
+			p: command.ProjectResult{
+				Command: command.Import,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ImportSuccess: &models.ImportSuccess{},
+				},
+			},
+			expStatus: models.DiscardedPlanStatus,
+		},
+		{
+			p: command.ProjectResult{
+				Command:    command.State,
+				SubCommand: "rm",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					StateRmSuccess: &models.StateRmSuccess{},
+				},
+			},
+			expStatus: models.DiscardedPlanStatus,
+		},
 	}
 
 	for _, c := range cases {

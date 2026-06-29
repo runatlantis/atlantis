@@ -10,6 +10,7 @@ import (
 
 func NewImportCommandRunner(
 	pullUpdater *PullUpdater,
+	dbUpdater *DBUpdater,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	prjCmdBuilder ProjectImportCommandBuilder,
 	prjCmdRunner ProjectImportCommandRunner,
@@ -17,6 +18,7 @@ func NewImportCommandRunner(
 ) *ImportCommandRunner {
 	return &ImportCommandRunner{
 		pullUpdater:          pullUpdater,
+		dbUpdater:            dbUpdater,
 		pullReqStatusFetcher: pullReqStatusFetcher,
 		prjCmdBuilder:        prjCmdBuilder,
 		prjCmdRunner:         prjCmdRunner,
@@ -26,6 +28,7 @@ func NewImportCommandRunner(
 
 type ImportCommandRunner struct {
 	pullUpdater          *PullUpdater
+	dbUpdater            *DBUpdater
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
 	prjCmdBuilder        ProjectImportCommandBuilder
 	prjCmdRunner         ProjectImportCommandRunner
@@ -72,6 +75,9 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Import)
 	}
 	v.pullUpdater.updatePull(ctx, cmd, result)
+	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
+		ctx.Log.Err("writing discarded plan status: %s", err)
+	}
 }
 
 func (v *ImportCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {

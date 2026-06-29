@@ -238,6 +238,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	importCommandRunner = events.NewImportCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -246,6 +247,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	stateCommandRunner = events.NewStateCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
@@ -451,6 +453,36 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 		Eq[command.Name](command.Plan),
 		Eq(models.ProjectCounts{}),
 	)
+}
+
+func TestRunCommentCommandPlan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
+	_ = setup(t)
+	planCommandRunner.SilenceNoProjects = true
+
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "old-project",
+			Workspace:  events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	Ok(t, err)
+
+	var pull github.PullRequest
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected current empty PullStatus")
+	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
+	Equals(t, 0, len(pullStatus.Projects))
 }
 
 func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
@@ -829,6 +861,95 @@ func TestRunCommentCommandImport_NoProjects_SilenceEnabled(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Import})
 	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
+func TestImportOrStateRm_DiscardedPlanStatusAllowsLaterGenericApply(t *testing.T) {
+	cases := []struct {
+		name       string
+		cmd        events.CommentCommand
+		projectCmd command.ProjectContext
+		output     command.ProjectCommandOutput
+	}{
+		{
+			name: "import",
+			cmd:  events.CommentCommand{Name: command.Import, ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.Import,
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		},
+		{
+			name: "state rm",
+			cmd:  events.CommentCommand{Name: command.State, SubName: "rm", ProjectName: "projA"},
+			projectCmd: command.ProjectContext{
+				CommandName: command.State,
+				SubCommand:  "rm",
+				RepoRelDir:  "dir1",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "projA",
+			},
+			output: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = setup(t)
+			logger := logging.NewNoopLogger(t)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+				{
+					Command:     command.Plan,
+					RepoRelDir:  tc.projectCmd.RepoRelDir,
+					Workspace:   tc.projectCmd.Workspace,
+					ProjectName: tc.projectCmd.ProjectName,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{},
+					},
+				},
+			})
+			Ok(t, err)
+
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logger,
+				Scope:    metricstest.NewLoggingScope(t, logger, "atlantis"),
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  command.CommentTrigger,
+			}
+			tc.projectCmd.BaseRepo = testdata.GithubRepo
+			tc.projectCmd.Pull = modelPull
+
+			switch tc.cmd.Name {
+			case command.Import:
+				When(pullReqStatusFetcher.FetchPullStatus(logger, modelPull)).ThenReturn(models.PullReqStatus{}, nil)
+				When(projectCommandBuilder.BuildImportCommands(ctx, &tc.cmd)).ThenReturn([]command.ProjectContext{tc.projectCmd}, nil)
+				When(projectCommandRunner.Import(tc.projectCmd)).ThenReturn(tc.output)
+				importCommandRunner.Run(ctx, &tc.cmd)
+			case command.State:
+				When(projectCommandBuilder.BuildStateRmCommands(ctx, &tc.cmd)).ThenReturn([]command.ProjectContext{tc.projectCmd}, nil)
+				When(projectCommandRunner.StateRm(tc.projectCmd)).ThenReturn(tc.output)
+				stateCommandRunner.Run(ctx, &tc.cmd)
+			}
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			Ok(t, err)
+			Assert(t, pullStatus != nil, "expected PullStatus")
+			Equals(t, 1, len(pullStatus.Projects))
+			Equals(t, models.DiscardedPlanStatus, pullStatus.Projects[0].Status)
+
+			applyCtx := &command.Context{
+				Log:        logger,
+				Pull:       modelPull,
+				PullStatus: pullStatus,
+			}
+			Ok(t, events.ValidatePlansForApply(applyCtx, nil))
+		})
+	}
 }
 
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {

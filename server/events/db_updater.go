@@ -28,3 +28,28 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 	ctx.Log.Debug("updating DB with pull results")
 	return c.Database.UpdatePullWithResults(pull, filtered)
 }
+
+func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	if err := c.Database.DeletePullStatus(pull); err != nil {
+		return models.PullStatus{}, err
+	}
+	return c.updateDB(ctx, pull, results)
+}
+
+func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) error {
+	var discarded []command.ProjectResult
+	for _, res := range results {
+		if res.Error != nil || res.Failure != "" {
+			continue
+		}
+		if res.ImportSuccess == nil && res.StateRmSuccess == nil {
+			continue
+		}
+		discarded = append(discarded, res)
+	}
+	if len(discarded) == 0 {
+		return nil
+	}
+	_, err := c.updateDB(ctx, pull, discarded)
+	return err
+}

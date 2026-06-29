@@ -11,11 +11,13 @@ import (
 
 func NewStateCommandRunner(
 	pullUpdater *PullUpdater,
+	dbUpdater *DBUpdater,
 	prjCmdBuilder ProjectStateCommandBuilder,
 	prjCmdRunner ProjectStateCommandRunner,
 ) *StateCommandRunner {
 	return &StateCommandRunner{
 		pullUpdater:   pullUpdater,
+		dbUpdater:     dbUpdater,
 		prjCmdBuilder: prjCmdBuilder,
 		prjCmdRunner:  prjCmdRunner,
 	}
@@ -23,6 +25,7 @@ func NewStateCommandRunner(
 
 type StateCommandRunner struct {
 	pullUpdater   *PullUpdater
+	dbUpdater     *DBUpdater
 	prjCmdBuilder ProjectStateCommandBuilder
 	prjCmdRunner  ProjectStateCommandRunner
 }
@@ -41,6 +44,9 @@ func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	v.pullUpdater.updatePull(ctx, cmd, result)
+	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
+		ctx.Log.Err("writing discarded plan status: %s", err)
+	}
 }
 
 func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) command.Result {

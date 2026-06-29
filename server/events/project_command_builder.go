@@ -1294,7 +1294,9 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		)
 	}
 
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
 	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
 		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
 		if proj == nil {
 			return fmt.Errorf(
@@ -1304,13 +1306,13 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		}
 		if !statusAllowedForDiscoveredPlan(proj.Status) {
 			return fmt.Errorf(
-				"plan for dir %q workspace %q has status %q and cannot be applied; run `atlantis plan`",
-				plan.RepoRelDir, plan.Workspace, proj.Status.String(),
+				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName, proj.Status.String(),
 			)
 		}
 	}
 
-	return nil
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys)
 }
 
 func validateNoPlansFound(ctx *command.Context) error {
@@ -1326,10 +1328,7 @@ func validateNoPlansFound(ctx *command.Context) error {
 		)
 	}
 
-	// Current-head PullStatus exists. Allow empty result — the DB is authoritative
-	// on whether projects need plans. This preserves import/state-rm flows where
-	// plans are intentionally discarded without updating status to DiscardedPlanStatus.
-	return nil
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
 }
 
 // pullStatusMatchesHead returns true if PullStatus is for the current PR head.
@@ -1361,6 +1360,46 @@ func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
 	default:
 		return false
 	}
+}
+
+func statusRequiresApplyPlanFile(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+type applyPlanKey struct {
+	workspace   string
+	repoRelDir  string
+	projectName string
+}
+
+func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
+	return applyPlanKey{
+		workspace:   workspace,
+		repoRelDir:  filepath.Clean(repoRelDir),
+		projectName: projectName,
+	}
+}
+
+func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
+	for _, proj := range pullStatus.Projects {
+		if !statusRequiresApplyPlanFile(proj.Status) {
+			continue
+		}
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		return fmt.Errorf(
+			"plan file is missing for dir %q workspace %q project %q with status %q; run `atlantis plan`",
+			proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+		)
+	}
+	return nil
 }
 
 func findProjectInPullStatus(pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {

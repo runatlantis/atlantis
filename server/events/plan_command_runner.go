@@ -125,6 +125,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
+		p.replacePullStatusWithEmptyProjects(ctx, pull)
 		if !p.silenceVCSStatusNoPlans && !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
@@ -220,6 +221,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
+		if !cmd.IsForSpecificProject() {
+			p.replacePullStatusWithEmptyProjects(ctx, pull)
+		}
 		if !p.silenceVCSStatusNoProjects {
 			if cmd.IsForSpecificProject() {
 				// With a specific plan, just reset the status so it's not stuck in pending state
@@ -286,7 +290,12 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		cmd,
 		result)
 
-	pullStatus, err := p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	var pullStatus models.PullStatus
+	if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
+	} else {
+		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	}
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 		return
@@ -317,6 +326,12 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		p.runAutoplan(ctx)
 	} else {
 		p.run(ctx, cmd)
+	}
+}
+
+func (p *PlanCommandRunner) replacePullStatusWithEmptyProjects(ctx *command.Context, pull models.PullRequest) {
+	if _, err := p.dbUpdater.replaceDB(ctx, pull, nil); err != nil {
+		ctx.Log.Err("writing empty plan status: %s", err)
 	}
 }
 
