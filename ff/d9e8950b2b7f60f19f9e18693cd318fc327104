@@ -1,0 +1,19 @@
+e2e/on_apply_lock.go
+  s_7ae3c68faf0427::t_f1bbad407e26eb 226,287,334,370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "ffd9e8950b2b7f60f19f9e18693cd318fc327104",
+  "prompts": {},
+  "sessions": {
+    "s_7ae3c68faf0427": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f11a4-0d42-7b41-aedc-d865ac2fad94",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
