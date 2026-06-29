@@ -139,6 +139,7 @@ var testFlags = map[string]any{
 	SilenceAllowlistErrorsFlag:       true,
 	SilenceVCSStatusNoPlans:          true,
 	SkipCloneNoChanges:               true,
+	SkipWorkingDirDeletionOnUnlock:   true,
 	SlackTokenFlag:                   "slack-token",
 	SSLCertFileFlag:                  "cert-file",
 	SSLKeyFileFlag:                   "key-file",

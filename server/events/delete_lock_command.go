@@ -20,10 +20,11 @@ type DeleteLockCommand interface {
 
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
-	Locker           locking.Locker
-	WorkingDir       WorkingDir
-	WorkingDirLocker WorkingDirLocker
-	Database         db.Database
+	Locker                         locking.Locker
+	WorkingDir                     WorkingDir
+	WorkingDirLocker               WorkingDirLocker
+	Database                       db.Database
+	SkipWorkingDirDeletionOnUnlock bool
 }
 
 // DeleteLock handles deleting the lock at id
@@ -57,13 +58,23 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 		return numLocks, nil
 	}
 
+	deletedWorkspaces := make(map[string]bool)
 	for i := range numLocks {
 		lock := locks[i]
 
-		err := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
-		if err != nil {
-			logger.Warn("Failed to delete plan: %s", err)
-			return numLocks, err
+		if l.SkipWorkingDirDeletionOnUnlock {
+			err := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
+			if err != nil {
+				logger.Warn("Failed to delete plan: %s", err)
+				return numLocks, err
+			}
+		} else if !deletedWorkspaces[lock.Workspace] {
+			err := l.WorkingDir.DeleteForWorkspace(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace)
+			if err != nil {
+				logger.Warn("Failed to delete working dir: %s", err)
+				return numLocks, err
+			}
+			deletedWorkspaces[lock.Workspace] = true
 		}
 	}
 
