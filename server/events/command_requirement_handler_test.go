@@ -143,6 +143,158 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
+			name: "API call without PR enforces approved requirement by default",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: -1},
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "explicit non-PR API opt-in skips approved requirement",
+			ctx: command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				API:                true,
+				SkipPRRequirements: true,
+				Pull:               models.PullRequest{Num: -1},
+				ApplyRequirements:  []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "API call without PR enforces mergeable requirement by default",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: -2},
+				ApplyRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "explicit non-PR API opt-in skips mergeable requirement",
+			ctx: command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				API:                true,
+				SkipPRRequirements: true,
+				Pull:               models.PullRequest{Num: -2},
+				ApplyRequirements:  []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "API call with PR still enforces approved requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 123},
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without PR still enforces undiverged requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{raw.UnDivergedRequirement},
+			},
+			setup: func(workingDir *mocks.MockWorkingDir) {
+				When(workingDir.HasDiverged(
+					Any[logging.SimpleLogging](),
+					Any[string](),
+					Any[string](),
+					Any[[]string](),
+					Any[models.PullRequest](),
+				)).ThenReturn(true)
+			},
+			wantFailure: "Default branch must be rebased onto pull request before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "opted-in API call without PR fails policies_passed when no policy status exists",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: -1},
+				RunPolicyChecks:   true,
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{{
+						Name:         "policy1",
+						ApproveCount: 1,
+					}},
+				},
+			},
+			wantFailure: "All policies must pass for project before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without policy execution uses existing policy status semantics",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{{
+						Name:         "policy1",
+						ApproveCount: 1,
+					}},
+				},
+			},
+			wantFailure: "",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "API call without PR still enforces policies_passed requirement",
+			ctx: command.ProjectContext{
+				Log:               logging.NewNoopLogger(t),
+				API:               true,
+				Pull:              models.PullRequest{Num: 0},
+				ApplyRequirements: []string{valid.PoliciesPassedCommandReq},
+				ProjectPlanStatus: models.ErroredPolicyCheckStatus,
+				ProjectPolicyStatus: []models.PolicySetStatus{
+					{
+						PolicySetName: "policy1",
+						Passed:        false,
+						Approvals:     []models.PolicySetApproval{},
+					},
+				},
+				PolicySets: valid.PolicySets{
+					PolicySets: []valid.PolicySet{
+						{
+							Name:         "policy1",
+							ApproveCount: 1,
+						},
+					},
+				},
+			},
+			wantFailure: "All policies must pass for project before running apply.",
+			wantErr:     assert.NoError,
+		},
+		{
 			name: "pass full requirements",
 			ctx: command.ProjectContext{
 				ApplyRequirements: fullRequirements,
@@ -634,6 +786,18 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 				},
 			},
 			wantFailure: "Can't apply your project unless you apply its dependencies: [project2]",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "Fail missing dependency when strict dependency status is required",
+			ctx: command.ProjectContext{
+				DependsOn:                 []string{"project1"},
+				FailOnMissingDependencies: true,
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{},
+				},
+			},
+			wantFailure: "Can't apply your project unless you apply its dependencies: [project1]",
 			wantErr:     assert.NoError,
 		},
 	}

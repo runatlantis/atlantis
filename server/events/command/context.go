@@ -50,6 +50,51 @@ type Context struct {
 	// API is true if plan/apply by API endpoints
 	API bool
 
+	// SkipPRRequirements allows explicitly opted-in API workflows that are not
+	// tied to a pull request to skip PR-only requirements like approved and mergeable.
+	SkipPRRequirements bool
+
+	// SkipPRModifiedFiles allows synthetic non-PR API workflows to resolve
+	// explicit selectors without querying pull request modified files.
+	SkipPRModifiedFiles bool
+
+	// SuppressVCSStatus prevents API workflows such as drift detection from
+	// publishing normal PR lifecycle commit statuses.
+	SuppressVCSStatus bool
+
+	// SuppressJobOutput prevents API workflows such as drift detection from
+	// publishing raw command output to the public job stream.
+	SuppressJobOutput bool
+
+	// SuppressApplyWebhooks prevents synthetic API workflows such as drift
+	// remediation from sending legacy event: apply webhooks.
+	SuppressApplyWebhooks bool
+
+	// RunPolicyChecks allows API workflows that model the full plan lifecycle
+	// to execute generated policy_check contexts after successful plan contexts.
+	RunPolicyChecks bool
+
+	// FailOnTeamAllowlistDenied makes project selection return an error when
+	// any selected project is denied by team allowlist filtering.
+	FailOnTeamAllowlistDenied bool
+
+	// FailOnMissingDependencies makes apply dependency validation fail when a
+	// dependency is absent from PullStatus. Drift remediation uses this to avoid
+	// applying a selected subset without its configured dependencies.
+	FailOnMissingDependencies bool
+
+	// ExactProjectNameMatching treats API project selectors as exact project
+	// identities even when regex command selection is enabled.
+	ExactProjectNameMatching bool
+
+	// SortByExecutionOrder sorts API-selected project commands by configured
+	// execution order.
+	SortByExecutionOrder bool
+
+	// PreWorkflowHooksAlreadyRun is set when an API workflow has already run
+	// pre-workflow hooks before project discovery.
+	PreWorkflowHooksAlreadyRun bool
+
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
 

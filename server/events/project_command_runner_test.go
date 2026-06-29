@@ -25,6 +25,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
+	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -117,6 +118,44 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
 		}
 	}
+}
+
+func TestDefaultProjectCommandRunner_PlanSuppressesCustomRunStepStreaming(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockRun := mocks.NewMockCustomStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             mockRun,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		Steps:             []valid.Step{{StepName: "run"}},
+		Workspace:         "default",
+		RepoRelDir:        ".",
+		SuppressJobOutput: true,
+	}
+	When(mockRun.Run(ctx, nil, "", repoDir, map[string]string{}, false, nil, nil)).ThenReturn("run", nil)
+
+	res := runner.Plan(ctx)
+
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, map[string]string{}, false, nil, nil)
 }
 
 func TestProjectOutputWrapper(t *testing.T) {
@@ -293,6 +332,32 @@ func TestProjectOutputWrapper(t *testing.T) {
 			mockJobMessageSender.VerifyWasCalled(Times(expectedSends)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 		})
 	}
+}
+
+func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		SuppressVCSStatus: true,
+		SuppressJobOutput: true,
+	}
+	expected := command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	When(mockProjectCommandRunner.Plan(ctx)).ThenReturn(expected)
+
+	runner := &events.ProjectOutputWrapper{
+		ProjectCommandRunner: mockProjectCommandRunner,
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+	}
+	result := runner.Plan(ctx)
+
+	Equals(t, expected, result)
+	mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Any[command.Name](), Any[models.CommitStatus](), Any[*command.ProjectCommandOutput]())
+	mockJobMessageSender.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 }
 
 func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {
@@ -985,6 +1050,55 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 	Assert(t, res.ApplySuccess == "", "exp apply failure")
 
 	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+}
+
+func TestDefaultProjectCommandRunner_ApplySuppressesApplyWebhooks(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	applyReqHandler := &events.DefaultCommandRequirementHandler{
+		WorkingDir: mockWorkingDir,
+	}
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: applyReqHandler,
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+	ctx := command.ProjectContext{
+		Log:                   logging.NewNoopLogger(t),
+		Steps:                 []valid.Step{{StepName: "apply"}},
+		Workspace:             "default",
+		RepoRelDir:            ".",
+		SuppressApplyWebhooks: true,
+	}
+	expEnvs := map[string]string{}
+	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+
+	Equals(t, "apply", res.ApplySuccess)
+	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, expEnvs)
+	mockSender.VerifyWasCalled(Never()).Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]())
 }
 
 // Test run and env steps. We don't use mocks for this test since we're

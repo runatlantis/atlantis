@@ -177,17 +177,25 @@ type ProjectOutputWrapper struct {
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	if !ctx.SuppressJobOutput {
+		p.JobMessageSender.Send(ctx, "", OperationComplete)
+	}
 	return result
 }
 
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
-	p.JobMessageSender.Send(ctx, "", OperationComplete)
+	if !ctx.SuppressJobOutput {
+		p.JobMessageSender.Send(ctx, "", OperationComplete)
+	}
 	return result
 }
 
 func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, ctx command.ProjectContext, execute func(ctx command.ProjectContext) command.ProjectCommandOutput) command.ProjectCommandOutput {
+	if ctx.SuppressVCSStatus {
+		return execute(ctx)
+	}
+
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
@@ -862,15 +870,17 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 
-	p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
-		Workspace:   ctx.Workspace,
-		User:        ctx.User,
-		Repo:        ctx.Pull.BaseRepo,
-		Pull:        ctx.Pull,
-		Success:     err == nil,
-		Directory:   ctx.RepoRelDir,
-		ProjectName: ctx.ProjectName,
-	})
+	if !ctx.SuppressApplyWebhooks && p.Webhooks != nil {
+		p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
+			Workspace:   ctx.Workspace,
+			User:        ctx.User,
+			Repo:        ctx.Pull.BaseRepo,
+			Success:     err == nil,
+			Pull:        ctx.Pull,
+			Directory:   ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+		})
+	}
 
 	if err != nil {
 		return "", "", errorWithStepOutput(err, outputs)
@@ -1032,7 +1042,7 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
-			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, true, step.Output, step.FilterRegexes)
+			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, !ctx.SuppressJobOutput, step.Output, step.FilterRegexes)
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out

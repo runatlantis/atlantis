@@ -116,6 +116,10 @@ func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLo
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error {
+	if ctx.SuppressVCSStatus {
+		return nil
+	}
+
 	src := truncateContext(fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), ctx.ProjectID()))
 	var descripWords string
 	switch status {

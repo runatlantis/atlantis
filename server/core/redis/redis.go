@@ -31,6 +31,24 @@ const (
 	pullKeySeparator = "::"
 )
 
+const unlockIfOwnedByPullScript = "" +
+	"local value = redis.call(\"GET\", KEYS[1])\n" +
+	"if not value then\n" +
+	"  return nil\n" +
+	"end\n" +
+	"\n" +
+	"local ok, lock = pcall(cjson.decode, value)\n" +
+	"if not ok then\n" +
+	"  return redis.error_reply(\"failed to deserialize current lock\")\n" +
+	"end\n" +
+	"\n" +
+	"if not lock[\"Pull\"] or tonumber(lock[\"Pull\"][\"Num\"]) ~= tonumber(ARGV[1]) then\n" +
+	"  return nil\n" +
+	"end\n" +
+	"\n" +
+	"redis.call(\"DEL\", KEYS[1])\n" +
+	"return value\n"
+
 // Config holds configuration for Redis connections.
 type Config struct {
 	Hostname           string
@@ -225,6 +243,31 @@ func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.Proj
 		return nil, fmt.Errorf("failed to deserialize current lock: %w", err)
 	}
 	r.client.Del(ctx, key)
+	return &lock, nil
+}
+
+// UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
+func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	key := r.lockKey(project, workspace)
+	val, err := r.client.Eval(ctx, unlockIfOwnedByPullScript, []string{key}, pullNum).Result()
+	if err == redis.Nil {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
+	if val == nil {
+		return nil, nil
+	}
+
+	serializedLock, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected unlock script result type %T", val)
+	}
+
+	var lock models.ProjectLock
+	if err := json.Unmarshal([]byte(serializedLock), &lock); err != nil {
+		return nil, fmt.Errorf("failed to deserialize current lock: %w", err)
+	}
 	return &lock, nil
 }
 

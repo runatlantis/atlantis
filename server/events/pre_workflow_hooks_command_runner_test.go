@@ -563,3 +563,57 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		Assert(t, *unlockCalled == true, "unlock function called")
 	})
 }
+
+func TestRunPreHooksSuppressesVCSStatus(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		err  error
+	}{
+		{name: "success"},
+		{name: "failure", err: errors.New("hook failed")},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			preWorkflowHooksSetup(t)
+			log := logging.NewNoopLogger(t)
+			var newPull = testdata.Pull
+			newPull.BaseRepo = testdata.GithubRepo
+			ctx := &command.Context{
+				Pull:              newPull,
+				HeadRepo:          testdata.GithubRepo,
+				User:              testdata.User,
+				Log:               log,
+				SuppressVCSStatus: true,
+				SuppressJobOutput: true,
+			}
+			planCmd := &events.CommentCommand{Name: command.Plan}
+			hook := valid.WorkflowHook{RunCommand: "echo hook"}
+			repoDir := "path/to/repo"
+			preWh.GlobalCfg = valid.GlobalCfg{Repos: []valid.Repo{{
+				ID:               testdata.GithubRepo.ID(),
+				PreWorkflowHooks: []*valid.WorkflowHook{&hook},
+			}}}
+			When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+				events.DefaultRepoRelDir, "", command.Plan)).ThenReturn(func() {}, nil)
+			When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+				Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+			var capturedHookCtx models.WorkflowHookCommandContext
+			When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(hook.RunCommand),
+				Any[string](), Any[string](), Eq(repoDir))).Then(func(args []Param) ReturnValues {
+				capturedHookCtx = args[0].(models.WorkflowHookCommandContext)
+				return ReturnValues{"", "", c.err}
+			})
+
+			err := preWh.RunPreHooks(ctx, planCmd)
+			if c.err != nil {
+				ErrContains(t, c.err.Error(), err)
+			} else {
+				Ok(t, err)
+			}
+			whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq(hook.RunCommand),
+				Any[string](), Any[string](), Eq(repoDir))
+			Assert(t, capturedHookCtx.SuppressJobOutput, "expected hook runtime context to suppress job output")
+			preCommitStatusUpdater.VerifyWasCalled(Never()).UpdatePreWorkflowHook(Any[logging.SimpleLogging](),
+				Any[models.PullRequest](), Any[models.CommitStatus](), Any[string](), Any[string](), Any[string]())
+		})
+	}
+}

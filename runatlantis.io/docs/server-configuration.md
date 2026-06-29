@@ -181,9 +181,10 @@ Notes:
 - Accepts a comma separated list, ex. `pattern1,pattern2`.
 - Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 - List of file patterns will be used by both automatic and manually run plans.
-- When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
-   (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
+- When not set, defaults to all `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
+   (`--autoplan-file-list='**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
 - Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+- The default is global (not distribution-aware). Both Terraform and OpenTofu installs will match `.tofu` changes. If you do not use OpenTofu, you can override the default to exclude `.tofu` patterns.
 - A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
 Examples:
@@ -211,6 +212,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: tip NOTE
+Module dependency indexing uses Terraform config inspection and may not fully support `.tofu` / `.tofu.json` files. Module calls defined only in `.tofu` files or shared module directories containing only `.tofu` files may not be traced. Direct file-change autoplanning for `.tofu` projects works regardless. Use explicit `autoplan.when_modified` patterns as a workaround. See [OpenTofu .tofu file support](terraform-versions.md#opentofu-tofu-file-support) for details.
+:::
 
 ### `--autoplan-modules-from-projects` <Badge text="v0.26.0+" type="info"/>
 
@@ -604,6 +609,40 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
+### `--enable-drift-detection`
+
+```bash
+atlantis server --enable-drift-detection
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+```
+
+Enable drift detection API endpoints. Drift detection does not run Terraform apply, but
+it does execute the normal plan lifecycle, including configured pre-workflow hooks,
+custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
+will initialize in-memory storage for drift detection results and a remediation service,
+making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+are configured (`event: drift`), successful detection runs send notifications to Slack or HTTP endpoints,
+including no-drift heartbeat results. Drift detection does not bypass team allowlists or PR-state
+`plan_requirements` such as `approved` or `mergeable`; those checks fail closed when
+they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
+`--enable-drift-remediation`. Defaults to `false`.
+
+### `--enable-drift-remediation`
+
+```bash
+atlantis server --enable-drift-detection --enable-drift-remediation
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
+```
+
+Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
+This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
+rejected while read-only drift detection remains available. This flag does not bypass
+repository `apply_requirements`; requirements that need pull request state fail closed for
+non-PR remediation requests. Defaults to `false`.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
@@ -640,7 +679,7 @@ The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](r
 
 This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
+When `--restrict-file-list` is enabled, regex project plans are limited to matching projects with files modified in the pull request. Without `--restrict-file-list`, regex project commands can still run against all matching projects.
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
@@ -794,6 +833,8 @@ In versions v0.20.1 and below, the GitHub team name required the case sensitive 
 Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
+
+GitHub team hierarchy is honored. If an allowlisted team has child teams, members of those child teams inherit the parent team's allowed commands.
 
 ::: tip
 If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
@@ -1407,8 +1448,7 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 ```
 
 `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
-This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
+When `--enable-regexp-cmd` is also enabled, regex project plans such as `atlantis plan -p .*` are scoped to matching projects with files modified in the pull request.
 Defaults to `false`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>

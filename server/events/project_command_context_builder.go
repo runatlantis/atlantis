@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -125,11 +126,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		}
 	}
 
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
+	detectProjectTerraformVersion(ctx, &prjCfg, repoDir, terraformClient)
 
 	projectCmdContext := newProjectCommandContext(
 		ctx,
@@ -180,11 +177,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Log.Debug("PolicyChecks are disabled on this repository")
 	}
 
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
+	detectProjectTerraformVersion(ctx, &prjCfg, repoDir, terraformClient)
 
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
@@ -229,6 +222,20 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	}
 
 	return
+}
+
+func detectProjectTerraformVersion(ctx *command.Context, prjCfg *valid.MergedProjectCfg, repoDir string, terraformClient tfclient.Client) {
+	// If TerraformVersion is not defined in the repo config, look for a
+	// required_version setting in the project's Terraform/OpenTofu config.
+	if prjCfg.TerraformVersion != nil {
+		return
+	}
+
+	var tfDistribution terraform.Distribution
+	if prjCfg.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*prjCfg.TerraformDistribution)
+	}
+	prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, tfDistribution, filepath.Join(repoDir, prjCfg.RepoRelDir))
 }
 
 // newProjectCommandContext is a initializer method that handles constructing the
@@ -321,6 +328,13 @@ func newProjectCommandContext(ctx *command.Context,
 		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
 		SilencePRComments:          projCfg.SilencePRComments,
 		TeamAllowlistChecker:       teamAllowlistChecker,
+		API:                        ctx.API,
+		SkipPRRequirements:         ctx.SkipPRRequirements,
+		RunPolicyChecks:            ctx.RunPolicyChecks,
+		SuppressVCSStatus:          ctx.SuppressVCSStatus,
+		SuppressJobOutput:          ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
+		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
 	}
 }
 

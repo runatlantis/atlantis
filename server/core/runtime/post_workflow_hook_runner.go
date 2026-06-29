@@ -60,8 +60,10 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	out, err := cmd.CombinedOutput()
 
 	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
-	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	if !ctx.SuppressJobOutput {
+		wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
+		wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	}
 
 	if err != nil {
 		err = fmt.Errorf("%s: running '%s' in '%s': \n%s", err, shell+" "+shellArgs+" "+command, path, out)

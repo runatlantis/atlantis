@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -88,10 +89,11 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		if diffStat.Next == nil || *diffStat.Next == "" {
 			break
 		}
+		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
+			return nil, fmt.Errorf("getting modified files: %w", err)
+		}
 		nextPageURL = *diffStat.Next
 	}
-
-	// Now ensure all files are unique.
 	hash := make(map[string]bool)
 	var unique []string
 	for _, f := range files {
@@ -266,6 +268,9 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		if diffStat.Next == nil || *diffStat.Next == "" {
 			break
 		}
+		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
+			return models.MergeableStatus{}, fmt.Errorf("checking pull mergeability: %w", err)
+		}
 		nextPageURL = *diffStat.Next
 	}
 	return models.MergeableStatus{
@@ -396,4 +401,25 @@ func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.
 
 func (b *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
 	return nil, nil
+}
+
+// validateNextPageURL checks that a pagination URL returned by the Bitbucket
+// API has the same origin as the configured base URL, preventing SSRF attacks
+// where a malicious server response could redirect requests to internal hosts.
+func (b *Client) validateNextPageURL(nextPageURL string) error {
+	parsedNext, err := url.Parse(nextPageURL)
+	if err != nil {
+		return fmt.Errorf("parsing next page URL %q: %w", nextPageURL, err)
+	}
+	parsedBase, err := url.Parse(b.BaseURL)
+	if err != nil {
+		return fmt.Errorf("parsing base URL %q: %w", b.BaseURL, err)
+	}
+	if !parsedNext.IsAbs() {
+		return fmt.Errorf("next page URL %q must be absolute", nextPageURL)
+	}
+	if !strings.EqualFold(parsedNext.Scheme, parsedBase.Scheme) || !strings.EqualFold(parsedNext.Host, parsedBase.Host) {
+		return fmt.Errorf("next page URL %q origin %q does not match base URL origin %q", nextPageURL, parsedNext.Scheme+"://"+parsedNext.Host, parsedBase.Scheme+"://"+parsedBase.Host)
+	}
+	return nil
 }

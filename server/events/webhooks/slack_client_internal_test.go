@@ -13,27 +13,49 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func descriptionField(attachments []slack.Attachment) (slack.AttachmentField, bool) {
+func attachmentField(attachments []slack.Attachment, title string) (slack.AttachmentField, bool) {
 	if len(attachments) == 0 {
 		return slack.AttachmentField{}, false
 	}
 	for _, f := range attachments[0].Fields {
-		if f.Title == "Description" {
+		if f.Title == title {
 			return f, true
 		}
 	}
 	return slack.AttachmentField{}, false
 }
 
+func descriptionField(attachments []slack.Attachment) (slack.AttachmentField, bool) {
+	return attachmentField(attachments, "Description")
+}
+
 func applyResultWithBody(body string) ApplyResult {
 	return ApplyResult{
 		Workspace: "default",
 		Repo:      models.Repo{FullName: "owner/repo"},
-		Pull:      models.PullRequest{Num: 1, URL: "url", BaseBranch: "main", Body: body},
+		Pull: models.PullRequest{
+			Num:        1,
+			URL:        "url",
+			BaseBranch: "main",
+			HeadBranch: "feature-branch",
+			Body:       body,
+		},
 		User:      models.User{Username: "user"},
 		Success:   true,
 		Directory: "dir",
 	}
+}
+
+func TestCreateAttachments_UsesHeadBranch(t *testing.T) {
+	c := DefaultSlackClient{}
+	attachments := c.createAttachments(applyResultWithBody(""))
+	field, ok := attachmentField(attachments, "Branch")
+	Assert(t, ok, "expected a Branch field")
+	Equals(t, slack.AttachmentField{
+		Title: "Branch",
+		Value: "feature-branch",
+		Short: true,
+	}, field)
 }
 
 func TestCreateAttachments_NoDescriptionWhenBodyEmpty(t *testing.T) {

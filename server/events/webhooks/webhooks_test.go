@@ -82,6 +82,22 @@ func TestNewWebhooksManager_InvalidBranchAndWorkspaceRegex(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "error parsing regexp"), "expected regex error")
 }
 
+func TestNewWebhooksManager_DriftConfigSkipsApplyRegexParsing(t *testing.T) {
+	RegisterMockTestingT(t)
+	clients := validClients()
+	configs := []webhooks.Config{{
+		Event:          webhooks.DriftEvent,
+		WorkspaceRegex: "(",
+		BranchRegex:    "(",
+		Kind:           webhooks.HttpKind,
+		URL:            "https://example.com/drift",
+	}}
+
+	manager, err := webhooks.NewMultiWebhookSender(configs, clients)
+	Ok(t, err)
+	Equals(t, 0, len(manager.Webhooks)) // nolint: staticcheck
+}
+
 func TestNewWebhooksManager_NoEvent(t *testing.T) {
 	t.Log("When the event key is not specified in a config, an error is returned")
 	RegisterMockTestingT(t)
@@ -103,7 +119,7 @@ func TestNewWebhooksManager_UnsupportedEvent(t *testing.T) {
 	configs[0].Event = unsupportedEvent
 	_, err := webhooks.NewMultiWebhookSender(configs, clients)
 	Assert(t, err != nil, "expected error")
-	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" is supported right now", err.Error())
+	Equals(t, "\"event: badevent\" not supported. Only \"event: apply\" and \"event: drift\" are supported", err.Error())
 }
 
 func TestNewWebhooksManager_NoKind(t *testing.T) {

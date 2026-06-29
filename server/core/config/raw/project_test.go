@@ -764,6 +764,42 @@ func TestIsTerraformProjectDir(t *testing.T) {
 			},
 			exp: false,
 		},
+		{
+			description: ".tofu file",
+			files: map[string]string{
+				"main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu.json file",
+			files: map[string]string{
+				"main.tofu.json": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu and .tf together",
+			files: map[string]string{
+				"main.tf":       "Some content",
+				"versions.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: "hidden .tofu file still matches indicator glob",
+			files: map[string]string{
+				".main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu in subdirectory only",
+			files: map[string]string{
+				"subdir/main.tofu": "Some content",
+			},
+			exp: false,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
@@ -783,6 +819,33 @@ func TestIsTerraformProjectDir(t *testing.T) {
 			actual, err := raw.IsTerraformProjectDir(dir)
 			Ok(t, err)
 			Equals(t, c.exp, actual)
+		})
+	}
+}
+
+func TestIsProjectIndicatorFile(t *testing.T) {
+	cases := []struct {
+		name string
+		exp  bool
+	}{
+		{"main.tf", true},
+		{"versions.tf", true},
+		{"main.tf.json", true},
+		{"versions.tf.json", true},
+		{"main.tofu", true},
+		{"versions.tofu", true},
+		{"main.tofu.json", true},
+		{"versions.tofu.json", true},
+		{"terragrunt.hcl", true},
+		{"README.md", false},
+		{"main.go", false},
+		{"terraform.tfstate", false},
+		{".terraform.lock.hcl", false},
+		{"vars.tfvars", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, raw.IsProjectIndicatorFile(c.name))
 		})
 	}
 }

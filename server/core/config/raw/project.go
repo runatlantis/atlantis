@@ -26,11 +26,25 @@ const (
 )
 
 // terraformProjectIndicators are configuration files that suggest a directory
-// should be treated as a Terraform/Terragrunt project.
+// should be treated as a Terraform/Terragrunt/OpenTofu project.
 var terraformProjectIndicators = []string{
 	"*.tf",
 	"*.tf.json",
+	"*.tofu",
+	"*.tofu.json",
 	"terragrunt.hcl",
+}
+
+// IsProjectIndicatorFile returns true if the given filename matches any of the
+// project indicator patterns. This is the canonical check shared by full project
+// discovery and module-parent autodiscovery.
+func IsProjectIndicatorFile(name string) bool {
+	for _, indicator := range terraformProjectIndicators {
+		if doublestar.MatchUnvalidated(indicator, name) {
+			return true
+		}
+	}
+	return false
 }
 
 type Project struct {
@@ -65,10 +79,8 @@ func IsTerraformProjectDir(dir string) (bool, error) {
 		if entry.IsDir() {
 			continue
 		}
-		for _, indicator := range terraformProjectIndicators {
-			if doublestar.MatchUnvalidated(indicator, entry.Name()) {
-				return true, nil
-			}
+		if IsProjectIndicatorFile(entry.Name()) {
+			return true, nil
 		}
 	}
 	return false, nil

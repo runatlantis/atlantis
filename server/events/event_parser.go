@@ -131,6 +131,9 @@ type CommentCommand struct {
 	// project specified in an atlantis.yaml file.
 	// If empty then the comment specified no project.
 	ProjectName string
+	// DiscoverAllProjects is true when API drift detection should enumerate all
+	// configured or auto-discovered projects without consulting PR modified files.
+	DiscoverAllProjects bool
 	// PolicySet is the name of a policy set to run an approval on.
 	PolicySet string
 	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.

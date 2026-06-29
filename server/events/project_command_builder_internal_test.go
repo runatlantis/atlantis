@@ -601,7 +601,7 @@ projects:
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
-				AutoplanWhenModified: []string{"**/*.tf*", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				AutoplanWhenModified: []string{"**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
 				HeadRepo:             models.Repo{},
 				Log:                  logger,
 				Scope:                statsScope,
@@ -679,6 +679,7 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
@@ -698,7 +699,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -897,6 +898,7 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
@@ -916,7 +918,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -1146,6 +1148,7 @@ workflows:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
@@ -1164,7 +1167,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
-				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)
@@ -1298,6 +1301,7 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",
@@ -1316,7 +1320,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", false, false, true)
 					Equals(t, c.expLen, len(ctxs))
 					Ok(t, err)
 				})
@@ -1541,6 +1545,7 @@ autodiscover:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",

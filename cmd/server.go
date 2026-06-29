@@ -161,6 +161,8 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag         = "enable-drift-detection"
+	EnableDriftRemediationFlag       = "enable-drift-remediation"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -168,7 +170,7 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -675,6 +677,14 @@ var boolFlags = map[string]boolFlag{
 	},
 	WebsocketCheckOrigin: {
 		description:  "Enable websocket origin check",
+		defaultValue: false,
+	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
+		defaultValue: false,
+	},
+	EnableDriftRemediationFlag: {
+		description:  "Enable drift remediation apply API actions. Requires --enable-drift-detection.",
 		defaultValue: false,
 	},
 	HideUnchangedPlanComments: {

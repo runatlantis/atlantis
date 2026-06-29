@@ -44,8 +44,10 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
-	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
+	// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+	// Non-exact constraints are resolved using the provided distribution, or the client default distribution when nil.
+	// Returns nil if unable to determine the version.
+	DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version
 }
 
 type DefaultClient struct {
@@ -287,20 +289,18 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	return tfVersions
 }
 
-// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-// It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
-// It will then select the highest version that satisfies the constraint.
-func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
-	module, diags := tfconfig.LoadModule(projectDirectory)
-	if diags.HasErrors() {
-		log.Err("trying to detect required version: %s", diags.Error())
-	}
+// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+// If downloads are allowed, non-exact constraints are resolved against the provided distribution, or the client
+// default distribution when nil, and the highest satisfying version is selected.
+// Returns nil if unable to determine the version.
+func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
+	requiredCore := c.detectRequiredCore(log, d, projectDirectory)
 
-	if len(module.RequiredCore) != 1 {
-		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+	if len(requiredCore) != 1 {
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(requiredCore))
 		return nil
 	}
-	requiredVersionSetting := module.RequiredCore[0]
+	requiredVersionSetting := requiredCore[0]
 	log.Debug("Found required_version setting of %q", requiredVersionSetting)
 
 	if !c.downloadAllowed {
@@ -319,13 +319,40 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
+	downloadVersion, err := c.effectiveDistribution(d).ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
 		log.Err("%s", err)
 		return nil
 	}
 
 	return downloadVersion
+}
+
+// detectRequiredCore returns the required_version constraints from configuration files.
+// For OpenTofu distribution, it uses a local parser that supports .tofu/.tofu.json files
+// with proper precedence (.tofu overrides same-basename .tf). For Terraform distribution,
+// it uses hashicorp/terraform-config-inspect which only reads .tf/.tf.json files.
+func (c *DefaultClient) detectRequiredCore(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) []string {
+	dist := c.effectiveDistribution(d)
+	if dist.BinName() == "tofu" {
+		constraints, err := detectRequiredCoreFromTofu(projectDirectory)
+		if err != nil {
+			log.Err("trying to detect required version from OpenTofu config: %s", err)
+		}
+		if len(constraints) == 0 && err != nil {
+			return nil
+		}
+		return constraints
+	}
+
+	module, diags := tfconfig.LoadModule(projectDirectory)
+	if diags.HasErrors() {
+		log.Err("trying to detect required version: %s", diags.Error())
+	}
+	if module == nil {
+		return nil
+	}
+	return module.RequiredCore
 }
 
 // See Client.EnsureVersion.
@@ -474,7 +501,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, true, c.projectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }
