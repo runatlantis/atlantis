@@ -1,0 +1,21 @@
+e2e/on_apply_lock.go
+  s_7ae3c68faf0427::t_a5e2546a69ef39 24,42-45,218-225,474-475,479,482,489-525
+e2e/on_apply_lock_test.go
+  s_7ae3c68faf0427::t_c2c7694b6ede4c 6,185-225,242-259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "49d3db52465548791292a35916cc15983ffd620b",
+  "prompts": {},
+  "sessions": {
+    "s_7ae3c68faf0427": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f11a4-0d42-7b41-aedc-d865ac2fad94",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
