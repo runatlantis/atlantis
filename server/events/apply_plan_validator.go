@@ -34,7 +34,10 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	if v == nil || v.PullStatusFetcher == nil {
 		return nil
 	}
-	planPath := planFilePath(ctx, absPath)
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
 
 	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
 	if err != nil {
@@ -110,7 +113,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
 		if actualHash != ctx.ExpectedPlanHash {
-			return rejectProjectPlan(planPath,
+			return fmt.Errorf(
 				"plan file changed for dir %q workspace %q project %q; run `atlantis plan` before apply",
 				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 			)
@@ -148,8 +151,21 @@ func planFilePath(ctx command.ProjectContext, absPath string) string {
 	return filepath.Join(absPath, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 }
 
-func pendingPlanFilePath(plan PendingPlan) string {
-	return filepath.Join(plan.RepoDir, plan.RepoRelDir, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
+func safePlanFilePath(ctx command.ProjectContext, absPath string) (string, error) {
+	planPath := planFilePath(ctx, absPath)
+	if err := utils.EnsureSubPath(absPath, planPath); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return planPath, nil
+}
+
+func pendingPlanFilePath(plan PendingPlan) (string, error) {
+	absPath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+	planPath := filepath.Join(absPath, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
+	if err := utils.EnsureSubPath(absPath, planPath); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return planPath, nil
 }
 
 func hashFile(path string) (string, error) {

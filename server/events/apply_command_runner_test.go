@@ -5,11 +5,13 @@ package events_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -249,54 +251,180 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 }
 
 func TestApplyCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
-	cases := []struct {
-		description string
-		setup       func(*TestConfig)
-	}{
-		{
-			description: "global lock backend errors",
-			setup: func(tc *TestConfig) {
-				tc.applyLockCheckerErr = errors.New("lock backend down")
-			},
-		},
-		{
-			description: "global apply lock is active",
-			setup: func(tc *TestConfig) {
-				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: true}
-			},
-		},
+	RegisterMockTestingT(t)
+	vcsClient := setup(t)
+	scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    scopeNull,
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
 	}
 
-	for _, c := range cases {
-		t.Run(c.description, func(t *testing.T) {
-			RegisterMockTestingT(t)
-			vcsClient := setup(t, c.setup)
-			scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
-			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-			cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
-			ctx := &command.Context{
-				User:     testdata.User,
-				Log:      logging.NewNoopLogger(t),
-				Scope:    scopeNull,
-				Pull:     modelPull,
-				HeadRepo: testdata.GithubRepo,
-				Trigger:  command.CommentTrigger,
-			}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
 
-			When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+	applyCommandRunner.Run(ctx, cmd)
+	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
 
-			applyCommandRunner.Run(ctx, cmd)
-			Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
 
-			vcsClient.VerifyWasCalled(Never()).CreateComment(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
-			commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
-			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
-			projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
-		})
+func TestApplyCommandRunner_TargetedApplyBlocksWhenPlanInFlight(t *testing.T) {
+	testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t, &events.CommentCommand{Name: command.Apply, ProjectName: "projA"})
+}
+
+func TestApplyCommandRunner_TargetedApplyProjectBlocksWhenPlanInFlight(t *testing.T) {
+	testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t, &events.CommentCommand{Name: command.Apply, ProjectName: "projA"})
+}
+
+func TestApplyCommandRunner_TargetedApplyDirBlocksWhenPlanInFlight(t *testing.T) {
+	testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t, &events.CommentCommand{Name: command.Apply, RepoRelDir: "dirA"})
+}
+
+func TestApplyCommandRunner_TargetedApplyWorkspaceBlocksWhenPlanInFlight(t *testing.T) {
+	testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t, &events.CommentCommand{Name: command.Apply, Workspace: "workspaceA"})
+}
+
+func TestApplyCommandRunner_TargetedApplyDoesNotRunTerraformBeforePlanStateFinalized(t *testing.T) {
+	testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t, &events.CommentCommand{Name: command.Apply, ProjectName: "projA"})
+}
+
+func testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t *testing.T, cmd *events.CommentCommand) {
+	locker := events.NewDefaultWorkingDirLocker()
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
 	}
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected targeted apply to fail while plan is in flight")
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(modelPull),
+		Eq(models.FailedCommitStatus),
+		Eq(command.Apply),
+	)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "currently locked by \"plan\""), "got comment: %s", comment)
+}
+
+func TestApplyCommandRunner_RefreshesPullStatusAfterApplyLock(t *testing.T) {
+	database := newTestBoltDB(t)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:       testdata.User,
+		Log:        logging.NewNoopLogger(t),
+		Scope:      metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:       modelPull,
+		PullStatus: nil,
+		HeadRepo:   testdata.GithubRepo,
+		Trigger:    command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: events.DefaultWorkspace, ProjectName: "projA"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Assert(t, ctx.PullStatus != nil, "expected PullStatus to be refreshed before build")
+		Equals(t, "abc123", ctx.PullStatus.Pull.HeadCommit)
+		Equals(t, 1, len(ctx.PullStatus.Projects))
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected refreshed PullStatus apply to succeed")
+}
+
+func TestBuildApplyCommands_UsesFreshPullStatusAfterPlanFinishes(t *testing.T) {
+	database := newTestBoltDB(t)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "new123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:  testdata.User,
+		Log:   logging.NewNoopLogger(t),
+		Scope: metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:  modelPull,
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old123"},
+		},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: events.DefaultWorkspace, ProjectName: "projA"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Assert(t, ctx.PullStatus != nil, "expected PullStatus to be refreshed before build")
+		Equals(t, "new123", ctx.PullStatus.Pull.HeadCommit)
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected fresh PullStatus apply to succeed")
+}
+
+func TestApplyCommandRunner_PullStatusRefreshFailureFailsClosed(t *testing.T) {
+	realDB := newTestBoltDB(t)
+	database := failingGetPullStatusDB{Database: realDB, err: errors.New("db unavailable")}
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected PullStatus refresh failure to fail closed")
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "fetching current plan status"), "got comment: %s", comment)
 }
 
 func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
@@ -669,4 +797,13 @@ func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
 		Eq[command.Name](command.Apply),
 		Eq(models.ProjectCounts{Success: 2, Total: 2, NoChanges: 1}),
 	)
+}
+
+type failingGetPullStatusDB struct {
+	db.Database
+	err error
+}
+
+func (f failingGetPullStatusDB) GetPullStatus(models.PullRequest) (*models.PullStatus, error) {
+	return nil, f.err
 }

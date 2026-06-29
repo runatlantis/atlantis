@@ -4,6 +4,7 @@
 package events
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -84,23 +85,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	pull := ctx.Pull
 
 	var projectCmds []command.ProjectContext
-	var projectCmdsBuilt bool
 	var projectCmdsErr error
-	if cmd.IsForSpecificProject() {
-		ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
-		if err != nil {
-			// On error we continue the request with mergeable assumed false.
-			// We want to continue because not all apply's will need this status,
-			// only if they rely on the mergeability requirement.
-			// All PullRequestStatus fields are set to false by default when error.
-			ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
-		}
-		projectCmds, projectCmdsErr = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
-		projectCmdsBuilt = true
-		if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), projectCmdsErr) {
-			return
-		}
-	}
 
 	locked, err := a.IsLocked()
 	if err != nil {
@@ -134,7 +119,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	var unlockPullApply func()
-	if !cmd.IsForSpecificProject() && a.workingDirLocker != nil {
+	if a.workingDirLocker != nil {
 		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply)
 		if err != nil {
 			ctx.CommandHasErrors = true
@@ -147,24 +132,32 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		defer unlockPullApply()
 	}
 
-	if !projectCmdsBuilt {
-		// Get the mergeable status before we set any build statuses of our own.
-		// We do this here because when we set a "Pending" status, if users have
-		// required the Atlantis status checks to pass, then we've now changed
-		// the mergeability status of the pull request.
-		// This sets the approved, mergeable, and sqlocked status in the context.
-		ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
-		if err != nil {
-			// On error we continue the request with mergeable assumed false.
-			// We want to continue because not all apply's will need this status,
-			// only if they rely on the mergeability requirement.
-			// All PullRequestStatus fields are set to false by default when error.
-			ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	if err := a.refreshPullStatus(ctx, pull); err != nil {
+		ctx.Log.Err("fetching current plan status: %s", err)
+		ctx.CommandHasErrors = true
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		projectCmds, projectCmdsErr = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
-		if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), projectCmdsErr) {
-			return
-		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching current plan status: %w", err)})
+		return
+	}
+
+	// Get the mergeable status before we set any build statuses of our own.
+	// We do this here because when we set a "Pending" status, if users have
+	// required the Atlantis status checks to pass, then we've now changed
+	// the mergeability status of the pull request.
+	// This sets the approved, mergeable, and sqlocked status in the context.
+	ctx.PullRequestStatus, err = a.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
+	if err != nil {
+		// On error we continue the request with mergeable assumed false.
+		// We want to continue because not all apply's will need this status,
+		// only if they rely on the mergeability requirement.
+		// All PullRequestStatus fields are set to false by default when error.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
+	projectCmds, projectCmdsErr = a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), projectCmdsErr) {
+		return
 	}
 	if projectCmdsErr != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -241,6 +234,18 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models.PullRequest) error {
+	if a.Database == nil {
+		return nil
+	}
+	pullStatus, err := a.Database.GetPullStatus(pull)
+	if err != nil {
+		return err
+	}
+	ctx.PullStatus = pullStatus
+	return nil
 }
 
 func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {

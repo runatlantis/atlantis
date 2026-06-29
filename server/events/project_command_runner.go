@@ -876,7 +876,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
 	if ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
-		planHash, err := hashFile(planFilePath(ctx, absPath))
+		planPath, err := safePlanFilePath(ctx, absPath)
+		if err != nil {
+			return "", "", err
+		}
+		planHash, err := hashFile(planPath)
 		if err != nil {
 			return "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}

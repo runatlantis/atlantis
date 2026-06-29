@@ -1015,6 +1015,113 @@ func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestApplyPlanValidator_RejectsPlanPathOutsideProjectDir(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "../escape",
+		RepoRelDir:       ".",
+		ProjectName:      "",
+		ExpectedPlanHash: planHashForContent([]byte("plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected plan path traversal error")
+	Assert(t, strings.Contains(err.Error(), "plan path traversal detected"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_RejectsTraversalPlanPathBeforeHashing(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "../escape",
+		RepoRelDir:       ".",
+		ProjectName:      "",
+		ExpectedPlanHash: planHashForContent([]byte("plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected traversal to fail before hashing")
+	Assert(t, strings.Contains(err.Error(), "plan path traversal detected"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_HashesOnlySubpathUnderProjectDir(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_HashMismatchDoesNotDeleteNewerCurrentPlan(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent([]byte("old plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("new plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected plan hash mismatch")
+	Assert(t, strings.Contains(err.Error(), "plan file changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "new plan", string(contents))
+}
+
 func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -1183,6 +1290,14 @@ func TestProjectCommandRunner_ApplyRejectsPlanOverwrittenByPreApplyRunStep(t *te
 	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
 }
 
+func TestProjectCommandRunner_ApplyRejectsPlanMutatedBeforeBuiltInApplyStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
+func TestProjectCommandRunner_PreApplyRunStepPlanfileExposureIsDocumented(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
 func TestProjectCommandRunner_ApplyRejectsPlanTruncatedByPreApplyRunStep(t *testing.T) {
 	testProjectCommandRunnerRejectsPlanContentMutation(t, nil, "plan file changed")
 }
@@ -1238,8 +1353,9 @@ func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContent
 
 	Assert(t, res.Error != nil, "expected plan hash mismatch")
 	Assert(t, strings.Contains(res.Error.Error(), expectedErr), "got: %s", res.Error)
-	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected rejected plan file to be deleted")
+	contents, err := os.ReadFile(planPath)
+	Ok(t, err)
+	Equals(t, string(newContents), string(contents))
 	Equals(t, []string{"run"}, calls)
 }
 

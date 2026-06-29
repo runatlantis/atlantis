@@ -1266,7 +1266,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
 		if commentCmd.Name == command.Apply {
-			planHash, err := hashFile(pendingPlanFilePath(plan))
+			planPath, err := pendingPlanFilePath(plan)
+			if err != nil {
+				return nil, fmt.Errorf("validating plan path for dir %q: %w", plan.RepoRelDir, err)
+			}
+			planHash, err := hashFile(planPath)
 			if err != nil {
 				return nil, fmt.Errorf("hashing plan for dir '%s': %w", plan.RepoRelDir, err)
 			}
@@ -1538,7 +1542,11 @@ func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Contex
 		if err != nil {
 			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
 		}
-		planHash, err := hashFile(planFilePath(projCtxs[i], filepath.Join(repoDir, projCtxs[i].RepoRelDir)))
+		planPath, err := safePlanFilePath(projCtxs[i], filepath.Join(repoDir, projCtxs[i].RepoRelDir))
+		if err != nil {
+			return fmt.Errorf("validating plan path for dir %q: %w", projCtxs[i].RepoRelDir, err)
+		}
+		planHash, err := hashFile(planPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
