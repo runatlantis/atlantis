@@ -541,6 +541,98 @@ func TestApplyCommandRunner_TargetedApplyParsedBeforePushDoesNotApplyNewHeadPlan
 	Ok(t, err)
 }
 
+func TestApplyCommandRunner_TargetedStaleApplyRequirementFailurePreservesLivePullStatus(t *testing.T) {
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Apply,
+		RepoRelDir:  "dirA",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "projA",
+		Pull:        ctx.Pull,
+		PullStatus:  ctx.PullStatus,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		projectCtx.Pull = ctx.Pull
+		projectCtx.PullStatus = ctx.PullStatus
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("mergeable requirement failed"),
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected stale targeted apply to fail")
+	pullStatus, err := database.GetPullStatus(currentPull)
+	Ok(t, err)
+	Equals(t, liveHead, pullStatus.Pull.HeadCommit)
+	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[0].Status)
+}
+
+func TestApplyCommandRunner_TargetedStaleApplyDependencyFailurePreservesLivePullStatus(t *testing.T) {
+	database := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+	})
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Apply,
+		RepoRelDir:  "dirA",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "projA",
+		Pull:        ctx.Pull,
+		PullStatus:  ctx.PullStatus,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		projectCtx.Pull = ctx.Pull
+		projectCtx.PullStatus = ctx.PullStatus
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("dependency validation failed"),
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected stale targeted apply to fail")
+	pullStatus, err := database.GetPullStatus(currentPull)
+	Ok(t, err)
+	Equals(t, liveHead, pullStatus.Pull.HeadCommit)
+	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[0].Status)
+}
+
 func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t *testing.T) {
 	realDB := newTestBoltDB(t)
 	locker := events.NewDefaultWorkingDirLocker()

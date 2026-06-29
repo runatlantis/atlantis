@@ -1065,6 +1065,99 @@ func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
 }
 
+func TestAPISetup_RefreshesPullRequestStatusAfterResolvingPRHead(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.Then(func(args []Param) ReturnValues {
+		pull := args[1].(models.PullRequest)
+		Equals(t, "main", pull.HeadCommit)
+		return ReturnValues{models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: false},
+			MergeableStatus: models.MergeableStatus{IsMergeable: false},
+		}, nil}
+	})
+	mockCall.Then(func(args []Param) ReturnValues {
+		pull := args[1].(models.PullRequest)
+		Equals(t, headCommit, pull.HeadCommit)
+		return ReturnValues{models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		}, nil}
+	})
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(2)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	planCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, headCommit, planCtx.Pull.HeadCommit)
+	Assert(t, planCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected plan commands to use resolved-head approved status")
+	Assert(t, planCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected plan commands to use resolved-head mergeable status")
+}
+
+func TestAPIApply_UsesResolvedHeadPullRequestStatusForPlanRequirements(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{}, nil)
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(3)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	planCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, headCommit, planCtx.Pull.HeadCommit)
+	Assert(t, planCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected pre-apply plan to use resolved-head approved status")
+	Assert(t, planCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected pre-apply plan to use resolved-head mergeable status")
+}
+
 func TestAPIController_ApplyRefreshesPullReqStatusAfterPlan(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	fetcher := NewMockPullReqStatusFetcher()

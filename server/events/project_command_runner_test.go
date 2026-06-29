@@ -1025,6 +1025,54 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 	Equals(t, "current plan", string(contents))
 }
 
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
+	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDependencyValidation(t *testing.T) {
+	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func assertTargetedStaleCommandClassifiedBeforeApplyValidation(t *testing.T) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead}},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale command-head error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
 func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyFails(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
@@ -1636,7 +1684,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected live head change error")
-	Assert(t, strings.Contains(res.Error.Error(), "recorded plan status is from commit"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
 	_, err = os.Stat(planPath)
 	Ok(t, err)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())

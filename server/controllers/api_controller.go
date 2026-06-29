@@ -527,8 +527,12 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 		return sanitizeAPIError(ctx, err)
 	}
 
-	if err := resolveAPIHeadCommit(ctx, repoDir); err != nil {
+	headBeforeResolve := ctx.Pull.HeadCommit
+	if err := resolveAPIHeadCommit(ctx, repoDir, checkoutMergeEnabled(a.WorkingDir)); err != nil {
 		return sanitizeAPIError(ctx, err)
+	}
+	if ctx.Pull.Num > 0 && ctx.Pull.HeadCommit != headBeforeResolve {
+		a.populatePullRequestStatus(ctx)
 	}
 	return sanitizeAPIError(ctx, verifyNonPRBaseBranchReachability(ctx, repoDir))
 }
@@ -537,10 +541,10 @@ func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 	if ctx.Pull.Num >= 0 || repoDir == "" {
 		return nil
 	}
-	return resolveAPIHeadCommit(ctx, repoDir)
+	return resolveAPIHeadCommit(ctx, repoDir, false)
 }
 
-func resolveAPIHeadCommit(ctx *command.Context, repoDir string) error {
+func resolveAPIHeadCommit(ctx *command.Context, repoDir string, checkoutMerge bool) error {
 	if repoDir == "" {
 		return nil
 	}
@@ -551,7 +555,7 @@ func resolveAPIHeadCommit(ctx *command.Context, repoDir string) error {
 		return fmt.Errorf("checking API checkout git metadata: %w", err)
 	}
 
-	if ctx.Pull.Num > 0 {
+	if ctx.Pull.Num > 0 && checkoutMerge {
 		if headCommit, err := checkedOutAPICommit(repoDir, "HEAD^2"); err == nil && headCommit != "" {
 			ctx.Pull.HeadCommit = headCommit
 			return nil
@@ -563,6 +567,13 @@ func resolveAPIHeadCommit(ctx *command.Context, repoDir string) error {
 	}
 	ctx.Pull.HeadCommit = headCommit
 	return nil
+}
+
+func checkoutMergeEnabled(workingDir events.WorkingDir) bool {
+	checkoutMerge, ok := workingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
 }
 
 func checkedOutAPICommit(repoDir string, ref string) (string, error) {

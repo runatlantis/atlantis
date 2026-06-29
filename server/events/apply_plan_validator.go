@@ -23,6 +23,10 @@ type ApplyPlanValidator interface {
 	ValidateProjectPlan(ctx command.ProjectContext, absPath string) error
 }
 
+type ApplyCommandStartValidator interface {
+	ValidateCommandStartHead(ctx command.ProjectContext) error
+}
+
 type LivePullHeadFetcher interface {
 	GetLiveHeadCommit(ctx command.ProjectContext) (string, error)
 }
@@ -33,6 +37,17 @@ type DefaultApplyPlanValidator struct {
 }
 
 var errStaleCommandHead = errors.New("stale command head")
+
+func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.ProjectContext) error {
+	if v == nil || v.LivePullHeadFetcher == nil {
+		return nil
+	}
+	liveHead, err := v.getLiveHeadCommit(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching live pull request head: %w", err)
+	}
+	return validateCommandStartHead(ctx, liveHead)
+}
 
 func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
 	if v == nil || v.PullStatusFetcher == nil {
@@ -66,13 +81,8 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 				shortSHA(liveHead),
 			)
 		}
-		if ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != liveHead {
-			return fmt.Errorf(
-				"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
-				errStaleCommandHead,
-				shortSHA(ctx.Pull.HeadCommit),
-				shortSHA(liveHead),
-			)
+		if err := validateCommandStartHead(ctx, liveHead); err != nil {
+			return err
 		}
 	} else if !pullStatusHeadMatchesPull(ctx.Pull, pullStatus.Pull) {
 		return rejectProjectPlan(planPath,
@@ -126,6 +136,18 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	return nil
+}
+
+func validateCommandStartHead(ctx command.ProjectContext, liveHead string) error {
+	if liveHead == "" || ctx.Pull.HeadCommit == "" || !looksLikeCommitSHA(ctx.Pull.HeadCommit) || ctx.Pull.HeadCommit == liveHead {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
+		errStaleCommandHead,
+		shortSHA(ctx.Pull.HeadCommit),
+		shortSHA(liveHead),
+	)
 }
 
 func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContext) (*models.PullStatus, error) {

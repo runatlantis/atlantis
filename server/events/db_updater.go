@@ -43,8 +43,30 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 		}
 		return models.PullStatus{Pull: pull}, nil
 	}
+	if staleApplyResultForCurrentPull(pull, filtered) {
+		pullStatus, err := c.Database.GetPullStatus(pull)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+		if pullStatus != nil && pullStatus.Pull.HeadCommit != "" && pull.HeadCommit != "" && pullStatus.Pull.HeadCommit != pull.HeadCommit {
+			ctx.Log.Debug("ignoring stale apply result from pull head %q because current plan status is for head %q", pull.HeadCommit, pullStatus.Pull.HeadCommit)
+			return *pullStatus, nil
+		}
+	}
 	ctx.Log.Debug("updating DB with pull results")
 	return c.Database.UpdatePullWithResults(pull, filtered)
+}
+
+func staleApplyResultForCurrentPull(pull models.PullRequest, results []command.ProjectResult) bool {
+	if pull.HeadCommit == "" {
+		return false
+	}
+	for _, result := range results {
+		if result.Command == command.Apply {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {

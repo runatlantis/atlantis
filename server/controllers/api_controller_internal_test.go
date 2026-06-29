@@ -99,11 +99,31 @@ func TestResolveAPIHeadCommitUpdatesPRBranchRef(t *testing.T) {
 		},
 	}
 
-	Ok(t, resolveAPIHeadCommit(ctx, repoDir))
+	Ok(t, resolveAPIHeadCommit(ctx, repoDir, false))
 	Equals(t, headCommit, ctx.Pull.HeadCommit)
 }
 
-func TestResolveAPIHeadCommitUsesPRHeadParentForMergeCheckout(t *testing.T) {
+func TestAPIResolvePRHead_BranchCheckoutUsesHEADWhenHEADIsMergeCommit(t *testing.T) {
+	repoDir := initReachabilityRepo(t)
+	runControllerGit(t, repoDir, "checkout", "-b", "feature", "old")
+	runControllerGit(t, repoDir, "commit", "--allow-empty", "-m", "feature")
+	runControllerGit(t, repoDir, "checkout", "main")
+	runControllerGit(t, repoDir, "merge", "--no-ff", "feature", "-m", "merge feature")
+	mergeHead := strings.TrimSpace(runControllerGit(t, repoDir, "rev-parse", "HEAD"))
+	secondParent := strings.TrimSpace(runControllerGit(t, repoDir, "rev-parse", "HEAD^2"))
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			Num:        123,
+			HeadCommit: "main",
+		},
+	}
+
+	Ok(t, resolveAPIHeadCommit(ctx, repoDir, false))
+	Equals(t, mergeHead, ctx.Pull.HeadCommit)
+	Assert(t, ctx.Pull.HeadCommit != secondParent, "expected branch checkout to use HEAD, not HEAD^2")
+}
+
+func TestAPIResolvePRHead_MergeCheckoutUsesHEADSecondParent(t *testing.T) {
 	repoDir := initReachabilityRepo(t)
 	runControllerGit(t, repoDir, "checkout", "-b", "feature", "old")
 	runControllerGit(t, repoDir, "commit", "--allow-empty", "-m", "feature")
@@ -118,7 +138,7 @@ func TestResolveAPIHeadCommitUsesPRHeadParentForMergeCheckout(t *testing.T) {
 		},
 	}
 
-	Ok(t, resolveAPIHeadCommit(ctx, repoDir))
+	Ok(t, resolveAPIHeadCommit(ctx, repoDir, true))
 	Equals(t, featureHead, ctx.Pull.HeadCommit)
 	Assert(t, ctx.Pull.HeadCommit != mergeHead, "expected PR head, not merge commit")
 }

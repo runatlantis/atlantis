@@ -842,6 +842,12 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
+	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
+		if err := validator.ValidateCommandStartHead(ctx); err != nil {
+			return "", "", err
+		}
+	}
+
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)
 	if failure != "" || err != nil {
 		return "", failure, err
