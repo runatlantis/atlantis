@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
@@ -723,6 +724,12 @@ projects:
 				tmpDir := DirStructure(t, map[string]any{
 					"main.tf": nil,
 				})
+				if cmdName == command.Apply && c.ExpErr == "" && !c.ExpNoProjects {
+					planDir := filepath.Join(tmpDir, c.ExpDir)
+					Ok(t, os.MkdirAll(planDir, 0700))
+					planPath := filepath.Join(planDir, runtime.GetPlanFilename(c.ExpWorkspace, c.ExpProjectName))
+					Ok(t, os.WriteFile(planPath, []byte("targeted plan"), 0600))
+				}
 
 				workingDir := mocks.NewMockWorkingDir()
 				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -771,6 +778,7 @@ projects:
 				var actCtxs []command.ProjectContext
 				var err error
 				cmd := c.Cmd
+				cmd.Name = cmdName
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
@@ -800,6 +808,9 @@ projects:
 				Equals(t, c.ExpAutoMerge, actCtx.AutomergeEnabled)
 				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				if cmdName == command.Apply {
+					Assert(t, actCtx.ExpectedPlanHash != "", "expected targeted apply to record plan hash")
+				}
 			})
 		}
 	}
@@ -3215,22 +3226,22 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
 			"project1": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
 			"project2": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
 		},
 		"workspace2": map[string]any{
 			"project1": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
 			"project2": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
 		},
 	})
@@ -3312,6 +3323,10 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[2].Workspace)
 	Equals(t, "project2", ctxs[3].RepoRelDir)
 	Equals(t, "workspace2", ctxs[3].Workspace)
+	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	for _, ctx := range ctxs {
+		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+	}
 }
 
 // Test that autodiscover.ignore_paths is respected during multi-apply.
@@ -4826,7 +4841,7 @@ func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T)
 	Ok(t, err)
 }
 
-func TestValidatePlansForApply_NoPlansEmptyPullStatusWithActivePlanFails(t *testing.T) {
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithEmptyPullStatus(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
 		Pull: models.PullRequest{HeadCommit: "abc123"},
@@ -4837,6 +4852,40 @@ func TestValidatePlansForApply_NoPlansEmptyPullStatusWithActivePlanFails(t *test
 	}
 	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
 	Assert(t, err != nil, "expected active in-flight plan to block empty generic apply")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithExistingPlanFiles(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{{RepoRelDir: "proj1", Workspace: "default"}}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, plans, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with existing files")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightWithNoChangeOrDiscardedStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.DiscardedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with terminal statuses")
 	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
 }
 

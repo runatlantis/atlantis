@@ -28,6 +28,7 @@ func NewApplyCommandRunner(
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
+	workingDirLocker WorkingDirLocker,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	disableAutomergeLabel string,
 ) *ApplyCommandRunner {
@@ -46,6 +47,7 @@ func NewApplyCommandRunner(
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
+		workingDirLocker:           workingDirLocker,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		disableAutomergeLabel:      disableAutomergeLabel,
 	}
@@ -64,6 +66,7 @@ type ApplyCommandRunner struct {
 	pullUpdater           *PullUpdater
 	dbUpdater             *DBUpdater
 	parallelPoolSize      int
+	workingDirLocker      WorkingDirLocker
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	disableAutomergeLabel string
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
@@ -128,6 +131,20 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 
 		return
+	}
+
+	var unlockPullApply func()
+	if !cmd.IsForSpecificProject() && a.workingDirLocker != nil {
+		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply)
+		if err != nil {
+			ctx.CommandHasErrors = true
+			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+				ctx.Log.Warn("unable to update commit status: %s", statusErr)
+			}
+			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+			return
+		}
+		defer unlockPullApply()
 	}
 
 	if !projectCmdsBuilt {

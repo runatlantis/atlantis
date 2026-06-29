@@ -5,6 +5,8 @@
 package events_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -955,6 +957,64 @@ func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(
 	Equals(t, []string{"validate", "run", "validate"}, calls)
 }
 
+func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "old123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: "new123"}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live head change error")
+	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+}
+
+func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{err: errors.New("vcs unavailable")}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live head fetch failure")
+	Assert(t, strings.Contains(err.Error(), "fetching live pull request head"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
 func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -1010,6 +1070,52 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 
 	Assert(t, res.Error != nil, "expected missing plan file error")
 	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCommandStart(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: "new123"}},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "old123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected live head change error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
@@ -1071,6 +1177,116 @@ func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testin
 	Assert(t, res.Error != nil, "expected final missing plan error")
 	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
 	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanOverwrittenByPreApplyRunStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanTruncatedByPreApplyRunStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, nil, "plan file changed")
+}
+
+func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContents []byte, expectedErr string) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("original plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			return os.WriteFile(planPath, newContents, 0600)
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected plan hash mismatch")
+	Assert(t, strings.Contains(res.Error.Error(), expectedErr), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected rejected plan file to be deleted")
+	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	planContents := []byte("original plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, []string{"apply"}, calls)
 }
 
 func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testing.T) {
@@ -1314,7 +1530,26 @@ type trackingWorkingDirLocker struct {
 	locked bool
 }
 
+func planHashForContent(contents []byte) string {
+	hash := sha256.Sum256(contents)
+	return hex.EncodeToString(hash[:])
+}
+
+type fakeLivePullHeadFetcher struct {
+	head string
+	err  error
+}
+
+func (f fakeLivePullHeadFetcher) GetLiveHeadCommit(command.ProjectContext) (string, error) {
+	return f.head, f.err
+}
+
 func (l *trackingWorkingDirLocker) TryLock(string, int, string, string, string, command.Name) (func(), error) {
+	l.locked = true
+	return func() { l.locked = false }, nil
+}
+
+func (l *trackingWorkingDirLocker) TryLockPull(string, int, command.Name) (func(), error) {
 	l.locked = true
 	return func() { l.locked = false }, nil
 }

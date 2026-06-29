@@ -240,6 +240,22 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	return approvalStatus, nil
 }
 
+func (b *Client) GetPullRequestHeadCommit(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (string, error) {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return "", err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return "", fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return "", fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	return *pullResp.Source.Commit.Hash, nil
+}
+
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
 func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)

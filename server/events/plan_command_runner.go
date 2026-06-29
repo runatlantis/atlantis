@@ -112,6 +112,11 @@ type PlanCommandRunner struct {
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+	unlockPullPlan, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
+	if !ok {
+		return
+	}
+	defer unlockPullPlan()
 
 	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
@@ -212,6 +217,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+	unlockPullPlan, ok := p.lockPullForPlan(ctx, cmd)
+	if !ok {
+		return
+	}
+	defer unlockPullPlan()
 
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -379,6 +389,18 @@ func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Co
 		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
 	return pullStatus, nil
+}
+
+func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullCommand) (func(), bool) {
+	if p.workingDirLocker == nil {
+		return func() {}, true
+	}
+	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+	if err != nil {
+		p.handleNoProjectPlanStateError(ctx, cmd, err)
+		return nil, false
+	}
+	return unlockFn, true
 }
 
 func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {

@@ -1265,6 +1265,15 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if err != nil {
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
+		if commentCmd.Name == command.Apply {
+			planHash, err := hashFile(pendingPlanFilePath(plan))
+			if err != nil {
+				return nil, fmt.Errorf("hashing plan for dir '%s': %w", plan.RepoRelDir, err)
+			}
+			for i := range commentCmds {
+				commentCmds[i].ExpectedPlanHash = planHash
+			}
+		}
 		cmds = append(cmds, commentCmds...)
 	}
 
@@ -1283,6 +1292,9 @@ func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
 }
 
 func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
+	if hasActivePlan {
+		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
+	}
 	if len(plans) > 0 {
 		return validateFoundPlans(ctx, plans)
 	}
@@ -1334,10 +1346,6 @@ func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 			shortSHA(ctx.PullStatus.Pull.HeadCommit),
 			shortSHA(ctx.Pull.HeadCommit),
 		)
-	}
-
-	if len(ctx.PullStatus.Projects) == 0 && hasActivePlan {
-		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
 	}
 
 	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
@@ -1500,7 +1508,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	return p.buildProjectCommandCtx(
+	projCtx, err = p.buildProjectCommandCtx(
 		ctx,
 		cmd.Name,
 		cmd.SubName,
@@ -1513,6 +1521,33 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
+	if err != nil {
+		return projCtx, err
+	}
+	if cmd.Name == command.Apply {
+		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
+			return nil, err
+		}
+	}
+	return projCtx, nil
+}
+
+func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
+	for i := range projCtxs {
+		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)
+		if err != nil {
+			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
+		}
+		planHash, err := hashFile(planFilePath(projCtxs[i], filepath.Join(repoDir, projCtxs[i].RepoRelDir)))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("hashing plan for dir '%s': %w", projCtxs[i].RepoRelDir, err)
+		}
+		projCtxs[i].ExpectedPlanHash = planHash
+	}
+	return nil
 }
 
 // buildProjectCommandCtx builds a context for a single or several projects identified

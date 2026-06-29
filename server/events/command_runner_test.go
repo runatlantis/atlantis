@@ -80,6 +80,7 @@ type TestConfig struct {
 	PendingApplyStatus         bool
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
+	workingDirLocker           events.WorkingDirLocker
 }
 
 type configuredPreWorkflowHooksCommandRunner struct {
@@ -171,13 +172,17 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		false,
 	)
 
+	workingDirLocker := testConfig.workingDirLocker
+	if workingDirLocker == nil {
+		workingDirLocker = events.NewDefaultWorkingDirLocker()
+	}
 	planCommandRunner = events.NewPlanCommandRunner(
 		testConfig.silenceVCSStatusNoPlans,
 		testConfig.silenceVCSStatusNoProjects,
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
-		events.NewDefaultWorkingDirLocker(),
+		workingDirLocker,
 		commitUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -210,6 +215,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
+		workingDirLocker,
 		pullReqStatusFetcher,
 		testConfig.DisableAutomergeLabel,
 	)
@@ -761,6 +767,67 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusDoesNotSucceedWhilePlanInFlight(
 	Assert(t, strings.Contains(comment, "plan is currently running"), "got: %s", comment)
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Apply), Eq(models.ProjectCounts{}))
+}
+
+func TestRunApply_DoesNotReturnZeroProjectsWhilePlanInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.SilenceNoProjects = true
+		tc.workingDirLocker = locker
+	})
+	unlock, err := locker.TryLockPull(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan)
+	Ok(t, err)
+	defer unlock()
+
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("apply")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Apply Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "currently locked by"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Apply), Eq(models.ProjectCounts{}))
+}
+
+func TestPlanCommandRunner_HoldsPlanInFlightLockAcrossCleanupPlanAndDBWrite(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  ".",
+		Workspace:   events.DefaultWorkspace,
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).Then(func(args []Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock during command build")
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Plan(projectCtx)).Then(func(args []Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock during project plan")
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	Assert(t, !locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock to be released")
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {

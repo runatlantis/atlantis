@@ -20,6 +20,9 @@ import (
 // on disk and we haven't written Atlantis (yet) to handle concurrent execution
 // within this workspace.
 type WorkingDirLocker interface {
+	// TryLockPull tries to acquire a pull-level lock for a command. It is used to
+	// coordinate commands that can make pull-wide plan state inconsistent.
+	TryLockPull(repoFullName string, pullNum int, cmdName command.Name) (func(), error)
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
@@ -60,17 +63,41 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	}, nil
 }
 
+func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name) (func(), error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	pullKey := d.pullKey(repoFullName, pullNum)
+	if currentLock, exists := d.locks[pullKey]; exists {
+		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q.\n"+
+			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock)
+	}
+	if currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan); exists {
+		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q.\n"+
+			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock)
+	}
+	d.locks[pullKey] = cmdName
+	return func() {
+		d.unlockPull(repoFullName, pullNum)
+	}, nil
+}
+
 func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
+	_, exists := d.findCommandLock(repoFullName, pullNum, cmdName)
+	return exists
+}
+
+func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name) (command.Name, bool) {
 	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
 	for key, currentLock := range d.locks {
 		if strings.HasPrefix(key, prefix) && currentLock == cmdName {
-			return true
+			return currentLock, true
 		}
 	}
-	return false
+	return cmdName, false
 }
 
 // UnlockByPull unlocks all workspaces for a specific pull request
@@ -96,6 +123,17 @@ func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, works
 	delete(d.locks, workspaceKey)
 }
 
+func (d *DefaultWorkingDirLocker) unlockPull(repoFullName string, pullNum int) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	delete(d.locks, d.pullKey(repoFullName, pullNum))
+}
+
 func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {
 	return strings.TrimRight(fmt.Sprintf("%s/%d/%s/%s/%s", repo, pull, workspace, path, projectName), "/")
+}
+
+func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {
+	return fmt.Sprintf("%s/%d/.pull", repo, pull)
 }
