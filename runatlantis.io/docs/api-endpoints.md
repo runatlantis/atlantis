@@ -178,6 +178,10 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }
 ```
 
+::: tip NOTE
+`PlansDeleted` is deprecated and always `false`: plans are no longer deleted when a project errors. It is kept in the response for backwards compatibility.
+:::
+
 #### Sample Response (Error)
 
 When a request/auth/setup error occurs, the legacy endpoint returns a top-level error body:

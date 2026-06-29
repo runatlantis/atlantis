@@ -3,14 +3,15 @@
 {{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
 ```
 
-{{ if .PlanWasDeleted -}}
-Este plan no se guardó porque uno o más proyectos fallaron y automerge requiere que todos los planes pasen.
+{{ if .ApplyBlocked -}}
+Este plan se guardó, pero la aplicación está bloqueada hasta que todos los planes tengan éxito.
 {{ else -}}
 {{ if not .DisableApply -}}
 * :arrow_forward: Para **aplicar** este plan, comenta:
   ```shell
   {{ .ApplyCmd }}
   ```
+{{ end -}}
 {{ end -}}
 {{ if not .DisableRepoLocking -}}
 * :put_litter_in_its_place: Para **eliminar** este plan y bloqueo, haz clic [aquí]({{ .LockURL }})
@@ -19,6 +20,5 @@ Este plan no se guardó porque uno o más proyectos fallaron y automerge requier
   ```shell
   {{ .RePlanCmd }}
   ```
-{{ end -}}
 {{ template "mergedAgain" . -}}
 {{ end -}}

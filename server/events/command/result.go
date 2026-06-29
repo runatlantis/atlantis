@@ -8,9 +8,12 @@ type Result struct {
 	Error          error
 	Failure        string
 	ProjectResults []ProjectResult
-	// PlansDeleted is true if all plans created during this command were
-	// deleted. This happens if automerging is enabled and one project has an
-	// error since automerging requires all plans to succeed.
+	// PlansDeleted used to be true if all plans created during this command
+	// were deleted, which happened when automerging was enabled and a project
+	// errored. Plans are now kept on partial failure, so it is always false.
+	//
+	// Deprecated: kept only so the API response shape stays stable; do not
+	// read or set it.
 	PlansDeleted bool
 }
 
