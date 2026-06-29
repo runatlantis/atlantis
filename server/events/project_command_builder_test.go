@@ -4838,6 +4838,47 @@ func TestValidatePlansForApply_RejectsPlansFromDifferentBaseBranch(t *testing.T)
 	Assert(t, strings.Contains(err.Error(), "main"), "got: %s", err)
 }
 
+func TestValidatePlansForApply_AcceptsFreshReplanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_RejectsOldBasePlanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base plan to be rejected")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+}
+
 func TestPullStatusFreshness_AllowsMissingLegacyBaseBranchWhenHeadMatches(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),

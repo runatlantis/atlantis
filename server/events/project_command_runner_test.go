@@ -1057,6 +1057,74 @@ func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.
 	Assert(t, os.IsNotExist(err), "expected stale-base plan file to be deleted")
 }
 
+func TestApplyPlanValidator_RejectsWhenLiveBaseChangedSinceCommandStart(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("old-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live base change to reject apply")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_UsesLiveBaseBranchNotCommandStartBase(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	commandStartPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: head,
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	livePull := commandStartPull
+	livePull.BaseBranch = "release"
+	_, err := db.UpdatePullWithResults(livePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename("default", "projA"))
+	Ok(t, os.WriteFile(planPath, []byte("current-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: livePull.HeadCommit, base: livePull.BaseBranch},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull:        commandStartPull,
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
 	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
 }
@@ -1215,7 +1283,7 @@ func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
 	err = validator.ValidateProjectPlan(ctx, repoDir)
 
 	Assert(t, err != nil, "expected live head fetch failure")
-	Assert(t, strings.Contains(err.Error(), "fetching live pull request head"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "fetching live pull request"), "got: %s", err)
 	_, err = os.Stat(planPath)
 	Ok(t, err)
 }
@@ -2187,11 +2255,12 @@ func planHashForContent(contents []byte) string {
 
 type fakeLivePullHeadFetcher struct {
 	head string
+	base string
 	err  error
 }
 
-func (f fakeLivePullHeadFetcher) GetLiveHeadCommit(command.ProjectContext) (string, error) {
-	return f.head, f.err
+func (f fakeLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return models.PullRequest{HeadCommit: f.head, BaseBranch: f.base}, f.err
 }
 
 func (l *trackingWorkingDirLocker) TryLock(string, int, string, string, string, command.Name) (func(), error) {

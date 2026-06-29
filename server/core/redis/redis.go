@@ -478,7 +478,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 
 	// If there is no pull OR if the pull we have is out of date, we
 	// just write a new pull.
-	if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
+	if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 		var statuses []models.ProjectStatus
 		for _, res := range newResults {
 			statuses = append(statuses, r.projectResultToProject(res))
@@ -556,6 +556,13 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 		return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
+	if statusPull.HeadCommit != pull.HeadCommit {
+		return true
+	}
+	return statusPull.BaseBranch != "" && pull.BaseBranch != "" && statusPull.BaseBranch != pull.BaseBranch
 }
 
 func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {

@@ -424,7 +424,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 
 		// If there is no pull OR if the pull we have is out of date, we
 		// just write a new pull.
-		if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 			var statuses []models.ProjectStatus
 			for _, r := range newResults {
 				statuses = append(statuses, b.projectResultToProject(r))
@@ -503,6 +503,13 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
+	if statusPull.HeadCommit != pull.HeadCommit {
+		return true
+	}
+	return statusPull.BaseBranch != "" && pull.BaseBranch != "" && statusPull.BaseBranch != pull.BaseBranch
 }
 
 // GetPullStatus returns the status for pull.

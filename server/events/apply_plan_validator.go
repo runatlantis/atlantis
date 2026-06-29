@@ -28,7 +28,7 @@ type ApplyCommandStartValidator interface {
 }
 
 type LivePullHeadFetcher interface {
-	GetLiveHeadCommit(ctx command.ProjectContext) (string, error)
+	GetLivePullIdentity(ctx command.ProjectContext) (models.PullRequest, error)
 }
 
 type DefaultApplyPlanValidator struct {
@@ -42,11 +42,11 @@ func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.Project
 	if v == nil || v.LivePullHeadFetcher == nil {
 		return nil
 	}
-	liveHead, err := v.getLiveHeadCommit(ctx)
+	livePull, err := v.getLivePullIdentity(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching live pull request head: %w", err)
+		return fmt.Errorf("fetching live pull request: %w", err)
 	}
-	return validateCommandStartHead(ctx, liveHead)
+	return validateCommandStartHead(ctx, livePull.HeadCommit)
 }
 
 func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
@@ -66,27 +66,30 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		return rejectProjectPlan(planPath, "no current plan status found; run `atlantis plan` before apply")
 	}
 
-	liveHead, err := v.getLiveHeadCommit(ctx)
+	livePull, err := v.getLivePullIdentity(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching live pull request head: %w", err)
+		return fmt.Errorf("fetching live pull request: %w", err)
 	}
-	if liveHead != "" {
+	if livePull.HeadCommit != "" {
 		if pullStatus.Pull.HeadCommit == "" {
 			return fmt.Errorf("recorded plan status has no head commit; run `atlantis plan` before apply")
 		}
-		if pullStatus.Pull.HeadCommit != liveHead {
+		if pullStatus.Pull.HeadCommit != livePull.HeadCommit {
 			return fmt.Errorf(
 				"recorded plan status is from commit %s but live pull request head is %s; run `atlantis plan` before apply",
 				shortSHA(pullStatus.Pull.HeadCommit),
-				shortSHA(liveHead),
+				shortSHA(livePull.HeadCommit),
 			)
 		}
 		currentPull := ctx.Pull
-		currentPull.HeadCommit = liveHead
+		currentPull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			currentPull.BaseBranch = livePull.BaseBranch
+		}
 		if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
 			return err
 		}
-		if err := validateCommandStartHead(ctx, liveHead); err != nil {
+		if err := validateCommandStartHead(ctx, livePull.HeadCommit); err != nil {
 			return err
 		}
 	} else if err := pullStatusFreshnessError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
@@ -165,21 +168,21 @@ func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContex
 	return nil, nil
 }
 
-func (v *DefaultApplyPlanValidator) getLiveHeadCommit(ctx command.ProjectContext) (string, error) {
+func (v *DefaultApplyPlanValidator) getLivePullIdentity(ctx command.ProjectContext) (models.PullRequest, error) {
 	if v.LivePullHeadFetcher == nil {
-		return "", nil
+		return models.PullRequest{}, nil
 	}
 	if ctx.API && ctx.Pull.Num <= 0 {
-		return "", nil
+		return models.PullRequest{}, nil
 	}
-	liveHead, err := v.LivePullHeadFetcher.GetLiveHeadCommit(ctx)
+	livePull, err := v.LivePullHeadFetcher.GetLivePullIdentity(ctx)
 	if err != nil {
-		return "", err
+		return models.PullRequest{}, err
 	}
-	if liveHead == "" {
-		return "", fmt.Errorf("live pull request head is empty")
+	if livePull.HeadCommit == "" {
+		return models.PullRequest{}, fmt.Errorf("live pull request head is empty")
 	}
-	return liveHead, nil
+	return livePull, nil
 }
 
 func statusAllowedForApplyExecution(status models.ProjectPlanStatus) bool {

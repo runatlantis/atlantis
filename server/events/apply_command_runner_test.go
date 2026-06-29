@@ -303,6 +303,30 @@ func TestApplyCommandRunner_IgnoredTargetedDirSkipsWhenApplyLockBackendFails(t *
 	})
 }
 
+func TestApplyCommandRunner_LocalConfigIgnoredTargetSkipsBeforeApplyLock(t *testing.T) {
+	assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t, nil, nil)
+}
+
+func TestApplyCommandRunner_MergeCheckoutIgnoredTargetSkipsBeforeApplyLock(t *testing.T) {
+	assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t, nil, nil)
+}
+
+func TestApplyCommandRunner_LocalConfigIgnoredTargetSkipsWhenPlanInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t, locker, &modelPull)
+}
+
+func TestApplyCommandRunner_LocalConfigIgnoredTargetSkipsWhenApplyLockBackendFails(t *testing.T) {
+	assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t, nil, nil, func(tc *TestConfig) {
+		tc.applyLockCheckerErr = errors.New("lock backend unavailable")
+	})
+}
+
 func assertIgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T, locker events.WorkingDirLocker, pull *models.PullRequest, options ...func(*TestConfig)) {
 	t.Helper()
 	configOptions := append([]func(*TestConfig){func(tc *TestConfig) {
@@ -331,6 +355,41 @@ func assertIgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T, locker events.Wo
 	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to skip")
 	Assert(t, !ctx.CommandHasErrors, "expected ignored targeted dir not to fail")
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+}
+
+func assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T, locker events.WorkingDirLocker, pull *models.PullRequest, options ...func(*TestConfig)) {
+	t.Helper()
+	configOptions := append([]func(*TestConfig){func(tc *TestConfig) {
+		if locker != nil {
+			tc.workingDirLocker = locker
+		}
+	}}, options...)
+	vcsClient := setup(t, configOptions...)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	if pull != nil {
+		modelPull = *pull
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn(nil, events.ErrIgnoredTargetedDir)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to skip")
+	Assert(t, !ctx.CommandHasErrors, "expected ignored targeted dir not to fail")
+	projectCommandBuilder.VerifyWasCalledOnce().BuildApplyCommands(ctx, cmd)
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 	vcsClient.VerifyWasCalled(Never()).CreateComment(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
@@ -380,7 +439,9 @@ func testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t *testing.T, cmd
 	applyCommandRunner.Run(ctx, cmd)
 
 	Assert(t, ctx.CommandHasErrors, "expected targeted apply to fail while plan is in flight")
-	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	if cmd.RepoRelDir == "" || cmd.ProjectName != "" {
+		projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	}
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
 		Any[logging.SimpleLogging](),
@@ -430,11 +491,12 @@ func TestApplyCommandRunner_GenericApplyUsesLiveHeadForBuilderValidation(t *test
 	database := newTestBoltDB(t)
 	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	liveBase := "release"
 	setup(t, func(tc *TestConfig) {
 		tc.database = database
-		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead, base: liveBase}
 	})
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead, BaseBranch: liveBase}
 	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply}
@@ -448,7 +510,9 @@ func TestApplyCommandRunner_GenericApplyUsesLiveHeadForBuilderValidation(t *test
 	}
 	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
 		Equals(t, liveHead, ctx.Pull.HeadCommit)
+		Equals(t, liveBase, ctx.Pull.BaseBranch)
 		Equals(t, liveHead, ctx.PullStatus.Pull.HeadCommit)
+		Equals(t, liveBase, ctx.PullStatus.Pull.BaseBranch)
 		return ReturnValues{[]command.ProjectContext{}, nil}
 	})
 
@@ -492,6 +556,50 @@ func TestApplyCommandRunner_GenericApplyDoesNotRejectCurrentPlanAfterPullStatusR
 	applyCommandRunner.Run(ctx, cmd)
 
 	Assert(t, !ctx.CommandHasErrors, "expected current live-head plan to pass builder validation after refresh")
+}
+
+func TestApplyCommandRunner_GenericApplyRejectsRetargetedPRSameHead(t *testing.T) {
+	database := newTestBoltDB(t)
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "release"}
+	})
+	storedPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
+	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     storedPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Equals(t, "release", ctx.Pull.BaseBranch)
+		err := events.ValidatePlansForApply(ctx, []events.PendingPlan{{
+			RepoRelDir:  "dirA",
+			Workspace:   events.DefaultWorkspace,
+			ProjectName: "projA",
+		}})
+		if err != nil {
+			return ReturnValues{nil, err}
+		}
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(ctx.Pull),
+		Eq(models.FailedCommitStatus),
+		Eq(command.Apply),
+	)
 }
 
 func TestApplyCommandRunner_TargetedApplyPreservesCommandStartHeadAfterLiveRefresh(t *testing.T) {
@@ -595,6 +703,58 @@ func TestApplyCommandRunner_TargetedApplyParsedBeforePushDoesNotApplyNewHeadPlan
 		ProjectName: projectCtx.ProjectName,
 	}})
 	Ok(t, err)
+}
+
+func TestApplyCommandRunner_TargetedApplyRejectsRetargetedPRSameHead(t *testing.T) {
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "release"}
+	})
+	storedPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
+	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, "dirA", runtime.GetPlanFilename(events.DefaultWorkspace, "projA"))
+	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
+	Ok(t, os.WriteFile(planPath, []byte("old-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   database,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     storedPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Apply,
+		RepoRelDir:  "dirA",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "projA",
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		projectCtx.Pull = ctx.Pull
+		projectCtx.PullStatus = ctx.PullStatus
+		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+		projCtx := args[0].(command.ProjectContext)
+		err := validator.ValidateProjectPlan(projCtx, filepath.Join(repoDir, projCtx.RepoRelDir))
+		return ReturnValues{command.ProjectCommandOutput{Error: err}}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected same-head retargeted targeted apply to fail")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "old-base plan", string(contents))
 }
 
 func TestApplyCommandRunner_TargetedStaleApplyRequirementFailurePreservesLivePullStatus(t *testing.T) {
@@ -713,16 +873,72 @@ func TestApplyCommandRunner_AutomergeRequiresReturnedPullStatusMatchesLiveHead(t
 	})
 }
 
+func TestApplyCommandRunner_AutomergeSucceedsWhenReturnedPullStatusMatchesLiveHeadAndBase(t *testing.T) {
+	database := newTestBoltDB(t)
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "main"}
+	})
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dirA",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "projA",
+		AutomergeEnabled:  true,
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              pull,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+}
+
+func TestApplyCommandRunner_DoesNotAutomergeWhenReturnedPullStatusBaseIsStale(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "release", command.ProjectCommandOutput{
+		ApplySuccess: "applied old-base command",
+	})
+}
+
+func TestApplyCommandRunner_DoesNotAutomergeWhenLiveBaseChangedAfterApplyCommandStart(t *testing.T) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "release", command.ProjectCommandOutput{
+		ApplySuccess: "applied old-base command",
+	})
+}
+
 func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t *testing.T, liveHead string, applyOutput command.ProjectCommandOutput) {
+	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t, liveHead, "", applyOutput)
+}
+
+func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t *testing.T, liveHead string, liveBase string, applyOutput command.ProjectCommandOutput) {
 	t.Helper()
 	database := newTestBoltDB(t)
 	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	recordedHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	commandHead := oldHead
+	if liveBase != "" {
+		commandHead = recordedHead
+	}
 	vcsClient := setup(t, func(tc *TestConfig) {
 		tc.database = database
-		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead, base: liveBase}
 	})
-	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: recordedHead}
+	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: recordedHead, BaseBranch: "main"}
 	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{{
 		Command:     command.Apply,
 		RepoRelDir:  "dirA",
@@ -741,7 +957,7 @@ func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t *testing
 		User:     testdata.User,
 		Log:      logging.NewNoopLogger(t),
 		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
-		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: oldHead},
+		Pull:     models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: commandHead, BaseBranch: "main"},
 		HeadRepo: testdata.GithubRepo,
 		Trigger:  command.CommentTrigger,
 	}

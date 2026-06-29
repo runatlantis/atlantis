@@ -94,6 +94,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if a.ShouldSkipPreWorkflowHooks(ctx, cmd) {
 		return
 	}
+	if a.skipIgnoredTargetedDirBeforeApplyLocks(ctx, cmd) {
+		return
+	}
 
 	locked, err := a.IsLocked()
 	if err != nil {
@@ -149,18 +152,21 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching current plan status: %w", err)})
 		return
 	}
-	liveHead, err := a.refreshLivePullHead(ctx)
+	livePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
-		ctx.Log.Err("fetching live pull request head: %s", err)
+		ctx.Log.Err("fetching live pull request: %s", err)
 		ctx.CommandHasErrors = true
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching live pull request head: %w", err)})
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching live pull request: %w", err)})
 		return
 	}
-	if liveHead != "" && !cmd.IsForSpecificProject() {
-		ctx.Pull.HeadCommit = liveHead
+	if livePull.HeadCommit != "" && !cmd.IsForSpecificProject() {
+		ctx.Pull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			ctx.Pull.BaseBranch = livePull.BaseBranch
+		}
 		pull = ctx.Pull
 	}
 
@@ -251,8 +257,11 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	currentPull := pull
-	if liveHead != "" {
-		currentPull.HeadCommit = liveHead
+	if livePull.HeadCommit != "" {
+		currentPull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			currentPull.BaseBranch = livePull.BaseBranch
+		}
 	}
 	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		ctx.Log.Warn("not automerging because %s", err)
@@ -295,23 +304,23 @@ func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models
 	return nil
 }
 
-func (a *ApplyCommandRunner) refreshLivePullHead(ctx *command.Context) (string, error) {
+func (a *ApplyCommandRunner) refreshLivePullIdentity(ctx *command.Context) (models.PullRequest, error) {
 	if a.livePullHeadFetcher == nil {
-		return "", nil
+		return models.PullRequest{}, nil
 	}
-	liveHead, err := a.livePullHeadFetcher.GetLiveHeadCommit(command.ProjectContext{
+	livePull, err := a.livePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{
 		Log:        ctx.Log,
 		Pull:       ctx.Pull,
 		PullStatus: ctx.PullStatus,
 		API:        ctx.API,
 	})
 	if err != nil {
-		return "", err
+		return models.PullRequest{}, err
 	}
-	if liveHead == "" {
-		return "", fmt.Errorf("live pull request head is empty")
+	if livePull.HeadCommit == "" {
+		return models.PullRequest{}, fmt.Errorf("live pull request head is empty")
 	}
-	return liveHead, nil
+	return livePull, nil
 }
 
 func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {
@@ -326,6 +335,14 @@ func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {
 
 func (a *ApplyCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
 	return MarkCommandSkippedIfIgnoredTarget(ctx, command.Apply, cmd, a.prjCmdBuilder)
+}
+
+func (a *ApplyCommandRunner) skipIgnoredTargetedDirBeforeApplyLocks(ctx *command.Context, cmd *CommentCommand) bool {
+	if cmd.ProjectName != "" || cmd.RepoRelDir == "" {
+		return false
+	}
+	_, err := a.prjCmdBuilder.BuildApplyCommands(ctx, cmd)
+	return MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err)
 }
 
 func (a *ApplyCommandRunner) IsLocked() (bool, error) {

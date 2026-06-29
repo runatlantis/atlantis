@@ -1297,7 +1297,7 @@ func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
 }
 
 func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
-	return ValidatePlansForApplyWithCurrentHead(ctx, plans, hasActivePlan, ctx.Pull.HeadCommit)
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, ctx.Pull)
 }
 
 // ValidatePlansForApplyWithCurrentHead validates plans against an authoritative
@@ -1305,9 +1305,24 @@ func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPl
 // before generic builder validation instead of trusting the command-start pull
 // snapshot.
 func ValidatePlansForApplyWithCurrentHead(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentHead string) error {
-	if currentHead != "" {
+	currentPull := ctx.Pull
+	currentPull.HeadCommit = currentHead
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, currentPull)
+}
+
+// ValidatePlansForApplyWithCurrentPull validates plans against an authoritative
+// current pull identity. This lets apply refresh the live PR head/base under the
+// apply lock before generic builder validation instead of trusting the
+// command-start pull snapshot.
+func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentPull models.PullRequest) error {
+	if currentPull.HeadCommit != "" || currentPull.BaseBranch != "" {
 		ctxCopy := *ctx
-		ctxCopy.Pull.HeadCommit = currentHead
+		if currentPull.HeadCommit != "" {
+			ctxCopy.Pull.HeadCommit = currentPull.HeadCommit
+		}
+		if currentPull.BaseBranch != "" {
+			ctxCopy.Pull.BaseBranch = currentPull.BaseBranch
+		}
 		ctx = &ctxCopy
 	}
 	if hasActivePlan {
