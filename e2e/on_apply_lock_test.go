@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +182,47 @@ func TestE2ERunNonceIncludesPerRunEntropy(t *testing.T) {
 	}
 }
 
+func TestNewLifecycleCleanupContextIgnoresParentCancellation(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	cancelParent()
+
+	ctx, cleanup := newLifecycleCleanupContext(parent)
+	defer cleanup()
+
+	select {
+	case <-ctx.Done():
+		t.Fatalf("cleanup context was already canceled: %v", ctx.Err())
+	default:
+	}
+}
+
+func TestContainsExactPullRef(t *testing.T) {
+	tests := []struct {
+		name       string
+		comment    string
+		pullNumber int
+		want       bool
+	}{
+		{name: "end of string", comment: "#123", pullNumber: 123, want: true},
+		{name: "period", comment: "#123.", pullNumber: 123, want: true},
+		{name: "comma", comment: "#123,", pullNumber: 123, want: true},
+		{name: "space", comment: "#123 ", pullNumber: 123, want: true},
+		{name: "newline", comment: "#123\n", pullNumber: 123, want: true},
+		{name: "superset number", comment: "#1234", pullNumber: 123, want: false},
+		{name: "embedded superset number", comment: "abc#1234", pullNumber: 123, want: false},
+		{name: "numeric boundary only permits letters", comment: "#123abc", pullNumber: 123, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := containsExactPullRef(tt.comment, tt.pullNumber)
+			if got != tt.want {
+				t.Fatalf("containsExactPullRef(%q, %d) = %v, want %v", tt.comment, tt.pullNumber, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFindLockConflictComment(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -194,6 +236,24 @@ func TestFindLockConflictComment(t *testing.T) {
 				"plan succeeded",
 				"This project is currently locked by an unapplied plan from pull #123. To continue, delete the lock from #123 or apply that plan and merge the pull request.",
 			},
+			ownerPullNumber: 123,
+			want:            true,
+		},
+		{
+			name:            "does not match owner pull prefix",
+			comments:        []string{"This project is currently locked by an unapplied plan from pull #1234. To continue, delete the lock from #1234 or apply that plan and merge the pull request."},
+			ownerPullNumber: 123,
+			want:            false,
+		},
+		{
+			name:            "does not match shorter wrong owner",
+			comments:        []string{"This project is currently locked by an unapplied plan from pull #123. To continue, delete the lock from #123 or apply that plan and merge the pull request."},
+			ownerPullNumber: 1234,
+			want:            false,
+		},
+		{
+			name:            "matches exact owner before punctuation",
+			comments:        []string{"This project is currently locked by an unapplied plan from pull #123. To continue, delete the lock from #123 or apply that plan and merge the pull request."},
 			ownerPullNumber: 123,
 			want:            true,
 		},

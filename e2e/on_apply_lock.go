@@ -21,6 +21,7 @@ const (
 	onApplyLockApplyCommand  = "atlantis apply -p " + onApplyLockProjectName
 	onApplyLockPlanCommand   = "atlantis plan"
 	lifecycleCommandMaxPolls = 60
+	lifecycleCleanupTimeout  = 30 * time.Second
 )
 
 type lockPreservationPR struct {
@@ -38,7 +39,10 @@ func (t *E2ETester) runOnApplyLockPreservation(ctx context.Context) (result *E2E
 	result = &E2EResult{testCase: tc.Name}
 	var prs []*lockPreservationPR
 	defer func() {
-		cleanupErr := cleanUpLockPRs(ctx, t, prs...)
+		cleanupCtx, cancel := newLifecycleCleanupContext(ctx)
+		defer cancel()
+
+		cleanupErr := cleanUpLockPRs(cleanupCtx, t, prs...)
 		switch {
 		case err != nil && cleanupErr != nil:
 			err = fmt.Errorf("%w; cleanup failed: %v", err, cleanupErr)
@@ -209,6 +213,14 @@ func cleanUpLockPRs(ctx context.Context, t *E2ETester, prs ...*lockPreservationP
 		}
 	}
 	return cleanupErr
+}
+
+func newLifecycleCleanupContext(parent context.Context) (context.Context, context.CancelFunc) {
+	base := context.Background()
+	if parent != nil {
+		base = context.WithoutCancel(parent)
+	}
+	return context.WithTimeout(base, lifecycleCleanupTimeout)
 }
 
 func cleanUpLockPR(ctx context.Context, t *E2ETester, pr *lockPreservationPR) error {
@@ -459,20 +471,56 @@ func assertLockConflictComment(ctx context.Context, client VCSClient, pullNumber
 }
 
 func findLockConflictComment(comments []string, lockOwnerPullNumber int) (string, bool) {
-	ownerRef := fmt.Sprintf("#%d", lockOwnerPullNumber)
-	lockPhrase := "this project is currently locked by an unapplied plan from pull"
-	deletePhrase := "delete the lock from " + ownerRef
+	lockPhrase := "this project is currently locked by an unapplied plan from pull "
+	deletePhrase := "delete the lock from "
 	applyPhrase := "apply that plan and merge the pull request"
 	for _, comment := range comments {
 		lower := strings.ToLower(comment)
-		if !strings.Contains(lower, lockPhrase) || !strings.Contains(lower, ownerRef) {
+		if !containsExactPullRefAfterPhrase(comment, lockPhrase, lockOwnerPullNumber) {
 			continue
 		}
-		if strings.Contains(lower, deletePhrase) || strings.Contains(lower, applyPhrase) {
+		if containsExactPullRefAfterPhrase(comment, deletePhrase, lockOwnerPullNumber) || strings.Contains(lower, applyPhrase) {
 			return comment, true
 		}
 	}
 	return "", false
+}
+
+func containsExactPullRefAfterPhrase(comment, phrase string, pullNumber int) bool {
+	lower := strings.ToLower(comment)
+	target := strings.ToLower(phrase) + fmt.Sprintf("#%d", pullNumber)
+	idx := 0
+	for {
+		pos := strings.Index(lower[idx:], target)
+		if pos == -1 {
+			return false
+		}
+		end := idx + pos + len(target)
+		if hasPullRefNumericBoundary(comment, end) {
+			return true
+		}
+		idx = end
+	}
+}
+
+func containsExactPullRef(comment string, pullNumber int) bool {
+	ref := fmt.Sprintf("#%d", pullNumber)
+	idx := 0
+	for {
+		pos := strings.Index(comment[idx:], ref)
+		if pos == -1 {
+			return false
+		}
+		end := idx + pos + len(ref)
+		if hasPullRefNumericBoundary(comment, end) {
+			return true
+		}
+		idx = end
+	}
+}
+
+func hasPullRefNumericBoundary(comment string, end int) bool {
+	return end == len(comment) || comment[end] < '0' || comment[end] > '9'
 }
 
 func truncateForLog(value string, maxLen int) string {
