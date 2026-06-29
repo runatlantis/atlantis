@@ -1,0 +1,56 @@
+server/events/apply_command_runner_test.go
+  s_bf2529fc29caf9::t_f0b2f505d0c811 306-329,365-399,442-444,561-595,603,708-759,876-923,925-928,939,941
+  s_bf2529fc29caf9::t_24e63069190838 933-936,960
+  s_bf2529fc29caf9::t_797b80f722c937 494,497,499,513,515
+  s_bf2529fc29caf9::t_90e401bf75a5ba 596-602
+  s_bf2529fc29caf9::t_9001bd1e568b3e 604
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_51592fa6d9e903 31,45,47,49,69,71,73,77,81,85-88,92,171,173,176,178,180,182-183,185
+server/core/boltdb/boltdb.go
+  s_bf2529fc29caf9::t_fc20437ddf7547 427,508-512
+  s_bf2529fc29caf9::t_74f0af74cbb443 513-514
+server/events/vcs/bitbucketserver/client.go
+  s_bf2529fc29caf9::t_b445ef08f7ea97 201,205-212,216,220,223,225-227
+server/events/vcs/bitbucketcloud/client.go
+  s_bf2529fc29caf9::t_31426eeed7fe32 244-251,255,259,262,264-266
+server/events/db_updater_internal_test.go
+  s_bf2529fc29caf9::t_2e6ca463093d51 28,34-89,196-248,250
+  s_bf2529fc29caf9::t_618768468a5bc0 29-33,249
+  s_bf2529fc29caf9::t_8dd20f06cf4c60 251
+server/core/boltdb/boltdb_test.go
+  s_bf2529fc29caf9::t_8938cc04833d67 849-915
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_75d4e6bb23a924 1300,1308-1318,1320-1325
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_2402b86352134c 4841-4881
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_a817e52117312f 97-99,340-345
+  s_bf2529fc29caf9::t_297c4198a59b1a 155,157,162,165-169,260-264,307,309,311,318,320-321,323
+  s_bf2529fc29caf9::t_9f231af6d836b7 346-347
+server/core/redis/redis_test.go
+  s_bf2529fc29caf9::t_9ec8c432ed254a 902-968
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_ed8349df8200f7 2258,2262-2263
+  s_bf2529fc29caf9::t_e2fd646519180c 1060-1127,1286
+server/events/live_pull_head_fetcher.go
+  s_bf2529fc29caf9::t_55773e08440283 16-17,26-27,30,34,38,42,44,47,51,54,57,61,65,67,70,74,78,80,83,85,88,90,92
+server/core/redis/redis.go
+  s_bf2529fc29caf9::t_1187e8a4f75efc 481,561-565
+  s_bf2529fc29caf9::t_64b7fb6ef47d89 566-567
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "287f87d5f5d614ed2872bb436c2870dd11016469",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
