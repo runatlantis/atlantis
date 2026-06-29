@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -842,10 +843,11 @@ func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:        logging.NewNoopLogger(t),
-		Steps:      valid.DefaultApplyStage.Steps,
-		Workspace:  "default",
-		RepoRelDir: ".",
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
 		Pull: models.PullRequest{
 			Num:      1,
 			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
@@ -863,6 +865,94 @@ func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
 	Equals(t, "apply", res.ApplySuccess)
 	Assert(t, validator.called, "expected apply plan validator to run")
 	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, map[string]string{})
+}
+
+func TestProjectCommandRunner_ApplyRevalidatesImmediatelyBeforeApplyStep(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	workingDirLocker := &trackingWorkingDirLocker{}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		RunStepRunner:             &mutatingCustomStepRunner{calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          workingDirLocker,
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &sequencedApplyPlanValidator{t: t, locker: workingDirLocker, calls: &calls},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:  "default",
+		RepoRelDir: ".",
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "run\napply", res.ApplySuccess)
+	Equals(t, []string{"validate", "run", "validate", "apply"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		RunStepRunner:             &mutatingCustomStepRunner{calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator: &sequencedApplyPlanValidator{
+			calls: &calls,
+			errs:  []error{nil, errors.New("final validation failed; rerun plan")},
+		},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:  "default",
+		RepoRelDir: ".",
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected final validation error")
+	Assert(t, strings.Contains(res.Error.Error(), "final validation failed"), "got: %s", res.Error)
+	Equals(t, []string{"validate", "run", "validate"}, calls)
 }
 
 func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *testing.T) {
@@ -883,6 +973,7 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
 		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
 		Steps:       valid.DefaultApplyStage.Steps,
 		Workspace:   "default",
 		RepoRelDir:  ".",
@@ -922,6 +1013,175 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
+func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			return os.Remove(planPath)
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected final missing plan error")
+	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
+	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected policy-check status error")
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected rejected plan file to be deleted")
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAfterBuild(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+			return err
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected policy-check status error")
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	Equals(t, []string{"run"}, calls)
+}
+
 func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -940,6 +1200,7 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
 		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
 		Steps:       valid.DefaultApplyStage.Steps,
 		Workspace:   "default",
 		RepoRelDir:  ".",
@@ -980,6 +1241,72 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 
 	Assert(t, res.Error != nil, "expected stale PullStatus error")
 	Assert(t, strings.Contains(res.Error.Error(), "recorded plan status is from commit"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErroredApply(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "new123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	stalePull := ctx.Pull
+	stalePull.HeadCommit = "old123"
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale PullStatus error")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		{
+			Command:     command.Apply,
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("validation rejected plan"),
+			},
+		},
+	})
+	Ok(t, err)
+	pullStatus, err := db.GetPullStatus(ctx.Pull)
+	Ok(t, err)
+	err = events.ValidatePlansForApply(&command.Context{Log: logging.NewNoopLogger(t), Pull: ctx.Pull, PullStatus: pullStatus}, nil)
+	Assert(t, err != nil, "expected later generic apply to reject errored apply status without plan file")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
@@ -990,6 +1317,10 @@ type trackingWorkingDirLocker struct {
 func (l *trackingWorkingDirLocker) TryLock(string, int, string, string, string, command.Name) (func(), error) {
 	l.locked = true
 	return func() { l.locked = false }, nil
+}
+
+func (l *trackingWorkingDirLocker) HasCommandLock(string, int, command.Name) bool {
+	return l.locked
 }
 
 func (l *trackingWorkingDirLocker) UnlockByPull(string, int) {
@@ -1006,6 +1337,79 @@ func (v *assertLockedApplyPlanValidator) ValidateProjectPlan(command.ProjectCont
 	v.called = true
 	Assert(v.t, v.locker.locked, "expected apply plan validation to run while working dir lock is held")
 	return nil
+}
+
+type sequencedApplyPlanValidator struct {
+	t      *testing.T
+	locker *trackingWorkingDirLocker
+	calls  *[]string
+	errs   []error
+	count  int
+}
+
+func (v *sequencedApplyPlanValidator) ValidateProjectPlan(command.ProjectContext, string) error {
+	if v.calls != nil {
+		*v.calls = append(*v.calls, "validate")
+	}
+	if v.locker != nil {
+		Assert(v.t, v.locker.locked, "expected apply plan validation to run while working dir lock is held")
+	}
+	defer func() { v.count++ }()
+	if v.count < len(v.errs) {
+		return v.errs[v.count]
+	}
+	return nil
+}
+
+type recordingStepRunner struct {
+	name  string
+	calls *[]string
+	err   error
+}
+
+func (r *recordingStepRunner) Run(command.ProjectContext, []string, string, map[string]string) (string, error) {
+	if r.calls != nil {
+		*r.calls = append(*r.calls, r.name)
+	}
+	return r.name, r.err
+}
+
+type mutatingCustomStepRunner struct {
+	calls  *[]string
+	mutate func() error
+}
+
+func (r *mutatingCustomStepRunner) Run(
+	command.ProjectContext,
+	*valid.CommandShell,
+	string,
+	string,
+	map[string]string,
+	bool,
+	[]valid.PostProcessRunOutputOption,
+	[]*regexp.Regexp,
+) (string, error) {
+	if r.calls != nil {
+		*r.calls = append(*r.calls, "run")
+	}
+	if r.mutate != nil {
+		if err := r.mutate(); err != nil {
+			return "", err
+		}
+	}
+	return "run", nil
+}
+
+func erroredPolicyProjectResult(ctx command.ProjectContext) command.ProjectResult {
+	return command.ProjectResult{
+		Command:     command.PolicyCheck,
+		Workspace:   ctx.Workspace,
+		RepoRelDir:  ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			Error: errors.New("policy check errored"),
+		},
+	}
 }
 
 func newTestBoltDB(t *testing.T) *boltdb.BoltDB {

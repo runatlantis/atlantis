@@ -1041,6 +1041,11 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
+			if ctx.CommandName == command.Apply && p.ApplyPlanValidator != nil {
+				if err = p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+					return outputs, err
+				}
+			}
 			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "version":
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)

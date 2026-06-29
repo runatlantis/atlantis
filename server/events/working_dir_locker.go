@@ -25,6 +25,8 @@ type WorkingDirLocker interface {
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
 	TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error)
+	// HasCommandLock reports whether this pull request has an active lock for cmdName.
+	HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool
 	// UnlockByPull unlocks all workspaces for a specific pull request
 	UnlockByPull(repoFullName string, pullNum int)
 }
@@ -56,6 +58,19 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path, projectName)
 	}, nil
+}
+
+func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	prefix := fmt.Sprintf("%s/%d/", repoFullName, pullNum)
+	for key, currentLock := range d.locks {
+		if strings.HasPrefix(key, prefix) && currentLock == cmdName {
+			return true
+		}
+	}
+	return false
 }
 
 // UnlockByPull unlocks all workspaces for a specific pull request

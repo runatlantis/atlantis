@@ -4826,6 +4826,20 @@ func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T)
 	Ok(t, err)
 }
 
+func TestValidatePlansForApply_NoPlansEmptyPullStatusWithActivePlanFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block empty generic apply")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
 func TestValidatePlansForApply_NoPlansCurrentAllNoChangesPasses(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),

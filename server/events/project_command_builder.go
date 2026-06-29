@@ -1244,7 +1244,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	}
 
 	if commentCmd.Name == command.Apply {
-		if err := ValidatePlansForApply(ctx, plans); err != nil {
+		hasActivePlan := false
+		if p.WorkingDirLocker != nil {
+			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+		}
+		if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
 			return nil, err
 		}
 	}
@@ -1275,10 +1279,14 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 // When plans are found, validates each against current-head PullStatus.
 // When no plans are found, fails if no current PullStatus exists or if it is stale.
 func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
+	return ValidatePlansForApplyWithActivePlan(ctx, plans, false)
+}
+
+func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
 	if len(plans) > 0 {
 		return validateFoundPlans(ctx, plans)
 	}
-	return validateNoPlansFound(ctx)
+	return validateNoPlansFound(ctx, hasActivePlan)
 }
 
 func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
@@ -1315,7 +1323,7 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys)
 }
 
-func validateNoPlansFound(ctx *command.Context) error {
+func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 	if ctx.PullStatus == nil {
 		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
@@ -1326,6 +1334,10 @@ func validateNoPlansFound(ctx *command.Context) error {
 			shortSHA(ctx.PullStatus.Pull.HeadCommit),
 			shortSHA(ctx.Pull.HeadCommit),
 		)
+	}
+
+	if len(ctx.PullStatus.Projects) == 0 && hasActivePlan {
+		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
 	}
 
 	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)

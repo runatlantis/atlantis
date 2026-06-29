@@ -491,6 +491,26 @@ func TestRunCommentCommandPlan_NoProjectsWritesCurrentEmptyPullStatus(t *testing
 	Equals(t, 0, len(pullStatus.Projects))
 }
 
+func TestRunCommentCommandPlan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *testing.T) {
+	_ = setup(t)
+	planCommandRunner.SilenceNoProjects = true
+
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	var pull github.PullRequest
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn("", os.ErrNotExist)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected current empty PullStatus")
+	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
+	Equals(t, 0, len(pullStatus.Projects))
+}
+
 func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 	_ = setup(t)
 	planCommandRunner.SilenceNoProjects = true
@@ -533,9 +553,66 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	Equals(t, 0, len(pullStatus.Projects))
 }
 
+func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T) {
+	_ = setup(t)
+
+	tmp := t.TempDir()
+	oldPlanDir := filepath.Join(tmp, "old-project")
+	Ok(t, os.MkdirAll(oldPlanDir, 0700))
+	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
+	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "old-project",
+			Workspace:  events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	Ok(t, err)
+
+	var pull github.PullRequest
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
+		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
+	}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	_, err = os.Stat(oldPlanPath)
+	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
+	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected current empty PullStatus")
+	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
+	Equals(t, 0, len(pullStatus.Projects))
+}
+
 func TestRunCommentCommandPlan_NoProjectsDoesNotUnlockActiveLocks(t *testing.T) {
 	vcsClient := setup(t)
 	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, true)
+
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	var pull github.PullRequest
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+}
+
+func TestRunCommentCommandPlan_NoProjectsNonSilencedDoesNotUnlockByPull(t *testing.T) {
+	vcsClient := setup(t)
+	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, false)
 
 	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
@@ -657,6 +734,33 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusNoOpsSafely(t *testing.T) {
 		Eq[command.Name](command.Apply),
 		Eq(models.ProjectCounts{}),
 	)
+}
+
+func TestRunApply_NoProjectsAfterEmptyPullStatusDoesNotSucceedWhilePlanInFlight(t *testing.T) {
+	vcsClient := setup(t)
+	applyCommandRunner.SilenceNoProjects = true
+
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	Ok(t, err)
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying"))
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("apply")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Apply Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "plan is currently running"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Apply), Eq(models.ProjectCounts{}))
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
@@ -1540,6 +1644,10 @@ func (l failUnlockByPullLocker) UnlockByPull(string, int) ([]models.ProjectLock,
 	return nil, nil
 }
 
+func (l failUnlockByPullLocker) UnlockIfOwnedByPull(models.Project, string, int) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
 func (l failUnlockByPullLocker) GetLock(string) (*models.ProjectLock, error) {
 	return nil, nil
 }
@@ -1904,6 +2012,24 @@ func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
+	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected current empty PullStatus")
+	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
+	Equals(t, 0, len(pullStatus.Projects))
+}
+
+func TestRunAutoplan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *testing.T) {
+	setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn("", os.ErrNotExist)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
