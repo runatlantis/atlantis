@@ -367,6 +367,135 @@ func TestApplyCommandRunner_RefreshesPullStatusAfterApplyLock(t *testing.T) {
 	Assert(t, !ctx.CommandHasErrors, "expected refreshed PullStatus apply to succeed")
 }
 
+func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t *testing.T) {
+	realDB := newTestBoltDB(t)
+	locker := events.NewDefaultWorkingDirLocker()
+	refreshObserved := false
+	database := assertApplyLockDB{
+		Database:     realDB,
+		t:            t,
+		locker:       locker,
+		repoFullName: testdata.GithubRepo.FullName,
+		pullNum:      testdata.Pull.Num,
+		called:       &refreshObserved,
+	}
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, nil)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, refreshObserved, "expected pull status refresh to be observed")
+}
+
+func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringCommandBuild(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Apply), "expected apply lock during command build")
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+}
+
+func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringExecution(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: events.DefaultWorkspace, ProjectName: "projA"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).Then(func([]Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Apply), "expected apply lock during project execution")
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+}
+
+func TestApplyCommandRunner_TargetedApplyHoldsApplyLockDuringCommandBuild(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Apply), "expected targeted apply lock during command build")
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+}
+
+func TestApplyCommandRunner_TargetedApplyHoldsApplyLockDuringExecution(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: events.DefaultWorkspace, ProjectName: "projA"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).Then(func([]Param) ReturnValues {
+		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Apply), "expected targeted apply lock during project execution")
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+}
+
 func TestBuildApplyCommands_UsesFreshPullStatusAfterPlanFinishes(t *testing.T) {
 	database := newTestBoltDB(t)
 	setup(t, func(tc *TestConfig) {
@@ -806,4 +935,19 @@ type failingGetPullStatusDB struct {
 
 func (f failingGetPullStatusDB) GetPullStatus(models.PullRequest) (*models.PullStatus, error) {
 	return nil, f.err
+}
+
+type assertApplyLockDB struct {
+	db.Database
+	t            *testing.T
+	locker       events.WorkingDirLocker
+	repoFullName string
+	pullNum      int
+	called       *bool
+}
+
+func (a assertApplyLockDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	*a.called = true
+	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Apply), "expected apply lock during pull status refresh")
+	return a.Database.GetPullStatus(pull)
 }

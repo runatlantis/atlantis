@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -39,7 +40,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		return err
 	}
 
-	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
+	pullStatus, err := v.pullStatusForApply(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching current plan status: %w", err)
 	}
@@ -53,17 +54,17 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 	if liveHead != "" {
 		if ctx.Pull.HeadCommit != "" && ctx.Pull.HeadCommit != liveHead {
-			return rejectProjectPlan(planPath,
+			return fmt.Errorf(
 				"pull request head changed from %s to %s; run `atlantis plan` before apply",
 				shortSHA(ctx.Pull.HeadCommit),
 				shortSHA(liveHead),
 			)
 		}
 		if pullStatus.Pull.HeadCommit == "" {
-			return rejectProjectPlan(planPath, "recorded plan status has no head commit; run `atlantis plan` before apply")
+			return fmt.Errorf("recorded plan status has no head commit; run `atlantis plan` before apply")
 		}
 		if pullStatus.Pull.HeadCommit != liveHead {
-			return rejectProjectPlan(planPath,
+			return fmt.Errorf(
 				"recorded plan status is from commit %s but live pull request head is %s; run `atlantis plan` before apply",
 				shortSHA(pullStatus.Pull.HeadCommit),
 				shortSHA(liveHead),
@@ -108,7 +109,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	if ctx.ExpectedPlanHash != "" {
-		actualHash, err := hashFile(planPath)
+		actualHash, err := hashFile(absPath, planPath)
 		if err != nil {
 			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
@@ -123,8 +124,25 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	return nil
 }
 
+func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContext) (*models.PullStatus, error) {
+	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		return nil, err
+	}
+	if pullStatus != nil {
+		return pullStatus, nil
+	}
+	if ctx.API && ctx.PullStatus != nil {
+		return ctx.PullStatus, nil
+	}
+	return nil, nil
+}
+
 func (v *DefaultApplyPlanValidator) getLiveHeadCommit(ctx command.ProjectContext) (string, error) {
 	if v.LivePullHeadFetcher == nil {
+		return "", nil
+	}
+	if ctx.API && ctx.Pull.Num <= 0 {
 		return "", nil
 	}
 	liveHead, err := v.LivePullHeadFetcher.GetLiveHeadCommit(ctx)
@@ -153,8 +171,8 @@ func planFilePath(ctx command.ProjectContext, absPath string) string {
 
 func safePlanFilePath(ctx command.ProjectContext, absPath string) (string, error) {
 	planPath := planFilePath(ctx, absPath)
-	if err := utils.EnsureSubPath(absPath, planPath); err != nil {
-		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
+		return "", err
 	}
 	return planPath, nil
 }
@@ -162,14 +180,18 @@ func safePlanFilePath(ctx command.ProjectContext, absPath string) (string, error
 func pendingPlanFilePath(plan PendingPlan) (string, error) {
 	absPath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
 	planPath := filepath.Join(absPath, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
-	if err := utils.EnsureSubPath(absPath, planPath); err != nil {
-		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
+		return "", err
 	}
 	return planPath, nil
 }
 
-func hashFile(path string) (string, error) {
-	file, err := os.Open(path)
+func hashFile(baseDir, path string) (string, error) {
+	relPath, err := containedPlanRelPath(baseDir, path)
+	if err != nil {
+		return "", err
+	}
+	file, err := os.OpenInRoot(filepath.Clean(baseDir), relPath)
 	if err != nil {
 		return "", err
 	}
@@ -180,6 +202,19 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func containedPlanRelPath(baseDir, path string) (string, error) {
+	cleanBase := filepath.Clean(baseDir)
+	cleanPath := filepath.Clean(path)
+	relPath, err := filepath.Rel(cleanBase, cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("checking plan path containment: %w", err)
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) || filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("plan path traversal detected: %w", utils.ErrPathEscapesBase)
+	}
+	return relPath, nil
 }
 
 func rejectProjectPlan(planPath string, format string, args ...any) error {

@@ -983,7 +983,88 @@ func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 	Assert(t, err != nil, "expected live head change error")
 	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	currentPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "new123",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        currentPull.Num,
+			HeadCommit: "old123",
+			BaseRepo:   currentPull.BaseRepo,
+		},
+	}
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: currentPull.HeadCommit}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected stale command head to be rejected")
+	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "current plan", string(contents))
+}
+
+func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyFails(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	currentPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "new123",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	project := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        currentPull.Num,
+			HeadCommit: "old123",
+			BaseRepo:   currentPull.BaseRepo,
+		},
+	}
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(project.RepoRelDir, project.Workspace, project.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: currentPull.HeadCommit}}
+
+	err = validator.ValidateProjectPlan(project, repoDir)
+	Assert(t, err != nil, "expected stale targeted apply to fail")
+
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+	pullStatus, err := db.GetPullStatus(currentPull)
+	Ok(t, err)
+	err = events.ValidatePlansForApply(&command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       currentPull,
+		PullStatus: pullStatus,
+	}, []events.PendingPlan{{
+		RepoDir:     repoDir,
+		RepoRelDir:  project.RepoRelDir,
+		Workspace:   project.Workspace,
+		ProjectName: project.ProjectName,
+	}})
+	Ok(t, err)
 }
 
 func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
@@ -1012,6 +1093,118 @@ func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
 	Assert(t, err != nil, "expected live head fetch failure")
 	Assert(t, strings.Contains(err.Error(), "fetching live pull request head"), "got: %s", err)
 	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_UsesInMemoryPullStatusForAPIApply(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("api plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: ctx.Pull.HeadCommit},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_CommentApplyStillFailsWhenDBPullStatusMissing(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("comment plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected comment apply to require DB pull status")
+	Assert(t, strings.Contains(err.Error(), "no current plan status found"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_DriftApplyUsesInMemoryPullStatusWithoutLiveHeadFetch(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("drift plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{err: errors.New("live head should not be fetched")},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
 	Ok(t, err)
 }
 
@@ -1063,7 +1256,7 @@ func TestApplyPlanValidator_RejectsTraversalPlanPathBeforeHashing(t *testing.T) 
 	Assert(t, strings.Contains(err.Error(), "plan path traversal detected"), "got: %s", err)
 }
 
-func TestApplyPlanValidator_HashesOnlySubpathUnderProjectDir(t *testing.T) {
+func TestApplyPlanValidator_HashesOnlyContainedPlanPath(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
 	planContents := []byte("plan")
@@ -1222,7 +1415,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	Assert(t, res.Error != nil, "expected live head change error")
 	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	Ok(t, err)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 

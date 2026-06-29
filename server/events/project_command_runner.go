@@ -880,7 +880,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		if err != nil {
 			return "", "", err
 		}
-		planHash, err := hashFile(planPath)
+		planHash, err := hashFile(absPath, planPath)
 		if err != nil {
 			return "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
