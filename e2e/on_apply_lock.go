@@ -4,12 +4,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -20,13 +23,6 @@ const (
 	lifecycleCommandMaxPolls = 60
 )
 
-var lockConflictCommentSubstrings = []string{
-	"currently locked",
-	"locked by",
-	"delete the lock",
-	"apply that plan",
-}
-
 type lockPreservationPR struct {
 	label      string
 	cloneDir   string
@@ -35,94 +31,124 @@ type lockPreservationPR struct {
 	pullID     int
 }
 
-func (t *E2ETester) runOnApplyLockPreservation(ctx context.Context) (*E2EResult, error) {
-	tc := t.testCase
-	result := &E2EResult{testCase: tc.Name}
-	timestamp := time.Now().UTC().Format("20060102150405")
+var e2eNonceCounter atomic.Uint64
 
-	pr1, err := t.createOnApplyLockPR(ctx, "pr1", fmt.Sprintf("e2e-lock-pr1-%s", timestamp), tc.MutateFile)
+func (t *E2ETester) runOnApplyLockPreservation(ctx context.Context) (result *E2EResult, err error) {
+	tc := t.testCase
+	result = &E2EResult{testCase: tc.Name}
+	var prs []*lockPreservationPR
+	defer func() {
+		cleanupErr := cleanUpLockPRs(ctx, t, prs...)
+		switch {
+		case err != nil && cleanupErr != nil:
+			err = fmt.Errorf("%w; cleanup failed: %v", err, cleanupErr)
+		case cleanupErr != nil:
+			err = cleanupErr
+		}
+	}()
+
+	err = t.runOnApplyLockPreservationBody(ctx, result, &prs)
+	return result, err
+}
+
+func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *E2EResult, prs *[]*lockPreservationPR) error {
+	tc := t.testCase
+	nonce := e2eRunNonce()
+
+	pr1, err := t.createOnApplyLockPR(ctx, "pr1", fmt.Sprintf("e2e-lock-pr1-%s", nonce), tc.MutateFile)
 	if err != nil {
-		return result, err
+		return err
 	}
+	*prs = append(*prs, pr1)
 	result.pullRequestURL = pr1.url
 	result.branchName = pr1.branchName
-	defer cleanUpLockPR(ctx, t, pr1)
 
 	log.Printf("[%s] PR1 branch %q pull request %s", tc.Name, pr1.branchName, pr1.url)
 	time.Sleep(initialWait)
 
 	state, err := pollAtlantisCommandStatusAfter(ctx, t.vcsClient, pr1.branchName, "plan", tc.Name, CommitStatus{})
 	if err != nil {
-		return result, err
+		return err
 	}
 	result.testResult = state
 	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return result, fmt.Errorf("[%s] PR1 plan expected success but got %q", tc.Name, state)
+		return fmt.Errorf("[%s] PR1 plan expected success but got %q", tc.Name, state)
 	}
 	if err := assertProjectStatuses(ctx, t.vcsClient, pr1.branchName, tc); err != nil {
-		return result, err
+		return err
 	}
 
 	state, err = t.postAtlantisCommandAndWait(ctx, pr1.pullID, pr1.branchName, tc.Name, "apply", onApplyLockApplyCommand)
 	if err != nil {
-		return result, err
+		return err
 	}
 	result.testResult = state
 	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return result, fmt.Errorf("[%s] PR1 apply expected success but got %q", tc.Name, state)
+		return fmt.Errorf("[%s] PR1 apply expected success but got %q", tc.Name, state)
 	}
 
 	planBaseline, err := t.vcsClient.GetCommitStatus(ctx, pr1.branchName, atlantisCommandStatusContext("plan"))
 	if err != nil {
-		return result, fmt.Errorf("[%s] getting PR1 plan status before cleanup trigger: %w", tc.Name, err)
+		return fmt.Errorf("[%s] getting PR1 plan status before cleanup trigger: %w", tc.Name, err)
+	}
+	projectPlanBaseline, err := t.vcsClient.GetCommitStatus(ctx, pr1.branchName, onApplyLockProjectPlanStatusContext())
+	if err != nil {
+		return fmt.Errorf("[%s] getting PR1 project plan status before cleanup trigger: %w", tc.Name, err)
 	}
 	log.Printf("[%s] posting PR1 cleanup-trigger plan command", tc.Name)
 	if err := t.vcsClient.PostPRComment(ctx, pr1.pullID, onApplyLockPlanCommand); err != nil {
-		return result, fmt.Errorf("[%s] posting PR1 plan command: %w", tc.Name, err)
+		return fmt.Errorf("[%s] posting PR1 plan command: %w", tc.Name, err)
 	}
 	state, err = pollAtlantisCommandStatusAfter(ctx, t.vcsClient, pr1.branchName, "plan", tc.Name, planBaseline)
 	if err != nil {
-		return result, err
+		return err
 	}
 	result.testResult = state
 	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return result, fmt.Errorf("[%s] PR1 cleanup-trigger plan expected success but got %q", tc.Name, state)
+		return fmt.Errorf("[%s] PR1 cleanup-trigger plan expected success but got %q", tc.Name, state)
+	}
+	projectPlanState, err := pollCommitStatusAfter(ctx, t.vcsClient, pr1.branchName, onApplyLockProjectPlanStatusContext(), tc.Name, projectPlanBaseline)
+	if err != nil {
+		return err
+	}
+	if !t.vcsClient.DidAtlantisSucceed(projectPlanState) {
+		return fmt.Errorf("[%s] PR1 cleanup-trigger project plan for %s expected success but got %q", tc.Name, onApplyLockProjectName, projectPlanState)
 	}
 
-	pr2, err := t.createOnApplyLockPR(ctx, "pr2", fmt.Sprintf("e2e-lock-pr2-%s", timestamp), "e2e_pr2_trigger.tf")
+	pr2, err := t.createOnApplyLockPR(ctx, "pr2", fmt.Sprintf("e2e-lock-pr2-%s", nonce), "e2e_pr2_trigger.tf")
 	if err != nil {
-		return result, err
+		return err
 	}
-	defer cleanUpLockPR(ctx, t, pr2)
+	*prs = append(*prs, pr2)
 	log.Printf("[%s] PR2 branch %q pull request %s", tc.Name, pr2.branchName, pr2.url)
 	time.Sleep(initialWait)
 
 	state, err = pollAtlantisCommandStatusAfter(ctx, t.vcsClient, pr2.branchName, "plan", tc.Name, CommitStatus{})
 	if err != nil {
-		return result, err
+		return err
 	}
 	result.testResult = state
 	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return result, fmt.Errorf("[%s] PR2 plan expected success but got %q", tc.Name, state)
+		return fmt.Errorf("[%s] PR2 plan expected success but got %q", tc.Name, state)
 	}
 	if err := assertProjectStatuses(ctx, t.vcsClient, pr2.branchName, tc); err != nil {
-		return result, err
+		return err
 	}
 
 	state, err = t.postAtlantisCommandAndWait(ctx, pr2.pullID, pr2.branchName, tc.Name, "apply", onApplyLockApplyCommand)
 	if err != nil {
-		return result, err
+		return err
 	}
 	result.testResult = state
 	if !t.vcsClient.DidAtlantisFail(state) {
-		return result, fmt.Errorf("[%s] PR2 apply expected lock-blocked failure but got %q; PR1=%s PR2=%s", tc.Name, state, pr1.url, pr2.url)
+		return fmt.Errorf("[%s] PR2 apply expected lock-blocked failure but got %q; PR1=%s PR2=%s", tc.Name, state, pr1.url, pr2.url)
 	}
-	if err := assertLockConflictComment(ctx, t.vcsClient, pr2.pullID, tc.Name); err != nil {
-		return result, err
+	if err := assertLockConflictComment(ctx, t.vcsClient, pr2.pullID, tc.Name, pr1.pullID); err != nil {
+		return err
 	}
 
 	result.testResult = "success"
-	return result, nil
+	return nil
 }
 
 func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, mutateFile string) (*lockPreservationPR, error) {
@@ -161,6 +187,9 @@ func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, 
 	title := fmt.Sprintf("[E2E] %s %s", tc.Name, label)
 	url, pullID, err := t.vcsClient.CreatePullRequest(ctx, title, branchName)
 	if err != nil {
+		if deleteErr := deleteRemoteBranch(cloneDir, branchName); deleteErr != nil {
+			return nil, fmt.Errorf("creating pull request after pushing branch %q: %w; additionally failed to delete pushed branch: %v", branchName, err, deleteErr)
+		}
 		return nil, err
 	}
 	return &lockPreservationPR{
@@ -172,13 +201,35 @@ func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, 
 	}, nil
 }
 
-func cleanUpLockPR(ctx context.Context, t *E2ETester, pr *lockPreservationPR) {
+func cleanUpLockPRs(ctx context.Context, t *E2ETester, prs ...*lockPreservationPR) error {
+	var cleanupErr error
+	for _, pr := range slices.Backward(prs) {
+		if err := cleanUpLockPR(ctx, t, pr); err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+		}
+	}
+	return cleanupErr
+}
+
+func cleanUpLockPR(ctx context.Context, t *E2ETester, pr *lockPreservationPR) error {
 	if pr == nil {
-		return
+		return nil
 	}
-	if cleanErr := cleanUp(ctx, t, pr.pullID, pr.branchName); cleanErr != nil {
-		log.Printf("[%s] cleanup failed for %s branch %q: %v", t.testCase.Name, pr.label, pr.branchName, cleanErr)
+	var cleanupErr error
+	if err := t.vcsClient.ClosePullRequest(ctx, pr.pullID); err != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("closing pull request %d: %w", pr.pullID, err))
+	} else {
+		log.Printf("closed pull request %d", pr.pullID)
 	}
+	if err := t.vcsClient.DeleteBranch(ctx, pr.branchName); err != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("deleting branch %s: %w", pr.branchName, err))
+	} else {
+		log.Printf("deleted branch %s", pr.branchName)
+	}
+	if cleanupErr != nil {
+		return fmt.Errorf("[%s] cleanup failed for %s pull %d branch %q: %w", t.testCase.Name, pr.label, pr.pullID, pr.branchName, cleanupErr)
+	}
+	return nil
 }
 
 func writeFixtureMutation(cloneDir, dir, mutateFile, content string) error {
@@ -206,6 +257,26 @@ func runGit(dir string, args ...string) error {
 	return nil
 }
 
+func deleteRemoteBranch(cloneDir, branchName string) error {
+	return runGit(cloneDir, "push", "origin", "--delete", branchName)
+}
+
+func e2eRunNonce() string {
+	now := time.Now().UTC().UnixNano()
+	counter := e2eNonceCounter.Add(1)
+	if runID := os.Getenv("GITHUB_RUN_ID"); runID != "" {
+		if attempt := os.Getenv("GITHUB_RUN_ATTEMPT"); attempt != "" {
+			return fmt.Sprintf("%s-%s-%d-%d", runID, attempt, now, counter)
+		}
+		return fmt.Sprintf("%s-%d-%d", runID, now, counter)
+	}
+	return fmt.Sprintf("%d-%d-%d", now, os.Getpid(), counter)
+}
+
+func onApplyLockProjectPlanStatusContext() string {
+	return projectStatusPrefix + onApplyLockProjectName
+}
+
 func (t *E2ETester) postAtlantisCommandAndWait(ctx context.Context, pullID int, branchName, caseName, statusCommand, body string) (string, error) {
 	statusContext := atlantisCommandStatusContext(statusCommand)
 	baseline, err := t.vcsClient.GetCommitStatus(ctx, branchName, statusContext)
@@ -221,6 +292,10 @@ func (t *E2ETester) postAtlantisCommandAndWait(ctx context.Context, pullID int, 
 
 func pollAtlantisCommandStatusAfter(ctx context.Context, client VCSClient, branchName, command, caseName string, baseline CommitStatus) (string, error) {
 	statusContext := atlantisCommandStatusContext(command)
+	return pollCommitStatusAfter(ctx, client, branchName, statusContext, caseName, baseline)
+}
+
+func pollCommitStatusAfter(ctx context.Context, client VCSClient, branchName, statusContext, caseName string, baseline CommitStatus) (string, error) {
 	state := "not started"
 	var statusErr error
 	for range lifecycleCommandMaxPolls {
@@ -364,32 +439,37 @@ func isTopLevelYAMLSection(line string) bool {
 	return line != "" && !strings.HasPrefix(line, " ") && strings.HasSuffix(strings.TrimSpace(line), ":")
 }
 
-func assertLockConflictComment(ctx context.Context, client VCSClient, pullNumber int, caseName string) error {
+func assertLockConflictComment(ctx context.Context, client VCSClient, pullNumber int, caseName string, lockOwnerPullNumber int) error {
 	var comments []string
 	var commentsErr error
 	for range lifecycleCommandMaxPolls {
 		comments, commentsErr = client.GetPRComments(ctx, pullNumber)
 		if commentsErr != nil {
 			log.Printf("[%s] error polling PR comments for lock conflict: %v", caseName, commentsErr)
-		} else if comment, ok := findLockConflictComment(comments); ok {
+		} else if comment, ok := findLockConflictComment(comments, lockOwnerPullNumber); ok {
 			log.Printf("[%s] found expected lock conflict comment: %q", caseName, truncateForLog(comment, 160))
 			return nil
 		}
 		time.Sleep(pollInterval)
 	}
 	if commentsErr != nil {
-		return fmt.Errorf("[%s] expected lock conflict comment but comment polling failed: %w", caseName, commentsErr)
+		return fmt.Errorf("[%s] expected lock conflict comment for lock owner pull #%d on pull #%d but comment polling failed: %w", caseName, lockOwnerPullNumber, pullNumber, commentsErr)
 	}
-	return fmt.Errorf("[%s] expected lock conflict comment containing one of %v not found in %d comments:\n%s", caseName, lockConflictCommentSubstrings, len(comments), strings.Join(comments, "\n---\n"))
+	return fmt.Errorf("[%s] expected repo-lock conflict comment for lock owner pull #%d on pull #%d not found in %d comments:\n%s", caseName, lockOwnerPullNumber, pullNumber, len(comments), strings.Join(comments, "\n---\n"))
 }
 
-func findLockConflictComment(comments []string) (string, bool) {
+func findLockConflictComment(comments []string, lockOwnerPullNumber int) (string, bool) {
+	ownerRef := fmt.Sprintf("#%d", lockOwnerPullNumber)
+	lockPhrase := "this project is currently locked by an unapplied plan from pull"
+	deletePhrase := "delete the lock from " + ownerRef
+	applyPhrase := "apply that plan and merge the pull request"
 	for _, comment := range comments {
 		lower := strings.ToLower(comment)
-		for _, candidate := range lockConflictCommentSubstrings {
-			if strings.Contains(lower, candidate) {
-				return comment, true
-			}
+		if !strings.Contains(lower, lockPhrase) || !strings.Contains(lower, ownerRef) {
+			continue
+		}
+		if strings.Contains(lower, deletePhrase) || strings.Contains(lower, applyPhrase) {
+			return comment, true
 		}
 	}
 	return "", false
