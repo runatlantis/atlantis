@@ -306,6 +306,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer database.Close()
 	// Seed the DB with a successful plan for that project (that is later discarded).
 	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
@@ -362,6 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer database.Close()
 	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
@@ -389,6 +391,8 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer database.Close()
+
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
