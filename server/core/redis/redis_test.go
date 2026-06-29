@@ -502,6 +502,55 @@ func TestUnlockingMultiple(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
+func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should ignore missing locks")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+}
+
+func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Assert(t, existing != nil, "expected lock to remain")
+	Equals(t, pullNum, existing.Pull.Num)
+}
+
+func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Assert(t, deleted != nil, "expected deleted lock")
+	Equals(t, lock.Project, deleted.Project)
+	Equals(t, lock.Workspace, deleted.Workspace)
+	Equals(t, lock.Pull, deleted.Pull)
+	Equals(t, lock.User, deleted.User)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), existing)
+}
+
 func TestUnlockByPullNone(t *testing.T) {
 	t.Log("UnlockByPull should be successful when there are no locks")
 	s := miniredis.RunT(t)

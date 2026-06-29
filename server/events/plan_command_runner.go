@@ -4,6 +4,7 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -14,7 +15,7 @@ import (
 // This ensures the same format is used for both locking and unlocking operations.
 func GenerateLockID(projCtx command.ProjectContext) string {
 	// Use models.NewProject to ensure consistent path cleaning
-	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, "")
+	project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
 	return models.GenerateLockKey(project, projCtx.Workspace)
 }
 
@@ -148,21 +149,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
-	p.deletePlans(ctx)
-	_, err = p.lockingLocker.UnlockByPull(baseRepo.FullName, pull.Num)
-	if err != nil {
-		ctx.Log.Err("deleting locks: %s", err)
-	}
+	p.deletePlansAndPlanLocks(ctx, projectCmds)
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlans(ctx)
-		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
-		if err != nil {
-			ctx.Log.Err("deleting locks: %s", err)
-		}
+		p.deletePlansAndPlanLocks(ctx, projectCmds)
 		result.PlansDeleted = true
 	}
 
@@ -276,11 +269,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	// discard previous plans that might not be relevant anymore
 	if !cmd.IsForSpecificProject() {
 		ctx.Log.Debug("deleting previous plans and locks")
-		p.deletePlans(ctx)
-		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
-		if err != nil {
-			ctx.Log.Err("deleting locks: %s", err)
-		}
+		p.deletePlansAndPlanLocks(ctx, projectCmds)
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
@@ -288,11 +277,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlans(ctx)
-		_, err := p.lockingLocker.UnlockByPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)
-		if err != nil {
-			ctx.Log.Err("deleting locks: %s", err)
-		}
+		p.deletePlansAndPlanLocks(ctx, projectCmds)
 		result.PlansDeleted = true
 	}
 
@@ -412,6 +397,35 @@ func (p *PlanCommandRunner) deletePlans(ctx *command.Context) {
 	}
 	if err := p.pendingPlanFinder.DeletePlans(pullDir); err != nil {
 		ctx.Log.Err("deleting pending plans: %s", err)
+	}
+}
+
+func (p *PlanCommandRunner) deletePlansAndPlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) {
+	p.deletePlans(ctx)
+	p.deletePlanLocks(ctx, projectCmds)
+}
+
+func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) {
+	unlocked := make(map[string]bool)
+	for _, projCtx := range projectCmds {
+		if projCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
+			continue
+		}
+
+		lockKey := GenerateLockID(projCtx)
+		if unlocked[lockKey] {
+			continue
+		}
+		unlocked[lockKey] = true
+
+		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
+		p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey)
+	}
+}
+
+func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, project models.Project, workspace string, lockKey string) {
+	if _, err := p.lockingLocker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
+		ctx.Log.Err("deleting lock %q for pull %d: %s", lockKey, ctx.Pull.Num, err)
 	}
 }
 

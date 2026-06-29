@@ -123,8 +123,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 		},
 		nil,
 	)
-	// Unlock will be called once when UnlockFn is invoked
-	mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+	mockLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
 	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
@@ -163,13 +162,48 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 		},
 		nil,
 	)
-	// Unlock will be called once when UnlockFn is invoked
-	mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+	mockLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
 	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
 
 	// UnlockFn should work.
+	err = res.UnlockFn()
+	Ok(t, err)
+}
+
+func TestDefaultProjectLocker_TryLockRepoLockingDisabledUnlockUsesNoOpLocker(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	var githubClient *github.Client
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker(ctrl)
+	mockNoOpLocker := mocks.NewMockLocker(ctrl)
+	locker := events.DefaultProjectLocker{
+		Locker:         mockLocker,
+		NoOpLocker:     mockNoOpLocker,
+		VCSClient:      mockClient,
+		ExecutableName: "atlantis",
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{Num: 2}
+	expUser := models.User{}
+	lockKey := "key"
+
+	mockNoOpLocker.EXPECT().TryLock(expProject, expWorkspace, expPull, expUser).Return(
+		locking.TryLockResponse{
+			LockAcquired: true,
+			CurrLock:     models.ProjectLock{},
+			LockKey:      lockKey,
+		},
+		nil,
+	)
+	mockNoOpLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
+
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
+	Ok(t, err)
+	Equals(t, true, res.LockAcquired)
+
 	err = res.UnlockFn()
 	Ok(t, err)
 }
