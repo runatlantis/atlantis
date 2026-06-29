@@ -38,6 +38,17 @@ const (
 )
 
 func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
+	switch t.testCase.Scenario {
+	case ScenarioPlanOnly:
+		return t.runPlanOnly(ctx)
+	case ScenarioOnApplyLockPreservation:
+		return t.runOnApplyLockPreservation(ctx)
+	default:
+		return nil, fmt.Errorf("unknown E2E scenario %d", t.testCase.Scenario)
+	}
+}
+
+func (t *E2ETester) runPlanOnly(ctx context.Context) (*E2EResult, error) {
 	tc := t.testCase
 	cloneDir := fmt.Sprintf("%s/%s-test", t.cloneDirRoot, tc.Name)
 	branchName := fmt.Sprintf("e2e-%s-%s", tc.Name, time.Now().Format("20060102150405"))

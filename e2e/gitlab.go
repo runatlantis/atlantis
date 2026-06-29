@@ -110,6 +110,16 @@ func (g GitlabClient) CreatePullRequest(ctx context.Context, title, branchName s
 	return mr.WebURL, mr.IID, nil
 }
 
+func (g GitlabClient) PostPRComment(ctx context.Context, pullNumber int, body string) error {
+	_, _, err := g.client.Notes.CreateMergeRequestNote(g.projectId, pullNumber, &gitlab.CreateMergeRequestNoteOptions{
+		Body: gitlab.Ptr(body),
+	})
+	if err != nil {
+		return fmt.Errorf("creating MR note: %w", err)
+	}
+	return nil
+}
+
 // GetAtlantisStatus polls pipeline status for the merge request.
 // Selects the newest pipeline by highest ID to avoid stale results.
 func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string) (string, error) {
@@ -135,6 +145,14 @@ func (g GitlabClient) GetAtlantisStatus(ctx context.Context, branchName string) 
 	}
 
 	return pipeline.Status, nil
+}
+
+func (g GitlabClient) GetAtlantisCommandStatus(ctx context.Context, branchName string, command string) (string, error) {
+	return "", fmt.Errorf("atlantis command status %q is not supported for GitLab E2E", command)
+}
+
+func (g GitlabClient) GetCommitStatus(ctx context.Context, branchName, statusContext string) (CommitStatus, error) {
+	return CommitStatus{}, fmt.Errorf("commit status context %q is not supported for GitLab E2E", statusContext)
 }
 
 // GetProjectStatuses is not supported on GitLab.
