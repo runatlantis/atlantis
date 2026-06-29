@@ -319,6 +319,10 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	if cmd.FailedPlansOnly {
+		ctx.Log.Debug("Building plan command for failed projects")
+		return p.buildFailedProjectPlanCommands(ctx, cmd)
+	}
 	if cmd.DiscoverAllProjects {
 		ctx.Log.Debug("Building plan command for all configured and auto-discovered projects")
 		return p.buildAllProjectsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
@@ -330,6 +334,52 @@ func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
 		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
 	return p.buildProjectPlanCommand(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) buildFailedProjectPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	failedProjects := ctx.ErroredPlanProjects()
+	if len(failedProjects) == 0 {
+		ctx.Log.Info("no failed plans found")
+		return []command.ProjectContext{}, nil
+	}
+
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name)
+	if err != nil {
+		return nil, err
+	}
+	defer unlockFn()
+
+	defaultRepoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return nil, err
+	}
+
+	var cmds []command.ProjectContext
+	for _, project := range failedProjects {
+		projectCmds, err := p.buildProjectCommandCtx(
+			ctx,
+			command.Plan,
+			cmd.SubName,
+			project.ProjectName,
+			cmd.Flags,
+			defaultRepoDir,
+			project.RepoRelDir,
+			project.Workspace,
+			false,
+			false,
+			cmd.Verbose,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("building command for failed plan at dir %q workspace %q: %w", project.RepoRelDir, project.Workspace, err)
+		}
+		cmds = append(cmds, projectCmds...)
+	}
+
+	sort.Slice(cmds, func(i, j int) bool {
+		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
+	})
+
+	return cmds, nil
 }
 
 // See ProjectCommandBuilder.BuildApplyCommands.

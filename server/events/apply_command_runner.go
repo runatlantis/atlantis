@@ -195,6 +195,18 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	// Only a generic apply is blocked: a targeted apply of a project that
+	// planned successfully is still allowed, since applying it may be what
+	// unblocks the projects that failed.
+	if failedProjects := ctx.ErroredPlanProjects(); len(failedProjects) > 0 && !cmd.IsForSpecificProject() {
+		ctx.Log.Info("blocking apply of all projects because %d plan(s) failed", len(failedProjects))
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Failure: failedPlansApplyBlockFailure(failedProjects)})
+		return
+	}
+
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")

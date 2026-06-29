@@ -12,7 +12,7 @@
 {{ end -}}
 {{ end -}}
 {{ if ne .DisableApplyAll true -}}
-{{ if and (gt (len .Results) 0) (not .PlansDeleted) -}}
+{{ if gt (len .Results) 0 -}}
 * :heavy_check_mark: To **approve** all unapplied plans from this {{ .VcsRequestType }}, comment:
   ```shell
   {{ .ExecutableName }} approve_policies

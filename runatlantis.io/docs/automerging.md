@@ -59,7 +59,7 @@ This is currently only implemented for the GitHub VCS.
 ### All Plans Must Succeed
 
 When automerge is enabled, **all plans** in a pull request **must succeed** before
-**any** plans can be applied.
+the pull request is merged, and before `atlantis apply` will apply everything.
 
 For example, imagine this scenario:
 
@@ -67,17 +67,32 @@ For example, imagine this scenario:
    and `dir2/`.
 1. The plan for `dir2/` fails because my Terraform syntax is wrong.
 
-In this scenario, I can't run
+Atlantis keeps the successful plan for `dir1/`, but blocks
+
+```shell
+atlantis apply
+```
+
+while `dir2/` is still failed, because **all** plans must succeed before **all**
+plans can be applied.
+
+I can still apply an individual project that planned successfully:
 
 ```shell
 atlantis apply -d dir1
 ```
 
-Even though that plan succeeded, because **all** plans must succeed for **any** plans
-to be saved.
+This is allowed because applying `dir1/` may be exactly what makes `dir2/` plan
+successfully, for example when `dir2/` depends on a resource that `dir1/` creates.
 
 Once I fix the issue in `dir2`, I can push a new commit which will trigger an
-autoplan. Then I will be able to apply both plans.
+autoplan, or I can re-run only failed plans:
+
+```shell
+atlantis plan --failed
+```
+
+Then I will be able to apply both plans.
 
 ### All Plans must be applied
 
