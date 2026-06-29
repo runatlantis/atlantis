@@ -1,0 +1,55 @@
+server/events/apply_command_runner_test.go
+  s_bf2529fc29caf9::t_db6fea65d46ae4 990-1024
+  s_bf2529fc29caf9::t_9ce3fe55883757 951-989,1025-1053,1123-1180
+  s_bf2529fc29caf9::t_863ee439252190 761-798
+  s_bf2529fc29caf9::t_2e76796cbf0d07 23
+  s_bf2529fc29caf9::t_b540ffe15aa9b4 1181
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_1f0d4b97d254b5 237-258,308-325
+  s_bf2529fc29caf9::t_f54fbf3f83e050 326-327
+server/core/boltdb/boltdb_test.go
+  s_bf2529fc29caf9::t_4df282b0c4ee50 916-968,970
+  s_bf2529fc29caf9::t_8b7c96383759e4 969,971-975
+server/core/redis/redis.go
+  s_bf2529fc29caf9::t_b82a3a8c161184 514,569-572
+  s_bf2529fc29caf9::t_cdad1f39fa3c6f 573-574
+server/events/db_updater_internal_test.go
+  s_bf2529fc29caf9::t_b062d246147966 8
+  s_bf2529fc29caf9::t_18f5c3932c00f2 253-309
+server/events/vcs/bitbucketserver/client_test.go
+  s_bf2529fc29caf9::t_a467a4ec1559cd 270-316
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_8b56f4cb18aa8e 2218-2300
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_3bf6cf7c658a8a 1140-1177
+  s_bf2529fc29caf9::t_f4708d7f2a7c14 1094,1125-1129
+server/events/vcs/bitbucketcloud/client_test.go
+  s_bf2529fc29caf9::t_6157b106b40147 233,243-278
+  s_bf2529fc29caf9::t_cdef2318131bbb 234-242
+server/core/redis/redis_test.go
+  s_bf2529fc29caf9::t_d37961fe6edb59 969-1024
+  s_bf2529fc29caf9::t_19c292a3e5d5b4 1025-1028
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_f709457c9df126 49,92,146-160,164,166-167
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_4bd467897f5fd3 1524-1528
+  s_bf2529fc29caf9::t_a456189d20f575 1529
+server/core/boltdb/boltdb.go
+  s_bf2529fc29caf9::t_156db3bb5636a7 460,516-521
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "444236bf5ec82b435a167e9ef765737d00bf50dc",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
