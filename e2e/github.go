@@ -191,21 +191,53 @@ func (g GithubClient) CreatePullRequest(ctx context.Context, title, branchName s
 	return pull.GetHTMLURL(), pull.GetNumber(), nil
 }
 
+// PostPRComment posts an issue comment on the pull request.
+func (g GithubClient) PostPRComment(ctx context.Context, pullNumber int, body string) error {
+	_, _, err := g.client.Issues.CreateComment(ctx, g.ownerName, g.repoName, pullNumber, &github.IssueComment{
+		Body: github.Ptr(body),
+	})
+	if err != nil {
+		return fmt.Errorf("creating PR comment: %w", err)
+	}
+	return nil
+}
+
 // GetAtlantisStatus polls the aggregate "atlantis/plan" commit status.
 // Used only for the polling loop to detect terminal state.
 func (g GithubClient) GetAtlantisStatus(ctx context.Context, branchName string) (string, error) {
-	combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
+	return g.GetAtlantisCommandStatus(ctx, branchName, "plan")
+}
+
+func (g GithubClient) GetAtlantisCommandStatus(ctx context.Context, branchName string, command string) (string, error) {
+	status, err := g.GetCommitStatus(ctx, branchName, atlantisCommandStatusContext(command))
 	if err != nil {
 		return "", err
 	}
+	return status.State, nil
+}
 
+func (g GithubClient) GetCommitStatus(ctx context.Context, branchName, statusContext string) (CommitStatus, error) {
+	combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
+	if err != nil {
+		return CommitStatus{}, err
+	}
+
+	var result CommitStatus
 	for _, status := range combinedStatus.Statuses {
-		if status.GetContext() == "atlantis/plan" {
-			return status.GetState(), nil
+		if status.GetContext() != statusContext {
+			continue
+		}
+		candidate := CommitStatus{
+			State:     status.GetState(),
+			ID:        status.GetID(),
+			UpdatedAt: status.GetUpdatedAt().Time,
+		}
+		if result.ID == 0 || candidate.UpdatedAt.After(result.UpdatedAt) || (candidate.UpdatedAt.Equal(result.UpdatedAt) && candidate.ID > result.ID) {
+			result = candidate
 		}
 	}
 
-	return "", nil
+	return result, nil
 }
 
 // GetProjectStatuses returns all per-project Atlantis plan status contexts

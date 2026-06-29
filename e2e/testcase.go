@@ -20,6 +20,14 @@ const (
 	CaseDisabled                   // Never run, documented for future
 )
 
+// Scenario controls the runner path for complex lifecycle tests.
+type Scenario int
+
+const (
+	ScenarioPlanOnly Scenario = iota
+	ScenarioOnApplyLockPreservation
+)
+
 // TestCase defines a single E2E fixture exercise.
 type TestCase struct {
 	// Name identifies the test case in logs and results.
@@ -60,6 +68,9 @@ type TestCase struct {
 	// Reserved; apply execution is not yet implemented in the harness.
 	ApplyCommand string
 
+	// Scenario selects a specialized runner path. Zero keeps the default plan-only behavior.
+	Scenario Scenario
+
 	// VCS controls which providers run this case.
 	VCS VCSProvider
 
@@ -81,6 +92,10 @@ const defaultMutateContent = `resource "null_resource" "e2e" {
 // projectStatusPrefix is the prefix for per-project Atlantis statuses.
 // The aggregate status is "atlantis/plan" (no colon/space).
 const projectStatusPrefix = "atlantis/plan: "
+
+func atlantisCommandStatusContext(command string) string {
+	return "atlantis/" + command
+}
 
 // testCases is the fixture test matrix.
 // Cases with Status=CaseActive run in every E2E invocation.
@@ -246,5 +261,15 @@ var testCases = []TestCase{
 		MutateFile: "e2e_trigger.tf",
 		Status:     CaseOptIn,
 		SkipReason: "Validates explicit-over-autodiscovery precedence. Enable with E2E_OPT_IN=1.",
+	},
+	{
+		Name:                   "locking-on-apply-preservation",
+		Dir:                    "locking/on-apply-lock-preservation",
+		MutateFile:             "e2e_pr1_trigger.tf",
+		ExpectedStatusContexts: []string{"atlantis/plan: locking-on-apply-preservation"},
+		VCS:                    VCSGitHub,
+		Status:                 CaseOptIn,
+		SkipReason:             "Exercises apply plus two-PR repo-lock lifecycle; enable with E2E_OPT_IN=1.",
+		Scenario:               ScenarioOnApplyLockPreservation,
 	},
 }
