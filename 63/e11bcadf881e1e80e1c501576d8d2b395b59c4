@@ -1,0 +1,42 @@
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_d7b9f85c8cfea9 1300-1312
+server/controllers/events/events_controller_e2e_test.go
+  s_bf2529fc29caf9::t_588ab7c8a5589a 1640
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_0bffe2475ab29b 34,54,74,147-155,264-280
+  s_bf2529fc29caf9::t_e3e78fdeb79f09 156
+  s_bf2529fc29caf9::t_bd75b53f0620b7 281-283
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_68437df7454682 84,221
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_c28afe9f3291ca 228-240
+  s_bf2529fc29caf9::t_574ceb881a35c9 66-72,128-130
+server/server.go
+  s_bf2529fc29caf9::t_e590d83c2e4eec 865
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_67f57eb431d22b 963-964,973,981,986,994-995,998,1009,1031-1032,1035,1046
+  s_bf2529fc29caf9::t_22463dc44f60fe 1144-1317
+  s_bf2529fc29caf9::t_16f078abe95152 1562-1563,1571,1583,1598
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_35ff8d7713fd0a 4976-4997
+server/events/apply_command_runner_test.go
+  s_bf2529fc29caf9::t_f39d04b91b10e0 370-437
+server/events/vcs/mocks/mock_client.go
+  s_bf2529fc29caf9::t_5c7d6d93743d47 59-77,440-480
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "63e11bcadf881e1e80e1c501576d8d2b395b59c4",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
