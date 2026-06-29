@@ -20,6 +20,10 @@ server/events/plan_command_runner.go
   s_bf2529fc29caf9::t_2dee8e15a971ec 8,12,16,474-478
   s_bf2529fc29caf9::t_bc72f17d3aa146 136-139,165-170,177-178,244-247,299-304,313-314,362-364,367-375,377
   s_bf2529fc29caf9::t_917b46f7d664e0 450,453,455-473,480
+  s_bf2529fc29caf9::t_7157606eb15863 479
+  s_bf2529fc29caf9::t_6ba74cff0ad0fa 164,176
+  s_bf2529fc29caf9::t_9b1cc8ec5c9ec8 298,312
+  s_bf2529fc29caf9::t_16a416efa67cbd 483-486,488
 server/events/project_command_runner.go
   s_bf2529fc29caf9::t_c255da00c5cdb8 308,872-876
   s_bf2529fc29caf9::t_ba0f7d81b0a5d6 877
