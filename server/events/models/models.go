@@ -816,6 +816,17 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ErroredPlanProjects returns the projects whose latest plan errored.
+func (p PullStatus) ErroredPlanProjects() []ProjectStatus {
+	var errored []ProjectStatus
+	for _, project := range p.Projects {
+		if project.Status == ErroredPlanStatus {
+			errored = append(errored, project)
+		}
+	}
+	return errored
+}
+
 // ProjectCounts holds the success/failure counts for a set of project operations.
 // For command.Apply: Errored counts projects with apply errors. NoChanges is a
 // subset of Success (projects that were already up to date count as successful).

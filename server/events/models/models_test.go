@@ -1292,6 +1292,35 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
 }
 
+func TestPullStatus_ErroredPlanProjects(t *testing.T) {
+	ps := models.PullStatus{
+		Projects: []models.ProjectStatus{
+			{
+				RepoRelDir: "planned",
+				Status:     models.PlannedPlanStatus,
+			},
+			{
+				RepoRelDir: "failed-a",
+				Status:     models.ErroredPlanStatus,
+			},
+			{
+				RepoRelDir: "failed-b",
+				Status:     models.ErroredPlanStatus,
+			},
+			{
+				RepoRelDir: "applied",
+				Status:     models.AppliedPlanStatus,
+			},
+		},
+	}
+
+	errored := ps.ErroredPlanProjects()
+
+	Equals(t, 2, len(errored))
+	Equals(t, "failed-a", errored[0].RepoRelDir)
+	Equals(t, "failed-b", errored[1].RepoRelDir)
+}
+
 func TestPlanSuccessStats(t *testing.T) {
 	tests := []struct {
 		name   string

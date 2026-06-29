@@ -30,6 +30,8 @@ const (
 	dirFlagShort                 = "d"
 	projectFlagLong              = "project"
 	projectFlagShort             = "p"
+	failedFlagLong               = "failed"
+	failedFlagShort              = ""
 	policySetFlagLong            = "policy-set"
 	policySetFlagShort           = ""
 	autoMergeDisabledFlagLong    = "auto-merge-disabled"
@@ -242,6 +244,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var verbose bool
 	var autoMergeDisabled bool
 	var autoMergeMethod string
+	var failedPlansOnly bool
 	var flagSet *pflag.FlagSet
 	var name command.Name
 
@@ -254,6 +257,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.BoolVarP(&failedPlansOnly, failedFlagLong, failedFlagShort, false, "Run plan only for projects with failed plans.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Apply.String():
 		name = command.Apply
@@ -341,6 +345,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
+	if failedPlansOnly && (workspace != "" || dir != "" || project != "") {
+		err := fmt.Sprintf("cannot use --%s at same time as -%s/--%s, -%s/--%s or -%s/--%s", failedFlagLong, projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+	}
+
 	if autoMergeMethod != "" {
 		if autoMergeDisabled {
 			err := fmt.Sprintf("cannot use --%s at the same time as --%s", autoMergeMethodFlagLong, autoMergeDisabledFlagLong)
@@ -353,9 +362,9 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		}
 	}
 
-	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval),
-	}
+	commentCommand := NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval)
+	commentCommand.FailedPlansOnly = failedPlansOnly
+	return CommentParseResult{Command: commentCommand}
 }
 
 func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pflag.FlagSet) (string, []string, string) {

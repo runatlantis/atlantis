@@ -23,6 +23,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -3814,6 +3815,95 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgno
 	Equals(t, 1, len(ctxs))
 	Equals(t, "app", ctxs[0].RepoRelDir)
 	Equals(t, "app", ctxs[0].ProjectName)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanFailedOnly(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nprojects:\n- name: failed\n  dir: failed\n- name: ok\n  dir: ok\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"failed": map[string]any{
+				"main.tf": nil,
+			},
+			"ok": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(events.DefaultWorkspace))).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+	)
+
+	ctxs, err := builder.BuildPlanCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     testdata.Pull,
+			HeadRepo: testdata.GithubRepo,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:   "default",
+						RepoRelDir:  "failed",
+						ProjectName: "failed",
+						Status:      models.ErroredPlanStatus,
+					},
+					{
+						Workspace:   "default",
+						RepoRelDir:  "ok",
+						ProjectName: "ok",
+						Status:      models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			Name:            command.Plan,
+			FailedPlansOnly: true,
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "failed", ctxs[0].RepoRelDir)
+	Equals(t, "failed", ctxs[0].ProjectName)
 	Equals(t, "default", ctxs[0].Workspace)
 }
 

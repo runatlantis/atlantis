@@ -3,14 +3,15 @@
 {{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
 ```
 
-{{ if .PlanWasDeleted -}}
-This plan was not saved because one or more projects failed and automerge requires all plans pass.
+{{ if .ApplyBlocked -}}
+This plan was saved, but apply is blocked until all plans succeed.
 {{ else -}}
 {{ if not .DisableApply -}}
 * :arrow_forward: To **apply** this plan, comment:
   ```shell
   {{ .ApplyCmd }}
   ```
+{{ end -}}
 {{ end -}}
 {{ if not .DisableRepoLocking -}}
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here]({{ .LockURL }})
@@ -19,6 +20,5 @@ This plan was not saved because one or more projects failed and automerge requir
   ```shell
   {{ .RePlanCmd }}
   ```
-{{ end -}}
 {{ template "mergedAgain" . -}}
 {{ end -}}

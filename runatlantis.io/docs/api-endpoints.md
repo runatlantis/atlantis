@@ -173,8 +173,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "Workspace": "default",
       "ProjectName": ""
     }
-  ],
-  "PlansDeleted": false
+  ]
 }
 ```
 
@@ -282,8 +281,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
       "Workspace": "default",
       "ProjectName": ""
     }
-  ],
-  "PlansDeleted": false
+  ]
 }
 ```
 

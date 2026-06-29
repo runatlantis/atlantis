@@ -59,7 +59,7 @@ type commonData struct {
 	SubCommand                string
 	Verbose                   bool
 	Log                       string
-	PlansDeleted              bool
+	ApplyBlocked              bool
 	DisableApplyAll           bool
 	DisableApply              bool
 	DisableRepoLocking        bool
@@ -92,9 +92,10 @@ type resultData struct {
 type planResultData struct {
 	Results []projectResultTmplData
 	commonData
-	NumPlansWithChanges   int
-	NumPlansWithNoChanges int
-	NumPlanFailures       int
+	NumPlansWithChanges      int
+	NumPlansWithNoChanges    int
+	NumPlanFailures          int
+	SuggestFailedPlanCommand bool
 }
 
 type applyResultData struct {
@@ -108,7 +109,7 @@ type applyResultData struct {
 type planSuccessData struct {
 	models.PlanSuccess
 	PlanSummary              string
-	PlanWasDeleted           bool
+	ApplyBlocked             bool
 	DisableApply             bool
 	DisableRepoLocking       bool
 	EnableDiffMarkdownFormat bool
@@ -208,7 +209,6 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		SubCommand:                cmd.SubCommandName(),
 		Verbose:                   cmd.IsVerbose(),
 		Log:                       ctx.Log.GetHistory(),
-		PlansDeleted:              res.PlansDeleted,
 		DisableApplyAll:           m.disableApplyAll || m.disableApply,
 		DisableApply:              m.disableApply,
 		DisableRepoLocking:        m.disableRepoLocking,
@@ -232,6 +232,7 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 
 func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData) string {
 	vcsHost := ctx.Pull.BaseRepo.VCSHost.Type
+	common.ApplyBlocked = applyBlockedByPlanResults(results, common)
 
 	var resultsTmplData []projectResultTmplData
 	numPlanSuccesses := 0
@@ -257,7 +258,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			data := planSuccessData{
 				PlanSuccess:              *result.PlanSuccess,
-				PlanWasDeleted:           common.PlansDeleted,
+				ApplyBlocked:             common.ApplyBlocked,
 				DisableApply:             common.DisableApply,
 				DisableRepoLocking:       common.DisableRepoLocking,
 				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
@@ -423,11 +424,31 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 	switch common.CommandName {
 	case planCommandTitle:
 		numPlanFailures := len(results) - numPlanSuccesses
-		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
+		suggestFailedPlanCommand := numPlanFailures > 0 && numPlanSuccesses > 0
+		return m.renderTemplateTrimSpace(tmpl, planResultData{
+			Results:                  resultsTmplData,
+			commonData:               common,
+			NumPlansWithChanges:      numPlansWithChanges,
+			NumPlansWithNoChanges:    numPlansWithNoChanges,
+			NumPlanFailures:          numPlanFailures,
+			SuggestFailedPlanCommand: suggestFailedPlanCommand,
+		})
 	case applyCommandTitle:
 		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
+}
+
+func applyBlockedByPlanResults(results []command.ProjectResult, common commonData) bool {
+	if common.CommandName != planCommandTitle {
+		return false
+	}
+	for _, result := range results {
+		if result.Error != nil || result.Failure != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown

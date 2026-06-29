@@ -138,12 +138,10 @@ func TestResult_MarshalJSON(t *testing.T) {
 			result: command.Result{
 				Failure:        "",
 				ProjectResults: []command.ProjectResult{},
-				PlansDeleted:   false,
 			},
 			checkFields: map[string]any{
-				"Error":        nil,
-				"Failure":      "",
-				"PlansDeleted": false,
+				"Error":   nil,
+				"Failure": "",
 			},
 		},
 		"error preserves legacy empty object shape": {
@@ -151,12 +149,10 @@ func TestResult_MarshalJSON(t *testing.T) {
 				Error:          errors.New("something went wrong"),
 				Failure:        "deployment failed",
 				ProjectResults: []command.ProjectResult{},
-				PlansDeleted:   true,
 			},
 			checkFields: map[string]any{
-				"Error":        map[string]any{},
-				"Failure":      "deployment failed",
-				"PlansDeleted": true,
+				"Error":   map[string]any{},
+				"Failure": "deployment failed",
 			},
 		},
 		"nested project errors serialize correctly": {
