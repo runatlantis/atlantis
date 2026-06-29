@@ -1,0 +1,51 @@
+server/server.go
+  s_bf2529fc29caf9::t_a261cf2fbc8a0a 821
+  s_bf2529fc29caf9::t_14f03a3879f30d 775
+server/events/project_command_builder.go
+  s_bf2529fc29caf9::t_68097393281dcc 1337
+server/events/db_updater.go
+  s_bf2529fc29caf9::t_e5817e22d5d8e2 40-47,56-57
+  s_bf2529fc29caf9::t_9a0f00a4e41cc6 65
+  s_bf2529fc29caf9::t_cd80dd30c8bc69 58-59
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_a537b674425769 986-1020
+  s_bf2529fc29caf9::t_4391d749e83c14 17
+  s_bf2529fc29caf9::t_f49ba8b20e8e16 827-985
+server/events/apply_plan_validator.go
+  s_bf2529fc29caf9::t_99d93c55052997 1-77
+server/controllers/events/events_controller_e2e_test.go
+  s_bf2529fc29caf9::t_e399fca3604e43 1556-1558,1605
+server/events/plan_command_runner.go
+  s_bf2529fc29caf9::t_dc6c925e8942ea 7,9,33,57,90
+  s_bf2529fc29caf9::t_2dee8e15a971ec 8,12,16,474-478
+  s_bf2529fc29caf9::t_bc72f17d3aa146 136-139,165-170,177-178,244-247,299-304,313-314,362-364,367-375,377
+  s_bf2529fc29caf9::t_917b46f7d664e0 450,453,455-473,480
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_c255da00c5cdb8 308,872-876
+  s_bf2529fc29caf9::t_ba0f7d81b0a5d6 877
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_8f2ef3d018734f 10-11,20,526,549,1882,1943,1965,2020,2048,2080,2100,2139,2159,2212,2241
+  s_bf2529fc29caf9::t_3b7fa3aff76126 520-522,527-528,1917-1920,1937-1939,1944-1945
+  s_bf2529fc29caf9::t_7ab042f41ec5b4 180
+  s_bf2529fc29caf9::t_30c4abfaaf037e 1953-1964,1966-1996
+  s_bf2529fc29caf9::t_b062f26157d19a 1470-1573
+  s_bf2529fc29caf9::t_6a6374a0bea70e 1267-1469
+  s_bf2529fc29caf9::t_d181dd48e2f087 499-502
+  s_bf2529fc29caf9::t_085d7ce740d299 536-548,550-583
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2f9c8119c24edd3d99b97c53a23e8bd99160e43f",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
