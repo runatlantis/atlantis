@@ -417,12 +417,14 @@ func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []
 			continue
 		}
 		unlocked[lockKey] = true
-		p.unlockPlanLockIfOwnedByPull(ctx, lockKey)
+
+		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
+		p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey)
 	}
 }
 
-func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, lockKey string) {
-	if _, err := p.lockingLocker.UnlockIfOwnedByPull(lockKey, ctx.Pull.BaseRepo.FullName, ctx.Pull.Num); err != nil {
+func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, project models.Project, workspace string, lockKey string) {
+	if _, err := p.lockingLocker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
 		ctx.Log.Err("deleting lock %q for pull %d: %s", lockKey, ctx.Pull.Num, err)
 	}
 }

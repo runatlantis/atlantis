@@ -123,8 +123,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedSamePull(t *testing.T) {
 		},
 		nil,
 	)
-	// Unlock will be called once when UnlockFn is invoked
-	mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+	mockLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
 	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
@@ -163,8 +162,7 @@ func TestDefaultProjectLocker_TryLockUnlocked(t *testing.T) {
 		},
 		nil,
 	)
-	// Unlock will be called once when UnlockFn is invoked
-	mockLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+	mockLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
 	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
 	Ok(t, err)
 	Equals(t, true, res.LockAcquired)
@@ -200,7 +198,7 @@ func TestDefaultProjectLocker_TryLockRepoLockingDisabledUnlockUsesNoOpLocker(t *
 		},
 		nil,
 	)
-	mockNoOpLocker.EXPECT().Unlock(lockKey).Return(nil, nil)
+	mockNoOpLocker.EXPECT().UnlockIfOwnedByPull(expProject, expWorkspace, expPull.Num).Return(nil, nil)
 
 	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, false)
 	Ok(t, err)

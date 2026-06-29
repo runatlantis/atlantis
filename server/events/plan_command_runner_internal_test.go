@@ -53,18 +53,29 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 		Workspace:     "default",
 		RepoLocksMode: valid.RepoLocksOnPlanMode,
 	}
+	slashfulRepo := models.Repo{FullName: "group/subgroup/repo"}
+	slashfulPull := models.PullRequest{BaseRepo: slashfulRepo, Num: pull.Num}
+	slashfulOnPlanProject := command.ProjectContext{
+		BaseRepo:      slashfulRepo,
+		RepoRelDir:    "terraform",
+		ProjectName:   "prod",
+		Workspace:     "default",
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
 	onPlanKey := "owner/repo/terraform/default/prod"
 	onApplyKey := keyForProject(onApplyProject)
 	disabledKey := keyForProject(disabledProject)
 	secondOnPlanKey := keyForProject(secondOnPlanProject)
 	sameWorkspaceOnPlanKey := "owner/repo/terraform/default/stage"
+	slashfulOnPlanKey := "group/subgroup/repo/terraform/default/prod"
 
 	tests := []struct {
-		name                            string
-		projectCmds                     []command.ProjectContext
-		locksByKey                      map[string]models.ProjectLock
-		expectedUnlockIfOwnedByPullKeys []string
-		expectedDeletedKeys             []string
+		name                             string
+		ctxPull                          models.PullRequest
+		projectCmds                      []command.ProjectContext
+		locksByKey                       map[string]models.ProjectLock
+		expectedUnlockIfOwnedByPullCalls []unlockIfOwnedByPullCall
+		expectedDeletedKeys              []string
 	}{
 		{
 			name: "empty selection deletes plans without deleting locks",
@@ -89,19 +100,19 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			locksByKey: map[string]models.ProjectLock{
 				onPlanKey: lockForPull(repo, pull.Num),
 			},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey},
-			expectedDeletedKeys:             []string{onPlanKey},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{expectedUnlockCall(onPlanProject, pull.Num)},
+			expectedDeletedKeys:              []string{onPlanKey},
 		},
 		{
-			name:                            "selected on_plan lock owned by another pull is not unlocked",
-			projectCmds:                     []command.ProjectContext{onPlanProject},
-			locksByKey:                      map[string]models.ProjectLock{onPlanKey: lockForPull(repo, 2)},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey},
+			name:                             "selected on_plan lock owned by another pull is not unlocked",
+			projectCmds:                      []command.ProjectContext{onPlanProject},
+			locksByKey:                       map[string]models.ProjectLock{onPlanKey: lockForPull(repo, 2)},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{expectedUnlockCall(onPlanProject, pull.Num)},
 		},
 		{
-			name:                            "selected on_plan lock missing is ignored",
-			projectCmds:                     []command.ProjectContext{onPlanProject},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey},
+			name:                             "selected on_plan lock missing is ignored",
+			projectCmds:                      []command.ProjectContext{onPlanProject},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{expectedUnlockCall(onPlanProject, pull.Num)},
 		},
 		{
 			name:        "mixed mode unlocks only current-pull selected on_plan project",
@@ -111,8 +122,8 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 				onApplyKey:  lockForPull(repo, pull.Num),
 				disabledKey: lockForPull(repo, pull.Num),
 			},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey},
-			expectedDeletedKeys:             []string{onPlanKey},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{expectedUnlockCall(onPlanProject, pull.Num)},
+			expectedDeletedKeys:              []string{onPlanKey},
 		},
 		{
 			name:        "multiple selected on_plan keys are unlocked",
@@ -121,8 +132,11 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 				onPlanKey:       lockForPull(repo, pull.Num),
 				secondOnPlanKey: lockForPull(repo, pull.Num),
 			},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey, secondOnPlanKey},
-			expectedDeletedKeys:             []string{onPlanKey, secondOnPlanKey},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{
+				expectedUnlockCall(onPlanProject, pull.Num),
+				expectedUnlockCall(secondOnPlanProject, pull.Num),
+			},
+			expectedDeletedKeys: []string{onPlanKey, secondOnPlanKey},
 		},
 		{
 			name:        "duplicate selected on_plan lock key unlocks once",
@@ -130,8 +144,8 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			locksByKey: map[string]models.ProjectLock{
 				onPlanKey: lockForPull(repo, pull.Num),
 			},
-			expectedUnlockIfOwnedByPullKeys: []string{onPlanKey},
-			expectedDeletedKeys:             []string{onPlanKey},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{expectedUnlockCall(onPlanProject, pull.Num)},
+			expectedDeletedKeys:              []string{onPlanKey},
 		},
 		{
 			name:        "same dir and workspace with different project names unlocks both keys",
@@ -140,19 +154,50 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 				onPlanKey:              lockForPull(repo, pull.Num),
 				sameWorkspaceOnPlanKey: lockForPull(repo, pull.Num),
 			},
-			expectedUnlockIfOwnedByPullKeys: []string{
-				"owner/repo/terraform/default/prod",
-				"owner/repo/terraform/default/stage",
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{
+				{
+					key:       "owner/repo/terraform/default/prod",
+					project:   models.NewProject("owner/repo", "terraform", "prod"),
+					workspace: "default",
+					pullNum:   pull.Num,
+				},
+				{
+					key:       "owner/repo/terraform/default/stage",
+					project:   models.NewProject("owner/repo", "terraform", "stage"),
+					workspace: "default",
+					pullNum:   pull.Num,
+				},
 			},
 			expectedDeletedKeys: []string{
 				"owner/repo/terraform/default/prod",
 				"owner/repo/terraform/default/stage",
 			},
 		},
+		{
+			name:        "slashful repo name unlocks selected project without parsing lock key",
+			ctxPull:     slashfulPull,
+			projectCmds: []command.ProjectContext{slashfulOnPlanProject},
+			locksByKey: map[string]models.ProjectLock{
+				slashfulOnPlanKey: lockForPull(slashfulRepo, slashfulPull.Num),
+			},
+			expectedUnlockIfOwnedByPullCalls: []unlockIfOwnedByPullCall{
+				{
+					key:       "group/subgroup/repo/terraform/default/prod",
+					project:   models.NewProject("group/subgroup/repo", "terraform", "prod"),
+					workspace: "default",
+					pullNum:   slashfulPull.Num,
+				},
+			},
+			expectedDeletedKeys: []string{"group/subgroup/repo/terraform/default/prod"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctxPull := pull
+			if tt.ctxPull.Num != 0 || tt.ctxPull.BaseRepo.FullName != "" {
+				ctxPull = tt.ctxPull
+			}
 			finder := &recordingPendingPlanFinder{}
 			locker := &recordingPlanCleanupLocker{locksByKey: tt.locksByKey}
 			runner := &PlanCommandRunner{
@@ -162,7 +207,7 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			}
 			ctx := &command.Context{
 				Log:  logging.NewNoopLogger(t),
-				Pull: pull,
+				Pull: ctxPull,
 			}
 
 			runner.deletePlansAndPlanLocks(ctx, tt.projectCmds)
@@ -179,8 +224,8 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			if len(locker.unlockKeys) != 0 {
 				t.Fatalf("expected no Unlock calls, got %#v", locker.unlockKeys)
 			}
-			if !equalUnlockIfOwnedByPullCalls(locker.unlockIfOwnedByPullCalls, tt.expectedUnlockIfOwnedByPullKeys, repo.FullName, pull.Num) {
-				t.Fatalf("expected UnlockIfOwnedByPull keys %#v for repo %q pull %d, got %#v", tt.expectedUnlockIfOwnedByPullKeys, repo.FullName, pull.Num, locker.unlockIfOwnedByPullCalls)
+			if !equalUnlockIfOwnedByPullCalls(locker.unlockIfOwnedByPullCalls, tt.expectedUnlockIfOwnedByPullCalls) {
+				t.Fatalf("expected UnlockIfOwnedByPull calls %#v, got %#v", tt.expectedUnlockIfOwnedByPullCalls, locker.unlockIfOwnedByPullCalls)
 			}
 			if !equalStringSlices(locker.deletedKeys, tt.expectedDeletedKeys) {
 				t.Fatalf("expected deleted keys %#v, got %#v", tt.expectedDeletedKeys, locker.deletedKeys)
@@ -205,9 +250,10 @@ type unlockByPullCall struct {
 }
 
 type unlockIfOwnedByPullCall struct {
-	lockKey      string
-	repoFullName string
-	pullNum      int
+	key       string
+	project   models.Project
+	workspace string
+	pullNum   int
 }
 
 type recordingPlanCleanupLocker struct {
@@ -230,14 +276,15 @@ func (r *recordingPlanCleanupLocker) Unlock(key string) (*models.ProjectLock, er
 	return nil, nil
 }
 
-func (r *recordingPlanCleanupLocker) UnlockIfOwnedByPull(lockKey string, repoFullName string, pullNum int) (*models.ProjectLock, error) {
-	r.unlockIfOwnedByPullCalls = append(r.unlockIfOwnedByPullCalls, unlockIfOwnedByPullCall{lockKey: lockKey, repoFullName: repoFullName, pullNum: pullNum})
-	lock, ok := r.locksByKey[lockKey]
+func (r *recordingPlanCleanupLocker) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	key := models.GenerateLockKey(project, workspace)
+	r.unlockIfOwnedByPullCalls = append(r.unlockIfOwnedByPullCalls, unlockIfOwnedByPullCall{key: key, project: project, workspace: workspace, pullNum: pullNum})
+	lock, ok := r.locksByKey[key]
 	if !ok || lock.Pull.Num != pullNum {
 		return nil, nil
 	}
-	delete(r.locksByKey, lockKey)
-	r.deletedKeys = append(r.deletedKeys, lockKey)
+	delete(r.locksByKey, key)
+	r.deletedKeys = append(r.deletedKeys, key)
 	return &lock, nil
 }
 
@@ -268,6 +315,16 @@ func lockForPull(repo models.Repo, pullNum int) models.ProjectLock {
 	}
 }
 
+func expectedUnlockCall(project command.ProjectContext, pullNum int) unlockIfOwnedByPullCall {
+	modelProject := models.NewProject(project.BaseRepo.FullName, project.RepoRelDir, project.ProjectName)
+	return unlockIfOwnedByPullCall{
+		key:       models.GenerateLockKey(modelProject, project.Workspace),
+		project:   modelProject,
+		workspace: project.Workspace,
+		pullNum:   pullNum,
+	}
+}
+
 func equalStringSlices(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -280,12 +337,12 @@ func equalStringSlices(a, b []string) bool {
 	return true
 }
 
-func equalUnlockIfOwnedByPullCalls(calls []unlockIfOwnedByPullCall, keys []string, repoFullName string, pullNum int) bool {
-	if len(calls) != len(keys) {
+func equalUnlockIfOwnedByPullCalls(calls []unlockIfOwnedByPullCall, expected []unlockIfOwnedByPullCall) bool {
+	if len(calls) != len(expected) {
 		return false
 	}
 	for i := range calls {
-		if calls[i].lockKey != keys[i] || calls[i].repoFullName != repoFullName || calls[i].pullNum != pullNum {
+		if calls[i] != expected[i] {
 			return false
 		}
 	}
