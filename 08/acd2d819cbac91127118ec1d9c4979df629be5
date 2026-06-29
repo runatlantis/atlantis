@@ -1,0 +1,80 @@
+.github/scripts/update_top_issues_ranking/main_test.go
+  s_703da21b40698b::t_4af4a04b64830f 14-71,218
+  s_703da21b40698b::t_0e33965b2dd840 11-13
+  s_703da21b40698b::t_f5d3e6924a499d 72-74,215-217
+  s_703da21b40698b::t_4724b792144547 219-221
+  s_703da21b40698b::t_646698e3867528 1-10,75-214,222-223
+.github/scripts/update_top_issues_ranking/go.mod
+  s_703da21b40698b::t_918020a31d5e59 1-6
+  s_703da21b40698b::t_800c5f009d22e3 7
+.codex/top-issues-ranking-exploration.md
+  s_703da21b40698b::t_86c41ccda1be97 1-324
+.github/scripts/update_top_issues_ranking/main.go
+  s_703da21b40698b::t_a6301632fb0610 40,48,109,111,115,131,134,137,140,143,146,153,155-218,227,242,251,258,284,292,295,298,301,325,327,332,340,345,356,360,368
+  s_703da21b40698b::t_41892f2e554cb8 261
+  s_703da21b40698b::t_9045abeda2a5c8 37-39
+  s_703da21b40698b::t_6552e2179ee476 41-43,45-47
+  s_703da21b40698b::t_fe99637ad93693 49-51,106-108
+  s_703da21b40698b::t_1ed50d4e8fd8cf 110
+  s_703da21b40698b::t_7df3dd7d3b801c 112-114
+  s_703da21b40698b::t_86488b5662488b 116-118,128-130
+  s_703da21b40698b::t_56664a90e96bc9 132-133
+  s_703da21b40698b::t_9dae4617caa800 135-136
+  s_703da21b40698b::t_6f4854cce0fffb 138-139
+  s_703da21b40698b::t_2be8d212dc2e12 141-142
+  s_703da21b40698b::t_622f4d6495be86 144-145
+  s_703da21b40698b::t_c40446f9646cb7 147-152
+  s_703da21b40698b::t_fb36ba7ecd89ea 154
+  s_703da21b40698b::t_f80baafcf61bc4 219-221,224-226
+  s_703da21b40698b::t_243b9cfbd2978d 228-230,239-241
+  s_703da21b40698b::t_dc6e8f6b908c09 243-245,248-250
+  s_703da21b40698b::t_31d61cc5dcb7a8 252-257
+  s_703da21b40698b::t_5c4d949ba3f0f9 259-260
+  s_703da21b40698b::t_4391ec7ff2022e 262-264,281-283
+  s_703da21b40698b::t_41a3fe16993740 285-287,289-291
+  s_703da21b40698b::t_03cc1b9a8328b1 293-294
+  s_703da21b40698b::t_bb615e6200d387 296-297
+  s_703da21b40698b::t_f028b2f464a5fd 299-300
+  s_703da21b40698b::t_6c98e6ae8b3748 302-304,322-324
+  s_703da21b40698b::t_a9a3398fc304ea 326
+  s_703da21b40698b::t_9101041b1edfa0 328-331
+  s_703da21b40698b::t_bae4c50a19e854 333-335,337-339
+  s_703da21b40698b::t_cf7a21d18042b0 341-344
+  s_703da21b40698b::t_7445c0b6c8e26e 346-348,353-355
+  s_703da21b40698b::t_d39ce4a7535125 357-359
+  s_703da21b40698b::t_9f411cd35b132f 361-363,365-367
+  s_703da21b40698b::t_8441ca65c8b188 369-371
+  s_7ae3c68faf0427::t_0b718c1f185fdf 1-36,44,52-105,119-127,222-223,231-238,246-247,265-280,288,305-321,336,349-352,364,372-382
+.codex/top-issues-ranking-implementation.md
+  s_703da21b40698b::t_b1a92a77ae623a 1-112
+.github/scripts/update_top_issues_ranking/go.sum
+  s_703da21b40698b::t_34d04acf8c9776 1-7
+.github/scripts/update_top_issues_ranking/ranking.tmpl
+  s_703da21b40698b::t_223df02ad80cde 1-19
+.github/workflows/update-top-issues-ranking.yml
+  s_703da21b40698b::t_36f6d3404ac70d 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "08acd2d819cbac91127118ec1d9c4979df629be5",
+  "prompts": {},
+  "sessions": {
+    "s_703da21b40698b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10b7-876a-7eb2-af0b-4b346035c257",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_7ae3c68faf0427": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f11a4-0d42-7b41-aedc-d865ac2fad94",
+        "model": "unknown"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
