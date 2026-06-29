@@ -124,6 +124,7 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 		return err
 	}
 	*prs = append(*prs, pr2)
+	result.pullRequestURL = fmt.Sprintf("PR1: %s PR2: %s", pr1.url, pr2.url)
 	log.Printf("[%s] PR2 branch %q pull request %s", tc.Name, pr2.branchName, pr2.url)
 	time.Sleep(initialWait)
 
