@@ -302,7 +302,11 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
+			if c.CommandName == command.Apply && c.Success {
+				mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, c.CommandName, models.SuccessCommitStatus, &prjResult)
+			} else {
+				mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
+			}
 
 			switch c.CommandName {
 			case command.Plan:
@@ -339,7 +343,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 	}
 }
 
-func TestProjectOutputWrapper_PassesRemoteApplyURLToDeferredSuccessStatus(t *testing.T) {
+func TestProjectOutputWrapper_DefersRemoteApplyURLSuccessStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	ctx := command.ProjectContext{
 		Log:        logging.NewNoopLogger(t),
@@ -363,8 +367,17 @@ func TestProjectOutputWrapper_PassesRemoteApplyURLToDeferredSuccessStatus(t *tes
 	runner.Apply(ctx)
 
 	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.PendingCommitStatus, nil)
-	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
 	mockJobMessageSender.VerifyWasCalledOnce().Send(ctx, "", true)
+
+	runner.PublishDeferredApplyStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectCommandOutput: prjResult,
+		Command:              command.Apply,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+	}}}, models.SuccessCommitStatus)
+
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
 }
 
 func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {

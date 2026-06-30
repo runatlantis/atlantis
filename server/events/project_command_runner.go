@@ -161,6 +161,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredApplyStatusPublisher interface {
+	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+}
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
@@ -216,11 +220,43 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
+	if commandName == command.Apply {
+		return result
+	}
+
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus, &result); err != nil {
 		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	return result
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Command != command.Apply || projectResult.ApplySuccess == "" || projectResult.Error != nil || projectResult.Failure != "" {
+			continue
+		}
+		ctx, ok := deferredApplyProjectContext(projectCmds, projectResult)
+		if !ok || ctx.SuppressVCSStatus {
+			continue
+		}
+		projectOutput := projectResult.ProjectCommandOutput
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, status, &projectOutput); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+		}
+	}
+}
+
+func deferredApplyProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult) (command.ProjectContext, bool) {
+	for _, ctx := range projectCmds {
+		if ctx.CommandName == command.Apply &&
+			ctx.RepoRelDir == result.RepoRelDir &&
+			ctx.Workspace == result.Workspace &&
+			ctx.ProjectName == result.ProjectName {
+			return ctx, true
+		}
+	}
+	return command.ProjectContext{}, false
 }
 
 // streamFailureToJob emits the project's error and/or failure text to the job

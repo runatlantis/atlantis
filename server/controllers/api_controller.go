@@ -347,10 +347,6 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
-	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
-		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
-		return
-	}
 
 	statusCode := http.StatusOK
 	if result.HasErrors() {
@@ -708,6 +704,9 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	if len(cmds) == 0 {
+		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+			return nil, err
+		}
 		ctx.Log.Info("determined there was no project to run plan in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
@@ -802,6 +801,9 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	}
 
 	if len(cmds) == 0 {
+		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+			return nil, err
+		}
 		ctx.Log.Info("determined there was no project to run apply in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
@@ -862,7 +864,13 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
-	return &command.Result{ProjectResults: projectResults}, nil
+	result := &command.Result{ProjectResults: projectResults}
+	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus)
+		return result, err
+	}
+	a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
+	return result, nil
 }
 
 func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error {
@@ -878,6 +886,17 @@ func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error
 		Pull: ctx.Pull,
 		API:  ctx.API,
 	}, repoDir))
+}
+
+func (a *APIController) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result *command.Result, status models.CommitStatus) {
+	if result == nil {
+		return
+	}
+	publisher, ok := a.ProjectApplyCommandRunner.(events.DeferredApplyStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredApplyStatuses(projectCmds, *result, status)
 }
 
 func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
@@ -1356,9 +1375,6 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 
 	applyResult, err := e.controller.apiApply(request, ctx)
 	if err != nil {
-		return remediationResults, err
-	}
-	if err := e.controller.validateNonPRAPIRefUnchanged(ctx); err != nil {
 		markRunningRemediationResultsFailed(remediationResults, err.Error())
 		return remediationResults, err
 	}
@@ -1452,11 +1468,11 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
 	if err != nil {
+		if result != nil {
+			output := applyRemediationOutput(result)
+			return output.String(), err
+		}
 		return "", err
-	}
-	if err := e.controller.validateNonPRAPIRefUnchanged(ctx); err != nil {
-		output := applyRemediationOutput(result)
-		return output.String(), err
 	}
 
 	output := applyRemediationOutput(result)

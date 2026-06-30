@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -252,7 +253,21 @@ func TestValidateNonPRAPIRefUnchangedAllowsNonGitDir(t *testing.T) {
 
 func initAPIRefValidatorGitRepo(t *testing.T) (string, string) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := os.MkdirTemp("", t.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for range 10 {
+			if err := os.RemoveAll(root); err == nil || os.IsNotExist(err) {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		if err := os.RemoveAll(root); err != nil && !os.IsNotExist(err) {
+			t.Fatalf("removing git fixture: %v", err)
+		}
+	})
 	originDir := filepath.Join(root, "origin.git")
 	repoDir := filepath.Join(root, "work")
 	runAPIRefValidatorGit(t, "", "init", "--bare", originDir)

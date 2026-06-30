@@ -244,6 +244,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Warn("apply result is stale because %s", err)
 		ctx.CommandHasErrors = true
 		result.Error = err
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
@@ -268,12 +269,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
 		ctx.Log.Warn("not publishing apply success status because %s", err)
 		ctx.CommandHasErrors = true
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		return
 	}
 
+	a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus)
 	a.updateCommitStatus(ctx, pullStatus)
 
 	if result.HasErrors() {
@@ -297,6 +300,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+func (a *ApplyCommandRunner) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	publisher, ok := a.prjCmdRunner.(DeferredApplyStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
 }
 
 func livePullIdentityChangedDuringApply(before models.PullRequest, after models.PullRequest) error {
