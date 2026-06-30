@@ -1206,27 +1206,37 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if !os.IsNotExist(err) {
 			return nil, err
 		}
-		// Try to restore plans from the store. If the store doesn't support
-		// restore (e.g. LocalPlanStore), surface the original "not exist" error.
+		// Working dir is gone (e.g. container restart with emptyDir). Try to
+		// recover via the plan store. We must clone each workspace that has
+		// stored plans BEFORE restoring, otherwise Clone falls through to
+		// forceClone (os.RemoveAll) and wipes the just-restored plans.
 		ctx.Log.Info("pull directory missing, attempting to restore plans")
-		if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace); cloneErr != nil {
-			return nil, fmt.Errorf("re-cloning repo for apply: %w", cloneErr)
+		// Probe capability first to avoid pointless I/O on stores that don't
+		// support restore (e.g. LocalPlanStore).
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return nil, os.ErrNotExist
+		}
+		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
+		if listErr != nil {
+			return nil, fmt.Errorf("listing workspaces from external store: %w", listErr)
+		}
+		// No workspaces in the store means there's nothing to restore.
+		if len(workspaces) == 0 {
+			return nil, os.ErrNotExist
+		}
+		// Clone every workspace before restoring; this ensures each workspace
+		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
+		for _, workspace := range workspaces {
+			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
+				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
+			}
 		}
 		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
 			return nil, err
 		}
 		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
-			if errors.Is(restoreErr, runtime.ErrRestoreNotSupported) {
-				return nil, os.ErrNotExist
-			}
 			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
-		}
-		// RestorePlans may create workspace directories that weren't cloned.
-		// PendingPlanFinder uses 'git ls-files' which requires a git repo, so
-		// clone into any workspace dir that is missing a .git directory.
-		if cloneErr := p.cloneMissingWorkspaces(ctx, pullDir); cloneErr != nil {
-			return nil, fmt.Errorf("cloning workspaces after plan restore: %w", cloneErr)
 		}
 	}
 
@@ -1793,32 +1803,6 @@ func filterProjectsByModifiedFiles(projects []valid.Project, modifiedFiles []str
 // because if users have gone to the trouble of defining projects in repoRelDir
 // then it's likely that if we're running a command for a workspace that isn't
 // defined then they probably just typed the workspace name wrong.
-// cloneMissingWorkspaces ensures every workspace directory under pullDir has a
-// git repo. RestorePlans may create workspace dirs for plans that were stored
-// in non-default workspaces. PendingPlanFinder.Find uses 'git ls-files' which
-// fails without a .git directory.
-func (p *DefaultProjectCommandBuilder) cloneMissingWorkspaces(ctx *command.Context, pullDir string) error {
-	entries, err := os.ReadDir(pullDir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		workspace := entry.Name()
-		gitDir := filepath.Join(pullDir, workspace, ".git")
-		if _, err := os.Stat(gitDir); err == nil {
-			continue // already cloned
-		}
-		ctx.Log.Info("cloning workspace %q after plan restore", workspace)
-		if _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); err != nil {
-			return fmt.Errorf("cloning workspace %q: %w", workspace, err)
-		}
-	}
-	return nil
-}
-
 func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.RepoCfg, repoRelDir string, workspace string) error {
 	if repoCfg == nil {
 		return nil

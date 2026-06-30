@@ -5713,6 +5713,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 
 	restoreCalled := false
 	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default"},
 		restoreFn: func(pullDir, owner, repo string, pullNum int) error {
 			restoreCalled = true
 			return nil
@@ -5776,7 +5777,8 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 // mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
 // the external plan store recovery path.
 type mockExternalPlanStore struct {
-	restoreFn func(pullDir, owner, repo string, pullNum int) error
+	workspaces []string
+	restoreFn  func(pullDir, owner, repo string, pullNum int) error
 }
 
 func (m *mockExternalPlanStore) Save(ctx command.ProjectContext, planPath string) error {
@@ -5787,6 +5789,9 @@ func (m *mockExternalPlanStore) Load(ctx command.ProjectContext, planPath string
 }
 func (m *mockExternalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
 	return nil
+}
+func (m *mockExternalPlanStore) ListWorkspaces(owner, repo string, pullNum int) ([]string, error) {
+	return m.workspaces, nil
 }
 func (m *mockExternalPlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
 	if m.restoreFn != nil {

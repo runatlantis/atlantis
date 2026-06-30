@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -225,6 +226,57 @@ func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error 
 // each plan is fetched from S3 twice in the "apply all" path. Acceptable
 // since plan files are small; eliminating it would require shared state
 // between RestorePlans and Load.
+// ListWorkspaces scans the pull request's prefix in S3 and returns the unique
+// workspace names (first path segment after owner/repo/pullNum/) that have at
+// least one .tfplan stored. Callers use this to clone each workspace before
+// invoking RestorePlans, so plan files don't get wiped by a subsequent Clone.
+func (s *S3PlanStore) ListWorkspaces(owner, repo string, pullNum int) ([]string, error) {
+	prefixParts := []string{}
+	if s.prefix != "" {
+		prefixParts = append(prefixParts, s.prefix)
+	}
+	prefixParts = append(prefixParts, owner, repo, strconv.Itoa(pullNum))
+	listPrefix := strings.Join(prefixParts, "/") + "/"
+
+	seen := map[string]struct{}{}
+	var continuationToken *string
+	for {
+		opCtx, opCancel := s3Ctx()
+		resp, err := s.client.ListObjectsV2(opCtx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucket),
+			Prefix:            aws.String(listPrefix),
+			ContinuationToken: continuationToken,
+		})
+		opCancel()
+		if err != nil {
+			return nil, fmt.Errorf("listing workspaces from S3 (prefix=%s): %w", listPrefix, err)
+		}
+		for _, obj := range resp.Contents {
+			key := aws.ToString(obj.Key)
+			if !strings.HasSuffix(key, ".tfplan") {
+				continue
+			}
+			rel := strings.TrimPrefix(key, listPrefix)
+			workspace, _, ok := strings.Cut(rel, "/")
+			if !ok || workspace == "" {
+				continue
+			}
+			seen[workspace] = struct{}{}
+		}
+		if !aws.ToBool(resp.IsTruncated) {
+			break
+		}
+		continuationToken = resp.NextContinuationToken
+	}
+
+	workspaces := make([]string, 0, len(seen))
+	for w := range seen {
+		workspaces = append(workspaces, w)
+	}
+	sort.Strings(workspaces)
+	return workspaces, nil
+}
+
 func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
 	if pullDir == "" {
 		return nil // capability probe: external store supports restore
