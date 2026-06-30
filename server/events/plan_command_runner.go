@@ -4,11 +4,19 @@
 package events
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // GenerateLockID creates a consistent lock ID for a project context.
@@ -25,6 +33,7 @@ func NewPlanCommandRunner(
 	vcsClient vcs.Client,
 	pendingPlanFinder PendingPlanFinder,
 	workingDir WorkingDir,
+	workingDirLocker WorkingDirLocker,
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
@@ -48,6 +57,7 @@ func NewPlanCommandRunner(
 		vcsClient:                  vcsClient,
 		pendingPlanFinder:          pendingPlanFinder,
 		workingDir:                 workingDir,
+		workingDirLocker:           workingDirLocker,
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdBuilder:              projectCommandBuilder,
 		prjCmdRunner:               projectCommandRunner,
@@ -80,6 +90,7 @@ type PlanCommandRunner struct {
 	commitStatusUpdater        CommitStatusUpdater
 	pendingPlanFinder          PendingPlanFinder
 	workingDir                 WorkingDir
+	workingDirLocker           WorkingDirLocker
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
 	cancellationTracker        CancellationTracker
@@ -101,6 +112,11 @@ type PlanCommandRunner struct {
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+	unlockPullPlan, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
+	if !ok {
+		return
+	}
+	defer unlockPullPlan()
 
 	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
@@ -125,6 +141,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
+		if _, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull); err != nil {
+			p.handleNoProjectPlanStateError(ctx, AutoplanCommand{}, err)
+			return
+		}
 		if !p.silenceVCSStatusNoPlans && !p.silenceVCSStatusNoProjects {
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects planned/policy_checked/applied successfully because some users require
@@ -149,13 +169,21 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
-	p.deletePlansAndPlanLocks(ctx, projectCmds)
+	if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
+		return
+	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlansAndPlanLocks(ctx, projectCmds)
+		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
+			ctx.Log.Err("deleting pending plans: %s", err)
+		}
 		result.PlansDeleted = true
 	}
 
@@ -189,6 +217,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
+	unlockPullPlan, ok := p.lockPullForPlan(ctx, cmd)
+	if !ok {
+		return
+	}
+	defer unlockPullPlan()
 
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -218,8 +251,20 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	if len(projectCmds) == 0 && p.SilenceNoProjects {
+	var noProjectPullStatus *models.PullStatus
+	if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		ctx.Log.Info("determined there was no project to run plan in")
+		pullStatus, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull)
+		if err != nil {
+			p.handleNoProjectPlanStateError(ctx, cmd, err)
+			return
+		}
+		noProjectPullStatus = &pullStatus
+	}
+	if len(projectCmds) == 0 && p.SilenceNoProjects {
+		if cmd.IsForSpecificProject() {
+			ctx.Log.Info("determined there was no project to run plan in")
+		}
 		if !p.silenceVCSStatusNoProjects {
 			if cmd.IsForSpecificProject() {
 				// With a specific plan, just reset the status so it's not stuck in pending state
@@ -267,9 +312,15 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	// if the plan is generic, new plans will be generated based on changes
 	// discard previous plans that might not be relevant anymore
-	if !cmd.IsForSpecificProject() {
+	if !cmd.IsForSpecificProject() && len(projectCmds) > 0 {
 		ctx.Log.Debug("deleting previous plans and locks")
-		p.deletePlansAndPlanLocks(ctx, projectCmds)
+		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
+			if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+				ctx.Log.Warn("unable to update commit status: %s", statusErr)
+			}
+			p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+			return
+		}
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
@@ -277,7 +328,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		p.deletePlansAndPlanLocks(ctx, projectCmds)
+		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
+			ctx.Log.Err("deleting pending plans: %s", err)
+		}
 		result.PlansDeleted = true
 	}
 
@@ -286,7 +339,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		cmd,
 		result)
 
-	pullStatus, err := p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	var pullStatus models.PullStatus
+	if noProjectPullStatus != nil {
+		pullStatus = *noProjectPullStatus
+	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
+	} else {
+		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	}
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 		return
@@ -318,6 +378,37 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	} else {
 		p.run(ctx, cmd)
 	}
+}
+
+func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) (models.PullStatus, error) {
+	if _, err := p.deletePlansAndPendingPlanLocks(ctx); err != nil {
+		return models.PullStatus{}, err
+	}
+	pullStatus, err := p.dbUpdater.replaceDB(ctx, pull, nil)
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
+	}
+	return pullStatus, nil
+}
+
+func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullCommand) (func(), bool) {
+	if p.workingDirLocker == nil {
+		return func() {}, true
+	}
+	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+	if err != nil {
+		p.handleNoProjectPlanStateError(ctx, cmd, err)
+		return nil, false
+	}
+	return unlockFn, true
+}
+
+func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {
+	ctx.CommandHasErrors = true
+	if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+		ctx.Log.Warn("unable to update commit status: %s", statusErr)
+	}
+	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 }
 
 func (p *PlanCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
@@ -390,22 +481,63 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 }
 
 // deletePlans deletes all plans generated in this ctx.
-func (p *PlanCommandRunner) deletePlans(ctx *command.Context) {
+func (p *PlanCommandRunner) deletePlans(ctx *command.Context) ([]PendingPlan, error) {
+	return p.deletePlansWithPostDelete(ctx, nil)
+}
+
+func (p *PlanCommandRunner) deletePlansAndPendingPlanLocks(ctx *command.Context) ([]PendingPlan, error) {
+	return p.deletePlansWithPostDelete(ctx, p.deletePlanLocksForPendingPlans)
+}
+
+func (p *PlanCommandRunner) deletePlansWithPostDelete(ctx *command.Context, postDelete func(*command.Context, []PendingPlan) error) ([]PendingPlan, error) {
 	pullDir, err := p.workingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		ctx.Log.Err("getting pull dir: %s", err)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("getting pull dir: %w", err)
 	}
-	if err := p.pendingPlanFinder.DeletePlans(pullDir); err != nil {
-		ctx.Log.Err("deleting pending plans: %s", err)
+	plans, err := p.pendingPlanFinder.Find(pullDir)
+	if err != nil {
+		return nil, fmt.Errorf("finding pending plans: %w", err)
 	}
+
+	var unlocks []func()
+	defer func() {
+		for _, unlock := range slices.Backward(unlocks) {
+			unlock()
+		}
+	}()
+	for _, plan := range plans {
+		unlockFn, err := p.workingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, command.Plan)
+		if err != nil {
+			return nil, fmt.Errorf("locking pending plan for dir %q workspace %q project %q before deleting: %w", plan.RepoRelDir, plan.Workspace, plan.ProjectName, err)
+		}
+		unlocks = append(unlocks, unlockFn)
+	}
+
+	for _, plan := range plans {
+		planPath := filepath.Join(plan.RepoDir, plan.RepoRelDir, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
+		if err := utils.RemoveIgnoreNonExistent(planPath); err != nil {
+			return nil, fmt.Errorf("deleting plan at %s: %w", planPath, err)
+		}
+	}
+	if postDelete != nil {
+		if err := postDelete(ctx, plans); err != nil {
+			return nil, err
+		}
+	}
+	return plans, nil
 }
 
-func (p *PlanCommandRunner) deletePlansAndPlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) {
-	p.deletePlans(ctx)
-	p.deletePlanLocks(ctx, projectCmds)
+func (p *PlanCommandRunner) deletePlansAndPlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) error {
+	if _, err := p.deletePlans(ctx); err != nil {
+		return err
+	}
+	return p.deletePlanLocks(ctx, projectCmds)
 }
 
-func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) {
+func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) error {
 	unlocked := make(map[string]bool)
 	for _, projCtx := range projectCmds {
 		if projCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
@@ -419,14 +551,34 @@ func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []
 		unlocked[lockKey] = true
 
 		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
-		p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey)
+		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, project models.Project, workspace string, lockKey string) {
-	if _, err := p.lockingLocker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
-		ctx.Log.Err("deleting lock %q for pull %d: %s", lockKey, ctx.Pull.Num, err)
+func (p *PlanCommandRunner) deletePlanLocksForPendingPlans(ctx *command.Context, plans []PendingPlan) error {
+	unlocked := make(map[string]bool)
+	for _, plan := range plans {
+		project := models.NewProject(ctx.Pull.BaseRepo.FullName, plan.RepoRelDir, plan.ProjectName)
+		lockKey := models.GenerateLockKey(project, plan.Workspace)
+		if unlocked[lockKey] {
+			continue
+		}
+		unlocked[lockKey] = true
+		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, plan.Workspace, lockKey); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, project models.Project, workspace string, lockKey string) error {
+	if _, err := p.lockingLocker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
+		return fmt.Errorf("deleting lock %q for pull %d: %w", lockKey, ctx.Pull.Num, err)
+	}
+	return nil
 }
 
 func (p *PlanCommandRunner) partitionProjectCmds(

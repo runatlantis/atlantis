@@ -626,6 +626,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsUser:    userConfig.AzureDevopsUser,
 		AzureDevopsToken:   userConfig.AzureDevopsToken,
 	}
+	livePullHeadFetcher := &events.DefaultLivePullHeadFetcher{
+		EventParser:               eventParser,
+		GithubPullGetter:          githubClient,
+		GitlabMergeRequestGetter:  gitlabClient,
+		AzureDevopsPullGetter:     azuredevopsClient,
+		GiteaPullGetter:           giteaClient,
+		BitbucketCloudPullGetter:  bitbucketCloudClient,
+		BitbucketServerPullGetter: bitbucketServerClient,
+	}
 	commentParser := events.NewCommentParser(
 		userConfig.GithubUser,
 		userConfig.GitlabUser,
@@ -772,6 +781,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -817,6 +827,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
+		workingDirLocker,
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
@@ -849,7 +860,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		workingDirLocker,
 		pullReqStatusFetcher,
+		livePullHeadFetcher,
 		userConfig.DisableAutomergeLabel,
 	)
 
@@ -881,6 +894,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
@@ -889,6 +903,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
@@ -1021,6 +1036,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:                workingDirLocker,
 		CommitStatusUpdater:             commitStatusUpdater,
 		PullReqStatusFetcher:            pullReqStatusFetcher,
+		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 	}
 
