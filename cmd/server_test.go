@@ -227,12 +227,7 @@ func TestExecute_Defaults(t *testing.T) {
 	}
 }
 
-func normalizePath(v any) string {
-	s, ok := v.(string)
-	if !ok {
-		return ""
-	}
-
+func normalizePath(s string) string {
 	if s == "" || s == "." {
 		return ""
 	}
@@ -241,15 +236,63 @@ func normalizePath(v any) string {
 		s = s[2:]
 	}
 
-	s = filepath.ToSlash(s)
+	s = strings.ReplaceAll(s, "\\", "/")
 	s = path.Clean(s)
+	if s == "." {
+		return ""
+	}
 
 	return s
 }
 
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		exp  string
+	}{
+		{
+			name: "empty",
+			in:   "",
+			exp:  "",
+		},
+		{
+			name: "dot",
+			in:   ".",
+			exp:  "",
+		},
+		{
+			name: "unix path",
+			in:   "foo/bar",
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows separators",
+			in:   `foo\bar`,
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows drive with backslashes",
+			in:   `C:\foo\bar`,
+			exp:  "/foo/bar",
+		},
+		{
+			name: "windows drive with slashes",
+			in:   "C:/foo/bar",
+			exp:  "/foo/bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Equals(t, tt.exp, normalizePath(tt.in))
+		})
+	}
+}
+
 var pathFlags = map[string]struct{}{
-	"data-dir":                        {},
-	"markdown-template-overrides-dir": {},
+	DataDirFlag:                      {},
+	MarkdownTemplateOverridesDirFlag: {},
 }
 
 func TestExecute_Flags(t *testing.T) {
@@ -263,17 +306,22 @@ func TestExecute_Flags(t *testing.T) {
 	for flag, exp := range testFlags {
 		got := configVal(t, passedConfig, flag)
 
-		expS := fmt.Sprintf("%v", exp)
-		gotS := fmt.Sprintf("%v", got)
-
 		if _, ok := pathFlags[flag]; ok {
-			expS = normalizePath(expS)
-			gotS = normalizePath(gotS)
+			expPath, ok := exp.(string)
+			Equals(t, true, ok)
+			gotPath, ok := got.(string)
+			Equals(t, true, ok)
+
+			normExp := normalizePath(expPath)
+			normGot := normalizePath(gotPath)
+
+			t.Logf("flag=%s exp=%v got=%v", flag, normExp, normGot)
+			Equals(t, normExp, normGot)
+			continue
 		}
 
-		t.Logf("flag=%s exp=%v got=%v", flag, expS, gotS)
-
-		Equals(t, expS, gotS)
+		t.Logf("flag=%s exp=%v got=%v", flag, exp, got)
+		Equals(t, exp, got)
 	}
 }
 
