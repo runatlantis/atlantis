@@ -17,6 +17,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -47,6 +48,7 @@ type PullClosedExecutor struct {
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
 	CancellationTracker      CancellationTracker
+	PlanStore                runtime.PlanStore
 }
 
 type templatedProject struct {
@@ -93,6 +95,12 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		return fmt.Errorf("cleaning workspace: %w", err)
+	}
+
+	if p.PlanStore != nil {
+		if err := p.PlanStore.DeleteForPull(repo.Owner, repo.Name, pull.Num); err != nil {
+			logger.Warn("failed to delete plans from external store: %s", err)
+		}
 	}
 
 	// Finally, delete locks. We do this last because when someone
