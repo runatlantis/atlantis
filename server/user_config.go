@@ -28,6 +28,7 @@ type UserConfig struct {
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
 	AzureDevopsToken            string `mapstructure:"azuredevops-token"`
+	AzureDevopsTokenFile        string `mapstructure:"azuredevops-token-file"`
 	AzureDevopsUser             string `mapstructure:"azuredevops-user"`
 	AzureDevopsWebhookPassword  string `mapstructure:"azuredevops-webhook-password"`
 	AzureDevopsWebhookUser      string `mapstructure:"azuredevops-webhook-user"`

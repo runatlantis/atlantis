@@ -284,6 +284,16 @@ ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
 
 Azure DevOps token of API user.
 
+### `--azuredevops-token-file`
+
+```bash
+atlantis server --azuredevops-token-file="/path/to/token"
+# or
+ATLANTIS_AZUREDEVOPS_TOKEN_FILE="/path/to/token"
+```
+
+Azure DevOps token of API user, read from a file. The token is loaded from disk on every request and before each git operation, so the token can be rotated by an external process without restarting the Atlantis server. Requires `--write-git-creds` for git operations. Cannot be used together with `--azuredevops-token`. If the file is temporarily unavailable or empty during a rotation, the last successfully written git credentials are retained.
+
 ### `--azuredevops-user` <Badge text="v0.9.0+" type="info"/>
 
 ```bash
