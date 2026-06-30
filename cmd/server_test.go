@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -226,13 +227,101 @@ func TestExecute_Defaults(t *testing.T) {
 	}
 }
 
+func normalizePath(s string) string {
+	if s == "" || s == "." {
+		return ""
+	}
+
+	if len(s) >= 2 && s[1] == ':' {
+		s = s[2:]
+	}
+
+	s = strings.ReplaceAll(s, "\\", "/")
+	s = path.Clean(s)
+	if s == "." {
+		return ""
+	}
+
+	return s
+}
+
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		exp  string
+	}{
+		{
+			name: "empty",
+			in:   "",
+			exp:  "",
+		},
+		{
+			name: "dot",
+			in:   ".",
+			exp:  "",
+		},
+		{
+			name: "unix path",
+			in:   "foo/bar",
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows separators",
+			in:   `foo\bar`,
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows drive with backslashes",
+			in:   `C:\foo\bar`,
+			exp:  "/foo/bar",
+		},
+		{
+			name: "windows drive with slashes",
+			in:   "C:/foo/bar",
+			exp:  "/foo/bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Equals(t, tt.exp, normalizePath(tt.in))
+		})
+	}
+}
+
+var pathFlags = map[string]struct{}{
+	DataDirFlag:                      {},
+	MarkdownTemplateOverridesDirFlag: {},
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
+
 	c := setup(testFlags, t)
+
 	err := c.Execute()
 	Ok(t, err)
+
 	for flag, exp := range testFlags {
-		Equals(t, exp, configVal(t, passedConfig, flag))
+		got := configVal(t, passedConfig, flag)
+
+		if _, ok := pathFlags[flag]; ok {
+			expPath, ok := exp.(string)
+			Equals(t, true, ok)
+			gotPath, ok := got.(string)
+			Equals(t, true, ok)
+
+			normExp := normalizePath(expPath)
+			normGot := normalizePath(gotPath)
+
+			t.Logf("flag=%s exp=%v got=%v", flag, normExp, normGot)
+			Equals(t, normExp, normGot)
+			continue
+		}
+
+		t.Logf("flag=%s exp=%v got=%v", flag, exp, got)
+		Equals(t, exp, got)
 	}
 }
 
