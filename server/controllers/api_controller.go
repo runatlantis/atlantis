@@ -67,6 +67,10 @@ type APIController struct {
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
 	// VCS state instead of always failing.
 	PullReqStatusFetcher vcs.PullReqStatusFetcher
+	// PullStatusFetcher is optional. When set and the API request supplies a PR
+	// number, it is used to populate command.Context.PullStatus so generated
+	// policy_check contexts can preserve existing policy approvals.
+	PullStatusFetcher events.PullStatusFetcher
 	// LivePullHeadFetcher is optional for tests. In production it is used for
 	// PR-backed API requests to seed live PR identity data such as base branch.
 	LivePullHeadFetcher events.LivePullHeadFetcher
@@ -736,7 +740,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	var planCmds []command.ProjectContext
 	var planCC []*events.CommentCommand
 	var policyCmds []command.ProjectContext
-	var policyCC []*events.CommentCommand
 	for i, cmd := range cmds {
 		switch cmd.CommandName {
 		case command.Plan:
@@ -744,7 +747,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			planCC = append(planCC, cc[i])
 		case command.PolicyCheck:
 			policyCmds = append(policyCmds, cmd)
-			policyCC = append(policyCC, cc[i])
 		default:
 			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
 		}
@@ -772,15 +774,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		return result, nil
 	}
 
-	for i, cmd := range policyCmds {
-		if !ctx.PreWorkflowHooksAlreadyRun {
-			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, policyCC[i])
-			if err != nil {
-				if a.FailOnPreWorkflowHookError {
-					return nil, err
-				}
-			}
-		}
+	for _, cmd := range policyCmds {
 		if a.ProjectPolicyCheckCommandRunner == nil {
 			return nil, fmt.Errorf("policy check runner is not configured")
 		}
@@ -922,6 +916,7 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 	if ctx.PullStatus == nil {
 		ctx.PullStatus = &models.PullStatus{Pull: ctx.Pull}
 	}
+	ctx.PullStatus.Pull = ctx.Pull
 	for _, projectResult := range result.ProjectResults {
 		if projectResult.Command != command.Plan && projectResult.Command != command.PolicyCheck && projectResult.Command != command.ApprovePolicies {
 			continue
@@ -1084,6 +1079,7 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		ExactProjectNameMatching:  true,
 	}
 	a.populatePullRequestStatus(ctx)
+	a.populatePullStatus(ctx)
 	return &request, ctx, http.StatusOK, nil
 }
 
@@ -1100,6 +1096,20 @@ func (a *APIController) populatePullRequestStatus(ctx *command.Context) {
 	}
 
 	ctx.PullRequestStatus = status
+}
+
+func (a *APIController) populatePullStatus(ctx *command.Context) {
+	if ctx.Pull.Num <= 0 || a.PullStatusFetcher == nil {
+		return
+	}
+
+	status, err := a.PullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		ctx.PullStatus = nil
+		ctx.Log.Warn("unable to fetch pull status: %s", err)
+		return
+	}
+	ctx.PullStatus = status
 }
 
 // Remediate handles POST /api/drift/remediate requests.

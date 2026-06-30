@@ -61,6 +61,21 @@ func (f fakeControllerLivePullHeadFetcher) GetLivePullIdentity(command.ProjectCo
 	return f.pull, f.err
 }
 
+type recordingPullStatusFetcher struct {
+	statuses []*models.PullStatus
+	calls    []models.PullRequest
+}
+
+func (f *recordingPullStatusFetcher) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	f.calls = append(f.calls, pull)
+	if len(f.statuses) == 0 {
+		return nil, nil
+	}
+	status := f.statuses[0]
+	f.statuses = f.statuses[1:]
+	return status, nil
+}
+
 func TestAPIController_Plan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 
@@ -270,6 +285,8 @@ func TestAPIController_PlanPublishesNormalCommitStatus(t *testing.T) {
 
 func TestAPIController_PlanRunsPolicyChecksForAPI(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+	postWorkflowHooksRunner := ac.PostWorkflowHooksCommandRunner.(*MockPostWorkflowHooksCommandRunner)
 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn([]command.ProjectContext{
@@ -309,7 +326,297 @@ func TestAPIController_PlanRunsPolicyChecksForAPI(t *testing.T) {
 	Equals(t, 2, len(result.ProjectResults))
 	Equals(t, command.Plan, result.ProjectResults[0].Command)
 	Equals(t, command.PolicyCheck, result.ProjectResults[1].Command)
+	projectCommandRunner.VerifyWasCalled(Once()).Plan(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
+
+	_, preHookCmds := preWorkflowHooksRunner.VerifyWasCalled(Times(1)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+	Assert(t, len(preHookCmds) == 1 && preHookCmds[0] != nil, "expected one non-nil pre-workflow hook command")
+	Equals(t, command.Plan, preHookCmds[0].Name)
+	Equals(t, "app", preHookCmds[0].ProjectName)
+
+	_, postHookCmds := postWorkflowHooksRunner.VerifyWasCalled(Times(1)).
+		RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+	Assert(t, len(postHookCmds) == 1 && postHookCmds[0] != nil, "expected one non-nil post-workflow hook command")
+	Equals(t, command.Plan, postHookCmds[0].Name)
+	Equals(t, "app", postHookCmds[0].ProjectName)
+}
+
+func TestAPIController_PlanPropagatesPolicyCheckFailure(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{Failure: "policy failed"})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusInternalServerError, "policy failed")
+	projectCommandRunner.VerifyWasCalled(Once()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
+}
+
+func TestAPIController_PlanLoadsPullStatusBeforePolicyChecks(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	policyStatus := []models.PolicySetStatus{{
+		PolicySetName: "policy",
+		Passed:        false,
+		Approvals: []models.PolicySetApproval{{
+			Approver: "owner",
+			Hashes:   []string{"hash"},
+		}},
+		Hashes: []string{"hash"},
+	}}
+	fetcher := &recordingPullStatusFetcher{statuses: []*models.PullStatus{{
+		Pull: models.PullRequest{Num: 42},
+		Projects: []models.ProjectStatus{{
+			ProjectName:  "app",
+			RepoRelDir:   "app",
+			Workspace:    events.DefaultWorkspace,
+			PolicyStatus: policyStatus,
+		}},
+	}}}
+	ac.PullStatusFetcher = fetcher
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			Assert(t, ctx.PullStatus != nil, "expected pull status before building plan commands")
+			return ReturnValues{[]command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					ProjectName: "app",
+					RepoRelDir:  "app",
+					Workspace:   events.DefaultWorkspace,
+				},
+				{
+					CommandName:         command.PolicyCheck,
+					ProjectName:         "app",
+					RepoRelDir:          "app",
+					Workspace:           events.DefaultWorkspace,
+					ProjectPolicyStatus: ctx.PullStatus.Projects[0].PolicyStatus,
+				},
+			}, nil}
+		})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+			PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+		}})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, 1, len(fetcher.calls))
+	policyCtx := projectCommandRunner.VerifyWasCalled(Once()).
+		PolicyCheck(Any[command.ProjectContext]()).
+		GetCapturedArguments()
+	Equals(t, policyStatus, policyCtx.ProjectPolicyStatus)
+}
+
+func TestAPIController_PlanWithoutPRDoesNotLoadPullStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := &recordingPullStatusFetcher{statuses: []*models.PullStatus{{
+		Projects: []models.ProjectStatus{{ProjectName: "app"}},
+	}}}
+	ac.PullStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, 0, len(fetcher.calls))
+}
+
+func TestAPIController_ApplyWithoutPRDoesNotLoadPullStatus(t *testing.T) {
+	ac, _, _ := setup(t)
+	fetcher := &recordingPullStatusFetcher{statuses: []*models.PullStatus{{
+		Projects: []models.ProjectStatus{{ProjectName: "app"}},
+	}}}
+	ac.PullStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, 0, len(fetcher.calls))
+}
+
+func TestAPIController_ApplyReportsPolicyCheckFailurePerProject(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.PolicyCheck,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName:       command.Apply,
+			ProjectName:       "app",
+			RepoRelDir:        "app",
+			Workspace:         events.DefaultWorkspace,
+			PullStatus:        &models.PullStatus{},
+			ApplyRequirements: []string{"policies_passed"},
+		}}, nil)
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{Failure: "policy failed"})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{Failure: "All policies must pass for project before running apply."})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusInternalServerError, "All policies must pass")
+	projectCommandRunner.VerifyWasCalled(Once()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
+	projectCommandBuilder.VerifyWasCalled(Once()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Once()).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyContinuesAfterMixedPolicyCheckFailure(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					ProjectName: cmd.ProjectName,
+					RepoRelDir:  cmd.ProjectName,
+					Workspace:   events.DefaultWorkspace,
+				},
+				{
+					CommandName: command.PolicyCheck,
+					ProjectName: cmd.ProjectName,
+					RepoRelDir:  cmd.ProjectName,
+					Workspace:   events.DefaultWorkspace,
+				},
+			}, nil}
+		})
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			cmd := args[1].(*events.CommentCommand)
+			Assert(t, ctx.PullStatus != nil, "expected seeded pull status before apply command build")
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:       command.Apply,
+				ProjectName:       cmd.ProjectName,
+				RepoRelDir:        cmd.ProjectName,
+				Workspace:         events.DefaultWorkspace,
+				PullStatus:        ctx.PullStatus,
+				ApplyRequirements: []string{"policies_passed"},
+			}}, nil}
+		})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.ProjectName == "app-a" {
+				return ReturnValues{command.ProjectCommandOutput{Failure: "policy failed for app-a"}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+				PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+			}}}
+		})
+
+	var applyCalls []string
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			applyCalls = append(applyCalls, projectCtx.ProjectName)
+			if projectCtx.ProjectName == "app-a" {
+				return ReturnValues{command.ProjectCommandOutput{Failure: "All policies must pass for project before running apply."}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied app-b"}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app-a", "app-b"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	Assert(t, strings.Contains(string(responseBody), "applied app-b"), "expected app-b apply result: %s", responseBody)
+	Assert(t, strings.Contains(string(responseBody), "All policies must pass"), "expected app-a policy failure: %s", responseBody)
+	projectCommandBuilder.VerifyWasCalled(Times(2)).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
+	Equals(t, []string{"app-a", "app-b"}, applyCalls)
 }
 
 func TestAPIController_NonPRSetupErrorCleansSyntheticWorkingDir(t *testing.T) {
@@ -1744,6 +2051,79 @@ func TestAPIController_ApplySeedsPolicyStatusFromAPIPlan(t *testing.T) {
 	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
 	projectCommandRunner.VerifyWasCalled(Once()).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyRefreshesStalePullStatusPullAfterAPIPlan(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	policyStatus := []models.PolicySetStatus{{
+		PolicySetName: "policy",
+		Passed:        false,
+		Approvals: []models.PolicySetApproval{{
+			Approver: "owner",
+			Hashes:   []string{"hash"},
+		}},
+		Hashes: []string{"hash"},
+	}}
+	fetcher := &recordingPullStatusFetcher{statuses: []*models.PullStatus{{
+		Pull: models.PullRequest{
+			Num:        42,
+			HeadBranch: "old-head",
+			HeadCommit: "old-head",
+			BaseBranch: "old-base",
+		},
+		Projects: []models.ProjectStatus{{
+			ProjectName:  "app",
+			RepoRelDir:   "app",
+			Workspace:    events.DefaultWorkspace,
+			PolicyStatus: policyStatus,
+		}},
+	}}}
+	ac.PullStatusFetcher = fetcher
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	var capturedCtx *command.Context
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			ctx := args[0].(*command.Context)
+			capturedCtx = ctx
+			Assert(t, ctx.PullStatus != nil, "expected pull status before building apply commands")
+			Equals(t, ctx.Pull, ctx.PullStatus.Pull)
+			Equals(t, "current-head", ctx.PullStatus.Pull.HeadCommit)
+			Equals(t, "main", ctx.PullStatus.Pull.BaseBranch)
+			Equals(t, policyStatus, ctx.PullStatus.Projects[0].PolicyStatus)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Apply,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+				PullStatus:  ctx.PullStatus,
+			}}, nil}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "current-head",
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	Assert(t, capturedCtx != nil, "expected apply command builder to be called")
+	Equals(t, 1, len(fetcher.calls))
+	Equals(t, 42, fetcher.calls[0].Num)
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {
