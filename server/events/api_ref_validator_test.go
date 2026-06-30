@@ -75,6 +75,93 @@ func TestValidateNonPRAPIRefUnchangedAllowsBareTagLikeRef(t *testing.T) {
 	}
 }
 
+func TestValidateNonPRAPIRefUnchanged_AnnotatedTagPeelsToCommit(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	runAPIRefValidatorGit(t, repoDir, "tag", "-a", "v1.0.0", "-m", "release", initialCommit)
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "origin", "refs/tags/v1.0.0")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "refs/tags/v1.0.0",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
+		t.Fatalf("expected annotated tag to peel to commit, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_LightweightTagStillMatches(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	runAPIRefValidatorGit(t, repoDir, "tag", "lightweight", initialCommit)
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "origin", "refs/tags/lightweight")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "refs/tags/lightweight",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
+		t.Fatalf("expected lightweight tag to match, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_AnnotatedTagChangedCommitFails(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	runAPIRefValidatorGit(t, repoDir, "tag", "-a", "v1.0.0", "-m", "release", initialCommit)
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "origin", "refs/tags/v1.0.0")
+	advanceAPIRefValidatorGitMain(t, repoDir)
+	runAPIRefValidatorGit(t, repoDir, "tag", "-f", "-a", "v1.0.0", "-m", "release 2")
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "-f", "origin", "refs/tags/v1.0.0")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "refs/tags/v1.0.0",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	err := ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+
+	if err == nil {
+		t.Fatal("expected moved annotated tag to fail")
+	}
+	if !strings.Contains(err.Error(), "changed") {
+		t.Fatalf("expected changed-ref error, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_UnsafeTagRefRejected(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "refs/tags/../bad",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	err := ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+
+	if err == nil {
+		t.Fatal("expected unsafe tag ref to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid API ref") {
+		t.Fatalf("expected invalid API ref error, got %v", err)
+	}
+}
+
 func TestValidateNonPRAPIRefUnchangedAllowsNonGitDir(t *testing.T) {
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -97,10 +184,16 @@ func initAPIRefValidatorGitRepo(t *testing.T) (string, string) {
 	originDir := filepath.Join(root, "origin.git")
 	repoDir := filepath.Join(root, "work")
 	runAPIRefValidatorGit(t, "", "init", "--bare", originDir)
+	runAPIRefValidatorGit(t, originDir, "config", "gc.auto", "0")
+	runAPIRefValidatorGit(t, originDir, "config", "maintenance.auto", "false")
+	runAPIRefValidatorGit(t, originDir, "config", "receive.autogc", "false")
 	runAPIRefValidatorGit(t, "", "init", "--initial-branch=main", repoDir)
+	runAPIRefValidatorGit(t, repoDir, "config", "gc.auto", "0")
+	runAPIRefValidatorGit(t, repoDir, "config", "maintenance.auto", "false")
 	runAPIRefValidatorGit(t, repoDir, "config", "user.email", "atlantisbot@runatlantis.io")
 	runAPIRefValidatorGit(t, repoDir, "config", "user.name", "atlantisbot")
 	runAPIRefValidatorGit(t, repoDir, "config", "commit.gpgsign", "false")
+	runAPIRefValidatorGit(t, repoDir, "config", "tag.gpgsign", "false")
 	if err := os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"main\" {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -125,8 +218,15 @@ func advanceAPIRefValidatorGitMain(t *testing.T, repoDir string) string {
 
 func runAPIRefValidatorGit(t *testing.T, dir string, args ...string) string {
 	t.Helper()
+	args = append([]string{
+		"-c", "protocol.file.allow=always",
+		"-c", "gc.auto=0",
+		"-c", "maintenance.auto=false",
+		"-c", "receive.autogc=false",
+	}, args...)
 	cmd := exec.Command("git", args...) //nolint:gosec
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("running git %s: %s: %v", strings.Join(args, " "), output, err)

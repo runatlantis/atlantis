@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -1057,6 +1058,77 @@ func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.
 	Assert(t, os.IsNotExist(err), "expected stale-base plan file to be deleted")
 }
 
+func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyBaseWhenLiveBaseKnown(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "release",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.BaseBranch = ""
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("legacy-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: ctx.Pull.BaseBranch},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected empty recorded base to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyHeadWhenLiveHeadKnown(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.HeadCommit = ""
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("legacy-head plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected empty recorded head to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
 func TestApplyPlanValidator_RejectsWhenLiveBaseChangedSinceCommandStart(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
@@ -1131,6 +1203,53 @@ func TestApplyPlanValidator_TargetedApplySameHeadDifferentBaseReturnsStaleComman
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
 	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	advanceProjectRunnerAPIRefGitMain(t, repoDir)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedBetweenRunStepAndApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	runner.RunStepRunner = &mutatingCustomStepRunner{mutate: func() error {
+		advanceProjectRunnerAPIRefGitMain(t, repoDir)
+		return nil
+	}}
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Steps = []valid.Step{{StepName: "run"}, {StepName: "apply"}}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref to fail before built-in apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedDuringApplyFailsClosed(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
+		Then(func([]Param) ReturnValues {
+			advanceProjectRunnerAPIRefGitMain(t, repoDir)
+			return ReturnValues{"applied", nil}
+		})
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref during apply to fail closed")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
 func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDependencyValidation(t *testing.T) {
@@ -2531,6 +2650,99 @@ func newTestBoltDB(t *testing.T) *boltdb.BoltDB {
 		_ = db.Close()
 	})
 	return db
+}
+
+func nonPRAPIApplyContext(t *testing.T, headCommit string) command.ProjectContext {
+	t.Helper()
+	return command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		API:         true,
+		Steps:       []valid.Step{{StepName: "apply"}},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "main",
+			HeadCommit: headCommit,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+}
+
+func newNonPRAPIApplyRunner(t *testing.T, repoDir string) (*events.DefaultProjectCommandRunner, *mocks.MockStepRunner) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockRequirementHandler.ValidateApplyProject(Any[string](), Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockRequirementHandler.ValidateProjectDependencies(Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("applied", nil)
+	return &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+	}, mockApply
+}
+
+func initProjectRunnerAPIRefGitRepo(t *testing.T) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	originDir := filepath.Join(root, "origin.git")
+	repoDir := filepath.Join(root, "work")
+	runProjectRunnerAPIRefGit(t, "", "init", "--bare", originDir)
+	runProjectRunnerAPIRefGit(t, originDir, "config", "gc.auto", "0")
+	runProjectRunnerAPIRefGit(t, originDir, "config", "maintenance.auto", "false")
+	runProjectRunnerAPIRefGit(t, originDir, "config", "receive.autogc", "false")
+	runProjectRunnerAPIRefGit(t, "", "init", "--initial-branch=main", repoDir)
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "gc.auto", "0")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "maintenance.auto", "false")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "user.email", "atlantisbot@runatlantis.io")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "user.name", "atlantisbot")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "commit.gpgsign", "false")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"main\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "initial")
+	initialCommit := strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+	runProjectRunnerAPIRefGit(t, repoDir, "remote", "add", "origin", "file://"+originDir)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "-u", "origin", "main")
+	return repoDir, initialCommit
+}
+
+func advanceProjectRunnerAPIRefGitMain(t *testing.T, repoDir string) string {
+	t.Helper()
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "advance main")
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+	return strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func runProjectRunnerAPIRefGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	args = append([]string{
+		"-c", "protocol.file.allow=always",
+		"-c", "gc.auto=0",
+		"-c", "maintenance.auto=false",
+		"-c", "receive.autogc=false",
+	}, args...)
+	cmd := exec.Command("git", args...) //nolint:gosec
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("running git %s: %s: %v", strings.Join(args, " "), output, err)
+	}
+	return string(output)
 }
 
 // Test that it runs the expected apply steps.

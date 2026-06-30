@@ -5077,7 +5077,7 @@ func TestValidatePlansForApply_RejectsOldBasePlanAfterBaseRetargetSameHead(t *te
 	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
 }
 
-func TestPullStatusFreshness_AllowsMissingLegacyBaseBranchWhenHeadMatches(t *testing.T) {
+func TestValidatePlansForApply_RejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
 		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
@@ -5094,7 +5094,29 @@ func TestPullStatusFreshness_AllowsMissingLegacyBaseBranchWhenHeadMatches(t *tes
 
 	err := events.ValidatePlansForApply(ctx, plans)
 
-	Ok(t, err)
+	Assert(t, err != nil, "expected missing recorded base branch to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected missing recorded head commit to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
 }
 
 func TestValidatePlansForApply_NoPlansCurrentEmptyProjectsPasses(t *testing.T) {
@@ -5121,6 +5143,42 @@ func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T)
 	}
 	err := events.ValidatePlansForApply(ctx, nil)
 	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty head to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty base to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
 }
 
 func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithEmptyPullStatus(t *testing.T) {
@@ -5589,7 +5647,7 @@ func TestValidatePlansForApply_CurrentHeadEmptyAllowsValidation(t *testing.T) {
 	Ok(t, err)
 }
 
-func TestValidatePlansForApply_StatusHeadEmptyAllowsValidation(t *testing.T) {
+func TestValidatePlansForApply_StatusHeadEmptyFailsWhenCurrentHeadKnown(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
 		Pull: models.PullRequest{HeadCommit: "abc123"},
@@ -5604,5 +5662,6 @@ func TestValidatePlansForApply_StatusHeadEmptyAllowsValidation(t *testing.T) {
 		{RepoRelDir: "proj1", Workspace: "default"},
 	}
 	err := events.ValidatePlansForApply(ctx, plans)
-	Ok(t, err)
+	Assert(t, err != nil, "expected empty recorded head to fail when current head is known")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
 }

@@ -233,6 +233,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.updatePendingCommitStatus(ctx)
 	}
 
+	preApplyPullStatus := ctx.PullStatus
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
@@ -270,7 +271,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	currentPull := applyPullWithLiveIdentity(pull, livePull)
-	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull); err != nil {
+	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
 		ctx.Log.Warn("not publishing apply success status because %s", err)
 		ctx.CommandHasErrors = true
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -335,7 +336,15 @@ func applyPullWithLiveIdentity(pull models.PullRequest, livePull models.PullRequ
 	return currentPull
 }
 
-func applyResultStatusUpdateError(result command.Result, pullStatus models.PullStatus, commandPull models.PullRequest, currentPull models.PullRequest) error {
+func applyResultStatusUpdateError(result command.Result, pullStatus models.PullStatus, commandPull models.PullRequest, currentPull models.PullRequest, preApplyPullStatus *models.PullStatus) error {
+	if len(result.ProjectResults) == 0 {
+		if preApplyPullStatus == nil {
+			return errors.New("apply produced no project results and no recorded plan status was available")
+		}
+		if err := pullStatusApplyEligibilityError(currentPull, preApplyPullStatus.Pull, "recorded plan status"); err != nil {
+			return err
+		}
+	}
 	if staleApplyResultForCurrentPull(commandPull, result.ProjectResults) && !pullStatusFreshForPull(commandPull, pullStatus.Pull) {
 		return fmt.Errorf(
 			"%w: apply result was for head %s base %q but recorded apply status is for head %s base %q",
@@ -349,7 +358,7 @@ func applyResultStatusUpdateError(result command.Result, pullStatus models.PullS
 	if applyResultHasStaleCommandHead(result.ProjectResults) {
 		return fmt.Errorf("%w: apply result is stale", errStaleCommandHead)
 	}
-	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		return err
 	}
 	if result.HasErrors() && pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {

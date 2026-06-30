@@ -1339,7 +1339,7 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
 	}
 
-	if err := pullStatusFreshnessError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
 		return err
 	}
 
@@ -1369,7 +1369,7 @@ func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
-	if err := pullStatusFreshnessError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
 		return err
 	}
 

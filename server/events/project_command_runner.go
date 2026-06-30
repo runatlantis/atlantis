@@ -893,6 +893,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		ctx.ExpectedPlanHash = planHash
 	}
 
+	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
+		return "", "", err
+	}
+
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err == nil {
 		err = ValidateNonPRAPIRefUnchanged(ctx, repoDir)
@@ -1067,6 +1071,9 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
+			if err = ValidateNonPRAPIRefUnchanged(ctx, absPath); err != nil {
+				return outputs, err
+			}
 			if ctx.CommandName == command.Apply && p.ApplyPlanValidator != nil {
 				if err = p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
 					return outputs, err

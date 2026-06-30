@@ -152,6 +152,78 @@ func TestApplyCommandRunner_StaleCommandResultWithEmptyPullStatusDoesNotPublishZ
 	}
 }
 
+func TestApplyCommandRunner_NoPlanLegacyEmptyIdentityDoesNotPublishZeroZeroSuccess(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+	legacyPull := models.PullRequest{
+		BaseRepo: testdata.GithubRepo,
+		State:    models.OpenPullState,
+		Num:      testdata.Pull.Num,
+	}
+	if _, err := database.UpdatePullWithResults(legacyPull, nil); err != nil {
+		t.Fatal(err)
+	}
+	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	commitUpdater := &recordingApplyStatusUpdater{}
+	pullUpdater := &PullUpdater{
+		VCSClient:        vcsClient,
+		MarkdownRenderer: NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
+	}
+	runner := NewApplyCommandRunner(
+		vcsClient,
+		false,
+		unlockedApplyLockChecker{},
+		commitUpdater,
+		staticApplyCommandBuilder{},
+		staticProjectApplyRunner{},
+		NewCancellationTracker(),
+		&AutoMerger{VCSClient: vcsClient},
+		pullUpdater,
+		&DBUpdater{Database: database},
+		database,
+		1,
+		false,
+		false,
+		nil,
+		noopPullReqStatusFetcher{},
+		nil,
+		"",
+	)
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "release",
+	}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	runner.Run(ctx, &CommentCommand{Name: command.Apply})
+
+	if !ctx.CommandHasErrors {
+		t.Fatal("expected legacy empty identity apply to mark the command as errored")
+	}
+	if containsCommitStatus(commitUpdater.combinedCount, models.SuccessCommitStatus) {
+		t.Fatal("expected no successful 0/0 apply count status for legacy empty identity")
+	}
+	if containsCommitStatus(commitUpdater.combined, models.SuccessCommitStatus) {
+		t.Fatal("expected no successful apply status for legacy empty identity")
+	}
+	if !containsCommitStatus(commitUpdater.combined, models.FailedCommitStatus) {
+		t.Fatal("expected failed apply status for legacy empty identity")
+	}
+}
+
 func containsCommitStatus(statuses []models.CommitStatus, expected models.CommitStatus) bool {
 	return slices.Contains(statuses, expected)
 }

@@ -70,29 +70,19 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	if err != nil {
 		return fmt.Errorf("fetching live pull request: %w", err)
 	}
-	if livePull.HeadCommit != "" {
-		if pullStatus.Pull.HeadCommit == "" {
-			return fmt.Errorf("recorded plan status has no head commit; run `atlantis plan` before apply")
-		}
-		if pullStatus.Pull.HeadCommit != livePull.HeadCommit {
-			return fmt.Errorf(
-				"recorded plan status is from commit %s but live pull request head is %s; run `atlantis plan` before apply",
-				shortSHA(pullStatus.Pull.HeadCommit),
-				shortSHA(livePull.HeadCommit),
-			)
-		}
+	if livePull.HeadCommit != "" || livePull.BaseBranch != "" {
 		currentPull := ctx.Pull
 		currentPull.HeadCommit = livePull.HeadCommit
 		if livePull.BaseBranch != "" {
 			currentPull.BaseBranch = livePull.BaseBranch
 		}
-		if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
 			return err
 		}
 		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
 			return err
 		}
-	} else if err := pullStatusFreshnessError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
+	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
 		return rejectProjectPlan(planPath, "%s", err)
 	}
 
@@ -283,9 +273,25 @@ func pullStatusFreshForPull(pull models.PullRequest, statusPull models.PullReque
 }
 
 func pullStatusFreshnessError(pull models.PullRequest, statusPull models.PullRequest, subject string) error {
+	return pullStatusFreshnessErrorWithMissingFields(pull, statusPull, subject, false)
+}
+
+func pullStatusApplyEligibilityError(pull models.PullRequest, statusPull models.PullRequest, subject string) error {
+	return pullStatusFreshnessErrorWithMissingFields(pull, statusPull, subject, true)
+}
+
+func pullStatusFreshnessErrorWithMissingFields(pull models.PullRequest, statusPull models.PullRequest, subject string, rejectMissing bool) error {
 	verb := "is"
 	if subject == "plans" {
 		verb = "are"
+	}
+	if rejectMissing && pull.HeadCommit != "" && statusPull.HeadCommit == "" {
+		return fmt.Errorf(
+			"%s %s missing a recorded head commit while current head is %s; run `atlantis plan` before apply",
+			subject,
+			verb,
+			shortSHA(pull.HeadCommit),
+		)
 	}
 	if pull.HeadCommit != "" && statusPull.HeadCommit != "" && statusPull.HeadCommit != pull.HeadCommit {
 		return fmt.Errorf(
@@ -298,6 +304,14 @@ func pullStatusFreshnessError(pull models.PullRequest, statusPull models.PullReq
 	}
 	currentBase := strings.TrimSpace(pull.BaseBranch)
 	statusBase := strings.TrimSpace(statusPull.BaseBranch)
+	if rejectMissing && currentBase != "" && statusBase == "" {
+		return fmt.Errorf(
+			"%s %s missing a recorded base branch while current base branch is %q; run `atlantis plan` before apply",
+			subject,
+			verb,
+			currentBase,
+		)
+	}
 	if currentBase != "" && statusBase != "" && statusBase != currentBase {
 		return fmt.Errorf(
 			"%s %s for base branch %q but current base branch is %q; run `atlantis plan` before apply",

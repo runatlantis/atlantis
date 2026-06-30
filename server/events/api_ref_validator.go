@@ -57,18 +57,18 @@ func hasGitMetadata(repoDir string) (bool, error) {
 
 func resolveMutableAPIRef(repoDir, ref string) (string, error) {
 	ref = strings.TrimSpace(ref)
-	if strings.HasPrefix(ref, "refs/tags/") {
-		if models.IsUnsafeAPIRef(ref) {
+	if tagName, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+		if _, ok := models.CheckedBaseBranchRef(tagName); !ok {
 			return "", fmt.Errorf("invalid API ref %q", ref)
 		}
-		remoteRef := ref
-		fetchRef := fmt.Sprintf("+%s:%s", ref, remoteRef)
+		remoteRef := "refs/tags/" + tagName
+		fetchRef := fmt.Sprintf("+%s:%s", remoteRef, remoteRef)
 		cmd := exec.Command("git", "fetch", "origin", "--", fetchRef) //nolint:gosec // fetchRef is built from a refs/tags ref checked for unsafe forms.
 		cmd.Dir = repoDir
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return "", fmt.Errorf("resolving API ref %q: %s: %w", ref, strings.TrimSpace(string(output)), err)
 		}
-		return checkedOutCommit(repoDir, remoteRef)
+		return checkedOutCommit(repoDir, remoteRef+"^{commit}")
 	}
 
 	branchRef, ok := models.CheckedBaseBranchRef(ref)
