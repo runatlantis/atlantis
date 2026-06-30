@@ -2756,6 +2756,8 @@ func setupApplyWithAutoMerge(t *testing.T, options ...func(testConfig *TestConfi
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	Ok(t, err)
 	autoMerger.GlobalAutomerge = true
 	autoMerger.GlobalAutomergeMethod = ""
 	t.Cleanup(func() {

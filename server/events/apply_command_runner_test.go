@@ -76,6 +76,8 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+			Ok(t, err)
 
 			ctx := &command.Context{
 				User:     testdata.User,
