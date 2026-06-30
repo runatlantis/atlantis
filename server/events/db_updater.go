@@ -16,6 +16,17 @@ type DBUpdater struct {
 }
 
 func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	if len(results) == 0 && pull.HeadCommit != "" {
+		pullStatus, err := c.Database.GetPullStatus(pull)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+		if pullStatus != nil && !pullStatusFreshForPull(pull, pullStatus.Pull) {
+			ctx.Log.Debug("ignoring empty result from pull head %q base %q because current plan status is for head %q base %q", pull.HeadCommit, pull.BaseBranch, pullStatus.Pull.HeadCommit, pullStatus.Pull.BaseBranch)
+			return *pullStatus, nil
+		}
+	}
+
 	if staleApplyResultForCurrentPull(pull, results) {
 		pullStatus, err := c.Database.GetPullStatus(pull)
 		if err != nil {

@@ -221,6 +221,9 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 				}
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
+			if c.Matched {
+				When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+			}
 
 			applyCommandRunner.Run(ctx, cmd)
 
@@ -632,6 +635,9 @@ func TestApplyCommandRunner_TargetedApplyPreservesCommandStartHeadAfterLiveRefre
 	applyCommandRunner.Run(ctx, cmd)
 
 	Assert(t, !ctx.CommandHasErrors, "expected targeted build to preserve command-start head without failing build")
+	pullStatus, err := database.GetPullStatus(currentPull)
+	Ok(t, err)
+	Equals(t, liveHead, pullStatus.Pull.HeadCommit)
 }
 
 func TestApplyCommandRunner_TargetedApplyParsedBeforePushDoesNotApplyNewHeadPlan(t *testing.T) {
