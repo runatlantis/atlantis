@@ -894,6 +894,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err == nil {
+		if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
+			err = validator.ValidateCommandStartHead(ctx)
+		}
+	}
 
 	if !ctx.SuppressApplyWebhooks && p.Webhooks != nil {
 		p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck

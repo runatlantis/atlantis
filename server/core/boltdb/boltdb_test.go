@@ -913,7 +913,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 	b.Close()
 }
 
-func TestBoltDB_UpdateSameCommitBackfillsMissingBaseBranch(t *testing.T) {
+func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
 	b := newTestDB2(t)
 
 	pull := models.PullRequest{
@@ -964,12 +964,19 @@ func TestBoltDB_UpdateSameCommitBackfillsMissingBaseBranch(t *testing.T) {
 
 	Ok(t, err)
 	Equals(t, "main", status.Pull.BaseBranch)
-	Equals(t, 2, len(status.Projects))
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
 
 	maybeStatus, err := b.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, "main", maybeStatus.Pull.BaseBranch)
-	Equals(t, 2, len(maybeStatus.Projects))
+	Equals(t, status.Projects, maybeStatus.Projects)
 	b.Close()
 }
 

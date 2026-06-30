@@ -457,7 +457,6 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			// in this command and so we don't want to delete our data about
 			// other projects that aren't affected by this command.
 			newStatus = *currStatus
-			backfillPullMetadata(&newStatus.Pull, pull)
 			for _, res := range newResults {
 				// First, check if we should update any existing projects.
 				updatedExisting := false
@@ -510,13 +509,10 @@ func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRe
 	if statusPull.HeadCommit != pull.HeadCommit {
 		return true
 	}
-	return statusPull.BaseBranch != "" && pull.BaseBranch != "" && statusPull.BaseBranch != pull.BaseBranch
-}
-
-func backfillPullMetadata(statusPull *models.PullRequest, pull models.PullRequest) {
-	if statusPull.BaseBranch == "" && pull.BaseBranch != "" {
-		statusPull.BaseBranch = pull.BaseBranch
+	if pull.BaseBranch == "" {
+		return false
 	}
+	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
 }
 
 // GetPullStatus returns the status for pull.

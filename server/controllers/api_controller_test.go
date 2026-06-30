@@ -51,6 +51,15 @@ func (r *recordingDriftSender) Send(_ logging.SimpleLogging, result webhooks.Dri
 	return nil
 }
 
+type fakeControllerLivePullHeadFetcher struct {
+	pull models.PullRequest
+	err  error
+}
+
+func (f fakeControllerLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return f.pull, f.err
+}
+
 func TestAPIController_Plan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 
@@ -1113,6 +1122,105 @@ func TestAPISetup_RefreshesPullRequestStatusAfterResolvingPRHead(t *testing.T) {
 		"expected plan commands to use resolved-head approved status")
 	Assert(t, planCtx.PullRequestStatus.MergeableStatus.IsMergeable,
 		"expected plan commands to use resolved-head mergeable status")
+}
+
+func TestAPISetup_PRWithoutBaseBranchSeedsLivePRBase(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	var capturedCtx *command.Context
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Assert(t, capturedCtx != nil, "expected plan command builder to be called")
+	Equals(t, headCommit, capturedCtx.Pull.HeadCommit)
+	Equals(t, "feature", capturedCtx.Pull.HeadBranch)
+	Equals(t, "main", capturedCtx.Pull.BaseBranch)
+}
+
+func TestAPIApply_PRRefDoesNotUseHeadRefAsBaseBranch(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	var applyCtx *command.Context
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			applyCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply}}, nil}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Assert(t, applyCtx != nil, "expected apply command builder to be called")
+	Equals(t, "feature", applyCtx.Pull.HeadBranch)
+	Equals(t, "main", applyCtx.Pull.BaseBranch)
+	Assert(t, applyCtx.PullStatus != nil, "expected API apply to seed in-memory PullStatus")
+	Equals(t, "main", applyCtx.PullStatus.Pull.BaseBranch)
+}
+
+func TestAPIApply_PRWithoutBaseBranchCurrentLiveBaseSucceeds(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{CommandName: command.Apply}}, nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
 }
 
 func TestAPIApply_UsesResolvedHeadPullRequestStatusForPlanRequirements(t *testing.T) {

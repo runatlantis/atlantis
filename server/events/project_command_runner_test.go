@@ -2049,6 +2049,121 @@ func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
 	Equals(t, []string{"apply"}, calls)
 }
 
+func TestProjectCommandRunner_RechecksLiveIdentityAfterApplyStep(t *testing.T) {
+	res, _, calls := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	Assert(t, res.Error != nil, "expected post-apply live identity error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request base branch changed"), "got: %s", res.Error)
+	Equals(t, []string{"apply"}, calls)
+}
+
+func TestProjectCommandRunner_BaseRetargetDuringApplyFailsBeforeSuccessOutput(t *testing.T) {
+	res, _, _ := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	Assert(t, res.Error != nil, "expected post-apply live identity error")
+	Equals(t, "", res.ApplySuccess)
+}
+
+func TestProjectCommandRunner_BaseRetargetDuringApplyDoesNotRunSuccessWebhooks(t *testing.T) {
+	_, mockSender, _ := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	_, results := mockSender.VerifyWasCalledOnce().Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]()).GetCapturedArguments()
+	Assert(t, !results.Success, "expected stale post-apply webhook to be unsuccessful")
+}
+
+func TestProjectCommandRunner_UnchangedIdentityApplyStillSucceeds(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	initialPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	fetcher := &sequenceLivePullIdentityFetcher{identities: []models.PullRequest{initialPull, initialPull}}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fetcher},
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: "already-captured",
+		Pull:             initialPull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, []string{"apply"}, calls)
+	_, results := mockSender.VerifyWasCalledOnce().Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]()).GetCapturedArguments()
+	Assert(t, results.Success, "expected unchanged identity apply webhook to be successful")
+}
+
+func runProjectApplyWithBaseChangeAfterApplyStep(t *testing.T) (command.ProjectCommandOutput, *mocks.MockWebhooksSender, []string) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	initialPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	finalPull := initialPull
+	finalPull.BaseBranch = "release"
+	fetcher := &sequenceLivePullIdentityFetcher{identities: []models.PullRequest{initialPull, finalPull}}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fetcher},
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: "already-captured",
+		Pull:             initialPull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	return runner.Apply(ctx), mockSender, calls
+}
+
 func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()

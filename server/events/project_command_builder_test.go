@@ -57,6 +57,14 @@ var defaultUserConfig = struct {
 	AutoDiscoverMode:         "auto",
 }
 
+type checkoutMergeWorkingDir struct {
+	events.WorkingDir
+}
+
+func (w checkoutMergeWorkingDir) CheckoutMergeEnabled() bool {
+	return true
+}
+
 func ChangedFiles(dirStructure map[string]any, parent string) []string {
 	var files []string
 	for k, v := range dirStructure {
@@ -2249,6 +2257,90 @@ autodiscover:
 	}
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		locker,
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  events.DefaultWorkspace,
+	})
+
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+}
+
+func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTargetSkipsBeforeProjectLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseBranch: "main",
+		HeadBranch: "feature",
+		BaseRepo:   repo,
+	}
+	baseWorkingDir := mocks.NewMockWorkingDir()
+	When(baseWorkingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+	workingDir := checkoutMergeWorkingDir{WorkingDir: baseWorkingDir}
 
 	logger := logging.NewNoopLogger(t)
 	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
@@ -4939,6 +5031,29 @@ func TestValidatePlansForApply_AcceptsFreshReplanAfterBaseRetargetSameHead(t *te
 	err := events.ValidatePlansForApply(ctx, plans)
 
 	Ok(t, err)
+}
+
+func TestValidatePlansForApply_GenericRejectsLegacyOldBaseProjectAfterTargetedReplanNewBase(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1"},
+		{RepoRelDir: "proj2", Workspace: "default", ProjectName: "proj2"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base project without current PullStatus to be rejected")
+	Assert(t, strings.Contains(err.Error(), "no matching plan status exists"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
 }
 
 func TestValidatePlansForApply_RejectsOldBasePlanAfterBaseRetargetSameHead(t *testing.T) {

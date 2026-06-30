@@ -67,6 +67,9 @@ type APIController struct {
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
 	// VCS state instead of always failing.
 	PullReqStatusFetcher vcs.PullReqStatusFetcher
+	// LivePullHeadFetcher is optional for tests. In production it is used for
+	// PR-backed API requests to seed live PR identity data such as base branch.
+	LivePullHeadFetcher events.LivePullHeadFetcher
 	// DriftWebhookSender sends webhook notifications when drift is detected.
 	// Nil when no drift webhooks are configured.
 	DriftWebhookSender *webhooks.DriftWebhookSender
@@ -528,13 +531,36 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	}
 
 	headBeforeResolve := ctx.Pull.HeadCommit
+	baseBeforeResolve := ctx.Pull.BaseBranch
 	if err := resolveAPIHeadCommit(ctx, repoDir, checkoutMergeEnabled(a.WorkingDir)); err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
-	if ctx.Pull.Num > 0 && ctx.Pull.HeadCommit != headBeforeResolve {
+	if err := a.seedAPIPrBaseBranch(ctx); err != nil {
+		return sanitizeAPIError(ctx, err)
+	}
+	if ctx.Pull.Num > 0 && (ctx.Pull.HeadCommit != headBeforeResolve || ctx.Pull.BaseBranch != baseBeforeResolve) {
 		a.populatePullRequestStatus(ctx)
 	}
 	return sanitizeAPIError(ctx, verifyNonPRBaseBranchReachability(ctx, repoDir))
+}
+
+func (a *APIController) seedAPIPrBaseBranch(ctx *command.Context) error {
+	if ctx.Pull.Num <= 0 || strings.TrimSpace(ctx.Pull.BaseBranch) != "" || a.LivePullHeadFetcher == nil {
+		return nil
+	}
+	livePull, err := a.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{
+		Log:        ctx.Log,
+		Pull:       ctx.Pull,
+		PullStatus: ctx.PullStatus,
+		API:        ctx.API,
+	})
+	if err != nil {
+		return fmt.Errorf("fetching live pull request: %w", err)
+	}
+	if strings.TrimSpace(livePull.BaseBranch) != "" {
+		ctx.Pull.BaseBranch = livePull.BaseBranch
+	}
+	return nil
 }
 
 func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
@@ -994,9 +1020,13 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		pullNum = nextNonPRPullNum()
 	}
 
+	baseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
+	if !syntheticNonPR && strings.TrimSpace(request.BaseBranch) == "" {
+		baseBranch = ""
+	}
 	pull := models.PullRequest{
 		Num:                      pullNum,
-		BaseBranch:               apiRequestBaseBranch(request.Ref, request.BaseBranch),
+		BaseBranch:               baseBranch,
 		HeadBranch:               request.Ref,
 		HeadCommit:               request.Ref,
 		BaseRepo:                 baseRepo,

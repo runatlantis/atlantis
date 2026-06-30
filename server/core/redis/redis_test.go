@@ -966,7 +966,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 	}, maybeStatus.Projects)
 }
 
-func TestRedis_UpdateSameCommitBackfillsMissingBaseBranch(t *testing.T) {
+func TestRedis_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
 	s := miniredis.RunT(t)
 	rdb := newTestRedis(s)
 
@@ -1018,12 +1018,19 @@ func TestRedis_UpdateSameCommitBackfillsMissingBaseBranch(t *testing.T) {
 
 	Ok(t, err)
 	Equals(t, "main", status.Pull.BaseBranch)
-	Equals(t, 2, len(status.Projects))
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
 
 	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, "main", maybeStatus.Pull.BaseBranch)
-	Equals(t, 2, len(maybeStatus.Projects))
+	Equals(t, status.Projects, maybeStatus.Projects)
 }
 
 // Test that if we update an existing pull status via Apply and our new status is for a

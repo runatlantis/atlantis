@@ -1024,6 +1024,47 @@ func TestApplyCommandRunner_AutomergeStillSucceedsWhenLiveIdentityUnchangedAfter
 	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
 }
 
+func TestApplyCommandRunner_UnchangedIdentityApplyPublishesSuccessCommitStatus(t *testing.T) {
+	database := newTestBoltDB(t)
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	livePull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
+	fetcher := &sequenceLivePullIdentityFetcher{identities: []models.PullRequest{livePull, livePull}}
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fetcher
+	})
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     livePull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dirA",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "projA",
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              livePull,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Any[models.ProjectCounts](),
+	)
+}
+
 func TestApplyCommandRunner_DoesNotAutomergeWhenBaseChangesDuringApply(t *testing.T) {
 	database, vcsClient, ctx, initialPull := runApplyCommandRunnerWithBaseChangeDuringApply(t)
 
@@ -1032,6 +1073,33 @@ func TestApplyCommandRunner_DoesNotAutomergeWhenBaseChangesDuringApply(t *testin
 	pullStatus, err := database.GetPullStatus(initialPull)
 	Ok(t, err)
 	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[0].Status)
+}
+
+func TestApplyCommandRunner_BaseRetargetDuringApplyDoesNotPublishSuccessCommitStatus(t *testing.T) {
+	_, _, ctx, _ := runApplyCommandRunnerWithBaseChangeDuringApply(t)
+
+	Assert(t, ctx.CommandHasErrors, "expected base retarget during apply to fail")
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+	)
+}
+
+func TestApplyCommandRunner_BaseRetargetDuringApplyDoesNotPublishSuccessCommitStatusCount(t *testing.T) {
+	_, _, ctx, _ := runApplyCommandRunnerWithBaseChangeDuringApply(t)
+
+	Assert(t, ctx.CommandHasErrors, "expected base retarget during apply to fail")
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Any[models.ProjectCounts](),
+	)
 }
 
 func TestApplyCommandRunner_DoesNotWriteAppliedStatusWhenBaseChangesDuringApply(t *testing.T) {

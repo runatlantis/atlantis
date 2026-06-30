@@ -142,10 +142,6 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	return nil
 }
 
-func validateCommandStartHead(ctx command.ProjectContext, liveHead string) error {
-	return validateCommandStartIdentity(ctx, models.PullRequest{HeadCommit: liveHead})
-}
-
 func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.PullRequest) error {
 	if livePull.HeadCommit != "" && ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != livePull.HeadCommit {
 		return fmt.Errorf(
