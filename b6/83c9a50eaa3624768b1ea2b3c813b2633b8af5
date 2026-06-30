@@ -1,0 +1,56 @@
+server/core/runtime/apply_step_runner.go
+  s_bf2529fc29caf9::t_0acf8c3d3d57be 200
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_a0efa6296f8fd8 898-899
+  s_bf2529fc29caf9::t_24742815ccf48d 897
+server/controllers/api_controller_test.go
+  s_bf2529fc29caf9::t_6ca7c948937e9a 1288-1376
+  s_bf2529fc29caf9::t_e5d8df51916d79 1820-1821
+  s_bf2529fc29caf9::t_f033a30e5ad3ae 17
+  s_bf2529fc29caf9::t_2dfa8075fe633a 1815-1819,1822-1828,1830-1836
+  s_bf2529fc29caf9::t_782c761b3ccead 1163-1223
+  s_bf2529fc29caf9::t_2dc8ce74befb52 1829
+server/events/apply_command_runner_internal_test.go
+  s_bf2529fc29caf9::t_a89b2113888823 1-7,9-15,17-32,76-81,84-92,109-143,157
+  s_bf2529fc29caf9::t_9db9e854d24909 8,156
+  s_bf2529fc29caf9::t_c631da7b77f819 16,33-75,82-83,93-108,144-155
+server/events/api_ref_validator_test.go
+  s_bf2529fc29caf9::t_4685fd3928f172 88,101
+  s_bf2529fc29caf9::t_b55dde2335ac00 59-77
+  s_bf2529fc29caf9::t_1cbdb5a98a1d0b 1-58,78-87,89-100,102-119
+server/core/runtime/apply_step_runner_test.go
+  s_bf2529fc29caf9::t_43ae57dbabcf5c 323
+server/controllers/api_controller.go
+  s_bf2529fc29caf9::t_c4139e237cf1c3 531-536,538
+  s_bf2529fc29caf9::t_73302d868655f5 1361-1364,1457-1460
+  s_bf2529fc29caf9::t_c36ccd9e7da0cb 350-353,868-880
+  s_bf2529fc29caf9::t_7d69575ca72c70 881-882
+server/controllers/api_remediation_executor_internal_test.go
+  s_bf2529fc29caf9::t_878572660bc6b4 952,1027-1029
+  s_bf2529fc29caf9::t_6f946820f37828 930-951,953-1026,1030-1032
+server/events/api_ref_validator.go
+  s_bf2529fc29caf9::t_6586cd86be38e3 1-32,36-46,62-91,93-109
+  s_bf2529fc29caf9::t_82a0ac673eb640 47-61,92
+  s_bf2529fc29caf9::t_b55dde2335ac00 33-35
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_1978acf0763e27 273,338-348
+  s_bf2529fc29caf9::t_36e5e244868261 272,274-278,281-284,327-337,349-357,359
+  s_bf2529fc29caf9::t_fef36195ace4df 358
+  s_bf2529fc29caf9::t_e3d97cc6ed13d9 360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "b683c9a50eaa3624768b1ea2b3c813b2633b8af5",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
