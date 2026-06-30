@@ -78,6 +78,9 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	// ExpectedPlanHash is the SHA-256 hash of the plan file selected when the
+	// apply command was built.
+	ExpectedPlanHash string
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
@@ -162,6 +165,10 @@ type ProjectContext struct {
 	// SuppressApplyWebhooks prevents synthetic API workflows such as drift
 	// remediation from sending legacy event: apply webhooks.
 	SuppressApplyWebhooks bool
+
+	// RemoteApplyRunURL receives the Terraform Cloud/Enterprise run URL found by
+	// remote apply execution so deferred final status publication can use it.
+	RemoteApplyRunURL *string
 
 	// FailOnMissingDependencies makes apply dependency validation fail when a
 	// configured dependency is not present in PullStatus.

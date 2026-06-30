@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
@@ -54,6 +55,14 @@ var defaultUserConfig = struct {
 	SilenceNoProjects:        false,
 	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
+}
+
+type checkoutMergeWorkingDir struct {
+	events.WorkingDir
+}
+
+func (w checkoutMergeWorkingDir) CheckoutMergeEnabled() bool {
+	return true
 }
 
 func ChangedFiles(dirStructure map[string]any, parent string) []string {
@@ -723,6 +732,12 @@ projects:
 				tmpDir := DirStructure(t, map[string]any{
 					"main.tf": nil,
 				})
+				if cmdName == command.Apply && c.ExpErr == "" && !c.ExpNoProjects {
+					planDir := filepath.Join(tmpDir, c.ExpDir)
+					Ok(t, os.MkdirAll(planDir, 0700))
+					planPath := filepath.Join(planDir, runtime.GetPlanFilename(c.ExpWorkspace, c.ExpProjectName))
+					Ok(t, os.WriteFile(planPath, []byte("targeted plan"), 0600))
+				}
 
 				workingDir := mocks.NewMockWorkingDir()
 				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
@@ -771,6 +786,7 @@ projects:
 				var actCtxs []command.ProjectContext
 				var err error
 				cmd := c.Cmd
+				cmd.Name = cmdName
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
@@ -800,6 +816,9 @@ projects:
 				Equals(t, c.ExpAutoMerge, actCtx.AutomergeEnabled)
 				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				if cmdName == command.Apply {
+					Assert(t, actCtx.ExpectedPlanHash != "", "expected targeted apply to record plan hash")
+				}
 			})
 		}
 	}
@@ -2204,6 +2223,173 @@ autodiscover:
 	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
 }
 
+func TestDefaultProjectCommandBuilder_BuildTargetedApply_LocalConfigIgnoredTargetSkipsBeforeProjectLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		locker,
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  events.DefaultWorkspace,
+	})
+
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+}
+
+func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTargetSkipsBeforeProjectLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseBranch: "main",
+		HeadBranch: "feature",
+		BaseRepo:   repo,
+	}
+	baseWorkingDir := mocks.NewMockWorkingDir()
+	When(baseWorkingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+	workingDir := checkoutMergeWorkingDir{WorkingDir: baseWorkingDir}
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan)
+	Ok(t, err)
+	defer unlockPlan()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		locker,
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  events.DefaultWorkspace,
+	})
+
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+}
+
 // Test that targeted -d commands to a path with an explicit project config
 // are NOT blocked by ignore_paths.
 func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePathsExplicitProjectAllowed(t *testing.T) {
@@ -3215,22 +3401,22 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
 			"project1": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
 			"project2": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
 		},
 		"workspace2": map[string]any{
 			"project1": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
 			"project2": map[string]any{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
 		},
 	})
@@ -3283,6 +3469,16 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3302,6 +3498,10 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[2].Workspace)
 	Equals(t, "project2", ctxs[3].RepoRelDir)
 	Equals(t, "workspace2", ctxs[3].Workspace)
+	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	for _, ctx := range ctxs {
+		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+	}
 }
 
 // Test that autodiscover.ignore_paths is respected during multi-apply.
@@ -3391,6 +3591,14 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3499,6 +3707,14 @@ autodiscover:
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -3608,6 +3824,13 @@ autodiscover:
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -4738,4 +4961,707 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Equals(t, c.ExpRepoRelDir, actCtx.RepoRelDir)
 		})
 	}
+}
+
+func TestValidatePlansForApply_NoPlansNoPullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: nil,
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected error when no PullStatus")
+	Assert(t, strings.Contains(err.Error(), "no current plan status"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansStalePullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected error for stale PullStatus")
+	Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsPlansFromDifferentBaseBranch(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected base branch mismatch error")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "release"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "main"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_AcceptsFreshReplanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_GenericRejectsLegacyOldBaseProjectAfterTargetedReplanNewBase(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1"},
+		{RepoRelDir: "proj2", Workspace: "default", ProjectName: "proj2"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base project without current PullStatus to be rejected")
+	Assert(t, strings.Contains(err.Error(), "no matching plan status exists"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsOldBasePlanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base plan to be rejected")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected missing recorded base branch to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected missing recorded head commit to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentEmptyProjectsPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty head to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty base to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithEmptyPullStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block empty generic apply")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithExistingPlanFiles(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{{RepoRelDir: "proj1", Workspace: "default"}}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, plans, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with existing files")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightWithNoChangeOrDiscardedStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.DiscardedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with terminal statuses")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentAllNoChangesPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.AppliedPlanStatus},
+				{RepoRelDir: "proj3", Workspace: "default", Status: models.DiscardedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentApplyableStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected missing plan error")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "proj1"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected errored plan status to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansButNoPullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: nil,
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error when no pull status")
+	Assert(t, strings.Contains(err.Error(), "no recorded plan status"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansStaleCommitFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected stale plan error")
+	Assert(t, strings.Contains(err.Error(), "plans are from commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_GenericAcceptsPullStatusMatchingLiveHeadWhenCommandHeadIsStale(t *testing.T) {
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: oldHead},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: liveHead},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApplyWithCurrentHead(ctx, plans, false, liveHead)
+
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_PlanMissingFromStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error for unmatched plan")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansMatchCurrentStatusPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "staging", Status: models.PassedPolicyCheckStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "staging"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_FoundSubsetOfCurrentStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.PassedPolicyCheckStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected missing plan error for DB project without plan file")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FoundSubsetWithErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected errored plan status without plan file to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FoundNoChangePlanPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_FoundPlanWithInvalidStatusFails(t *testing.T) {
+	invalidStatuses := []models.ProjectPlanStatus{
+		models.AppliedPlanStatus,
+		models.DiscardedPlanStatus,
+		models.ErroredPlanStatus,
+	}
+	for _, status := range invalidStatuses {
+		t.Run(status.String(), func(t *testing.T) {
+			ctx := &command.Context{
+				Log:  logging.NewNoopLogger(t),
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "proj1", Workspace: "default", Status: status},
+					},
+				},
+			}
+			plans := []events.PendingPlan{
+				{RepoRelDir: "proj1", Workspace: "default"},
+			}
+			err := events.ValidatePlansForApply(ctx, plans)
+			Assert(t, err != nil, "expected error for status %s", status.String())
+		})
+	}
+}
+
+func TestValidatePlansForApply_FoundPlanWithAllowedStatusPasses(t *testing.T) {
+	allowedStatuses := []models.ProjectPlanStatus{
+		models.PlannedPlanStatus,
+		models.PassedPolicyCheckStatus,
+		models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus,
+		models.ErroredPolicyCheckStatus,
+	}
+	for _, status := range allowedStatuses {
+		t.Run(status.String(), func(t *testing.T) {
+			ctx := &command.Context{
+				Log:  logging.NewNoopLogger(t),
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "proj1", Workspace: "default", Status: status},
+					},
+				},
+			}
+			plans := []events.PendingPlan{
+				{RepoRelDir: "proj1", Workspace: "default"},
+			}
+			err := events.ValidatePlansForApply(ctx, plans)
+			Ok(t, err)
+		})
+	}
+}
+
+func TestValidatePlansForApply_NamedProjectMustMatch(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Plan has different project name → no match
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error for mismatched project name")
+}
+
+func TestValidatePlansForApply_NamedProjectsSameDirWorkspace(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA"},
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NamedProjectUsesOwnStatusWhenSameDirWorkspace(t *testing.T) {
+	t.Run("pending plan for valid project passes when sibling project status is invalid", func(t *testing.T) {
+		ctx := &command.Context{
+			Log:  logging.NewNoopLogger(t),
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.AppliedPlanStatus},
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.PlannedPlanStatus},
+				},
+			},
+		}
+		plans := []events.PendingPlan{
+			{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+		}
+		err := events.ValidatePlansForApply(ctx, plans)
+		Ok(t, err)
+	})
+
+	t.Run("pending plan for invalid project fails when sibling project status is valid", func(t *testing.T) {
+		ctx := &command.Context{
+			Log:  logging.NewNoopLogger(t),
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.DiscardedPlanStatus},
+				},
+			},
+		}
+		plans := []events.PendingPlan{
+			{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+		}
+		err := events.ValidatePlansForApply(ctx, plans)
+		Assert(t, err != nil, "expected projB invalid status error")
+		Assert(t, strings.Contains(err.Error(), "projB"), "got: %s", err)
+		Assert(t, strings.Contains(err.Error(), models.DiscardedPlanStatus.String()), "got: %s", err)
+	})
+}
+
+func TestValidatePlansForApply_UnnamedPlanDoesNotMatchNamedProject(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Unnamed plan should not match named project
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: ""},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "unnamed plan should not match named project")
+}
+
+func TestValidatePlansForApply_NamedPlanDoesNotMatchUnnamedProject(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Named plan should not match unnamed project
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "named plan should not match unnamed project")
+}
+
+func TestValidatePlansForApply_EmptyHeadCommitAllowsValidation(t *testing.T) {
+	// For backward compat: if HeadCommit is empty, skip head check
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: ""},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: ""},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_CurrentHeadEmptyAllowsValidation(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: ""},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_StatusHeadEmptyFailsWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: ""},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected empty recorded head to fail when current head is known")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
 }

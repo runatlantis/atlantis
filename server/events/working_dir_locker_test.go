@@ -215,3 +215,55 @@ func TestUnlockDifferentProjectNames(t *testing.T) {
 	_, err = locker.TryLock(repo, 1, workspace, path, newProjectName, cmd)
 	Ok(t, err)
 }
+
+func TestWorkingDirLocker_HasCommandLockDoesNotCrossMatchSlashNestedRepoNames(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockPull("group/repo/1", 2, command.Plan)
+	Ok(t, err)
+	defer unlock()
+
+	Assert(t, locker.HasCommandLock("group/repo/1", 2, command.Plan), "expected exact nested repo lock")
+	Assert(t, !locker.HasCommandLock("group/repo", 1, command.Plan), "did not expect parent repo/pull prefix to match nested repo lock")
+}
+
+func TestWorkingDirLocker_TryLockPullDoesNotCrossMatchSlashNestedRepoNames(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockPull("group/repo/1", 2, command.Plan)
+	Ok(t, err)
+	defer unlock()
+
+	unlockParent, err := locker.TryLockPull("group/repo", 1, command.Apply)
+	Ok(t, err)
+	defer unlockParent()
+}
+
+func TestWorkingDirLocker_PullLockExactRepoAndPullIsolation(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockPull("group/repo/12", 3, command.Plan)
+	Ok(t, err)
+	defer unlock()
+
+	Assert(t, locker.HasCommandLock("group/repo/12", 3, command.Plan), "expected exact repo/pull lock")
+	Assert(t, !locker.HasCommandLock("group/repo", 12, command.Plan), "did not expect pull prefix to match nested repo path")
+	unlockOther, err := locker.TryLockPull("group/repo", 12, command.Apply)
+	Ok(t, err)
+	defer unlockOther()
+}
+
+func TestWorkingDirLocker_ProjectLocksStillUseExactWorkspaceDirProjectIdentity(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLock("group/repo/1", 2, "default", "dir", "proj", command.Plan)
+	Ok(t, err)
+	defer unlock()
+
+	Assert(t, locker.HasCommandLock("group/repo/1", 2, command.Plan), "expected exact project lock to count as command lock")
+	Assert(t, !locker.HasCommandLock("group/repo", 1, command.Plan), "did not expect nested repo project lock to match parent repo/pull")
+	_, err = locker.TryLock("group/repo/1", 2, "default", "dir", "proj", command.Apply)
+	ErrContains(t, "currently locked", err)
+	_, err = locker.TryLock("group/repo/1", 2, "default", "dir", "other", command.Apply)
+	Ok(t, err)
+}

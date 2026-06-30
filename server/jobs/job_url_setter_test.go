@@ -35,6 +35,23 @@ func TestJobURLSetter(t *testing.T) {
 		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, "url-to-project-jobs", result)
 	})
 
+	t.Run("update deferred remote apply status with remote run url", func(t *testing.T) {
+		RegisterMockTestingT(t)
+		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()
+		projectJobURLGenerator := mocks.NewMockProjectJobURLGenerator()
+		jobURLSetter := jobs.NewJobURLSetter(projectJobURLGenerator, projectStatusUpdater)
+		result := &command.ProjectCommandOutput{
+			ApplySuccess:    "apply complete",
+			ApplySuccessURL: "https://app.terraform.io/app/org/workspace/runs/run-123",
+		}
+
+		When(projectJobURLGenerator.GenerateProjectJobURL(Eq[command.ProjectContext](ctx))).ThenReturn("url-to-project-jobs", nil)
+		err := jobURLSetter.SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, result)
+		Ok(t, err)
+
+		projectStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, result.ApplySuccessURL, result)
+	})
+
 	t.Run("update project status with project jobs url error", func(t *testing.T) {
 		RegisterMockTestingT(t)
 		projectStatusUpdater := mocks.NewMockProjectStatusUpdater()

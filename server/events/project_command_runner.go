@@ -161,6 +161,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredApplyStatusPublisher interface {
+	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+}
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
@@ -216,11 +220,43 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
+	if commandName == command.Apply {
+		return result
+	}
+
 	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.SuccessCommitStatus, &result); err != nil {
 		ctx.Log.Err("updating project PR status: %s", err)
 	}
 
 	return result
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Command != command.Apply || projectResult.ApplySuccess == "" || projectResult.Error != nil || projectResult.Failure != "" {
+			continue
+		}
+		ctx, ok := deferredApplyProjectContext(projectCmds, projectResult)
+		if !ok || ctx.SuppressVCSStatus {
+			continue
+		}
+		projectOutput := projectResult.ProjectCommandOutput
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, status, &projectOutput); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+		}
+	}
+}
+
+func deferredApplyProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult) (command.ProjectContext, bool) {
+	for _, ctx := range projectCmds {
+		if ctx.CommandName == command.Apply &&
+			ctx.RepoRelDir == result.RepoRelDir &&
+			ctx.Workspace == result.Workspace &&
+			ctx.ProjectName == result.ProjectName {
+			return ctx, true
+		}
+	}
+	return command.ProjectContext{}, false
 }
 
 // streamFailureToJob emits the project's error and/or failure text to the job
@@ -305,6 +341,7 @@ type DefaultProjectCommandRunner struct {
 	WorkingDirLocker          WorkingDirLocker
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
+	ApplyPlanValidator        ApplyPlanValidator
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -329,11 +366,12 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
-	applyOut, failure, err := p.doApply(ctx)
+	applyOut, applyURL, failure, err := p.doApply(ctx)
 	return command.ProjectCommandOutput{
-		Failure:      failure,
-		Error:        err,
-		ApplySuccess: applyOut,
+		Failure:         failure,
+		Error:           err,
+		ApplySuccess:    applyOut,
+		ApplySuccessURL: applyURL,
 	}
 }
 
@@ -825,50 +863,90 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}, "", nil
 }
 
-func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, failure string, err error) {
+func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
+	var remoteApplyRunURL string
+	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
+		if err := validator.ValidateCommandStartHead(ctx); err != nil {
+			return "", "", "", err
+		}
+	}
+
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", "", errors.New("project has not been cloned–did you run plan?")
+			return "", "", "", errors.New("project has not been cloned–did you run plan?")
 		}
-		return "", "", err
+		return "", "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-		return "", "", fmt.Errorf("project path traversal detected: %w", err)
+		return "", "", "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return "", "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)
 	if failure != "" || err != nil {
-		return "", failure, err
+		return "", "", failure, err
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateProjectDependencies(ctx)
 	if failure != "" || err != nil {
-		return "", failure, err
+		return "", "", failure, err
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode == valid.RepoLocksOnApplyMode)
 	if err != nil {
-		return "", "", fmt.Errorf("acquiring lock: %w", err)
+		return "", "", "", fmt.Errorf("acquiring lock: %w", err)
 	}
 	if !lockAttempt.LockAcquired {
-		return "", lockAttempt.LockFailureReason, nil
+		return "", "", lockAttempt.LockFailureReason, nil
 	}
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer unlockFn()
 
+	if p.ApplyPlanValidator != nil {
+		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+			return "", "", "", err
+		}
+	}
+	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
+	if ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
+		planPath, err := safePlanFilePath(ctx, absPath)
+		if err != nil {
+			return "", "", "", err
+		}
+		planHash, err := hashFile(absPath, planPath)
+		if err != nil {
+			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+		}
+		ctx.ExpectedPlanHash = planHash
+	}
+
+	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
+		return "", "", "", err
+	}
+
+	if _, ok := p.ApplyStepRunner.(*runtime.ApplyStepRunner); ok {
+		ctx.RemoteApplyRunURL = &remoteApplyRunURL
+	}
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err == nil {
+		err = ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+	}
+	if err == nil {
+		if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
+			err = validator.ValidateCommandStartHead(ctx)
+		}
+	}
 
 	if !ctx.SuppressApplyWebhooks && p.Webhooks != nil {
 		p.Webhooks.Send(ctx.Log, webhooks.ApplyResult{ // nolint: errcheck
@@ -883,10 +961,10 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 
 	if err != nil {
-		return "", "", errorWithStepOutput(err, outputs)
+		return "", remoteApplyRunURL, "", errorWithStepOutput(err, outputs)
 	}
 
-	return strings.Join(outputs, "\n"), "", nil
+	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
 }
 
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
@@ -1034,6 +1112,14 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "policy_check":
 			out, err = p.PolicyCheckStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "apply":
+			if err = ValidateNonPRAPIRefUnchanged(ctx, absPath); err != nil {
+				return outputs, err
+			}
+			if ctx.CommandName == command.Apply && p.ApplyPlanValidator != nil {
+				if err = p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+					return outputs, err
+				}
+			}
 			out, err = p.ApplyStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "version":
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)

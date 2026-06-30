@@ -5,15 +5,20 @@
 package events_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -297,7 +302,11 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
-			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
+			if c.CommandName == command.Apply && c.Success {
+				mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, c.CommandName, models.SuccessCommitStatus, &prjResult)
+			} else {
+				mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
+			}
 
 			switch c.CommandName {
 			case command.Plan:
@@ -332,6 +341,43 @@ func TestProjectOutputWrapper(t *testing.T) {
 			mockJobMessageSender.VerifyWasCalled(Times(expectedSends)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 		})
 	}
+}
+
+func TestProjectOutputWrapper_DefersRemoteApplyURLSuccessStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+	prjResult := command.ProjectCommandOutput{
+		ApplySuccess:    "apply complete",
+		ApplySuccessURL: "https://app.terraform.io/app/org/workspace/runs/run-123",
+	}
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+		ProjectCommandRunner: mockProjectCommandRunner,
+	}
+	When(mockProjectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(prjResult)
+
+	runner.Apply(ctx)
+
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.PendingCommitStatus, nil)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
+	mockJobMessageSender.VerifyWasCalledOnce().Send(ctx, "", true)
+
+	runner.PublishDeferredApplyStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectCommandOutput: prjResult,
+		Command:              command.Apply,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+	}}}, models.SuccessCommitStatus)
+
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
 }
 
 func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
@@ -821,6 +867,1971 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
+}
+
+func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	workingDirLocker := &trackingWorkingDirLocker{}
+	validator := &assertLockedApplyPlanValidator{t: t, locker: workingDirLocker}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          workingDirLocker,
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        validator,
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(ctx, nil, repoDir, map[string]string{})).ThenReturn("apply", nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "apply", res.ApplySuccess)
+	Assert(t, validator.called, "expected apply plan validator to run")
+	mockApply.VerifyWasCalledOnce().Run(ctx, nil, repoDir, map[string]string{})
+}
+
+func TestProjectCommandRunner_ApplyRevalidatesImmediatelyBeforeApplyStep(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	workingDirLocker := &trackingWorkingDirLocker{}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		RunStepRunner:             &mutatingCustomStepRunner{calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          workingDirLocker,
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &sequencedApplyPlanValidator{t: t, locker: workingDirLocker, calls: &calls},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:  "default",
+		RepoRelDir: ".",
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "run\napply", res.ApplySuccess)
+	Equals(t, []string{"validate", "run", "validate", "apply"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		RunStepRunner:             &mutatingCustomStepRunner{calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator: &sequencedApplyPlanValidator{
+			calls: &calls,
+			errs:  []error{nil, errors.New("final validation failed; rerun plan")},
+		},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:  "default",
+		RepoRelDir: ".",
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected final validation error")
+	Assert(t, strings.Contains(res.Error.Error(), "final validation failed"), "got: %s", res.Error)
+	Equals(t, []string{"validate", "run", "validate"}, calls)
+}
+
+func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: newHead}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live head change error")
+	Assert(t, strings.Contains(err.Error(), "recorded plan status is from commit"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	currentPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: newHead,
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        currentPull.Num,
+			HeadCommit: oldHead,
+			BaseRepo:   currentPull.BaseRepo,
+		},
+	}
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: currentPull.HeadCommit}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected stale command head to be rejected")
+	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "current plan", string(contents))
+}
+
+func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.BaseBranch = "release"
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected base branch mismatch")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale-base plan file to be deleted")
+}
+
+func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyBaseWhenLiveBaseKnown(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "release",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.BaseBranch = ""
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("legacy-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: ctx.Pull.BaseBranch},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected empty recorded base to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyHeadWhenLiveHeadKnown(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	statusPull := ctx.Pull
+	statusPull.HeadCommit = ""
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("legacy-head plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected empty recorded head to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_RejectsWhenLiveBaseChangedSinceCommandStart(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("old-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live base change to reject apply")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_TargetedApplySameHeadDifferentBaseReturnsStaleCommandError(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	commandStartPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: head,
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	livePull := commandStartPull
+	livePull.BaseBranch = "release"
+	_, err := db.UpdatePullWithResults(livePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename("default", "projA"))
+	Ok(t, os.WriteFile(planPath, []byte("current-base plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: livePull.HeadCommit, base: livePull.BaseBranch},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull:        commandStartPull,
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected same-head base retarget to be stale")
+	Assert(t, strings.Contains(err.Error(), "pull request base branch changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "current-base plan", string(contents))
+}
+
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeApplyRequirements(t *testing.T) {
+	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	advanceProjectRunnerAPIRefGitMain(t, repoDir)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRReleaseBranchChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	createProjectRunnerAPIRefGitBranch(t, repoDir, "release", initialCommit)
+	advanceProjectRunnerAPIRefGitBranch(t, repoDir, "release")
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Pull.HeadBranch = "release"
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed release branch to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRStableBranchChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	createProjectRunnerAPIRefGitBranch(t, repoDir, "stable", initialCommit)
+	advanceProjectRunnerAPIRefGitBranch(t, repoDir, "stable")
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Pull.HeadBranch = "stable"
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed stable branch to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedBetweenRunStepAndApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	runner.RunStepRunner = &mutatingCustomStepRunner{mutate: func() error {
+		advanceProjectRunnerAPIRefGitMain(t, repoDir)
+		return nil
+	}}
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Steps = []valid.Step{{StepName: "run"}, {StepName: "apply"}}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref to fail before built-in apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRMutableRefChangedDuringApplyFailsClosed(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
+		Then(func([]Param) ReturnValues {
+			advanceProjectRunnerAPIRefGitMain(t, repoDir)
+			return ReturnValues{"applied", nil}
+		})
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed mutable ref during apply to fail closed")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDependencyValidation(t *testing.T) {
+	assertTargetedStaleCommandClassifiedBeforeApplyValidation(t)
+}
+
+func TestProjectCommandRunner_TargetedBaseRetargetClassifiedBeforeRequirements(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"}},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: head,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale base command error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request base branch changed"), "got: %s", res.Error)
+	mockWorkingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDirNotExist(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead}},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  "deleted-dir",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale command-head error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	mockWorkingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func assertTargetedStaleCommandClassifiedBeforeApplyValidation(t *testing.T) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead}},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale command-head error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateApplyProject(Any[string](), Any[command.ProjectContext]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidateProjectDependencies(Any[command.ProjectContext]())
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyFails(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	currentPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: newHead,
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	project := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        currentPull.Num,
+			HeadCommit: oldHead,
+			BaseRepo:   currentPull.BaseRepo,
+		},
+	}
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(project.RepoRelDir, project.Workspace, project.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: currentPull.HeadCommit}}
+
+	err = validator.ValidateProjectPlan(project, repoDir)
+	Assert(t, err != nil, "expected stale targeted apply to fail")
+
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+	pullStatus, err := db.GetPullStatus(currentPull)
+	Ok(t, err)
+	err = events.ValidatePlansForApply(&command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       currentPull,
+		PullStatus: pullStatus,
+	}, []events.PendingPlan{{
+		RepoDir:     repoDir,
+		RepoRelDir:  project.RepoRelDir,
+		Workspace:   project.Workspace,
+		ProjectName: project.ProjectName,
+	}})
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{err: errors.New("vcs unavailable")}}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected live head fetch failure")
+	Assert(t, strings.Contains(err.Error(), "fetching live pull request"), "got: %s", err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_UsesInMemoryPullStatusForAPIApply(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("api plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: ctx.Pull.HeadCommit},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIApplyWithBranchRefDoesNotCompareRefStringToLiveSHA(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api branch plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: models.PullRequest{
+			Num:        ctx.Pull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   ctx.Pull.BaseRepo,
+		},
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIApplyWithResolvedCommitComparesToLiveSHA(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api resolved plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: models.PullRequest{
+			Num:        ctx.Pull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   ctx.Pull.BaseRepo,
+		},
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected stale resolved API commit to fail")
+	Assert(t, strings.Contains(err.Error(), "pull request head changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, string(planContents), string(contents))
+}
+
+func TestApplyPlanValidator_APIApplyPrefersSeededPullStatusOverStaleDB(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	staleHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("fresh api plan")
+	stalePull := models.PullRequest{
+		Num:        1,
+		HeadCommit: staleHead,
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	Ok(t, err)
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        stalePull.Num,
+			HeadCommit: liveHead,
+			BaseRepo:   stalePull.BaseRepo,
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_APIInMemoryErroredPolicyCheckStatusRejectsApply(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api policy errored plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.ErroredPolicyCheckStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected policy-check errored status to reject API apply")
+	Assert(t, strings.Contains(err.Error(), "policy checks have errored"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_APIApplyUsesDBWhenNoSeededPullStatusExists(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	planContents := []byte("api db plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: liveHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead},
+	}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_CommentApplyStillFailsWhenDBPullStatusMissing(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("comment plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected comment apply to require DB pull status")
+	Assert(t, strings.Contains(err.Error(), "no current plan status found"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_DriftApplyUsesInMemoryPullStatusWithoutLiveHeadFetch(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("drift plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		API:              true,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	ctx.PullStatus = &models.PullStatus{
+		Pull: ctx.Pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{
+		PullStatusFetcher:   db,
+		LivePullHeadFetcher: fakeLivePullHeadFetcher{err: errors.New("live head should not be fetched")},
+	}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_RejectsPlanPathOutsideProjectDir(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "../escape",
+		RepoRelDir:       ".",
+		ProjectName:      "",
+		ExpectedPlanHash: planHashForContent([]byte("plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected plan path traversal error")
+	Assert(t, strings.Contains(err.Error(), "plan path traversal detected"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_RejectsTraversalPlanPathBeforeHashing(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "../escape",
+		RepoRelDir:       ".",
+		ProjectName:      "",
+		ExpectedPlanHash: planHashForContent([]byte("plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected traversal to fail before hashing")
+	Assert(t, strings.Contains(err.Error(), "plan path traversal detected"), "got: %s", err)
+}
+
+func TestApplyPlanValidator_HashesOnlyContainedPlanPath(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Ok(t, err)
+}
+
+func TestApplyPlanValidator_HashMismatchDoesNotDeleteNewerCurrentPlan(t *testing.T) {
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent([]byte("old plan")),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("new plan"), 0600))
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
+
+	err = validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected plan hash mismatch")
+	Assert(t, strings.Contains(err.Error(), "plan file changed"), "got: %s", err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, "new plan", string(contents))
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	Ok(t, err)
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected missing plan file error")
+	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCommandStart(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	newHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db, LivePullHeadFetcher: fakeLivePullHeadFetcher{head: newHead}},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: oldHead,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected live head change error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request head changed"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			return os.Remove(planPath)
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected final missing plan error")
+	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
+	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanOverwrittenByPreApplyRunStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanMutatedBeforeBuiltInApplyStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
+func TestProjectCommandRunner_PreApplyRunStepPlanfileExposureIsDocumented(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, []byte("changed plan"), "plan file changed")
+}
+
+func TestProjectCommandRunner_ApplyRejectsPlanTruncatedByPreApplyRunStep(t *testing.T) {
+	testProjectCommandRunnerRejectsPlanContentMutation(t, nil, "plan file changed")
+}
+
+func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContents []byte, expectedErr string) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("original plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			return os.WriteFile(planPath, newContents, 0600)
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected plan hash mismatch")
+	Assert(t, strings.Contains(res.Error.Error(), expectedErr), "got: %s", res.Error)
+	contents, err := os.ReadFile(planPath)
+	Ok(t, err)
+	Equals(t, string(newContents), string(contents))
+	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	planContents := []byte("original plan")
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(planContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, planContents, 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, []string{"apply"}, calls)
+}
+
+func TestProjectCommandRunner_RechecksLiveIdentityAfterApplyStep(t *testing.T) {
+	res, _, calls := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	Assert(t, res.Error != nil, "expected post-apply live identity error")
+	Assert(t, strings.Contains(res.Error.Error(), "pull request base branch changed"), "got: %s", res.Error)
+	Equals(t, []string{"apply"}, calls)
+}
+
+func TestProjectCommandRunner_BaseRetargetDuringApplyFailsBeforeSuccessOutput(t *testing.T) {
+	res, _, _ := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	Assert(t, res.Error != nil, "expected post-apply live identity error")
+	Equals(t, "", res.ApplySuccess)
+}
+
+func TestProjectCommandRunner_BaseRetargetDuringApplyDoesNotRunSuccessWebhooks(t *testing.T) {
+	_, mockSender, _ := runProjectApplyWithBaseChangeAfterApplyStep(t)
+
+	_, results := mockSender.VerifyWasCalledOnce().Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]()).GetCapturedArguments()
+	Assert(t, !results.Success, "expected stale post-apply webhook to be unsuccessful")
+}
+
+func TestProjectCommandRunner_UnchangedIdentityApplyStillSucceeds(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	initialPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	fetcher := &sequenceLivePullIdentityFetcher{identities: []models.PullRequest{initialPull, initialPull}}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fetcher},
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: "already-captured",
+		Pull:             initialPull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, []string{"apply"}, calls)
+	_, results := mockSender.VerifyWasCalledOnce().Send(Any[logging.SimpleLogging](), Any[webhooks.ApplyResult]()).GetCapturedArguments()
+	Assert(t, results.Success, "expected unchanged identity apply webhook to be successful")
+}
+
+func runProjectApplyWithBaseChangeAfterApplyStep(t *testing.T) (command.ProjectCommandOutput, *mocks.MockWebhooksSender, []string) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockSender := mocks.NewMockWebhooksSender()
+	initialPull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	finalPull := initialPull
+	finalPull.BaseBranch = "release"
+	fetcher := &sequenceLivePullIdentityFetcher{identities: []models.PullRequest{initialPull, finalPull}}
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fetcher},
+		Webhooks:                  mockSender,
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: "already-captured",
+		Pull:             initialPull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	return runner.Apply(ctx), mockSender, calls
+}
+
+func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected policy-check status error")
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected rejected plan file to be deleted")
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAfterBuild(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	calls := []string{}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           &recordingStepRunner{name: "apply", calls: &calls},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps: []valid.Step{
+			{StepName: "run"},
+			{StepName: "apply"},
+		},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	runner.RunStepRunner = &mutatingCustomStepRunner{
+		calls: &calls,
+		mutate: func() error {
+			_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+			return err
+		},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected policy-check status error")
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "new123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "new123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	stalePull := ctx.Pull
+	stalePull.HeadCommit = "old123"
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+	})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale PullStatus error")
+	Assert(t, strings.Contains(res.Error.Error(), "recorded plan status is from commit"), "got: %s", res.Error)
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErroredApply(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "new123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	stalePull := ctx.Pull
+	stalePull.HeadCommit = "old123"
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected stale PullStatus error")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		{
+			Command:     command.Apply,
+			Workspace:   ctx.Workspace,
+			RepoRelDir:  ctx.RepoRelDir,
+			ProjectName: ctx.ProjectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("validation rejected plan"),
+			},
+		},
+	})
+	Ok(t, err)
+	pullStatus, err := db.GetPullStatus(ctx.Pull)
+	Ok(t, err)
+	err = events.ValidatePlansForApply(&command.Context{Log: logging.NewNoopLogger(t), Pull: ctx.Pull, PullStatus: pullStatus}, nil)
+	Assert(t, err != nil, "expected later generic apply to reject errored apply status without plan file")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+type trackingWorkingDirLocker struct {
+	locked bool
+}
+
+func planHashForContent(contents []byte) string {
+	hash := sha256.Sum256(contents)
+	return hex.EncodeToString(hash[:])
+}
+
+type fakeLivePullHeadFetcher struct {
+	head string
+	base string
+	err  error
+}
+
+func (f fakeLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return models.PullRequest{HeadCommit: f.head, BaseBranch: f.base}, f.err
+}
+
+func (l *trackingWorkingDirLocker) TryLock(string, int, string, string, string, command.Name) (func(), error) {
+	l.locked = true
+	return func() { l.locked = false }, nil
+}
+
+func (l *trackingWorkingDirLocker) TryLockPull(string, int, command.Name) (func(), error) {
+	l.locked = true
+	return func() { l.locked = false }, nil
+}
+
+func (l *trackingWorkingDirLocker) HasCommandLock(string, int, command.Name) bool {
+	return l.locked
+}
+
+func (l *trackingWorkingDirLocker) UnlockByPull(string, int) {
+	l.locked = false
+}
+
+type assertLockedApplyPlanValidator struct {
+	t      *testing.T
+	locker *trackingWorkingDirLocker
+	called bool
+}
+
+func (v *assertLockedApplyPlanValidator) ValidateProjectPlan(command.ProjectContext, string) error {
+	v.called = true
+	Assert(v.t, v.locker.locked, "expected apply plan validation to run while working dir lock is held")
+	return nil
+}
+
+type sequencedApplyPlanValidator struct {
+	t      *testing.T
+	locker *trackingWorkingDirLocker
+	calls  *[]string
+	errs   []error
+	count  int
+}
+
+func (v *sequencedApplyPlanValidator) ValidateProjectPlan(command.ProjectContext, string) error {
+	if v.calls != nil {
+		*v.calls = append(*v.calls, "validate")
+	}
+	if v.locker != nil {
+		Assert(v.t, v.locker.locked, "expected apply plan validation to run while working dir lock is held")
+	}
+	defer func() { v.count++ }()
+	if v.count < len(v.errs) {
+		return v.errs[v.count]
+	}
+	return nil
+}
+
+type recordingStepRunner struct {
+	name  string
+	calls *[]string
+	err   error
+}
+
+func (r *recordingStepRunner) Run(command.ProjectContext, []string, string, map[string]string) (string, error) {
+	if r.calls != nil {
+		*r.calls = append(*r.calls, r.name)
+	}
+	return r.name, r.err
+}
+
+type mutatingCustomStepRunner struct {
+	calls  *[]string
+	mutate func() error
+}
+
+func (r *mutatingCustomStepRunner) Run(
+	command.ProjectContext,
+	*valid.CommandShell,
+	string,
+	string,
+	map[string]string,
+	bool,
+	[]valid.PostProcessRunOutputOption,
+	[]*regexp.Regexp,
+) (string, error) {
+	if r.calls != nil {
+		*r.calls = append(*r.calls, "run")
+	}
+	if r.mutate != nil {
+		if err := r.mutate(); err != nil {
+			return "", err
+		}
+	}
+	return "run", nil
+}
+
+func erroredPolicyProjectResult(ctx command.ProjectContext) command.ProjectResult {
+	return command.ProjectResult{
+		Command:     command.PolicyCheck,
+		Workspace:   ctx.Workspace,
+		RepoRelDir:  ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			Error: errors.New("policy check errored"),
+		},
+	}
+}
+
+func newTestBoltDB(t *testing.T) *boltdb.BoltDB {
+	t.Helper()
+	db, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() {
+		_ = db.Close()
+	})
+	return db
+}
+
+func nonPRAPIApplyContext(t *testing.T, headCommit string) command.ProjectContext {
+	t.Helper()
+	return command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		API:         true,
+		Steps:       []valid.Step{{StepName: "apply"}},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "main",
+			HeadCommit: headCommit,
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+}
+
+func newNonPRAPIApplyRunner(t *testing.T, repoDir string) (*events.DefaultProjectCommandRunner, *mocks.MockStepRunner) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockRequirementHandler.ValidateApplyProject(Any[string](), Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockRequirementHandler.ValidateProjectDependencies(Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("applied", nil)
+	return &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+	}, mockApply
+}
+
+func initProjectRunnerAPIRefGitRepo(t *testing.T) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	originDir := filepath.Join(root, "origin.git")
+	repoDir := filepath.Join(root, "work")
+	runProjectRunnerAPIRefGit(t, "", "init", "--bare", originDir)
+	runProjectRunnerAPIRefGit(t, originDir, "config", "gc.auto", "0")
+	runProjectRunnerAPIRefGit(t, originDir, "config", "maintenance.auto", "false")
+	runProjectRunnerAPIRefGit(t, originDir, "config", "receive.autogc", "false")
+	runProjectRunnerAPIRefGit(t, "", "init", "--initial-branch=main", repoDir)
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "gc.auto", "0")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "maintenance.auto", "false")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "user.email", "atlantisbot@runatlantis.io")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "user.name", "atlantisbot")
+	runProjectRunnerAPIRefGit(t, repoDir, "config", "commit.gpgsign", "false")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"main\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "initial")
+	initialCommit := strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+	runProjectRunnerAPIRefGit(t, repoDir, "remote", "add", "origin", "file://"+originDir)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "-u", "origin", "main")
+	return repoDir, initialCommit
+}
+
+func advanceProjectRunnerAPIRefGitMain(t *testing.T, repoDir string) string {
+	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "main")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "advance main")
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+	return strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func createProjectRunnerAPIRefGitBranch(t *testing.T, repoDir string, branch string, commit string) {
+	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "-B", branch, commit)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "-u", "origin", "HEAD:"+branch)
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "main")
+}
+
+func advanceProjectRunnerAPIRefGitBranch(t *testing.T, repoDir string, branch string) string {
+	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", branch)
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \""+branch+"\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "advance "+branch)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "origin", "HEAD:"+branch)
+	return strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func runProjectRunnerAPIRefGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	args = append([]string{
+		"-c", "protocol.file.allow=always",
+		"-c", "gc.auto=0",
+		"-c", "maintenance.auto=false",
+		"-c", "receive.autogc=false",
+	}, args...)
+	cmd := exec.Command("git", args...) //nolint:gosec
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("running git %s: %s: %v", strings.Join(args, " "), output, err)
+	}
+	return string(output)
 }
 
 // Test that it runs the expected apply steps.

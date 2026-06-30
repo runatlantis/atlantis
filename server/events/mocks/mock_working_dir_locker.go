@@ -25,12 +25,46 @@ func NewMockWorkingDirLocker(options ...pegomock.Option) *MockWorkingDirLocker {
 func (mock *MockWorkingDirLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDirLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasCommandLock", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	var _ret0 bool
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(bool)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
 	}
 	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName, cmdName}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 func()
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(func())
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
+func (mock *MockWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name) (func(), error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLockPull", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 func()
 	var _ret1 error
 	if len(_result) != 0 {
@@ -89,6 +123,47 @@ type VerifierMockWorkingDirLocker struct {
 	timeout                time.Duration
 }
 
+func (verifier *VerifierMockWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) *MockWorkingDirLocker_HasCommandLock_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasCommandLock", _params, verifier.timeout)
+	return &MockWorkingDirLocker_HasCommandLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_HasCommandLock_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_HasCommandLock_OngoingVerification) GetCapturedArguments() (string, int, command.Name) {
+	repoFullName, pullNum, cmdName := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], cmdName[len(cmdName)-1]
+}
+
+func (c *MockWorkingDirLocker_HasCommandLock_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []command.Name) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]command.Name, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.Name)
+			}
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) *MockWorkingDirLocker_TryLock_OngoingVerification {
 	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName, cmdName}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLock", _params, verifier.timeout)
@@ -142,6 +217,47 @@ func (c *MockWorkingDirLocker_TryLock_OngoingVerification) GetAllCapturedArgumen
 			_param5 = make([]command.Name, len(c.methodInvocations))
 			for u, param := range _params[5] {
 				_param5[u] = param.(command.Name)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name) *MockWorkingDirLocker_TryLockPull_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLockPull", _params, verifier.timeout)
+	return &MockWorkingDirLocker_TryLockPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_TryLockPull_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetCapturedArguments() (string, int, command.Name) {
+	repoFullName, pullNum, cmdName := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], cmdName[len(cmdName)-1]
+}
+
+func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []command.Name) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]command.Name, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.Name)
 			}
 		}
 	}

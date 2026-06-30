@@ -67,6 +67,9 @@ type APIController struct {
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
 	// VCS state instead of always failing.
 	PullReqStatusFetcher vcs.PullReqStatusFetcher
+	// LivePullHeadFetcher is optional for tests. In production it is used for
+	// PR-backed API requests to seed live PR identity data such as base branch.
+	LivePullHeadFetcher events.LivePullHeadFetcher
 	// DriftWebhookSender sends webhook notifications when drift is detected.
 	// Nil when no drift webhooks are configured.
 	DriftWebhookSender *webhooks.DriftWebhookSender
@@ -521,20 +524,55 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
+	headBeforeResolve := ctx.Pull.HeadCommit
+	baseBeforeResolve := ctx.Pull.BaseBranch
+	if err := a.seedAPIPrBaseBranch(ctx); err != nil {
+		return sanitizeAPIError(ctx, err)
+	}
+
 	// ensure workingDir is present
-	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
+	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
 	if err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
 
-	if err := resolveNonPRHeadCommit(ctx, repoDir); err != nil {
+	if err := resolveAPIHeadCommit(ctx, repoDir, checkoutMergeEnabled(a.WorkingDir)); err != nil {
 		return sanitizeAPIError(ctx, err)
+	}
+	if ctx.Pull.Num > 0 && (ctx.Pull.HeadCommit != headBeforeResolve || ctx.Pull.BaseBranch != baseBeforeResolve) {
+		a.populatePullRequestStatus(ctx)
 	}
 	return sanitizeAPIError(ctx, verifyNonPRBaseBranchReachability(ctx, repoDir))
 }
 
+func (a *APIController) seedAPIPrBaseBranch(ctx *command.Context) error {
+	if ctx.Pull.Num <= 0 || strings.TrimSpace(ctx.Pull.BaseBranch) != "" || a.LivePullHeadFetcher == nil {
+		return nil
+	}
+	livePull, err := a.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{
+		Log:        ctx.Log,
+		Pull:       ctx.Pull,
+		PullStatus: ctx.PullStatus,
+		API:        ctx.API,
+	})
+	if err != nil {
+		return fmt.Errorf("fetching live pull request: %w", err)
+	}
+	if strings.TrimSpace(livePull.BaseBranch) != "" {
+		ctx.Pull.BaseBranch = livePull.BaseBranch
+	}
+	return nil
+}
+
 func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 	if ctx.Pull.Num >= 0 || repoDir == "" {
+		return nil
+	}
+	return resolveAPIHeadCommit(ctx, repoDir, false)
+}
+
+func resolveAPIHeadCommit(ctx *command.Context, repoDir string, checkoutMerge bool) error {
+	if repoDir == "" {
 		return nil
 	}
 	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
@@ -544,18 +582,39 @@ func resolveNonPRHeadCommit(ctx *command.Context, repoDir string) error {
 		return fmt.Errorf("checking API checkout git metadata: %w", err)
 	}
 
-	cmd := exec.Command("git", "rev-parse", "HEAD") // nolint: gosec
-	cmd.Dir = repoDir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("resolving checked out API ref: %s: %w", strings.TrimSpace(string(output)), err)
+	if ctx.Pull.Num > 0 && checkoutMerge {
+		if headCommit, err := checkedOutAPICommit(repoDir, "HEAD^2"); err == nil && headCommit != "" {
+			ctx.Pull.HeadCommit = headCommit
+			return nil
+		}
 	}
-	headCommit := strings.TrimSpace(string(output))
-	if headCommit == "" {
-		return fmt.Errorf("resolving checked out API ref: empty commit")
+	headCommit, err := checkedOutAPICommit(repoDir, "HEAD")
+	if err != nil {
+		return err
 	}
 	ctx.Pull.HeadCommit = headCommit
 	return nil
+}
+
+func checkoutMergeEnabled(workingDir events.WorkingDir) bool {
+	checkoutMerge, ok := workingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
+}
+
+func checkedOutAPICommit(repoDir string, ref string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", ref) // nolint: gosec
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("resolving checked out API ref %q: %s: %w", ref, strings.TrimSpace(string(output)), err)
+	}
+	headCommit := strings.TrimSpace(string(output))
+	if headCommit == "" {
+		return "", fmt.Errorf("resolving checked out API ref %q: empty commit", ref)
+	}
+	return headCommit, nil
 }
 
 func verifyNonPRBaseBranchReachability(ctx *command.Context, repoDir string) error {
@@ -645,6 +704,9 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	if len(cmds) == 0 {
+		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+			return nil, err
+		}
 		ctx.Log.Info("determined there was no project to run plan in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
@@ -739,6 +801,9 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 	}
 
 	if len(cmds) == 0 {
+		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+			return nil, err
+		}
 		ctx.Log.Info("determined there was no project to run apply in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
@@ -799,7 +864,39 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
-	return &command.Result{ProjectResults: projectResults}, nil
+	result := &command.Result{ProjectResults: projectResults}
+	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus)
+		return result, err
+	}
+	a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
+	return result, nil
+}
+
+func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error {
+	if ctx == nil || !ctx.API || ctx.Pull.Num > 0 {
+		return nil
+	}
+	repoDir, err := a.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, events.DefaultWorkspace)
+	if err != nil {
+		return sanitizeAPIError(ctx, err)
+	}
+	return sanitizeAPIError(ctx, events.ValidateNonPRAPIRefUnchanged(command.ProjectContext{
+		Log:  ctx.Log,
+		Pull: ctx.Pull,
+		API:  ctx.API,
+	}, repoDir))
+}
+
+func (a *APIController) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result *command.Result, status models.CommitStatus) {
+	if result == nil {
+		return
+	}
+	publisher, ok := a.ProjectApplyCommandRunner.(events.DeferredApplyStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredApplyStatuses(projectCmds, *result, status)
 }
 
 func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
@@ -856,11 +953,24 @@ func upsertProjectPolicyStatus(pullStatus *models.PullStatus, result command.Pro
 		if status.Workspace == project.Workspace &&
 			status.RepoRelDir == project.RepoRelDir &&
 			status.ProjectName == project.ProjectName {
+			project.Status = planStatusAfterPolicyCheck(project.Status, result)
 			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
 			return
 		}
 	}
+	status.Status = result.PlanStatus()
 	pullStatus.Projects = append(pullStatus.Projects, status)
+}
+
+func planStatusAfterPolicyCheck(existing models.ProjectPlanStatus, result command.ProjectResult) models.ProjectPlanStatus {
+	policyStatus := result.PlanStatus()
+	if policyStatus == models.ErroredPolicyCheckStatus {
+		return policyStatus
+	}
+	if existing == models.PlannedPlanStatus || existing == models.ErroredPolicyCheckStatus {
+		return policyStatus
+	}
+	return existing
 }
 
 func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectStatus) {
@@ -949,9 +1059,13 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 		pullNum = nextNonPRPullNum()
 	}
 
+	baseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
+	if !syntheticNonPR && strings.TrimSpace(request.BaseBranch) == "" {
+		baseBranch = ""
+	}
 	pull := models.PullRequest{
 		Num:                      pullNum,
-		BaseBranch:               apiRequestBaseBranch(request.Ref, request.BaseBranch),
+		BaseBranch:               baseBranch,
 		HeadBranch:               request.Ref,
 		HeadCommit:               request.Ref,
 		BaseRepo:                 baseRepo,
@@ -1261,6 +1375,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 
 	applyResult, err := e.controller.apiApply(request, ctx)
 	if err != nil {
+		markRunningRemediationResultsFailed(remediationResults, err.Error())
 		return remediationResults, err
 	}
 	remediationResults = mergeApplyRemediationResults(remediationResults, applyResult)
@@ -1353,6 +1468,10 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	// Execute apply
 	result, err := e.controller.apiApply(request, ctx)
 	if err != nil {
+		if result != nil {
+			output := applyRemediationOutput(result)
+			return output.String(), err
+		}
 		return "", err
 	}
 

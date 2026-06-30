@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -49,6 +50,15 @@ func (r *recordingDriftSender) Send(_ logging.SimpleLogging, result webhooks.Dri
 	r.calls++
 	r.results = append(r.results, result)
 	return nil
+}
+
+type fakeControllerLivePullHeadFetcher struct {
+	pull models.PullRequest
+	err  error
+}
+
+func (f fakeControllerLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return f.pull, f.err
 }
 
 func TestAPIController_Plan(t *testing.T) {
@@ -1065,6 +1075,459 @@ func TestAPIController_PlanContinuesWhenPullReqStatusFetchFails(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
 }
 
+func TestAPISetup_RefreshesPullRequestStatusAfterResolvingPRHead(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.Then(func(args []Param) ReturnValues {
+		pull := args[1].(models.PullRequest)
+		Equals(t, "main", pull.HeadCommit)
+		return ReturnValues{models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: false},
+			MergeableStatus: models.MergeableStatus{IsMergeable: false},
+		}, nil}
+	})
+	mockCall.Then(func(args []Param) ReturnValues {
+		pull := args[1].(models.PullRequest)
+		Equals(t, headCommit, pull.HeadCommit)
+		return ReturnValues{models.PullReqStatus{
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+		}, nil}
+	})
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(2)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	planCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, headCommit, planCtx.Pull.HeadCommit)
+	Assert(t, planCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected plan commands to use resolved-head approved status")
+	Assert(t, planCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected plan commands to use resolved-head mergeable status")
+}
+
+func TestAPISetup_PRWithoutBaseBranchSeedsLivePRBase(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	var capturedCtx *command.Context
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Assert(t, capturedCtx != nil, "expected plan command builder to be called")
+	Equals(t, headCommit, capturedCtx.Pull.HeadCommit)
+	Equals(t, "feature", capturedCtx.Pull.HeadBranch)
+	Equals(t, "main", capturedCtx.Pull.BaseBranch)
+}
+
+func TestAPISetup_PRWithoutBaseBranchSeedsLiveBaseBeforeClone(t *testing.T) {
+	ac, _, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	var clonePull models.PullRequest
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		Then(func(args []Param) ReturnValues {
+			clonePull = args[2].(models.PullRequest)
+			return ReturnValues{repoDir, nil}
+		})
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, "main", clonePull.BaseBranch)
+	Equals(t, "feature", clonePull.HeadBranch)
+}
+
+func TestAPISetup_MergeCheckoutCloneReceivesLivePRBase(t *testing.T) {
+	ac, _, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	var clonePull models.PullRequest
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		Then(func(args []Param) ReturnValues {
+			clonePull = args[2].(models.PullRequest)
+			return ReturnValues{repoDir, nil}
+		})
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, "main", clonePull.BaseBranch)
+}
+
+func TestAPIApply_PRRefDoesNotUseHeadRefAsBaseBranch(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	var applyCtx *command.Context
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			applyCtx = args[0].(*command.Context)
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply}}, nil}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Assert(t, applyCtx != nil, "expected apply command builder to be called")
+	Equals(t, "feature", applyCtx.Pull.HeadBranch)
+	Equals(t, "main", applyCtx.Pull.BaseBranch)
+	Assert(t, applyCtx.PullStatus != nil, "expected API apply to seed in-memory PullStatus")
+	Equals(t, "main", applyCtx.PullStatus.Pull.BaseBranch)
+}
+
+func TestAPIApply_PRWithoutBaseBranchCurrentLiveBaseSucceeds(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	ac.LivePullHeadFetcher = fakeControllerLivePullHeadFetcher{
+		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
+	}
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{CommandName: command.Apply}}, nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "feature",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIApply_NonPRMutableRefChangedDuringApplyDoesNotPublishSuccess(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	repoDir, _ := initAPIControllerGitRepoWithOrigin(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).
+		Then(func([]Param) ReturnValues {
+			advanceAPIControllerGitMain(t, repoDir)
+			return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+		})
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	ResponseContains(t, w, http.StatusInternalServerError, "changed")
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Any[models.ProjectCounts](),
+	)
+}
+
+func TestAPIApply_NonPRReleaseStableBranchChangedNoProjectsDoesNotPublishZeroZeroSuccess(t *testing.T) {
+	for _, ref := range []string{"release", "stable"} {
+		t.Run(ref, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			repoDir, _ := initAPIControllerGitRepoWithOrigin(t)
+			createAPIControllerGitBranch(t, repoDir, ref)
+			workingDir := ac.WorkingDir.(*MockWorkingDir)
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+				ThenReturn(repoDir, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+				ThenReturn(repoDir, nil)
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func([]Param) ReturnValues {
+					advanceAPIControllerGitBranch(t, repoDir, ref)
+					return ReturnValues{[]command.ProjectContext{}, nil}
+				})
+			commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        ref,
+				Type:       "Gitlab",
+				Projects:   []string{"default"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Apply(w, req)
+
+			Equals(t, http.StatusInternalServerError, w.Code)
+			ResponseContains(t, w, http.StatusInternalServerError, "changed")
+			projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+			commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Eq(models.SuccessCommitStatus),
+				Eq(command.Apply),
+				Any[models.ProjectCounts](),
+			)
+		})
+	}
+}
+
+func TestAPIApply_NonPRAmbiguousBranchUnchangedNoProjectsSucceeds(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	repoDir, _ := initAPIControllerGitRepoWithOrigin(t)
+	createAPIControllerGitBranch(t, repoDir, "release")
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "release",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitStatusUpdater.VerifyWasCalled(Times(2)).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Eq(models.ProjectCounts{}),
+	)
+}
+
+func TestAPIApply_NonPRImmutableSHANoProjectsSucceeds(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	repoDir, commit := initAPIControllerGitRepoWithOrigin(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        commit,
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIApply_NonPRMutableRefUnchangedAllowsApply(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	repoDir, _ := initAPIControllerGitRepoWithOrigin(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIApply_NonPRImmutableSHAAllowsApply(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	repoDir, commit := initAPIControllerGitRepoWithOrigin(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        commit,
+		BaseBranch: "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIApply_UsesResolvedHeadPullRequestStatusForPlanRequirements(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	repoDir, headCommit := initAPIControllerGitRepo(t)
+	workingDir := ac.WorkingDir.(*MockWorkingDir)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(repoDir, nil)
+	fetcher := NewMockPullReqStatusFetcher()
+	mockCall := When(fetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]()))
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{}, nil)
+	mockCall = mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	mockCall.ThenReturn(models.PullReqStatus{
+		ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		MergeableStatus: models.MergeableStatus{IsMergeable: true},
+	}, nil)
+	ac.PullReqStatusFetcher = fetcher
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	fetcher.VerifyWasCalled(Times(3)).FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())
+	planCtx, _ := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, headCommit, planCtx.Pull.HeadCommit)
+	Assert(t, planCtx.PullRequestStatus.ApprovalStatus.IsApproved,
+		"expected pre-apply plan to use resolved-head approved status")
+	Assert(t, planCtx.PullRequestStatus.MergeableStatus.IsMergeable,
+		"expected pre-apply plan to use resolved-head mergeable status")
+}
+
 func TestAPIController_ApplyRefreshesPullReqStatusAfterPlan(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	fetcher := NewMockPullReqStatusFetcher()
@@ -1280,6 +1743,7 @@ func TestAPIController_ApplySeedsPolicyStatusFromAPIPlan(t *testing.T) {
 	Equals(t, 1, len(capturedPullStatus.Projects))
 	Equals(t, 1, len(capturedPullStatus.Projects[0].PolicyStatus))
 	projectCommandRunner.VerifyWasCalled(Once()).PolicyCheck(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Once()).Apply(Any[command.ProjectContext]())
 }
 
 func TestAPIController_ListLocksEmpty(t *testing.T) {
@@ -1457,6 +1921,47 @@ func initAPIControllerGitRepo(t *testing.T) (string, string) {
 	runAPIControllerGit(t, repoDir, "config", "--local", "commit.gpgsign", "false")
 	runAPIControllerGit(t, repoDir, "commit", "--allow-empty", "-m", "initial commit")
 	return repoDir, strings.TrimSpace(runAPIControllerGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func initAPIControllerGitRepoWithOrigin(t *testing.T) (string, string) {
+	t.Helper()
+	repoDir, commit := initAPIControllerGitRepo(t)
+	originDir := filepath.Join(t.TempDir(), "origin.git")
+	runAPIControllerGit(t, repoDir, "init", "--bare", originDir)
+	runAPIControllerGit(t, originDir, "config", "gc.auto", "0")
+	runAPIControllerGit(t, originDir, "config", "maintenance.auto", "false")
+	runAPIControllerGit(t, repoDir, "remote", "add", "origin", "file://"+originDir)
+	runAPIControllerGit(t, repoDir, "push", "-q", "-u", "origin", "main")
+	return repoDir, commit
+}
+
+func createAPIControllerGitBranch(t *testing.T, repoDir, branch string) string {
+	t.Helper()
+	runAPIControllerGit(t, repoDir, "checkout", "-q", "-b", branch)
+	runAPIControllerGit(t, repoDir, "push", "-q", "-u", "origin", branch)
+	return strings.TrimSpace(runAPIControllerGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func advanceAPIControllerGitBranch(t *testing.T, repoDir, branch string) string {
+	t.Helper()
+	runAPIControllerGit(t, repoDir, "checkout", "-q", branch)
+	changedTF := []byte("resource \"null_resource\" \"" + strings.ReplaceAll(branch, "-", "_") + "_changed\" {}\n")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), changedTF, 0600))
+	runAPIControllerGit(t, repoDir, "add", "main.tf")
+	runAPIControllerGit(t, repoDir, "commit", "-q", "-m", "advance "+branch)
+	runAPIControllerGit(t, repoDir, "push", "-q", "origin", "HEAD:"+branch)
+	return strings.TrimSpace(runAPIControllerGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func advanceAPIControllerGitMain(t *testing.T, repoDir string) string {
+	t.Helper()
+	runAPIControllerGit(t, repoDir, "checkout", "-q", "main")
+	mainTF := []byte("resource \"null_resource\" \"changed\" {}\n")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), mainTF, 0600))
+	runAPIControllerGit(t, repoDir, "add", "main.tf")
+	runAPIControllerGit(t, repoDir, "commit", "-q", "-m", "advance main")
+	runAPIControllerGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+	return strings.TrimSpace(runAPIControllerGit(t, repoDir, "rev-parse", "HEAD"))
 }
 
 func runAPIControllerGit(t *testing.T, dir string, args ...string) string {
