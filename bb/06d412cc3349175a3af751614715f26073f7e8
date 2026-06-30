@@ -1,0 +1,22 @@
+cmd/server_test.go
+  s_bf2529fc29caf9::t_228a005aef4347 239
+  s_bf2529fc29caf9::t_8089e94a1689e5 294-295
+  s_bf2529fc29caf9::t_678b71852a4e0e 230,241-243,248-290,310-313,315-321,323-324
+  s_bf2529fc29caf9::t_202a833a4e29be 291-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "bb06d412cc3349175a3af751614715f26073f7e8",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
