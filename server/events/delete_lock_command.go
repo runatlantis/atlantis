@@ -4,6 +4,8 @@
 package events
 
 import (
+	"strings"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/planstore"
@@ -67,10 +69,6 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 	if err != nil {
 		return numLocks, err
 	}
-	if numLocks == 0 {
-		logger.Debug("No locks found for repo '%v', pull request: %v", repoFullName, pullNum)
-		return numLocks, nil
-	}
 
 	for i := range numLocks {
 		lock := locks[i]
@@ -82,14 +80,20 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 		}
 	}
 
-	// Clean up external plan store for the entire pull request.
-	if l.PlanStore != nil && numLocks > 0 {
-		owner := locks[0].Pull.BaseRepo.Owner
-		repo := locks[0].Pull.BaseRepo.Name
-		pullNum := locks[0].Pull.Num
-		if err := l.PlanStore.DeleteForPull(owner, repo, pullNum); err != nil {
+	// Always clean up the external plan store for this pull, even when no
+	// locks were found locally. Locks can be cleaned via other paths (manual
+	// unlock, partial failure) which would otherwise leave orphaned S3 plans.
+	if l.PlanStore != nil {
+		owner, repo, ok := strings.Cut(repoFullName, "/")
+		if !ok {
+			logger.Warn("cannot parse owner/repo from %q; skipping external plan store cleanup", repoFullName)
+		} else if err := l.PlanStore.DeleteForPull(owner, repo, pullNum); err != nil {
 			logger.Warn("Failed to delete plans from external store: %s", err)
 		}
+	}
+
+	if numLocks == 0 {
+		logger.Debug("No locks found for repo '%v', pull request: %v", repoFullName, pullNum)
 	}
 
 	return numLocks, nil
