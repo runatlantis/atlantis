@@ -6,6 +6,7 @@ package events_test
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -5804,4 +5805,156 @@ func (m *mockExternalPlanStore) DeleteForPull(owner, repo string, pullNum int) e
 }
 func (m *mockExternalPlanStore) DeletePlanForProject(owner, repo string, pullNum int, workspace, repoRelDir, projectName string) error {
 	return nil
+}
+
+// fakeWorkingDir mimics the parts of FileWorkspace.Clone that matter for the
+// regression test. Importantly, Clone simulates forceClone behavior — it wipes
+// the workspace dir before recreating it. This is exactly what caused the
+// pre-fix bug: if RestorePlans ran before Clone for a workspace, Clone would
+// blow away the freshly restored plans.
+type fakeWorkingDir struct {
+	mocks.MockWorkingDir // embedded so unused methods don't need stubs
+	pullDir              string
+	cloneCalls           []string
+}
+
+func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, workspace string) (string, error) {
+	f.cloneCalls = append(f.cloneCalls, workspace)
+	workspaceDir := filepath.Join(f.pullDir, workspace)
+	// Wipe and recreate (mimics forceClone) — this is the behavior that wiped
+	// restored plans before the fix.
+	if err := os.RemoveAll(workspaceDir); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(workspaceDir, 0o700); err != nil {
+		return "", err
+	}
+	// Initialize a real git repo so PendingPlanFinder's `git ls-files --others`
+	// can pick up restored .tfplan files as untracked.
+	if err := exec.Command("git", "-C", workspaceDir, "init").Run(); err != nil {
+		return "", err
+	}
+	return workspaceDir, nil
+}
+
+func (f *fakeWorkingDir) GetPullDir(_ models.Repo, _ models.PullRequest) (string, error) {
+	if _, err := os.Stat(f.pullDir); err != nil {
+		return "", err
+	}
+	return f.pullDir, nil
+}
+
+func (f *fakeWorkingDir) GetWorkingDir(_ models.Repo, _ models.PullRequest, workspace string) (string, error) {
+	workspaceDir := filepath.Join(f.pullDir, workspace)
+	if _, err := os.Stat(workspaceDir); err != nil {
+		return "", err
+	}
+	return workspaceDir, nil
+}
+
+// Test that plans restored for non-default workspaces survive the Clone +
+// RestorePlans flow. This is the regression test for the bug where
+// cloneMissingWorkspaces ran after RestorePlans and wiped non-default
+// workspace plans via forceClone's os.RemoveAll.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	pullDir := t.TempDir()
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	// restoreFn writes a .tfplan into each workspace dir. With the bug,
+	// Clone for "staging" would run AFTER this and wipe the plan via
+	// os.RemoveAll. With the fix, Clone runs for both workspaces before
+	// this callback fires, so the plans land in already-initialized dirs.
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default", "staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			for _, ws := range []string{"default", "staging"} {
+				projDir := filepath.Join(pullDirArg, ws, "project1")
+				if err := os.MkdirAll(projDir, 0o700); err != nil {
+					return err
+				}
+				planFile := filepath.Join(projDir, ws+".tfplan")
+				if err := os.WriteFile(planFile, []byte("plan-data"), 0o600); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	// Trigger the missing-pullDir path: delete pullDir so the first
+	// GetPullDir errors with ErrNotExist.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	// Both workspaces must be cloned (in the order returned by ListWorkspaces).
+	Equals(t, []string{"default", "staging"}, workingDir.cloneCalls)
+
+	// Both plans must survive — the apply command builder discovers them via
+	// PendingPlanFinder. With the original bug, staging's plan would be wiped
+	// by the late Clone and only the default ctx would come back.
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to survive")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to survive")
+
+	// Verify the staging plan file bytes survived — this is the exact
+	// regression: under the old code, Clone(staging) after RestorePlans
+	// would RemoveAll the staging dir and the plan file would be gone.
+	stagingPlan, err := os.ReadFile(filepath.Join(pullDir, "staging", "project1", "staging.tfplan"))
+	Ok(t, err)
+	Equals(t, "plan-data", string(stagingPlan))
 }
