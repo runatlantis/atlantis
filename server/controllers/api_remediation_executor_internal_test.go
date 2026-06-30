@@ -927,6 +927,109 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsRejectsStaleCachedDrift(t *t
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
+func TestDriftApply_NonPRMutableRefChangedDuringApplyFailsClosed(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	repoDir, mainCommit, _, _ := initReachabilityGitRepo(t)
+	runRemediationGit(t, repoDir, "checkout", "-q", "main")
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Apply,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	projectCommandRunner := NewMockProjectCommandRunner()
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func([]Param) ReturnValues {
+		Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600))
+		runRemediationGit(t, repoDir, "add", "main.tf")
+		runRemediationGit(t, repoDir, "commit", "-q", "-m", "advance main during apply")
+		runRemediationGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                          locker,
+			ApplyLockChecker:                applyLockChecker,
+			Logger:                          logger,
+			Scope:                           metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:           projectCommandBuilder,
+			ProjectPlanCommandRunner:        projectCommandRunner,
+			ProjectPolicyCheckCommandRunner: projectCommandRunner,
+			ProjectApplyCommandRunner:       projectCommandRunner,
+			PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
+			WorkingDir:                      workingDir,
+			WorkingDirLocker:                workingDirLocker,
+			CommitStatusUpdater:             commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      events.DefaultWorkspace,
+		Ref:            "main",
+		DetectionID:    "detect-1",
+		ResolvedCommit: mainCommit,
+		Drift:          models.DriftSummary{HasDrift: true},
+	}})
+
+	Assert(t, err != nil, "expected mutable ref movement to fail remediation apply")
+	Assert(t, strings.Contains(err.Error(), "changed"), "expected changed-ref error, got %v", err)
+	Equals(t, 1, len(results))
+	Equals(t, models.RemediationStatusFailed, results[0].Status)
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
 func TestAPIRemediationExecutor_ExecuteApplyProjectsPolicyFailureSkipsApply(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)

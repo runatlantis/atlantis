@@ -197,7 +197,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	if err != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
+		ctx.Log.Debug("remote apply succeeded; deferring success status until final apply freshness validation")
 	}
 	return output, err
 }

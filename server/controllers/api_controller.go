@@ -347,6 +347,10 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
+	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	statusCode := http.StatusOK
 	if result.HasErrors() {
@@ -524,18 +528,19 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
+	headBeforeResolve := ctx.Pull.HeadCommit
+	baseBeforeResolve := ctx.Pull.BaseBranch
+	if err := a.seedAPIPrBaseBranch(ctx); err != nil {
+		return sanitizeAPIError(ctx, err)
+	}
+
 	// ensure workingDir is present
-	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, pull, events.DefaultWorkspace)
+	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
 	if err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
 
-	headBeforeResolve := ctx.Pull.HeadCommit
-	baseBeforeResolve := ctx.Pull.BaseBranch
 	if err := resolveAPIHeadCommit(ctx, repoDir, checkoutMergeEnabled(a.WorkingDir)); err != nil {
-		return sanitizeAPIError(ctx, err)
-	}
-	if err := a.seedAPIPrBaseBranch(ctx); err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
 	if ctx.Pull.Num > 0 && (ctx.Pull.HeadCommit != headBeforeResolve || ctx.Pull.BaseBranch != baseBeforeResolve) {
@@ -858,6 +863,21 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
+}
+
+func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error {
+	if ctx == nil || !ctx.API || ctx.Pull.Num > 0 {
+		return nil
+	}
+	repoDir, err := a.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, events.DefaultWorkspace)
+	if err != nil {
+		return sanitizeAPIError(ctx, err)
+	}
+	return sanitizeAPIError(ctx, events.ValidateNonPRAPIRefUnchanged(command.ProjectContext{
+		Log:  ctx.Log,
+		Pull: ctx.Pull,
+		API:  ctx.API,
+	}, repoDir))
 }
 
 func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
@@ -1338,6 +1358,10 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 	if err != nil {
 		return remediationResults, err
 	}
+	if err := e.controller.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		markRunningRemediationResultsFailed(remediationResults, err.Error())
+		return remediationResults, err
+	}
 	remediationResults = mergeApplyRemediationResults(remediationResults, applyResult)
 	if applyResult.HasErrors() {
 		markRunningRemediationResultsFailed(remediationResults, "apply skipped because an earlier execution group failed")
@@ -1429,6 +1453,10 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	result, err := e.controller.apiApply(request, ctx)
 	if err != nil {
 		return "", err
+	}
+	if err := e.controller.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		output := applyRemediationOutput(result)
+		return output.String(), err
 	}
 
 	output := applyRemediationOutput(result)

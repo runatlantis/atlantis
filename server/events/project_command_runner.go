@@ -895,6 +895,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err == nil {
+		err = ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+	}
+	if err == nil {
 		if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
 			err = validator.ValidateCommandStartHead(ctx)
 		}

@@ -269,21 +269,20 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	currentPull := applyPullWithLiveIdentity(pull, livePull)
+	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull); err != nil {
+		ctx.Log.Warn("not publishing apply success status because %s", err)
+		ctx.CommandHasErrors = true
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		return
+	}
+
 	a.updateCommitStatus(ctx, pullStatus)
 
-	if result.HasErrors() || applyResultHasStaleCommandHead(result.ProjectResults) {
+	if result.HasErrors() {
 		return
-	}
-	if err := pullStatusFreshnessError(pull, pullStatus.Pull, "recorded apply status"); err != nil {
-		ctx.Log.Warn("not automerging because %s", err)
-		return
-	}
-	currentPull := pull
-	if livePull.HeadCommit != "" {
-		currentPull.HeadCommit = livePull.HeadCommit
-		if livePull.BaseBranch != "" {
-			currentPull.BaseBranch = livePull.BaseBranch
-		}
 	}
 	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		ctx.Log.Warn("not automerging because %s", err)
@@ -321,6 +320,40 @@ func livePullIdentityChangedDuringApply(before models.PullRequest, after models.
 			before.BaseBranch,
 			after.BaseBranch,
 		)
+	}
+	return nil
+}
+
+func applyPullWithLiveIdentity(pull models.PullRequest, livePull models.PullRequest) models.PullRequest {
+	currentPull := pull
+	if livePull.HeadCommit != "" {
+		currentPull.HeadCommit = livePull.HeadCommit
+	}
+	if livePull.BaseBranch != "" {
+		currentPull.BaseBranch = livePull.BaseBranch
+	}
+	return currentPull
+}
+
+func applyResultStatusUpdateError(result command.Result, pullStatus models.PullStatus, commandPull models.PullRequest, currentPull models.PullRequest) error {
+	if staleApplyResultForCurrentPull(commandPull, result.ProjectResults) && !pullStatusFreshForPull(commandPull, pullStatus.Pull) {
+		return fmt.Errorf(
+			"%w: apply result was for head %s base %q but recorded apply status is for head %s base %q",
+			errStaleCommandHead,
+			shortSHA(commandPull.HeadCommit),
+			commandPull.BaseBranch,
+			shortSHA(pullStatus.Pull.HeadCommit),
+			pullStatus.Pull.BaseBranch,
+		)
+	}
+	if applyResultHasStaleCommandHead(result.ProjectResults) {
+		return fmt.Errorf("%w: apply result is stale", errStaleCommandHead)
+	}
+	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+		return err
+	}
+	if result.HasErrors() && pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {
+		return errors.New("apply result has errors but no errored apply status was recorded")
 	}
 	return nil
 }
