@@ -1,0 +1,46 @@
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_627bf6748850f4 897-901
+server/core/redis/redis.go
+  s_bf2529fc29caf9::t_627bf6748850f4 565-566,568
+server/events/project_command_builder_test.go
+  s_bf2529fc29caf9::t_fd5b358c99cacb 60-67
+  s_bf2529fc29caf9::t_1efd692283fae3 2309-2392
+  s_bf2529fc29caf9::t_0d4e101bf966e9 5036-5058
+server/controllers/api_controller.go
+  s_bf2529fc29caf9::t_627bf6748850f4 70-72,534,538-541,547-565,1023-1026,1029
+server/core/boltdb/boltdb_test.go
+  s_bf2529fc29caf9::t_41d5b703bd365d 916,967-974,979
+server/server.go
+  s_bf2529fc29caf9::t_627bf6748850f4 1039
+server/controllers/api_controller_test.go
+  s_bf2529fc29caf9::t_d265620d3ab5f2 1127-1225
+  s_bf2529fc29caf9::t_37fac1edb0d11c 54-62
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_f6cf20f3508829 2099-2106,2150-2157
+  s_bf2529fc29caf9::t_c3b090e532d83f 2122-2149,2158-2165
+  s_bf2529fc29caf9::t_d5b9a4b8fe3d55 2052-2098,2107-2121
+  s_bf2529fc29caf9::t_973b64d3b4b644 2051
+server/events/apply_command_runner_test.go
+  s_bf2529fc29caf9::t_73c4537dd92ab4 1027-1067,1078-1103
+  s_bf2529fc29caf9::t_e16aa0ca9958bf 1104
+server/core/redis/redis_test.go
+  s_bf2529fc29caf9::t_41d5b703bd365d 969,1021-1028,1033
+server/core/boltdb/boltdb.go
+  s_bf2529fc29caf9::t_195009222d3221 512-513,515
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0275a0a89be2c9a9652087c45f8b6c6f8abfce88",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
