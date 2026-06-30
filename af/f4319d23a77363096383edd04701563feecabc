@@ -1,0 +1,21 @@
+server/events/apply_command_runner_test.go
+  s_243a1a1edc15e5::t_f0000826c5aedc 224-226,638-640
+server/events/db_updater.go
+  s_243a1a1edc15e5::t_635e66be3b7a0e 19-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "aff4319d23a77363096383edd04701563feecabc",
+  "prompts": {},
+  "sessions": {
+    "s_243a1a1edc15e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eff59-4592-7c81-877d-5feab029c97e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
