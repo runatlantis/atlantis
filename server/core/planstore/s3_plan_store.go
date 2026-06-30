@@ -281,8 +281,6 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 	if pullDir == "" {
 		return nil // capability probe: external store supports restore
 	}
-	opCtx, opCancel := s3Ctx()
-	defer opCancel()
 	// Build the S3 prefix for all plans under this pull request.
 	prefixParts := []string{}
 	if s.prefix != "" {
@@ -294,11 +292,13 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 	var restored int
 	var continuationToken *string
 	for {
-		resp, err := s.client.ListObjectsV2(opCtx, &s3.ListObjectsV2Input{
+		listCtx, listCancel := s3Ctx()
+		resp, err := s.client.ListObjectsV2(listCtx, &s3.ListObjectsV2Input{
 			Bucket:            aws.String(s.bucket),
 			Prefix:            aws.String(listPrefix),
 			ContinuationToken: continuationToken,
 		})
+		listCancel()
 		if err != nil {
 			return fmt.Errorf("listing plans from S3 (prefix=%s): %w", listPrefix, err)
 		}
@@ -323,25 +323,8 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 				return fmt.Errorf("creating directory for restored plan: %w", err)
 			}
 
-			getResp, err := s.client.GetObject(opCtx, &s3.GetObjectInput{
-				Bucket: aws.String(s.bucket),
-				Key:    aws.String(key),
-			})
-			if err != nil {
-				return fmt.Errorf("downloading plan from S3 (key=%s): %w", key, err)
-			}
-
-			f, err := os.Create(localPath)
-			if err != nil {
-				getResp.Body.Close()
-				return fmt.Errorf("creating local plan file %s: %w", localPath, err)
-			}
-
-			_, copyErr := io.Copy(f, getResp.Body)
-			f.Close()
-			getResp.Body.Close()
-			if copyErr != nil {
-				return fmt.Errorf("writing restored plan file %s: %w", localPath, copyErr)
+			if err := s.downloadObjectTo(key, localPath); err != nil {
+				return err
 			}
 
 			restored++
@@ -358,11 +341,35 @@ func (s *S3PlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) err
 	return nil
 }
 
+// downloadObjectTo fetches the S3 object at key and writes it to localPath.
+// Each call uses its own bounded context so a slow object doesn't starve the
+// rest of a paginated restore.
+func (s *S3PlanStore) downloadObjectTo(key, localPath string) error {
+	getCtx, getCancel := s3Ctx()
+	defer getCancel()
+	getResp, err := s.client.GetObject(getCtx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("downloading plan from S3 (key=%s): %w", key, err)
+	}
+	defer getResp.Body.Close()
+
+	f, err := os.Create(localPath)
+	if err != nil {
+		return fmt.Errorf("creating local plan file %s: %w", localPath, err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, getResp.Body); err != nil {
+		return fmt.Errorf("writing restored plan file %s: %w", localPath, err)
+	}
+	return nil
+}
+
 // DeleteForPull removes all plan objects stored under the pull request prefix in S3.
 func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
-	opCtx, opCancel := s3Ctx()
-	defer opCancel()
-
 	prefixParts := []string{}
 	if s.prefix != "" {
 		prefixParts = append(prefixParts, s.prefix)
@@ -373,21 +380,26 @@ func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
 	var deleted int
 	var continuationToken *string
 	for {
-		resp, err := s.client.ListObjectsV2(opCtx, &s3.ListObjectsV2Input{
+		listCtx, listCancel := s3Ctx()
+		resp, err := s.client.ListObjectsV2(listCtx, &s3.ListObjectsV2Input{
 			Bucket:            aws.String(s.bucket),
 			Prefix:            aws.String(listPrefix),
 			ContinuationToken: continuationToken,
 		})
+		listCancel()
 		if err != nil {
 			return fmt.Errorf("listing plans for deletion (prefix=%s): %w", listPrefix, err)
 		}
 
 		for _, obj := range resp.Contents {
 			key := aws.ToString(obj.Key)
-			if _, err := s.client.DeleteObject(opCtx, &s3.DeleteObjectInput{
+			delCtx, delCancel := s3Ctx()
+			_, err := s.client.DeleteObject(delCtx, &s3.DeleteObjectInput{
 				Bucket: aws.String(s.bucket),
 				Key:    aws.String(key),
-			}); err != nil {
+			})
+			delCancel()
+			if err != nil {
 				s.logger.Warn("failed to delete plan from S3 (key=%s): %v", key, err)
 				continue
 			}
