@@ -75,6 +75,7 @@ atlantis plan -w staging
 
 * `-d directory` Which directory to run plan in relative to root of repo. Use `.` for root.
   * Ex. `atlantis plan -d child/dir`
+* `--failed` Run plan only for projects whose previous plan failed. This is useful after a multi-project plan where some projects succeeded and one or more projects failed.
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w` because the project defines this already.
 * `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused.
 * `--verbose` Append Atlantis log to comment.

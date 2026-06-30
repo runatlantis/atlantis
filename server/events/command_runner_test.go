@@ -453,6 +453,41 @@ func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	)
 }
 
+func TestRunCommentCommandPlanFailedOnly_NoFailedProjects(t *testing.T) {
+	t.Log("if a plan --failed command is run and there are no failed projects Atlantis comments by default")
+	vcsClient := setup(t)
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, FailedPlansOnly: true})
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("No failed plans to re-run."), Eq("plan"))
+}
+
+func TestRunCommentCommandPlanFailedOnly_NoFailedProjectsSilenceEnabled(t *testing.T) {
+	t.Log("if a plan --failed command is run and there are no failed projects SilenceNoProjects suppresses the comment")
+	vcsClient := setup(t)
+	planCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan, FailedPlansOnly: true})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.Plan),
+		Eq(models.ProjectCounts{}),
+	)
+}
+
 func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 	// TODO
 	t.Log("if a plan command is run against a project and SilenceNoProjects is enabled, we are silencing all comments if the project is not in the repo config")
@@ -1308,8 +1343,8 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 }
 
 // Test that if one plan fails and we are using automerge, that
-// we delete the plans.
-func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
+// we keep the successful plans generated during the run.
+func TestRunAutoplanCommandWithError_KeepsPlans(t *testing.T) {
 	vcsClient := setup(t)
 
 	tmp := t.TempDir()
@@ -1356,8 +1391,8 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
+	// gets called once before the plan starts to clear any stale plans
+	pendingPlanFinder.VerifyWasCalledOnce().DeletePlans(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
@@ -1450,6 +1485,60 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 
 	When(workingDir.GetPullDir(testdata.GithubRepo, modelPull)).ThenReturn(tmp, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &modelPull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+}
+
+func TestRunApply_BlockedWhenPullHasFailedPlan(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and at least one plan failed then apply is not performed")
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	vcsClient := setup(t, func(testConfig *TestConfig) {
+		testConfig.database = boltDB
+	})
+
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "ok",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		},
+		{
+			Command:    command.Plan,
+			RepoRelDir: "failed",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("plan failed"),
+			},
+		},
+	})
+	Ok(t, err)
+
+	ghPull := &github.PullRequest{State: github.Ptr("open")}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(ghPull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(ghPull))).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Apply,
+				RepoRelDir:  "ok",
+				Workspace:   "default",
+			},
+		}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &pull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Eq("apply")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Apply is blocked because 1 plan(s) failed"), "expected apply blocked comment, got %q", comment)
+	Assert(t, strings.Contains(comment, "atlantis plan --failed"), "expected plan --failed hint, got %q", comment)
 }
 
 func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {
