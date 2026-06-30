@@ -34,13 +34,14 @@ type PreWorkflowHooksConfiguredChecker interface {
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
-	VCSClient             vcs.Client                    `validate:"required"`
-	WorkingDirLocker      WorkingDirLocker              `validate:"required"`
-	WorkingDir            WorkingDir                    `validate:"required"`
-	GlobalCfg             valid.GlobalCfg               `validate:"required"`
-	PreWorkflowHookRunner runtime.PreWorkflowHookRunner `validate:"required"`
-	CommitStatusUpdater   CommitStatusUpdater           `validate:"required"`
-	Router                PreWorkflowHookURLGenerator   `validate:"required"`
+	VCSClient                       vcs.Client                    `validate:"required"`
+	WorkingDirLocker                WorkingDirLocker              `validate:"required"`
+	WorkingDir                      WorkingDir                    `validate:"required"`
+	GlobalCfg                       valid.GlobalCfg               `validate:"required"`
+	PreWorkflowHookRunner           runtime.PreWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater             CommitStatusUpdater           `validate:"required"`
+	Router                          PreWorkflowHookURLGenerator   `validate:"required"`
+	SilenceVCSStatusPreWorkflowHook bool
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -145,17 +146,22 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			ctx.Log.Debug("Setting shellArgs to default: '%s'", shellArgs)
 			shellArgs = "-c"
 		}
-		url, err := w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
-		if err != nil && !ctx.API {
-			return err
-		}
+		// VCS statuses for pre-workflow hooks are suppressed either for API-driven
+		// workflows (suppressVCSStatus, e.g. drift detection) or globally via the
+		// silence-vcs-status-pre-workflow-hook config flag. The hook URL is only used
+		// for these statuses, so skip generating it when they are suppressed.
+		suppressStatus := suppressVCSStatus || w.SilenceVCSStatusPreWorkflowHook
 
-		if !suppressVCSStatus {
+		var url string
+		if !suppressStatus {
+			var urlErr error
+			url, urlErr = w.Router.GenerateProjectWorkflowHookURL(ctx.HookID)
+			if urlErr != nil && !ctx.API {
+				return urlErr
+			}
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-				ctx.Log.Info("is api? %v", ctx.API)
 				if !ctx.API {
-					ctx.Log.Info("is api? %v", ctx.API)
 					return err
 				}
 			}
@@ -164,7 +170,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if !suppressVCSStatus {
+			if !suppressStatus {
 				if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 					ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 				}
@@ -172,7 +178,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if !suppressVCSStatus {
+		if !suppressStatus {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 				if !ctx.API {
