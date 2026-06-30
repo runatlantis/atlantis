@@ -339,10 +339,6 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
-	if hasPolicyCheckErrors(result) {
-		responder.writeJSON(w, http.StatusInternalServerError, result)
-		return
-	}
 
 	// The API apply endpoint runs plan first. Refresh PR status afterward so
 	// apply requirements evaluate the VCS state the plan phase just produced.
@@ -897,18 +893,6 @@ func (a *APIController) publishDeferredApplyStatuses(projectCmds []command.Proje
 	publisher.PublishDeferredApplyStatuses(projectCmds, *result, status)
 }
 
-func hasPolicyCheckErrors(result *command.Result) bool {
-	if result == nil {
-		return false
-	}
-	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command == command.PolicyCheck && !projectResult.IsSuccessful() {
-			return true
-		}
-	}
-	return false
-}
-
 func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
 	if ctx.PullStatus == nil {
 		return
@@ -932,6 +916,7 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 	if ctx.PullStatus == nil {
 		ctx.PullStatus = &models.PullStatus{Pull: ctx.Pull}
 	}
+	ctx.PullStatus.Pull = ctx.Pull
 	for _, projectResult := range result.ProjectResults {
 		if projectResult.Command != command.Plan && projectResult.Command != command.PolicyCheck && projectResult.Command != command.ApprovePolicies {
 			continue
