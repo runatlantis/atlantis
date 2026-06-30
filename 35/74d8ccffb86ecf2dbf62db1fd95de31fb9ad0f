@@ -1,0 +1,50 @@
+server/events/apply_command_runner_test.go
+  s_bf2529fc29caf9::t_1ff7efde06ce1e 191,215-216
+  s_bf2529fc29caf9::t_355fad379c6295 217
+server/events/api_ref_validator_test.go
+  s_bf2529fc29caf9::t_35f768811bcc13 61,78-149,282,292-307,309
+  s_bf2529fc29caf9::t_488a1b13c7cab5 308
+  s_bf2529fc29caf9::t_6cea9af03d4714 310
+server/events/apply_command_runner_internal_test.go
+  s_bf2529fc29caf9::t_5cf141d8773b58 227-295
+server/events/command_runner_test.go
+  s_bf2529fc29caf9::t_1ff7efde06ce1e 697-699
+server/events/command/project_result.go
+  s_bf2529fc29caf9::t_b2171d559cf493 26
+server/events/project_command_runner.go
+  s_bf2529fc29caf9::t_b2171d559cf493 333,338,830-831,834,841,843,847,850,855,860,866,869,876,882,889,893,899,928,931
+  s_bf2529fc29caf9::t_255a780217f635 335-337,902-904
+server/jobs/job_url_setter.go
+  s_bf2529fc29caf9::t_b2171d559cf493 48-50
+server/events/apply_command_runner.go
+  s_bf2529fc29caf9::t_b2171d559cf493 202-208,373-388
+  s_bf2529fc29caf9::t_f2c2fef04d87a1 389-390
+server/events/command/project_context.go
+  s_bf2529fc29caf9::t_b2171d559cf493 169-172
+server/jobs/job_url_setter_test.go
+  s_bf2529fc29caf9::t_8626782d3d7a0e 38-54
+server/events/project_command_runner_test.go
+  s_bf2529fc29caf9::t_41ab79b6a9c087 342-369
+  s_bf2529fc29caf9::t_b7fc47f2509c4f 1249-1278,2781,2789-2802,2804
+  s_bf2529fc29caf9::t_4cc3115c559e90 2803,2805
+server/core/runtime/apply_step_runner_test.go
+  s_bf2529fc29caf9::t_8626782d3d7a0e 296,303,324
+server/core/runtime/apply_step_runner.go
+  s_bf2529fc29caf9::t_b2171d559cf493 162-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "3574d8ccffb86ecf2dbf62db1fd95de31fb9ad0f",
+  "prompts": {},
+  "sessions": {
+    "s_bf2529fc29caf9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f10d7-ed91-7260-a28b-d774bc2177da",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
