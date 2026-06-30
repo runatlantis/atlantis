@@ -159,6 +159,9 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
+			if ctx.RemoteApplyRunURL != nil {
+				*ctx.RemoteApplyRunURL = runURL
+			}
 			ctx.Log.Debug("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false

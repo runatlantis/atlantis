@@ -339,6 +339,34 @@ func TestProjectOutputWrapper(t *testing.T) {
 	}
 }
 
+func TestProjectOutputWrapper_PassesRemoteApplyURLToDeferredSuccessStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		Workspace:  "default",
+		RepoRelDir: ".",
+	}
+	prjResult := command.ProjectCommandOutput{
+		ApplySuccess:    "apply complete",
+		ApplySuccessURL: "https://app.terraform.io/app/org/workspace/runs/run-123",
+	}
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+		ProjectCommandRunner: mockProjectCommandRunner,
+	}
+	When(mockProjectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(prjResult)
+
+	runner.Apply(ctx)
+
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.PendingCommitStatus, nil)
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
+	mockJobMessageSender.VerifyWasCalledOnce().Send(ctx, "", true)
+}
+
 func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
@@ -1214,6 +1242,36 @@ func TestProjectCommandRunner_NonPRMutableRefChangedBeforeApplyDoesNotRunApply(t
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected changed mutable ref to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRReleaseBranchChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	createProjectRunnerAPIRefGitBranch(t, repoDir, "release", initialCommit)
+	advanceProjectRunnerAPIRefGitBranch(t, repoDir, "release")
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Pull.HeadBranch = "release"
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed release branch to fail before apply")
+	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
+	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_NonPRStableBranchChangedBeforeApplyDoesNotRunApply(t *testing.T) {
+	repoDir, initialCommit := initProjectRunnerAPIRefGitRepo(t)
+	createProjectRunnerAPIRefGitBranch(t, repoDir, "stable", initialCommit)
+	advanceProjectRunnerAPIRefGitBranch(t, repoDir, "stable")
+	runner, mockApply := newNonPRAPIApplyRunner(t, repoDir)
+	ctx := nonPRAPIApplyContext(t, initialCommit)
+	ctx.Pull.HeadBranch = "stable"
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected changed stable branch to fail before apply")
 	Assert(t, strings.Contains(res.Error.Error(), "changed"), "got: %s", res.Error)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
@@ -2720,10 +2778,28 @@ func initProjectRunnerAPIRefGitRepo(t *testing.T) (string, string) {
 
 func advanceProjectRunnerAPIRefGitMain(t *testing.T, repoDir string) string {
 	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "main")
 	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600))
 	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
 	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "advance main")
 	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+	return strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func createProjectRunnerAPIRefGitBranch(t *testing.T, repoDir string, branch string, commit string) {
+	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "-B", branch, commit)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "-u", "origin", "HEAD:"+branch)
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", "main")
+}
+
+func advanceProjectRunnerAPIRefGitBranch(t *testing.T, repoDir string, branch string) string {
+	t.Helper()
+	runProjectRunnerAPIRefGit(t, repoDir, "checkout", "-q", branch)
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \""+branch+"\" {}\n"), 0600))
+	runProjectRunnerAPIRefGit(t, repoDir, "add", "main.tf")
+	runProjectRunnerAPIRefGit(t, repoDir, "commit", "-q", "-m", "advance "+branch)
+	runProjectRunnerAPIRefGit(t, repoDir, "push", "-q", "origin", "HEAD:"+branch)
 	return strings.TrimSpace(runProjectRunnerAPIRefGit(t, repoDir, "rev-parse", "HEAD"))
 }
 

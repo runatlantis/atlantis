@@ -23,6 +23,7 @@ type ProjectCommandOutput struct {
 	PlanSuccess        *models.PlanSuccess
 	PolicyCheckResults *models.PolicyCheckResults
 	ApplySuccess       string
+	ApplySuccessURL    string `json:"-"`
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
 	StateRmSuccess     *models.StateRmSuccess

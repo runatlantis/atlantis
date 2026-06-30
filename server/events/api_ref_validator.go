@@ -29,9 +29,6 @@ func ValidateNonPRAPIRefUnchanged(ctx command.ProjectContext, repoDir string) er
 	if headRef == "" || isImmutableAPICommitRef(headRef) {
 		return nil
 	}
-	if !strings.HasPrefix(headRef, "refs/tags/") && models.RequiresBaseBranchForRef(headRef) {
-		return nil
-	}
 	resolved, err := resolveMutableAPIRef(repoDir, headRef)
 	if err != nil {
 		return err

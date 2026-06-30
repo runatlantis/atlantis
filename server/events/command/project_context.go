@@ -166,6 +166,10 @@ type ProjectContext struct {
 	// remediation from sending legacy event: apply webhooks.
 	SuppressApplyWebhooks bool
 
+	// RemoteApplyRunURL receives the Terraform Cloud/Enterprise run URL found by
+	// remote apply execution so deferred final status publication can use it.
+	RemoteApplyRunURL *string
+
 	// FailOnMissingDependencies makes apply dependency validation fail when a
 	// configured dependency is not present in PullStatus.
 	FailOnMissingDependencies bool

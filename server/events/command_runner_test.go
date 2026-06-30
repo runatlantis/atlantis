@@ -694,7 +694,9 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	vcsClient := setup(t)
 	applyCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	Ok(t, err)
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 

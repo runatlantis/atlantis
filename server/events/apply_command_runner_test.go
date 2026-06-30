@@ -188,7 +188,7 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 			})
 
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
-			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
 
 			cmd := &events.CommentCommand{Name: command.Apply}
 			if c.Targeted {
@@ -211,6 +211,9 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 						Workspace:  "default",
 					},
 				})
+				Ok(t, err)
+			} else if c.ExpVCSStatusSet && !c.Matched {
+				_, err = db.UpdatePullWithResults(modelPull, nil)
 				Ok(t, err)
 			}
 

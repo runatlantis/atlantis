@@ -199,21 +199,15 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !a.silenceVCSStatusNoProjects {
+			currentPull := applyPullWithLiveIdentity(pull, livePull)
+			pullStatus, err := a.currentNoProjectApplyPullStatus(ctx, pull, currentPull)
+			if err != nil {
+				ctx.Log.Warn("not publishing no-project apply success status because %s", err)
+				ctx.CommandHasErrors = true
+				return
+			}
 			if cmd.IsForSpecificProject() {
 				// With a specific apply, just reset the status so it's not stuck in pending state
-				pullStatus, err := a.Database.GetPullStatus(pull)
-				if err != nil {
-					ctx.Log.Warn("unable to fetch pull status: %s", err)
-					return
-				}
-				if pullStatus == nil {
-					// default to 0/0
-					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
-					if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
-						ctx.Log.Warn("unable to update commit status: %s", err)
-					}
-					return
-				}
 				ctx.Log.Debug("resetting VCS status")
 				a.updateCommitStatus(ctx, *pullStatus)
 			} else {
@@ -374,6 +368,24 @@ func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {
 		}
 	}
 	return false
+}
+
+func (a *ApplyCommandRunner) currentNoProjectApplyPullStatus(ctx *command.Context, pull models.PullRequest, currentPull models.PullRequest) (*models.PullStatus, error) {
+	pullStatus := ctx.PullStatus
+	if pullStatus == nil && a.Database != nil {
+		var err error
+		pullStatus, err = a.Database.GetPullStatus(pull)
+		if err != nil {
+			return nil, fmt.Errorf("fetching recorded plan status: %w", err)
+		}
+	}
+	if pullStatus == nil {
+		return nil, errors.New("no recorded plan status found")
+	}
+	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+		return nil, err
+	}
+	return pullStatus, nil
 }
 
 func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models.PullRequest) error {

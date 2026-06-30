@@ -58,7 +58,7 @@ func TestValidateNonPRAPIRefUnchangedAllowsImmutableSHA(t *testing.T) {
 
 func TestValidateNonPRAPIRefUnchangedAllowsBareTagLikeRef(t *testing.T) {
 	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
-	runAPIRefValidatorGit(t, repoDir, "tag", "v1.0.0", initialCommit)
+	createAPIRefValidatorGitBranch(t, repoDir, "v1.0.0", initialCommit)
 	advanceAPIRefValidatorGitMain(t, repoDir)
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -72,6 +72,78 @@ func TestValidateNonPRAPIRefUnchangedAllowsBareTagLikeRef(t *testing.T) {
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
 		t.Fatalf("expected bare tag-like API ref to pass, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_BranchNamedReleaseIsRevalidated(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	createAPIRefValidatorGitBranch(t, repoDir, "release", initialCommit)
+	advanceAPIRefValidatorGitBranch(t, repoDir, "release")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "release",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	err := ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+
+	if err == nil {
+		t.Fatal("expected moved release branch to fail")
+	}
+	if !strings.Contains(err.Error(), "changed") {
+		t.Fatalf("expected changed-ref error, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_BranchNamedStableIsRevalidated(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	createAPIRefValidatorGitBranch(t, repoDir, "stable", initialCommit)
+	advanceAPIRefValidatorGitBranch(t, repoDir, "stable")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "stable",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	err := ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+
+	if err == nil {
+		t.Fatal("expected moved stable branch to fail")
+	}
+	if !strings.Contains(err.Error(), "changed") {
+		t.Fatalf("expected changed-ref error, got %v", err)
+	}
+}
+
+func TestValidateNonPRAPIRefUnchanged_TagLikeBranchNameIsRevalidated(t *testing.T) {
+	repoDir, initialCommit := initAPIRefValidatorGitRepo(t)
+	createAPIRefValidatorGitBranch(t, repoDir, "v1.2.3", initialCommit)
+	advanceAPIRefValidatorGitBranch(t, repoDir, "v1.2.3")
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "v1.2.3",
+			HeadCommit: initialCommit,
+		},
+	}
+
+	err := ValidateNonPRAPIRefUnchanged(ctx, repoDir)
+
+	if err == nil {
+		t.Fatal("expected moved tag-like branch to fail")
+	}
+	if !strings.Contains(err.Error(), "changed") {
+		t.Fatalf("expected changed-ref error, got %v", err)
 	}
 }
 
@@ -207,12 +279,32 @@ func initAPIRefValidatorGitRepo(t *testing.T) (string, string) {
 
 func advanceAPIRefValidatorGitMain(t *testing.T, repoDir string) string {
 	t.Helper()
+	runAPIRefValidatorGit(t, repoDir, "checkout", "-q", "main")
 	if err := os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	runAPIRefValidatorGit(t, repoDir, "add", "main.tf")
 	runAPIRefValidatorGit(t, repoDir, "commit", "-q", "-m", "advance main")
 	runAPIRefValidatorGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+	return strings.TrimSpace(runAPIRefValidatorGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func createAPIRefValidatorGitBranch(t *testing.T, repoDir string, branch string, commit string) {
+	t.Helper()
+	runAPIRefValidatorGit(t, repoDir, "checkout", "-q", "-B", branch, commit)
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "-u", "origin", "HEAD:"+branch)
+	runAPIRefValidatorGit(t, repoDir, "checkout", "-q", "main")
+}
+
+func advanceAPIRefValidatorGitBranch(t *testing.T, repoDir string, branch string) string {
+	t.Helper()
+	runAPIRefValidatorGit(t, repoDir, "checkout", "-q", branch)
+	if err := os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \""+branch+"\" {}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	runAPIRefValidatorGit(t, repoDir, "add", "main.tf")
+	runAPIRefValidatorGit(t, repoDir, "commit", "-q", "-m", "advance "+branch)
+	runAPIRefValidatorGit(t, repoDir, "push", "-q", "origin", "HEAD:"+branch)
 	return strings.TrimSpace(runAPIRefValidatorGit(t, repoDir, "rev-parse", "HEAD"))
 }
 
