@@ -75,6 +75,22 @@ func TestValidateNonPRAPIRefUnchangedAllowsBareTagLikeRef(t *testing.T) {
 	}
 }
 
+func TestValidateNonPRAPIRefUnchangedAllowsNonGitDir(t *testing.T) {
+	ctx := command.ProjectContext{
+		Log: logging.NewNoopLogger(t),
+		API: true,
+		Pull: models.PullRequest{
+			Num:        -1,
+			HeadBranch: "main",
+			HeadCommit: strings.Repeat("a", 40),
+		},
+	}
+
+	if err := ValidateNonPRAPIRefUnchanged(ctx, t.TempDir()); err != nil {
+		t.Fatalf("expected non-git API dir to pass, got %v", err)
+	}
+}
+
 func initAPIRefValidatorGitRepo(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()

@@ -5,9 +5,7 @@ package events
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -20,11 +18,12 @@ func ValidateNonPRAPIRefUnchanged(ctx command.ProjectContext, repoDir string) er
 	if !ctx.API || ctx.Pull.Num > 0 || repoDir == "" {
 		return nil
 	}
-	if _, err := os.Stat(filepath.Join(repoDir, ".git")); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("checking API checkout git metadata: %w", err)
+	gitMetadata, err := hasGitMetadata(repoDir)
+	if err != nil {
+		return err
+	}
+	if !gitMetadata {
+		return nil
 	}
 	headRef := strings.TrimSpace(ctx.Pull.HeadBranch)
 	if headRef == "" || isImmutableAPICommitRef(headRef) {
@@ -41,6 +40,19 @@ func ValidateNonPRAPIRefUnchanged(ctx command.ProjectContext, repoDir string) er
 		return fmt.Errorf("API ref %q changed from %s to %s while apply was running; rerun plan/apply for the current ref", headRef, shortAPICommit(ctx.Pull.HeadCommit), shortAPICommit(resolved))
 	}
 	return nil
+}
+
+func hasGitMetadata(repoDir string) (bool, error) {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = repoDir
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return strings.TrimSpace(string(output)) != "", nil
+	}
+	if strings.Contains(string(output), "not a git repository") {
+		return false, nil
+	}
+	return false, fmt.Errorf("checking API checkout git metadata: %s: %w", strings.TrimSpace(string(output)), err)
 }
 
 func resolveMutableAPIRef(repoDir, ref string) (string, error) {
