@@ -296,7 +296,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -311,7 +311,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -321,7 +321,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}"'
       - env:
           name: TF_VAR_author
           command: 'git show -s --format="%ae" $HEAD_COMMIT'
@@ -331,7 +331,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
@@ -351,7 +351,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -363,7 +363,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
