@@ -2336,9 +2336,10 @@ projects:
 	}
 }
 
-// A later matching repo block that does not set apply_requirements must not
-// override the requirements inherited from an earlier block, even when policy
-// checks inject policies_passed into every block.
+// A later matching repo block that omits apply_requirements must inherit the
+// requirements from an earlier block rather than override them, even with
+// policy checks enabled (which would otherwise inject a policies_passed-only
+// slice into the omitted requirement).
 func TestParseGlobalCfg_InheritReqsAcrossMatchingRepos(t *testing.T) {
 	input := `repos:
 - id: /.*/
@@ -2357,4 +2358,27 @@ func TestParseGlobalCfg_InheritReqsAcrossMatchingRepos(t *testing.T) {
 	merged := global.MergeProjectCfg(logging.NewNoopLogger(t), "github.com/owner/repo",
 		valid.Project{Dir: ".", Workspace: "default"}, valid.RepoCfg{})
 	Equals(t, []string{"approved", "mergeable", "policies_passed"}, merged.ApplyRequirements)
+}
+
+// A later matching repo block that explicitly sets an empty apply_requirements
+// must override (clear) inherited requirements rather than inherit them. The
+// non-nil empty list must be preserved (not collapsed to nil) for this to work.
+func TestParseGlobalCfg_ExplicitEmptyReqsOverride(t *testing.T) {
+	input := `repos:
+- id: /.*/
+  apply_requirements: [approved, mergeable]
+- id: github.com/owner/repo
+  apply_requirements: []
+`
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "conf.yaml")
+	Ok(t, os.WriteFile(path, []byte(input), 0600))
+
+	global, err := (&config.ParserValidator{}).ParseGlobalCfg(path,
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{PolicyCheckEnabled: false}))
+	Ok(t, err)
+
+	merged := global.MergeProjectCfg(logging.NewNoopLogger(t), "github.com/owner/repo",
+		valid.Project{Dir: ".", Workspace: "default"}, valid.RepoCfg{})
+	Equals(t, []string{}, merged.ApplyRequirements)
 }

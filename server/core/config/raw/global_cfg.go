@@ -315,12 +315,11 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalPlanReqs []stri
 		}
 	}
 
-	var mergedPlanReqs []string
-	mergedPlanReqs = append(mergedPlanReqs, r.PlanRequirements...)
-	var mergedApplyReqs []string
-	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
-	var mergedImportReqs []string
-	mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
+	// Clone (not append into nil) so nil stays nil and an explicit empty list
+	// stays non-nil empty; getMatchingCfg relies on that distinction.
+	mergedPlanReqs := slices.Clone(r.PlanRequirements)
+	mergedApplyReqs := slices.Clone(r.ApplyRequirements)
+	mergedImportReqs := slices.Clone(r.ImportRequirements)
 
 	// Only add global reqs if the block set this requirement; keep an omitted
 	// (nil) requirement nil so getMatchingCfg inherits it from an earlier block
