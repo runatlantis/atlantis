@@ -463,10 +463,30 @@ func TestSetupRoutes_ProfilingRoutesDisabled(t *testing.T) {
 
 	s.SetupRoutes()
 
-	req, err := http.NewRequest("GET", "/debug/pprof/goroutine", nil)
-	Ok(t, err)
+	cases := []struct {
+		method string
+		path   string
+	}{
+		{"GET", "/debug/pprof/"},
+		{"GET", "/debug/pprof/cmdline"},
+		{"GET", "/debug/pprof/profile"},
+		{"GET", "/debug/pprof/symbol"},
+		{"GET", "/debug/pprof/trace"},
+		{"GET", "/debug/pprof/goroutine"},
+		{"GET", "/debug/pprof/heap"},
+		{"GET", "/debug/pprof/allocs"},
+		{"GET", "/debug/pprof/block"},
+		{"GET", "/debug/pprof/mutex"},
+		{"GET", "/debug/pprof/threadcreate"},
+	}
 
-	var match mux.RouteMatch
-	Assert(t, !s.Router.Match(req, &match),
-		"route GET /debug/pprof/goroutine should NOT be registered when EnableProfilingAPI=false")
-}
+	for _, c := range cases {
+		t.Run(c.method+" "+c.path, func(t *testing.T) {
+			req, err := http.NewRequest(c.method, c.path, nil)
+			Ok(t, err)
+
+			var match mux.RouteMatch
+			Assert(t, !s.Router.Match(req, &match),
+				"route %s %s should NOT be registered when EnableProfilingAPI=false", c.method, c.path)
+		})
+	}
