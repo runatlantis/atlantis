@@ -315,16 +315,27 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalPlanReqs []stri
 		}
 	}
 
+	// Keep omitted (nil) requirements nil so getMatchingCfg inherits them
+	// instead of a policies_passed-only slice overriding an earlier block.
 	var mergedPlanReqs []string
-	mergedPlanReqs = append(mergedPlanReqs, r.PlanRequirements...)
+	if r.PlanRequirements != nil {
+		mergedPlanReqs = append(mergedPlanReqs, r.PlanRequirements...)
+	}
 	var mergedApplyReqs []string
-	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
+	if r.ApplyRequirements != nil {
+		mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
+	}
 	var mergedImportReqs []string
-	mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
+	if r.ImportRequirements != nil {
+		mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
+	}
 
 	// only add global reqs if they don't exist already.
 OuterGlobalPlanReqs:
 	for _, globalReq := range globalPlanReqs {
+		if r.PlanRequirements == nil {
+			break
+		}
 		for _, currReq := range r.PlanRequirements {
 			if globalReq == currReq {
 				continue OuterGlobalPlanReqs
@@ -339,6 +350,9 @@ OuterGlobalPlanReqs:
 	}
 OuterGlobalApplyReqs:
 	for _, globalReq := range globalApplyReqs {
+		if r.ApplyRequirements == nil {
+			break
+		}
 		for _, currReq := range r.ApplyRequirements {
 			if globalReq == currReq {
 				continue OuterGlobalApplyReqs
@@ -353,6 +367,9 @@ OuterGlobalApplyReqs:
 	}
 OuterGlobalImportReqs:
 	for _, globalReq := range globalImportReqs {
+		if r.ImportRequirements == nil {
+			break
+		}
 		for _, currReq := range r.ImportRequirements {
 			if globalReq == currReq {
 				continue OuterGlobalImportReqs

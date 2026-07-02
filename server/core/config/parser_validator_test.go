@@ -18,6 +18,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -2333,4 +2334,27 @@ projects:
 	for _, p := range cfg.Projects {
 		Assert(t, p.Name == nil, "expanded projects should not have names")
 	}
+}
+
+// A later matching repo block that does not set apply_requirements must not
+// override the requirements inherited from an earlier block, even when policy
+// checks inject policies_passed into every block.
+func TestParseGlobalCfg_InheritReqsAcrossMatchingRepos(t *testing.T) {
+	input := `repos:
+- id: /.*/
+  apply_requirements: [approved, mergeable]
+- id: github.com/owner/repo
+  allow_custom_workflows: true
+`
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "conf.yaml")
+	Ok(t, os.WriteFile(path, []byte(input), 0600))
+
+	global, err := (&config.ParserValidator{}).ParseGlobalCfg(path,
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{PolicyCheckEnabled: true}))
+	Ok(t, err)
+
+	merged := global.MergeProjectCfg(logging.NewNoopLogger(t), "github.com/owner/repo",
+		valid.Project{Dir: ".", Workspace: "default"}, valid.RepoCfg{})
+	Equals(t, []string{"approved", "mergeable", "policies_passed"}, merged.ApplyRequirements)
 }
