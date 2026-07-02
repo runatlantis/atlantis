@@ -315,22 +315,16 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalPlanReqs []stri
 		}
 	}
 
-	// Keep omitted (nil) requirements nil so getMatchingCfg inherits them
-	// instead of a policies_passed-only slice overriding an earlier block.
 	var mergedPlanReqs []string
-	if r.PlanRequirements != nil {
-		mergedPlanReqs = append(mergedPlanReqs, r.PlanRequirements...)
-	}
+	mergedPlanReqs = append(mergedPlanReqs, r.PlanRequirements...)
 	var mergedApplyReqs []string
-	if r.ApplyRequirements != nil {
-		mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
-	}
+	mergedApplyReqs = append(mergedApplyReqs, r.ApplyRequirements...)
 	var mergedImportReqs []string
-	if r.ImportRequirements != nil {
-		mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
-	}
+	mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
 
-	// only add global reqs if they don't exist already.
+	// Only add global reqs if the block set this requirement; keep an omitted
+	// (nil) requirement nil so getMatchingCfg inherits it from an earlier block
+	// instead of a policies_passed-only slice overriding it.
 OuterGlobalPlanReqs:
 	for _, globalReq := range globalPlanReqs {
 		if r.PlanRequirements == nil {
