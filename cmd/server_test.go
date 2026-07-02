@@ -1370,10 +1370,18 @@ func setupWithDefaults(flags map[string]any, t *testing.T) *cobra.Command {
 func tempFile(t *testing.T, contents string) string {
 	f, err := os.CreateTemp("", "")
 	Ok(t, err)
+
+	err = f.Close()
+	Ok(t, err)
+
 	newName := f.Name() + ".yaml"
+
 	err = os.Rename(f.Name(), newName)
 	Ok(t, err)
-	os.WriteFile(newName, []byte(contents), 0600) // nolint: errcheck
+
+	err = os.WriteFile(newName, []byte(contents), 0600)
+	Ok(t, err)
+
 	return newName
 }
 
