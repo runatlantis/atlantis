@@ -395,3 +395,78 @@ func TestSetupRoutes_APIRoutesRegistered(t *testing.T) {
 		})
 	}
 }
+
+func TestSetupRoutes_ProfilingRoutesRegistered(t *testing.T) {
+	t.Log("All pprof profile routes should be reachable when EnableProfilingAPI is true")
+
+	s := server.Server{
+		Router:              mux.NewRouter(),
+		APIController:       &controllers.APIController{},
+		StatusController:    &controllers.StatusController{},
+		LocksController:     &controllers.LocksController{},
+		GithubAppController: &controllers.GithubAppController{},
+		JobsController:      &controllers.JobsController{},
+		VCSEventsController: &events_controllers.VCSEventsController{},
+		Logger:              logging.NewNoopLogger(t),
+		EnableProfilingAPI:  true,
+	}
+
+	s.SetupRoutes()
+
+	// All 10 standard net/http/pprof profiles must be reachable when the
+	// profiling API is enabled. Previously only 5 were registered (index,
+	// cmdline, profile, symbol, trace) while the pprof.Index HTML page
+	// linked to all 10 -- see issue #6626.
+	cases := []struct {
+		method string
+		path   string
+	}{
+		{"GET", "/debug/pprof/"},
+		{"GET", "/debug/pprof/cmdline"},
+		{"GET", "/debug/pprof/profile"},
+		{"GET", "/debug/pprof/symbol"},
+		{"GET", "/debug/pprof/trace"},
+		{"GET", "/debug/pprof/goroutine"},
+		{"GET", "/debug/pprof/heap"},
+		{"GET", "/debug/pprof/allocs"},
+		{"GET", "/debug/pprof/block"},
+		{"GET", "/debug/pprof/mutex"},
+		{"GET", "/debug/pprof/threadcreate"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.method+" "+c.path, func(t *testing.T) {
+			req, err := http.NewRequest(c.method, c.path, nil)
+			Ok(t, err)
+
+			var match mux.RouteMatch
+			Assert(t, s.Router.Match(req, &match),
+				"route %s %s should be registered but was not found", c.method, c.path)
+		})
+	}
+}
+
+func TestSetupRoutes_ProfilingRoutesDisabled(t *testing.T) {
+	t.Log("pprof routes should NOT be reachable when EnableProfilingAPI is false")
+
+	s := server.Server{
+		Router:              mux.NewRouter(),
+		APIController:       &controllers.APIController{},
+		StatusController:    &controllers.StatusController{},
+		LocksController:     &controllers.LocksController{},
+		GithubAppController: &controllers.GithubAppController{},
+		JobsController:      &controllers.JobsController{},
+		VCSEventsController: &events_controllers.VCSEventsController{},
+		Logger:              logging.NewNoopLogger(t),
+		EnableProfilingAPI:  false,
+	}
+
+	s.SetupRoutes()
+
+	req, err := http.NewRequest("GET", "/debug/pprof/goroutine", nil)
+	Ok(t, err)
+
+	var match mux.RouteMatch
+	Assert(t, !s.Router.Match(req, &match),
+		"route GET /debug/pprof/goroutine should NOT be registered when EnableProfilingAPI=false")
+}
