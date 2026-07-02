@@ -490,3 +490,4 @@ func TestSetupRoutes_ProfilingRoutesDisabled(t *testing.T) {
 				"route %s %s should NOT be registered when EnableProfilingAPI=false", c.method, c.path)
 		})
 	}
+}
