@@ -331,7 +331,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
