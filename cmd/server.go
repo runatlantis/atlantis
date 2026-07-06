@@ -461,9 +461,6 @@ var stringFlags = map[string]stringFlag{
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
 	},
-	SlackIncludeBody: {
-		description: "Whether to include the body of the commit message as an extra \"description\" field in Slack output.",
-	},
 	SSLCertFileFlag: {
 		description: "File containing x509 Certificate used for serving HTTPS. If the cert is signed by a CA, the file should be the concatenation of the server's certificate, any intermediates, and the CA's certificate.",
 	},
@@ -697,6 +694,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
+	},
+	SlackIncludeBody: {
+		description:  "Whether to include the body of the pull request as an extra \"description\" field in Slack output.",
 		defaultValue: true,
 	},
 }
