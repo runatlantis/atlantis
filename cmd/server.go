@@ -141,6 +141,7 @@ const (
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
 	SlackTokenFlag                   = "slack-token"
+	SlackIncludeBody                 = "slack-include-body"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
@@ -459,6 +460,9 @@ var stringFlags = map[string]stringFlag{
 	},
 	SlackTokenFlag: {
 		description: "API token for Slack notifications.",
+	},
+	SlackIncludeBody: {
+		description: "Whether to include the body of the commit message as an extra \"description\" field in Slack output.",
 	},
 	SSLCertFileFlag: {
 		description: "File containing x509 Certificate used for serving HTTPS. If the cert is signed by a CA, the file should be the concatenation of the server's certificate, any intermediates, and the CA's certificate.",
