@@ -152,7 +152,7 @@ func TestNewWebhooksManager_NoConfigSuccess(t *testing.T) {
 	var emptyConfigs []webhooks.Config
 	emptyToken := ""
 	anyClients := webhooks.Clients{
-		Slack: webhooks.NewSlackClient(emptyToken),
+		Slack: webhooks.NewSlackClient(emptyToken, true),
 		Http:  &webhooks.HttpClient{Client: http.DefaultClient},
 	}
 	m, err := webhooks.NewMultiWebhookSender(emptyConfigs, anyClients)
