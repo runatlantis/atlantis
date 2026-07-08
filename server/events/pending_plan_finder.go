@@ -184,6 +184,19 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		if err != nil {
 			return nil, nil, err
 		}
+		if _, err := os.Stat(cloneRepoDir); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, nil, err
+		}
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(cloneRepoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			continue
+		}
 		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)
 		if err != nil {
 			return nil, nil, err
