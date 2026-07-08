@@ -8,7 +8,9 @@ package runtime
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
@@ -24,6 +26,7 @@ const (
 	// a link to the run url will be output.
 	lineBeforeRunURL     = "To view this run in a browser, visit:"
 	planfileSlashReplace = "::"
+	planStoreReposDir    = "repos"
 )
 
 // TerraformExec brings the interface from TerraformClient into this package
@@ -97,6 +100,24 @@ func GetPlanFilename(workspace string, projName string) string {
 	}
 	projName = strings.ReplaceAll(projName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+}
+
+// GetPlanFileDir returns the directory where Atlantis stores the plan file for ctx.
+func GetPlanFileDir(ctx command.ProjectContext, projectPath string) string {
+	if ctx.LocalPlanStoreDir == "" {
+		return projectPath
+	}
+	return filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir, ctx.BaseRepo.FullName, strconv.Itoa(ctx.Pull.Num), ctx.Workspace, ctx.RepoRelDir)
+}
+
+// GetPlanFilePath returns the full path to the generated Terraform plan file.
+func GetPlanFilePath(ctx command.ProjectContext, projectPath string) string {
+	return filepath.Join(GetPlanFileDir(ctx, projectPath), GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+}
+
+// GetPlanPullDir returns the root directory for all plan files for a pull request.
+func GetPlanPullDir(localPlanStoreDir string, r models.Repo, p models.PullRequest) string {
+	return filepath.Join(localPlanStoreDir, planStoreReposDir, r.FullName, strconv.Itoa(p.Num))
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated

@@ -117,7 +117,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	if ctx.ExpectedPlanHash != "" {
-		actualHash, err := hashFile(absPath, planPath)
+		actualHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
 		if err != nil {
 			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
@@ -196,19 +196,19 @@ func statusAllowedForApplyExecution(status models.ProjectPlanStatus) bool {
 }
 
 func planFilePath(ctx command.ProjectContext, absPath string) string {
-	return filepath.Join(absPath, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	return runtime.GetPlanFilePath(ctx, absPath)
 }
 
 func safePlanFilePath(ctx command.ProjectContext, absPath string) (string, error) {
 	planPath := planFilePath(ctx, absPath)
-	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
+	if _, err := containedPlanRelPath(runtime.GetPlanFileDir(ctx, absPath), planPath); err != nil {
 		return "", err
 	}
 	return planPath, nil
 }
 
 func pendingPlanFilePath(plan PendingPlan) (string, error) {
-	absPath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+	absPath := filepath.Join(plan.planRepoDir(), plan.RepoRelDir)
 	planPath := filepath.Join(absPath, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
 	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
 		return "", err

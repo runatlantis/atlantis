@@ -80,6 +80,7 @@ var testFlags = map[string]any{
 	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
+	EnableLocalStoresFlag:            "/plans",
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
@@ -199,6 +200,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GHTokenFlag:                      "token",
 		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
+		EnableLocalStoresFlag:            dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
 		RepoAllowlistFlag:                "*",
@@ -292,6 +294,7 @@ func TestNormalizePath(t *testing.T) {
 
 var pathFlags = map[string]struct{}{
 	DataDirFlag:                      {},
+	EnableLocalStoresFlag:            {},
 	MarkdownTemplateOverridesDirFlag: {},
 }
 
@@ -448,6 +451,36 @@ func TestAllFlagsDocumented(t *testing.T) {
 		}
 	}
 
+}
+
+func TestExecute_ExpandHomeInEnableLocalStores(t *testing.T) {
+	t.Log("If ~ is used as an enable-local-stores path, should expand to absolute home path")
+	c := setup(map[string]any{
+		GHUserFlag:            "user",
+		GHTokenFlag:           "token",
+		RepoAllowlistFlag:     "*",
+		EnableLocalStoresFlag: "~/this/is/a/path",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/this/is/a/path", passedConfig.EnableLocalStores)
+}
+
+func TestExecute_RelativeEnableLocalStores(t *testing.T) {
+	t.Log("Should convert relative enable-local-stores dir to absolute.")
+	c := setupWithDefaults(map[string]any{
+		EnableLocalStoresFlag: "../",
+	}, t)
+
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.EnableLocalStores)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {

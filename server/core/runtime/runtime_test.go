@@ -5,9 +5,12 @@ package runtime_test
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -58,6 +61,27 @@ func TestGetPlanFilename(t *testing.T) {
 			Equals(t, c.exp, runtime.GetPlanFilename(c.workspace, c.projectName))
 		})
 	}
+}
+
+func TestGetPlanFilePath(t *testing.T) {
+	projectPath := filepath.Join("data", "repos", "owner", "repo", "2", "default", "modules", "app")
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalPlanStoreDir: filepath.Join("plans"),
+		ProjectName:       "project/name",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "modules/app",
+		Workspace:  "default",
+	}
+
+	Equals(t, filepath.Join("plans", "repos", "owner", "repo", "2", "default", "modules", "app", "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
+
+	ctx.LocalPlanStoreDir = ""
+	Equals(t, filepath.Join(projectPath, "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
 }
 
 func TestProjectNameFromPlanfile(t *testing.T) {

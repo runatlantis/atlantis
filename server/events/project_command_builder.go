@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -93,6 +94,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	localPlanStoreDir string,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -100,34 +102,37 @@ func NewInstrumentedProjectCommandBuilder(
 		metrics.InitCounter(scope, m)
 	}
 
+	builder := NewProjectCommandBuilder(
+		policyChecksSupported,
+		parserValidator,
+		projectFinder,
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentBuilder,
+		skipCloneNoChanges,
+		EnableRegExpCmd,
+		EnableAutoMerge,
+		EnableParallelPlan,
+		EnableParallelApply,
+		AutoDetectModuleFiles,
+		AutoplanFileList,
+		RestrictFileList,
+		DefaultTFDistribution,
+		SilenceNoProjects,
+		IncludeGitUntrackedFiles,
+		AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+	builder.LocalPlanStoreDir = localPlanStoreDir
+
 	return &InstrumentedProjectCommandBuilder{
-		ProjectCommandBuilder: NewProjectCommandBuilder(
-			policyChecksSupported,
-			parserValidator,
-			projectFinder,
-			vcsClient,
-			workingDir,
-			workingDirLocker,
-			globalCfg,
-			pendingPlanFinder,
-			commentBuilder,
-			skipCloneNoChanges,
-			EnableRegExpCmd,
-			EnableAutoMerge,
-			EnableParallelPlan,
-			EnableParallelApply,
-			AutoDetectModuleFiles,
-			AutoplanFileList,
-			RestrictFileList,
-			DefaultTFDistribution,
-			SilenceNoProjects,
-			IncludeGitUntrackedFiles,
-			AutoDiscoverMode,
-			scope,
-			terraformClient,
-		),
-		Logger: logger,
-		scope:  scope,
+		ProjectCommandBuilder: builder,
+		Logger:                logger,
+		scope:                 scope,
 	}
 }
 
@@ -298,6 +303,15 @@ type DefaultProjectCommandBuilder struct {
 	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor tfclient.Client
+	// Root directory for local Terraform plan files.
+	LocalPlanStoreDir string
+}
+
+func (p *DefaultProjectCommandBuilder) withLocalPlanStoreDir(projCtxs []command.ProjectContext) []command.ProjectContext {
+	for i := range projCtxs {
+		projCtxs[i].LocalPlanStoreDir = p.LocalPlanStoreDir
+	}
+	return projCtxs
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -837,7 +851,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -939,7 +953,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
@@ -1266,7 +1280,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
 		if commentCmd.Name == command.Apply {
-			planBasePath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+			planBasePath := filepath.Join(plan.planRepoDir(), plan.RepoRelDir)
 			planPath, err := pendingPlanFilePath(plan)
 			if err != nil {
 				return nil, fmt.Errorf("validating plan path for dir %q: %w", plan.RepoRelDir, err)
@@ -1562,7 +1576,7 @@ func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Contex
 		if err != nil {
 			return fmt.Errorf("validating plan path for dir %q: %w", projCtxs[i].RepoRelDir, err)
 		}
-		planHash, err := hashFile(absPath, planPath)
+		planHash, err := hashFile(runtime.GetPlanFileDir(projCtxs[i], absPath), planPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -1680,7 +1694,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 	}
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {
