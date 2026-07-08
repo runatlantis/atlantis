@@ -57,7 +57,12 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 		tfVersion = ctx.TerraformVersion
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planFile := GetPlanFilePath(ctx, path)
+	if ctx.LocalPlanStoreDir != "" {
+		if err := os.MkdirAll(filepath.Dir(planFile), 0700); err != nil {
+			return "", fmt.Errorf("creating plan file directory: %w", err)
+		}
+	}
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {

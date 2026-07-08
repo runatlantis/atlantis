@@ -69,7 +69,7 @@ func (r *RunStepRunner) Run(
 		"HEAD_REPO_NAME":                  ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":                 ctx.HeadRepo.Owner,
 		"PATH":                            fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                        filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"PLANFILE":                        GetPlanFilePath(ctx, path),
 		"SHOWFILE":                        filepath.Join(path, ctx.GetShowResultFileName()),
 		"POLICYCHECKFILE":                 filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":                    ctx.ProjectName,

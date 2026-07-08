@@ -94,6 +94,9 @@ type ProjectContext struct {
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
+	// LocalPlanStoreDir is the root directory for local Terraform plan files.
+	// If empty, plan files are stored in the project working directory.
+	LocalPlanStoreDir string
 	// RepoConfigVersion is the version of the repo's atlantis.yaml file. If
 	// there was no file, this will be 0.
 	RepoConfigVersion int

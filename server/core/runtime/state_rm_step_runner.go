@@ -44,7 +44,7 @@ func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), stateRmCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the state rm was successful and a plan file exists, delete the plan.
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	if err == nil {
 		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("state rm successful, deleting planfile")

@@ -33,7 +33,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
 
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	contents, err := os.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)

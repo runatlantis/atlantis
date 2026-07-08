@@ -545,10 +545,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
-		DataDir:          userConfig.DataDir,
-		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
-		CheckoutDepth:    userConfig.CheckoutDepth,
-		GithubAppEnabled: githubAppEnabled,
+		DataDir:           userConfig.DataDir,
+		LocalPlanStoreDir: userConfig.EnableLocalStores,
+		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
+		CheckoutDepth:     userConfig.CheckoutDepth,
+		GithubAppEnabled:  githubAppEnabled,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -647,7 +648,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
-	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{
+		DataDir:           userConfig.DataDir,
+		LocalPlanStoreDir: userConfig.EnableLocalStores,
+	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
@@ -709,6 +713,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
 		terraformClient,
+		userConfig.EnableLocalStores,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)

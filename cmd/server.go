@@ -80,6 +80,7 @@ const (
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	EnableLocalStoresFlag            = "enable-local-stores"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
@@ -319,6 +320,10 @@ var stringFlags = map[string]stringFlag{
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
+	},
+	EnableLocalStoresFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
 	},
 	ExecutableName: {
 		description:  "Comment command executable name.",
@@ -932,6 +937,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setEnableLocalStoresDir(&userConfig); err != nil {
+		return err
+	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
@@ -1237,6 +1245,31 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
+	return nil
+}
+
+// setEnableLocalStoresDir checks if ~ was used in enable-local-stores and converts it to the actual
+// home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
+func (s *ServerCmd) setEnableLocalStoresDir(userConfig *server.UserConfig) error {
+	if userConfig.EnableLocalStores == "" {
+		userConfig.EnableLocalStores = userConfig.DataDir
+		return nil
+	}
+
+	finalPath := userConfig.EnableLocalStores
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making enable-local-stores absolute: %w", err)
+	}
+	userConfig.EnableLocalStores = finalPath
 	return nil
 }
 

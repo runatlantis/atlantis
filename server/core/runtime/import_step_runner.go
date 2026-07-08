@@ -44,7 +44,7 @@ func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the import was successful and a plan file exists, delete the plan.
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	if err == nil {
 		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("import successful, deleting planfile")

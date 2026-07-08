@@ -452,7 +452,7 @@ ATLANTIS_DATA_DIR="path/to/data/dir"
 ```
 
 Directory where Atlantis will store its data. Will be created if it doesn't exist.
-Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
+Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans by default, and downloaded
 Terraform binaries here. If Atlantis loses this directory, [locks](locking.md)
 will be lost and unapplied plans will be lost.
 
@@ -642,6 +642,16 @@ This flag requires `--enable-drift-detection`; without it, `action: "apply"` req
 rejected while read-only drift detection remains available. This flag does not bypass
 repository `apply_requirements`; requirements that need pull request state fail closed for
 non-PR remediation requests. Defaults to `false`.
+
+### `--enable-local-stores`
+
+```bash
+atlantis server --enable-local-stores="path/to/local/plan/dir"
+# or
+ATLANTIS_ENABLE_LOCAL_STORES="path/to/local/plan/dir"
+```
+
+Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--enable-local-stores`.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
