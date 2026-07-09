@@ -36,6 +36,23 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+func expectJobFailureBanner(
+	inOrder *InOrderContext,
+	mockJobMessageSender *mocks.MockJobMessageSender,
+	ctx command.ProjectContext,
+	label string,
+	message string,
+) int {
+	sends := 0
+	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, label+":", false)
+	sends++
+	for _, line := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n"), "\n") {
+		mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, line, false)
+		sends++
+	}
+	return sends
+}
+
 // Test that it runs the expected plan steps.
 func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	RegisterMockTestingT(t)
@@ -177,22 +194,22 @@ func TestProjectOutputWrapper(t *testing.T) {
 	}
 
 	const (
-		expErrorBanner          = "\r\nError:\r\nerror\r\n"
-		expMultilineErrorBanner = "\r\nError:\r\nerror\r\nmore detail\r\n"
-		expFailureBanner        = "\r\nFailure:\r\nfailure\r\n"
-		expMultilineFailure     = "\r\nFailure:\r\nfailure\r\nmore detail\r\n"
+		expErrorMessage          = "error"
+		expMultilineErrorMessage = "error\nmore detail"
+		expFailureMessage        = "failure"
+		expMultilineFailure      = "failure\nmore detail"
 	)
 
 	cases := []struct {
-		Description      string
-		Failure          bool
-		Error            bool
-		Success          bool
-		CommandName      command.Name
-		ErrorMessage     string
-		FailureMessage   string
-		ExpErrorBanner   string
-		ExpFailureBanner string
+		Description       string
+		Failure           bool
+		Error             bool
+		Success           bool
+		CommandName       command.Name
+		ErrorMessage      string
+		FailureMessage    string
+		ExpErrorMessage   string
+		ExpFailureMessage string
 	}{
 		{
 			Description: "plan success",
@@ -205,11 +222,11 @@ func TestProjectOutputWrapper(t *testing.T) {
 			CommandName: command.Plan,
 		},
 		{
-			Description:      "plan multiline failure",
-			Failure:          true,
-			CommandName:      command.Plan,
-			FailureMessage:   "failure\nmore detail",
-			ExpFailureBanner: expMultilineFailure,
+			Description:       "plan multiline failure",
+			Failure:           true,
+			CommandName:       command.Plan,
+			FailureMessage:    "failure\nmore detail",
+			ExpFailureMessage: expMultilineFailure,
 		},
 		{
 			Description: "plan error",
@@ -217,11 +234,11 @@ func TestProjectOutputWrapper(t *testing.T) {
 			CommandName: command.Plan,
 		},
 		{
-			Description:    "plan multiline error",
-			Error:          true,
-			CommandName:    command.Plan,
-			ErrorMessage:   "error\nmore detail",
-			ExpErrorBanner: expMultilineErrorBanner,
+			Description:     "plan multiline error",
+			Error:           true,
+			CommandName:     command.Plan,
+			ErrorMessage:    "error\nmore detail",
+			ExpErrorMessage: expMultilineErrorMessage,
 		},
 		{
 			Description: "plan error and failure",
@@ -320,21 +337,23 @@ func TestProjectOutputWrapper(t *testing.T) {
 			// so the xterm-based job page renders the final status.
 			inOrder := new(InOrderContext)
 			expectedSends := 0
-			if c.Error {
-				expectedBanner := c.ExpErrorBanner
-				if expectedBanner == "" {
-					expectedBanner = expErrorBanner
-				}
-				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expectedBanner, false)
+			if c.Error || c.Failure {
+				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", false)
 				expectedSends++
 			}
-			if c.Failure {
-				expectedBanner := c.ExpFailureBanner
-				if expectedBanner == "" {
-					expectedBanner = expFailureBanner
+			if c.Error {
+				expectedMessage := c.ExpErrorMessage
+				if expectedMessage == "" {
+					expectedMessage = expErrorMessage
 				}
-				mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, expectedBanner, false)
-				expectedSends++
+				expectedSends += expectJobFailureBanner(inOrder, mockJobMessageSender, ctx, "Error", expectedMessage)
+			}
+			if c.Failure {
+				expectedMessage := c.ExpFailureMessage
+				if expectedMessage == "" {
+					expectedMessage = expFailureMessage
+				}
+				expectedSends += expectJobFailureBanner(inOrder, mockJobMessageSender, ctx, "Failure", expectedMessage)
 			}
 			mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", true)
 			expectedSends++
@@ -451,9 +470,10 @@ func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {
 
 	ErrEquals(t, "error\nmore detail\nalready streamed output", result.Error)
 	inOrder := new(InOrderContext)
-	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "\r\nError:\r\nerror\r\nmore detail\r\n", false)
+	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", false)
+	expectJobFailureBanner(inOrder, mockJobMessageSender, ctx, "Error", "error\nmore detail")
 	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, "", true)
-	mockJobMessageSender.VerifyWasCalled(Times(2)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
+	mockJobMessageSender.VerifyWasCalled(Times(5)).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 }
 
 func TestProjectOutputWrapperDoesNotReplayCustomRunStepOutput(t *testing.T) {
@@ -516,13 +536,17 @@ func TestProjectOutputWrapperDoesNotReplayCustomRunStepOutput(t *testing.T) {
 	result := runner.Plan(ctx)
 
 	ErrContains(t, "already streamed output", result.Error)
-	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(2)).
+	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(4)).
 		Send(Any[command.ProjectContext](), Any[string](), Any[bool]()).GetAllCapturedArguments()
-	Assert(t, strings.Contains(messages[0], "\r\nError:\r\nrunning 'sh -c' 'cat output.txt; exit 1'"), fmt.Sprintf("expected error summary banner, got %q", messages[0]))
-	Assert(t, !strings.Contains(messages[0], "already streamed output"), fmt.Sprintf("expected banner not to replay run output, got %q", messages[0]))
-	Equals(t, "", messages[1])
+	Assert(t, messages[0] == "", fmt.Sprintf("expected leading blank line, got %q", messages[0]))
+	Assert(t, messages[1] == "Error:", fmt.Sprintf("expected error label, got %q", messages[1]))
+	Assert(t, strings.Contains(messages[2], "running 'sh -c' 'cat output.txt; exit 1'"), fmt.Sprintf("expected error summary banner, got %q", messages[2]))
+	for _, message := range messages[:3] {
+		Assert(t, !strings.Contains(message, "already streamed output"), fmt.Sprintf("expected banner not to replay run output, got %q", message))
+	}
+	Equals(t, "", messages[3])
 	Equals(t, false, operationComplete[0])
-	Equals(t, true, operationComplete[1])
+	Equals(t, true, operationComplete[3])
 }
 
 func TestProjectOutputWrapperPreservesNonStreamedEnvStepOutput(t *testing.T) {
@@ -590,13 +614,15 @@ func TestProjectOutputWrapperPreservesNonStreamedEnvStepOutput(t *testing.T) {
 	result := runner.Plan(ctx)
 
 	ErrContains(t, "not streamed output", result.Error)
-	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(2)).
+	_, messages, operationComplete := mockJobMessageSender.VerifyWasCalled(Times(5)).
 		Send(Any[command.ProjectContext](), Any[string](), Any[bool]()).GetAllCapturedArguments()
-	Assert(t, strings.Contains(messages[0], "\r\nError:\r\n"), fmt.Sprintf("expected error banner, got %q", messages[0]))
-	Assert(t, strings.Contains(messages[0], "\r\nnot streamed output\r\n"), fmt.Sprintf("expected banner to include non-streamed output, got %q", messages[0]))
-	Equals(t, "", messages[1])
+	Assert(t, messages[0] == "", fmt.Sprintf("expected leading blank line, got %q", messages[0]))
+	Assert(t, messages[1] == "Error:", fmt.Sprintf("expected error label, got %q", messages[1]))
+	Assert(t, strings.Contains(messages[2], "running 'sh -c' 'cat output.txt; exit 1'"), fmt.Sprintf("expected error summary banner, got %q", messages[2]))
+	Assert(t, messages[3] == "not streamed output", fmt.Sprintf("expected banner to include non-streamed output, got %q", messages[3]))
+	Equals(t, "", messages[4])
 	Equals(t, false, operationComplete[0])
-	Equals(t, true, operationComplete[1])
+	Equals(t, true, operationComplete[4])
 }
 
 // Test what happens if there's no working dir. This signals that the project
