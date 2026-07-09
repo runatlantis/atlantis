@@ -186,7 +186,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		if len(p.disableAutomergeLabel) > 0 {
 			labels, err := p.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
 			if err != nil {
-				ctx.Log.Err("unable to get pull request labels so not planning, error %s", err)
+				ctx.Log.Err("unable to get pull request labels, error %s", err)
 			} else if slices.Contains(labels, p.disableAutomergeLabel) {
 				ctx.Log.Info("pull/merge request has disable automerge label %q so not deleting any successful plans", p.disableAutomergeLabel)
 			}
