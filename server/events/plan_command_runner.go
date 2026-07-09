@@ -49,6 +49,7 @@ func NewPlanCommandRunner(
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
+	disableAutomergeLabel string,
 
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -73,6 +74,7 @@ func NewPlanCommandRunner(
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
+		disableAutomergeLabel:      disableAutomergeLabel,
 	}
 }
 
@@ -107,6 +109,7 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	disableAutomergeLabel string
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -180,11 +183,20 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
+		if len(p.disableAutomergeLabel) > 0 {
+			labels, err := p.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
+			if err != nil {
+				ctx.Log.Err("unable to get pull request labels so not planning, error %s", err)
+			} else if slices.Contains(labels, p.disableAutomergeLabel) {
+				ctx.Log.Info("pull/merge request has disable automerge label %q so not deleting any successful plans", p.disableAutomergeLabel)
+			}
+		} else {
+			ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
+			if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
+				ctx.Log.Err("deleting pending plans: %s", err)
+			}
+			result.PlansDeleted = true
 		}
-		result.PlansDeleted = true
 	}
 
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)

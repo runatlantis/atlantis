@@ -843,6 +843,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
+		userConfig.DisableAutomergeLabel,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
