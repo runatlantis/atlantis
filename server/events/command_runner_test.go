@@ -1898,6 +1898,7 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		false,
 		pullReqStatusFetcher,
 		false,
+		"no-auto-merge",
 	)
 	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
 }
