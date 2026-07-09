@@ -46,7 +46,8 @@ func expectJobFailureBanner(
 	sends := 0
 	mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, label+":", false)
 	sends++
-	for _, line := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n"), "\n") {
+	normalized := strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n")
+	for line := range strings.SplitSeq(normalized, "\n") {
 		mockJobMessageSender.VerifyWasCalledInOrder(Once(), inOrder).Send(ctx, line, false)
 		sends++
 	}
