@@ -263,36 +263,46 @@ func deferredApplyProjectContext(projectCmds []command.ProjectContext, result co
 // output stream so the per-project job page linked from the VCS commit status
 // has a visible final status when plan or apply fails before producing any
 // terraform output (e.g. lock contention, depends_on, requirement checks).
-// Uses \r\n so the xterm-based job page renders the banner on its own lines.
+// Each line is sent separately so the websocket writer's per-line \r prefix
+// renders correctly in the xterm-based job page.
 func (p *ProjectOutputWrapper) streamFailureToJob(ctx command.ProjectContext, result command.ProjectCommandOutput) {
+	errorMessage := ""
 	if result.Error != nil {
-		p.JobMessageSender.Send(ctx, jobFailureBanner("Error", jobErrorMessage(result.Error)), false)
+		errorMessage = strings.TrimSpace(jobErrorMessage(result.Error))
 	}
-	if result.Failure != "" {
-		p.JobMessageSender.Send(ctx, jobFailureBanner("Failure", result.Failure), false)
+	failureMessage := strings.TrimSpace(result.Failure)
+	if errorMessage == "" && failureMessage == "" {
+		return
+	}
+
+	p.JobMessageSender.Send(ctx, "", false)
+	if errorMessage != "" {
+		streamJobFailureLines(p, ctx, "Error", errorMessage)
+	}
+	if failureMessage != "" {
+		streamJobFailureLines(p, ctx, "Failure", failureMessage)
 	}
 }
 
-func jobFailureBanner(label string, message string) string {
-	return fmt.Sprintf("\r\n%s:\r\n%s\r\n", label, normalizeJobLineEndings(message))
-}
-
-func normalizeJobLineEndings(message string) string {
-	message = strings.ReplaceAll(message, "\r\n", "\n")
-	message = strings.ReplaceAll(message, "\r", "\n")
-	return strings.ReplaceAll(message, "\n", "\r\n")
+func streamJobFailureLines(p *ProjectOutputWrapper, ctx command.ProjectContext, label string, message string) {
+	p.JobMessageSender.Send(ctx, label+":", false)
+	for _, line := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n"), "\n") {
+		p.JobMessageSender.Send(ctx, line, false)
+	}
 }
 
 func jobErrorMessage(err error) string {
-	if errWithOutput, ok := err.(interface{ JobMessage() string }); ok {
-		return errWithOutput.JobMessage()
+	var withJobMessage interface{ JobMessage() string }
+	if errors.As(err, &withJobMessage) {
+		return withJobMessage.JobMessage()
 	}
 	return err.Error()
 }
 
 type errWithStepOutput struct {
-	err    error
-	output string
+	err      error
+	output   string
+	streamed bool
 }
 
 func (e errWithStepOutput) Error() string {
@@ -307,13 +317,17 @@ func (e errWithStepOutput) Unwrap() error {
 }
 
 func (e errWithStepOutput) JobMessage() string {
-	return jobErrorMessage(e.err)
+	if e.streamed || e.output == "" {
+		return jobErrorMessage(e.err)
+	}
+	return e.Error()
 }
 
-func errorWithStepOutput(err error, outputs []string) error {
+func errorWithStepOutput(err error, outputs []string, streamed bool) error {
 	return errWithStepOutput{
-		err:    err,
-		output: strings.Join(outputs, "\n"),
+		err:      err,
+		output:   strings.Join(outputs, "\n"),
+		streamed: streamed,
 	}
 }
 
@@ -851,7 +865,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", errorWithStepOutput(err, outputs)
+		return nil, "", errorWithStepOutput(err, outputs, !ctx.SuppressJobOutput)
 	}
 
 	return &models.PlanSuccess{
@@ -961,7 +975,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 
 	if err != nil {
-		return "", remoteApplyRunURL, "", errorWithStepOutput(err, outputs)
+		return "", remoteApplyRunURL, "", errorWithStepOutput(err, outputs, !ctx.SuppressJobOutput)
 	}
 
 	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
@@ -992,7 +1006,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err != nil {
-		return "", "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return "", "", errorWithStepOutput(err, outputs, !ctx.SuppressJobOutput)
 	}
 
 	return strings.Join(outputs, "\n"), "", nil
@@ -1036,7 +1050,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return nil, "", errorWithStepOutput(err, outputs, !ctx.SuppressJobOutput)
 	}
 
 	// after import, re-plan command is required without import args
@@ -1080,7 +1094,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("%s\n%s", err, strings.Join(outputs, "\n"))
+		return nil, "", errorWithStepOutput(err, outputs, !ctx.SuppressJobOutput)
 	}
 
 	// after state rm, re-plan command is required without state rm args
