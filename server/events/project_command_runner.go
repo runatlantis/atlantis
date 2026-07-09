@@ -266,6 +266,10 @@ func deferredApplyProjectContext(projectCmds []command.ProjectContext, result co
 // Each line is sent separately so the websocket writer's per-line \r prefix
 // renders correctly in the xterm-based job page.
 func (p *ProjectOutputWrapper) streamFailureToJob(ctx command.ProjectContext, result command.ProjectCommandOutput) {
+	if ctx.SuppressJobOutput {
+		return
+	}
+
 	errorMessage := ""
 	if result.Error != nil {
 		errorMessage = strings.TrimSpace(jobErrorMessage(result.Error))
