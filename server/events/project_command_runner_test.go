@@ -426,6 +426,34 @@ func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
 	mockJobMessageSender.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
 }
 
+func TestProjectOutputWrapperSuppressesFailureJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		SuppressJobOutput: true,
+	}
+	expected := command.ProjectCommandOutput{
+		Error: errors.New("plan failed"),
+	}
+	When(mockProjectCommandRunner.Plan(ctx)).ThenReturn(expected)
+
+	runner := &events.ProjectOutputWrapper{
+		ProjectCommandRunner: mockProjectCommandRunner,
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+	}
+	result := runner.Plan(ctx)
+
+	Equals(t, expected, result)
+	mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
+	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &expected)
+	mockJobMessageSender.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
+}
+
 func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {
 	RegisterMockTestingT(t)
 
