@@ -286,7 +286,8 @@ func (p *ProjectOutputWrapper) streamFailureToJob(ctx command.ProjectContext, re
 
 func streamJobFailureLines(p *ProjectOutputWrapper, ctx command.ProjectContext, label string, message string) {
 	p.JobMessageSender.Send(ctx, label+":", false)
-	for _, line := range strings.Split(strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n"), "\n") {
+	normalized := strings.ReplaceAll(strings.ReplaceAll(message, "\r\n", "\n"), "\r", "\n")
+	for line := range strings.SplitSeq(normalized, "\n") {
 		p.JobMessageSender.Send(ctx, line, false)
 	}
 }
