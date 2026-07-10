@@ -322,48 +322,57 @@ func (r Repo) ToValid(workflows map[string]valid.Workflow, globalPlanReqs []stri
 	var mergedImportReqs []string
 	mergedImportReqs = append(mergedImportReqs, r.ImportRequirements...)
 
-	// only add global reqs if they don't exist already.
-OuterGlobalPlanReqs:
-	for _, globalReq := range globalPlanReqs {
-		for _, currReq := range r.PlanRequirements {
-			if globalReq == currReq {
-				continue OuterGlobalPlanReqs
+	// Only merge in global reqs when this entry explicitly sets the
+	// requirement. Leaving the slice nil signals to getMatchingCfg that this
+	// entry does not override the requirement, so earlier matching entries
+	// (e.g. a broader `/.*/` rule) are preserved.
+	if r.PlanRequirements != nil {
+	OuterGlobalPlanReqs:
+		for _, globalReq := range globalPlanReqs {
+			for _, currReq := range r.PlanRequirements {
+				if globalReq == currReq {
+					continue OuterGlobalPlanReqs
+				}
 			}
-		}
 
-		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
-			continue
+			// dont add policy_check step if repo have it explicitly disabled
+			if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
+				continue
+			}
+			mergedPlanReqs = append(mergedPlanReqs, globalReq)
 		}
-		mergedPlanReqs = append(mergedPlanReqs, globalReq)
 	}
-OuterGlobalApplyReqs:
-	for _, globalReq := range globalApplyReqs {
-		for _, currReq := range r.ApplyRequirements {
-			if globalReq == currReq {
-				continue OuterGlobalApplyReqs
+	if r.ApplyRequirements != nil {
+	OuterGlobalApplyReqs:
+		for _, globalReq := range globalApplyReqs {
+			for _, currReq := range r.ApplyRequirements {
+				if globalReq == currReq {
+					continue OuterGlobalApplyReqs
+				}
 			}
-		}
 
-		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
-			continue
+			// dont add policy_check step if repo have it explicitly disabled
+			if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
+				continue
+			}
+			mergedApplyReqs = append(mergedApplyReqs, globalReq)
 		}
-		mergedApplyReqs = append(mergedApplyReqs, globalReq)
 	}
-OuterGlobalImportReqs:
-	for _, globalReq := range globalImportReqs {
-		for _, currReq := range r.ImportRequirements {
-			if globalReq == currReq {
-				continue OuterGlobalImportReqs
+	if r.ImportRequirements != nil {
+	OuterGlobalImportReqs:
+		for _, globalReq := range globalImportReqs {
+			for _, currReq := range r.ImportRequirements {
+				if globalReq == currReq {
+					continue OuterGlobalImportReqs
+				}
 			}
-		}
 
-		// dont add policy_check step if repo have it explicitly disabled
-		if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
-			continue
+			// dont add policy_check step if repo have it explicitly disabled
+			if globalReq == valid.PoliciesPassedCommandReq && r.PolicyCheck != nil && !*r.PolicyCheck {
+				continue
+			}
+			mergedImportReqs = append(mergedImportReqs, globalReq)
 		}
-		mergedImportReqs = append(mergedImportReqs, globalReq)
 	}
 
 	var autoDiscover *valid.AutoDiscover

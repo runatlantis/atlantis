@@ -1459,6 +1459,45 @@ repos:
 				CustomPolicyCheck:  false,
 			},
 		},
+		// Regression test for the bug where a later repo entry that does not set
+		// *_requirements would wipe out the requirements inherited from an
+		// earlier matching entry, because policies_passed was being appended to
+		// the (otherwise nil) requirement slice and getMatchingCfg's "last
+		// non-nil wins" logic would treat that as an override.
+		"policy check does not clobber earlier repo requirements when later entry omits them": {
+			gPolicyCheck: true,
+			gCfg: `
+repos:
+- id: /.*/
+  plan_requirements: [approved, mergeable, undiverged]
+  apply_requirements: [approved, mergeable, undiverged]
+  import_requirements: [approved, mergeable, undiverged]
+- id: github.com/example/terraform
+  allow_custom_workflows: true
+`,
+			repoID: "github.com/example/terraform",
+			proj: valid.Project{
+				Dir:         "mydir",
+				Workspace:   "myworkspace",
+				Name:        String("myname"),
+				PolicyCheck: Bool(true),
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"approved", "mergeable", "undiverged"},
+				ApplyRequirements:  []string{"approved", "mergeable", "undiverged", "policies_passed"},
+				ImportRequirements: []string{"approved", "mergeable", "undiverged"},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         "mydir",
+				Workspace:          "myworkspace",
+				Name:               "myname",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocks:          valid.DefaultRepoLocks,
+				PolicyCheck:        true,
+				CustomPolicyCheck:  false,
+			},
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
