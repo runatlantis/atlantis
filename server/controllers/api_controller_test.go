@@ -2208,7 +2208,7 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 		})
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
