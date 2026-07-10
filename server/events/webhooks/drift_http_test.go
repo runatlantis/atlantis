@@ -65,6 +65,21 @@ func TestDriftHttpWebhook_SendWithHeaders(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestDriftHttpWebhook_Send202(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	hook := webhooks.DriftHttpWebhook{
+		Client: &webhooks.HttpClient{Client: http.DefaultClient},
+		URL:    server.URL,
+	}
+
+	err := hook.Send(logging.NewNoopLogger(t), driftResult)
+	Ok(t, err)
+}
+
 func TestDriftHttpWebhook_Send500(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

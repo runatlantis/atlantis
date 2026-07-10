@@ -75,6 +75,23 @@ func TestHttpWebhookNoHeaders(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestHttpWebhook202(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	webhook := webhooks.HttpWebhook{
+		Client:         &webhooks.HttpClient{Client: http.DefaultClient},
+		URL:            server.URL,
+		WorkspaceRegex: regexp.MustCompile(".*"),
+		BranchRegex:    regexp.MustCompile(".*"),
+	}
+
+	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
+	Ok(t, err)
+}
+
 func TestHttpWebhook500(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

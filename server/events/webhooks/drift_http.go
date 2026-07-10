@@ -48,7 +48,7 @@ func (h *DriftHttpWebhook) Send(_ logging.SimpleLogging, result DriftResult) err
 		return fmt.Errorf("sending drift webhook to %q: %s", sanitizeDriftWebhookURL(h.URL), sanitizeDriftWebhookError(err.Error()))
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("drift webhook to %q returned status %d: %s", sanitizeDriftWebhookURL(h.URL), resp.StatusCode, sanitizeDriftWebhookError(string(respBody)))
 	}
