@@ -116,9 +116,12 @@ func formatCommitSuffix(lock workingDirLock) string {
 	if lock.HeadCommit == "" {
 		return ""
 	}
+	// This message is rendered inside a fenced code block in PR comments, so
+	// markdown links would show literally. We emit the plain full SHA and, when
+	// available, the raw commit URL in parentheses so it can be copied and opened.
 	commitRef := lock.HeadCommit
 	if lock.CommitURL != "" {
-		commitRef = fmt.Sprintf("[%s](%s)", lock.HeadCommit, lock.CommitURL)
+		commitRef = fmt.Sprintf("%s (%s)", lock.HeadCommit, lock.CommitURL)
 	}
 	return " for commit " + commitRef
 }
