@@ -221,8 +221,8 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 				}
 			}
 		} else {
-			// Suppress post-workflow hook VCS statuses so uninvolved instances
-			// don't create GitHub checks for hooks like notify/automerge.
+			// Suppress post-workflow hooks so uninvolved instances don't execute
+			// hooks or create GitHub checks (for example: notify/automerge).
 			ctx.SuppressVCSStatus = true
 		}
 		return

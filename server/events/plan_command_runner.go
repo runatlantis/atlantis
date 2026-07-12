@@ -162,8 +162,8 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		} else {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
-			// Suppress post-workflow hook VCS statuses so uninvolved instances
-			// don't create GitHub checks for hooks like notify/automerge.
+			// Suppress post-workflow hooks so uninvolved instances don't execute
+			// hooks or create GitHub checks (for example: notify/automerge).
 			ctx.SuppressVCSStatus = true
 		}
 		return
@@ -305,8 +305,8 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		} else {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
-			// Suppress post-workflow hook VCS statuses so uninvolved instances
-			// don't create GitHub checks for hooks like notify/automerge.
+			// Suppress post-workflow hooks so uninvolved instances don't execute
+			// hooks or create GitHub checks (for example: notify/automerge).
 			ctx.SuppressVCSStatus = true
 		}
 		return
