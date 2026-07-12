@@ -5647,6 +5647,173 @@ func TestValidatePlansForApply_CurrentHeadEmptyAllowsValidation(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestDefaultProjectCommandBuilder_SilenceNoProjects_AutodiscoverEnabled_DoesNotSilenceUnmatchedDir(t *testing.T) {
+	// Regression test: when SilenceNoProjects=true, a repo has explicit projects in
+	// atlantis.yaml, AND autodiscover is enabled, a dir not listed as an explicit
+	// project must NOT be silenced — it may be a legitimate project found by
+	// PendingPlanFinder (apply-all) or changed-file discovery (plan).
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: auto
+projects:
+  - name: explicit-project
+    dir: dir-a
+    workspace: default
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"dir-a": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"dir-b": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	terraformClient := tfclientmocks.NewMockClient()
+
+	userConfig := defaultUserConfig
+	userConfig.SilenceNoProjects = true
+	userConfig.AutoDiscoverMode = "auto"
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	// dir-b is not in the explicit projects list but autodiscover is on —
+	// it must not be silenced during apply.
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Apply,
+		RepoRelDir: "dir-b",
+		Workspace: "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "dir-b", applyCtxs[0].RepoRelDir)
+}
+
+func TestDefaultProjectCommandBuilder_SilenceNoProjects_AutodiscoverDisabled_SilencesUnmatchedDir(t *testing.T) {
+	// When autodiscover is disabled, a dir not listed in explicit projects must
+	// still be silenced when SilenceNoProjects=true.
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: disabled
+projects:
+  - name: explicit-project
+    dir: dir-a
+    workspace: default
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"dir-a": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"dir-b": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	terraformClient := tfclientmocks.NewMockClient()
+
+	userConfig := defaultUserConfig
+	userConfig.SilenceNoProjects = true
+	userConfig.AutoDiscoverMode = "disabled"
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	// dir-b is not in the explicit projects list and autodiscover is off —
+	// it must be silenced (empty result, no error).
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Apply,
+		RepoRelDir: "dir-b",
+		Workspace: "default",
+	})
+	Ok(t, err)
+	Equals(t, 0, len(applyCtxs))
+}
+
 func TestValidatePlansForApply_StatusHeadEmptyFailsWhenCurrentHeadKnown(t *testing.T) {
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
