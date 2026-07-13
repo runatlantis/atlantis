@@ -4,13 +4,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -24,25 +21,17 @@ const (
 	lifecycleCleanupTimeout  = 30 * time.Second
 )
 
-type lockPreservationPR struct {
-	label      string
-	cloneDir   string
-	branchName string
-	url        string
-	pullID     int
-}
-
 var e2eNonceCounter atomic.Uint64
 
 func (t *E2ETester) runOnApplyLockPreservation(ctx context.Context) (result *E2EResult, err error) {
 	tc := t.testCase
 	result = &E2EResult{testCase: tc.Name}
-	var prs []*lockPreservationPR
+	var prs []*fixturePull
 	defer func() {
 		cleanupCtx, cancel := newLifecycleCleanupContext(ctx)
 		defer cancel()
 
-		cleanupErr := cleanUpLockPRs(cleanupCtx, t, prs...)
+		cleanupErr := cleanUpFixturePulls(cleanupCtx, t, prs...)
 		switch {
 		case err != nil && cleanupErr != nil:
 			err = fmt.Errorf("%w; cleanup failed: %v", err, cleanupErr)
@@ -55,7 +44,7 @@ func (t *E2ETester) runOnApplyLockPreservation(ctx context.Context) (result *E2E
 	return result, err
 }
 
-func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *E2EResult, prs *[]*lockPreservationPR) error {
+func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *E2EResult, prs *[]*fixturePull) error {
 	tc := t.testCase
 	nonce := e2eRunNonce()
 
@@ -78,7 +67,7 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 	if !t.vcsClient.DidAtlantisSucceed(state) {
 		return fmt.Errorf("[%s] PR1 plan expected success but got %q", tc.Name, state)
 	}
-	if err := assertProjectStatuses(ctx, t.vcsClient, pr1.branchName, tc); err != nil {
+	if err := assertProjectStatuses(ctx, t.vcsClient, pr1.branchName, "plan", tc.Name, tc.ExpectedStatusContexts, tc.ForbidExtraProjectStatuses); err != nil {
 		return err
 	}
 
@@ -136,7 +125,7 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 	if !t.vcsClient.DidAtlantisSucceed(state) {
 		return fmt.Errorf("[%s] PR2 plan expected success but got %q", tc.Name, state)
 	}
-	if err := assertProjectStatuses(ctx, t.vcsClient, pr2.branchName, tc); err != nil {
+	if err := assertProjectStatuses(ctx, t.vcsClient, pr2.branchName, "plan", tc.Name, tc.ExpectedStatusContexts, tc.ForbidExtraProjectStatuses); err != nil {
 		return err
 	}
 
@@ -156,67 +145,8 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 	return nil
 }
 
-func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, mutateFile string) (*lockPreservationPR, error) {
-	tc := t.testCase
-	cloneDir := filepath.Join(t.cloneDirRoot, fmt.Sprintf("%s-%s-test", tc.Name, label))
-	log.Printf("[%s] creating %s clone dir %q", tc.Name, label, cloneDir)
-	if err := os.MkdirAll(cloneDir, 0700); err != nil {
-		return nil, fmt.Errorf("creating clone dir %q: %w", cloneDir, err)
-	}
-	if err := t.vcsClient.Clone(cloneDir); err != nil {
-		return nil, err
-	}
-	if err := runGit(cloneDir, "checkout", "-b", branchName); err != nil {
-		return nil, err
-	}
-
-	if mutateFile == "" {
-		mutateFile = fmt.Sprintf("%s.tf", tc.Name)
-	}
-	if err := writeFixtureMutation(cloneDir, tc.Dir, mutateFile, tc.MutateContent); err != nil {
-		return nil, err
-	}
-	if err := enableOnApplyRepoLocksForFixture(cloneDir); err != nil {
-		return nil, err
-	}
-	if err := runGit(cloneDir, "add", filepath.Join(tc.Dir, mutateFile), "atlantis.yaml"); err != nil {
-		return nil, err
-	}
-	if err := runGit(cloneDir, "commit", "-m", fmt.Sprintf("e2e: %s %s", tc.Name, label)); err != nil {
-		return nil, err
-	}
-	if err := runGit(cloneDir, "push", "origin", branchName); err != nil {
-		return nil, err
-	}
-
-	title := fmt.Sprintf("[E2E] %s %s", tc.Name, label)
-	url, pullID, err := t.vcsClient.CreatePullRequest(ctx, title, branchName)
-	if err != nil {
-		cleanupCtx, cancel := newLifecycleCleanupContext(ctx)
-		defer cancel()
-
-		if deleteErr := deleteRemoteBranch(cleanupCtx, cloneDir, branchName); deleteErr != nil {
-			return nil, fmt.Errorf("creating pull request after pushing branch %q: %w; additionally failed to delete pushed branch: %v", branchName, err, deleteErr)
-		}
-		return nil, err
-	}
-	return &lockPreservationPR{
-		label:      label,
-		cloneDir:   cloneDir,
-		branchName: branchName,
-		url:        url,
-		pullID:     pullID,
-	}, nil
-}
-
-func cleanUpLockPRs(ctx context.Context, t *E2ETester, prs ...*lockPreservationPR) error {
-	var cleanupErr error
-	for _, pr := range slices.Backward(prs) {
-		if err := cleanUpLockPR(ctx, t, pr); err != nil {
-			cleanupErr = errors.Join(cleanupErr, err)
-		}
-	}
-	return cleanupErr
+func (t *E2ETester) createOnApplyLockPR(ctx context.Context, label, branchName, mutateFile string) (*fixturePull, error) {
+	return t.createFixturePull(ctx, label, branchName, mutateFile, enableOnApplyRepoLocksForFixture)
 }
 
 func newLifecycleCleanupContext(parent context.Context) (context.Context, context.CancelFunc) {
@@ -225,66 +155,6 @@ func newLifecycleCleanupContext(parent context.Context) (context.Context, contex
 		base = context.WithoutCancel(parent)
 	}
 	return context.WithTimeout(base, lifecycleCleanupTimeout)
-}
-
-func cleanUpLockPR(ctx context.Context, t *E2ETester, pr *lockPreservationPR) error {
-	if pr == nil {
-		return nil
-	}
-	var cleanupErr error
-	if err := t.vcsClient.ClosePullRequest(ctx, pr.pullID); err != nil {
-		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("closing pull request %d: %w", pr.pullID, err))
-	} else {
-		log.Printf("closed pull request %d", pr.pullID)
-	}
-	if err := t.vcsClient.DeleteBranch(ctx, pr.branchName); err != nil {
-		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("deleting branch %s: %w", pr.branchName, err))
-	} else {
-		log.Printf("deleted branch %s", pr.branchName)
-	}
-	if cleanupErr != nil {
-		return fmt.Errorf("[%s] cleanup failed for %s pull %d branch %q: %w", t.testCase.Name, pr.label, pr.pullID, pr.branchName, cleanupErr)
-	}
-	return nil
-}
-
-func writeFixtureMutation(cloneDir, dir, mutateFile, content string) error {
-	if content == "" {
-		content = defaultMutateContent
-	}
-	filePath := filepath.Join(cloneDir, dir, mutateFile)
-	if err := os.MkdirAll(filepath.Dir(filePath), 0700); err != nil {
-		return fmt.Errorf("creating parent dir for %q: %w", filePath, err)
-	}
-	log.Printf("writing mutation file %q", filePath)
-	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
-		return fmt.Errorf("writing mutation file %q: %w", filePath, err)
-	}
-	return nil
-}
-
-func runGit(dir string, args ...string) error {
-	cmd := exec.Command("git", args...) //nolint:gosec // arguments are test-controlled branch/file names.
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, string(output))
-	}
-	return nil
-}
-
-func runGitContext(ctx context.Context, dir string, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...) //nolint:gosec // arguments are test-controlled branch/file names.
-	cmd.Dir = dir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, string(output))
-	}
-	return nil
-}
-
-func deleteRemoteBranch(ctx context.Context, cloneDir, branchName string) error {
-	return runGitContext(ctx, cloneDir, "push", "origin", "--delete", branchName)
 }
 
 func e2eRunNonce() string {
