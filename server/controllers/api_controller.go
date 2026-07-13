@@ -2003,6 +2003,7 @@ func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolv
 		projectDrift.Drift = models.DriftSummary{HasDrift: false}
 	} else if pr.PlanSuccess != nil {
 		projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		projectDrift.PlanOutput = pr.PlanSuccess.TerraformOutput
 	}
 
 	return projectDrift
@@ -2214,7 +2215,11 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
-		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
+		// Plan text is returned in the detection response only; never persist it
+		// to storage (it can be large and must not leak into drift status).
+		stored := projectDrift
+		stored.PlanOutput = ""
+		if err := a.DriftStorage.Store(baseRepo.ID(), stored); err != nil {
 			storeFailed = true
 			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
 			a.Logger.Warn("failed to store drift data: %v", err)

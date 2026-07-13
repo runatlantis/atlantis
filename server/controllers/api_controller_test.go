@@ -2411,6 +2411,86 @@ func TestAPIResponseEnvelopeIncludesNullInactiveFields(t *testing.T) {
 	Assert(t, strings.Contains(errorBody, "\"data\":null"), "error envelope must include data:null: %s", errorBody)
 }
 
+func TestAPIController_DetectDriftIncludesPlanOutput(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	planOutput := "Terraform will perform the following actions:\n\nPlan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: cmd.ProjectName,
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput}})
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, planOutput, result.Projects[0].PlanOutput)
+}
+
+func TestAPIController_DetectDriftDoesNotPersistPlanOutput(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	var storedDrifts []models.ProjectDrift
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			storedDrifts = append(storedDrifts, args[1].(models.ProjectDrift))
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	planOutput := "Plan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			cmd := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: cmd.ProjectName,
+				RepoRelDir:  cmd.RepoRelDir,
+				Workspace:   events.DefaultWorkspace,
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput}})
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, len(storedDrifts) == 1, "expected one drift result to be stored, got %d", len(storedDrifts))
+	Equals(t, "", storedDrifts[0].PlanOutput)
+}
+
 func TestAPIController_DriftStatus(t *testing.T) {
 	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()

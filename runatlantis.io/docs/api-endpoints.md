@@ -697,6 +697,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
           "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
           "changes_outside": false
         },
+        "plan_output": "Terraform will perform the following actions:\n\n  # aws_instance.example will be updated in-place\n  ...\n\nPlan: 1 to add, 2 to change, 0 to destroy.",
         "last_checked": "2025-01-21T10:30:00Z"
       },
       {
@@ -705,6 +706,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
         "workspace": "production",
         "ref": "main",
         "has_drift": false,
+        "plan_output": "No changes. Your infrastructure matches the configuration.",
         "last_checked": "2025-01-21T10:30:00Z"
       }
     ],
@@ -721,6 +723,10 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
   "timestamp": "2025-01-21T10:30:00Z"
 }
 ```
+
+::: tip Plan Output
+Each project includes a `plan_output` field carrying the raw Terraform plan text produced during detection (the same field `POST /api/drift/remediate` returns). This lets callers see *what* changed without a second remediation request. It reflects only this detection run and is not persisted: `GET /api/drift/status`, which is served from stored results, does not include `plan_output`.
+:::
 
 #### Error Responses
 
