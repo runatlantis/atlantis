@@ -1,0 +1,38 @@
+e2e/on_apply_lock_test.go
+  s_2a3e2ffe398070::t_1dfd300e29ed84 104-181
+e2e/README.md
+  s_2a3e2ffe398070::t_a4d419aef06fb1 3-18,27-28,31
+e2e/e2e.go
+  s_2a3e2ffe398070::t_16efbe73c02910 76,83-85,88-94,96,100,103,105,107,109,111,215,219,232
+  s_2a3e2ffe398070::t_78330846477656 9,42-43,51,53-54,58,62-63,66-69,77-82,112,114-136,138-143,145-159,161-164,167-169,171-179,181-182,186,188,193-194,196,201,206,224,226,237
+  s_2a3e2ffe398070::t_10520d04bb6424 255-269,271-275,277-289,291-292,294-332
+e2e/vcs.go
+  s_2a3e2ffe398070::t_d24e2d409223a6 35,37
+e2e/gitlab.go
+  s_2a3e2ffe398070::t_d24e2d409223a6 161
+e2e/lifecycle.go
+  s_2a3e2ffe398070::t_79740daeef4a81 1-166
+e2e/testcase.go
+  s_2a3e2ffe398070::t_d24e2d409223a6 28,68-69,72-79,109-112,227-261,324-330
+e2e/on_apply_lock.go
+  s_2a3e2ffe398070::t_79740daeef4a81 29,34,47,148-149
+  s_2a3e2ffe398070::t_a1054a9937a55c 70,128
+e2e/github.go
+  s_2a3e2ffe398070::t_d24e2d409223a6 243-245,254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "783b8fd58c1bd1bca6ab882031a0fed61fa286f1",
+  "prompts": {},
+  "sessions": {
+    "s_2a3e2ffe398070": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-fc9f-7442-9630-9cda5e921418",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
