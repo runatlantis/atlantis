@@ -1605,6 +1605,9 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
 	for i := range projCtxs {
+		if !hasAtlantisManagedApplyStep(projCtxs[i].Steps) {
+			continue
+		}
 		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)
 		if err != nil {
 			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
