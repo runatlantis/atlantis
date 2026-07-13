@@ -817,7 +817,6 @@ func TestPlanCommandRunner_HoldsPlanInFlightLockAcrossCleanupPlanAndDBWrite(t *t
 		BaseRepo:    testdata.GithubRepo,
 		Pull:        modelPull,
 	}
-
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).Then(func(args []Param) ReturnValues {
@@ -968,6 +967,162 @@ func TestPlanCommandRunner_AutoplanHoldsPlanLockDuringPullStatusWrite(t *testing
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
 	Assert(t, writeObserved, "expected autoplan pull status write to be observed")
+}
+
+func TestPlanCommandRunner_AutoplanPersistsPullStatusBeforePublishingSuccess(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "gitea-autoplan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	tmp := t.TempDir()
+	statusVisibleWhenCommented := false
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(vcsClient.CreateComment(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(modelPull.Num),
+		Any[string](),
+		Eq("plan"),
+	)).Then(func([]Param) ReturnValues {
+		pullStatus, err := database.GetPullStatus(modelPull)
+		Ok(t, err)
+		if pullStatus != nil {
+			for _, project := range pullStatus.Projects {
+				if project.Workspace == projectCtx.Workspace &&
+					project.RepoRelDir == projectCtx.RepoRelDir &&
+					project.ProjectName == projectCtx.ProjectName &&
+					project.Status == models.PlannedPlanStatus {
+					statusVisibleWhenCommented = true
+					break
+				}
+			}
+		}
+		return ReturnValues{nil}
+	})
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	Assert(t, statusVisibleWhenCommented, "expected persisted PullStatus before successful autoplan comment was published")
+}
+
+func TestPlanCommandRunner_AutoplanPersistenceFailureFailsClosed(t *testing.T) {
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "gitea-autoplan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	policyCtx := projectCtx
+	policyCtx.CommandName = command.PolicyCheck
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.AutoTrigger,
+	}
+	tmp := t.TempDir()
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx, policyCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark autoplan errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "persisting plan results"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(policyCtx)
+}
+
+func TestPlanCommandRunner_ManualPlanPersistenceFailureFailsClosed(t *testing.T) {
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "manual-plan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	policyCtx := projectCtx
+	policyCtx.CommandName = command.PolicyCheck
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	tmp := t.TempDir()
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx, policyCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark manual plan errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "persisting plan results"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(policyCtx)
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
