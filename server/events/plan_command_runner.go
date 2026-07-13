@@ -165,7 +165,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		}
 		return
 	}
-	preexistingPlanLocks := p.snapshotExistingPlanLocks(ctx, projectCmds)
 	planGeneration, _, err := p.dbUpdater.beginPlanGeneration(pull, projectCmds)
 	if err != nil {
 		p.handlePlanGenerationStartError(ctx, AutoplanCommand{}, err)
@@ -185,7 +184,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// Any on-plan lock that existed before this generic/autoplan command was
 	// removed above. A lock present after the plan steps is therefore owned by
 	// this generation and is safe to clean on a failed final write.
-	preexistingPlanLocks = make(map[string]bool)
+	preexistingPlanLocks := make(map[string]bool)
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 

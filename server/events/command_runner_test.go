@@ -1680,7 +1680,7 @@ func (d *blockingPlanCompletionDB) CompletePlanGeneration(pull models.PullReques
 }
 
 func (d *supersedePlanCompletionDB) CompletePlanGeneration(pull models.PullRequest, _ string, _ []command.ProjectResult) (models.PullStatus, error) {
-	if _, err := d.Database.BeginPlanGeneration(pull, []models.ProjectStatus{d.project}, "newer-generation"); err != nil {
+	if _, err := d.BeginPlanGeneration(pull, []models.ProjectStatus{d.project}, "newer-generation"); err != nil {
 		return models.PullStatus{}, fmt.Errorf("starting newer plan generation: %w", err)
 	}
 	return models.PullStatus{}, errors.New("injected superseded PullStatus persistence failure")
