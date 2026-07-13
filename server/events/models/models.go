@@ -832,6 +832,10 @@ type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
+	// PlanGeneration identifies an in-progress plan attempt. It is persisted so
+	// another Atlantis replica cannot authorize the previous plan while new plan
+	// artifacts are being generated.
+	PlanGeneration string `json:",omitempty"`
 	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
@@ -867,6 +871,9 @@ const (
 	// PassedPolicyCheckStatus means that all policy checks passed or were
 	// approved.
 	PassedPolicyCheckStatus
+	// PlanningPlanStatus means a new plan generation has invalidated the
+	// previously recorded plan but has not yet persisted its final result.
+	PlanningPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -888,6 +895,8 @@ func (p ProjectPlanStatus) String() string {
 		return "policy_check_errored"
 	case PassedPolicyCheckStatus:
 		return "policy_check_passed"
+	case PlanningPlanStatus:
+		return "planning"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}

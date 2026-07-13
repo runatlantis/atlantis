@@ -165,6 +165,12 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		}
 		return
 	}
+	preexistingPlanLocks := p.snapshotExistingPlanLocks(ctx, projectCmds)
+	planGeneration, _, err := p.dbUpdater.beginPlanGeneration(pull, projectCmds)
+	if err != nil {
+		p.handlePlanGenerationStartError(ctx, AutoplanCommand{}, err)
+		return
+	}
 	p.updatePendingCommitStatus(ctx, command.Plan)
 
 	// discard previous plans that might not be relevant anymore
@@ -176,6 +182,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
 		return
 	}
+	// Any on-plan lock that existed before this generic/autoplan command was
+	// removed above. A lock present after the plan steps is therefore owned by
+	// this generation and is safe to clean on a failed final write.
+	preexistingPlanLocks = make(map[string]bool)
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
@@ -187,9 +197,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result.PlansDeleted = true
 	}
 
-	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := p.dbUpdater.completePlanGeneration(ctx.Pull, planGeneration, result.ProjectResults)
 	if err != nil {
-		p.handlePlanResultPersistenceError(ctx, AutoplanCommand{}, err)
+		p.handlePlanGenerationCompletionError(ctx, AutoplanCommand{}, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
 
@@ -306,7 +316,15 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
+	var planGeneration string
+	var preexistingPlanLocks map[string]bool
 	if len(projectCmds) > 0 {
+		preexistingPlanLocks = p.snapshotExistingPlanLocks(ctx, projectCmds)
+		planGeneration, _, err = p.dbUpdater.beginPlanGeneration(pull, projectCmds)
+		if err != nil {
+			p.handlePlanGenerationStartError(ctx, cmd, err)
+			return
+		}
 		p.updatePendingCommitStatus(ctx, command.Plan)
 	}
 
@@ -321,6 +339,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 			p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 			return
 		}
+		preexistingPlanLocks = make(map[string]bool)
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
@@ -340,10 +359,10 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
 	} else {
-		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+		pullStatus, err = p.dbUpdater.completePlanGeneration(pull, planGeneration, result.ProjectResults)
 	}
 	if err != nil {
-		p.handlePlanResultPersistenceError(ctx, cmd, err)
+		p.handlePlanGenerationCompletionError(ctx, cmd, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
 
@@ -419,6 +438,101 @@ func (p *PlanCommandRunner) handlePlanResultPersistenceError(ctx *command.Contex
 	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: persistenceErr})
 }
 
+func (p *PlanCommandRunner) handlePlanGenerationStartError(ctx *command.Context, cmd PullCommand, err error) {
+	p.handlePlanResultPersistenceError(ctx, cmd, fmt.Errorf("invalidating previous plan state before planning: %w", err))
+}
+
+func (p *PlanCommandRunner) handlePlanGenerationCompletionError(
+	ctx *command.Context,
+	cmd PullCommand,
+	err error,
+	generation string,
+	projectCmds []command.ProjectContext,
+	preexistingPlanLocks map[string]bool,
+) {
+	if cleanupErr := p.cleanupFailedPlanGeneration(ctx, generation, projectCmds, preexistingPlanLocks); cleanupErr != nil {
+		err = errors.Join(err, fmt.Errorf("cleaning failed plan generation: %w", cleanupErr))
+	}
+	p.handlePlanResultPersistenceError(ctx, cmd, err)
+}
+
+func (p *PlanCommandRunner) snapshotExistingPlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) map[string]bool {
+	preexisting := make(map[string]bool)
+	for _, projectCtx := range projectCmds {
+		if projectCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
+			continue
+		}
+		lockKey := GenerateLockID(projectCtx)
+		if _, seen := preexisting[lockKey]; seen {
+			continue
+		}
+		lock, err := p.lockingLocker.GetLock(lockKey)
+		if err != nil {
+			ctx.Log.Warn("unable to inspect plan lock %q before planning; it will not be cleaned automatically: %s", lockKey, err)
+			preexisting[lockKey] = true
+			continue
+		}
+		preexisting[lockKey] = lock != nil
+	}
+	return preexisting
+}
+
+func (p *PlanCommandRunner) cleanupFailedPlanGeneration(
+	ctx *command.Context,
+	generation string,
+	projectCmds []command.ProjectContext,
+	preexistingPlanLocks map[string]bool,
+) error {
+	pullStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+	if err != nil {
+		return fmt.Errorf("checking current plan generation before cleanup: %w", err)
+	}
+	if pullStatus == nil {
+		return errors.New("checking current plan generation before cleanup: pull status is missing")
+	}
+
+	var cleanupErrors []error
+	cleanedPlans := make(map[applyPlanKey]bool)
+	cleanedLocks := make(map[string]bool)
+	for _, projectCtx := range projectCmds {
+		projectStatus := findProjectInPullStatus(pullStatus, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+		if projectStatus == nil || projectStatus.Status != models.PlanningPlanStatus || projectStatus.PlanGeneration != generation {
+			continue
+		}
+
+		projectKey := newApplyPlanKey(projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+		if hasAtlantisManagedPlanStep(projectCtx.Steps) && !cleanedPlans[projectKey] {
+			cleanedPlans[projectKey] = true
+			if err := p.workingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName); err != nil {
+				cleanupErrors = append(cleanupErrors, fmt.Errorf("deleting managed plan for dir %q workspace %q project %q: %w", projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName, err))
+			}
+		}
+
+		if projectCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
+			continue
+		}
+		lockKey := GenerateLockID(projectCtx)
+		if cleanedLocks[lockKey] || preexistingPlanLocks[lockKey] {
+			continue
+		}
+		cleanedLocks[lockKey] = true
+		project := models.NewProject(projectCtx.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName)
+		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projectCtx.Workspace, lockKey); err != nil {
+			cleanupErrors = append(cleanupErrors, err)
+		}
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
+	for _, step := range steps {
+		if step.StepName == "plan" {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *PlanCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
 	return MarkCommandSkippedIfIgnoredTarget(ctx, command.Plan, cmd, p.prjCmdBuilder)
 }
@@ -441,8 +555,9 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 	switch commandName {
 	case command.Plan:
-		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus)
-		// We consider anything that isn't a plan error as a plan success.
+		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus) + pullStatus.StatusCount(models.PlanningPlanStatus)
+		// We consider anything that isn't a plan error or an incomplete plan
+		// generation as a plan success.
 		// For example, if there is an apply error, that means that at least a
 		// plan was generated successfully.
 		numSuccess = len(pullStatus.Projects) - numErrored

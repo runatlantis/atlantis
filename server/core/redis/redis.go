@@ -21,6 +21,7 @@ import (
 )
 
 var ctx = context.Background()
+var errPullStatusMissing = errors.New("pull status is missing")
 
 // RedisDB is a database using Redis 6+
 type RedisDB struct { // nolint: revive
@@ -48,6 +49,16 @@ const unlockIfOwnedByPullScript = "" +
 	"\n" +
 	"redis.call(\"DEL\", KEYS[1])\n" +
 	"return value\n"
+
+const compareAndSwapPullScript = "" +
+	"local current = redis.call(\"GET\", KEYS[1])\n" +
+	"if ARGV[1] == \"0\" then\n" +
+	"  if current then return 0 end\n" +
+	"elseif not current or current ~= ARGV[2] then\n" +
+	"  return 0\n" +
+	"end\n" +
+	"redis.call(\"SET\", KEYS[1], ARGV[3])\n" +
+	"return 1\n"
 
 // Config holds configuration for Redis connections.
 type Config struct {
@@ -408,31 +419,25 @@ func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string,
 		return err
 	}
 
-	currStatusPtr, err := r.getPull(key)
-	if err != nil {
-		return err
-	}
-	if currStatusPtr == nil {
+	_, err = r.updatePullAtomically(key, false, func(currStatus *models.PullStatus) (models.PullStatus, error) {
+		if currStatus == nil {
+			return models.PullStatus{}, errPullStatusMissing
+		}
+		newPullStatus := *currStatus
+		for i := range newPullStatus.Projects {
+			proj := &newPullStatus.Projects[i]
+			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+				proj.Status = newStatus
+				proj.PlanGeneration = ""
+				break
+			}
+		}
+		return newPullStatus, nil
+	})
+	if errors.Is(err, errPullStatusMissing) {
 		return nil
 	}
-	currStatus := *currStatusPtr
-
-	// Update the status.
-	for i := range currStatus.Projects {
-		// NOTE: We're using a reference here because we are
-		// in-place updating its Status field.
-		proj := &currStatus.Projects[i]
-		if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
-			proj.Status = newStatus
-			break
-		}
-	}
-
-	err = r.writePull(key, currStatus)
-	if err != nil {
-		return fmt.Errorf("db transaction failed: %w", err)
-	}
-	return nil
+	return err
 }
 
 func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
@@ -466,96 +471,224 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 		return models.PullStatus{}, err
 	}
 
-	var newStatus models.PullStatus
-	currStatus, err := r.getPull(key)
-	if err != nil {
-		// Tolerate an unreadable prior entry (e.g. after a PullStatus schema
-		// change). It will be overwritten with fresh data below; in-flight
-		// policy approvals captured in the old blob are lost.
-		log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
-		currStatus = nil
-	}
+	return r.updatePullAtomically(key, true, func(currStatus *models.PullStatus) (models.PullStatus, error) {
+		var newStatus models.PullStatus
+		// If there is no pull OR if the pull we have is out of date, we
+		// just write a new pull.
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			var statuses []models.ProjectStatus
+			for _, res := range newResults {
+				statuses = append(statuses, r.projectResultToProject(res))
+			}
+			// Preserve policy status from the previous commit so approvals
+			// survive between the plan DB write and the subsequent policy
+			// check DB write. doPolicyCheck applies sticky filtering and
+			// overwrites these when it writes its own results.
+			if currStatus != nil {
+				for i := range statuses {
+					for _, old := range currStatus.Projects {
+						if statuses[i].Workspace == old.Workspace &&
+							statuses[i].RepoRelDir == old.RepoRelDir &&
+							statuses[i].ProjectName == old.ProjectName &&
+							len(old.PolicyStatus) > 0 {
+							statuses[i].PolicyStatus = old.PolicyStatus
+							break
+						}
+					}
+				}
+			}
+			newStatus = models.PullStatus{
+				Pull:     pull,
+				Projects: statuses,
+			}
+		} else {
+			// If there's an existing pull at the right commit then we have to
+			// merge our project results with the existing ones. We do a merge
+			// because it's possible a user is just applying a single project
+			// in this command and so we don't want to delete our data about
+			// other projects that aren't affected by this command.
+			newStatus = *currStatus
+			for _, res := range newResults {
+				updatedExisting := false
+				for i := range newStatus.Projects {
+					proj := &newStatus.Projects[i]
+					if res.Workspace == proj.Workspace &&
+						res.RepoRelDir == proj.RepoRelDir &&
+						res.ProjectName == proj.ProjectName {
+						proj.Status = res.PlanStatus()
+						proj.PlanGeneration = ""
 
-	// If there is no pull OR if the pull we have is out of date, we
-	// just write a new pull.
-	if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
-		var statuses []models.ProjectStatus
-		for _, res := range newResults {
-			statuses = append(statuses, r.projectResultToProject(res))
-		}
-		// Preserve policy status from the previous commit so approvals
-		// survive between the plan DB write and the subsequent policy
-		// check DB write. doPolicyCheck applies sticky filtering and
-		// overwrites these when it writes its own results.
-		if currStatus != nil {
-			for i := range statuses {
-				for _, old := range currStatus.Projects {
-					if statuses[i].Workspace == old.Workspace &&
-						statuses[i].RepoRelDir == old.RepoRelDir &&
-						statuses[i].ProjectName == old.ProjectName &&
-						len(old.PolicyStatus) > 0 {
-						statuses[i].PolicyStatus = old.PolicyStatus
+						// Updating only policy sets which are included in results; keeping the rest.
+						if len(proj.PolicyStatus) > 0 {
+							for i, oldPolicySet := range proj.PolicyStatus {
+								for _, newPolicySet := range res.PolicyStatus() {
+									if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+										proj.PolicyStatus[i] = newPolicySet
+									}
+								}
+							}
+						} else {
+							proj.PolicyStatus = res.PolicyStatus()
+						}
+						updatedExisting = true
 						break
 					}
 				}
+
+				if !updatedExisting {
+					newStatus.Projects = append(newStatus.Projects, r.projectResultToProject(res))
+				}
 			}
 		}
-		newStatus = models.PullStatus{
-			Pull:     pull,
-			Projects: statuses,
+		return newStatus, nil
+	})
+}
+
+// BeginPlanGeneration atomically makes the selected projects non-applyable
+// before their plan steps can replace any plan artifacts.
+func (r *RedisDB) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error) {
+	if generation == "" {
+		return models.PullStatus{}, errors.New("plan generation is empty")
+	}
+	key, err := r.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	return r.updatePullAtomically(key, false, func(currStatus *models.PullStatus) (models.PullStatus, error) {
+		var newStatus models.PullStatus
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			newStatus = models.PullStatus{Pull: pull}
+		} else {
+			newStatus = *currStatus
 		}
-	} else {
-		// If there's an existing pull at the right commit then we have to
-		// merge our project results with the existing ones. We do a merge
-		// because it's possible a user is just applying a single project
-		// in this command and so we don't want to delete our data about
-		// other projects that aren't affected by this command.
-		newStatus = *currStatus
-		for _, res := range newResults {
-			// First, check if we should update any existing projects.
-			updatedExisting := false
+
+		for _, project := range projects {
+			updated := false
 			for i := range newStatus.Projects {
-				// NOTE: We're using a reference here because we are
-				// in-place updating its Status field.
-				proj := &newStatus.Projects[i]
-				if res.Workspace == proj.Workspace &&
-					res.RepoRelDir == proj.RepoRelDir &&
-					res.ProjectName == proj.ProjectName {
-
-					proj.Status = res.PlanStatus()
-
-					// Updating only policy sets which are included in results; keeping the rest.
-					if len(proj.PolicyStatus) > 0 {
-						for i, oldPolicySet := range proj.PolicyStatus {
-							for _, newPolicySet := range res.PolicyStatus() {
-								if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
-									proj.PolicyStatus[i] = newPolicySet
-								}
-							}
-						}
-					} else {
-						proj.PolicyStatus = res.PolicyStatus()
-					}
-
-					updatedExisting = true
+				current := &newStatus.Projects[i]
+				if sameProjectStatus(*current, project) {
+					current.Status = models.PlanningPlanStatus
+					current.PlanGeneration = generation
+					current.PolicyStatus = nil
+					updated = true
 					break
 				}
 			}
-
-			if !updatedExisting {
-				// If we didn't update an existing project, then we need to
-				// add this because it's a new one.
-				newStatus.Projects = append(newStatus.Projects, r.projectResultToProject(res))
+			if !updated {
+				newStatus.Projects = append(newStatus.Projects, models.ProjectStatus{
+					Workspace:      project.Workspace,
+					RepoRelDir:     project.RepoRelDir,
+					ProjectName:    project.ProjectName,
+					PlanGeneration: generation,
+					Status:         models.PlanningPlanStatus,
+				})
 			}
 		}
+		return newStatus, nil
+	})
+}
+
+// CompletePlanGeneration atomically persists final plan results only while the
+// selected projects still belong to the plan generation that produced them.
+func (r *RedisDB) CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult) (models.PullStatus, error) {
+	if generation == "" {
+		return models.PullStatus{}, errors.New("plan generation is empty")
+	}
+	key, err := r.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
 	}
 
-	// Now, we overwrite the key with our new status.
-	err = r.writePull(key, newStatus)
-	if err != nil {
-		return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
+	return r.updatePullAtomically(key, false, func(currStatus *models.PullStatus) (models.PullStatus, error) {
+		if currStatus == nil {
+			return models.PullStatus{}, errors.New("plan generation status is missing")
+		}
+		if pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			return models.PullStatus{}, errors.New("plan generation pull identity changed")
+		}
+
+		newStatus := *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			if project == nil || project.Status != models.PlanningPlanStatus || project.PlanGeneration != generation {
+				return models.PullStatus{}, fmt.Errorf("plan generation %q is no longer current for dir %q workspace %q project %q", generation, result.RepoRelDir, result.Workspace, result.ProjectName)
+			}
+			project.Status = result.PlanStatus()
+			project.PlanGeneration = ""
+			project.PolicyStatus = result.PolicyStatus()
+		}
+		for _, project := range newStatus.Projects {
+			if project.Status == models.PlanningPlanStatus && project.PlanGeneration == generation {
+				return models.PullStatus{}, fmt.Errorf("plan generation %q is incomplete for dir %q workspace %q project %q", generation, project.RepoRelDir, project.Workspace, project.ProjectName)
+			}
+		}
+		return newStatus, nil
+	})
+}
+
+func (r *RedisDB) updatePullAtomically(key string, tolerateUnreadable bool, update func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
+	const maxAttempts = 32
+	for range maxAttempts {
+		serializedCurrent, err := r.client.Get(ctx, key).Result()
+		exists := true
+		if err == redis.Nil {
+			exists = false
+			serializedCurrent = ""
+		} else if err != nil {
+			return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
+		}
+
+		var current *models.PullStatus
+		if exists {
+			var decoded models.PullStatus
+			if err := json.Unmarshal([]byte(serializedCurrent), &decoded); err != nil {
+				if !tolerateUnreadable {
+					return models.PullStatus{}, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, serializedCurrent, err)
+				}
+				log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			} else {
+				current = &decoded
+			}
+		}
+
+		newStatus, err := update(current)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+		serializedNew, err := json.Marshal(newStatus)
+		if err != nil {
+			return models.PullStatus{}, fmt.Errorf("serializing: %w", err)
+		}
+		existsArg := "0"
+		if exists {
+			existsArg = "1"
+		}
+		swapped, err := r.client.Eval(ctx, compareAndSwapPullScript, []string{key}, existsArg, serializedCurrent, serializedNew).Int()
+		if err != nil {
+			return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
+		}
+		if swapped == 1 {
+			return newStatus, nil
+		}
 	}
-	return newStatus, nil
+	return models.PullStatus{}, errors.New("db transaction failed: pull status changed too many times")
+}
+
+func sameProjectStatus(left, right models.ProjectStatus) bool {
+	return left.Workspace == right.Workspace &&
+		left.RepoRelDir == right.RepoRelDir &&
+		left.ProjectName == right.ProjectName
+}
+
+func findProjectStatus(projects []models.ProjectStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	for i := range projects {
+		project := &projects[i]
+		if project.Workspace == workspace && project.RepoRelDir == repoRelDir && project.ProjectName == projectName {
+			return project
+		}
+	}
+	return nil
 }
 
 func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
@@ -581,18 +714,6 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, val, err)
 	}
 	return &p, nil
-}
-
-func (r *RedisDB) writePull(key string, pull models.PullStatus) error {
-	serialized, err := json.Marshal(pull)
-	if err != nil {
-		return fmt.Errorf("serializing: %w", err)
-	}
-	err = r.client.Set(ctx, key, serialized, 0).Err()
-	if err != nil {
-		return fmt.Errorf("DB Transaction failed: %w", err)
-	}
-	return nil
 }
 
 func (r *RedisDB) deletePull(key string) error {

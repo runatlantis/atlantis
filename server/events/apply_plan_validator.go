@@ -142,6 +142,12 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 		), true
 	}
 	if !statusAllowedForApplyExecution(proj.Status) {
+		if proj.Status == models.PlanningPlanStatus {
+			return fmt.Errorf(
+				"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+			), true
+		}
 		if proj.Status == models.ErroredPolicyCheckStatus {
 			return fmt.Errorf(
 				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
