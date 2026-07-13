@@ -1,0 +1,25 @@
+server/events/gitea_pull_status_integration_test.go
+  s_2a3e2ffe398070::t_95e9af7e013b64 1-172
+server/events/command_runner_test.go
+  s_2a3e2ffe398070::t_0718054c780c0b 1058,1074,1094-1095,1109,1125
+  s_2a3e2ffe398070::t_3f55e27f9cfd4c 1008-1018
+  s_2a3e2ffe398070::t_a1b7924af7339e 1044-1045
+  s_2a3e2ffe398070::t_a4b2cdd5103af4 972-1007,1019-1043,1046-1057,1059-1073,1075-1093,1096-1108,1110-1124,1126
+  s_2a3e2ffe398070::t_7fa78af1e8b490 1127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "09bf1a832b0079e35dd599c4eda3cf242367cff7",
+  "prompts": {},
+  "sessions": {
+    "s_2a3e2ffe398070": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-fc9f-7442-9630-9cda5e921418",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
