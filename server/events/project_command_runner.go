@@ -866,6 +866,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
 	var remoteApplyRunURL string
+	hasManagedApply := hasAtlantisManagedApplyStep(ctx.Steps)
 	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
 		if err := validator.ValidateCommandStartHead(ctx); err != nil {
 			return "", "", "", err
@@ -914,20 +915,22 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
-	// External plan stores put .tfplan on disk only via Load/RestorePlans.
-	// Targeted apply re-clones without RestorePlans; Load must run before
-	// ValidateProjectPlan (which stats the local file) and before hashing.
-	if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
-		return "", "", "", err
-	}
-
-	if p.ApplyPlanValidator != nil {
-		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+	if hasManagedApply {
+		// External plan stores put .tfplan on disk only via Load/RestorePlans.
+		// Targeted apply re-clones without RestorePlans; Load must run before
+		// ValidateProjectPlan (which stats the local file) and before hashing.
+		if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
 			return "", "", "", err
+		}
+
+		if p.ApplyPlanValidator != nil {
+			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+				return "", "", "", err
+			}
 		}
 	}
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
+	if hasManagedApply && ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
 		planPath, err := safePlanFilePath(ctx, absPath)
 		if err != nil {
 			return "", "", "", err
@@ -973,6 +976,15 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 
 	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
+}
+
+func hasAtlantisManagedApplyStep(steps []valid.Step) bool {
+	for _, step := range steps {
+		if step.StepName == "apply" {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
