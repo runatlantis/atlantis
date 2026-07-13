@@ -1,0 +1,30 @@
+server/events/project_command_builder.go
+  s_2a3e2ffe398070::t_d2e1deda9f4252 1556-1558
+server/events/project_command_runner.go
+  s_2a3e2ffe398070::t_d2e1deda9f4252 868,917,923,971-977
+  s_20546d219c30ca::t_57362113e63e30 978-979
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "9af9aabe46ddb9e6f4dcfd5bb46ea6dcc8852593",
+  "prompts": {},
+  "sessions": {
+    "s_20546d219c30ca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-ea8c-7180-ae37-c68f6873dc5c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_2a3e2ffe398070": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-fc9f-7442-9630-9cda5e921418",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
