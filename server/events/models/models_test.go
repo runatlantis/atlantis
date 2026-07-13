@@ -1280,6 +1280,9 @@ func TestPullStatus_StatusCount(t *testing.T) {
 			{
 				Status: models.PassedPolicyCheckStatus,
 			},
+			{
+				Status: models.PlanningPlanStatus,
+			},
 		},
 	}
 
@@ -1290,6 +1293,11 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
+	Equals(t, 1, ps.StatusCount(models.PlanningPlanStatus))
+}
+
+func TestPlanningPlanStatusString(t *testing.T) {
+	Equals(t, "planning", models.PlanningPlanStatus.String())
 }
 
 func TestPlanSuccessStats(t *testing.T) {

@@ -1387,6 +1387,86 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
+func TestPlanGenerationInvalidationPreservesUnrelatedProjectsAndRejectsStaleCompletion(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	planResult := func(dir, projectName string) command.ProjectResult {
+		return command.ProjectResult{
+			Command:     command.Plan,
+			Workspace:   "default",
+			RepoRelDir:  dir,
+			ProjectName: projectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		}
+	}
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		planResult("project-a", "a"),
+		planResult("project-b", "b"),
+	})
+	Ok(t, err)
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{{
+		Command:     command.PolicyCheck,
+		Workspace:   "default",
+		RepoRelDir:  "project-a",
+		ProjectName: "a",
+		ProjectCommandOutput: command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+			PolicySetResults: []models.PolicySetResult{{
+				PolicySetName: "required-policy",
+				Passed:        true,
+				Approvals:     []models.PolicySetApproval{{Approver: "reviewer"}},
+			}},
+		}},
+	}})
+	Ok(t, err)
+	selected := []models.ProjectStatus{{Workspace: "default", RepoRelDir: "project-a", ProjectName: "a"}}
+
+	status, err := database.BeginPlanGeneration(pull, selected, "generation-1")
+	Ok(t, err)
+	projectA := findPlanGenerationProject(t, status, "project-a", "a")
+	projectB := findPlanGenerationProject(t, status, "project-b", "b")
+	Equals(t, models.PlanningPlanStatus, projectA.Status)
+	Equals(t, "generation-1", projectA.PlanGeneration)
+	Equals(t, 0, len(projectA.PolicyStatus))
+	Equals(t, models.PlannedPlanStatus, projectB.Status)
+	Equals(t, "", projectB.PlanGeneration)
+
+	_, err = database.BeginPlanGeneration(pull, selected, "generation-2")
+	Ok(t, err)
+	_, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{planResult("project-a", "a")})
+	Assert(t, err != nil, "expected stale plan generation completion to fail")
+
+	status, err = database.CompletePlanGeneration(pull, "generation-2", []command.ProjectResult{planResult("project-a", "a")})
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, status, "project-a", "a")
+	projectB = findPlanGenerationProject(t, status, "project-b", "b")
+	Equals(t, models.PlannedPlanStatus, projectA.Status)
+	Equals(t, "", projectA.PlanGeneration)
+	Equals(t, models.PlannedPlanStatus, projectB.Status)
+}
+
+func findPlanGenerationProject(t *testing.T, status models.PullStatus, dir, projectName string) models.ProjectStatus {
+	t.Helper()
+	for _, project := range status.Projects {
+		if project.RepoRelDir == dir && project.ProjectName == projectName {
+			return project
+		}
+	}
+	t.Fatalf("project %q at %q not found", projectName, dir)
+	return models.ProjectStatus{}
+}
+
 // newTestDB returns a TestDB using a temporary path.
 func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
 	// Retrieve a temporary path.
