@@ -25,6 +25,7 @@ type Scenario int
 
 const (
 	ScenarioPlanOnly Scenario = iota
+	ScenarioPlanThenApply
 	ScenarioOnApplyLockPreservation
 )
 
@@ -64,9 +65,17 @@ type TestCase struct {
 	// in at least one Atlantis PR/MR comment after plan succeeds.
 	ExpectedCommentSubstring string
 
-	// ApplyCommand to post after plan succeeds. Empty = skip apply.
-	// Reserved; apply execution is not yet implemented in the harness.
+	// ApplyCommand is posted after plan succeeds by ScenarioPlanThenApply.
+	// It is ignored by plan-only scenarios for backward compatibility.
 	ApplyCommand string
+
+	// ExpectedApplyStatusContexts lists the exact per-project apply status
+	// contexts that must appear on GitHub after ApplyCommand runs.
+	ExpectedApplyStatusContexts []string
+
+	// ExpectedApplyCommentSubstring, if non-empty, must appear in a new
+	// Atlantis comment created after ApplyCommand is posted.
+	ExpectedApplyCommentSubstring string
 
 	// Scenario selects a specialized runner path. Zero keeps the default plan-only behavior.
 	Scenario Scenario
@@ -95,6 +104,10 @@ const projectStatusPrefix = "atlantis/plan: "
 
 func atlantisCommandStatusContext(command string) string {
 	return "atlantis/" + command
+}
+
+func atlantisProjectStatusPrefix(command string) string {
+	return atlantisCommandStatusContext(command) + ": "
 }
 
 // testCases is the fixture test matrix.
@@ -211,6 +224,41 @@ var testCases = []TestCase{
 		Status:                   CaseActive,
 	},
 
+	// ─── v0.46.0 apply regression lifecycles (#6641 and #6642) ───
+	// These cases explicitly opt into plan-then-apply. ApplyCommand fields on
+	// older plan-only cases remain inert so this does not expand their runtime.
+	{
+		Name:                       "builtin-autoplan-apply",
+		Dir:                        "apply-regressions/builtin-autoplan-apply",
+		MutateFile:                 "e2e_trigger.tf",
+		MutateContent:              regressionMutateContent("builtin-autoplan-apply"),
+		ExpectedStatusContexts:     []string{"atlantis/plan: builtin-autoplan-apply"},
+		ForbidExtraProjectStatuses: true,
+		ApplyCommand:               "atlantis apply -p builtin-autoplan-apply",
+		ExpectedApplyStatusContexts: []string{
+			"atlantis/apply: builtin-autoplan-apply",
+		},
+		ExpectedApplyCommentSubstring: "ATLANTIS_E2E_BUILTIN_AUTOPLAN_APPLY_OK",
+		Scenario:                      ScenarioPlanThenApply,
+		VCS:                           VCSGitHub,
+		Status:                        CaseActive,
+	},
+	{
+		Name:                          "custom-plan-path-apply",
+		Dir:                           "custom-workflows/custom-plan-path",
+		MutateFile:                    "e2e_trigger.tf",
+		MutateContent:                 regressionMutateContent("custom-plan-path"),
+		ExpectedStatusContexts:        []string{"atlantis/plan: custom-plan-path"},
+		ForbidExtraProjectStatuses:    true,
+		ExpectedCommentSubstring:      "ATLANTIS_E2E_CUSTOM_PLAN_CREATED",
+		ApplyCommand:                  "atlantis apply -p custom-plan-path",
+		ExpectedApplyStatusContexts:   []string{"atlantis/apply: custom-plan-path"},
+		ExpectedApplyCommentSubstring: "ATLANTIS_E2E_CUSTOM_PLAN_APPLY_OK",
+		Scenario:                      ScenarioPlanThenApply,
+		VCS:                           VCSGitHub,
+		Status:                        CaseActive,
+	},
+
 	// ─── Output: long-line rendering ───
 	// Writes a separate trigger file to preserve the >64KiB long-line expression.
 	// Asserts project status context proves the project was planned.
@@ -272,4 +320,11 @@ var testCases = []TestCase{
 		SkipReason:             "Exercises apply plus two-PR repo-lock lifecycle; enable with E2E_OPT_IN=1.",
 		Scenario:               ScenarioOnApplyLockPreservation,
 	},
+}
+
+func regressionMutateContent(name string) string {
+	return `resource "terraform_data" "e2e_trigger" {
+  input = "` + name + `"
+}
+`
 }

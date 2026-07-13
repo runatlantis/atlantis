@@ -101,6 +101,84 @@ func TestAtlantisStatusContexts(t *testing.T) {
 	}
 }
 
+func TestAtlantisProjectStatusPrefixes(t *testing.T) {
+	tests := []struct {
+		command string
+		want    string
+	}{
+		{command: "plan", want: "atlantis/plan: "},
+		{command: "apply", want: "atlantis/apply: "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.command, func(t *testing.T) {
+			if got := atlantisProjectStatusPrefix(tt.command); got != tt.want {
+				t.Fatalf("atlantisProjectStatusPrefix(%q) = %q, want %q", tt.command, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewCommentContains(t *testing.T) {
+	tests := []struct {
+		name     string
+		comments []string
+		baseline []string
+		expected string
+		want     bool
+	}{
+		{
+			name:     "new marker is accepted",
+			comments: []string{"plan marker", "apply ATLANTIS_E2E_OK"},
+			baseline: []string{"plan marker"},
+			expected: "ATLANTIS_E2E_OK",
+			want:     true,
+		},
+		{
+			name:     "stale marker is rejected",
+			comments: []string{"old ATLANTIS_E2E_OK", "new unrelated comment"},
+			baseline: []string{"old ATLANTIS_E2E_OK"},
+			expected: "ATLANTIS_E2E_OK",
+			want:     false,
+		},
+		{
+			name:     "duplicate body added after baseline is new",
+			comments: []string{"ATLANTIS_E2E_OK", "ATLANTIS_E2E_OK"},
+			baseline: []string{"ATLANTIS_E2E_OK"},
+			expected: "ATLANTIS_E2E_OK",
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := newCommentContains(tt.comments, tt.baseline, tt.expected); got != tt.want {
+				t.Fatalf("newCommentContains(%v, %v, %q) = %v, want %v", tt.comments, tt.baseline, tt.expected, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPlanThenApplyCasesAreExplicit(t *testing.T) {
+	var got []string
+	for _, tc := range testCases {
+		if tc.Scenario == ScenarioPlanThenApply {
+			got = append(got, tc.Name)
+			if tc.ApplyCommand == "" {
+				t.Errorf("plan-then-apply case %q has no ApplyCommand", tc.Name)
+			}
+		}
+		if tc.Name == "standalone" && tc.Scenario != ScenarioPlanOnly {
+			t.Errorf("legacy standalone case scenario = %d, want plan-only", tc.Scenario)
+		}
+	}
+
+	want := []string{"builtin-autoplan-apply", "custom-plan-path-apply"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("plan-then-apply cases = %v, want %v", got, want)
+	}
+}
+
 func TestOnApplyLockProjectPlanStatusContext(t *testing.T) {
 	got := onApplyLockProjectPlanStatusContext()
 	want := "atlantis/plan: locking-on-apply-preservation"

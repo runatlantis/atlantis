@@ -158,7 +158,7 @@ func (g GitlabClient) GetCommitStatus(ctx context.Context, branchName, statusCon
 // GetProjectStatuses is not supported on GitLab.
 // GitLab uses aggregate pipeline status; per-project commit status contexts
 // are not available. Cases requiring project-level assertions must use VCSGitHub.
-func (g GitlabClient) GetProjectStatuses(ctx context.Context, branchName string) (map[string]string, error) {
+func (g GitlabClient) GetProjectStatuses(ctx context.Context, branchName, command string) (map[string]string, error) {
 	return nil, nil
 }
 

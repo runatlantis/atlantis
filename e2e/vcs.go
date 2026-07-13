@@ -32,9 +32,9 @@ type VCSClient interface {
 	// used to distinguish repeated command runs on the same SHA.
 	GetCommitStatus(ctx context.Context, branchName, statusContext string) (CommitStatus, error)
 	// GetProjectStatuses returns all per-project Atlantis status contexts and
-	// their states. Contexts have the form "atlantis/plan: <project>".
+	// their states for command. Contexts have the form "atlantis/<command>: <project>".
 	// Used for post-completion assertions. Returns nil on GitLab (unsupported).
-	GetProjectStatuses(ctx context.Context, branchName string) (map[string]string, error)
+	GetProjectStatuses(ctx context.Context, branchName, command string) (map[string]string, error)
 	// GetPRComments returns all comment bodies on the PR/MR.
 	GetPRComments(ctx context.Context, pullNumber int) ([]string, error)
 	ClosePullRequest(ctx context.Context, pullRequestNumber int) error
