@@ -141,6 +141,25 @@ func writeFixtureMutation(cloneDir, dir, mutateFile, content string) error {
 	return nil
 }
 
+func (t *E2ETester) pushFixtureMutation(pull *fixturePull, mutateFile, content, label string) error {
+	if mutateFile == "" {
+		return fmt.Errorf("[%s] %s mutation file is empty", t.testCase.Name, label)
+	}
+	if err := writeFixtureMutation(pull.cloneDir, t.testCase.Dir, mutateFile, content); err != nil {
+		return err
+	}
+	if err := runGit(pull.cloneDir, "add", "-A"); err != nil {
+		return err
+	}
+	if err := runGit(pull.cloneDir, "commit", "-m", fmt.Sprintf("e2e: %s %s", t.testCase.Name, label)); err != nil {
+		return err
+	}
+	if err := runGit(pull.cloneDir, "push", "origin", pull.branchName); err != nil {
+		return err
+	}
+	return nil
+}
+
 func runGit(dir string, args ...string) error {
 	cmd := exec.Command("git", args...) //nolint:gosec // arguments are test-controlled branch/file names.
 	cmd.Dir = dir

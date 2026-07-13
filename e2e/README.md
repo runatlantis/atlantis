@@ -10,6 +10,10 @@ VCS providers.
 - `ScenarioPlanThenApply` waits for autoplan, posts a configured targeted apply,
   rejects stale aggregate results, and asserts apply project statuses and a new
   apply comment marker.
+- `ScenarioPlanThenReplanThenApply` pushes a second mutation, requires a new
+  plan result and marker, and proves targeted apply consumed generation 2.
+- `ScenarioPlanThenApplyExpectFailure` requires a new failed apply result and
+  error marker while rejecting a configured built-in apply success marker.
 - `ScenarioOnApplyLockPreservation` is an opt-in two-pull-request apply-lock
   lifecycle.
 

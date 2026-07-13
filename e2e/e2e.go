@@ -41,6 +41,10 @@ func (t *E2ETester) Start(ctx context.Context) (*E2EResult, error) {
 		return t.runPlanOnly(ctx)
 	case ScenarioPlanThenApply:
 		return t.runPlanThenApply(ctx)
+	case ScenarioPlanThenReplanThenApply:
+		return t.runPlanThenReplanThenApply(ctx)
+	case ScenarioPlanThenApplyExpectFailure:
+		return t.runPlanThenApplyExpectFailure(ctx)
 	case ScenarioOnApplyLockPreservation:
 		return t.runOnApplyLockPreservation(ctx)
 	default:
@@ -112,9 +116,21 @@ func pollInitialPlanStatus(ctx context.Context, client VCSClient, branchName, ca
 }
 
 func (t *E2ETester) runPlanThenApply(ctx context.Context) (result *E2EResult, err error) {
+	return t.runPlanApplyLifecycle(ctx, false, false)
+}
+
+func (t *E2ETester) runPlanThenReplanThenApply(ctx context.Context) (result *E2EResult, err error) {
+	return t.runPlanApplyLifecycle(ctx, true, false)
+}
+
+func (t *E2ETester) runPlanThenApplyExpectFailure(ctx context.Context) (result *E2EResult, err error) {
+	return t.runPlanApplyLifecycle(ctx, false, true)
+}
+
+func (t *E2ETester) runPlanApplyLifecycle(ctx context.Context, replan, expectApplyFailure bool) (result *E2EResult, err error) {
 	tc := t.testCase
 	if tc.ApplyCommand == "" {
-		return nil, fmt.Errorf("[%s] plan-then-apply scenario requires ApplyCommand", tc.Name)
+		return nil, fmt.Errorf("[%s] plan/apply lifecycle requires ApplyCommand", tc.Name)
 	}
 	branchName := fmt.Sprintf("e2e-%s-%s", tc.Name, e2eRunNonce())
 	result = &E2EResult{testCase: tc.Name, branchName: branchName}
@@ -141,6 +157,37 @@ func (t *E2ETester) runPlanThenApply(ctx context.Context) (result *E2EResult, er
 	if err := t.assertPlanResult(ctx, pull, state); err != nil {
 		return result, err
 	}
+	if replan {
+		planBaseline, err := t.vcsClient.GetCommitStatus(ctx, branchName, atlantisCommandStatusContext("plan"))
+		if err != nil {
+			return result, fmt.Errorf("[%s] fetching plan baseline before replan: %w", tc.Name, err)
+		}
+		commentBaseline, err := t.vcsClient.GetPRComments(ctx, pull.pullID)
+		if err != nil {
+			return result, fmt.Errorf("[%s] fetching comments before replan: %w", tc.Name, err)
+		}
+		if err := t.pushFixtureMutation(pull, tc.ReplanMutateFile, tc.ReplanMutateContent, "generation-2"); err != nil {
+			return result, fmt.Errorf("[%s] pushing replan mutation: %w", tc.Name, err)
+		}
+		state, err = pollAtlantisCommandStatusAfter(ctx, t.vcsClient, branchName, "plan", tc.Name, planBaseline)
+		result.testResult = state
+		if err != nil {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "plan", err)
+		}
+		if !t.vcsClient.DidAtlantisSucceed(state) {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "plan", fmt.Errorf("[%s] replan expected success but got %q", tc.Name, state))
+		}
+		if len(tc.ExpectedStatusContexts) > 0 {
+			if err := assertProjectStatuses(ctx, t.vcsClient, branchName, "plan", tc.Name, tc.ExpectedStatusContexts, tc.ForbidExtraProjectStatuses); err != nil {
+				return result, t.withLifecycleDiagnostics(ctx, pull, "plan", err)
+			}
+		}
+		if tc.ExpectedReplanCommentSubstring != "" {
+			if err := waitForNewCommentContaining(ctx, t.vcsClient, pull.pullID, tc.Name, commentBaseline, tc.ExpectedReplanCommentSubstring); err != nil {
+				return result, t.withLifecycleDiagnostics(ctx, pull, "plan", err)
+			}
+		}
+	}
 
 	commentBaseline, err := t.vcsClient.GetPRComments(ctx, pull.pullID)
 	if err != nil {
@@ -151,17 +198,35 @@ func (t *E2ETester) runPlanThenApply(ctx context.Context) (result *E2EResult, er
 	if applyErr != nil {
 		return result, t.withLifecycleDiagnostics(ctx, pull, "apply", applyErr)
 	}
-	if !t.vcsClient.DidAtlantisSucceed(state) {
-		return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] apply expected success but got %q", tc.Name, state))
-	}
-	if len(tc.ExpectedApplyStatusContexts) > 0 {
-		if err := assertProjectStatuses(ctx, t.vcsClient, branchName, "apply", tc.Name, tc.ExpectedApplyStatusContexts, false); err != nil {
+	if expectApplyFailure {
+		if !t.vcsClient.DidAtlantisFail(state) {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] apply expected failure but got %q", tc.Name, state))
+		}
+		if err := assertFailedProjectStatuses(ctx, t.vcsClient, branchName, "apply", tc.Name, tc.ExpectedFailedApplyStatusContexts); err != nil {
 			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", err)
+		}
+	} else {
+		if !t.vcsClient.DidAtlantisSucceed(state) {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] apply expected success but got %q", tc.Name, state))
+		}
+		if len(tc.ExpectedApplyStatusContexts) > 0 {
+			if err := assertProjectStatuses(ctx, t.vcsClient, branchName, "apply", tc.Name, tc.ExpectedApplyStatusContexts, false); err != nil {
+				return result, t.withLifecycleDiagnostics(ctx, pull, "apply", err)
+			}
 		}
 	}
 	if tc.ExpectedApplyCommentSubstring != "" {
 		if err := waitForNewCommentContaining(ctx, t.vcsClient, pull.pullID, tc.Name, commentBaseline, tc.ExpectedApplyCommentSubstring); err != nil {
 			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", err)
+		}
+	}
+	if tc.ForbiddenApplyCommentSubstring != "" {
+		comments, err := t.vcsClient.GetPRComments(ctx, pull.pullID)
+		if err != nil {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] fetching comments for forbidden marker: %w", tc.Name, err))
+		}
+		if newCommentContains(comments, commentBaseline, tc.ForbiddenApplyCommentSubstring) {
+			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] forbidden apply marker %q appeared after command", tc.Name, tc.ForbiddenApplyCommentSubstring))
 		}
 	}
 	result.testResult = "success"
@@ -235,6 +300,30 @@ func assertProjectStatuses(ctx context.Context, client VCSClient, branchName, co
 	}
 
 	log.Printf("[%s] %s project status contexts verified: %v", caseName, command, expectedContexts)
+	return nil
+}
+
+func assertFailedProjectStatuses(ctx context.Context, client VCSClient, branchName, command, caseName string, expectedContexts []string) error {
+	if len(expectedContexts) == 0 {
+		return nil
+	}
+	projectStatuses, err := client.GetProjectStatuses(ctx, branchName, command)
+	if err != nil {
+		return fmt.Errorf("[%s] failed to get %s project statuses: %v", caseName, command, err)
+	}
+	if projectStatuses == nil {
+		log.Printf("[%s] skipping failed %s project status assertion (not supported on this VCS)", caseName, command)
+		return nil
+	}
+	for _, expected := range expectedContexts {
+		state, ok := projectStatuses[expected]
+		if !ok {
+			return fmt.Errorf("[%s] expected failed status context %q not found", caseName, expected)
+		}
+		if !client.DidAtlantisFail(state) {
+			return fmt.Errorf("[%s] status context %q has state %q, expected failure", caseName, expected, state)
+		}
+	}
 	return nil
 }
 
