@@ -922,11 +922,14 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
 			return "", "", "", err
 		}
-
 		if p.ApplyPlanValidator != nil {
 			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
 				return "", "", "", err
 			}
+		}
+	} else if validator, ok := p.ApplyPlanValidator.(ApplyPlanStatusValidator); ok {
+		if err := validator.ValidateProjectPlanStatus(ctx); err != nil {
+			return "", "", "", err
 		}
 	}
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)

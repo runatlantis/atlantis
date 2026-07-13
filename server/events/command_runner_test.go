@@ -1065,6 +1065,8 @@ func TestPlanCommandRunner_AutoplanPersistenceFailureFailsClosed(t *testing.T) {
 	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark autoplan errored")
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
@@ -1116,6 +1118,8 @@ func TestPlanCommandRunner_ManualPlanPersistenceFailureFailsClosed(t *testing.T)
 	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark manual plan errored")
 	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)

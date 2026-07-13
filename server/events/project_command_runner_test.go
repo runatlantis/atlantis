@@ -949,12 +949,153 @@ func TestProjectCommandRunner_RunOnlyApplyDoesNotRequireManagedPlanFile(t *testi
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
 		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	_, err := database.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
 
 	res := runner.Apply(ctx)
 
 	Ok(t, res.Error)
 	Equals(t, "run", res.ApplySuccess)
 	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_RunOnlyApplyRejectsMissingPullStatus(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRun := mocks.NewMockCustomStepRunner()
+	database := newTestBoltDB(t)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             mockRun,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher:   database,
+			LivePullHeadFetcher: fakeLivePullHeadFetcher{head: pull.HeadCommit, base: pull.BaseBranch},
+		},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       []valid.Step{{StepName: "run", RunCommand: "some-custom-apply-command custom-plan-path"}},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "custom-plan-path",
+		Pull:        pull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected missing PullStatus to reject run-only apply")
+	Assert(t, strings.Contains(res.Error.Error(), "no current plan status found"), "got: %s", res.Error)
+	mockRun.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](),
+		Any[*valid.CommandShell](),
+		Any[string](),
+		Any[string](),
+		Any[map[string]string](),
+		AnyBool(),
+		Any[[]valid.PostProcessRunOutputOption](),
+		Any[[]*regexp.Regexp](),
+	)
+}
+
+func TestProjectCommandRunner_RunOnlyApplyRejectsStalePullStatus(t *testing.T) {
+	tests := []struct {
+		name         string
+		statusHead   string
+		statusBase   string
+		expectedText string
+	}{
+		{
+			name:         "stale head",
+			statusHead:   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			statusBase:   "main",
+			expectedText: "recorded plan status is from commit",
+		},
+		{
+			name:         "stale base",
+			statusHead:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			statusBase:   "release",
+			expectedText: "recorded plan status is for base branch",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockRun := mocks.NewMockCustomStepRunner()
+			database := newTestBoltDB(t)
+			pull := models.PullRequest{
+				Num:        1,
+				HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				BaseBranch: "main",
+				BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+			}
+			runner := &events.DefaultProjectCommandRunner{
+				Locker:                    mockLocker,
+				LockURLGenerator:          mockURLGenerator{},
+				RunStepRunner:             mockRun,
+				WorkingDir:                mockWorkingDir,
+				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+				ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+					PullStatusFetcher:   database,
+					LivePullHeadFetcher: fakeLivePullHeadFetcher{head: pull.HeadCommit, base: pull.BaseBranch},
+				},
+			}
+			repoDir := t.TempDir()
+			ctx := command.ProjectContext{
+				Log:         logging.NewNoopLogger(t),
+				CommandName: command.Apply,
+				Steps:       []valid.Step{{StepName: "run", RunCommand: "some-custom-apply-command custom-plan-path"}},
+				Workspace:   "default",
+				RepoRelDir:  ".",
+				ProjectName: "custom-plan-path",
+				Pull:        pull,
+			}
+			statusPull := pull
+			statusPull.HeadCommit = tt.statusHead
+			statusPull.BaseBranch = tt.statusBase
+			_, err := database.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+			Ok(t, err)
+			When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+			When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+				ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+			res := runner.Apply(ctx)
+
+			Assert(t, res.Error != nil, "expected stale PullStatus to reject run-only apply")
+			Assert(t, strings.Contains(res.Error.Error(), tt.expectedText), "got: %s", res.Error)
+			mockRun.VerifyWasCalled(Never()).Run(
+				Any[command.ProjectContext](),
+				Any[*valid.CommandShell](),
+				Any[string](),
+				Any[string](),
+				Any[map[string]string](),
+				AnyBool(),
+				Any[[]valid.PostProcessRunOutputOption](),
+				Any[[]*regexp.Regexp](),
+			)
+		})
+	}
 }
 
 func TestProjectCommandRunner_RunOnlyApplyStillValidatesLivePullIdentity(t *testing.T) {
