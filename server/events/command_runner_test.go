@@ -1438,6 +1438,76 @@ func TestPlanCommandRunner_FailedTargetedReplanPreservesPreexistingPlanLock(t *t
 	Assert(t, planLocker.lock == preexistingLock, "expected preexisting plan lock to remain")
 }
 
+func TestPlanCommandRunner_FailedReplanDoesNotCleanNewerGeneration(t *testing.T) {
+	RegisterMockTestingT(t)
+	underlying := newTestBoltDB(t)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:   command.Plan,
+		RepoRelDir:    ".",
+		Workspace:     events.DefaultWorkspace,
+		ProjectName:   "superseded-replan",
+		BaseRepo:      pull.BaseRepo,
+		Pull:          pull,
+		Steps:         valid.DefaultPlanStage.Steps,
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	database := &supersedePlanCompletionDB{
+		Database: underlying,
+		project: models.ProjectStatus{
+			Workspace:   projectCtx.Workspace,
+			RepoRelDir:  projectCtx.RepoRelDir,
+			ProjectName: projectCtx.ProjectName,
+		},
+	}
+	planLocker := &trackingPlanGenerationLocker{}
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.planLocker = planLocker
+	})
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: projectCtx.ProjectName}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).Then(func([]Param) ReturnValues {
+		planLocker.lock = &models.ProjectLock{
+			Pull:      pull,
+			Project:   models.NewProject(pull.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName),
+			Workspace: projectCtx.Workspace,
+		}
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected superseded final persistence to fail the replan")
+	workingDir.(*mocks.MockWorkingDir).VerifyWasCalled(Never()).DeletePlan(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[string](), Any[string]())
+	Equals(t, 0, planLocker.unlockIfOwnedCalls)
+	Equals(t, 0, planLocker.unlockByPullCalls)
+	Assert(t, planLocker.lock != nil, "expected the newer generation lock to remain")
+	status, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected newer plan generation status")
+	Equals(t, models.PlanningPlanStatus, status.Projects[0].Status)
+	Equals(t, "newer-generation", status.Projects[0].PlanGeneration)
+}
+
 func assertFailedReplanInvalidatesPreviousPlanGeneration(t *testing.T, planSteps, applySteps []valid.Step, expectManagedPlanCleanup bool, cleanupError error) {
 	t.Helper()
 	RegisterMockTestingT(t)
@@ -1561,6 +1631,11 @@ type blockingPlanCompletionDB struct {
 	release chan struct{}
 }
 
+type supersedePlanCompletionDB struct {
+	db.Database
+	project models.ProjectStatus
+}
+
 type trackingPlanGenerationLocker struct {
 	lock               *models.ProjectLock
 	unlockIfOwnedCalls int
@@ -1602,6 +1677,13 @@ func (d *blockingPlanCompletionDB) CompletePlanGeneration(pull models.PullReques
 	close(d.started)
 	<-d.release
 	return d.Database.CompletePlanGeneration(pull, generation, results)
+}
+
+func (d *supersedePlanCompletionDB) CompletePlanGeneration(pull models.PullRequest, _ string, _ []command.ProjectResult) (models.PullStatus, error) {
+	if _, err := d.Database.BeginPlanGeneration(pull, []models.ProjectStatus{d.project}, "newer-generation"); err != nil {
+		return models.PullStatus{}, fmt.Errorf("starting newer plan generation: %w", err)
+	}
+	return models.PullStatus{}, errors.New("injected superseded PullStatus persistence failure")
 }
 
 func (d *failNextPullStatusWriteDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
