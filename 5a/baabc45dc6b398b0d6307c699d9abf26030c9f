@@ -1,0 +1,19 @@
+runatlantis.io/docs/custom-workflows.md
+  s_20546d219c30ca::t_b720dab429ab0d 273-277,328,338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "5abaabc45dc6b398b0d6307c699d9abf26030c9f",
+  "prompts": {},
+  "sessions": {
+    "s_20546d219c30ca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-ea8c-7180-ae37-c68f6873dc5c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
