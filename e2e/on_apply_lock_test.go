@@ -179,6 +179,40 @@ func TestPlanThenApplyCasesAreExplicit(t *testing.T) {
 	}
 }
 
+func TestPlanGenerationRegressionCasesAreExplicit(t *testing.T) {
+	var replanCases []string
+	var expectedFailureCases []string
+	for _, tc := range testCases {
+		switch tc.Scenario {
+		case ScenarioPlanThenReplanThenApply:
+			replanCases = append(replanCases, tc.Name)
+			if tc.ReplanMutateFile == "" || tc.ReplanMutateContent == "" || tc.ExpectedReplanCommentSubstring == "" {
+				t.Errorf("replan case %q is missing second-generation mutation or marker", tc.Name)
+			}
+		case ScenarioPlanThenApplyExpectFailure:
+			expectedFailureCases = append(expectedFailureCases, tc.Name)
+			if len(tc.ExpectedFailedApplyStatusContexts) == 0 || tc.ExpectedApplyCommentSubstring == "" || tc.ForbiddenApplyCommentSubstring == "" {
+				t.Errorf("expected-failure case %q is missing failure or forbidden-marker assertions", tc.Name)
+			}
+		}
+	}
+
+	wantReplan := []string{"builtin-replan-apply", "custom-plan-replan-apply"}
+	if strings.Join(replanCases, ",") != strings.Join(wantReplan, ",") {
+		t.Fatalf("plan-replan-apply cases = %v, want %v", replanCases, wantReplan)
+	}
+	wantFailure := []string{"mixed-managed-plan-mutation"}
+	if strings.Join(expectedFailureCases, ",") != strings.Join(wantFailure, ",") {
+		t.Fatalf("expected-apply-failure cases = %v, want %v", expectedFailureCases, wantFailure)
+	}
+}
+
+func TestRegressionGenerationContent(t *testing.T) {
+	if got, want := regressionGenerationContent("GENERATION_2"), "e2e_generation = \"GENERATION_2\"\n"; got != want {
+		t.Fatalf("regressionGenerationContent() = %q, want %q", got, want)
+	}
+}
+
 func TestOnApplyLockProjectPlanStatusContext(t *testing.T) {
 	got := onApplyLockProjectPlanStatusContext()
 	want := "atlantis/plan: locking-on-apply-preservation"

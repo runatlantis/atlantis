@@ -26,6 +26,8 @@ type Scenario int
 const (
 	ScenarioPlanOnly Scenario = iota
 	ScenarioPlanThenApply
+	ScenarioPlanThenReplanThenApply
+	ScenarioPlanThenApplyExpectFailure
 	ScenarioOnApplyLockPreservation
 )
 
@@ -47,6 +49,11 @@ type TestCase struct {
 	// MutateContent is written to MutateFile. Defaults to a null_resource.
 	MutateContent string
 
+	// ReplanMutateFile and ReplanMutateContent describe the second commit for
+	// ScenarioPlanThenReplanThenApply.
+	ReplanMutateFile    string
+	ReplanMutateContent string
+
 	// ExpectedStatusContexts lists the exact per-project commit status contexts
 	// that must appear on GitHub (e.g. "atlantis/plan: project1").
 	// Empty means no project-level assertion (only aggregate success).
@@ -65,6 +72,10 @@ type TestCase struct {
 	// in at least one Atlantis PR/MR comment after plan succeeds.
 	ExpectedCommentSubstring string
 
+	// ExpectedReplanCommentSubstring must occur in a new comment after the
+	// second mutation is pushed.
+	ExpectedReplanCommentSubstring string
+
 	// ApplyCommand is posted after plan succeeds by ScenarioPlanThenApply.
 	// It is ignored by plan-only scenarios for backward compatibility.
 	ApplyCommand string
@@ -76,6 +87,14 @@ type TestCase struct {
 	// ExpectedApplyCommentSubstring, if non-empty, must appear in a new
 	// Atlantis comment created after ApplyCommand is posted.
 	ExpectedApplyCommentSubstring string
+
+	// ExpectedFailedApplyStatusContexts lists per-project apply contexts that
+	// must be failed in an expected-failure lifecycle.
+	ExpectedFailedApplyStatusContexts []string
+
+	// ForbiddenApplyCommentSubstring must not occur in comments added after the
+	// apply command.
+	ForbiddenApplyCommentSubstring string
 
 	// Scenario selects a specialized runner path. Zero keeps the default plan-only behavior.
 	Scenario Scenario
@@ -258,6 +277,55 @@ var testCases = []TestCase{
 		VCS:                           VCSGitHub,
 		Status:                        CaseActive,
 	},
+	{
+		Name:                           "builtin-replan-apply",
+		Dir:                            "apply-regressions/builtin-replan-apply",
+		MutateFile:                     "generation.auto.tfvars",
+		MutateContent:                  regressionGenerationContent("GENERATION_1"),
+		ReplanMutateFile:               "generation.auto.tfvars",
+		ReplanMutateContent:            regressionGenerationContent("GENERATION_2"),
+		ExpectedStatusContexts:         []string{"atlantis/plan: builtin-replan-apply"},
+		ForbidExtraProjectStatuses:     true,
+		ExpectedReplanCommentSubstring: "ATLANTIS_E2E_BUILTIN_REPLAN_GENERATION_2",
+		ApplyCommand:                   "atlantis apply -p builtin-replan-apply",
+		ExpectedApplyStatusContexts:    []string{"atlantis/apply: builtin-replan-apply"},
+		ExpectedApplyCommentSubstring:  "ATLANTIS_E2E_BUILTIN_REPLAN_GENERATION_2",
+		Scenario:                       ScenarioPlanThenReplanThenApply,
+		VCS:                            VCSGitHub,
+		Status:                         CaseActive,
+	},
+	{
+		Name:                           "custom-plan-replan-apply",
+		Dir:                            "custom-workflows/custom-plan-replan",
+		MutateFile:                     "generation.auto.tfvars",
+		MutateContent:                  regressionGenerationContent("GENERATION_1"),
+		ReplanMutateFile:               "generation.auto.tfvars",
+		ReplanMutateContent:            regressionGenerationContent("GENERATION_2"),
+		ExpectedStatusContexts:         []string{"atlantis/plan: custom-plan-replan"},
+		ForbidExtraProjectStatuses:     true,
+		ExpectedReplanCommentSubstring: "ATLANTIS_E2E_CUSTOM_REPLAN_PLAN_GENERATION_2",
+		ApplyCommand:                   "atlantis apply -p custom-plan-replan",
+		ExpectedApplyStatusContexts:    []string{"atlantis/apply: custom-plan-replan"},
+		ExpectedApplyCommentSubstring:  "ATLANTIS_E2E_CUSTOM_REPLAN_GENERATION_2",
+		Scenario:                       ScenarioPlanThenReplanThenApply,
+		VCS:                            VCSGitHub,
+		Status:                         CaseActive,
+	},
+	{
+		Name:                              "mixed-managed-plan-mutation",
+		Dir:                               "apply-regressions/mixed-plan-mutation",
+		MutateFile:                        "e2e_trigger.tf",
+		MutateContent:                     regressionMutateContent("mixed-plan-mutation"),
+		ExpectedStatusContexts:            []string{"atlantis/plan: mixed-plan-mutation"},
+		ForbidExtraProjectStatuses:        true,
+		ApplyCommand:                      "atlantis apply -p mixed-plan-mutation",
+		ExpectedFailedApplyStatusContexts: []string{"atlantis/apply: mixed-plan-mutation"},
+		ExpectedApplyCommentSubstring:     "plan file changed",
+		ForbiddenApplyCommentSubstring:    "ATLANTIS_E2E_MIXED_BUILTIN_APPLY_MUST_NOT_RUN",
+		Scenario:                          ScenarioPlanThenApplyExpectFailure,
+		VCS:                               VCSGitHub,
+		Status:                            CaseActive,
+	},
 
 	// ─── Output: long-line rendering ───
 	// Writes a separate trigger file to preserve the >64KiB long-line expression.
@@ -327,4 +395,8 @@ func regressionMutateContent(name string) string {
   input = "` + name + `"
 }
 `
+}
+
+func regressionGenerationContent(generation string) string {
+	return "e2e_generation = \"" + generation + "\"\n"
 }
