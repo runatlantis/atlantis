@@ -187,13 +187,13 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
-
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		p.handlePlanResultPersistenceError(ctx, AutoplanCommand{}, err)
+		return
 	}
 
+	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -334,11 +334,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	var pullStatus models.PullStatus
 	if noProjectPullStatus != nil {
 		pullStatus = *noProjectPullStatus
@@ -348,10 +343,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	}
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		p.handlePlanResultPersistenceError(ctx, cmd, err)
 		return
 	}
 
+	p.pullUpdater.updatePull(ctx, cmd, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -409,6 +405,15 @@ func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, 
 		ctx.Log.Warn("unable to update commit status: %s", statusErr)
 	}
 	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+}
+
+func (p *PlanCommandRunner) handlePlanResultPersistenceError(ctx *command.Context, cmd PullCommand, err error) {
+	persistenceErr := fmt.Errorf("persisting plan results: %w", err)
+	ctx.CommandHasErrors = true
+	if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+		ctx.Log.Warn("unable to update commit status: %s", statusErr)
+	}
+	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: persistenceErr})
 }
 
 func (p *PlanCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
