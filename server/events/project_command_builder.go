@@ -1451,7 +1451,7 @@ func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool
 
 func statusBlocksGenericApplyWithoutPlan(status models.ProjectPlanStatus) bool {
 	switch status {
-	case models.ErroredPlanStatus:
+	case models.ErroredPlanStatus, models.PlanningPlanStatus:
 		return true
 	default:
 		return false
@@ -1493,6 +1493,12 @@ func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[
 			)
 		}
 		if statusBlocksGenericApplyWithoutPlan(proj.Status) {
+			if proj.Status == models.PlanningPlanStatus {
+				return fmt.Errorf(
+					"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+					proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+				)
+			}
 			return fmt.Errorf(
 				"plan for dir %q workspace %q project %q errored and cannot be applied without a plan file; run `atlantis plan`",
 				proj.RepoRelDir, proj.Workspace, proj.ProjectName,

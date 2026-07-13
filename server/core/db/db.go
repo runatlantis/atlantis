@@ -26,6 +26,8 @@ type Database interface {
 	GetPullStatus(pull models.PullRequest) (*models.PullStatus, error)
 	DeletePullStatus(pull models.PullRequest) error
 	UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error)
+	BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error)
+	CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult) (models.PullStatus, error)
 
 	LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error)
 	UnlockCommand(cmdName command.Name) error

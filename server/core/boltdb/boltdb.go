@@ -469,6 +469,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.ProjectName == proj.ProjectName {
 
 						proj.Status = res.PlanStatus()
+						proj.PlanGeneration = ""
 
 						// Updating only policy sets which are included in results; keeping the rest.
 						if len(proj.PolicyStatus) > 0 {
@@ -503,6 +504,126 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+// BeginPlanGeneration atomically makes the selected projects non-applyable
+// before their plan steps can replace any plan artifacts.
+func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error) {
+	if generation == "" {
+		return models.PullStatus{}, errors.New("plan generation is empty")
+	}
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return err
+		}
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			newStatus = models.PullStatus{Pull: pull}
+		} else {
+			newStatus = *currStatus
+		}
+
+		for _, project := range projects {
+			updated := false
+			for i := range newStatus.Projects {
+				current := &newStatus.Projects[i]
+				if sameProjectStatus(*current, project) {
+					current.Status = models.PlanningPlanStatus
+					current.PlanGeneration = generation
+					current.PolicyStatus = nil
+					updated = true
+					break
+				}
+			}
+			if !updated {
+				newStatus.Projects = append(newStatus.Projects, models.ProjectStatus{
+					Workspace:      project.Workspace,
+					RepoRelDir:     project.RepoRelDir,
+					ProjectName:    project.ProjectName,
+					PlanGeneration: generation,
+					Status:         models.PlanningPlanStatus,
+				})
+			}
+		}
+
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+// CompletePlanGeneration atomically persists final plan results only while the
+// selected projects still belong to the plan generation that produced them.
+func (b *BoltDB) CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult) (models.PullStatus, error) {
+	if generation == "" {
+		return models.PullStatus{}, errors.New("plan generation is empty")
+	}
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return err
+		}
+		if currStatus == nil {
+			return errors.New("plan generation status is missing")
+		}
+		if pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			return errors.New("plan generation pull identity changed")
+		}
+
+		newStatus = *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			if project == nil || project.Status != models.PlanningPlanStatus || project.PlanGeneration != generation {
+				return fmt.Errorf("plan generation %q is no longer current for dir %q workspace %q project %q", generation, result.RepoRelDir, result.Workspace, result.ProjectName)
+			}
+			project.Status = result.PlanStatus()
+			project.PlanGeneration = ""
+			project.PolicyStatus = result.PolicyStatus()
+		}
+		for _, project := range newStatus.Projects {
+			if project.Status == models.PlanningPlanStatus && project.PlanGeneration == generation {
+				return fmt.Errorf("plan generation %q is incomplete for dir %q workspace %q project %q", generation, project.RepoRelDir, project.Workspace, project.ProjectName)
+			}
+		}
+
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+func sameProjectStatus(left, right models.ProjectStatus) bool {
+	return left.Workspace == right.Workspace &&
+		left.RepoRelDir == right.RepoRelDir &&
+		left.ProjectName == right.ProjectName
+}
+
+func findProjectStatus(projects []models.ProjectStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	for i := range projects {
+		project := &projects[i]
+		if project.Workspace == workspace && project.RepoRelDir == repoRelDir && project.ProjectName == projectName {
+			return project
+		}
+	}
+	return nil
 }
 
 func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
@@ -575,6 +696,7 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 			proj := &currStatus.Projects[i]
 			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
 				proj.Status = newStatus
+				proj.PlanGeneration = ""
 				break
 			}
 		}
