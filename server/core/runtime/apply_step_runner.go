@@ -100,11 +100,11 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 
   Enter a value: 
 `
-	applyStartIdx := strings.Index(out, applyStartText)
-	if applyStartIdx < 0 {
+	_, after, found := strings.Cut(out, applyStartText)
+	if !found {
 		return out
 	}
-	return out[applyStartIdx+len(applyStartText):]
+	return after
 }
 
 // runRemoteApply handles running the apply and performing actions in real-time
@@ -159,6 +159,9 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
+			if ctx.RemoteApplyRunURL != nil {
+				*ctx.RemoteApplyRunURL = runURL
+			}
 			ctx.Log.Debug("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
@@ -197,7 +200,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	if err != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
+		ctx.Log.Debug("remote apply succeeded; deferring success status until final apply freshness validation")
 	}
 	return output, err
 }
@@ -210,11 +213,11 @@ func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut st
 	output := StripRefreshingFromPlanOutput(applyOut, tfVersion)
 
 	// Strip plan output after the prompt to execute the plan.
-	planEndIdx := strings.Index(output, "Do you want to perform these actions in workspace \"")
-	if planEndIdx < 0 {
+	before, _, found := strings.Cut(output, "Do you want to perform these actions in workspace \"")
+	if !found {
 		return fmt.Errorf("couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
-	currPlan := strings.TrimSpace(output[:planEndIdx])
+	currPlan := strings.TrimSpace(before)
 
 	// Ensure we strip the remoteOpsHeader from the plan contents so the
 	// comparison is fair. We add this header in the plan phase so we can

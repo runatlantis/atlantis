@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package github
@@ -26,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
-	"github.com/google/go-github/v71/github"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
+	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -125,25 +116,26 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
-	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
-	}
+	transportWithRateLimit := newSecondaryRateLimitHTTPClient(transport)
 
-	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
-		client = github.NewClient(transportWithRateLimit)
-		graphqlURL = "https://api.github.com/graphql"
+		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
+		if err != nil {
+			return nil, fmt.Errorf("creating github client: %w", err)
+		}
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
-		// TODO: Deprecated: Use NewClient(httpClient).WithEnterpriseURLs(baseURL, uploadURL) instead
-		client, err = github.NewEnterpriseClient(apiURL.String(), apiURL.String(), transportWithRateLimit) //nolint:staticcheck
+		client, err = github.NewClient(
+			github.WithHTTPClient(transportWithRateLimit),
+			github.WithEnterpriseURLs(apiURL.String(), apiURL.String()),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
+
+	graphqlURL := resolveGraphQLURL(hostname)
 
 	// Use the client from shurcooL's githubv4 library for queries.
 	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
@@ -164,6 +156,12 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		maxCommentsPerCommand: maxCommentsPerCommand,
 		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
+}
+
+func newSecondaryRateLimitHTTPClient(client *http.Client) *http.Client {
+	clientWithRateLimit := *client
+	clientWithRateLimit.Transport = github_ratelimit.NewSecondaryLimiter(client.Transport)
+	return &clientWithRateLimit
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
@@ -228,24 +226,8 @@ listloop:
 // multiple comments.
 func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitHub pull request %d", pullNum)
-	var sepStart string
 
-	sepEnd := "\n```\n</details>" +
-		"\n<br>\n\n**Warning**: Output length greater than max comment size. Continued in next comment."
-
-	if command != "" {
-		sepStart = fmt.Sprintf("Continued %s output from previous comment.\n<details><summary>Show Output</summary>\n\n", command) +
-			"```diff\n"
-	} else {
-		sepStart = "Continued from previous comment.\n<details><summary>Show Output</summary>\n\n" +
-			"```diff\n"
-	}
-
-	truncationHeader := "> [!WARNING]\n" +
-		"> **Warning**: Command output is larger than the maximum number of comments per command. Output truncated.\n<details><summary>Show Output</summary>\n\n" +
-		"```diff\n"
-
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, g.maxCommentsPerCommand, truncationHeader)
+	comments := common.SplitComment(logger, comment, maxCommentLength, g.maxCommentsPerCommand, command)
 	for i := range comments {
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {
@@ -607,13 +589,19 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	requiredWorkflows []WorkflowFileReference,
 	checkRuns []CheckRun,
 	statusContexts []StatusContext,
+	pendingRequiredReviewerApproval bool,
 	err error,
 ) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
-				ReviewDecision githubv4.String
-				BaseRef        struct {
+				ReviewDecision           githubv4.String
+				LatestOpinionatedReviews struct {
+					Nodes []struct {
+						State githubv4.String
+					}
+				} `graphql:"latestOpinionatedReviews(first: 100)"`
+				BaseRef struct {
 					BranchProtectionRule struct {
 						RequiredStatusChecks []struct {
 							Context githubv4.String
@@ -635,6 +623,9 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 								WorkflowsParameters struct {
 									Workflows []WorkflowFileReference
 								} `graphql:"... on WorkflowsParameters"`
+								PullRequestParameters struct {
+									RequiredApprovingReviewCount githubv4.Int
+								} `graphql:"... on PullRequestParameters"`
 							}
 						}
 					} `graphql:"rules(first: 100, after: $ruleCursor)"`
@@ -668,6 +659,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	}
 
 	requiredChecksSet := make(map[githubv4.String]any)
+	maxRequiredApprovals := 0
 
 pagination:
 	for {
@@ -695,6 +687,11 @@ pagination:
 			case "WORKFLOWS":
 				for _, workflow := range rule.Parameters.WorkflowsParameters.Workflows {
 					requiredWorkflows = append(requiredWorkflows, workflow.Copy())
+				}
+			case "PULL_REQUEST":
+				required := int(rule.Parameters.PullRequestParameters.RequiredApprovingReviewCount)
+				if required > maxRequiredApprovals {
+					maxRequiredApprovals = required
 				}
 			default:
 				continue
@@ -732,14 +729,27 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+		return "", nil, nil, nil, nil, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+	}
+
+	// latestOpinionatedReviews is not paginated, so compute the approved count once after the loop.
+	if maxRequiredApprovals > 0 {
+		approvedReviewCount := 0
+		for _, review := range query.Repository.PullRequest.LatestOpinionatedReviews.Nodes {
+			if review.State == "APPROVED" {
+				approvedReviewCount++
+			}
+		}
+		if approvedReviewCount < maxRequiredApprovals {
+			pendingRequiredReviewerApproval = true
+		}
 	}
 
 	for context := range requiredChecksSet {
 		requiredChecks = append(requiredChecks, context)
 	}
 
-	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, nil
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, nil
 }
 
 func CheckSuitePassed(checkSuite CheckSuite) bool {
@@ -821,17 +831,22 @@ func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
-	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, err := g.GetPullRequestMergeabilityInfo(repo, pull)
 	if err != nil {
 		return false, err
 	}
 
 	notMergeablePrefix := fmt.Sprintf("Pull Request %s/%s:%s is not mergeable", repo.Owner, repo.Name, strconv.Itoa(*pull.Number))
 
-	// Review decision takes CODEOWNERS into account
-	// Empty review decision means review is not required
+	// reviewDecision covers CODEOWNERS and classic branch protection review requirements.
+	// Empty/null means GitHub rulesets may be enforcing reviews via required_reviewers
+	// instead — check that separately via pendingRequiredReviewerApproval.
 	if reviewDecision != "APPROVED" && len(reviewDecision) != 0 {
 		logger.Debug("%s: Review Decision: %s", notMergeablePrefix, reviewDecision)
+		return false, nil
+	}
+	if pendingRequiredReviewerApproval {
+		logger.Debug("%s: Pending required reviewer approval from ruleset", notMergeablePrefix)
 		return false, nil
 	}
 
@@ -876,7 +891,7 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 
 	// We map our mergeable check to when the GitHub merge button is clickable.
-	// This corresponds to the following states:
+	// This corresponds to when the PR is not a draft and has one of the following states:
 	// clean: No conflicts, all requirements satisfied.
 	//        Merging is allowed (green box).
 	// unstable: Failing/pending commit status that is not part of the required
@@ -884,6 +899,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	// has_hooks: GitHub Enterprise only, if a repo has custom pre-receive
 	//            hooks. Merging is allowed (green box).
 	// See: https://github.com/octokit/octokit.net/issues/1763
+	if githubPR.GetDraft() {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      "PR is a draft",
+		}, nil
+	}
 	state := githubPR.GetMergeableState()
 	if state == "" {
 		state = "<unknown>"
@@ -968,7 +989,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
-	status := &github.RepoStatus{
+	status := github.RepoStatus{
 		State:       github.Ptr(ghState),
 		Description: github.Ptr(description),
 		Context:     github.Ptr(src),
@@ -1107,6 +1128,52 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.R
 	return teamNames, nil
 }
 
+// GetChildTeams returns the slugs of the direct child teams of the given team.
+// Use this with fetchDescendantTeams in the command runner to expand an allowlisted team
+// to all its descendants, supporting GitHub team hierarchy.
+// https://docs.github.com/en/graphql/reference/objects#team
+func (g *Client) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	logger.Debug("Getting child teams for GitHub team '%s'", teamSlug)
+	orgName := repo.Owner
+	variables := map[string]any{
+		"orgName":     githubv4.String(orgName),
+		"teamSlug":    githubv4.String(teamSlug),
+		"childCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Team struct {
+				ChildTeams struct {
+					Nodes []struct {
+						Slug string
+					}
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage bool
+					}
+				} `graphql:"childTeams(first: 100, after: $childCursor)"`
+			} `graphql:"team(slug: $teamSlug)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var childSlugs []string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for {
+		err := g.v4Client.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range q.Organization.Team.ChildTeams.Nodes {
+			childSlugs = append(childSlugs, node.Slug)
+		}
+		if !q.Organization.Team.ChildTeams.PageInfo.HasNextPage {
+			break
+		}
+		variables["childCursor"] = githubv4.NewString(q.Organization.Team.ChildTeams.PageInfo.EndCursor)
+	}
+	return childSlugs, nil
+}
+
 // ExchangeCode returns a newly created app's info
 func (g *Client) ExchangeCode(logger logging.SimpleLogging, code string) (*GithubAppTemporarySecrets, error) {
 	logger.Debug("Exchanging code for app secrets")
@@ -1145,7 +1212,29 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		return true, []byte{}, err
 	}
 
-	decodedData, err := base64.StdEncoding.DecodeString(*fileContent.Content)
+	// GitHub Contents API returns empty Content for files > 1MB (size > 0 but no content).
+	// Fall back to the Git Blobs API which has no size limit.
+	// We check size > 0 to avoid triggering the fallback for genuinely empty files.
+	if (fileContent.Content == nil || *fileContent.Content == "") && fileContent.GetSize() > 0 {
+		if fileContent.SHA == nil {
+			return true, []byte{}, fmt.Errorf("file %s is too large and has no SHA for blob fetch", fileName)
+		}
+		blob, _, err := g.client.Git.GetBlob(g.ctx, repo.Owner, repo.Name, *fileContent.SHA)
+		if err != nil {
+			return true, []byte{}, fmt.Errorf("fetching blob for large file %s: %w", fileName, err)
+		}
+		// GitHub's base64 payloads include newline separators; strip them before decoding.
+		encoded := strings.ReplaceAll(blob.GetContent(), "\n", "")
+		decodedData, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return true, []byte{}, err
+		}
+		return true, decodedData, nil
+	}
+
+	// GitHub's base64 payloads include newline separators; strip them before decoding.
+	encoded := strings.ReplaceAll(*fileContent.Content, "\n", "")
+	decodedData, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
 		return true, []byte{}, err
 	}

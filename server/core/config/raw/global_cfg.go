@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // GlobalCfg is the raw schema for server-side repo config.
@@ -107,7 +107,7 @@ func (g GlobalCfg) Validate() error {
 			continue
 		}
 		for _, silenceStage := range repo.SilencePRComments {
-			if !utils.SlicesContains(valid.AllowedSilencePRComments, silenceStage) {
+			if !slices.Contains(valid.AllowedSilencePRComments, silenceStage) {
 				return fmt.Errorf(
 					"server-side repo config '%s' key value of '%s' is not supported, supported values are [%s]",
 					valid.SilencePRCommentsKey,

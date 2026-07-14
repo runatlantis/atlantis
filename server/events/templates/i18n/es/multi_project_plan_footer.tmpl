@@ -1,0 +1,17 @@
+{{ define "multiProjectPlanFooter" -}}
+{{ if and (gt (len .Results) 0) -}}
+### Resumen del plan
+
+{{ len .Results }} proyectos, {{ .NumPlansWithChanges }} con cambios, {{ .NumPlansWithNoChanges }} sin cambios, {{ .NumPlanFailures }} fallidos
+{{ if and (not .PlansDeleted) (ne .DisableApplyAll true) }}
+* :fast_forward: Para **aplicar** todos los planes pendientes de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} apply
+  ```
+* :put_litter_in_its_place: Para **eliminar** todos los planes y bloqueos de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
+{{ end -}}
+{{ end -}}
+{{ end -}}

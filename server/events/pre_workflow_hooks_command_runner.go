@@ -15,17 +15,21 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
 // PreWorkflowHookURLGenerator generates urls to view the pre workflow progress.
 type PreWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflows_hooks_command_runner.go PreWorkflowHooksCommandRunner
 
 type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
+}
+
+type PreWorkflowHooksConfiguredChecker interface {
+	HasPreWorkflowHooks(ctx *command.Context) bool
 }
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -41,12 +45,7 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
-	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
-	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
-			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
-		}
-	}
+	preWorkflowHooks := w.preWorkflowHooks(ctx)
 
 	// short circuit any other calls if there are no pre-hooks configured
 	if len(preWorkflowHooks) == 0 {
@@ -55,7 +54,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, cmd.Name)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name)
 	if err != nil {
 		return err
 	}
@@ -83,8 +82,10 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
 			API:                ctx.API,
+			ProjectName:        cmd.ProjectName,
+			SuppressJobOutput:  ctx.SuppressJobOutput,
 		},
-		preWorkflowHooks, repoDir)
+		preWorkflowHooks, repoDir, ctx.SuppressVCSStatus)
 
 	if err != nil {
 		ctx.Log.Err("Error running pre-workflow hooks %s.", err)
@@ -96,10 +97,25 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	return nil
 }
 
+func (w *DefaultPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(ctx *command.Context) bool {
+	return len(w.preWorkflowHooks(ctx)) > 0
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Context) []*valid.WorkflowHook {
+	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
+	for _, repo := range w.GlobalCfg.Repos {
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
+			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
+		}
+	}
+	return preWorkflowHooks
+}
+
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 	ctx models.WorkflowHookCommandContext,
 	preWorkflowHooks []*valid.WorkflowHook,
 	repoDir string,
+	suppressVCSStatus bool,
 ) error {
 	for i, hook := range preWorkflowHooks {
 		ctx.HookDescription = hook.StepDescription
@@ -134,28 +150,34 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
-			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			ctx.Log.Info("is api? %v", ctx.API)
-			if !ctx.API {
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
 				ctx.Log.Info("is api? %v", ctx.API)
-				return err
+				if !ctx.API {
+					ctx.Log.Info("is api? %v", ctx.API)
+					return err
+				}
 			}
 		}
 
 		_, runtimeDesc, err := w.PreWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+			if !suppressVCSStatus {
+				if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+					ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+				}
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-			ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-			if !ctx.API {
-				return err
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+				if !ctx.API {
+					return err
+				}
 			}
 		}
 	}

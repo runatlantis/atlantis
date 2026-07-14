@@ -54,17 +54,18 @@ Values are chosen in this order:
 ### `--allow-commands` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
-atlantis server --allow-commands=version,plan,apply,unlock,approve_policies
+atlantis server --allow-commands=version,plan,apply,unlock,approve_policies,cancel
 # or
-ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies'
+ATLANTIS_ALLOW_COMMANDS='version,plan,apply,unlock,approve_policies,cancel'
 ```
 
-List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies`
+List of allowed commands to be run on the Atlantis server, Defaults to `version,plan,apply,unlock,approve_policies,cancel`
 
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `import`, `state` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel`, `import`, `state`, `policy_check` and `all` are available.
+- `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs` <Badge text="v0.13.0" type="info"/>
@@ -151,6 +152,19 @@ ATLANTIS_AUTOMERGE=true
 Automatically merge pull requests after all plans have been successfully applied.
 Defaults to `false`. See [Automerging](automerging.md) for more details.
 
+### `--automerge-method`
+
+```bash
+atlantis server --automerge-method="squash"
+# or
+ATLANTIS_AUTOMERGE_METHOD="squash"
+```
+
+Default merge method to use when automerging pull requests. Valid values are
+`merge`, `rebase`, and `squash`. When not set, the VCS provider's default merge
+method is used. This can be overridden per command with the `--auto-merge-method`
+comment flag. Currently only implemented for GitHub.
+
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
@@ -167,9 +181,10 @@ Notes:
 - Accepts a comma separated list, ex. `pattern1,pattern2`.
 - Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 - List of file patterns will be used by both automatic and manually run plans.
-- When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
-   (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
+- When not set, defaults to all `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
+   (`--autoplan-file-list='**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
 - Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+- The default is global (not distribution-aware). Both Terraform and OpenTofu installs will match `.tofu` changes. If you do not use OpenTofu, you can override the default to exclude `.tofu` patterns.
 - A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
 Examples:
@@ -179,7 +194,7 @@ Examples:
 - Autoplan when any `*.tf` file is modified except in `project2/` directory
   - `--autoplan-file-list='**/*.tf,!project2'`
 - Autoplan when any `*.tf` files or `.yml` files in subfolder of `project1` is modified.
-  - `--autoplan-file-list='**/*.tf,project2/**/*.yml'`
+  - `--autoplan-file-list='**/*.tf,project1/**/*.yml'`
 
 ::: warning NOTE
 By default, changes to modules will not trigger autoplanning. See the flags below.
@@ -197,6 +212,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: tip NOTE
+Module dependency indexing uses Terraform config inspection and may not fully support `.tofu` / `.tofu.json` files. Module calls defined only in `.tofu` files or shared module directories containing only `.tofu` files may not be traced. Direct file-change autoplanning for `.tofu` projects works regardless. Use explicit `autoplan.when_modified` patterns as a workaround. See [OpenTofu .tofu file support](terraform-versions.md#opentofu-tofu-file-support) for details.
+:::
 
 ### `--autoplan-modules-from-projects` <Badge text="v0.26.0+" type="info"/>
 
@@ -239,7 +258,7 @@ atlantis server --azuredevops-hostname="dev.azure.com"
 ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
 ```
 
-Azure DevOps hostname to support cloud and self hosted instances. Defaults to `dev.azure.com`.
+Azure DevOps hostname to support cloud and self-hosted instances. Defaults to `dev.azure.com`.
 
 ::: warning COMPATIBILITY WARNING
 If you are affected by this change [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
@@ -316,7 +335,7 @@ Bitbucket username (usually an email) used for API authentication with Bitbucket
 
 **Note:**
 
-- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026 (see [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Config file key:**
 
@@ -374,6 +393,23 @@ Secret used to validate Bitbucket webhooks.
 If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket.
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
+
+### `--blocked-extra-args`
+
+```bash
+atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+# or
+ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+```
+
+Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
+Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+
+Notes:
+
+- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
+- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- Accepts a comma separated list, ex. `-flag1,-flag2`.
 
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
@@ -454,6 +490,19 @@ ATLANTIS_DISABLE_APPLY_ALL=true
 
 Disable `atlantis apply` command so a specific project/workspace/directory has to
 be specified for applies.
+
+### `--disable-automerge-label` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --disable-automerge-label="no-auto-merge"
+# or
+ATLANTIS_DISABLE_AUTOMERGE_LABEL="no-auto-merge"
+```
+
+Disable atlantis automerge only on pull requests with the specified label.
+Defaults to an empty string, so no label disables automerge by default.
+This flag has no effect unless automerge is enabled with `--automerge` or
+repo-level `automerge: true`.
 
 ### `--disable-autoplan` <Badge text="v0.15.0+" type="info"/>
 
@@ -536,15 +585,15 @@ atlantis server --emoji-reaction eyes
 ATLANTIS_EMOJI_REACTION=eyes
 ```
 
-The emoji reaction to use for marking processed comments. Currently supported on Azure DevOps, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
+The emoji reaction to use for marking processed comments. Currently supported on Gitea, GitHub and GitLab. If not specified, Atlantis will not use an emoji reaction.
 Defaults to "" (empty string).
 
 ::: warning NOTE
 Each VCS provider supports a different list of emojis:
 
-- [Github](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
-- [Gitlab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
-- [Azure DevOps](https://learn.microsoft.com/en-us/azure/devops/project/wiki/markdown-guidance?view=azure-devops#emoji)
+- [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
+- [GitLab](https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json)
+- [Gitea](https://docs.gitea.com/administration/customizing-gitea#reactions)
 
    :::
 
@@ -558,7 +607,41 @@ ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 
 Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-Useful to enable for use with GitHub.
+Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
+
+### `--enable-drift-detection`
+
+```bash
+atlantis server --enable-drift-detection
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+```
+
+Enable drift detection API endpoints. Drift detection does not run Terraform apply, but
+it does execute the normal plan lifecycle, including configured pre-workflow hooks,
+custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
+will initialize in-memory storage for drift detection results and a remediation service,
+making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+are configured (`event: drift`), successful detection runs send notifications to Slack or HTTP endpoints,
+including no-drift heartbeat results. Drift detection does not bypass team allowlists or PR-state
+`plan_requirements` such as `approved` or `mergeable`; those checks fail closed when
+they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
+`--enable-drift-remediation`. Defaults to `false`.
+
+### `--enable-drift-remediation`
+
+```bash
+atlantis server --enable-drift-detection --enable-drift-remediation
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
+```
+
+Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
+This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
+rejected while read-only drift detection remains available. This flag does not bypass
+repository `apply_requirements`; requirements that need pull request state fail closed for
+non-PR remediation requests. Defaults to `false`.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -596,11 +679,11 @@ The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](r
 
 This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
+When `--restrict-file-list` is enabled, regex project plans are limited to matching projects with files modified in the pull request. Without `--restrict-file-list`, regex project commands can still run against all matching projects.
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
-The command `atlantis apply -p .*` will bypass the restriction and run apply on every projects.
+The command `atlantis apply -p .*` will bypass the restriction and run apply on every project.
 :::
 
 ### `--executable-name` <Badge text="v0.42.0+" type="info"/>
@@ -721,6 +804,8 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
 
+For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
+
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
@@ -743,11 +828,23 @@ In versions v0.35.0 and later, the GitHub team name can only be a slug because i
 
 In versions between v0.21.0 and v0.34.0, the GitHub team name can be a name or a slug.
 
-In versions v0.20.1 and below, the Github team name required the case sensitive team name.
+In versions v0.20.1 and below, the GitHub team name required the case sensitive team name.
 
 Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
+
+GitHub team hierarchy is honored. If an allowlisted team has child teams, members of those child teams inherit the parent team's allowed commands.
+
+::: tip
+If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
+
+```bash
+atlantis server --gh-team-allowlist="*:plan,*:policy_check,myteam:apply"
+```
+
+See [Policy Checking documentation](policy-checking.md#step-1-enable-the-workflow) for more details.
+:::
 
 ### `--gh-token` <Badge text="v0.1.3+" type="info"/>
 
@@ -878,7 +975,7 @@ atlantis server --gitlab-hostname="my.gitlab.enterprise.com"
 ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 ```
 
-Hostname of your GitLab Enterprise installation. If using [Gitlab.com](https://gitlab.com),
+Hostname of your GitLab Enterprise installation. If using [GitLab.com](https://gitlab.com),
 don't set. Defaults to `gitlab.com`.
 
 ### `--gitlab-status-retry-enabled`
@@ -991,6 +1088,57 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
+### `--language` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="en"
+# or
+ATLANTIS_LANGUAGE="en"
+```
+
+Language used for Atlantis pull request comments. Defaults to `en`.
+
+Supported values:
+
+- `en` (English)
+- `es` (Spanish)
+
+Atlantis normalizes locale-style values (for example `es-MX` resolves to `es`).
+If an unsupported language is configured and `--language-config-file` is not set,
+Atlantis returns a validation error at startup.
+
+Built-in language strings are loaded from:
+
+- `server/i18n/locales/en.yaml`
+- `server/i18n/locales/es.yaml`
+
+### `--language-config-file` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="de" --language-config-file="/etc/atlantis/language.yaml"
+# or
+ATLANTIS_LANGUAGE_CONFIG_FILE="/etc/atlantis/language.yaml"
+```
+
+Optional path to a custom YAML language catalog. Values in this file override
+the selected built-in language, and partial overrides are supported.
+
+When `--language-config-file` is set, unsupported `--language` values are allowed
+and Atlantis falls back to built-in English for unspecified strings.
+
+Expected YAML schema:
+
+```yaml
+pull_request_label: Pull Request (custom)
+merge_request_label: Merge Request (custom)
+command_titles:
+  plan: Plan (custom)
+  apply: Apply (custom)
+```
+
+For complete markdown wording customization, keep using
+`--markdown-template-overrides-dir`.
+
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
@@ -1004,7 +1152,7 @@ The locking database type to use for storing plan and apply locks. Defaults to `
 Notes:
 
 - If set to `boltdb`, only one process may have access to the boltdb instance.
-- If set to `redis`, then `--redis-host`, `--redis-port`, and `--redis-password` must be set.
+- If set to `redis`, use `--redis-host` and `--redis-port` for single-node mode, or `--redis-cluster-addresses` for Redis Cluster mode. Use `--redis-password` and (optionally) `--redis-username` only if your Redis deployment requires authentication.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 
@@ -1046,6 +1194,8 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 ```
 
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
+
+When command output exceeds the VCS comment size limit (or when this limit applies), Atlantis splits the output into multiple comments using **intelligent comment splitting**. Split points are chosen so that markdown structure is preserved: the splitter detects whether it is inside a code block (`` ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
 
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
@@ -1090,6 +1240,9 @@ This prevents merge requests from being merged until all Terraform applies are c
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+Projects with no Terraform changes are counted as up to date rather than applied. If a pull request has both
+up-to-date projects and projects still waiting to apply, the Atlantis apply commit status remains pending
+until all changed projects are applied.
 
 Defaults to `false`.
 
@@ -1114,6 +1267,16 @@ ATLANTIS_QUIET_POLICY_CHECKS=true
 ```
 
 Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings. Defaults to `false`.
+
+### `--redis-cluster-addresses`
+
+```bash
+atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+# or
+ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
+```
+
+Comma-delimited list of Redis cluster node addresses in the format `host:port`. When set, Atlantis uses Redis Cluster mode instead of single-node mode. This is mutually exclusive with `--redis-host`/`--redis-port` (which are used for single-node mode).
 
 ### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
@@ -1179,6 +1342,16 @@ ATLANTIS_REDIS_TLS_ENABLED=false
 
 Enables a TLS connection, with min version of 1.2, to Redis when using a Locking DB type of `redis`. Defaults to `false`.
 
+### `--redis-username`
+
+```bash
+atlantis server --redis-username="myuser"
+# or
+ATLANTIS_REDIS_USERNAME="myuser"
+```
+
+The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
+
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 
 ```bash
@@ -1198,7 +1371,7 @@ Notes:
 - An entry beginning with `!` negates it, ex. `github.com/foo/*,!github.com/foo/bar` will match all github repos in the `foo` owner _except_ `bar`.
 - For Bitbucket Server: `{hostname}` is the domain without scheme and port, `{owner}` is the name of the project (not the key), and `{repo}` is the repo name
   - User (not project) repositories take on the format: `{hostname}/{full name}/{repo}` (e.g., `bitbucket.example.com/Jane Doe/myatlantis` for username `jdoe` and full name `Jane Doe`, which is not very intuitive)
-- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
+- For Azure DevOps the allowlist takes one of two forms: `{owner}.visualstudio.com/{owner}/{project}/{repo}` or `dev.azure.com/{owner}/{project}/{repo}`
 - Microsoft is in the process of changing Azure DevOps to the latter form, so it may be safest to always specify both formats in your repo allowlist for each repository until the change is complete.
 
 Examples:
@@ -1212,7 +1385,7 @@ Examples:
 - Allowlist all repos in my GitHub Enterprise installation
   - `--repo-allowlist='github.yourcompany.com/*'`
 - Allowlist all repos under `myorg` project `myproject` on Azure DevOps
-  - `--repo-allowlist='myorg.visualstudio.com/myproject/*,dev.azure.com/myorg/myproject/*'`
+  - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'`
 - Allowlist all repositories
   - `--repo-allowlist='*'`
 
@@ -1275,8 +1448,7 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 ```
 
 `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
-This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
+When `--enable-regexp-cmd` is also enabled, regex project plans such as `atlantis plan -p .*` are scoped to matching projects with files modified in the pull request.
 Defaults to `false`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>
@@ -1316,7 +1488,7 @@ ATLANTIS_SILENCE_NO_PROJECTS=true
 `--silence-no-projects` will tell Atlantis to ignore PRs if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 This flag ensures an Atlantis server only responds to its explicitly declared projects.
 This has no effect if projects are undefined in the repo level `atlantis.yaml`.
-This also silences targeted commands (eg. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
+This also silences targeted commands (e.g. `atlantis plan -d mydir` or `atlantis apply -p myproj`) so if the project is not in the repo config `atlantis.yaml`, these commands will not run or report back in a comment.
 
 This is useful when running multiple Atlantis servers against a single repository so you can
 delegate work to each Atlantis server. Also useful when used with pre_workflow_hooks to dynamically generate an `atlantis.yaml` file.
@@ -1471,7 +1643,7 @@ This flag is useful when having multiple projects that need to run a plan and ap
 - [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
 - [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply, by disabling the use of plugin cache will impact in the performance when starting a new plan or apply, but in large atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
+The effect of the race condition is more evident when using parallel configuration to run plan and apply. Disabling the use of plugin cache will impact the performance when starting a new plan or apply, but in large Atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
 ### `--var-file-allowlist` <Badge text="v0.19.5" type="info"/>
 

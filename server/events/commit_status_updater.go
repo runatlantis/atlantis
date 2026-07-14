@@ -1,20 +1,13 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"unicode/utf8"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -25,7 +18,7 @@ import (
 	"golang.org/x/text/language"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_commit_status_updater.go CommitStatusUpdater
 
 // CommitStatusUpdater updates the status of a commit with the VCS host. We set
 // the status to signify whether the plan/apply succeeds.
@@ -33,9 +26,9 @@ type CommitStatusUpdater interface {
 	// UpdateCombined updates the combined status of the head commit of pull.
 	// A combined status represents all the projects modified in the pull.
 	UpdateCombined(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error
-	// UpdateCombinedCount updates the combined status to reflect the
-	// numSuccess out of numTotal.
-	UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error
+	// UpdateCombinedCount updates the combined status to reflect the counts
+	// of project outcomes. counts.NoChanges is only meaningful for command.Apply.
+	UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) error
 
 	UpdatePreWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
 	UpdatePostWorkflowHook(logger logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error
@@ -53,7 +46,7 @@ type DefaultCommitStatusUpdater struct {
 var _ runtime.StatusUpdater = (*DefaultCommitStatusUpdater)(nil)
 
 func (d *DefaultCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
+	src := truncateContext(fmt.Sprintf("%s/%s", d.StatusName, cmdName.String()))
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -66,28 +59,68 @@ func (d *DefaultCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging
 	return d.Client.UpdateStatus(logger, repo, pull, status, src, descripWords, "")
 }
 
-func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
-	src := fmt.Sprintf("%s/%s", d.StatusName, cmdName.String())
-	cmdVerb := "unknown"
+func (d *DefaultCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) error {
+	src := truncateContext(fmt.Sprintf("%s/%s", d.StatusName, cmdName.String()))
 
+	var descrip string
 	switch cmdName {
-	case command.Plan:
-		cmdVerb = "planned"
-	case command.PolicyCheck:
-		cmdVerb = "policies checked"
 	case command.Apply:
-		cmdVerb = "applied"
+		switch {
+		case status == models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed to apply.", counts.Errored, counts.Total)
+		case status == models.PendingCommitStatus:
+			applied := counts.Success - counts.NoChanges
+			if counts.NoChanges > 0 {
+				descrip = fmt.Sprintf("%d/%d projects applied (%d up to date).", applied, counts.Total, counts.NoChanges)
+			} else {
+				descrip = fmt.Sprintf("%d/%d projects applied.", applied, counts.Total)
+			}
+		case counts.NoChanges > 0 && counts.NoChanges == counts.Total:
+			descrip = fmt.Sprintf("%d/%d projects up to date.", counts.NoChanges, counts.Total)
+		case counts.NoChanges > 0 && counts.Success > counts.NoChanges:
+			applied := counts.Success - counts.NoChanges
+			descrip = fmt.Sprintf("%d/%d projects applied successfully (%d up to date).", applied, counts.Total, counts.NoChanges)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects applied successfully.", counts.Success, counts.Total)
+		}
+	case command.Plan:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed to plan.", counts.Total-counts.Success, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects planned.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects planned successfully.", counts.Success, counts.Total)
+		}
+	case command.PolicyCheck:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed policy checks.", counts.Errored, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects had policies checked.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects had policies checked successfully.", counts.Success, counts.Total)
+		}
+	default:
+		switch status {
+		case models.FailedCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects failed.", counts.Total-counts.Success, counts.Total)
+		case models.PendingCommitStatus:
+			descrip = fmt.Sprintf("%d/%d projects completed.", counts.Success, counts.Total)
+		default:
+			descrip = fmt.Sprintf("%d/%d projects succeeded.", counts.Success, counts.Total)
+		}
 	}
 
-	return d.Client.UpdateStatus(logger, repo, pull, status, src, fmt.Sprintf("%d/%d projects %s successfully.", numSuccess, numTotal, cmdVerb), "")
+	return d.Client.UpdateStatus(logger, repo, pull, status, src, descrip, "")
 }
 
 func (d *DefaultCommitStatusUpdater) UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, result *command.ProjectCommandOutput) error {
-	projectID := ctx.ProjectName
-	if projectID == "" {
-		projectID = fmt.Sprintf("%s/%s", ctx.RepoRelDir, ctx.Workspace)
+	if ctx.SuppressVCSStatus {
+		return nil
 	}
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), projectID)
+
+	src := truncateContext(fmt.Sprintf("%s/%s: %s", d.StatusName, cmdName.String(), ctx.ProjectID()))
 	var descripWords string
 	switch status {
 	case models.PendingCommitStatus:
@@ -108,6 +141,27 @@ func genProjectStatusDescription(cmdName, description string) string {
 	return fmt.Sprintf("%s %s", cases.Title(language.English).String(cmdName), description)
 }
 
+// maxStatusContext is the maximum number of characters allowed by the GitHub
+// Statuses API for the "context" field. Exceeding this limit causes a 422.
+// See https://docs.github.com/en/rest/commits/statuses
+const (
+	maxStatusContext            = 255
+	statusContextHashLength     = 12
+	statusContextHashPrefixSize = statusContextHashLength / 2
+)
+
+// truncateContext shortens s to maxStatusContext characters if needed while
+// preserving uniqueness for contexts that share the same long prefix.
+func truncateContext(s string) string {
+	if utf8.RuneCountInString(s) <= maxStatusContext {
+		return s
+	}
+	hash := sha256.Sum256([]byte(s))
+	suffix := fmt.Sprintf("-%x", hash[:statusContextHashPrefixSize])
+	prefixLength := maxStatusContext - utf8.RuneCountInString(suffix)
+	return string([]rune(s)[:prefixLength]) + suffix
+}
+
 func (d *DefaultCommitStatusUpdater) UpdatePreWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, url string) error {
 	return d.updateWorkflowHook(log, pull, status, hookDescription, runtimeDescription, "pre_workflow_hook", url)
 }
@@ -117,7 +171,7 @@ func (d *DefaultCommitStatusUpdater) UpdatePostWorkflowHook(log logging.SimpleLo
 }
 
 func (d *DefaultCommitStatusUpdater) updateWorkflowHook(log logging.SimpleLogging, pull models.PullRequest, status models.CommitStatus, hookDescription string, runtimeDescription string, workflowType string, url string) error {
-	src := fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription)
+	src := truncateContext(fmt.Sprintf("%s/%s: %s", d.StatusName, workflowType, hookDescription))
 
 	var descripWords string
 	if runtimeDescription != "" {

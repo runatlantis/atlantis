@@ -7,7 +7,7 @@ commands can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
-* [UnDiverged](#undiverged) - requires pull requests to be ahead of the base branch
+* [UnDiverged](#undiverged) - requires project files in pull requests to be ahead of the base branch
 
 ## What Happens If The Requirement Is Not Met?
 
@@ -23,7 +23,7 @@ by at least one person other than the author.
 
 #### Usage
 
-The `approved` requirement by:
+Set the `approved` requirement by:
 
 1. Creating a `repos.yaml` file with the `apply_requirements` key:
 
@@ -153,6 +153,8 @@ For pipelines, if the project requires that pipelines must succeed, all builds e
 
 For Jobs with allow_failure setting set to true, will be ignored. If the pipeline has been skipped and the project allows merging, it will be marked as mergeable.
 
+For per-project `atlantis apply` commands, Atlantis scopes GitLab's `mergeable` requirement to the project being applied when GitLab reports blocking commit statuses. Atlantis ignores blocking Atlantis plan statuses from other projects in the same merge request, but the project's own plan status and any non-Atlantis blocker still prevent the apply.
+
 #### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
 
 For Bitbucket, we just check if there is a conflict that is preventing a
@@ -223,7 +225,31 @@ The `merge` checkout strategy creates a temporary merge commit and runs the `pla
 source and destination branch. The local destination branch can become out of date since changes to the destination branch are not fetched
 if there are no changes to the source branch. `undiverged` enforces that Atlantis local version of main is up to date
 with remote so that the state of the source during the `apply` is identical to that if you were to merge the PR at that
-time.
+time. In the case of a transient error, Atlantis assumes divergence for safety and errors.
+
+When a project has `autoplan.when_modified` patterns configured, the `undiverged` requirement automatically uses those
+patterns to perform a **targeted** divergence check. Instead of failing when **any** file on the base branch has changed,
+it only fails when files matching the project's `when_modified` patterns have changed. This is especially useful in
+monorepos where unrelated changes to other projects should not block your applies.
+
+Targeted `undiverged` checks also follow Atlantis project selection for:
+
+* repo-configured projects affected through [module autoplanning](server-configuration.md#autoplan-modules)
+* auto-discovered projects selected by the default `autoplan-file-list` rules
+
+If Atlantis cannot determine project impact for a repository, `undiverged` falls back to checking all files.
+
+**Example scenario:**
+
+```text
+monorepo/
+  project1/        # Has when_modified: ["project1/**"]
+  project2/        # Has when_modified: ["project2/**"]
+```
+
+* PR modifies `project1/main.tf`
+* After PR created, someone merges changes to `project2/main.tf`
+* The `undiverged` requirement for project1 **passes** because the base branch change only affected `project2/`
 
 ## Setting Command Requirements
 
@@ -239,7 +265,7 @@ having that apply requirement set.
 
 If you only want some projects/repos to have apply requirements, then you must
 
-1. Specifying which repos have which requirements via the `repos.yaml` file.
+1. Specify which repos have which requirements via the `repos.yaml` file.
 
    ```yaml
    repos:

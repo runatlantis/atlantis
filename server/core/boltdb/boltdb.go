@@ -7,13 +7,15 @@ package boltdb
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	bolt "go.etcd.io/bbolt"
@@ -64,6 +66,59 @@ func New(dataDir string) (*BoltDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("starting BoltDB: %w", err)
 	}
+
+	// Migrate old lock keys to new format.
+	// Old format: {repoFullName}/{path}/{workspace}
+	// New format: {repoFullName}/{path}/{workspace}/{projectName}
+	// We scan all keys and for those that don't match the new format,
+	// we read their value, create a new key with the new format and
+	// delete the old key.
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(locksBucketName))
+
+		// Phase 1: Collect keys that need migration
+		type migration struct {
+			oldKey   []byte
+			newKey   string
+			oldValue []byte
+		}
+		var migrations []migration
+
+		if err := bucket.ForEach(func(oldKey, oldValue []byte) error {
+			_, err := locking.IsCurrentLocking(string(oldKey))
+			if err != nil {
+				var currLock models.ProjectLock
+				if err := json.Unmarshal(oldValue, &currLock); err != nil {
+					return errors.Wrap(err, "failed to deserialize current lock")
+				}
+				newKey := models.GenerateLockKey(currLock.Project, currLock.Workspace)
+				migrations = append(migrations, migration{
+					oldKey:   append([]byte(nil), oldKey...),
+					newKey:   newKey,
+					oldValue: append([]byte(nil), oldValue...),
+				})
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		for _, m := range migrations {
+			if err := bucket.Put([]byte(m.newKey), m.oldValue); err != nil {
+				return err
+			}
+			if err := bucket.Delete(m.oldKey); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("warning: failed to migrate BoltDB lock keys: %v", err)
+	}
+
 	return &BoltDB{
 		db:                    db,
 		locksBucketName:       []byte(locksBucketName),
@@ -145,6 +200,38 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 		return &lock, err
 	}
 	return nil, err
+}
+
+// UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
+func (b *BoltDB) UnlockIfOwnedByPull(p models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	var lock models.ProjectLock
+	foundLock := false
+	key := b.lockKey(p, workspace)
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.locksBucketName)
+		serialized := bucket.Get([]byte(key))
+		if serialized == nil {
+			return nil
+		}
+		if err := json.Unmarshal(serialized, &lock); err != nil {
+			return fmt.Errorf("failed to deserialize lock: %w", err)
+		}
+		if lock.Pull.Num != pullNum {
+			return nil
+		}
+		if err := bucket.Delete([]byte(key)); err != nil {
+			return err
+		}
+		foundLock = true
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	if foundLock {
+		return &lock, nil
+	}
+	return nil, nil
 }
 
 // List lists all current locks.
@@ -328,15 +415,36 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		bucket := tx.Bucket(b.pullsBucketName)
 		currStatus, err := b.getPullFromBucket(bucket, key)
 		if err != nil {
-			return err
+			// Tolerate an unreadable prior entry (e.g. after a PullStatus
+			// schema change). It will be overwritten with fresh data below;
+			// in-flight policy approvals captured in the old blob are lost.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
 		}
 
 		// If there is no pull OR if the pull we have is out of date, we
 		// just write a new pull.
-		if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 			var statuses []models.ProjectStatus
 			for _, r := range newResults {
 				statuses = append(statuses, b.projectResultToProject(r))
+			}
+			// Preserve policy status from the previous commit so approvals
+			// survive between the plan DB write and the subsequent policy
+			// check DB write. doPolicyCheck applies sticky filtering and
+			// overwrites these when it writes its own results.
+			if currStatus != nil {
+				for i := range statuses {
+					for _, old := range currStatus.Projects {
+						if statuses[i].Workspace == old.Workspace &&
+							statuses[i].RepoRelDir == old.RepoRelDir &&
+							statuses[i].ProjectName == old.ProjectName &&
+							len(old.PolicyStatus) > 0 {
+							statuses[i].PolicyStatus = old.PolicyStatus
+							break
+						}
+					}
+				}
 			}
 			newStatus = models.PullStatus{
 				Pull:     pull,
@@ -395,6 +503,16 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
+	if statusPull.HeadCommit != pull.HeadCommit {
+		return true
+	}
+	if pull.BaseBranch == "" {
+		return false
+	}
+	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
 }
 
 // GetPullStatus returns the status for pull.
@@ -519,6 +637,13 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
 	}
+}
+
+// Ping checks the database connection health.
+func (b *BoltDB) Ping() error {
+	return b.db.View(func(tx *bolt.Tx) error {
+		return nil
+	})
 }
 
 func (b *BoltDB) Close() error {

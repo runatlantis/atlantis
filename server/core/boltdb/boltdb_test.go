@@ -1,22 +1,15 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package boltdb_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -97,6 +90,132 @@ func TestUnlockCommandDisabled(t *testing.T) {
 	config, err = b.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, config == nil, "exp nil object")
+}
+
+func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
+	t.Log("migration should convert old format keys to new format with project name")
+
+	// Create a temporary directory
+	tmpDir := t.TempDir()
+
+	// Create a database file manually with an old format key
+	dbPath := tmpDir + "/atlantis.db"
+	boltDB, err := bolt.Open(dbPath, 0600, nil)
+	Ok(t, err)
+
+	// Create buckets
+	err = boltDB.Update(func(tx *bolt.Tx) error {
+		if _, err := tx.CreateBucketIfNotExists([]byte("runLocks")); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("pulls")); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte("globalLocks")); err != nil {
+			return err
+		}
+		return nil
+	})
+	Ok(t, err)
+
+	// Create a lock in old format: {repoFullName}/{path}/{workspace}
+	oldKey := "owner/repo/path/default"
+	oldProject := models.NewProject("owner/repo", "path", "myproject")
+	oldLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   oldProject,
+		Time:      time.Now(),
+	}
+
+	oldLockSerialized, err := json.Marshal(oldLock)
+	Ok(t, err)
+
+	// Insert old format lock
+	err = boltDB.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("runLocks"))
+		return bucket.Put([]byte(oldKey), oldLockSerialized)
+	})
+	Ok(t, err)
+
+	// Verify old key exists
+	err = boltDB.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte("runLocks"))
+		val := bucket.Get([]byte(oldKey))
+		Assert(t, val != nil, "old key should exist before migration")
+		return nil
+	})
+	Ok(t, err)
+
+	// Close the database
+	boltDB.Close()
+
+	// Now open with boltdb.New which should trigger the migration
+	b, err := boltdb.New(tmpDir)
+	Ok(t, err)
+	defer b.Close()
+
+	// List all locks
+	allLocks, err := b.List()
+	Ok(t, err)
+	Assert(t, len(allLocks) == 1, "should have 1 lock after migration")
+
+	// Verify the lock can be retrieved using the GetLock method
+	// which uses the new key format internally
+	projectWithName := models.NewProject("owner/repo", "path", "myproject")
+	retrievedLock, err := b.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist with new key format")
+	Equals(t, "owner/repo", retrievedLock.Project.RepoFullName)
+	Equals(t, "path", retrievedLock.Project.Path)
+	Equals(t, "myproject", retrievedLock.Project.ProjectName)
+	Equals(t, "default", retrievedLock.Workspace)
+	Equals(t, "testuser", retrievedLock.User.Username)
+}
+
+func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
+	t.Log("migration should not affect keys already in new format")
+
+	// Create a temporary directory for the test database
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	Ok(t, err)
+
+	// Create a lock with the new format (includes project name)
+	projectWithName := models.NewProject("owner/repo", "path", "projectName")
+	newLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   projectWithName,
+		Time:      time.Now(),
+	}
+
+	// Acquire lock using the new format
+	acquired, _, err := db.TryLock(newLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire lock")
+
+	// Verify the lock can be retrieved immediately after creation
+	retrievedLock, err := db.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
+	// Close and reopen the database to trigger any migration logic
+	db.Close()
+	db, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer db.Close()
+
+	// Verify lock still exists after reopening (no migration should have changed it)
+	retrievedLock, err = db.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist after migration")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
 }
 
 func TestUnlockCommandFail(t *testing.T) {
@@ -328,6 +447,55 @@ func TestUnlockingMultiple(t *testing.T) {
 	ls, err := b.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
+}
+
+func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should ignore missing locks")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+}
+
+func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+
+	existing, err := b.GetLock(project, workspace)
+	Ok(t, err)
+	Assert(t, existing != nil, "expected lock to remain")
+	Equals(t, pullNum, existing.Pull.Num)
+}
+
+func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Assert(t, deleted != nil, "expected deleted lock")
+	Equals(t, lock.Project, deleted.Project)
+	Equals(t, lock.Workspace, deleted.Workspace)
+	Equals(t, lock.Pull, deleted.Pull)
+	Equals(t, lock.User, deleted.User)
+
+	existing, err := b.GetLock(project, workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), existing)
 }
 
 func TestUnlockByPullNone(t *testing.T) {
@@ -678,6 +846,140 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	b.Close()
 }
 
+func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := b.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "release"
+	status, err := b.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+
+	maybeStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, maybeStatus.Projects)
+	b.Close()
+}
+
+func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := b.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "main"
+	status, err := b.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, "main", status.Pull.BaseBranch)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
+
+	maybeStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, "main", maybeStatus.Pull.BaseBranch)
+	Equals(t, status.Projects, maybeStatus.Projects)
+	b.Close()
+}
+
 // Test that if we update an existing pull status via Apply and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
@@ -840,8 +1142,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -857,8 +1159,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -877,9 +1179,9 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
-								CurApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
+								Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 							},
 						},
 					},
@@ -903,7 +1205,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					},
 				},
 			},
@@ -915,13 +1217,174 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 			},
 		}, updateStatus.Projects)
 	}
 	b.Close()
+}
+
+// Test that policy approvals are preserved when HeadCommit changes,
+// so sticky approvals can survive across code pushes.
+func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Write initial policy check results with an approval at commit A.
+	_, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.PolicyCheck,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Failure: "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName:    "policy1",
+							ReqApprovalCount: 1,
+							Hashes:           []string{"h1", "h2"},
+							Approvals: []models.PolicySetApproval{
+								{Approver: "boss", Hashes: []string{"h1", "h2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// Push new commit B with a plan result (no PolicyCheckResults).
+	// This simulates what happens when autoplan writes the plan to DB
+	// before the policy check runs.
+	pull.HeadCommit = "sha-B"
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "plan output",
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// The policy approvals from commit A should be preserved.
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	Assert(t, len(status.Projects[0].PolicyStatus) > 0, "expected policy status to be preserved across commit change")
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 1, len(status.Projects[0].PolicyStatus[0].Approvals))
+	Equals(t, "boss", status.Projects[0].PolicyStatus[0].Approvals[0].Approver)
+
+	// Verify via GetPullStatus too.
+	getStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
+	b.Close()
+}
+
+// TestPullStatus_UpdateOverwritesCorruptData verifies that
+// UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
+// no longer matches the current Go shape (e.g. after upgrading across a
+// PullStatus schema change). The corrupt entry should be logged and
+// overwritten rather than causing every subsequent plan to fail.
+func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
+	tmp := t.TempDir()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// First, let boltdb.New create the file and buckets.
+	b, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, b.Close())
+
+	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
+	// that the current Go types cannot unmarshal.
+	key := fmt.Appendf(nil, "%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	err = raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, corrupt)
+	})
+	Ok(t, err)
+	Ok(t, raw.Close())
+
+	// Reopen and write fresh results. This must succeed despite the
+	// unreadable prior entry.
+	b, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer b.Close()
+
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	// Prior in-flight approvals are lost; this is the documented trade-off.
+	Equals(t, 0, len(status.Projects[0].PolicyStatus))
+
+	// The corrupt entry is gone: reading it back returns clean data.
+	got, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
 // newTestDB returns a TestDB using a temporary path.

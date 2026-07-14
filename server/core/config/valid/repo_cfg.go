@@ -95,6 +95,16 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 	return nil
 }
 
+func (r RepoCfg) FindProjectsByExactName(name string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if p.Name != nil && *p.Name == name {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
 // FindProjectsByName returns all projects that match with name.
 func (r RepoCfg) FindProjectsByName(name string) []Project {
 	var ps []Project
@@ -126,16 +136,10 @@ func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
 	return false
 }
 
-// This function returns a final true/false decision for whether AutoDiscover is enabled
-// for a repo. It takes into account the defaultAutoDiscoverMode when there is no explicit
-// repo config. The defaultAutoDiscoverMode param should be understood as the default
-// AutoDiscover mode as may be set via CLI params or server side repo config.
-func (r RepoCfg) AutoDiscoverEnabled(defaultAutoDiscoverMode AutoDiscoverMode) bool {
-	autoDiscoverMode := defaultAutoDiscoverMode
-	if r.AutoDiscover != nil {
-		autoDiscoverMode = r.AutoDiscover.Mode
-	}
-
+// AutoDiscoverEnabled returns a final true/false decision for whether
+// AutoDiscover is enabled for a repo. The caller must resolve precedence
+// before passing autoDiscoverMode. This method does not read r.AutoDiscover.
+func (r RepoCfg) AutoDiscoverEnabled(autoDiscoverMode AutoDiscoverMode) bool {
 	if autoDiscoverMode == AutoDiscoverAutoMode {
 		// AutoDiscover is enabled by default when no projects are defined
 		return len(r.Projects) == 0

@@ -6,14 +6,17 @@ package events
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	tally "github.com/uber-go/tally/v4"
 
+	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -24,6 +27,9 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
+
+// ErrTeamAllowlistDenied indicates project selection was denied by team allowlist rules.
+var ErrTeamAllowlistDenied = errors.New("team allowlist denied command")
 
 const (
 	// DefaultRepoRelDir is the default directory we run commands in, relative
@@ -37,6 +43,30 @@ const (
 	// DefaultAbortOnExecutionOrderFail being false is the default setting for abort on execution group failures
 	DefaultAbortOnExecutionOrderFail = false
 )
+
+var ErrIgnoredTargetedDir = errors.New("targeted dir ignored by autodiscover.ignore_paths")
+
+func IsIgnoredTargetedDir(err error) bool {
+	return errors.Is(err, ErrIgnoredTargetedDir)
+}
+
+func MarkCommandSkippedIfIgnoredTargetedDir(ctx *command.Context, commandName command.Name, err error) bool {
+	if !IsIgnoredTargetedDir(err) {
+		return false
+	}
+	ctx.Log.Debug("ignoring targeted %s because the directory matches autodiscover.ignore_paths", commandName.String())
+	ctx.CommandSkipped = true
+	return true
+}
+
+func MarkCommandSkippedIfIgnoredTarget(ctx *command.Context, commandName command.Name, cmd *CommentCommand, ignorer ProjectTargetedDirIgnorer) bool {
+	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || !ignorer.ShouldIgnoreTargetedDir(ctx, cmd) {
+		return false
+	}
+	ctx.Log.Debug("ignoring targeted %s because the directory matches autodiscover.ignore_paths", commandName.String())
+	ctx.CommandSkipped = true
+	return true
+}
 
 func NewInstrumentedProjectCommandBuilder(
 	logger logging.SimpleLogging,
@@ -57,6 +87,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	DefaultTFDistribution string,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
@@ -88,6 +119,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDetectModuleFiles,
 			AutoplanFileList,
 			RestrictFileList,
+			DefaultTFDistribution,
 			SilenceNoProjects,
 			IncludeGitUntrackedFiles,
 			AutoDiscoverMode,
@@ -117,6 +149,7 @@ func NewProjectCommandBuilder(
 	AutoDetectModuleFiles string,
 	AutoplanFileList string,
 	RestrictFileList bool,
+	DefaultTFDistribution string,
 	SilenceNoProjects bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
@@ -139,6 +172,7 @@ func NewProjectCommandBuilder(
 		AutoDetectModuleFiles:    AutoDetectModuleFiles,
 		AutoplanFileList:         AutoplanFileList,
 		RestrictFileList:         RestrictFileList,
+		DefaultTFDistribution:    DefaultTFDistribution,
 		SilenceNoProjects:        SilenceNoProjects,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
 		AutoDiscoverMode:         AutoDiscoverMode,
@@ -152,6 +186,7 @@ func NewProjectCommandBuilder(
 }
 
 type ProjectPlanCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildAutoplanCommands builds project commands that will run plan on
 	// the projects determined to be modified.
 	BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error)
@@ -162,6 +197,7 @@ type ProjectPlanCommandBuilder interface {
 }
 
 type ProjectApplyCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildApplyCommands builds project Apply commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -169,11 +205,13 @@ type ProjectApplyCommandBuilder interface {
 }
 
 type ProjectApprovePoliciesCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildApprovePoliciesCommands builds project PolicyCheck commands for this ctx and comment.
 	BuildApprovePoliciesCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
 type ProjectVersionCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildVersionCommands builds project Version commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -181,6 +219,7 @@ type ProjectVersionCommandBuilder interface {
 }
 
 type ProjectImportCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildImportCommands builds project Import commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
@@ -188,13 +227,18 @@ type ProjectImportCommandBuilder interface {
 }
 
 type ProjectStateCommandBuilder interface {
+	ProjectTargetedDirIgnorer
 	// BuildStateRmCommands builds project state rm commands for this ctx and comment. If
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildStateRmCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
+type ProjectTargetedDirIgnorer interface {
+	ShouldIgnoreTargetedDir(ctx *command.Context, comment *CommentCommand) bool
+}
+
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
@@ -244,6 +288,8 @@ type DefaultProjectCommandBuilder struct {
 	EnableDiffMarkdownFormat bool
 	// User config option: Block plan requests from projects outside the files modified in the pull request.
 	RestrictFileList bool
+	// User config option: The default Terraform/OpenTofu distribution for projects without explicit config.
+	DefaultTFDistribution string
 	// User config option: Ignore PR if none of the modified files are part of a project.
 	SilenceNoProjects bool
 	// User config option: Include git untracked files in the modified file list.
@@ -273,6 +319,10 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 
 // See ProjectCommandBuilder.BuildPlanCommands.
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	if cmd.DiscoverAllProjects {
+		ctx.Log.Debug("Building plan command for all configured and auto-discovered projects")
+		return p.buildAllProjectsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+	}
 	if !cmd.IsForSpecificProject() {
 		ctx.Log.Debug("Building plan command for all affected projects")
 		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
@@ -373,24 +423,211 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 // autoDiscoverModeEnabled determines whether to use autodiscover
 func (p *DefaultProjectCommandBuilder) autoDiscoverModeEnabled(ctx *command.Context, repoCfg valid.RepoCfg) bool {
+	// 1. If global defines autodiscover, evaluate it directly
+	if global := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID()); global != nil {
+		return repoCfg.AutoDiscoverEnabled(global.Mode)
+	}
+
+	// 2. Otherwise if repo defines it, evaluate that
+	if repoCfg.AutoDiscover != nil {
+		return repoCfg.AutoDiscoverEnabled(repoCfg.AutoDiscover.Mode)
+	}
+
+	// 3. Otherwise use CLI/default
 	defaultAutoDiscoverMode := valid.AutoDiscoverMode(p.AutoDiscoverMode)
-	globalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if globalAutoDiscover != nil {
-		defaultAutoDiscoverMode = globalAutoDiscover.Mode
+	if defaultAutoDiscoverMode == "" {
+		defaultAutoDiscoverMode = valid.AutoDiscoverAutoMode
 	}
 	return repoCfg.AutoDiscoverEnabled(defaultAutoDiscoverMode)
 }
 
-// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery
+// parseRepoCfg parses the repo config file from repoDir if it exists. Returns the
+// parsed config (or a zero-valued RepoCfg if absent), a bool indicating whether the
+// file was found, and any parse error. Logs at Info level for both outcomes.
+func (p *DefaultProjectCommandBuilder) parseRepoCfg(ctx *command.Context, repoDir string) (valid.RepoCfg, bool, error) {
+	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+	}
+	if !hasRepoCfg {
+		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
+		return valid.RepoCfg{}, false, nil
+	}
+	repoCfg, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+	if err != nil {
+		return valid.RepoCfg{}, false, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
+	}
+	ctx.Log.Info("successfully parsed %s file", repoCfgFile)
+	return repoCfg, true, nil
+}
+
+// shouldIgnoreTargetedDir checks whether a targeted -d command should be
+// silently skipped because the path matches autodiscover.ignore_paths. It only
+// applies when autodiscovery is active and the directory has no explicit project
+// config in the repo config file.
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDir(ctx *command.Context, repoDir string, repoRelDir string) bool {
+	if valid.ContainsDirGlobPattern(repoRelDir) {
+		return false
+	}
+	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return false
+	}
+	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, repoRelDir)
+}
+
+func (p *DefaultProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Context, cmd *CommentCommand) bool {
+	if cmd.ProjectName != "" || cmd.RepoRelDir == "" || valid.ContainsDirGlobPattern(cmd.RepoRelDir) {
+		return false
+	}
+	repoCfg, ok := p.repoCfgForTargetedIgnore(ctx, cmd)
+	if !ok {
+		return false
+	}
+	return p.shouldIgnoreTargetedDirFromCfg(ctx, repoCfg, cmd.RepoRelDir)
+}
+
+func (p *DefaultProjectCommandBuilder) repoCfgForTargetedIgnore(ctx *command.Context, cmd *CommentCommand) (valid.RepoCfg, bool) {
+	repoRelDir := cmd.RepoRelDir
+	if ctx.PreferLocalRepoCfgForTargetedIgnore {
+		if repoCfg, ok, _ := p.repoCfgFromWorkingDir(ctx); ok {
+			return repoCfg, true
+		}
+	}
+
+	if p.needsLocalRepoCfgForTargetedIgnore(ctx) {
+		ctx.Log.Debug("not checking remote repo config for targeted ignore because merge checkout needs the merged local config")
+		return valid.RepoCfg{}, false
+	}
+
+	if p.VCSClient != nil {
+		repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
+		hasRepoCfg, repoCfgData, err := p.VCSClient.GetFileContent(ctx.Log, ctx.HeadRepo, targetedIgnoreConfigRef(ctx.Pull), repoCfgFile)
+		if err != nil {
+			ctx.Log.Debug("unable to fetch %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+			if !p.VCSClient.SupportsSingleFileDownload(ctx.HeadRepo) && p.shouldIgnoreTargetedDirFromGlobalCfg(ctx, repoRelDir) {
+				// Do not let global ignore_paths hide an explicit project that only the
+				// cloned repo config can prove.
+				if cmd.Name == command.Plan {
+					return valid.RepoCfg{}, false
+				}
+				if repoCfg, ok, missing := p.repoCfgFromWorkingDir(ctx); ok {
+					return repoCfg, true
+				} else if !missing {
+					return valid.RepoCfg{}, false
+				}
+				return valid.RepoCfg{}, true
+			}
+			return valid.RepoCfg{}, false
+		} else if hasRepoCfg {
+			repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
+			if err != nil {
+				ctx.Log.Debug("unable to parse %s while checking autodiscover.ignore_paths: %s", repoCfgFile, err)
+				return valid.RepoCfg{}, false
+			} else {
+				return repoCfg, true
+			}
+		}
+		return valid.RepoCfg{}, true
+	}
+
+	return valid.RepoCfg{}, false
+}
+
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromGlobalCfg(ctx *command.Context, repoRelDir string) bool {
+	repoCfg := valid.RepoCfg{}
+	return p.autoDiscoverModeEnabled(ctx, repoCfg) &&
+		p.isAutoDiscoverPathIgnored(ctx, repoCfg, filepath.Clean(repoRelDir))
+}
+
+func targetedIgnoreConfigRef(pull models.PullRequest) string {
+	if pull.HeadCommit != "" {
+		return pull.HeadCommit
+	}
+	return pull.HeadBranch
+}
+
+func (p *DefaultProjectCommandBuilder) repoCfgFromWorkingDir(ctx *command.Context) (valid.RepoCfg, bool, bool) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return valid.RepoCfg{}, false, errors.Is(err, os.ErrNotExist)
+	}
+	repoCfg, _, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return valid.RepoCfg{}, false, false
+	}
+	return repoCfg, true, false
+}
+
+func (p *DefaultProjectCommandBuilder) needsLocalRepoCfgForTargetedIgnore(ctx *command.Context) bool {
+	return ctx.Pull.Num > 0 && workingDirUsesMergeCheckout(p.WorkingDir)
+}
+
+func workingDirUsesMergeCheckout(workingDir WorkingDir) bool {
+	checkoutMerge, ok := workingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
+}
+
+func (p *DefaultProjectCommandBuilder) shouldIgnoreTargetedDirFromCfg(ctx *command.Context, repoCfg valid.RepoCfg, repoRelDir string) bool {
+	if !p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		return false
+	}
+	cleanDir := filepath.Clean(repoRelDir)
+	for _, proj := range repoCfg.Projects {
+		if projectDirMatchesTargetedDir(proj.Dir, cleanDir) {
+			return false
+		}
+	}
+	return p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanDir)
+}
+
+func projectDirMatchesTargetedDir(projectDir string, cleanTargetDir string) bool {
+	cleanProjectDir := filepath.Clean(projectDir)
+	if cleanProjectDir == cleanTargetDir {
+		return true
+	}
+	if !valid.ContainsDirGlobPattern(cleanProjectDir) {
+		return false
+	}
+	return doublestar.MatchUnvalidated(filepath.ToSlash(cleanProjectDir), filepath.ToSlash(cleanTargetDir))
+}
+
+// isAutoDiscoverPathIgnored determines whether this particular path is ignored for the purposes of auto discovery.
+// Global config ignore_paths takes precedence when explicitly set; otherwise falls through to repo config.
 func (p *DefaultProjectCommandBuilder) isAutoDiscoverPathIgnored(ctx *command.Context, repoCfg valid.RepoCfg, path string) bool {
+	// 1. If global defines autodiscover, evaluate that
 	fromGlobalAutoDiscover := p.GlobalCfg.RepoAutoDiscoverCfg(ctx.Pull.BaseRepo.ID())
-	if fromGlobalAutoDiscover != nil {
+	if fromGlobalAutoDiscover != nil && fromGlobalAutoDiscover.IgnorePaths != nil {
 		return fromGlobalAutoDiscover.IsPathIgnored(path)
 	}
+	// 2. Otherwise, if repo defines, evaluate that
 	if repoCfg.AutoDiscover != nil {
 		return repoCfg.AutoDiscover.IsPathIgnored(path)
 	}
+	// The CLI default for auto discover is to not ignore any paths
+	return false
+}
 
+func pendingPlanInPullStatus(ctx *command.Context, plan PendingPlan) bool {
+	if ctx.PullStatus == nil {
+		return false
+	}
+
+	path := filepath.Clean(plan.RepoRelDir)
+	for _, project := range ctx.PullStatus.Projects {
+		if project.Workspace != plan.Workspace || filepath.Clean(project.RepoRelDir) != path {
+			continue
+		}
+		if plan.ProjectName != "" {
+			return project.ProjectName == plan.ProjectName
+		}
+		if project.ProjectName == "" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -450,7 +687,7 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		for _, mp := range modifiedProjects {
 			ctx.Log.Debug("determining config for project at dir: '%s'", mp.Path)
 			absProjectDir := filepath.Join(repoDir, mp.Path)
-			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir)
+			pWorkspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir, p.DefaultTFDistribution)
 			if err != nil {
 				return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
 			}
@@ -460,6 +697,147 @@ func (p *DefaultProjectCommandBuilder) getMergedProjectCfgs(ctx *command.Context
 		}
 	}
 	return mergedCfgs, nil
+}
+
+func (p *DefaultProjectCommandBuilder) getAllMergedProjectCfgs(ctx *command.Context, repoDir string, repoCfg valid.RepoCfg) ([]valid.MergedProjectCfg, error) {
+	mergedCfgs := make([]valid.MergedProjectCfg, 0)
+	configuredProjDirs := make(map[string]bool)
+
+	for _, project := range repoCfg.Projects {
+		ctx.Log.Debug("determining config for project at dir: '%s' workspace: '%s'", project.Dir, project.Workspace)
+		mergedCfgs = append(mergedCfgs, p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), project, repoCfg))
+		configuredProjDirs[filepath.Clean(project.Dir)] = true
+	}
+
+	if !p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		return mergedCfgs, nil
+	}
+
+	projectDirs, err := p.discoverAllProjectDirs(ctx, repoDir, repoCfg, configuredProjDirs)
+	if err != nil {
+		return nil, err
+	}
+	ctx.Log.Info("automatically discovered %d additional project(s): %v", len(projectDirs), projectDirs)
+	for _, projectDir := range projectDirs {
+		absProjectDir := filepath.Join(repoDir, projectDir)
+		workspace, err := p.ProjectFinder.DetermineWorkspaceFromHCL(ctx.Log, absProjectDir, p.DefaultTFDistribution)
+		if err != nil {
+			return nil, fmt.Errorf("looking for Terraform Cloud workspace from configuration in '%s': %w", absProjectDir, err)
+		}
+
+		mergedCfgs = append(mergedCfgs, p.GlobalCfg.DefaultProjCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), projectDir, workspace))
+	}
+	return mergedCfgs, nil
+}
+
+func (p *DefaultProjectCommandBuilder) discoverAllProjectDirs(ctx *command.Context, repoDir string, repoCfg valid.RepoCfg, configuredProjDirs map[string]bool) ([]string, error) {
+	projectDirs := make([]string, 0)
+	err := filepath.WalkDir(repoDir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if entry.Name() == ".git" || entry.Name() == ".terraform" || entry.Name() == ".terragrunt-cache" {
+			return filepath.SkipDir
+		}
+
+		relPath, err := filepath.Rel(repoDir, path)
+		if err != nil {
+			return err
+		}
+		if relPath == "." {
+			relPath = DefaultRepoRelDir
+		}
+		cleanPath := filepath.Clean(relPath)
+		if configuredProjDirs[cleanPath] || p.isAutoDiscoverPathIgnored(ctx, repoCfg, cleanPath) || isModule(filepath.ToSlash(cleanPath)) {
+			return nil
+		}
+
+		isProject, err := raw.IsTerraformProjectDir(path)
+		if err != nil {
+			return err
+		}
+		if isProject {
+			projectDirs = append(projectDirs, cleanPath)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(projectDirs)
+	return projectDirs, nil
+}
+
+func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
+	workspace := DefaultWorkspace
+
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName)
+	if err != nil {
+		ctx.Log.Warn("workspace was locked")
+		return nil, err
+	}
+	ctx.Log.Debug("got workspace lock")
+	defer unlockFn()
+
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	repoCfg, hasRepoCfg, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	mergedProjectCfgs, err := p.getAllMergedProjectCfgs(ctx, repoDir, repoCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	automerge := p.EnableAutoMerge
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	if hasRepoCfg {
+		if repoCfg.Automerge != nil {
+			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.ParallelApply != nil {
+			parallelApply = *repoCfg.ParallelApply
+		}
+		if repoCfg.ParallelPlan != nil {
+			parallelPlan = *repoCfg.ParallelPlan
+		}
+		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
+	}
+
+	projCtxs := make([]command.ProjectContext, 0)
+	for _, mergedProjectCfg := range mergedProjectCfgs {
+		projCtxs = append(projCtxs,
+			p.ProjectCommandContextBuilder.BuildProjectContext(
+				ctx,
+				cmdName,
+				subCmdName,
+				mergedProjectCfg,
+				commentFlags,
+				repoDir,
+				automerge,
+				parallelApply,
+				parallelPlan,
+				verbose,
+				abortOnExecutionOrderFail,
+				p.TerraformExecutor,
+			)...)
+	}
+
+	sort.Slice(projCtxs, func(i, j int) bool {
+		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
+
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -487,7 +865,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmdName)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName)
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -509,27 +887,12 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		modifiedFiles = append(modifiedFiles, untrackedFiles...)
 	}
 
-	// Parse config file if it exists.
-	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
-	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
+	repoCfg, hasRepoCfg, err := p.parseRepoCfg(ctx, repoDir)
 	if err != nil {
-		return nil, fmt.Errorf("looking for '%s' file in '%s': %w", repoCfgFile, repoDir, err)
+		return nil, err
 	}
 
 	var projCtxs []command.ProjectContext
-	var repoCfg valid.RepoCfg
-
-	if hasRepoCfg {
-		// If there's a repo cfg with projects then we'll use it to figure out which projects
-		// should be planed.
-		repoCfg, err = p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
-		if err != nil {
-			return nil, fmt.Errorf("parsing %s: %w", repoCfgFile, err)
-		}
-		ctx.Log.Info("successfully parsed %s file", repoCfgFile)
-	} else {
-		ctx.Log.Info("repo config file %s is absent, using global defaults", repoCfgFile)
-	}
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
 	if err != nil {
@@ -576,30 +939,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
-	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
-		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
-			return false
-		}
-		ctx := models.TeamAllowlistCheckerContext{
-			BaseRepo:           projCtx.BaseRepo,
-			CommandName:        projCtx.CommandName.String(),
-			EscapedCommentArgs: projCtx.EscapedCommentArgs,
-			HeadRepo:           projCtx.HeadRepo,
-			Log:                projCtx.Log,
-			Pull:               projCtx.Pull,
-			ProjectName:        projCtx.ProjectName,
-			RepoDir:            repoDir,
-			RepoRelDir:         projCtx.RepoRelDir,
-			User:               projCtx.User,
-			Verbose:            projCtx.Verbose,
-			Workspace:          projCtx.Workspace,
-			API:                false,
-		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
-	})
-
-	return projCtxs, nil
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
@@ -613,7 +953,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	var pcc []command.ProjectContext
 
 	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.Name)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
 	if err != nil {
 		return pcc, err
 	}
@@ -632,7 +972,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		return pcc, err
 	}
 
-	if p.RestrictFileList {
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
+	}
+
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, defaultRepoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted plan for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return pcc, ErrIgnoredTargetedDir
+	}
+
+	var restrictedRegexProjects []valid.Project
+	var restrictedRegexRepoCfg *valid.RepoCfg
+	if p.RestrictFileList && !ctx.SkipPRModifiedFiles {
 		ctx.Log.Debug("'restrict-file-list' option is set, checking modified files")
 		modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 		if err != nil {
@@ -667,31 +1019,28 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 
 		if cmd.ProjectName != "" {
 			ctx.Log.Debug("Command project name specified: %s", cmd.ProjectName)
-			var notFoundFiles = []string{}
 			var repoConfig valid.RepoCfg
 
 			repoConfig, err = p.ParserValidator.ParseRepoCfg(defaultRepoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
 			if err != nil {
 				return pcc, err
 			}
+			exactAPIProjectIdentity := ctx.API && (cmd.RepoRelDir != "" || cmd.Workspace != "")
 			repoCfgProjects := repoConfig.FindProjectsByName(cmd.ProjectName)
-
-			for _, f := range modifiedFiles {
-				foundDir := false
-
-				for _, p := range repoCfgProjects {
-					if filepath.Dir(f) == p.Dir {
-						foundDir = true
-					}
-				}
-
-				if !foundDir {
-					notFoundFiles = append(notFoundFiles, filepath.Dir(f))
-				}
+			if exactAPIProjectIdentity {
+				repoCfgProjects = repoConfig.FindProjectsByExactName(cmd.ProjectName)
 			}
+			notFoundFiles := modifiedFilesOutsideProjects(modifiedFiles, repoCfgProjects)
 
 			if len(notFoundFiles) > 0 {
 				return pcc, fmt.Errorf("the following directories are present in the pull request but not in the requested project:\n%s", strings.Join(notFoundFiles, "\n"))
+			}
+			if p.EnableRegExpCmd && !exactAPIProjectIdentity && len(repoCfgProjects) > 1 {
+				restrictedRegexProjects = filterProjectsByModifiedFiles(repoCfgProjects, modifiedFiles)
+				if len(restrictedRegexProjects) == 0 {
+					return pcc, fmt.Errorf("no modified files match requested project %q", cmd.ProjectName)
+				}
+				restrictedRegexRepoCfg = &repoConfig
 			}
 		}
 	}
@@ -703,10 +1052,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			return pcc, err
 		}
 	}
-
-	repoRelDir := DefaultRepoRelDir
-	if cmd.RepoRelDir != "" {
-		repoRelDir = cmd.RepoRelDir
+	if restrictedRegexRepoCfg != nil {
+		return p.buildProjectCommandCtxWithCfg(
+			ctx,
+			command.Plan,
+			"",
+			cmd.Flags,
+			defaultRepoDir,
+			repoRelDir,
+			workspace,
+			cmd.Verbose,
+			restrictedRegexProjects,
+			restrictedRegexRepoCfg,
+		)
 	}
 
 	return p.buildProjectCommandCtx(
@@ -718,13 +1076,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 		defaultRepoDir,
 		repoRelDir,
 		workspace,
+		ctx.API && cmd.RepoRelDir != "",
+		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
 }
 
 // getCfg returns the atlantis.yaml config (if it exists) for this project. If
 // there is no config, then projectCfg and repoCfg will be nil.
-func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
+func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName string, dir string, workspace string, repoDir string, filterProjectDir bool, filterProjectWorkspace bool) (projectsCfg []valid.Project, repoCfg *valid.RepoCfg, err error) {
 	repoCfgFile := p.GlobalCfg.RepoConfigFile(ctx.Pull.BaseRepo.ID())
 	hasRepoCfg, err := p.ParserValidator.HasRepoCfg(repoDir, repoCfgFile)
 	if err != nil {
@@ -749,16 +1109,32 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// If they've specified a project by name we look it up. Otherwise we
 	// use the dir and workspace.
 	if projectName != "" {
-		if p.EnableRegExpCmd {
+		if filterProjectDir || filterProjectWorkspace || ctx.ExactProjectNameMatching {
+			projectsCfg = repoCfg.FindProjectsByExactName(projectName)
+		} else if p.EnableRegExpCmd {
 			projectsCfg = repoCfg.FindProjectsByName(projectName)
 		} else {
 			if p := repoCfg.FindProjectByName(projectName); p != nil {
 				projectsCfg = append(projectsCfg, *p)
 			}
 		}
+		projectsWithName := len(projectsCfg)
+		if filterProjectDir {
+			cleanDir := filepath.Clean(dir)
+			projectsCfg = slices.DeleteFunc(projectsCfg, func(p valid.Project) bool {
+				return filepath.Clean(p.Dir) != cleanDir
+			})
+		}
+		if filterProjectWorkspace {
+			projectsCfg = slices.DeleteFunc(projectsCfg, func(p valid.Project) bool {
+				return p.Workspace != workspace
+			})
+		}
 		if len(projectsCfg) == 0 {
 			if p.SilenceNoProjects && len(repoConfig.Projects) > 0 {
 				ctx.Log.Debug("no project with name '%s' found but silencing the error", projectName)
+			} else if projectsWithName > 0 && (filterProjectDir || filterProjectWorkspace) {
+				err = fmt.Errorf("no project with name '%s' is defined in '%s' for dir: '%s' workspace: '%s'", projectName, repoCfgFile, dir, workspace)
 			} else {
 				err = fmt.Errorf("no project with name '%s' is defined in '%s'", projectName, repoCfgFile)
 			}
@@ -782,6 +1158,17 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	// Exact directory matching
 	projCfgs := repoCfg.FindProjectsByDirWorkspace(dir, workspace)
 	if len(projCfgs) == 0 {
+		if filterProjectDir {
+			configuredOnAnotherBranch, branchErr := p.pathConfiguredOnlyOnAnotherBranch(ctx, repoDir, repoConfig, dir)
+			if branchErr != nil {
+				err = branchErr
+				return
+			}
+			if configuredOnAnotherBranch {
+				err = fmt.Errorf("no project is defined in '%s' for dir: '%s' on branch: '%s'", repoCfgFile, dir, ctx.Pull.BaseBranch)
+				return
+			}
+		}
 		return
 	}
 	if len(projCfgs) > 1 {
@@ -790,6 +1177,18 @@ func (p *DefaultProjectCommandBuilder) getCfg(ctx *command.Context, projectName 
 	}
 	projectsCfg = projCfgs
 	return
+}
+
+func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *command.Context, repoDir string, repoConfig valid.RepoCfg, dir string) (bool, error) {
+	cleanDir := filepath.Clean(dir)
+	if len(repoConfig.FindProjectsByDir(cleanDir)) > 0 {
+		return false, nil
+	}
+	unfilteredRepoConfig, err := p.ParserValidator.ParseRepoCfg(repoDir, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), "")
+	if err != nil {
+		return false, err
+	}
+	return len(unfilteredRepoConfig.FindProjectsByDir(cleanDir)) > 0, nil
 }
 
 // buildAllProjectCommandsByPlan builds contexts for a command for every project that has
@@ -812,17 +1211,73 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		return nil, err
 	}
 
+	// Parse config file to check autodiscover.ignore_paths.
+	// During plan, getMergedProjectCfgs calls isAutoDiscoverPathIgnored to
+	// filter ignored paths, but PendingPlanFinder only filters
+	// .terragrunt-cache. Apply the same ignore_paths filtering here so
+	// apply doesn't pick up .tfplan files in paths that should be ignored
+	// (e.g. .terraform/modules/).
+	repoCfg, _, err := p.parseRepoCfg(ctx, defaultRepoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter out untracked plan files in paths matching autodiscover.ignore_paths,
+	// but only when autodiscovery is active, matching the plan-path behavior in
+	// getMergedProjectCfgs. Preserve ignored-path plans already present in pull
+	// status because Atlantis created those plans through an explicit command.
+	if p.autoDiscoverModeEnabled(ctx, repoCfg) {
+		configuredProjDirs := make(map[string]bool)
+		for _, configProj := range repoCfg.Projects {
+			configuredProjDirs[filepath.Clean(configProj.Dir)] = true
+		}
+		var filteredPlans []PendingPlan
+		for _, plan := range plans {
+			path := filepath.Clean(plan.RepoRelDir)
+			if !configuredProjDirs[path] && p.isAutoDiscoverPathIgnored(ctx, repoCfg, path) && !pendingPlanInPullStatus(ctx, plan) {
+				ctx.Log.Debug("ignoring plan in '%s' due to autodiscover.ignore_paths", plan.RepoRelDir)
+				continue
+			}
+			filteredPlans = append(filteredPlans, plan)
+		}
+		plans = filteredPlans
+	}
+
+	if commentCmd.Name == command.Apply {
+		hasActivePlan := false
+		if p.WorkingDirLocker != nil {
+			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+		}
+		if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
+			return nil, err
+		}
+	}
+
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		// Lock all the directories we need to run the command in
-		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, commentCmd.Name)
+		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, commentCmd.Name)
 		if err != nil {
 			return nil, err
 		}
 		defer unlockFn()
-		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, commentCmd.Verbose)
+		commentCmds, err := p.buildProjectCommandCtx(ctx, commentCmd.CommandName(), commentCmd.SubName, plan.ProjectName, commentCmd.Flags, defaultRepoDir, plan.RepoRelDir, plan.Workspace, false, false, commentCmd.Verbose)
 		if err != nil {
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
+		}
+		if commentCmd.Name == command.Apply {
+			planBasePath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+			planPath, err := pendingPlanFilePath(plan)
+			if err != nil {
+				return nil, fmt.Errorf("validating plan path for dir %q: %w", plan.RepoRelDir, err)
+			}
+			planHash, err := hashFile(planBasePath, planPath)
+			if err != nil {
+				return nil, fmt.Errorf("hashing plan for dir '%s': %w", plan.RepoRelDir, err)
+			}
+			for i := range commentCmds {
+				commentCmds[i].ExpectedPlanHash = planHash
+			}
 		}
 		cmds = append(cmds, commentCmds...)
 	}
@@ -834,6 +1289,205 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	return cmds, nil
 }
 
+// ValidatePlansForApply ensures discovered plans are valid for the current PR head.
+// When plans are found, validates each against current-head PullStatus.
+// When no plans are found, fails if no current PullStatus exists or if it is stale.
+func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
+	return ValidatePlansForApplyWithActivePlan(ctx, plans, false)
+}
+
+func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, ctx.Pull)
+}
+
+// ValidatePlansForApplyWithCurrentHead validates plans against an authoritative
+// current head. This lets apply refresh the live PR head under the apply lock
+// before generic builder validation instead of trusting the command-start pull
+// snapshot.
+func ValidatePlansForApplyWithCurrentHead(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentHead string) error {
+	currentPull := ctx.Pull
+	currentPull.HeadCommit = currentHead
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, currentPull)
+}
+
+// ValidatePlansForApplyWithCurrentPull validates plans against an authoritative
+// current pull identity. This lets apply refresh the live PR head/base under the
+// apply lock before generic builder validation instead of trusting the
+// command-start pull snapshot.
+func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentPull models.PullRequest) error {
+	if currentPull.HeadCommit != "" || currentPull.BaseBranch != "" {
+		ctxCopy := *ctx
+		if currentPull.HeadCommit != "" {
+			ctxCopy.Pull.HeadCommit = currentPull.HeadCommit
+		}
+		if currentPull.BaseBranch != "" {
+			ctxCopy.Pull.BaseBranch = currentPull.BaseBranch
+		}
+		ctx = &ctxCopy
+	}
+	if hasActivePlan {
+		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
+	}
+	if len(plans) > 0 {
+		return validateFoundPlans(ctx, plans)
+	}
+	return validateNoPlansFound(ctx, hasActivePlan)
+}
+
+func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
+	if ctx.PullStatus == nil {
+		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
+	}
+
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+		return err
+	}
+
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if proj == nil {
+			return fmt.Errorf(
+				"plan file found for dir %q workspace %q project %q but no matching plan status exists; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName,
+			)
+		}
+		if !statusAllowedForDiscoveredPlan(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName, proj.Status.String(),
+			)
+		}
+	}
+
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys)
+}
+
+func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
+	if ctx.PullStatus == nil {
+		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
+	}
+
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
+		return err
+	}
+
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// statusAllowedForDiscoveredPlan returns true if a discovered .tfplan file
+// with this status is valid to build an apply command for. Includes
+// PlannedNoChangesPlanStatus (no-op plan can leave a .tfplan on disk) and
+// ErroredPolicyCheckStatus (let apply build the command and fail through
+// existing per-project apply-requirement handling).
+func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus, models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusBlocksGenericApplyWithoutPlan(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.ErroredPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusIsSafeWithoutPlanFile(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedNoChangesPlanStatus, models.AppliedPlanStatus, models.DiscardedPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+type applyPlanKey struct {
+	workspace   string
+	repoRelDir  string
+	projectName string
+}
+
+func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
+	return applyPlanKey{
+		workspace:   workspace,
+		repoRelDir:  filepath.Clean(repoRelDir),
+		projectName: projectName,
+	}
+}
+
+func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
+	for _, proj := range pullStatus.Projects {
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		if statusRequiresPlanFileForGenericApply(proj.Status) {
+			return fmt.Errorf(
+				"plan file is missing for dir %q workspace %q project %q with status %q; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+			)
+		}
+		if statusBlocksGenericApplyWithoutPlan(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q errored and cannot be applied without a plan file; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+			)
+		}
+		if statusIsSafeWithoutPlanFile(proj.Status) {
+			continue
+		}
+		return fmt.Errorf(
+			"plan for dir %q workspace %q project %q has status %q and cannot be applied without a plan file; run `atlantis plan`",
+			proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+		)
+	}
+	return nil
+}
+
+func findProjectInPullStatus(pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	cleanDir := filepath.Clean(repoRelDir)
+	for i := range pullStatus.Projects {
+		proj := &pullStatus.Projects[i]
+		if proj.Workspace != workspace || filepath.Clean(proj.RepoRelDir) != cleanDir {
+			continue
+		}
+		if projectName != "" {
+			if proj.ProjectName == projectName {
+				return proj
+			}
+			continue
+		}
+		if proj.ProjectName == "" {
+			return proj
+		}
+	}
+	return nil
+}
+
 // buildProjectCommand builds an command for the single project
 // identified by cmd except plan.
 func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
@@ -843,11 +1497,15 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	}
 
 	var projCtx []command.ProjectContext
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.Name)
-	if err != nil {
-		return projCtx, err
+	repoRelDir := DefaultRepoRelDir
+	if cmd.RepoRelDir != "" {
+		repoRelDir = cmd.RepoRelDir
 	}
-	defer unlockFn()
+
+	if p.ShouldIgnoreTargetedDir(ctx, cmd) {
+		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return projCtx, ErrIgnoredTargetedDir
+	}
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
@@ -858,12 +1516,18 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, err
 	}
 
-	repoRelDir := DefaultRepoRelDir
-	if cmd.RepoRelDir != "" {
-		repoRelDir = cmd.RepoRelDir
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" && p.shouldIgnoreTargetedDir(ctx, repoDir, repoRelDir) {
+		ctx.Log.Debug("ignoring targeted command for dir '%s' due to autodiscover.ignore_paths", repoRelDir)
+		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	return p.buildProjectCommandCtx(
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
+
+	projCtx, err = p.buildProjectCommandCtx(
 		ctx,
 		cmd.Name,
 		cmd.SubName,
@@ -872,8 +1536,42 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		repoDir,
 		repoRelDir,
 		workspace,
+		ctx.API && cmd.RepoRelDir != "",
+		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
+	if err != nil {
+		return projCtx, err
+	}
+	if cmd.Name == command.Apply {
+		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
+			return nil, err
+		}
+	}
+	return projCtx, nil
+}
+
+func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
+	for i := range projCtxs {
+		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)
+		if err != nil {
+			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
+		}
+		absPath := filepath.Join(repoDir, projCtxs[i].RepoRelDir)
+		planPath, err := safePlanFilePath(projCtxs[i], absPath)
+		if err != nil {
+			return fmt.Errorf("validating plan path for dir %q: %w", projCtxs[i].RepoRelDir, err)
+		}
+		planHash, err := hashFile(absPath, planPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("hashing plan for dir '%s': %w", projCtxs[i].RepoRelDir, err)
+		}
+		projCtxs[i].ExpectedPlanHash = planHash
+	}
+	return nil
 }
 
 // buildProjectCommandCtx builds a context for a single or several projects identified
@@ -886,12 +1584,27 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	repoDir string,
 	repoRelDir string,
 	workspace string,
+	filterProjectDir bool,
+	filterProjectWorkspace bool,
 	verbose bool) ([]command.ProjectContext, error) {
 
-	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir)
+	matchingProjects, repoCfgPtr, err := p.getCfg(ctx, projectName, repoRelDir, workspace, repoDir, filterProjectDir, filterProjectWorkspace)
 	if err != nil {
 		return []command.ProjectContext{}, err
 	}
+	return p.buildProjectCommandCtxWithCfg(ctx, cmd, subCmd, commentFlags, repoDir, repoRelDir, workspace, verbose, matchingProjects, repoCfgPtr)
+}
+
+func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *command.Context,
+	cmd command.Name,
+	subCmd string,
+	commentFlags []string,
+	repoDir string,
+	repoRelDir string,
+	workspace string,
+	verbose bool,
+	matchingProjects []valid.Project,
+	repoCfgPtr *valid.RepoCfg) ([]command.ProjectContext, error) {
 	var projCtxs []command.ProjectContext
 	var projCfg valid.MergedProjectCfg
 	automerge := p.EnableAutoMerge
@@ -915,11 +1628,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 		// Override any dir/workspace defined on the comment with what was
 		// defined in config. This shouldn't matter since we don't allow comments
 		// with both project name and dir/workspace.
-		repoRelDir = projCfg.RepoRelDir
-		workspace = projCfg.Workspace
 		for _, mp := range matchingProjects {
 			ctx.Log.Debug("Merging config for project at dir: '%s' workspace: '%s'", mp.Dir, mp.Workspace)
 			projCfg = p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), mp, *repoCfgPtr)
+			repoRelDir = projCfg.RepoRelDir
+			workspace = projCfg.Workspace
 
 			projCtxs = append(projCtxs,
 				p.ProjectCommandContextBuilder.BuildProjectContext(
@@ -967,12 +1680,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 	}
 
 	// Filter projects to only include ones the user is authorized for
-	projCtxs = slices.DeleteFunc(projCtxs, func(projCtx command.ProjectContext) bool {
+	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+}
+
+func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {
+	authorized := make([]command.ProjectContext, 0, len(projCtxs))
+	for _, projCtx := range projCtxs {
 		if projCtx.TeamAllowlistChecker == nil || !projCtx.TeamAllowlistChecker.HasRules() {
-			// allowlist restriction is not enabled
-			return false
+			authorized = append(authorized, projCtx)
+			continue
 		}
-		ctx := models.TeamAllowlistCheckerContext{
+		allowlistCtx := models.TeamAllowlistCheckerContext{
 			BaseRepo:           projCtx.BaseRepo,
 			CommandName:        projCtx.CommandName.String(),
 			EscapedCommentArgs: projCtx.EscapedCommentArgs,
@@ -985,12 +1703,48 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtx(ctx *command.Conte
 			User:               projCtx.User,
 			Verbose:            projCtx.Verbose,
 			Workspace:          projCtx.Workspace,
-			API:                false,
+			API:                projCtx.API,
 		}
-		return !projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(ctx, projCtx.User.Teams, projCtx.CommandName.String())
-	})
+		if projCtx.TeamAllowlistChecker.IsCommandAllowedForAnyTeam(allowlistCtx, projCtx.User.Teams, projCtx.CommandName.String()) {
+			authorized = append(authorized, projCtx)
+			continue
+		}
+		if failOnDenied {
+			return nil, fmt.Errorf("%w: %s is not authorized for project %q in %q workspace %q", ErrTeamAllowlistDenied, projCtx.CommandName, projCtx.ProjectName, projCtx.RepoRelDir, projCtx.Workspace)
+		}
+	}
+	return authorized, nil
+}
 
-	return projCtxs, nil
+func modifiedFilesOutsideProjects(modifiedFiles []string, projects []valid.Project) []string {
+	projectDirs := make(map[string]struct{}, len(projects))
+	for _, project := range projects {
+		projectDirs[filepath.Clean(project.Dir)] = struct{}{}
+	}
+
+	var notFoundFiles []string
+	for _, file := range modifiedFiles {
+		dir := filepath.Clean(filepath.Dir(file))
+		if _, ok := projectDirs[dir]; !ok {
+			notFoundFiles = append(notFoundFiles, filepath.Dir(file))
+		}
+	}
+	return notFoundFiles
+}
+
+func filterProjectsByModifiedFiles(projects []valid.Project, modifiedFiles []string) []valid.Project {
+	modifiedDirs := make(map[string]struct{}, len(modifiedFiles))
+	for _, file := range modifiedFiles {
+		modifiedDirs[filepath.Clean(filepath.Dir(file))] = struct{}{}
+	}
+
+	var filtered []valid.Project
+	for _, project := range projects {
+		if _, ok := modifiedDirs[filepath.Clean(project.Dir)]; ok {
+			filtered = append(filtered, project)
+		}
+	}
+	return filtered
 }
 
 // validateWorkspaceAllowed returns an error if repoCfg defines projects in

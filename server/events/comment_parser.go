@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -51,6 +42,18 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
+// DefaultBlockedExtraArgs is the default set of Terraform CLI flag prefixes
+// that are rejected when supplied as comment extra args (after "--"). These
+// flags could be used to bypass security controls (e.g. working-directory
+// traversal via -chdir, or loading of malicious providers via -plugin-dir).
+// Operators may override this list via the --blocked-extra-args server flag.
+var DefaultBlockedExtraArgs = []string{
+	"-chdir",
+	"--chdir",
+	"-plugin-dir",
+	"--plugin-dir",
+}
+
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
 // Atlantis commands. If the second line just has newlines then we let it pass
 // through because when you double click on a comment in GitHub and then you
@@ -58,7 +61,7 @@ const (
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
@@ -67,7 +70,7 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
@@ -88,10 +91,14 @@ type CommentParser struct {
 	AzureDevopsUser string
 	ExecutableName  string
 	AllowCommands   []command.Name
+	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
+	// rejected when supplied as comment extra args (after "--").
+	// Populated by NewCommentParser from UserConfig.ToBlockedExtraArgs().
+	BlockedExtraArgs []string
 }
 
-// NewCommentParser returns a CommentParser
-func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+// NewCommentParser returns a CommentParser.
+func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, blockedExtraArgs []string) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
@@ -103,13 +110,14 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 	}
 
 	return &CommentParser{
-		GithubUser:      githubUser,
-		GitlabUser:      gitlabUser,
-		GiteaUser:       giteaUser,
-		BitbucketUser:   bitbucketUser,
-		AzureDevopsUser: azureDevopsUser,
-		ExecutableName:  executableName,
-		AllowCommands:   commentAllowCommands,
+		GithubUser:       githubUser,
+		GitlabUser:       gitlabUser,
+		GiteaUser:        giteaUser,
+		BitbucketUser:    bitbucketUser,
+		AzureDevopsUser:  azureDevopsUser,
+		ExecutableName:   executableName,
+		AllowCommands:    commentAllowCommands,
+		BlockedExtraArgs: blockedExtraArgs,
 	}
 }
 
@@ -315,7 +323,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
 	// we also don't allow '..'. We don't want the workspace to contain a path
 	// since we create files based on the name.
-	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
+	// Additionally reject workspace names that start with '~': the shell
+	// expands leading tildes (tilde expansion) when the workspace name is
+	// used as a word in a "sh -c" command, which would produce unexpected and
+	// potentially unsafe behaviour.
+	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") || strings.HasPrefix(workspace, "~") {
 		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
 	}
 
@@ -375,7 +387,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
 		}
 		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
-		isAvailableSubCommand := utils.SlicesContains(availableSubCommands, subCommand)
+		isAvailableSubCommand := slices.Contains(availableSubCommands, subCommand)
 		if !isAvailableSubCommand {
 			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
 			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)
@@ -406,7 +418,27 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	//     - from: `atlantis state rm ADDRESS1 ADDRESS2 -- -var foo=bar
 	//     - to: `terraform state rm -var foo=bar ADDRESS1 ADDRESS2` (subcommand=rm)
 	extraArgs = append(extraArgs, commandArgs...)
+
+	// Reject extra args that contain blocked Terraform CLI flags.
+	// These flags could be used to bypass security controls (e.g. directory
+	// traversal via -chdir, or loading malicious providers via -plugin-dir).
+	for _, arg := range extraArgs {
+		if e.isBlockedExtraArg(arg) {
+			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
+		}
+	}
 	return subCommand, extraArgs, ""
+}
+
+// isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
+// permitted in comment extra args for security reasons.
+func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+	for _, blocked := range e.BlockedExtraArgs {
+		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
@@ -540,6 +572,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion         bool
 		AllowPlan            bool
 		AllowApply           bool
+		AllowCancel          bool
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
@@ -549,6 +582,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
+		AllowCancel:          e.isAllowedCommand(command.Cancel.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
@@ -591,6 +625,10 @@ Commands:
 {{- if .AllowApply }}
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowCancel }}
+  cancel   Cancels all queued commands for this pull request.
+           Already running commands are not interrupted.
 {{- end }}
 {{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.

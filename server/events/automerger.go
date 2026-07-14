@@ -12,8 +12,9 @@ import (
 )
 
 type AutoMerger struct {
-	VCSClient       vcs.Client
-	GlobalAutomerge bool
+	VCSClient             vcs.Client
+	GlobalAutomerge       bool
+	GlobalAutomergeMethod string
 }
 
 func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
@@ -29,6 +30,12 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, command.Apply.String()); err != nil {
 		ctx.Log.Err("failed to comment about automerge: %s", err)
 		// Commenting isn't required so continue.
+	}
+
+	// Fall back to the server-side default merge method when the comment
+	// command didn't specify one with --auto-merge-method.
+	if mergeMethod == "" {
+		mergeMethod = c.GlobalAutomergeMethod
 	}
 
 	// Make the API call to perform the merge.

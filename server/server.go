@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 // Package server handles the web server and executing commands that come in
@@ -46,6 +37,7 @@ import (
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -73,6 +65,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitlab"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -176,6 +169,10 @@ var staticAssets embed.FS
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
+	if userConfig.EnableDriftRemediation && !userConfig.EnableDriftDetection {
+		return nil, errors.New("--enable-drift-remediation requires --enable-drift-detection")
+	}
+
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
@@ -404,13 +401,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing webhook http headers: %w", err)
 	}
-	webhooksManager, err := webhooks.NewMultiWebhookSender(
-		webhooksConfig,
-		webhooks.Clients{
-			Slack: webhooks.NewSlackClient(userConfig.SlackToken),
-			Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
-		},
-	)
+	webhookClients := webhooks.Clients{
+		Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+		Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
+	}
+	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhookClients)
 	if err != nil {
 		return nil, fmt.Errorf("initializing webhooks: %w", err)
 	}
@@ -488,6 +483,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ExecutableName,
 		userConfig.HideUnchangedPlanComments,
 		userConfig.QuietPolicyChecks,
+		i18n.TranslatorConfig{
+			LanguageCode: userConfig.Language,
+			CatalogPath:  userConfig.LanguageConfigFile,
+		},
 	)
 
 	var lockingClient locking.Locker
@@ -496,8 +495,32 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
-		logger.Info("Utilizing Redis DB")
-		database, err = redis.New(userConfig.RedisHost, userConfig.RedisPort, userConfig.RedisPassword, userConfig.RedisTLSEnabled, userConfig.RedisInsecureSkipVerify, userConfig.RedisDB)
+		var clusterAddrs []string
+		if userConfig.RedisClusterAddresses != "" {
+			for addr := range strings.SplitSeq(userConfig.RedisClusterAddresses, ",") {
+				trimmed := strings.TrimSpace(addr)
+				if trimmed == "" {
+					continue
+				}
+				clusterAddrs = append(clusterAddrs, trimmed)
+			}
+		}
+		switch {
+		case len(clusterAddrs) > 0:
+			logger.Info("Utilizing Redis DB in cluster mode, addresses: %s", strings.Join(clusterAddrs, ", "))
+		default:
+			logger.Info("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort)
+		}
+		database, err = redis.NewWithConfig(redis.Config{
+			Hostname:           userConfig.RedisHost,
+			Port:               userConfig.RedisPort,
+			Password:           userConfig.RedisPassword,
+			Username:           userConfig.RedisUsername,
+			TLSEnabled:         userConfig.RedisTLSEnabled,
+			InsecureSkipVerify: userConfig.RedisInsecureSkipVerify,
+			DB:                 userConfig.RedisDB,
+			ClusterAddresses:   clusterAddrs,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -562,9 +585,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  vcsClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      vcsClient,
+		ExecutableName: userConfig.ExecutableName,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
@@ -592,6 +616,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubTokenFile:    userConfig.GithubTokenFile,
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
+		GitlabHostname:     userConfig.GitlabHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -601,6 +626,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsUser:    userConfig.AzureDevopsUser,
 		AzureDevopsToken:   userConfig.AzureDevopsToken,
 	}
+	livePullHeadFetcher := &events.DefaultLivePullHeadFetcher{
+		EventParser:               eventParser,
+		GithubPullGetter:          githubClient,
+		GitlabMergeRequestGetter:  gitlabClient,
+		AzureDevopsPullGetter:     azuredevopsClient,
+		GiteaPullGetter:           giteaClient,
+		BitbucketCloudPullGetter:  bitbucketCloudClient,
+		BitbucketServerPullGetter: bitbucketServerClient,
+	}
 	commentParser := events.NewCommentParser(
 		userConfig.GithubUser,
 		userConfig.GitlabUser,
@@ -609,6 +643,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AzureDevopsUser,
 		userConfig.ExecutableName,
 		allowCommands,
+		userConfig.ToBlockedExtraArgs(),
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
@@ -648,11 +683,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
+	projectFinder := &events.DefaultProjectFinder{}
 	projectCommandBuilder := events.NewInstrumentedProjectCommandBuilder(
 		logger,
 		policyChecksEnabled,
 		parserValidator,
-		&events.DefaultProjectFinder{},
+		projectFinder,
 		vcsClient,
 		workingDir,
 		workingDirLocker,
@@ -667,6 +703,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoplanModulesFromProjects,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverModeFlag,
@@ -691,7 +728,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	applyRequirementHandler := &events.DefaultCommandRequirementHandler{
-		WorkingDir: workingDir,
+		WorkingDir:    workingDir,
+		VCSStatusName: userConfig.VCSStatusName,
+		ProjectImpactResolver: events.NewUndivergedProjectImpactResolver(
+			parserValidator,
+			projectFinder,
+			globalCfg,
+			userConfig.AutoplanModulesFromProjects,
+			userConfig.AutoplanFileList,
+			userConfig.AutoDiscoverModeFlag,
+		),
 	}
 
 	cancellationTracker := events.NewCancellationTracker()
@@ -735,6 +781,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -748,8 +795,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	autoMerger := &events.AutoMerger{
-		VCSClient:       vcsClient,
-		GlobalAutomerge: userConfig.Automerge,
+		VCSClient:             vcsClient,
+		GlobalAutomerge:       userConfig.Automerge,
+		GlobalAutomergeMethod: userConfig.AutomergeMethod,
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
@@ -779,6 +827,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		vcsClient,
 		pendingPlanFinder,
 		workingDir,
+		workingDirLocker,
 		commitStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
@@ -811,7 +860,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
+		workingDirLocker,
 		pullReqStatusFetcher,
+		livePullHeadFetcher,
+		userConfig.DisableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -842,6 +894,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
@@ -850,6 +903,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
@@ -962,23 +1016,42 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	apiController := &controllers.APIController{
-		APISecret:                      []byte(userConfig.APISecret),
-		Locker:                         lockingClient,
-		Logger:                         logger,
-		Parser:                         eventParser,
-		ProjectCommandBuilder:          projectCommandBuilder,
-		ProjectPlanCommandRunner:       instrumentedProjectCmdRunner,
-		ProjectApplyCommandRunner:      instrumentedProjectCmdRunner,
-		FailOnPreWorkflowHookError:     userConfig.FailOnPreWorkflowHookError,
-		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
-		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		RepoAllowlistChecker:           repoAllowlist,
-		Scope:                          statsScope.SubScope("api"),
-		VCSClient:                      vcsClient,
-		WorkingDir:                     workingDir,
-		WorkingDirLocker:               workingDirLocker,
-		CommitStatusUpdater:            commitStatusUpdater,
-		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
+		APISecret:                       []byte(userConfig.APISecret),
+		Locker:                          lockingClient,
+		Logger:                          logger,
+		Parser:                          eventParser,
+		ProjectCommandBuilder:           projectCommandBuilder,
+		ProjectPlanCommandRunner:        instrumentedProjectCmdRunner,
+		ProjectPolicyCheckCommandRunner: instrumentedProjectCmdRunner,
+		ProjectApplyCommandRunner:       instrumentedProjectCmdRunner,
+		ApplyLockChecker:                applyLockingClient,
+		EnableDriftRemediation:          userConfig.EnableDriftRemediation,
+		FailOnPreWorkflowHookError:      userConfig.FailOnPreWorkflowHookError,
+		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
+		PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
+		RepoAllowlistChecker:            repoAllowlist,
+		Scope:                           statsScope.SubScope("api"),
+		VCSClient:                       vcsClient,
+		WorkingDir:                      workingDir,
+		WorkingDirLocker:                workingDirLocker,
+		CommitStatusUpdater:             commitStatusUpdater,
+		PullReqStatusFetcher:            pullReqStatusFetcher,
+		PullStatusFetcher:               database,
+		LivePullHeadFetcher:             livePullHeadFetcher,
+		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
+	}
+
+	if userConfig.EnableDriftDetection {
+		logger.Info("Drift detection is enabled")
+		driftStorage := drift.NewInMemoryStorage()
+		apiController.DriftStorage = driftStorage
+		apiController.RemediationService = drift.NewInMemoryRemediationService(driftStorage)
+
+		driftWebhookSender, err := webhooks.NewDriftWebhookSender(webhooksConfig, webhookClients)
+		if err != nil {
+			return nil, fmt.Errorf("initializing drift webhooks: %w", err)
+		}
+		apiController.DriftWebhookSender = driftWebhookSender
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
@@ -1060,18 +1133,25 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 }
 
-// Start creates the routes and starts serving traffic.
-func (s *Server) Start() error {
+// SetupRoutes registers all HTTP routes on the router.
+// Extracted from Start() to enable route registration testing.
+func (s *Server) SetupRoutes() {
 	s.Router.HandleFunc("/", s.Index).Methods("GET").MatcherFunc(func(r *http.Request, rm *mux.RouteMatch) bool {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/readyz", s.Readyz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+	s.Router.HandleFunc("/api/drift/status", s.APIController.DriftStatus).Methods("GET")
+	s.Router.HandleFunc("/api/drift/detect", s.APIController.DetectDrift).Methods("POST")
+	s.Router.HandleFunc("/api/drift/remediate/{id}", s.APIController.GetRemediationResult).Methods("GET")
+	s.Router.HandleFunc("/api/drift/remediate", s.APIController.ListRemediationResults).Methods("GET")
+	s.Router.HandleFunc("/api/drift/remediate", s.APIController.Remediate).Methods("POST")
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")
@@ -1100,6 +1180,11 @@ func (s *Server) Start() error {
 			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
 		}
 	}
+}
+
+// Start creates the routes and starts serving traffic.
+func (s *Server) Start() error {
+	s.SetupRoutes()
 
 	n := negroni.New(&negroni.Recovery{
 		Logger:     log.New(os.Stdout, "", log.LstdFlags),
@@ -1136,7 +1221,7 @@ func (s *Server) Start() error {
 		}
 
 		if err != nil && err != http.ErrServerClosed {
-			s.Logger.Err(err.Error())
+			s.Logger.Err("%s", err.Error())
 		}
 	}()
 	<-stop
@@ -1146,7 +1231,7 @@ func (s *Server) Start() error {
 
 	// flush stats before shutdown
 	if err := s.StatsCloser.Close(); err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 
 	// Attempt to close the database
@@ -1249,7 +1334,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		CleanedBasePath:  s.AtlantisURL.Path,
 	})
 	if err != nil {
-		s.Logger.Err(err.Error())
+		s.Logger.Err("%s", err.Error())
 	}
 }
 
@@ -1296,9 +1381,26 @@ func mkSubDir(parentDir string, subDir string) (string, error) {
 	return fullDir, nil
 }
 
-// Healthz returns the health check response. It always returns a 200 currently.
+// Healthz returns the health check response. It always returns 200 if the
+// process is running. Use /readyz for dependency health checks.
+// Suitable for K8s liveness probes (should not depend on external services).
 func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Write(healthzData) // nolint: errcheck
+}
+
+// Readyz checks whether the server is ready to handle requests by verifying
+// connectivity to external dependencies (e.g. Redis). Returns 503 if any
+// dependency is unreachable. Suitable for K8s readiness probes.
+func (s *Server) Readyz(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.database != nil {
+		if err := s.database.Ping(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
+			return
+		}
+	}
 	w.Write(healthzData) // nolint: errcheck
 }
 

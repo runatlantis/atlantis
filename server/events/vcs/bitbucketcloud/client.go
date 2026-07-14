@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -88,10 +89,11 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		if diffStat.Next == nil || *diffStat.Next == "" {
 			break
 		}
+		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
+			return nil, fmt.Errorf("getting modified files: %w", err)
+		}
 		nextPageURL = *diffStat.Next
 	}
-
-	// Now ensure all files are unique.
 	hash := make(map[string]bool)
 	var unique []string
 	for _, f := range files {
@@ -143,14 +145,14 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		if strings.EqualFold(*c.User.UUID, me) {
 			// do the same crude filtering as github client does
 			body := strings.Split(c.Content.Raw, "\n")
-			logger.Debug("Body is %s", body)
+			logger.Debug("Body is %v", body)
 			if len(body) == 0 {
 				continue
 			}
 			firstLine := strings.ToLower(body[0])
 			if strings.Contains(firstLine, strings.ToLower(command)) {
 				// we found our old comment that references that command
-				logger.Debug("Deleting comment with id %s", *c.ID)
+				logger.Debug("Deleting comment with id %d", *c.ID)
 				err = b.DeletePullRequestComment(repo, pullNum, *c.ID)
 				if err != nil {
 					return err
@@ -238,6 +240,32 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 	return approvalStatus, nil
 }
 
+func (b *Client) GetPullRequestHeadCommit(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (string, error) {
+	livePull, err := b.GetPullRequestIdentity(logger, repo, pull)
+	if err != nil {
+		return "", err
+	}
+	return livePull.HeadCommit, nil
+}
+
+func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.PullRequest, error) {
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d", b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return models.PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return models.PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	pull.HeadCommit = *pullResp.Source.Commit.Hash
+	pull.BaseBranch = *pullResp.Destination.Branch.Name
+	return pull, nil
+}
+
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
 func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
 	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
@@ -265,6 +293,9 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		}
 		if diffStat.Next == nil || *diffStat.Next == "" {
 			break
+		}
+		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
+			return models.MergeableStatus{}, fmt.Errorf("checking pull mergeability: %w", err)
 		}
 		nextPageURL = *diffStat.Next
 	}
@@ -392,4 +423,29 @@ func (b *Client) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ st
 
 func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+func (b *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
+}
+
+// validateNextPageURL checks that a pagination URL returned by the Bitbucket
+// API has the same origin as the configured base URL, preventing SSRF attacks
+// where a malicious server response could redirect requests to internal hosts.
+func (b *Client) validateNextPageURL(nextPageURL string) error {
+	parsedNext, err := url.Parse(nextPageURL)
+	if err != nil {
+		return fmt.Errorf("parsing next page URL %q: %w", nextPageURL, err)
+	}
+	parsedBase, err := url.Parse(b.BaseURL)
+	if err != nil {
+		return fmt.Errorf("parsing base URL %q: %w", b.BaseURL, err)
+	}
+	if !parsedNext.IsAbs() {
+		return fmt.Errorf("next page URL %q must be absolute", nextPageURL)
+	}
+	if !strings.EqualFold(parsedNext.Scheme, parsedBase.Scheme) || !strings.EqualFold(parsedNext.Host, parsedBase.Host) {
+		return fmt.Errorf("next page URL %q origin %q does not match base URL origin %q", nextPageURL, parsedNext.Scheme+"://"+parsedNext.Host, parsedBase.Scheme+"://"+parsedBase.Host)
+	}
+	return nil
 }

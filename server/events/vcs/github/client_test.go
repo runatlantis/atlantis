@@ -644,6 +644,64 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	}
 }
 
+func TestClient_PullIsMergeable_Draft(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	vcsStatusName := "atlantis-test"
+
+	// Use a real GitHub json response and inject draft: true.
+	jsBytes, err := os.ReadFile("testdata/pull-request.json")
+	Ok(t, err)
+	prJSON := string(jsBytes)
+
+	// Inject draft: true.
+	// We replace "mergeable_state": "clean" to ensure it's clean (so it would be mergeable otherwise)
+	// and add "draft": true.
+	response := strings.Replace(prJSON,
+		`"mergeable_state": "clean"`,
+		`"mergeable_state": "clean", "draft": true`,
+		1,
+	)
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo/pulls/1":
+				w.Write([]byte(response)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	actMergeable, err := client.PullIsMergeable(
+		logger,
+		models.Repo{
+			FullName:          "owner/repo",
+			Owner:             "owner",
+			Name:              "repo",
+			CloneURL:          "",
+			SanitizedCloneURL: "",
+			VCSHost: models.VCSHost{
+				Type:     models.Github,
+				Hostname: "github.com",
+			},
+		}, models.PullRequest{
+			Num: 1,
+		}, vcsStatusName, []string{})
+	Ok(t, err)
+	Equals(t, models.MergeableStatus{
+		IsMergeable: false,
+		Reason:      "PR is a draft",
+	}, actMergeable)
+}
+
 func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis"
@@ -937,6 +995,24 @@ func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 			"blocked",
 			"ruleset-workflow-passed-with-global-codeql.json",
 			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		// Ruleset-enforced required reviewer approvals (reviewDecision is null when rulesets control reviews)
+		{
+			"blocked",
+			"ruleset-required-reviewer-pending.json",
+			"null",
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
+			"ruleset-required-reviewer-approved.json",
+			"null",
 			models.MergeableStatus{
 				IsMergeable: true,
 			},
@@ -1301,6 +1377,96 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 	}
 }
 
+func TestClient_GetFileContent(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repo := models.Repo{
+		FullName: "owner/repo",
+		Owner:    "owner",
+		Name:     "repo",
+		VCSHost: models.VCSHost{
+			Type:     models.Github,
+			Hostname: "github.com",
+		},
+	}
+
+	t.Run("normal file under 1MB", func(t *testing.T) {
+		encoded := "cHJvamVjdHM6Ci0gbmFtZTogbXlwcm9qZWN0CiAgZGlyOiAuCg=="
+
+		contentsResp := fmt.Sprintf(`{"name":"atlantis.yaml","sha":"abc123","size":42,"content":"%s","encoding":"base64"}`, encoded)
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/v3/repos/owner/repo/contents/atlantis.yaml?ref=main":
+					w.Write([]byte(contentsResp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, found, "expected file to be found")
+		Equals(t, "projects:\n- name: myproject\n  dir: .\n", string(content))
+	})
+
+	t.Run("file not found returns false", func(t *testing.T) {
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, !found, "expected file to not be found")
+		Equals(t, 0, len(content))
+	})
+
+	t.Run("file over 1MB falls back to blobs API", func(t *testing.T) {
+		encoded := "bGFyZ2UgZmlsZSBjb250ZW50"
+
+		// Contents API returns empty content for files > 1MB, but provides size and SHA.
+		contentsResp := `{"name":"atlantis.yaml","sha":"deadbeef","size":2000000,"content":"","encoding":"base64"}`
+		blobResp := fmt.Sprintf(`{"sha":"deadbeef","content":"%s","encoding":"base64"}`, encoded)
+
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/v3/repos/owner/repo/contents/atlantis.yaml?ref=main":
+					w.Write([]byte(contentsResp)) // nolint: errcheck
+				case "/api/v3/repos/owner/repo/git/blobs/deadbeef":
+					w.Write([]byte(blobResp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Ok(t, err)
+		Assert(t, found, "expected file to be found")
+		Equals(t, "large file content", string(content))
+	})
+}
+
 func TestClient_MarkdownPullLink(t *testing.T) {
 	client, err := github.New("hostname", &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
@@ -1529,6 +1695,140 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 		})
 	Ok(t, err)
 	Equals(t, []string{"frontend-developers", "employees"}, teams)
+}
+
+// TestClient_GetChildTeams verifies that direct child teams of a given team are returned.
+func TestClient_GetChildTeams(t *testing.T) {
+	t.Run("single page", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		resp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-a"},
+							{"slug": "child-team-b"}
+						],
+						"pageInfo": {
+							"endCursor": "Y3Vyc29yOnYyOpHOAFMoLQ==",
+							"hasNextPage": false
+						}
+					}
+				}
+			}
+		  }
+		}`
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/graphql":
+					w.Write([]byte(resp)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+		defer testServer.Close()
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		children, err := client.GetChildTeams(
+			logger,
+			models.Repo{Owner: "testrepo"},
+			"parent-team",
+		)
+		Ok(t, err)
+		Equals(t, []string{"child-team-a", "child-team-b"}, children)
+	})
+
+	t.Run("multiple pages", func(t *testing.T) {
+		logger := logging.NewNoopLogger(t)
+		firstCursor := "cursor-page-1"
+		firstResp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-a"},
+							{"slug": "child-team-b"}
+						],
+						"pageInfo": {
+							"endCursor": "cursor-page-1",
+							"hasNextPage": true
+						}
+					}
+				}
+			}
+		  }
+		}`
+		secondResp := `{
+			"data":{
+			  "organization": {
+				"team": {
+					"childTeams": {
+						"nodes": [
+							{"slug": "child-team-c"}
+						],
+						"pageInfo": {
+							"endCursor": "cursor-page-2",
+							"hasNextPage": false
+						}
+					}
+				}
+			}
+		  }
+		}`
+
+		requestBodies := make([]string, 0, 2)
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/api/graphql":
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						t.Errorf("reading request body: %s", err)
+						http.Error(w, "bad request", http.StatusBadRequest)
+						return
+					}
+					requestBodies = append(requestBodies, string(body))
+					if len(requestBodies) == 1 {
+						w.Write([]byte(firstResp)) // nolint: errcheck
+					} else {
+						w.Write([]byte(secondResp)) // nolint: errcheck
+					}
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+		defer testServer.Close()
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		children, err := client.GetChildTeams(
+			logger,
+			models.Repo{Owner: "testrepo"},
+			"parent-team",
+		)
+		Ok(t, err)
+		Equals(t, []string{"child-team-a", "child-team-b", "child-team-c"}, children)
+		Equals(t, 2, len(requestBodies))
+		// First request should not contain the cursor; second should.
+		Assert(t, !strings.Contains(requestBodies[0], firstCursor),
+			"expected first request not to include cursor")
+		Assert(t, strings.Contains(requestBodies[1], firstCursor),
+			"expected second request to include cursor")
+	})
 }
 
 func TestClient_DiscardReviews(t *testing.T) {

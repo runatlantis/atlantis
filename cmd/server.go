@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -28,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -55,10 +47,12 @@ const (
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
+	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
@@ -78,6 +72,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -134,6 +129,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -154,6 +151,8 @@ const (
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	LanguageFlag                     = "language"
+	LanguageConfigFileFlag           = "language-config-file"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -162,6 +161,8 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag         = "enable-drift-detection"
+	EnableDriftRemediationFlag       = "enable-drift-remediation"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -169,8 +170,9 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -183,6 +185,7 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
+	DefaultLanguage                     = i18n.DefaultLanguage
 	DefaultLogLevel                     = "info"
 	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
@@ -230,6 +233,12 @@ var stringFlags = map[string]stringFlag{
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
 	},
+	BlockedExtraArgsFlag: {
+		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+			"in comment extra args (the flags after '--'). " +
+			"Defaults to " + DefaultBlockedExtraArgs + ".",
+		defaultValue: DefaultBlockedExtraArgs,
+	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
@@ -238,6 +247,11 @@ var stringFlags = map[string]stringFlag{
 			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
+	},
+	AutomergeMethodFlag: {
+		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
+			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -292,6 +306,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableAutomergeLabelFlag: {
+		description:  "Pull request label to disable atlantis automerge feature only if present.",
 		defaultValue: "",
 	},
 	DisableUnlockLabelFlag: {
@@ -420,6 +438,13 @@ var stringFlags = map[string]stringFlag{
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
 	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
+	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
 	},
@@ -475,6 +500,14 @@ var stringFlags = map[string]stringFlag{
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
 			" Currently only implemented for GitHub.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
+	},
+	LanguageFlag: {
+		description:  "Language used for Atlantis pull request comments. Supported values: " + i18n.SupportedLanguagesDescription() + ".",
+		defaultValue: DefaultLanguage,
+	},
+	LanguageConfigFileFlag: {
+		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
+			"Supports partial overrides and can be combined with --language.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -646,6 +679,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
+		defaultValue: false,
+	},
+	EnableDriftRemediationFlag: {
+		description:  "Enable drift remediation apply API actions. Requires --enable-drift-detection.",
+		defaultValue: false,
+	},
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
@@ -704,6 +745,10 @@ var int64Flags = map[string]int64Flag{
 
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
+
+// ValidAutomergeMethods are the valid merge methods that can be set for the
+// automerge-method flag.
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
 
 type stringFlag struct {
 	description  string
@@ -851,7 +896,23 @@ func (s *ServerCmd) preRun() error {
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
@@ -911,6 +972,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
+	if c.BlockedExtraArgs == "" {
+		c.BlockedExtraArgs = DefaultBlockedExtraArgs
+	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -940,6 +1004,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
+	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
@@ -999,6 +1066,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
+	// Intentionally allow unsupported --language values when a custom language
+	// catalog is provided, so operators can define their own locale codes.
+	if strings.TrimSpace(userConfig.LanguageConfigFile) == "" {
+		if err := i18n.ValidateLanguage(userConfig.Language); err != nil {
+			return err
+		}
+	} else {
+		if err := i18n.ValidateCustomCatalog(userConfig.LanguageConfigFile); err != nil {
+			return err
+		}
+	}
 
 	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
 		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
@@ -1009,6 +1087,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
 		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
+	}
+
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
@@ -1092,6 +1174,18 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.TFEHostname != DefaultTFEHostname && userConfig.TFEToken == "" {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
+	}
+
+	if userConfig.RedisClusterAddresses != "" {
+		if userConfig.RedisHost != "" {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisHost)
+		}
+		if userConfig.RedisPort != DefaultRedisPort {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisPort)
+		}
+		if userConfig.RedisDB != DefaultRedisDB {
+			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
+		}
 	}
 
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))

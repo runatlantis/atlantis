@@ -1,0 +1,119 @@
+name: Code Coverage
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - 'Makefile'
+      - 'scripts/**'
+      - '.github/workflows/code-coverage.yml'
+      - 'server/events/templates/**'
+      - 'server/i18n/**'
+      - '**/testdata/**'
+      - 'testdata/**'
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - 'Makefile'
+      - 'scripts/**'
+      - '.github/workflows/code-coverage.yml'
+      - 'server/events/templates/**'
+      - 'server/i18n/**'
+      - '**/testdata/**'
+      - 'testdata/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  go-coverage:
+    name: Go Coverage
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:dc683c36e7fb8f26fcc8628fdcf328f42d3b1903e130aebb8484223fbdedfd98
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run Go tests with coverage
+        run: make test-coverage
+
+      - name: Convert Go coverage to Cobertura XML
+        run: |
+          go install github.com/boumenot/gocover-cobertura@v1.5.0
+          gocover-cobertura < .cover/cover.out > .cover/coverage.xml
+          test -s .cover/coverage.xml
+
+      - name: Validate Cobertura XML
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = ".cover/coverage.xml"
+          root = ET.parse(path).getroot()
+          if root.tag != "coverage":
+              raise SystemExit(f"unexpected root tag: {root.tag}")
+          print(f"validated {path}")
+          PY
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: go-coverage-cobertura
+          path: .cover/coverage.xml
+          if-no-files-found: error
+          retention-days: 1
+
+  upload-coverage:
+    name: Upload Coverage
+    needs: go-coverage
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      code-quality: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: go-coverage-cobertura
+          path: .cover
+
+      - name: Upload coverage report
+        uses: actions/upload-code-coverage@82c7aee3fb2ad768e00b00a0a8d749c5815085b6 # v1
+        with:
+          file: .cover/coverage.xml
+          language: Go
+          label: code-coverage/go

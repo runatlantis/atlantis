@@ -68,7 +68,7 @@ projects:
   branch: /main/ # Available since v0.21.0
   dir: . # Available since v0.1.0
   workspace: default # Available since v0.1.0
-  terraform_distribution: terraform # Available since v0.25.0
+  terraform_distribution: terraform # Available since v0.33.0
   terraform_version: v0.11.0 # Available since v0.1.0
   delete_source_branch_on_merge: true # Available since v0.17.0
   repo_locking: true # deprecated: use repo_locks instead, Available since v0.17.0
@@ -218,6 +218,7 @@ Note:
 - The paths are relative to the project's directory.
 - `when_modified` will be used by both automatic and manually run plans.
 - `when_modified` will continue to work for manually run plans even when autoplan is disabled.
+- The default `when_modified` includes `**/*.tf*`, `**/*.tofu`, `**/*.tofu.json`, `**/terragrunt.hcl`, and `**/.terraform.lock.hcl`. Custom `when_modified` overrides these defaults entirely.
 
 ### Supporting Terraform Workspaces
 
@@ -278,6 +279,8 @@ projects:
 ```
 
 Atlantis will automatically download and use this distribution. Valid values are `terraform` and `opentofu`.
+If `terraform_version` is omitted and the project uses a `required_version` constraint, Atlantis resolves that
+constraint against the selected distribution.
 
 ### Terraform Versions
 
@@ -309,7 +312,7 @@ projects:
 
 :::warning
 `plan_requirements`, `apply_requirements` and `import_requirements` are restricted keys so this repo will need to be configured
-to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.md#repos-can-set-their-own-apply-an-applicable-subcommand).
+to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.md#repos-can-set-their-own-apply-requirements).
 :::
 
 ### Order of planning/applying
@@ -416,7 +419,15 @@ autodiscover:
       - dir/*
 ```
 
-Autodiscover can also be configured to skip over directories that match a path glob (as defined [here](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4))
+Autodiscover can also be configured to skip over directories that match a path glob (as defined by the [doublestar path matching package](https://pkg.go.dev/github.com/bmatcuk/doublestar/v4)).
+
+When `ignore_paths` is set, it applies to:
+
+- Automatic project discovery during autoplan and `atlantis plan` (without `-d`)
+- `atlantis apply` (without `-d`) when filtering pending plans
+- All targeted `-d` commands (`plan`, `apply`, `import`, `state rm`, etc.) when autodiscovery is enabled, if the path has no explicit project configuration
+
+This makes `ignore_paths` useful for **multi-instance setups** where each Atlantis instance manages a different directory subtree. For example, one instance can ignore `environments/prod/**` while another ignores `environments/nonprod/**`, preventing cross-instance interference on targeted commands.
 
 ### Custom Backend Config
 
@@ -471,8 +482,8 @@ workflow: myworkflow
 | name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                       |
 | branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                     |
 | dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
-| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workplace when planning/applying and will create it if it doesn't exist.                  |
-| execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sort by this field before planning/applying.                                                                                                                                           |
+| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workspace when planning/applying and will create it if it doesn't exist.                  |
+| execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                         |
 | delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
 | repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |
 | repo_locks                              | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Get a repository lock in this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                   |
@@ -501,7 +512,9 @@ when_modified: ["*.tf", "terragrunt.hcl", ".terraform.lock.hcl"]
 | Key           | Type            | Default        | Required | Description                                                                                                                                                                                                                                                     |
 | ------------- | --------------- | -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | enabled       | boolean         | `true`         | no       | Whether autoplanning is enabled for this project.                                                                                                                                                                                                               |
-| when_modified | array\[string\] | `["**/*.tf*"]` | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
+| when_modified | array\[string\] | see below      | no       | Uses [.dockerignore](https://docs.docker.com/engine/reference/builder/#dockerignore-file) syntax. If any modified file in the pull request matches, this project will be planned. See [Autoplanning](autoplanning.md). Paths are relative to the project's dir. |
+
+Default `when_modified` patterns: `["**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"]`. Custom `when_modified` values override these defaults entirely. The default is global (not distribution-aware).
 
 ### RepoLocks
 

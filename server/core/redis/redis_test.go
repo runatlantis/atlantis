@@ -5,13 +5,14 @@ package redis_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -20,6 +21,8 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/pkg/errors"
+	redisLib "github.com/redis/go-redis/v9"
 	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -46,6 +49,40 @@ var (
 	cert   tls.Certificate
 	caPath string
 )
+
+func TestNewWithConfig_SingleNode(t *testing.T) {
+	t.Log("creating redis client with single-node mode")
+	s := miniredis.RunT(t)
+	r, err := redis.NewWithConfig(redis.Config{
+		Hostname: s.Host(),
+		Port:     s.Server().Addr().Port,
+	})
+	Ok(t, err)
+	Assert(t, r != nil, "expected redis client to be created")
+	r.Close()
+}
+
+func TestNewWithConfig_WithUsername(t *testing.T) {
+	t.Log("creating redis client with username")
+	s := miniredis.RunT(t)
+	r, err := redis.NewWithConfig(redis.Config{
+		Hostname: s.Host(),
+		Port:     s.Server().Addr().Port,
+		Username: "testuser",
+	})
+	Ok(t, err)
+	Assert(t, r != nil, "expected redis client to be created")
+	r.Close()
+}
+
+func TestNewWithConfig_ClusterEmptyAddresses(t *testing.T) {
+	t.Log("cluster mode with empty addresses should fail")
+	_, err := redis.NewWithConfig(redis.Config{
+		ClusterAddresses: []string{"", ""},
+	})
+	Assert(t, err != nil, "expected error when cluster addresses are all empty")
+	Assert(t, err.Error() == "redis cluster addresses provided but all are empty", "unexpected error: %v", err)
+}
 
 func TestRedisWithTLS(t *testing.T) {
 	t.Log("connecting to redis over TLS")
@@ -143,6 +180,101 @@ func TestUnlockCommandFail(t *testing.T) {
 	r := newTestRedis(s)
 	err := r.UnlockCommand(command.Apply)
 	ErrEquals(t, "db transaction failed: no lock exists", err)
+}
+
+func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
+	t.Log("migration should convert old format keys to new format with project name")
+
+	s := miniredis.RunT(t)
+
+	// Create a direct redis client to set up old format locks
+	client := redisLib.NewClient(&redisLib.Options{
+		Addr: s.Addr(),
+	})
+	defer client.Close()
+
+	// Create a lock in old format: {repoFullName}/{path}/{workspace}
+	oldKey := "pr/owner/repo/path/default"
+	oldProject := models.NewProject("owner/repo", "path", "myproject")
+	oldLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   oldProject,
+		Time:      time.Now(),
+	}
+
+	oldLockSerialized, err := json.Marshal(oldLock)
+	Ok(t, err)
+
+	// Insert old format lock directly
+	err = client.Set(context.Background(), oldKey, oldLockSerialized, 0).Err()
+	Ok(t, err)
+
+	// Verify old key exists before migration
+	val, err := client.Get(context.Background(), oldKey).Result()
+	Ok(t, err)
+	Assert(t, val != "", "old key should exist before migration")
+
+	// Now create a new Redis instance which should trigger the migration
+	r, err := redis.New(s.Host(), s.Server().Addr().Port, "", false, false, 0)
+	Ok(t, err)
+
+	// Verify the old key no longer exists
+	_, err = client.Get(context.Background(), oldKey).Result()
+	Assert(t, err != nil, "old key should be deleted after migration")
+
+	// Verify the new key exists with correct format
+	retrievedLock, err := r.GetLock(oldProject, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist with new key format")
+	Equals(t, "owner/repo", retrievedLock.Project.RepoFullName)
+	Equals(t, "path", retrievedLock.Project.Path)
+	Equals(t, "myproject", retrievedLock.Project.ProjectName)
+	Equals(t, "default", retrievedLock.Workspace)
+	Equals(t, "testuser", retrievedLock.User.Username)
+}
+
+func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
+	t.Log("migration should not affect keys already in new format")
+
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+
+	// Create a lock with the new format (includes project name)
+	projectWithName := models.NewProject("owner/repo", "path", "projectName")
+	newLock := models.ProjectLock{
+		Pull:      models.PullRequest{Num: 1},
+		User:      models.User{Username: "testuser"},
+		Workspace: "default",
+		Project:   projectWithName,
+		Time:      time.Now(),
+	}
+
+	// Try to lock using the new format
+	acquired, _, err := r.TryLock(newLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire lock")
+
+	// Verify the lock was created and can be retrieved with the correct key format
+	retrievedLock, err := r.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
+	// Close the current Redis connection and create a new one
+	// This simulates a restart which would trigger the migration logic
+	r.Close()
+	r = newTestRedis(s)
+	defer r.Close()
+	// Verify lock still exists after "migration"
+	retrievedLock, err = r.GetLock(projectWithName, "default")
+	Ok(t, err)
+	Assert(t, retrievedLock != nil, "lock should exist")
+	Equals(t, "projectName", retrievedLock.Project.ProjectName)
+	Equals(t, "testuser", retrievedLock.User.Username)
+
 }
 
 func TestMixedLocksPresent(t *testing.T) {
@@ -368,6 +500,55 @@ func TestUnlockingMultiple(t *testing.T) {
 	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
+}
+
+func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should ignore missing locks")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+}
+
+func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Assert(t, existing != nil, "expected lock to remain")
+	Equals(t, pullNum, existing.Pull.Num)
+}
+
+func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Assert(t, deleted != nil, "expected deleted lock")
+	Equals(t, lock.Project, deleted.Project)
+	Equals(t, lock.Workspace, deleted.Workspace)
+	Equals(t, lock.Pull, deleted.Pull)
+	Equals(t, lock.User, deleted.User)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), existing)
 }
 
 func TestUnlockByPullNone(t *testing.T) {
@@ -718,6 +899,140 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	}, maybeStatus.Projects)
 }
 
+func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := rdb.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "release"
+	status, err := rdb.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+
+	maybeStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, maybeStatus.Projects)
+}
+
+func TestRedis_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := rdb.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "main"
+	status, err := rdb.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, "main", status.Pull.BaseBranch)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
+
+	maybeStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, "main", maybeStatus.Pull.BaseBranch)
+	Equals(t, status.Projects, maybeStatus.Projects)
+}
+
 // Test that if we update an existing pull status via Apply and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
@@ -881,8 +1196,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -898,8 +1213,8 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
 							},
 						},
 					},
@@ -918,9 +1233,9 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					PolicyCheckResults: &models.PolicyCheckResults{
 						PolicySetResults: []models.PolicySetResult{
 							{
-								PolicySetName: "policy1",
-								ReqApprovals:  1,
-								CurApprovals:  1,
+								PolicySetName:    "policy1",
+								ReqApprovalCount: 1,
+								Approvals:        []models.PolicySetApproval{{Approver: "approver1"}},
 							},
 						},
 					},
@@ -944,7 +1259,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     1,
+						Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 					},
 				},
 			},
@@ -956,12 +1271,156 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 				PolicyStatus: []models.PolicySetStatus{
 					{
 						PolicySetName: "policy1",
-						Approvals:     0,
+						Approvals:     nil,
 					},
 				},
 			},
 		}, updateStatus.Projects)
 	}
+}
+
+// Test that policy approvals are preserved when HeadCommit changes,
+// so sticky approvals can survive across code pushes.
+func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Write initial policy check results with an approval at commit A.
+	_, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.PolicyCheck,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Failure: "policy failure",
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{
+						{
+							PolicySetName:    "policy1",
+							ReqApprovalCount: 1,
+							Hashes:           []string{"h1", "h2"},
+							Approvals: []models.PolicySetApproval{
+								{Approver: "boss", Hashes: []string{"h1", "h2"}},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// Push new commit B with a plan result (no PolicyCheckResults).
+	pull.HeadCommit = "sha-B"
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "plan output",
+				},
+			},
+		},
+	})
+	Ok(t, err)
+
+	// The policy approvals from commit A should be preserved.
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	Assert(t, len(status.Projects[0].PolicyStatus) > 0, "expected policy status to be preserved across commit change")
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 1, len(status.Projects[0].PolicyStatus[0].Approvals))
+	Equals(t, "boss", status.Projects[0].PolicyStatus[0].Approvals[0].Approver)
+
+	// Verify via GetPullStatus too.
+	getStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
+}
+
+// TestPullStatus_UpdateOverwritesCorruptData verifies that
+// UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
+// no longer matches the current Go shape (e.g. after upgrading across a
+// PullStatus schema change). The corrupt entry should be logged and
+// overwritten rather than causing every subsequent plan to fail.
+func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
+	// that the current Go types cannot unmarshal (Approvals used to be int).
+	key := fmt.Sprintf("%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	Ok(t, s.Set(key, corrupt))
+
+	// Write fresh results. This must succeed despite the unreadable prior entry.
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Equals(t, "mydir", status.Projects[0].RepoRelDir)
+	// Prior in-flight approvals are lost; this is the documented trade-off.
+	Equals(t, 0, len(status.Projects[0].PolicyStatus))
+
+	// The corrupt entry is gone: reading it back returns clean data.
+	got, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {

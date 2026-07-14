@@ -136,10 +136,8 @@ func (b *Client) GetProjectKey(repoName string, cloneURL string) (string, error)
 
 // CreateComment creates a comment on the merge request. It will write multiple
 // comments if a single comment is too long.
-func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, _ string) error {
-	sepEnd := "\n```\n**Warning**: Output length greater than max comment size. Continued in next comment."
-	sepStart := "Continued from previous comment.\n```diff\n"
-	comments := common.SplitComment(comment, maxCommentLength, sepEnd, sepStart, 0, "")
+func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
+	comments := common.SplitComment(logger, comment, maxCommentLength, 0, command)
 	for _, c := range comments {
 		if err := b.postComment(repo, pullNum, c); err != nil {
 			return err
@@ -197,6 +195,36 @@ func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 	}
 	return approvalStatus, nil
+}
+
+func (b *Client) GetPullRequestHeadCommit(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (string, error) {
+	livePull, err := b.GetPullRequestIdentity(logger, repo, pull)
+	if err != nil {
+		return "", err
+	}
+	return livePull.HeadCommit, nil
+}
+
+func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.PullRequest, error) {
+	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return models.PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return models.PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	pull.HeadCommit = *pullResp.FromRef.LatestCommit
+	pull.BaseBranch = *pullResp.ToRef.DisplayID
+	return pull, nil
 }
 
 func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) error {
@@ -377,4 +405,8 @@ func (b *Client) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ st
 
 func (b *Client) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, fmt.Errorf("not yet implemented")
+}
+
+func (b *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
 }

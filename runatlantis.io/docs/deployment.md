@@ -690,7 +690,7 @@ atlantis server \
 ##### GitHub Enterprise
 
 ```bash
-HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io or tenant.ghe.com
 atlantis server \
 --atlantis-url="$URL" \
 --gh-user="$USERNAME" \
@@ -699,6 +699,8 @@ atlantis server \
 --gh-hostname="$HOSTNAME" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
+
+For GitHub Enterprise Cloud, set `--gh-hostname` to the tenant hostname, such as `tenant.ghe.com`, without `https://` or an `api.` prefix.
 
 ##### GitLab
 
@@ -727,10 +729,12 @@ atlantis server \
 ##### Gitea
 
 ```bash
+GITEA_BASE_URL=YOUR_GITEA_BASE_URL # ex. https://gitea.example.com:3000
 atlantis server \
 --atlantis-url="$URL" \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
+--gitea-base-url="$GITEA_BASE_URL" \
 --gitea-webhook-secret="$SECRET" \
 --gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"

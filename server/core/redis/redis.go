@@ -8,54 +8,185 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 var ctx = context.Background()
 
-// Redis is a database using Redis 6
+// RedisDB is a database using Redis 6+
 type RedisDB struct { // nolint: revive
-	client *redis.Client
+	client redis.Cmdable
 }
 
 const (
 	pullKeySeparator = "::"
 )
 
+const unlockIfOwnedByPullScript = "" +
+	"local value = redis.call(\"GET\", KEYS[1])\n" +
+	"if not value then\n" +
+	"  return nil\n" +
+	"end\n" +
+	"\n" +
+	"local ok, lock = pcall(cjson.decode, value)\n" +
+	"if not ok then\n" +
+	"  return redis.error_reply(\"failed to deserialize current lock\")\n" +
+	"end\n" +
+	"\n" +
+	"if not lock[\"Pull\"] or tonumber(lock[\"Pull\"][\"Num\"]) ~= tonumber(ARGV[1]) then\n" +
+	"  return nil\n" +
+	"end\n" +
+	"\n" +
+	"redis.call(\"DEL\", KEYS[1])\n" +
+	"return value\n"
+
+// Config holds configuration for Redis connections.
+type Config struct {
+	Hostname           string
+	Port               int
+	Password           string
+	Username           string
+	TLSEnabled         bool
+	InsecureSkipVerify bool
+	DB                 int
+	// ClusterAddresses is a list of cluster node addresses. When set, cluster mode is used.
+	ClusterAddresses []string
+}
+
+// New creates a new RedisDB for client interactions with redis.
+// Deprecated: Use NewWithConfig for new code.
 func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
-	var rdb *redis.Client
+	return NewWithConfig(Config{
+		Hostname:           hostname,
+		Port:               port,
+		Password:           password,
+		TLSEnabled:         tlsEnabled,
+		InsecureSkipVerify: insecureSkipVerify,
+		DB:                 db,
+	})
+}
+
+// NewWithConfig creates a new RedisDB based on the provided configuration.
+// It automatically selects the appropriate Redis client type:
+// - If ClusterAddresses is set, uses Redis Cluster mode
+// - Otherwise, uses single-node mode
+func NewWithConfig(cfg Config) (*RedisDB, error) {
+	var rdb redis.Cmdable
 
 	var tlsConfig *tls.Config
-	if tlsEnabled {
+	if cfg.TLSEnabled {
 		tlsConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
+			InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
 		}
 	}
 
-	rdb = redis.NewClient(&redis.Options{
-		Addr:      fmt.Sprintf("%s:%d", hostname, port),
-		Password:  password,
-		DB:        db,
-		TLSConfig: tlsConfig,
-	})
+	// Determine which Redis client to use based on configuration
+	var connDesc string
+	switch {
+	case len(cfg.ClusterAddresses) > 0:
+		// Filter out empty addresses
+		var addrs []string
+		for _, addr := range cfg.ClusterAddresses {
+			trimmed := strings.TrimSpace(addr)
+			if trimmed != "" {
+				addrs = append(addrs, trimmed)
+			}
+		}
+		if len(addrs) == 0 {
+			return nil, errors.New("redis cluster addresses provided but all are empty")
+		}
+		rdb = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:     addrs,
+			Username:  cfg.Username,
+			Password:  cfg.Password,
+			TLSConfig: tlsConfig,
+		})
+		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
+	default:
+		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
+		rdb = redis.NewClient(&redis.Options{
+			Addr:      address,
+			Username:  cfg.Username,
+			Password:  cfg.Password,
+			DB:        cfg.DB,
+			TLSConfig: tlsConfig,
+		})
+		connDesc = address
+	}
 
 	// Check if connection is valid
 	err := rdb.Ping(ctx).Err()
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to redis instance at %s:%d: %w", hostname, port, err)
+		return nil, fmt.Errorf("failed to connect to redis at %s: %w", connDesc, err)
+	}
+
+	// Migrate old lock keys to new format with a bounded timeout.
+	// Non-fatal: if migration times out or fails, remaining keys will be
+	// retried on next startup. This avoids blocking boot on large key sets.
+	migrateCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := migrateOldLockKeys(migrateCtx, rdb); err != nil {
+		log.Printf("WARN: lock key migration incomplete (will retry next startup): %v", err)
 	}
 
 	return &RedisDB{
 		client: rdb,
 	}, nil
+}
+
+// migrateOldLockKeys migrates old lock key format to new format.
+// Old format: pr/{repoFullName}/{path}/{workspace}
+// New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
+// Uses Scan instead of Keys for compatibility with Redis Cluster (Scan fans out
+// across all nodes via go-redis ClusterClient, whereas Keys does not).
+func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
+	iter := rdb.Scan(ctx, 0, "pr/*", 0).Iterator()
+	for iter.Next(ctx) {
+		oldKey := iter.Val()
+		// Remove the "pr/" prefix to validate the key format
+		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
+
+		_, err := locking.IsCurrentLocking(keyWithoutPrefix)
+		if err != nil {
+			var currLock models.ProjectLock
+			oldValue, err := rdb.Get(ctx, oldKey).Result()
+			if err != nil {
+				return errors.Wrap(err, "failed to get current lock")
+			}
+			if err := json.Unmarshal([]byte(oldValue), &currLock); err != nil {
+				return errors.Wrap(err, "failed to deserialize current lock")
+			}
+			newKey := fmt.Sprintf("pr/%s", models.GenerateLockKey(currLock.Project, currLock.Workspace))
+
+			// Skip if the new key already exists (idempotent on retry).
+			if _, err := rdb.Get(ctx, newKey).Result(); err == nil {
+				// New key exists — just clean up the old one.
+				rdb.Del(ctx, oldKey)
+				continue
+			}
+
+			if err := rdb.Set(ctx, newKey, oldValue, 0).Err(); err != nil {
+				return errors.Wrapf(err, "failed to set new lock key %s", newKey)
+			}
+			if err := rdb.Del(ctx, oldKey).Err(); err != nil {
+				return errors.Wrapf(err, "failed to delete old lock key %s", oldKey)
+			}
+		}
+	}
+	if err := iter.Err(); err != nil {
+		return fmt.Errorf("failed scanning for old lock keys: %w", err)
+	}
+	return nil
 }
 
 // NewWithClient is used for testing.
@@ -112,6 +243,31 @@ func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.Proj
 		return nil, fmt.Errorf("failed to deserialize current lock: %w", err)
 	}
 	r.client.Del(ctx, key)
+	return &lock, nil
+}
+
+// UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
+func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	key := r.lockKey(project, workspace)
+	val, err := r.client.Eval(ctx, unlockIfOwnedByPullScript, []string{key}, pullNum).Result()
+	if err == redis.Nil {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
+	if val == nil {
+		return nil, nil
+	}
+
+	serializedLock, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf("unexpected unlock script result type %T", val)
+	}
+
+	var lock models.ProjectLock
+	if err := json.Unmarshal([]byte(serializedLock), &lock); err != nil {
+		return nil, fmt.Errorf("failed to deserialize current lock: %w", err)
+	}
 	return &lock, nil
 }
 
@@ -313,15 +469,36 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 	var newStatus models.PullStatus
 	currStatus, err := r.getPull(key)
 	if err != nil {
-		return newStatus, fmt.Errorf("db transaction failed: %w", err)
+		// Tolerate an unreadable prior entry (e.g. after a PullStatus schema
+		// change). It will be overwritten with fresh data below; in-flight
+		// policy approvals captured in the old blob are lost.
+		log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+		currStatus = nil
 	}
 
 	// If there is no pull OR if the pull we have is out of date, we
 	// just write a new pull.
-	if currStatus == nil || currStatus.Pull.HeadCommit != pull.HeadCommit {
+	if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 		var statuses []models.ProjectStatus
 		for _, res := range newResults {
 			statuses = append(statuses, r.projectResultToProject(res))
+		}
+		// Preserve policy status from the previous commit so approvals
+		// survive between the plan DB write and the subsequent policy
+		// check DB write. doPolicyCheck applies sticky filtering and
+		// overwrites these when it writes its own results.
+		if currStatus != nil {
+			for i := range statuses {
+				for _, old := range currStatus.Projects {
+					if statuses[i].Workspace == old.Workspace &&
+						statuses[i].RepoRelDir == old.RepoRelDir &&
+						statuses[i].ProjectName == old.ProjectName &&
+						len(old.PolicyStatus) > 0 {
+						statuses[i].PolicyStatus = old.PolicyStatus
+						break
+					}
+				}
+			}
 		}
 		newStatus = models.PullStatus{
 			Pull:     pull,
@@ -379,6 +556,16 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 		return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
+	if statusPull.HeadCommit != pull.HeadCommit {
+		return true
+	}
+	if pull.BaseBranch == "" {
+		return false
+	}
+	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
 }
 
 func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
@@ -447,6 +634,18 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 	}
 }
 
+// Ping checks the Redis connection health.
+func (r *RedisDB) Ping() error {
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return r.client.Ping(pingCtx).Err()
+}
+
 func (r *RedisDB) Close() error {
-	return r.client.Close()
+	// Prefer a narrower interface and return an explicit error for unsupported client types.
+	if closer, ok := r.client.(interface{ Close() error }); ok {
+		return closer.Close()
+	}
+
+	return fmt.Errorf("redis: unsupported client type %T does not implement Close() error", r.client)
 }

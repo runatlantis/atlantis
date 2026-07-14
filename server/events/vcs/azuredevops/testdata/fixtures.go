@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package testdata
@@ -42,6 +33,7 @@ var Pull = azuredevops.GitPullRequest{
 		CommitID: azuredevops.String("b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
 		URL:      azuredevops.String("https://dev.azure.com/owner/_apis/git/repositories/3411ebc1-d5aa-464f-9615-0b527bc66719/commits/b60280bc6e62e2f880f1b63c1e24987664d3bda3"),
 	},
+	Description:   azuredevops.String("pull request description"),
 	PullRequestID: azuredevops.Int(1),
 	Repository:    &Repo,
 	SourceRefName: azuredevops.String("refs/heads/feature/sourceBranch"),

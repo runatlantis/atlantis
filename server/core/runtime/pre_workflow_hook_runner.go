@@ -14,7 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflows_hook_runner.go PreWorkflowHookRunner
 type PreWorkflowHookRunner interface {
 	Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error)
 }
@@ -47,6 +47,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
 		"COMMAND_NAME":       ctx.CommandName,
+		"PROJECT_NAME":       ctx.ProjectName,
 	}
 
 	finalEnvVars := baseEnvVars
@@ -58,8 +59,10 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	out, err := cmd.CombinedOutput()
 
 	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
-	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	if !ctx.SuppressJobOutput {
+		wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
+		wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	}
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
