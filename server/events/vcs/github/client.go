@@ -24,6 +24,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/shurcooL/githubv4"
+	"golang.org/x/time/rate"
 )
 
 // maxCommentLength is the maximum number of chars allowed in a single comment
@@ -77,6 +78,7 @@ type Client struct {
 	ctx                   context.Context
 	config                Config
 	maxCommentsPerCommand int
+	commentLimiter        *rate.Limiter
 	repoIdCache           GitHubRepoIdCache
 }
 
@@ -110,6 +112,10 @@ type GithubPRReviewSummary struct {
 // NewClient returns a valid GitHub client.
 
 func New(hostname string, credentials Credentials, config Config, maxCommentsPerCommand int, logger logging.SimpleLogging) (*Client, error) {
+	if config.CommentInterval < 0 {
+		return nil, fmt.Errorf("github comment interval must be non-negative")
+	}
+
 	logger.Debug("Creating new GitHub client for host: %s", hostname)
 	transport, err := credentials.Client()
 	if err != nil {
@@ -154,8 +160,16 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		ctx:                   context.Background(),
 		config:                config,
 		maxCommentsPerCommand: maxCommentsPerCommand,
+		commentLimiter:        newCommentLimiter(config.CommentInterval),
 		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
+}
+
+func newCommentLimiter(interval time.Duration) *rate.Limiter {
+	if interval == 0 {
+		return rate.NewLimiter(rate.Inf, 1)
+	}
+	return rate.NewLimiter(rate.Every(interval), 1)
 }
 
 func newSecondaryRateLimitHTTPClient(client *http.Client) *http.Client {
@@ -229,6 +243,9 @@ func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 
 	comments := common.SplitComment(logger, comment, maxCommentLength, g.maxCommentsPerCommand, command)
 	for i := range comments {
+		if err := g.commentLimiter.Wait(g.ctx); err != nil {
+			return fmt.Errorf("waiting to create github comment: %w", err)
+		}
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {
 			logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)

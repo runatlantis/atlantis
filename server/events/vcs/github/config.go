@@ -3,7 +3,10 @@
 
 package github
 
+import "time"
+
 // GithubConfig allows for custom github-specific functionality and behavior
 type Config struct {
 	AllowMergeableBypassApply bool
+	CommentInterval           time.Duration
 }

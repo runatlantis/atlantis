@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1554,6 +1556,62 @@ func TestClient_SplitComments(t *testing.T) {
 	Equals(t, 4, len(githubComments))
 	Assert(t, strings.Contains(firstSplit, command.Plan.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
 	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
+}
+
+func TestClient_CommentIntervalSharedAcrossConcurrentSplitComments(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	commentInterval := 25 * time.Millisecond
+	var requestCount atomic.Int32
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/v3/repos/runatlantis/atlantis/issues/1/comments" {
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			requestCount.Add(1)
+			w.WriteHeader(http.StatusCreated)
+		}))
+	t.Cleanup(testServer.Close)
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(
+		testServerURL.Host,
+		&github.UserCredentials{"user", "pass", ""},
+		github.Config{CommentInterval: commentInterval},
+		0,
+		logger,
+	)
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	repo := models.Repo{Owner: "runatlantis", Name: "atlantis"}
+	comment := strings.Repeat("a", 65537)
+	start := make(chan struct{})
+	errs := make(chan error, 2)
+	var waitGroup sync.WaitGroup
+	for range 2 {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			<-start
+			errs <- client.CreateComment(logger, repo, 1, comment, command.Plan.String())
+		}()
+	}
+	started := time.Now()
+	close(start)
+	waitGroup.Wait()
+	elapsed := time.Since(started)
+	close(errs)
+	for err := range errs {
+		Ok(t, err)
+	}
+
+	Equals(t, int32(4), requestCount.Load())
+	minimumElapsed := 3*commentInterval - 5*time.Millisecond
+	Assert(t, elapsed >= minimumElapsed, "expected shared comment pacing to take at least %s, got %s", minimumElapsed, elapsed)
 }
 
 // Test that we retry the get pull request call if it 404s.

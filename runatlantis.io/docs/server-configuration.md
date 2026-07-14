@@ -793,6 +793,18 @@ ATLANTIS_GH_APP_SLUG="myappslug"
 
 A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
+### `--gh-comment-interval`
+
+```bash
+atlantis server --gh-comment-interval=1s
+# or
+ATLANTIS_GH_COMMENT_INTERVAL=1s
+```
+
+Minimum interval between GitHub pull request comments. Defaults to `1s`. Set to `0` to disable proactive comment pacing.
+
+The interval applies across all pull requests handled by an Atlantis instance and between parts of split command output. It complements `--max-comments-per-command`, which limits the number of comments, and does not replace reactive handling of GitHub secondary rate limits.
+
 ### `--gh-hostname` <Badge text="v0.1.3+" type="info"/>
 
 ```bash

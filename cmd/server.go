@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -38,7 +39,7 @@ const (
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
-// 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
+// 3. Add your flag's description etc. to the corresponding flags map.
 const (
 	// Flag names.
 	ADWebhookPasswordFlag            = "azuredevops-webhook-password" // nolint: gosec
@@ -86,6 +87,7 @@ const (
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
+	GHCommentIntervalFlag            = "gh-comment-interval"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
@@ -180,6 +182,7 @@ const (
 	DefaultEmojiReaction                = ""
 	DefaultExecutableName               = "atlantis"
 	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
+	DefaultGHCommentInterval            = time.Second
 	DefaultGHHostname                   = "github.com"
 	DefaultGiteaBaseURL                 = "https://gitea.com"
 	DefaultGiteaPageSize                = 30
@@ -696,6 +699,14 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: true,
 	},
 }
+
+var durationFlags = map[string]durationFlag{
+	GHCommentIntervalFlag: {
+		description:  "Minimum interval between GitHub pull request comments. Set to 0 to disable proactive comment pacing.",
+		defaultValue: DefaultGHCommentInterval,
+	},
+}
+
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
 		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
@@ -765,6 +776,11 @@ type int64Flag struct {
 	defaultValue int64
 	hidden       bool
 }
+type durationFlag struct {
+	description  string
+	defaultValue time.Duration
+	hidden       bool
+}
 type boolFlag struct {
 	description  string
 	defaultValue bool
@@ -826,7 +842,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 	s.Viper.AutomaticEnv()
 	s.Viper.SetTypeByDefaultValue(true)
 
-	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
+	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags, durationFlags))
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		s.printErr(err)
@@ -866,6 +882,19 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %d)", usage, f.defaultValue)
 		}
 		c.Flags().Int(name, 0, usage+"\n")
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+	}
+
+	// Set duration flags.
+	for name, f := range durationFlags {
+		usage := f.description
+		if f.defaultValue != 0 {
+			usage = fmt.Sprintf("%s (default %s)", usage, f.defaultValue)
+		}
+		c.Flags().Duration(name, 0, usage+"\n")
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
 		}
@@ -984,6 +1013,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.GithubHostname == "" {
 		c.GithubHostname = DefaultGHHostname
 	}
+	if !v.IsSet(GHCommentIntervalFlag) {
+		c.GithubCommentInterval = DefaultGHCommentInterval
+	}
 	if c.GitlabHostname == "" {
 		c.GitlabHostname = DefaultGitlabHostname
 	}
@@ -1062,6 +1094,10 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
+	if userConfig.GithubCommentInterval < 0 {
+		return fmt.Errorf("--%s must be non-negative", GHCommentIntervalFlag)
+	}
+
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)

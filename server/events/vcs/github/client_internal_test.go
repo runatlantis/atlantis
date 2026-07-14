@@ -32,6 +32,11 @@ func TestNew_NonGithub(t *testing.T) {
 	// moment the shurcooL library doesn't expose it.
 }
 
+func TestNew_NegativeCommentInterval(t *testing.T) {
+	_, err := New("github.com", &UserCredentials{"user", "pass", ""}, Config{CommentInterval: -time.Second}, 0, logging.NewNoopLogger(t))
+	ErrEquals(t, "github comment interval must be non-negative", err)
+}
+
 func TestNewSecondaryRateLimitHTTPClientDoesNotApplyPrimaryLimits(t *testing.T) {
 	var requests []string
 	baseTransport := roundTripFunc(func(req *http.Request) (*http.Response, error) {

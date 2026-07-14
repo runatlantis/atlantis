@@ -187,8 +187,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
-
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
@@ -196,6 +194,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
+	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
@@ -334,11 +333,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	var pullStatus models.PullStatus
 	if noProjectPullStatus != nil {
 		pullStatus = *noProjectPullStatus
@@ -349,11 +343,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
+		p.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
 
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
+	p.pullUpdater.updatePull(ctx, cmd, result)
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.

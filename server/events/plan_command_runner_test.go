@@ -194,6 +194,87 @@ func TestPlanCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
 }
 
+func TestPlanCommandRunner_FinalizesBeforeCommenting(t *testing.T) {
+	cases := []struct {
+		name    string
+		trigger command.Trigger
+	}{
+		{name: "manual plan", trigger: command.CommentTrigger},
+		{name: "autoplan", trigger: command.AutoTrigger},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			vcsClient := setup(t)
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "terraform"}
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  testCase.trigger,
+			}
+			projectCtx := command.ProjectContext{
+				CommandName: command.Plan,
+				RepoRelDir:  "terraform",
+				Workspace:   events.DefaultWorkspace,
+				BaseRepo:    testdata.GithubRepo,
+				Pull:        modelPull,
+			}
+
+			if testCase.trigger == command.AutoTrigger {
+				When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+				pullDir := t.TempDir()
+				When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(pullDir, nil)
+				When(pendingPlanFinder.Find(pullDir)).ThenReturn([]events.PendingPlan{}, nil)
+			} else {
+				When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+			}
+			When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{Error: errors.New("plan failed")})
+
+			statusUpdated := false
+			When(commitUpdater.UpdateCombinedCount(
+				Any[logging.SimpleLogging](),
+				Any[models.Repo](),
+				Any[models.PullRequest](),
+				Any[models.CommitStatus](),
+				Eq[command.Name](command.Plan),
+				Any[models.ProjectCounts](),
+			)).Then(func([]Param) ReturnValues {
+				statusUpdated = true
+				return ReturnValues{nil}
+			})
+			When(vcsClient.CreateComment(
+				Any[logging.SimpleLogging](),
+				Any[models.Repo](),
+				Any[int](),
+				Any[string](),
+				Any[string](),
+			)).Then(func([]Param) ReturnValues {
+				pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+				Ok(t, err)
+				Assert(t, pullStatus != nil, "expected persisted pull status before comment")
+				Equals(t, 1, pullStatus.StatusCount(models.ErroredPlanStatus))
+				Assert(t, statusUpdated, "expected final plan status before comment")
+				return ReturnValues{errors.New("comment failed")}
+			})
+
+			planCommandRunner.Run(ctx, cmd)
+
+			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			Ok(t, err)
+			Assert(t, pullStatus != nil, "expected persisted pull status")
+			Equals(t, 1, pullStatus.StatusCount(models.ErroredPlanStatus))
+			Assert(t, statusUpdated, "expected final plan status")
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+		})
+	}
+}
+
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)

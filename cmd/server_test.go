@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"go.yaml.in/yaml/v4"
 
@@ -83,6 +84,7 @@ var testFlags = map[string]any{
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
+	GHCommentIntervalFlag:            2 * time.Second,
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",
@@ -222,6 +224,10 @@ func TestExecute_Defaults(t *testing.T) {
 		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
 	}
 	for flag, cfg := range intFlags {
+		t.Log(flag)
+		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
+	}
+	for flag, cfg := range durationFlags {
 		t.Log(flag)
 		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
 	}
@@ -489,6 +495,23 @@ func TestExecute_NoConfigFlag(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	Ok(t, err)
+}
+
+func TestExecute_GithubCommentInterval(t *testing.T) {
+	t.Run("zero disables pacing", func(t *testing.T) {
+		c := setupWithDefaults(map[string]any{
+			GHCommentIntervalFlag: 0,
+		}, t)
+		Ok(t, c.Execute())
+		Equals(t, time.Duration(0), passedConfig.GithubCommentInterval)
+	})
+
+	t.Run("negative is rejected", func(t *testing.T) {
+		c := setupWithDefaults(map[string]any{
+			GHCommentIntervalFlag: -time.Second,
+		}, t)
+		ErrEquals(t, "--gh-comment-interval must be non-negative", c.Execute())
+	})
 }
 
 func TestExecute_ConfigFileExtension(t *testing.T) {
