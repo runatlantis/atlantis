@@ -806,7 +806,7 @@ don't set. Defaults to `github.com`.
 
 For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
 
-### `--gh-merge-queue-enabled` <Badge text="v0.43.0+" type="info"/>
+### `--gh-merge-queue-enabled` <Badge text="v0.47.0+" type="info"/>
 
 ```bash
 atlantis server --gh-merge-queue-enabled
@@ -814,13 +814,16 @@ atlantis server --gh-merge-queue-enabled
 ATLANTIS_GH_MERGE_QUEUE_ENABLED=true
 ```
 
-Enable handling of [GitHub merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) (`merge_group`) webhook events. When enabled, on a `merge_group` `checks_requested` event Atlantis posts `success` for the `<status-name>/plan`, `<status-name>/apply`, and `<status-name>/policy_check` commit statuses on the merge group's head SHA so the merge queue can proceed.
+Enable end-to-end support for [GitHub merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue). When the flag is on, Atlantis:
 
-Atlantis does not re-run `terraform plan`/`apply` against the merge ref — the PR was already validated before joining the queue, so posting `success` is sufficient to unblock the queue. `destroyed` actions are ignored.
+- On `merge_group` `checks_requested` webhooks, posts `success` for the `<status-name>/plan`, `<status-name>/apply`, and `<status-name>/policy_check` commit statuses on the merge group's head SHA so the queue's required checks pass. `destroyed` actions are ignored.
+- For `automerge`, detects whether the PR's base branch enforces a merge queue. If so, Atlantis enables auto-merge via GraphQL (which adds the PR to the queue) instead of issuing a direct REST merge that GitHub would reject with `405`. Detection covers both classic branch protection and ruleset-enforced queues (the latter via a 405 fallback).
+
+Atlantis does not re-run `terraform plan`/`apply` against the merge ref — the PR was already validated before joining the queue, so posting `success` is sufficient to unblock the queue.
 
 To use this, ensure the `merge_group` event is enabled on the GitHub webhook (or for the GitHub App).
 
-Defaults to `false`.
+Defaults to `false`. With the flag off, Atlantis ignores `merge_group` events and uses direct REST merge for `automerge` (which will fail with a clear error against merge-queue-protected branches).
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 

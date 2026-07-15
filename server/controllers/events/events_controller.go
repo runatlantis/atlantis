@@ -631,6 +631,10 @@ func (e *VCSEventsController) HandleGithubMergeGroupEvent(logger logging.SimpleL
 
 	logger.Info("Handling GitHub Merge Group 'checks_requested' event for %s", headSHA)
 
+	// CommitStatusUpdater.UpdateCombined only reads BaseRepo and HeadCommit
+	// (see github.Client.UpdateStatus). Merge group events have no PR number
+	// and we never run a real plan/apply against the merge ref, so the
+	// remaining PullRequest fields are intentionally left zero.
 	pull := models.PullRequest{
 		HeadCommit: headSHA,
 		BaseRepo:   baseRepo,
