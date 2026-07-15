@@ -814,6 +814,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
+		PlanStore:                 planStore,
 	}
 
 	dbUpdater := &events.DBUpdater{

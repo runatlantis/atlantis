@@ -1554,7 +1554,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	if errors.Is(err, os.ErrNotExist) {
 		// Re-clone only if the plan store can recover plans externally.
 		// LocalPlanStore signals this via ErrRestoreNotSupported; external
-		// stores (S3) return nil and restore during the apply step.
+		// stores (S3) return nil and Load restores the plan in doApply before
+		// plan validation (this path does not call RestorePlans).
 		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}

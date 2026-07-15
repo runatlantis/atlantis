@@ -34,8 +34,9 @@ type PlanStore interface {
 	ListWorkspaces(owner, repo string, pullNum int) ([]string, error)
 	// RestorePlans discovers and downloads all plans for a pull request into
 	// pullDir. Only used by the "apply all" path (buildAllProjectCommandsByPlan)
-	// where the set of planned projects is unknown. The single-project apply
-	// path does not call this — it uses Load with an already-known key.
+	// where the set of planned projects is unknown. Targeted apply does not
+	// call this; DefaultProjectCommandRunner.doApply calls Load before plan
+	// validation so the local .tfplan exists after a re-clone.
 	// Callers must ensure each workspace directory is cloned (has a .git) before
 	// invoking this; see ListWorkspaces.
 	//

@@ -1559,6 +1559,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
 			PullStatusFetcher: database,
 		},
+		PlanStore: &runtime.LocalPlanStore{},
 	}
 
 	dbUpdater := &events.DBUpdater{
