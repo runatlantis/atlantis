@@ -806,6 +806,22 @@ don't set. Defaults to `github.com`.
 
 For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
 
+### `--gh-merge-queue-enabled` <Badge text="v0.43.0+" type="info"/>
+
+```bash
+atlantis server --gh-merge-queue-enabled
+# or
+ATLANTIS_GH_MERGE_QUEUE_ENABLED=true
+```
+
+Enable handling of [GitHub merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) (`merge_group`) webhook events. When enabled, on a `merge_group` `checks_requested` event Atlantis posts `success` for the `<status-name>/plan`, `<status-name>/apply`, and `<status-name>/policy_check` commit statuses on the merge group's head SHA so the merge queue can proceed.
+
+Atlantis does not re-run `terraform plan`/`apply` against the merge ref — the PR was already validated before joining the queue, so posting `success` is sufficient to unblock the queue. `destroyed` actions are ignored.
+
+To use this, ensure the `merge_group` event is enabled on the GitHub webhook (or for the GitHub App).
+
+Defaults to `false`.
+
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
