@@ -1072,6 +1072,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ExecutableName:                  userConfig.ExecutableName,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
+		CommitStatusUpdater:             commitStatusUpdater,
+		GithubMergeQueueEnabled:         userConfig.GithubMergeQueueEnabled,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
