@@ -1,0 +1,21 @@
+testing/Dockerfile
+  s_bfc46b18454588::t_d1787d6d451c69 12
+Dockerfile
+  s_bfc46b18454588::t_d1787d6d451c69 136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "4f92e9043f9f56b081962987dbe7cf7352c88355",
+  "prompts": {},
+  "sessions": {
+    "s_bfc46b18454588": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6afa-d963-75f2-8b4f-5bb63f238827",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
