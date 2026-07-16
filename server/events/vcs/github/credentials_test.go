@@ -172,28 +172,26 @@ func TestUserTransport_RoundTripConcurrentDoesNotMutateBaseTransport(t *testing.
 	start := make(chan struct{})
 	errs := make(chan error, requests)
 	var wg sync.WaitGroup
-	for i := 0; i < requests; i++ {
+	for range requests {
 		req, err := http.NewRequest(http.MethodGet, "https://api.github.com/user", nil)
 		Ok(t, err)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			resp, err := transport.RoundTrip(req)
 			if err == nil {
 				err = resp.Body.Close()
 			}
 			errs <- err
-		}()
+		})
 	}
 
 	close(start)
-	for i := 0; i < requests; i++ {
+	for range requests {
 		Equals(t, "rotated-token", <-observedTokens)
 	}
 	close(release)
 	wg.Wait()
-	for i := 0; i < requests; i++ {
+	for range requests {
 		Ok(t, <-errs)
 	}
 
