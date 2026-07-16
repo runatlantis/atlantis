@@ -1,0 +1,11 @@
+{{ define "applyExecutionOrderProgress" -}}
+{{ with .ApplyExecutionOrderProgress -}}
+{{ if .RemainingExecutionOrderGroups }}
+Atlantis paused after `execution_order_group` {{ .CompletedExecutionOrderGroup }}.
+
+Remaining execution order groups: {{ join ", " .RemainingExecutionOrderGroups }}.
+
+Run `{{ $.ExecutableName }} apply` to apply the next `execution_order_group`.
+{{ end -}}
+{{ end -}}
+{{ end -}}

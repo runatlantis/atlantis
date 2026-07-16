@@ -3400,8 +3400,20 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
+	atlantisYAML := "version: 3\n" +
+		"pause_apply_between_execution_order_groups: true\n" +
+		"projects:\n" +
+		"  - dir: project1\n" +
+		"    workspace: workspace1\n" +
+		"  - dir: project2\n" +
+		"    workspace: workspace1\n" +
+		"  - dir: project1\n" +
+		"    workspace: workspace2\n" +
+		"  - dir: project2\n" +
+		"    workspace: workspace2\n"
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
+			"atlantis.yaml": atlantisYAML,
 			"project1": map[string]any{
 				"main.tf":           nil,
 				"workspace1.tfplan": nil,
@@ -3432,6 +3444,11 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		Any[models.Repo](),
 		Any[models.PullRequest]())).
 		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(events.DefaultWorkspace))).
+		ThenReturn(filepath.Join(tmpDir, "workspace1"), nil)
 
 	logger := logging.NewNoopLogger(t)
 	userConfig := defaultUserConfig
@@ -3503,6 +3520,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	for _, ctx := range ctxs {
 		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+		Assert(t, ctx.PauseApplyBetweenExecutionOrderGroups, "expected broad apply context to inherit pause setting")
 	}
 }
 
