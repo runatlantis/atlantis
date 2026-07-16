@@ -189,6 +189,9 @@ func TestPlanGenerationRegressionCasesAreExplicit(t *testing.T) {
 			if tc.ReplanMutateFile == "" || tc.ReplanMutateContent == "" || tc.ExpectedReplanCommentSubstring == "" {
 				t.Errorf("replan case %q is missing second-generation mutation or marker", tc.Name)
 			}
+			if tc.ExpectedReplanCommentSubstring == tc.ExpectedApplyCommentSubstring {
+				t.Errorf("replan case %q reuses its post-apply marker for the pre-apply assertion", tc.Name)
+			}
 		case ScenarioPlanThenApplyExpectFailure:
 			expectedFailureCases = append(expectedFailureCases, tc.Name)
 			if len(tc.ExpectedFailedApplyStatusContexts) == 0 || tc.ExpectedApplyCommentSubstring == "" || tc.ForbiddenApplyCommentSubstring == "" {
