@@ -1,0 +1,24 @@
+.github/workflows/test.yml
+  s_bfc46b18454588::t_514e1153e3adda 50-51,53-56
+Makefile
+  s_bfc46b18454588::t_514e1153e3adda 50-60,62,70
+.github/workflows/codeql.yml
+  s_bfc46b18454588::t_5171d19328f812 64
+  s_bfc46b18454588::t_514e1153e3adda 57-63,65-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "62fc08a675fbe57a171add3dcd507348425bc847",
+  "prompts": {},
+  "sessions": {
+    "s_bfc46b18454588": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6afa-d963-75f2-8b4f-5bb63f238827",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
