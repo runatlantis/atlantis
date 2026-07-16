@@ -3,11 +3,19 @@
 
 package command
 
+// ApplyExecutionOrderProgress describes a completed apply execution order group
+// and the groups that remain pending for a later apply command.
+type ApplyExecutionOrderProgress struct {
+	CompletedExecutionOrderGroup  int
+	RemainingExecutionOrderGroups []int
+}
+
 // Result is the result of running a Command.
 type Result struct {
-	Error          error
-	Failure        string
-	ProjectResults []ProjectResult
+	Error                       error
+	Failure                     string
+	ProjectResults              []ProjectResult
+	ApplyExecutionOrderProgress *ApplyExecutionOrderProgress `json:"-"`
 	// PlansDeleted is true if all plans created during this command were
 	// deleted. This happens if automerging is enabled and one project has an
 	// error since automerging requires all plans to succeed.

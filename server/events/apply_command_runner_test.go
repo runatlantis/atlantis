@@ -14,6 +14,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
+	dbmocks "github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
@@ -25,6 +26,7 @@ import (
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestApplyCommandRunner_IsLocked(t *testing.T) {
@@ -1751,6 +1753,227 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			)
 		})
 	}
+}
+
+func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.parallelPoolSize = 2
+	})
+	autoMerger.GlobalAutomerge = true
+	t.Cleanup(func() { autoMerger.GlobalAutomerge = false })
+
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult("dev-a", events.DefaultWorkspace, "dev-a"),
+		plannedProjectResult("dev-b", events.DefaultWorkspace, "dev-b"),
+		plannedProjectResult("production", events.DefaultWorkspace, "production"),
+	})
+	Ok(t, err)
+
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	devA := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "dev-a",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "dev-a",
+		AutomergeEnabled:                      true,
+		ParallelApplyEnabled:                  true,
+		ProjectPlanStatus:                     models.PlannedPlanStatus,
+		ExecutionOrderGroup:                   1,
+		PauseApplyBetweenExecutionOrderGroups: true,
+		Pull:                                  pull,
+	}
+	devB := devA
+	devB.RepoRelDir = "dev-b"
+	devB.ProjectName = "dev-b"
+	production := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "production",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "production",
+		AutomergeEnabled:                      true,
+		ProjectPlanStatus:                     models.PlannedPlanStatus,
+		ExecutionOrderGroup:                   2,
+		PauseApplyBetweenExecutionOrderGroups: true,
+		Pull:                                  pull,
+	}
+
+	buildCalls := 0
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		buildCalls++
+		if buildCalls == 1 {
+			return ReturnValues{[]command.ProjectContext{production, devA, devB}, nil}
+		}
+		return ReturnValues{[]command.ProjectContext{production}, nil}
+	})
+	When(projectCommandRunner.Apply(devA)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "dev-a applied"})
+	When(projectCommandRunner.Apply(devB)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "dev-b applied"})
+	When(projectCommandRunner.Apply(production)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "production applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalledOnce().Apply(devA)
+	projectCommandRunner.VerifyWasCalledOnce().Apply(devB)
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(production)
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+	pullStatus, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[1].Status)
+	Equals(t, models.PlannedPlanStatus, pullStatus.Projects[2].Status)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(pull),
+		Eq(models.PendingCommitStatus),
+		Eq(command.Apply),
+		Eq(models.ProjectCounts{Success: 2, Total: 3}),
+	)
+	_, _, _, firstComment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
+	).GetCapturedArguments()
+	Assert(t, strings.Contains(firstComment, "Run `atlantis apply` to apply the next `execution_order_group`."), "got comment: %s", firstComment)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalledOnce().Apply(production)
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(pull), Any[models.PullRequestOptions]())
+	pullStatus, err = database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[1].Status)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[2].Status)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(pull),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Eq(models.ProjectCounts{Success: 3, Total: 3}),
+	)
+}
+
+func TestApplyCommandRunner_PausedGroupFailureDoesNotAdvertiseContinuation(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult("dev", events.DefaultWorkspace, "dev"),
+		plannedProjectResult("production", events.DefaultWorkspace, "production"),
+	})
+	Ok(t, err)
+
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	dev := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "dev",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "dev",
+		ExecutionOrderGroup:                   1,
+		PauseApplyBetweenExecutionOrderGroups: true,
+	}
+	production := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "production",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "production",
+		ExecutionOrderGroup:                   2,
+		PauseApplyBetweenExecutionOrderGroups: true,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{production, dev}, nil)
+	When(projectCommandRunner.Apply(dev)).ThenReturn(command.ProjectCommandOutput{Error: errors.New("apply failed")})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalledOnce().Apply(dev)
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(production)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
+	).GetCapturedArguments()
+	Assert(t, !strings.Contains(comment, "Atlantis paused after"), "got comment: %s", comment)
+}
+
+func TestApplyCommandRunner_PausedGroupPersistenceFailureRequiresReplan(t *testing.T) {
+	controller := gomock.NewController(t)
+	database := dbmocks.NewMockDatabase(controller)
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	recordedStatus := models.PullStatus{
+		Pull: pull,
+		Projects: []models.ProjectStatus{
+			{RepoRelDir: "dev", Workspace: events.DefaultWorkspace, ProjectName: "dev", Status: models.PlannedPlanStatus},
+			{RepoRelDir: "production", Workspace: events.DefaultWorkspace, ProjectName: "production", Status: models.PlannedPlanStatus},
+		},
+	}
+	database.EXPECT().GetPullStatus(pull).Return(&recordedStatus, nil)
+	database.EXPECT().UpdatePullWithResults(pull, gomock.Any()).Return(models.PullStatus{}, errors.New("database unavailable"))
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	dev := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "dev",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "dev",
+		ExecutionOrderGroup:                   1,
+		PauseApplyBetweenExecutionOrderGroups: true,
+	}
+	production := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "production",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "production",
+		ExecutionOrderGroup:                   2,
+		PauseApplyBetweenExecutionOrderGroups: true,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{dev, production}, nil)
+	When(projectCommandRunner.Apply(dev)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "dev applied"})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected persistence failure to mark the command as errored")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(dev)
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(production)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
+	).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "run `atlantis plan` before applying again"), "got comment: %s", comment)
+	Assert(t, !strings.Contains(comment, "Atlantis paused after"), "got comment: %s", comment)
 }
 
 func TestApplyCommandRunner_NoChangesCount(t *testing.T) {

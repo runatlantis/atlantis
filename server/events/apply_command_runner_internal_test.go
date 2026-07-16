@@ -73,6 +73,85 @@ func (r staticProjectApplyRunner) Apply(command.ProjectContext) command.ProjectC
 	return r.output
 }
 
+func TestSelectApplyExecutionOrderGroup(t *testing.T) {
+	tests := []struct {
+		name             string
+		projectCmds      []command.ProjectContext
+		targeted         bool
+		wantProjects     []string
+		wantCompleted    int
+		wantRemaining    []int
+		wantContinuation bool
+	}{
+		{
+			name: "disabled preserves every group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "later", ExecutionOrderGroup: 5},
+				{ProjectName: "first", ExecutionOrderGroup: 1},
+			},
+			wantProjects: []string{"later", "first"},
+		},
+		{
+			name: "enabled selects every project in the lowest group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "later", ExecutionOrderGroup: 5, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "first-a", ExecutionOrderGroup: -2, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "middle", ExecutionOrderGroup: 3, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "first-b", ExecutionOrderGroup: -2, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects:     []string{"first-a", "first-b"},
+			wantCompleted:    -2,
+			wantRemaining:    []int{3, 5},
+			wantContinuation: true,
+		},
+		{
+			name: "targeted apply preserves every group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "first", ExecutionOrderGroup: 1, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "later", ExecutionOrderGroup: 2, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			targeted:     true,
+			wantProjects: []string{"first", "later"},
+		},
+		{
+			name: "final group does not advertise a continuation",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "only-a", ExecutionOrderGroup: 4, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "only-b", ExecutionOrderGroup: 4, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects: []string{"only-a", "only-b"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			selected, continuation := selectApplyExecutionOrderGroup(test.projectCmds, test.targeted)
+			gotProjects := make([]string, 0, len(selected))
+			for _, projectCmd := range selected {
+				gotProjects = append(gotProjects, projectCmd.ProjectName)
+			}
+			if !slices.Equal(gotProjects, test.wantProjects) {
+				t.Fatalf("selected projects = %v, want %v", gotProjects, test.wantProjects)
+			}
+			if !test.wantContinuation {
+				if continuation != nil {
+					t.Fatalf("continuation = %#v, want nil", continuation)
+				}
+				return
+			}
+			if continuation == nil {
+				t.Fatal("continuation = nil, want continuation")
+			}
+			if continuation.CompletedExecutionOrderGroup != test.wantCompleted {
+				t.Fatalf("completed group = %d, want %d", continuation.CompletedExecutionOrderGroup, test.wantCompleted)
+			}
+			if !slices.Equal(continuation.RemainingExecutionOrderGroups, test.wantRemaining) {
+				t.Fatalf("remaining groups = %v, want %v", continuation.RemainingExecutionOrderGroups, test.wantRemaining)
+			}
+		})
+	}
+}
+
 type recordingDeferredApplyRunner struct {
 	output   command.ProjectCommandOutput
 	statuses []models.CommitStatus
