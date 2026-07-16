@@ -1,0 +1,44 @@
+runatlantis.io/docs/deployment.md
+  s_bfc46b18454588::t_8a7aae75f1d36d 643
+.github/workflows/atlantis-image.yml
+  s_bfc46b18454588::t_0babd38cee4a95 55-60
+  s_bfc46b18454588::t_8a7aae75f1d36d 50,52-53
+AGENTS.md
+  s_bfc46b18454588::t_cc93845807b9a2 5
+  s_bfc46b18454588::t_8a7aae75f1d36d 13,126
+e2e/go.mod
+  s_bfc46b18454588::t_8a7aae75f1d36d 3
+.github/renovate.json5
+  s_bfc46b18454588::t_a5fd1446af46e2 109
+testing/Dockerfile
+  s_bfc46b18454588::t_8a7aae75f1d36d 1
+  s_bfc46b18454588::t_064b03c5448514 7-8,12-16,18,20
+Dockerfile
+  s_bfc46b18454588::t_b935925ebedb07 130
+  s_bfc46b18454588::t_8a7aae75f1d36d 6,40,133-135,138
+  s_bfc46b18454588::t_e9324ba48abd8a 131
+  s_bfc46b18454588::t_0eb0d5fdff2c5f 62
+go.mod
+  s_bfc46b18454588::t_8a7aae75f1d36d 3
+  s_bfc46b18454588::t_94a87341d679ba 51
+.tool-versions
+  s_bfc46b18454588::t_8a7aae75f1d36d 2
+.github/scripts/update_top_issues_ranking/go.mod
+  s_bfc46b18454588::t_8a7aae75f1d36d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6869763f3e9ca3897cd7a4a60fa646fe3f1f506e",
+  "prompts": {},
+  "sessions": {
+    "s_bfc46b18454588": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6afa-d963-75f2-8b4f-5bb63f238827",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
