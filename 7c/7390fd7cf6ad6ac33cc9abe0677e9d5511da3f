@@ -1,0 +1,21 @@
+server/events/vcs/github/credentials_test.go
+  s_bfc46b18454588::t_d9335da0630c07 7-10,13,117-216
+server/events/vcs/github/credentials.go
+  s_bfc46b18454588::t_77574ffacac96a 65-66,69,104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "7c7390fd7cf6ad6ac33cc9abe0677e9d5511da3f",
+  "prompts": {},
+  "sessions": {
+    "s_bfc46b18454588": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6afa-d963-75f2-8b4f-5bb63f238827",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
