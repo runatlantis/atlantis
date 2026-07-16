@@ -49,16 +49,17 @@ regen-mocks: ## Delete and regenerate all mocks
 
 .PHONY: test-e2e-module
 test-e2e-module: ## Run tests for the e2e Go module
-	@cd e2e && go test ./...
+	@cd e2e && go test $(NESTED_TEST_FLAGS) ./...
 
 .PHONY: test-ranking-module
 test-ranking-module: ## Run tests for the top-issues ranking Go module
-	@cd .github/scripts/update_top_issues_ranking && go test ./...
+	@cd .github/scripts/update_top_issues_ranking && go test $(NESTED_TEST_FLAGS) ./...
 
 .PHONY: test-nested-modules
 test-nested-modules: test-e2e-module test-ranking-module ## Run tests for nested Go modules
 
 .PHONY: test
+test: NESTED_TEST_FLAGS = -short
 test: test-nested-modules ## Run tests
 	@go test -short $(PKG)
 
