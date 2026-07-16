@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -1471,9 +1472,9 @@ func TestPlanGenerationInvalidationPreservesUnrelatedProjectsAndRejectsStaleComp
 	Ok(t, err)
 	projectA := findPlanGenerationProject(t, status, "project-a", "a")
 	projectB := findPlanGenerationProject(t, status, "project-b", "b")
-	Equals(t, models.PlanningPlanStatus, projectA.Status)
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
 	Equals(t, "generation-1", projectA.PlanGeneration)
-	Equals(t, 0, len(projectA.PolicyStatus))
+	Equals(t, 1, len(projectA.PolicyStatus))
 	Equals(t, models.PlannedPlanStatus, projectB.Status)
 	Equals(t, "", projectB.PlanGeneration)
 
@@ -1489,6 +1490,300 @@ func TestPlanGenerationInvalidationPreservesUnrelatedProjectsAndRejectsStaleComp
 	Equals(t, models.PlannedPlanStatus, projectA.Status)
 	Equals(t, "", projectA.PlanGeneration)
 	Equals(t, models.PlannedPlanStatus, projectB.Status)
+}
+
+func TestUpdatePullWithResultsRejectsActivePlanGeneration(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	planResult := func(dir, projectName string) command.ProjectResult {
+		return command.ProjectResult{
+			Command:     command.Plan,
+			Workspace:   "default",
+			RepoRelDir:  dir,
+			ProjectName: projectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		}
+	}
+	policyResult := func(commandName command.Name) command.ProjectResult {
+		return command.ProjectResult{
+			Command:     commandName,
+			Workspace:   "default",
+			RepoRelDir:  "project-a",
+			ProjectName: "a",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PolicyCheckResults: &models.PolicyCheckResults{PolicySetResults: []models.PolicySetResult{{
+					PolicySetName: "required-policy",
+					Passed:        true,
+					Approvals:     []models.PolicySetApproval{{Approver: "reviewer"}},
+				}}},
+			},
+		}
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		planResult("project-a", "a"),
+		planResult("project-b", "b"),
+	})
+	Ok(t, err)
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{policyResult(command.PolicyCheck)})
+	Ok(t, err)
+
+	status, err := database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+	}}, "generation-1")
+	Ok(t, err)
+	active := findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, active.Status)
+	Equals(t, "generation-1", active.PlanGeneration)
+	Equals(t, 1, len(active.PolicyStatus))
+
+	ordinaryWrites := []struct {
+		name   string
+		result command.ProjectResult
+	}{
+		{name: "approve policies", result: policyResult(command.ApprovePolicies)},
+		{name: "policy check", result: policyResult(command.PolicyCheck)},
+		{name: "apply", result: command.ProjectResult{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+			ProjectCommandOutput: command.ProjectCommandOutput{ApplySuccess: "applied"},
+		}},
+		{name: "import", result: command.ProjectResult{
+			Command: command.Import, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+			ProjectCommandOutput: command.ProjectCommandOutput{ImportSuccess: &models.ImportSuccess{}},
+		}},
+		{name: "state", result: command.ProjectResult{
+			Command: command.State, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+			ProjectCommandOutput: command.ProjectCommandOutput{StateRmSuccess: &models.StateRmSuccess{}},
+		}},
+	}
+	for _, test := range ordinaryWrites {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{test.result})
+			Assert(t, err != nil, "expected ordinary write to reject an active plan generation")
+			Assert(t, strings.Contains(err.Error(), "project has an active plan generation"), "unexpected error: %s", err)
+
+			got, err := database.GetPullStatus(pull)
+			Ok(t, err)
+			active := findPlanGenerationProject(t, *got, "project-a", "a")
+			Equals(t, models.ErroredPlanStatus, active.Status)
+			Equals(t, "generation-1", active.PlanGeneration)
+			Equals(t, 1, len(active.PolicyStatus))
+		})
+	}
+
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "project-b", ProjectName: "b",
+			ProjectCommandOutput: command.ProjectCommandOutput{ApplySuccess: "applied"},
+		},
+		policyResult(command.ApprovePolicies),
+	})
+	Assert(t, err != nil, "expected the whole update to reject an active plan generation")
+	got, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, models.PlannedPlanStatus, findPlanGenerationProject(t, *got, "project-b", "b").Status)
+	stalePull := pull
+	stalePull.HeadCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	_, err = database.UpdatePullWithResults(stalePull, []command.ProjectResult{{
+		Command: command.Apply, Workspace: "default", RepoRelDir: "project-b", ProjectName: "b",
+		ProjectCommandOutput: command.ProjectCommandOutput{ApplySuccess: "applied"},
+	}})
+	Assert(t, err != nil, "expected a different-head result to preserve every active plan generation")
+	Assert(t, strings.Contains(err.Error(), "project has an active plan generation"), "unexpected error: %s", err)
+	got, err = database.GetPullStatus(pull)
+	Ok(t, err)
+	active = findPlanGenerationProject(t, *got, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, active.Status)
+	Equals(t, "generation-1", active.PlanGeneration)
+	Equals(t, models.PlannedPlanStatus, findPlanGenerationProject(t, *got, "project-b", "b").Status)
+	err = database.UpdateProjectStatus(pull, "default", "project-a", models.DiscardedPlanStatus)
+	Assert(t, err != nil, "expected lock deletion status update to reject an active plan generation")
+	Assert(t, strings.Contains(err.Error(), "project has an active plan generation"), "unexpected error: %s", err)
+	_, err = database.ReplacePullWithResults(pull, []command.ProjectResult{planResult("project-b", "b")})
+	Assert(t, err != nil, "expected atomic replacement to reject an active plan generation")
+	Assert(t, strings.Contains(err.Error(), "project has an active plan generation"), "unexpected error: %s", err)
+	got, err = database.GetPullStatus(pull)
+	Ok(t, err)
+	active = findPlanGenerationProject(t, *got, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, active.Status)
+	Equals(t, "generation-1", active.PlanGeneration)
+	Equals(t, models.PlannedPlanStatus, findPlanGenerationProject(t, *got, "project-b", "b").Status)
+
+	status, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{planResult("project-a", "a")})
+	Ok(t, err)
+	completed := findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.PlannedPlanStatus, completed.Status)
+	Equals(t, 1, len(completed.PolicyStatus))
+	_, err = database.CompletePlanGeneration(pull, "stale-generation", []command.ProjectResult{planResult("project-a", "a")})
+	Assert(t, err != nil, "expected stale plan generation completion to fail")
+}
+
+func TestPlanGenerationPreservesStickyPolicyStatusAcrossRestartAndPullHeadChange(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	planResult := func(dir, projectName string) command.ProjectResult {
+		return command.ProjectResult{
+			Command:     command.Plan,
+			Workspace:   "default",
+			RepoRelDir:  dir,
+			ProjectName: projectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{},
+			},
+		}
+	}
+	policyResult := func(dir, projectName, hash string, approvals []models.PolicySetApproval) command.ProjectResult {
+		return command.ProjectResult{
+			Command:     command.PolicyCheck,
+			Workspace:   "default",
+			RepoRelDir:  dir,
+			ProjectName: projectName,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PolicyCheckResults: &models.PolicyCheckResults{PolicySetResults: []models.PolicySetResult{{
+					PolicySetName: "required-policy",
+					Passed:        true,
+					Hashes:        []string{hash},
+					Approvals:     approvals,
+				}}},
+			},
+		}
+	}
+	approval := models.PolicySetApproval{Approver: "reviewer", Hashes: []string{"hash-1"}}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		planResult("project-a", "a"),
+		planResult("project-b", "b"),
+	})
+	Ok(t, err)
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		policyResult("project-a", "a", "hash-1", []models.PolicySetApproval{approval}),
+		policyResult("project-b", "b", "hash-b", []models.PolicySetApproval{{Approver: "other-reviewer", Hashes: []string{"hash-b"}}}),
+	})
+	Ok(t, err)
+
+	selected := []models.ProjectStatus{{Workspace: "default", RepoRelDir: "project-a", ProjectName: "a"}}
+	status, err := database.BeginPlanGeneration(pull, selected, "generation-1")
+	Ok(t, err)
+	projectA := findPlanGenerationProject(t, status, "project-a", "a")
+	projectB := findPlanGenerationProject(t, status, "project-b", "b")
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
+	Equals(t, "generation-1", projectA.PlanGeneration)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+	Equals(t, "other-reviewer", projectB.PolicyStatus[0].Approvals[0].Approver)
+
+	failedPlan := planResult("project-a", "a")
+	failedPlan.PlanSuccess = nil
+	failedPlan.Error = errors.New("plan failed")
+	status, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{failedPlan})
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
+	Equals(t, "", projectA.PlanGeneration)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+
+	_, err = database.BeginPlanGeneration(pull, selected, "generation-2")
+	Ok(t, err)
+	_, err = database.CompletePlanGeneration(pull, "stale-generation", []command.ProjectResult{planResult("project-a", "a")})
+	Assert(t, err != nil, "expected failed generation completion")
+	Ok(t, database.Close())
+
+	database = newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	restartedStatus, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, *restartedStatus, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
+	Equals(t, "generation-2", projectA.PlanGeneration)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+	projectB = findPlanGenerationProject(t, *restartedStatus, "project-b", "b")
+	Equals(t, "other-reviewer", projectB.PolicyStatus[0].Approvals[0].Approver)
+
+	newHeadPull := pull
+	newHeadPull.HeadCommit = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	status, err = database.BeginPlanGeneration(newHeadPull, selected, "generation-3")
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
+	Equals(t, "generation-3", projectA.PlanGeneration)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+	status, err = database.CompletePlanGeneration(newHeadPull, "generation-3", []command.ProjectResult{planResult("project-a", "a")})
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.PlannedPlanStatus, projectA.Status)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+	Ok(t, database.Close())
+	database = newTestRedis(mr)
+	postPlanRestartStatus, err := database.GetPullStatus(newHeadPull)
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, *postPlanRestartStatus, "project-a", "a")
+	Equals(t, models.PlannedPlanStatus, projectA.Status)
+	Equals(t, "reviewer", projectA.PolicyStatus[0].Approvals[0].Approver)
+
+	status, err = database.UpdatePullWithResults(newHeadPull, []command.ProjectResult{
+		policyResult("project-a", "a", "hash-2", nil),
+	})
+	Ok(t, err)
+	projectA = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, "hash-2", projectA.PolicyStatus[0].Hashes[0])
+	Equals(t, 0, len(projectA.PolicyStatus[0].Approvals))
+}
+
+func TestCompletePlanGenerationRejectsMatchingTokenWithNonActiveStatus(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	_, err := database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+	}}, "generation-1")
+	Ok(t, err)
+
+	key := fmt.Sprintf("%s::%s::%d", pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	serialized, err := mr.Get(key)
+	Ok(t, err)
+	var status models.PullStatus
+	Ok(t, json.Unmarshal([]byte(serialized), &status))
+	status.Projects[0].Status = models.PlannedPlanStatus
+	serializedStatus, err := json.Marshal(status)
+	Ok(t, err)
+	Ok(t, mr.Set(key, string(serializedStatus)))
+
+	_, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{{
+		Command: command.Plan, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+		ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}},
+	}})
+	Assert(t, err != nil, "expected matching token with non-active status to fail completion")
+	got, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+	Equals(t, "generation-1", got.Projects[0].PlanGeneration)
 }
 
 func findPlanGenerationProject(t *testing.T, status models.PullStatus, dir, projectName string) models.ProjectStatus {

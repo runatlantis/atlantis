@@ -421,6 +421,14 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
 			currStatus = nil
 		}
+		if currStatus != nil && pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			if err := rejectAnyActivePlanGeneration(currStatus); err != nil {
+				return err
+			}
+		}
+		if err := rejectResultsForActivePlanGeneration(currStatus, newResults); err != nil {
+			return err
+		}
 
 		// If there is no pull OR if the pull we have is out of date, we
 		// just write a new pull.
@@ -506,6 +514,40 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 	return newStatus, nil
 }
 
+// ReplacePullWithResults atomically replaces a pull status unless a plan
+// generation is active. Only CompletePlanGeneration may finalize that state.
+func (b *BoltDB) ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			// Preserve the historical replace behavior: an unreadable entry is
+			// discarded because replacement does not depend on its contents.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
+		}
+		if err := rejectAnyActivePlanGeneration(currStatus); err != nil {
+			return err
+		}
+
+		newStatus = models.PullStatus{Pull: pull}
+		for _, result := range newResults {
+			newStatus.Projects = append(newStatus.Projects, b.projectResultToProject(result))
+		}
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
 // BeginPlanGeneration atomically makes the selected projects non-applyable
 // before their plan steps can replace any plan artifacts.
 func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error) {
@@ -535,20 +577,26 @@ func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, projects []models.
 			for i := range newStatus.Projects {
 				current := &newStatus.Projects[i]
 				if sameProjectStatus(*current, project) {
-					current.Status = models.PlanningPlanStatus
+					current.Status = models.ErroredPlanStatus
 					current.PlanGeneration = generation
-					current.PolicyStatus = nil
 					updated = true
 					break
 				}
 			}
 			if !updated {
+				policyStatus := project.PolicyStatus
+				if currStatus != nil {
+					if previous := findProjectStatus(currStatus.Projects, project.Workspace, project.RepoRelDir, project.ProjectName); previous != nil {
+						policyStatus = previous.PolicyStatus
+					}
+				}
 				newStatus.Projects = append(newStatus.Projects, models.ProjectStatus{
 					Workspace:      project.Workspace,
 					RepoRelDir:     project.RepoRelDir,
 					ProjectName:    project.ProjectName,
 					PlanGeneration: generation,
-					Status:         models.PlanningPlanStatus,
+					PolicyStatus:   policyStatus,
+					Status:         models.ErroredPlanStatus,
 				})
 			}
 		}
@@ -589,15 +637,14 @@ func (b *BoltDB) CompletePlanGeneration(pull models.PullRequest, generation stri
 		newStatus = *currStatus
 		for _, result := range newResults {
 			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
-			if project == nil || project.Status != models.PlanningPlanStatus || project.PlanGeneration != generation {
+			if project == nil || project.Status != models.ErroredPlanStatus || project.PlanGeneration != generation {
 				return fmt.Errorf("plan generation %q is no longer current for dir %q workspace %q project %q", generation, result.RepoRelDir, result.Workspace, result.ProjectName)
 			}
 			project.Status = result.PlanStatus()
 			project.PlanGeneration = ""
-			project.PolicyStatus = result.PolicyStatus()
 		}
 		for _, project := range newStatus.Projects {
-			if project.Status == models.PlanningPlanStatus && project.PlanGeneration == generation {
+			if project.PlanGeneration == generation {
 				return fmt.Errorf("plan generation %q is incomplete for dir %q workspace %q project %q", generation, project.RepoRelDir, project.Workspace, project.ProjectName)
 			}
 		}
@@ -621,6 +668,31 @@ func findProjectStatus(projects []models.ProjectStatus, workspace, repoRelDir, p
 		project := &projects[i]
 		if project.Workspace == workspace && project.RepoRelDir == repoRelDir && project.ProjectName == projectName {
 			return project
+		}
+	}
+	return nil
+}
+
+func rejectResultsForActivePlanGeneration(status *models.PullStatus, results []command.ProjectResult) error {
+	if status == nil {
+		return nil
+	}
+	for _, result := range results {
+		project := findProjectStatus(status.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+		if project != nil && project.PlanGeneration != "" {
+			return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", result.RepoRelDir, result.Workspace, result.ProjectName)
+		}
+	}
+	return nil
+}
+
+func rejectAnyActivePlanGeneration(status *models.PullStatus) error {
+	if status == nil {
+		return nil
+	}
+	for _, project := range status.Projects {
+		if project.PlanGeneration != "" {
+			return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", project.RepoRelDir, project.Workspace, project.ProjectName)
 		}
 	}
 	return nil
@@ -695,6 +767,9 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 			// in-place updating its Status field.
 			proj := &currStatus.Projects[i]
 			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+				if proj.PlanGeneration != "" {
+					return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", proj.RepoRelDir, proj.Workspace, proj.ProjectName)
+				}
 				proj.Status = newStatus
 				proj.PlanGeneration = ""
 				break

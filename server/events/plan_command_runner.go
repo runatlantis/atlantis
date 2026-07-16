@@ -165,6 +165,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		}
 		return
 	}
+	preexistingPlanLocks := p.snapshotExistingPlanLocks(ctx, projectCmds)
 	planGeneration, _, err := p.dbUpdater.beginPlanGeneration(pull, projectCmds)
 	if err != nil {
 		p.handlePlanGenerationStartError(ctx, AutoplanCommand{}, err)
@@ -175,18 +176,23 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
 	if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
+		p.handlePlanGenerationCompletionError(
+			ctx,
+			AutoplanCommand{},
+			fmt.Errorf("deleting previous plans and locks after starting plan generation: %w", err),
+			planGeneration,
+			projectCmds,
+			preexistingPlanLocks,
+		)
 		return
 	}
 	// Any on-plan lock that existed before this generic/autoplan command was
 	// removed above. A lock present after the plan steps is therefore owned by
 	// this generation and is safe to clean on a failed final write.
-	preexistingPlanLocks := make(map[string]bool)
+	preexistingPlanLocks = make(map[string]bool)
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result = completePlanGenerationResults(projectCmds, result)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -198,6 +204,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	pullStatus, err := p.dbUpdater.completePlanGeneration(ctx.Pull, planGeneration, result.ProjectResults)
 	if err != nil {
+		p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus)
 		p.handlePlanGenerationCompletionError(ctx, AutoplanCommand{}, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
@@ -332,16 +339,21 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if !cmd.IsForSpecificProject() && len(projectCmds) > 0 {
 		ctx.Log.Debug("deleting previous plans and locks")
 		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-				ctx.Log.Warn("unable to update commit status: %s", statusErr)
-			}
-			p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+			p.handlePlanGenerationCompletionError(
+				ctx,
+				cmd,
+				fmt.Errorf("deleting previous plans and locks after starting plan generation: %w", err),
+				planGeneration,
+				projectCmds,
+				preexistingPlanLocks,
+			)
 			return
 		}
 		preexistingPlanLocks = make(map[string]bool)
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result = completePlanGenerationResults(projectCmds, result)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -361,6 +373,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		pullStatus, err = p.dbUpdater.completePlanGeneration(pull, planGeneration, result.ProjectResults)
 	}
 	if err != nil {
+		p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus)
 		p.handlePlanGenerationCompletionError(ctx, cmd, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
@@ -395,13 +408,13 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 }
 
 func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) (models.PullStatus, error) {
-	if _, err := p.deletePlansAndPendingPlanLocks(ctx); err != nil {
-		return models.PullStatus{}, err
-	}
 	pullStatus, err := p.dbUpdater.replaceDB(ctx, pull, nil)
 	if err != nil {
 		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
+	// Keep any filesystem artifacts. Another replica can begin a generation
+	// immediately after the durable replacement, and this process has no atomic
+	// way to prove a discovered plan still belongs to the replaced state.
 	return pullStatus, nil
 }
 
@@ -495,7 +508,7 @@ func (p *PlanCommandRunner) cleanupFailedPlanGeneration(
 	cleanedLocks := make(map[string]bool)
 	for _, projectCtx := range projectCmds {
 		projectStatus := findProjectInPullStatus(pullStatus, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
-		if projectStatus == nil || projectStatus.Status != models.PlanningPlanStatus || projectStatus.PlanGeneration != generation {
+		if projectStatus == nil || projectStatus.Status != models.ErroredPlanStatus || projectStatus.PlanGeneration != generation {
 			continue
 		}
 
@@ -532,6 +545,41 @@ func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
 	return false
 }
 
+func completePlanGenerationResults(projectCmds []command.ProjectContext, result command.Result) command.Result {
+	completed := make(map[applyPlanKey]struct{}, len(result.ProjectResults))
+	for _, projectResult := range result.ProjectResults {
+		completed[newApplyPlanKey(projectResult.Workspace, projectResult.RepoRelDir, projectResult.ProjectName)] = struct{}{}
+	}
+
+	for _, projectCtx := range projectCmds {
+		key := newApplyPlanKey(projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+		if _, ok := completed[key]; ok {
+			continue
+		}
+		completed[key] = struct{}{}
+		result.ProjectResults = append(result.ProjectResults, command.ProjectResult{
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("plan skipped because an earlier execution-order group failed"),
+			},
+			Command:           command.Plan,
+			SubCommand:        projectCtx.SubCommand,
+			RepoRelDir:        projectCtx.RepoRelDir,
+			Workspace:         projectCtx.Workspace,
+			ProjectName:       projectCtx.ProjectName,
+			SilencePRComments: projectCtx.SilencePRComments,
+		})
+	}
+	return result
+}
+
+func (p *PlanCommandRunner) publishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+}
+
 func (p *PlanCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
 	return MarkCommandSkippedIfIgnoredTarget(ctx, command.Plan, cmd, p.prjCmdBuilder)
 }
@@ -554,7 +602,11 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 	switch commandName {
 	case command.Plan:
-		numErrored = pullStatus.StatusCount(models.ErroredPlanStatus) + pullStatus.StatusCount(models.PlanningPlanStatus)
+		for _, project := range pullStatus.Projects {
+			if project.Status == models.ErroredPlanStatus || project.PlanGeneration != "" {
+				numErrored++
+			}
+		}
 		// We consider anything that isn't a plan error or an incomplete plan
 		// generation as a plan success.
 		// For example, if there is an apply error, that means that at least a
@@ -604,14 +656,6 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 // deletePlans deletes all plans generated in this ctx.
 func (p *PlanCommandRunner) deletePlans(ctx *command.Context) ([]PendingPlan, error) {
-	return p.deletePlansWithPostDelete(ctx, nil)
-}
-
-func (p *PlanCommandRunner) deletePlansAndPendingPlanLocks(ctx *command.Context) ([]PendingPlan, error) {
-	return p.deletePlansWithPostDelete(ctx, p.deletePlanLocksForPendingPlans)
-}
-
-func (p *PlanCommandRunner) deletePlansWithPostDelete(ctx *command.Context, postDelete func(*command.Context, []PendingPlan) error) ([]PendingPlan, error) {
 	pullDir, err := p.workingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -644,11 +688,6 @@ func (p *PlanCommandRunner) deletePlansWithPostDelete(ctx *command.Context, post
 			return nil, fmt.Errorf("deleting plan at %s: %w", planPath, err)
 		}
 	}
-	if postDelete != nil {
-		if err := postDelete(ctx, plans); err != nil {
-			return nil, err
-		}
-	}
 	return plans, nil
 }
 
@@ -674,22 +713,6 @@ func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []
 
 		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
 		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *PlanCommandRunner) deletePlanLocksForPendingPlans(ctx *command.Context, plans []PendingPlan) error {
-	unlocked := make(map[string]bool)
-	for _, plan := range plans {
-		project := models.NewProject(ctx.Pull.BaseRepo.FullName, plan.RepoRelDir, plan.ProjectName)
-		lockKey := models.GenerateLockKey(project, plan.Workspace)
-		if unlocked[lockKey] {
-			continue
-		}
-		unlocked[lockKey] = true
-		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, plan.Workspace, lockKey); err != nil {
 			return err
 		}
 	}

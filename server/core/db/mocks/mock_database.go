@@ -189,6 +189,21 @@ func (mr *MockDatabaseMockRecorder) Ping() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDatabase)(nil).Ping))
 }
 
+// ReplacePullWithResults mocks base method.
+func (m *MockDatabase) ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplacePullWithResults", pull, newResults)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplacePullWithResults indicates an expected call of ReplacePullWithResults.
+func (mr *MockDatabaseMockRecorder) ReplacePullWithResults(pull, newResults any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplacePullWithResults", reflect.TypeOf((*MockDatabase)(nil).ReplacePullWithResults), pull, newResults)
+}
+
 // TryLock mocks base method.
 func (m *MockDatabase) TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error) {
 	m.ctrl.T.Helper()

@@ -107,10 +107,8 @@ func staleApplyResultForCurrentPull(pull models.PullRequest, results []command.P
 }
 
 func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
-	if err := c.Database.DeletePullStatus(pull); err != nil {
-		return models.PullStatus{}, err
-	}
-	return c.updateDB(ctx, pull, results)
+	ctx.Log.Debug("replacing DB pull results")
+	return c.Database.ReplacePullWithResults(pull, results)
 }
 
 func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) error {

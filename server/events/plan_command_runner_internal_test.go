@@ -239,54 +239,6 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 	}
 }
 
-func TestPlanCommandRunner_DeletePlanLocksForPendingPlansReleasesOnlyPendingPlanLocks(t *testing.T) {
-	repo := models.Repo{FullName: "owner/repo"}
-	pull := models.PullRequest{BaseRepo: repo, Num: 1}
-	deletedPlanProject := models.NewProject(repo.FullName, "terraform", "prod")
-	unrelatedProject := models.NewProject(repo.FullName, "terraform/unrelated", "prod")
-	deletedPlanKey := models.GenerateLockKey(deletedPlanProject, "default")
-	unrelatedKey := models.GenerateLockKey(unrelatedProject, "default")
-	locker := &recordingPlanCleanupLocker{
-		locksByKey: map[string]models.ProjectLock{
-			deletedPlanKey: lockForPull(repo, pull.Num),
-			unrelatedKey:   lockForPull(repo, pull.Num),
-		},
-	}
-	runner := &PlanCommandRunner{lockingLocker: locker}
-	ctx := &command.Context{
-		Log:  logging.NewNoopLogger(t),
-		Pull: pull,
-	}
-	plans := []PendingPlan{
-		{RepoRelDir: "terraform", Workspace: "default", ProjectName: "prod"},
-	}
-
-	if err := runner.deletePlanLocksForPendingPlans(ctx, plans); err != nil {
-		t.Fatalf("deletePlanLocksForPendingPlans returned error: %s", err)
-	}
-
-	expectedCalls := []unlockIfOwnedByPullCall{
-		{
-			key:       deletedPlanKey,
-			project:   deletedPlanProject,
-			workspace: "default",
-			pullNum:   pull.Num,
-		},
-	}
-	if !equalUnlockIfOwnedByPullCalls(locker.unlockIfOwnedByPullCalls, expectedCalls) {
-		t.Fatalf("expected UnlockIfOwnedByPull calls %#v, got %#v", expectedCalls, locker.unlockIfOwnedByPullCalls)
-	}
-	if !equalStringSlices(locker.deletedKeys, []string{deletedPlanKey}) {
-		t.Fatalf("expected deleted keys %#v, got %#v", []string{deletedPlanKey}, locker.deletedKeys)
-	}
-	if _, ok := locker.locksByKey[unrelatedKey]; !ok {
-		t.Fatalf("expected unrelated lock %q to remain", unrelatedKey)
-	}
-	if len(locker.unlockByPullCalls) != 0 {
-		t.Fatalf("expected no UnlockByPull calls, got %#v", locker.unlockByPullCalls)
-	}
-}
-
 type recordingPendingPlanFinder struct {
 	PendingPlanFinder
 	findPullDirs []string

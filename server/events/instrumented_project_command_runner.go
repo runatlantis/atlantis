@@ -58,6 +58,14 @@ func (p *InstrumentedProjectCommandRunner) PublishDeferredApplyStatuses(projectC
 	publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
 }
 
+func (p *InstrumentedProjectCommandRunner) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	publisher, ok := p.projectCommandRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+}
+
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
 	return RunAndEmitStats(ctx, p.projectCommandRunner.ApprovePolicies, p.scope)
 }

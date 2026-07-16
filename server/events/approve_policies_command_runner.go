@@ -4,6 +4,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -80,18 +82,19 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 
 	result := runProjectCmds(projectCmds, a.prjCmdRunner.ApprovePolicies)
 
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result,
-	)
-
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
+		ctx.CommandHasErrors = true
+		result.Error = fmt.Errorf("writing approve_policies results: %w", err)
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
 
+	a.pullUpdater.updatePull(ctx, cmd, result)
 	a.updateCommitStatus(ctx, pullStatus)
 }
 

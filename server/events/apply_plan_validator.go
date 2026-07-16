@@ -61,10 +61,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	if err != nil {
 		return err
 	}
-	if statusErr, deletePlan := v.validateProjectPlanStatus(ctx); statusErr != nil {
-		if deletePlan {
-			return rejectProjectPlan(planPath, "%s", statusErr)
-		}
+	if statusErr := v.validateProjectPlanStatus(ctx); statusErr != nil {
 		return statusErr
 	}
 
@@ -98,25 +95,24 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlanStatus(ctx command.Projec
 	if v == nil || v.PullStatusFetcher == nil {
 		return nil
 	}
-	err, _ := v.validateProjectPlanStatus(ctx)
-	return err
+	return v.validateProjectPlanStatus(ctx)
 }
 
-// validateProjectPlanStatus returns whether Atlantis should remove its
-// convention-managed plan file when validation fails. A stale command must not
-// delete a newer plan recorded for the live pull identity.
-func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) (error, bool) {
+// validateProjectPlanStatus only validates durable state. Rejected validation
+// must not remove a convention-managed plan because another replica may have
+// replaced the file after this validator read PullStatus.
+func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) error {
 	pullStatus, err := v.pullStatusForApply(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching current plan status: %w", err), false
+		return fmt.Errorf("fetching current plan status: %w", err)
 	}
 	if pullStatus == nil {
-		return errors.New("no current plan status found; run `atlantis plan` before apply"), true
+		return errors.New("no current plan status found; run `atlantis plan` before apply")
 	}
 
 	livePull, err := v.getLivePullIdentity(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching live pull request: %w", err), false
+		return fmt.Errorf("fetching live pull request: %w", err)
 	}
 	if livePull.HeadCommit != "" || livePull.BaseBranch != "" {
 		currentPull := ctx.Pull
@@ -125,13 +121,13 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 			currentPull.BaseBranch = livePull.BaseBranch
 		}
 		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
-			return err, false
+			return err
 		}
 		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
-			return err, false
+			return err
 		}
 	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
-		return err, true
+		return err
 	}
 
 	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
@@ -139,28 +135,28 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 		return fmt.Errorf(
 			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
-		), true
+		)
+	}
+	if proj.PlanGeneration != "" {
+		return fmt.Errorf(
+			"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+		)
 	}
 	if !statusAllowedForApplyExecution(proj.Status) {
-		if proj.Status == models.PlanningPlanStatus {
-			return fmt.Errorf(
-				"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
-				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
-			), true
-		}
 		if proj.Status == models.ErroredPolicyCheckStatus {
 			return fmt.Errorf(
 				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
 				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
-			), true
+			)
 		}
 		return fmt.Errorf(
 			"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, proj.Status.String(),
-		), true
+		)
 	}
 
-	return nil, false
+	return nil
 }
 
 func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.PullRequest) error {
@@ -276,14 +272,6 @@ func containedPlanRelPath(baseDir, path string) (string, error) {
 		return "", fmt.Errorf("plan path traversal detected: %w", utils.ErrPathEscapesBase)
 	}
 	return relPath, nil
-}
-
-func rejectProjectPlan(planPath string, format string, args ...any) error {
-	err := fmt.Errorf(format, args...)
-	if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
-		return fmt.Errorf("%w; deleting rejected plan file %q: %v", err, planPath, removeErr)
-	}
-	return err
 }
 
 func looksLikeCommitSHA(s string) bool {

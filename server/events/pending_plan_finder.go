@@ -35,6 +35,10 @@ type PendingPlan struct {
 	// Workspace is the workspace this plan should execute in.
 	Workspace   string
 	ProjectName string
+	// PlanFilePath is the absolute path discovered by the pending plan finder.
+	// It distinguishes Atlantis convention-managed plan files from custom
+	// workflow artifacts that also use a .tfplan extension.
+	PlanFilePath string
 }
 
 // Find finds all pending plans in pullDir. pullDir should be the working
@@ -98,13 +102,15 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 				if err != nil {
 					return nil, nil, err
 				}
+				planFilePath := filepath.Join(repoDir, file)
 				plans = append(plans, PendingPlan{
-					RepoDir:     repoDir,
-					RepoRelDir:  filepath.Dir(file),
-					Workspace:   workspace,
-					ProjectName: projectName,
+					RepoDir:      repoDir,
+					RepoRelDir:   filepath.Dir(file),
+					Workspace:    workspace,
+					ProjectName:  projectName,
+					PlanFilePath: planFilePath,
 				})
-				absPaths = append(absPaths, filepath.Join(repoDir, file))
+				absPaths = append(absPaths, planFilePath)
 			}
 		}
 	}
