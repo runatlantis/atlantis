@@ -3687,6 +3687,122 @@ workflows:
 	})
 }
 
+func TestDefaultProjectCommandBuilder_BuildMultiApply_RunOnlyWorkflowWithNestedCustomPlans(t *testing.T) {
+	RegisterMockTestingT(t)
+	atlantisYAML := `
+version: 3
+projects:
+- name: platform-stack
+  dir: stacks/platform
+  workspace: default
+  workflow: terragrunt-style
+workflows:
+  terragrunt-style:
+    plan:
+      steps:
+      - run: custom-plan-command
+    apply:
+      steps:
+      - run: custom-apply-command
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"stacks": map[string]any{
+				"platform": map[string]any{
+					"main.tf": nil,
+					"dev": map[string]any{
+						"atlantis.tfplan": "dev-plan-marker",
+					},
+					"staging": map[string]any{
+						"atlantis.tfplan": "staging-plan-marker",
+					},
+				},
+			},
+		},
+	})
+	repoDir := filepath.Join(tmpDir, "default")
+	devPlanPath := filepath.Join(repoDir, "stacks", "platform", "dev", "atlantis.tfplan")
+	stagingPlanPath := filepath.Join(repoDir, "stacks", "platform", "staging", "atlantis.tfplan")
+	runCmd(t, repoDir, "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(repoDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+	)
+
+	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
+	ctxs, err := builder.BuildApplyCommands(&command.Context{
+		Log:   logger,
+		Scope: scope,
+		Pull:  pull,
+		PullStatus: &models.PullStatus{
+			Pull: pull,
+			Projects: []models.ProjectStatus{{
+				RepoRelDir:  "stacks/platform",
+				Workspace:   "default",
+				ProjectName: "platform-stack",
+				Status:      models.PlannedPlanStatus,
+			}},
+		},
+	}, &events.CommentCommand{Name: command.Apply})
+
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "platform-stack", ctxs[0].ProjectName)
+	Equals(t, "stacks/platform", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, 1, len(ctxs[0].Steps))
+	Equals(t, "run", ctxs[0].Steps[0].StepName)
+	Equals(t, "custom-apply-command", ctxs[0].Steps[0].RunCommand)
+	Equals(t, "", ctxs[0].ExpectedPlanHash)
+
+	devPlan, err := os.ReadFile(devPlanPath)
+	Ok(t, err)
+	Equals(t, "dev-plan-marker", string(devPlan))
+	stagingPlan, err := os.ReadFile(stagingPlanPath)
+	Ok(t, err)
+	Equals(t, "staging-plan-marker", string(stagingPlan))
+	for _, ctx := range ctxs {
+		Assert(t, ctx.RepoRelDir != "stacks/platform/dev", "unexpected dev apply context")
+		Assert(t, ctx.RepoRelDir != "stacks/platform/staging", "unexpected staging apply context")
+	}
+}
+
 // Test that autodiscover.ignore_paths is respected during multi-apply.
 // Plans in ignored paths (e.g. .terraform/modules/) should not be applied.
 func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) {
