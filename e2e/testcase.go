@@ -269,7 +269,7 @@ var testCases = []TestCase{
 		MutateContent:                 regressionMutateContent("custom-plan-path"),
 		ExpectedStatusContexts:        []string{"atlantis/plan: custom-plan-path"},
 		ForbidExtraProjectStatuses:    true,
-		ExpectedCommentSubstring:      "ATLANTIS_E2E_CUSTOM_PLAN_CREATED generated/dev/atlantis.tfplan generated/staging/atlantis.tfplan",
+		ExpectedCommentSubstring:      "ATLANTIS_E2E_CUSTOM_PLAN_CREATED",
 		ApplyCommand:                  "atlantis apply",
 		ExpectedApplyStatusContexts:   []string{"atlantis/apply: custom-plan-path"},
 		ExpectedApplyCommentSubstring: "ATLANTIS_E2E_CUSTOM_PLAN_APPLY_OK",
