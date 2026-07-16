@@ -1,0 +1,60 @@
+server/events/project_command_builder.go
+  s_2a3e2ffe398070::t_e9c849d1b79336 1455-1460
+  s_2a3e2ffe398070::t_df9436f64a9ba1 1413
+server/core/redis/redis.go
+  s_2a3e2ffe398070::t_0ca96e147cd293 24,422-424,426-438,440
+  s_2a3e2ffe398070::t_0111d381aa8867 550-552,595-597
+  s_2a3e2ffe398070::t_5d6cf4ffbee922 621-625
+  s_2a3e2ffe398070::t_8b9e0899d190f3 474-496,500-527,530-531,533-534,536-544,558,603,630,646-651
+  s_2a3e2ffe398070::t_a08ec89a195823 607
+  s_2a3e2ffe398070::t_a2cc7722ae2b93 53-62,545,547-549,553-557,559-574,578-594,598-602,604-606,608-609,611-615,617-620,626-629,631-645,652-672,675-676,678-689,691
+server/events/db_updater.go
+  s_2a3e2ffe398070::t_93617723fd0195 9,19-41
+  s_84f9cf2cdf3e31::t_2ad6a828a6db55 42
+server/core/db/db.go
+  s_2a3e2ffe398070::t_ddfad75da246d1 29-30
+server/core/boltdb/boltdb.go
+  s_2a3e2ffe398070::t_7c1fefe0c21777 509-511,515-566,570-584,586-598,604-627
+  s_2a3e2ffe398070::t_a08ec89a195823 585
+  s_2a3e2ffe398070::t_5d6cf4ffbee922 599-603
+  s_2a3e2ffe398070::t_844b843f7f39f7 472,699
+  s_2a3e2ffe398070::t_0111d381aa8867 512-514,567-569
+  s_2a3e2ffe398070::t_ff04885019d47e 628
+server/events/models/models.go
+  s_2a3e2ffe398070::t_ddfad75da246d1 835-838,874-876,898-899
+server/events/plan_command_runner.go
+  s_2a3e2ffe398070::t_df9436f64a9ba1 558
+  s_2a3e2ffe398070::t_2d96c27748bb23 185-188,342
+  s_2a3e2ffe398070::t_2d97d8dba7c605 559-560
+  s_2a3e2ffe398070::t_dea67feeec6312 168,202,320,322,365,443-534
+  s_2a3e2ffe398070::t_670790cfc1f8d6 169-173,200,319,323-327,362,441-442
+  s_2a3e2ffe398070::t_ec2271ec48cc41 535
+server/events/apply_plan_validator.go
+  s_2a3e2ffe398070::t_df9436f64a9ba1 145-150
+server/core/db/mocks/mock_database.go
+  s_84f9cf2cdf3e31::t_6f9c75ec8e10f9 45-59,89-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "3bc8b3974e1c781fb4f73cee3684a836a0be573a",
+  "prompts": {},
+  "sessions": {
+    "s_2a3e2ffe398070": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-fc9f-7442-9630-9cda5e921418",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    },
+    "s_84f9cf2cdf3e31": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5126-892e-71e1-a6fc-8aaad682a7bb",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
