@@ -7,7 +7,7 @@ VCS providers.
 
 - `ScenarioPlanOnly` waits for autoplan and asserts configured project statuses
   and comment markers. It does not execute `ApplyCommand` fields.
-- `ScenarioPlanThenApply` waits for autoplan, posts a configured targeted apply,
+- `ScenarioPlanThenApply` waits for autoplan, posts its configured apply command,
   rejects stale aggregate results, and asserts apply project statuses and a new
   apply comment marker.
 - `ScenarioPlanThenReplanThenApply` pushes a second mutation, requires a new
