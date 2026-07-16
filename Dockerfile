@@ -133,6 +133,7 @@ RUN case ${TARGETPLATFORM} in \
         "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=1c0b6ee5200ca708c5cebebb18fdeb0e1c98f1af5c1a9cba205a4c0ab5a5ec08 ;; \
         "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=73a9c90eeb4312133a63c3eaee0c38c019ea7bfa0953d174809d25b18588dd8d ;; \
         "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=567002d2735ceb0e876e326736f1b72895931d5ac156002cc8561b072a4ce9a3 ;; \
+        *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
     echo "${GIT_LFS_SHA256}  git-lfs.tar.gz" | sha256sum -c - && \
