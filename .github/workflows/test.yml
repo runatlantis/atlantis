@@ -47,10 +47,13 @@ jobs:
         with:
           filters: |
             go:
-              - '**.go'
-              - '**.txt' # golden file test output
+              - '**/*.go'
+              - '**/*.txt' # golden file test output
               - 'go.*'
-              - '**.tmpl'
+              - '**/go.mod'
+              - '**/go.sum'
+              - '**/*.tmpl'
+              - 'Makefile'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]

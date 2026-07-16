@@ -47,8 +47,19 @@ regen-mocks: ## Delete and regenerate all mocks
 	@# been made empty, causing go generate to fail.
 	./scripts/go-generate.sh
 
+.PHONY: test-e2e-module
+test-e2e-module: ## Run tests for the e2e Go module
+	@cd e2e && go test ./...
+
+.PHONY: test-ranking-module
+test-ranking-module: ## Run tests for the top-issues ranking Go module
+	@cd .github/scripts/update_top_issues_ranking && go test ./...
+
+.PHONY: test-nested-modules
+test-nested-modules: test-e2e-module test-ranking-module ## Run tests for nested Go modules
+
 .PHONY: test
-test: ## Run tests
+test: test-nested-modules ## Run tests
 	@go test -short $(PKG)
 
 .PHONY: docker/test
@@ -56,7 +67,7 @@ docker/test: ## Run tests in docker
 	docker run -it -v $(PWD):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test"
 
 .PHONY: test-all
-test-all: ## Run tests including integration
+test-all: test-nested-modules ## Run tests including integration
 	@go test -timeout=300s $(PKG)
 
 .PHONY: docker/test-all
