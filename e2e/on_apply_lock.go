@@ -174,6 +174,15 @@ func onApplyLockProjectPlanStatusContext() string {
 }
 
 func (t *E2ETester) postAtlantisCommandAndWait(ctx context.Context, pullID int, branchName, caseName, statusCommand, body string) (string, error) {
+	return t.postAtlantisCommandAndWaitForExpectedState(ctx, pullID, branchName, caseName, statusCommand, body, nil)
+}
+
+func (t *E2ETester) postAtlantisCommandAndWaitForExpectedState(
+	ctx context.Context,
+	pullID int,
+	branchName, caseName, statusCommand, body string,
+	expectedState func(string) bool,
+) (string, error) {
 	statusContext := atlantisCommandStatusContext(statusCommand)
 	baseline, err := t.vcsClient.GetCommitStatus(ctx, branchName, statusContext)
 	if err != nil {
@@ -183,15 +192,40 @@ func (t *E2ETester) postAtlantisCommandAndWait(ctx context.Context, pullID int, 
 	if err := t.vcsClient.PostPRComment(ctx, pullID, body); err != nil {
 		return "", fmt.Errorf("[%s] posting command %q: %w", caseName, body, err)
 	}
-	return pollAtlantisCommandStatusAfter(ctx, t.vcsClient, branchName, statusCommand, caseName, baseline)
+	return pollAtlantisCommandStatusAfterExpectedState(ctx, t.vcsClient, branchName, statusCommand, caseName, baseline, expectedState)
 }
 
 func pollAtlantisCommandStatusAfter(ctx context.Context, client VCSClient, branchName, command, caseName string, baseline CommitStatus) (string, error) {
-	statusContext := atlantisCommandStatusContext(command)
-	return pollCommitStatusAfter(ctx, client, branchName, statusContext, caseName, baseline)
+	return pollAtlantisCommandStatusAfterExpectedState(ctx, client, branchName, command, caseName, baseline, nil)
 }
 
-func pollCommitStatusAfter(ctx context.Context, client VCSClient, branchName, statusContext, caseName string, baseline CommitStatus) (string, error) {
+func pollAtlantisCommandStatusAfterExpectedState(
+	ctx context.Context,
+	client VCSClient,
+	branchName, command, caseName string,
+	baseline CommitStatus,
+	expectedState func(string) bool,
+) (string, error) {
+	statusContext := atlantisCommandStatusContext(command)
+	return pollCommitStatusAfterExpectedState(ctx, client, branchName, statusContext, caseName, baseline, expectedState)
+}
+
+func pollCommitStatusAfter(
+	ctx context.Context,
+	client VCSClient,
+	branchName, statusContext, caseName string,
+	baseline CommitStatus,
+) (string, error) {
+	return pollCommitStatusAfterExpectedState(ctx, client, branchName, statusContext, caseName, baseline, nil)
+}
+
+func pollCommitStatusAfterExpectedState(
+	ctx context.Context,
+	client VCSClient,
+	branchName, statusContext, caseName string,
+	baseline CommitStatus,
+	expectedState func(string) bool,
+) (string, error) {
 	state := "not started"
 	var statusErr error
 	for range lifecycleCommandMaxPolls {
@@ -212,14 +246,25 @@ func pollCommitStatusAfter(ctx context.Context, client VCSClient, branchName, st
 			continue
 		}
 		log.Printf("[%s] %s status on branch %q: %s", caseName, statusContext, branchName, state)
-		if !client.IsAtlantisInProgress(state) {
+		inProgress := client.IsAtlantisInProgress(state)
+		if shouldReturnCommitStatus(state, inProgress, expectedState) {
 			return state, nil
+		}
+		if !inProgress {
+			log.Printf("[%s] %s status %q does not match the expected terminal state; continuing to poll", caseName, statusContext, state)
 		}
 	}
 	if statusErr != nil {
 		return state, fmt.Errorf("[%s] %s timed out after %d polls for branch %q; last state %q; last error: %w", caseName, statusContext, lifecycleCommandMaxPolls, branchName, state, statusErr)
 	}
 	return state, fmt.Errorf("[%s] %s timed out after %d polls for branch %q; last state %q", caseName, statusContext, lifecycleCommandMaxPolls, branchName, state)
+}
+
+func shouldReturnCommitStatus(state string, inProgress bool, expectedState func(string) bool) bool {
+	if inProgress {
+		return false
+	}
+	return expectedState == nil || expectedState(state)
 }
 
 func isNewCommitStatus(status, baseline CommitStatus) bool {

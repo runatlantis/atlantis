@@ -193,7 +193,19 @@ func (t *E2ETester) runPlanApplyLifecycle(ctx context.Context, replan, expectApp
 	if err != nil {
 		return result, fmt.Errorf("[%s] fetching comments before apply: %w", tc.Name, err)
 	}
-	state, applyErr := t.postAtlantisCommandAndWait(ctx, pull.pullID, branchName, tc.Name, "apply", tc.ApplyCommand)
+	expectedApplyState := t.vcsClient.DidAtlantisSucceed
+	if expectApplyFailure {
+		expectedApplyState = t.vcsClient.DidAtlantisFail
+	}
+	state, applyErr := t.postAtlantisCommandAndWaitForExpectedState(
+		ctx,
+		pull.pullID,
+		branchName,
+		tc.Name,
+		"apply",
+		tc.ApplyCommand,
+		expectedApplyState,
+	)
 	result.testResult = state
 	if applyErr != nil {
 		return result, t.withLifecycleDiagnostics(ctx, pull, "apply", applyErr)
