@@ -3696,6 +3696,13 @@ projects:
   dir: stacks/platform
   workspace: default
   workflow: terragrunt-style
+- name: platform-stack-alt
+  dir: stacks/platform
+  workspace: default
+  workflow: terragrunt-style
+- name: managed-child
+  dir: stacks/platform/managed-child
+  workspace: default
 workflows:
   terragrunt-style:
     plan:
@@ -3717,6 +3724,12 @@ workflows:
 					"staging": map[string]any{
 						"atlantis.tfplan": "staging-plan-marker",
 					},
+					"managed-child": map[string]any{
+						"main.tf": nil,
+					},
+				},
+				"platform-other": map[string]any{
+					"main.tf": nil,
 				},
 			},
 		},
@@ -3766,20 +3779,24 @@ workflows:
 	)
 
 	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
-	ctxs, err := builder.BuildApplyCommands(&command.Context{
-		Log:   logger,
-		Scope: scope,
-		Pull:  pull,
-		PullStatus: &models.PullStatus{
-			Pull: pull,
-			Projects: []models.ProjectStatus{{
-				RepoRelDir:  "stacks/platform",
-				Workspace:   "default",
-				ProjectName: "platform-stack",
-				Status:      models.PlannedPlanStatus,
-			}},
-		},
-	}, &events.CommentCommand{Name: command.Apply})
+	platformProject := models.ProjectStatus{
+		RepoRelDir:  "stacks/platform",
+		Workspace:   "default",
+		ProjectName: "platform-stack",
+		Status:      models.PlannedPlanStatus,
+	}
+	buildApply := func(currentPull models.PullRequest, statusPull models.PullRequest, projects ...models.ProjectStatus) ([]command.ProjectContext, error) {
+		return builder.BuildApplyCommands(&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  currentPull,
+			PullStatus: &models.PullStatus{
+				Pull:     statusPull,
+				Projects: projects,
+			},
+		}, &events.CommentCommand{Name: command.Apply})
+	}
+	ctxs, err := buildApply(pull, pull, platformProject)
 
 	Ok(t, err)
 	Equals(t, 1, len(ctxs))
@@ -3801,6 +3818,227 @@ workflows:
 		Assert(t, ctx.RepoRelDir != "stacks/platform/dev", "unexpected dev apply context")
 		Assert(t, ctx.RepoRelDir != "stacks/platform/staging", "unexpected staging apply context")
 	}
+
+	t.Run("preserves nested managed convention plan and hash", func(t *testing.T) {
+		managedProject := models.ProjectStatus{
+			RepoRelDir:  "stacks/platform/managed-child",
+			Workspace:   "default",
+			ProjectName: "managed-child",
+			Status:      models.PlannedPlanStatus,
+		}
+		managedPlanPath := filepath.Join(
+			repoDir,
+			managedProject.RepoRelDir,
+			runtime.GetPlanFilename(managedProject.Workspace, managedProject.ProjectName),
+		)
+		Ok(t, os.WriteFile(managedPlanPath, []byte("managed-plan-marker"), 0600))
+		t.Cleanup(func() { _ = os.Remove(managedPlanPath) })
+
+		ctxs, err := buildApply(pull, pull, platformProject, managedProject)
+		Ok(t, err)
+		Equals(t, 2, len(ctxs))
+		for _, ctx := range ctxs {
+			switch ctx.ProjectName {
+			case "platform-stack":
+				Equals(t, "", ctx.ExpectedPlanHash)
+			case "managed-child":
+				Equals(t, "stacks/platform/managed-child", ctx.RepoRelDir)
+				Assert(t, ctx.ExpectedPlanHash != "", "expected nested managed plan hash")
+			default:
+				t.Fatalf("unexpected project %q", ctx.ProjectName)
+			}
+		}
+	})
+
+	t.Run("rejects nested convention plan without pull status", func(t *testing.T) {
+		managedPlanPath := filepath.Join(
+			repoDir,
+			"stacks",
+			"platform",
+			"managed-child",
+			runtime.GetPlanFilename("default", "managed-child"),
+		)
+		Ok(t, os.WriteFile(managedPlanPath, []byte("unmatched-managed-plan"), 0600))
+		defer func() { _ = os.Remove(managedPlanPath) }()
+
+		_, err := buildApply(pull, pull, platformProject)
+		Assert(t, err != nil, "expected unmatched nested convention plan to reject apply")
+		Assert(t, strings.Contains(err.Error(), "no matching plan status exists"), "got: %s", err)
+	})
+
+	t.Run("does not swallow sibling custom artifact", func(t *testing.T) {
+		siblingPlanPath := filepath.Join(repoDir, "stacks", "platform-other", "atlantis.tfplan")
+		Ok(t, os.WriteFile(siblingPlanPath, []byte("sibling-plan-marker"), 0600))
+		defer func() { _ = os.Remove(siblingPlanPath) }()
+
+		_, err := buildApply(pull, pull, platformProject)
+		Assert(t, err != nil, "expected sibling custom artifact to reject apply")
+		Assert(t, strings.Contains(err.Error(), `dir "stacks/platform-other"`), "got: %s", err)
+		contents, readErr := os.ReadFile(siblingPlanPath)
+		Ok(t, readErr)
+		Equals(t, "sibling-plan-marker", string(contents))
+	})
+
+	t.Run("builds duplicate named projects in the same directory", func(t *testing.T) {
+		alternateProject := platformProject
+		alternateProject.ProjectName = "platform-stack-alt"
+
+		ctxs, err := buildApply(pull, pull, platformProject, alternateProject)
+		Ok(t, err)
+		Equals(t, 2, len(ctxs))
+		projectNames := []string{ctxs[0].ProjectName, ctxs[1].ProjectName}
+		sort.Strings(projectNames)
+		Equals(t, []string{"platform-stack", "platform-stack-alt"}, projectNames)
+		for _, ctx := range ctxs {
+			Equals(t, "stacks/platform", ctx.RepoRelDir)
+			Equals(t, "", ctx.ExpectedPlanHash)
+		}
+	})
+
+	t.Run("rejects active plan generation", func(t *testing.T) {
+		activeProject := platformProject
+		activeProject.Status = models.ErroredPlanStatus
+		activeProject.PlanGeneration = "generation-1"
+		_, err := buildApply(pull, pull, activeProject)
+		Assert(t, err != nil, "expected active generation to reject generic apply")
+		Assert(t, strings.Contains(err.Error(), "plan is incomplete"), "got: %s", err)
+	})
+
+	t.Run("rejects stale head pull status", func(t *testing.T) {
+		_, err := buildApply(
+			models.PullRequest{HeadCommit: "def456", BaseBranch: "main"},
+			pull,
+			platformProject,
+		)
+		Assert(t, err != nil, "expected stale head to reject generic apply")
+		Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+	})
+
+	t.Run("rejects stale base pull status", func(t *testing.T) {
+		_, err := buildApply(
+			models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			pull,
+			platformProject,
+		)
+		Assert(t, err != nil, "expected stale base to reject generic apply")
+		Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	})
+}
+
+func TestDefaultProjectCommandBuilder_BuildMultiApply_AutodiscoveredRunOnlyWorkflowWithoutManagedPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"stacks": map[string]any{
+				"platform": map[string]any{
+					"main.tf": nil,
+				},
+			},
+		},
+	})
+	repoDir := filepath.Join(tmpDir, "default")
+	runCmd(t, repoDir, "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(repoDir, nil)
+
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	defaultWorkflow := globalCfg.Workflows[valid.DefaultWorkflowName]
+	defaultWorkflow.Plan = valid.Stage{Steps: []valid.Step{{
+		StepName:   "run",
+		RunCommand: "custom-plan-command",
+	}}}
+	defaultWorkflow.Apply = valid.Stage{Steps: []valid.Step{{
+		StepName:   "run",
+		RunCommand: "custom-apply-command",
+	}}}
+	globalCfg.Workflows[valid.DefaultWorkflowName] = defaultWorkflow
+	globalCfg.Repos[0].Workflow = &defaultWorkflow
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{Mode: valid.AutoDiscoverEnabledMode}
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+	)
+
+	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
+	project := models.ProjectStatus{
+		RepoRelDir: "stacks/platform",
+		Workspace:  "default",
+		Status:     models.PlannedPlanStatus,
+	}
+	buildApply := func(currentPull models.PullRequest, statusPull models.PullRequest, status models.ProjectStatus) ([]command.ProjectContext, error) {
+		return builder.BuildApplyCommands(&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  currentPull,
+			PullStatus: &models.PullStatus{
+				Pull:     statusPull,
+				Projects: []models.ProjectStatus{status},
+			},
+		}, &events.CommentCommand{Name: command.Apply})
+	}
+
+	ctxs, err := buildApply(pull, pull, project)
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "", ctxs[0].ProjectName)
+	Equals(t, "stacks/platform", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, 1, len(ctxs[0].Steps))
+	Equals(t, "run", ctxs[0].Steps[0].StepName)
+	Equals(t, "custom-apply-command", ctxs[0].Steps[0].RunCommand)
+	Equals(t, "", ctxs[0].ExpectedPlanHash)
+
+	t.Run("rejects active plan generation", func(t *testing.T) {
+		activeProject := project
+		activeProject.Status = models.ErroredPlanStatus
+		activeProject.PlanGeneration = "generation-1"
+		_, err := buildApply(pull, pull, activeProject)
+		Assert(t, err != nil, "expected active generation to reject autodiscovered apply")
+		Assert(t, strings.Contains(err.Error(), "plan is incomplete"), "got: %s", err)
+	})
+
+	t.Run("rejects stale pull status", func(t *testing.T) {
+		_, err := buildApply(
+			models.PullRequest{HeadCommit: "def456", BaseBranch: "main"},
+			pull,
+			project,
+		)
+		Assert(t, err != nil, "expected stale status to reject autodiscovered apply")
+		Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+	})
 }
 
 // Test that autodiscover.ignore_paths is respected during multi-apply.

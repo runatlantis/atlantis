@@ -1287,9 +1287,9 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	var runOnlyApplyProjects []runOnlyApplyProject
 	var runOnlyApplyKeys map[applyPlanKey]struct{}
 	if commentCmd.Name == command.Apply {
-		var runOnlyApplyDirs map[applyPlanKey]struct{}
-		runOnlyApplyProjects, runOnlyApplyKeys, runOnlyApplyDirs = p.findRunOnlyApplyProjectsWithoutManagedPlans(ctx, repoCfg, plans)
-		plans = filterNonConventionRunOnlyPlanArtifacts(plans, runOnlyApplyDirs)
+		var runOnlyApplyRoots []runOnlyApplyRoot
+		runOnlyApplyProjects, runOnlyApplyKeys, runOnlyApplyRoots = p.findRunOnlyApplyProjectsWithoutManagedPlans(ctx, repoCfg, plans)
+		plans = filterNonConventionRunOnlyPlanArtifacts(plans, runOnlyApplyRoots)
 		hasActivePlan := false
 		if p.WorkingDirLocker != nil {
 			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
@@ -1371,11 +1371,16 @@ type runOnlyApplyProject struct {
 	config valid.Project
 }
 
+type runOnlyApplyRoot struct {
+	workspace  string
+	repoRelDir string
+}
+
 func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPlans(
 	ctx *command.Context,
 	repoCfg valid.RepoCfg,
 	plans []PendingPlan,
-) ([]runOnlyApplyProject, map[applyPlanKey]struct{}, map[applyPlanKey]struct{}) {
+) ([]runOnlyApplyProject, map[applyPlanKey]struct{}, []runOnlyApplyRoot) {
 	if ctx.PullStatus == nil {
 		return nil, nil, nil
 	}
@@ -1389,10 +1394,11 @@ func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPla
 
 	var projects []runOnlyApplyProject
 	projectKeys := make(map[applyPlanKey]struct{})
-	projectDirs := make(map[applyPlanKey]struct{})
+	rootKeys := make(map[applyPlanKey]struct{})
+	var roots []runOnlyApplyRoot
 	for _, status := range ctx.PullStatus.Projects {
 		key := newApplyPlanKey(status.Workspace, status.RepoRelDir, status.ProjectName)
-		projectCfg := findConfiguredProjectForStatus(repoCfg, status)
+		projectCfg := p.findRunOnlyProjectConfigForStatus(ctx, repoCfg, status)
 		if projectCfg == nil {
 			continue
 		}
@@ -1400,7 +1406,14 @@ func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPla
 		if !hasRunOnlyApplySteps(mergedCfg.Workflow.Apply.Steps) {
 			continue
 		}
-		projectDirs[newApplyPlanKey(status.Workspace, status.RepoRelDir, "")] = struct{}{}
+		rootKey := newApplyPlanKey(status.Workspace, status.RepoRelDir, "")
+		if _, ok := rootKeys[rootKey]; !ok {
+			roots = append(roots, runOnlyApplyRoot{
+				workspace:  status.Workspace,
+				repoRelDir: filepath.Clean(status.RepoRelDir),
+			})
+			rootKeys[rootKey] = struct{}{}
+		}
 
 		if _, ok := conventionPlanKeys[key]; ok {
 			continue
@@ -1415,19 +1428,49 @@ func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPla
 		projects = append(projects, runOnlyApplyProject{status: status, config: *projectCfg})
 		projectKeys[key] = struct{}{}
 	}
-	return projects, projectKeys, projectDirs
+	return projects, projectKeys, roots
 }
 
-func filterNonConventionRunOnlyPlanArtifacts(plans []PendingPlan, runOnlyDirs map[applyPlanKey]struct{}) []PendingPlan {
+func filterNonConventionRunOnlyPlanArtifacts(plans []PendingPlan, runOnlyRoots []runOnlyApplyRoot) []PendingPlan {
 	filtered := make([]PendingPlan, 0, len(plans))
 	for _, plan := range plans {
-		_, inRunOnlyDir := runOnlyDirs[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, "")]
-		if inRunOnlyDir && !pendingPlanUsesConventionPath(plan) {
+		if !pendingPlanUsesConventionPath(plan) && runOnlyRootOwnsPlanArtifact(runOnlyRoots, plan) {
 			continue
 		}
 		filtered = append(filtered, plan)
 	}
 	return filtered
+}
+
+func runOnlyRootOwnsPlanArtifact(roots []runOnlyApplyRoot, plan PendingPlan) bool {
+	for _, root := range roots {
+		if root.workspace == plan.Workspace && repoRelDirWithinRoot(root.repoRelDir, plan.RepoRelDir) {
+			return true
+		}
+	}
+	return false
+}
+
+func repoRelDirWithinRoot(root, candidate string) bool {
+	if filepath.IsAbs(root) || filepath.IsAbs(candidate) {
+		return false
+	}
+
+	cleanRoot := filepath.Clean(root)
+	cleanCandidate := filepath.Clean(candidate)
+	if repoRelDirEscapesRoot(cleanRoot) || repoRelDirEscapesRoot(cleanCandidate) {
+		return false
+	}
+
+	rel, err := filepath.Rel(cleanRoot, cleanCandidate)
+	if err != nil || filepath.IsAbs(rel) {
+		return false
+	}
+	return !repoRelDirEscapesRoot(filepath.Clean(rel))
+}
+
+func repoRelDirEscapesRoot(path string) bool {
+	return path == ".." || strings.HasPrefix(path, ".."+string(filepath.Separator))
 }
 
 func pendingPlanUsesConventionPath(plan PendingPlan) bool {
@@ -1454,6 +1497,35 @@ func findConfiguredProjectForStatus(repoCfg valid.RepoCfg, status models.Project
 		return project
 	}
 	return nil
+}
+
+func (p *DefaultProjectCommandBuilder) findRunOnlyProjectConfigForStatus(
+	ctx *command.Context,
+	repoCfg valid.RepoCfg,
+	status models.ProjectStatus,
+) *valid.Project {
+	if configured := findConfiguredProjectForStatus(repoCfg, status); configured != nil {
+		return configured
+	}
+
+	statusDir := filepath.Clean(status.RepoRelDir)
+	if status.ProjectName != "" || !p.autoDiscoverModeEnabled(ctx, repoCfg) ||
+		!repoRelDirWithinRoot(statusDir, statusDir) || p.isAutoDiscoverPathIgnored(ctx, repoCfg, statusDir) {
+		return nil
+	}
+	for _, project := range repoCfg.Projects {
+		if filepath.Clean(project.Dir) == statusDir {
+			return nil
+		}
+	}
+
+	return &valid.Project{
+		Dir:       statusDir,
+		Workspace: status.Workspace,
+		Autoplan: valid.Autoplan{
+			Enabled: true,
+		},
+	}
 }
 
 func hasRunOnlyApplySteps(steps []valid.Step) bool {
