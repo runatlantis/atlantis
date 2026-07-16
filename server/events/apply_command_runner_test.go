@@ -1969,6 +1969,13 @@ func TestApplyCommandRunner_PausedGroupPersistenceFailureRequiresReplan(t *testi
 	Assert(t, ctx.CommandHasErrors, "expected persistence failure to mark the command as errored")
 	projectCommandRunner.VerifyWasCalledOnce().Apply(dev)
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(production)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(pull),
+		Eq(models.FailedCommitStatus),
+		Eq(command.Apply),
+	)
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
 	).GetCapturedArguments()
