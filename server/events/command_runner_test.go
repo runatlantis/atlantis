@@ -1307,9 +1307,11 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalled(Never()).DeletePlans(tmp)
 }
 
-// Test that if one plan fails and we are using automerge, that
-// we delete the plans.
-func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
+// Test that if one plan fails and we are using automerge, the successful
+// plan is kept (not deleted) so it can still be applied on its own. Automerge
+// itself is still blocked because it requires every project to have applied
+// successfully.
+func TestRunAutoplanCommandWithError_KeepsSuccessfulPlans(t *testing.T) {
 	vcsClient := setup(t)
 
 	tmp := t.TempDir()
@@ -1356,8 +1358,9 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).DeletePlans(tmp)
+	// only called once, to discard stale plans before planning starts. The
+	// successful project's plan/lock must survive the other project's error.
+	pendingPlanFinder.VerifyWasCalled(Times(1)).DeletePlans(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
