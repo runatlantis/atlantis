@@ -236,6 +236,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Err("fetching live pull request after apply: %s", err)
 		ctx.CommandHasErrors = true
 		result.Error = fmt.Errorf("fetching live pull request after apply: %w", err)
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
@@ -259,9 +260,13 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
-		if applyContinuation != nil && !result.HasErrors() {
-			ctx.CommandHasErrors = true
+		ctx.CommandHasErrors = true
+		if !result.HasErrors() {
 			result.Error = fmt.Errorf("recording apply results: %w; run `atlantis plan` before applying again", err)
+		}
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
