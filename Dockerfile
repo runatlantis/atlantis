@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
 ARG DEBIAN_TAG=13.5-slim@sha256:28de0877c2189802884ccd20f15ee41c203573bd87bb6b883f5f46362d24c5c2
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.26.4-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648
+ARG GOLANG_TAG=1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.14.9
@@ -37,7 +37,7 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
 ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
@@ -59,7 +59,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 # renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
 # renovate: datasource=repology depName=debian_13/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u3"
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u4"
 # renovate: datasource=repology depName=debian_13/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=repology depName=debian_13/unzip versioning=loose
@@ -127,12 +127,15 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
 ENV GIT_LFS_VERSION=3.7.1
 
+# Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
+# SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=1c0b6ee5200ca708c5cebebb18fdeb0e1c98f1af5c1a9cba205a4c0ab5a5ec08 ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=73a9c90eeb4312133a63c3eaee0c38c019ea7bfa0953d174809d25b18588dd8d ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=567002d2735ceb0e876e326736f1b72895931d5ac156002cc8561b072a4ce9a3 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    echo "${GIT_LFS_SHA256}  git-lfs.tar.gz" | sha256sum -c - && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \

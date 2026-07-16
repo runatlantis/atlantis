@@ -1,23 +1,27 @@
-FROM golang:1.26.4@sha256:32c0e6e5c4f6707717051091b4d0b077464a679eaab563e11474efc5328e2aa5
+FROM golang:1.26.5@sha256:ae5a2316d12f3e78fd99177dad452e6ad4f240af2d71d57b480c3477f250fec6
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Install Terraform
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ENV TERRAFORM_VERSION=1.14.9
-RUN case $(uname -m) in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
-    wget -nv -O terraform.zip https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip && \
+RUN case "$(uname -m)" in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
+    TERRAFORM_ARCHIVE="terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip" && \
+    wget -nv "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/${TERRAFORM_ARCHIVE}" && \
+    wget -nv -O terraform_SHA256SUMS "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_SHA256SUMS" && \
+    grep " ${TERRAFORM_ARCHIVE}$" terraform_SHA256SUMS | sha256sum -c - && \
     mkdir -p /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
-    unzip terraform.zip -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
+    unzip "${TERRAFORM_ARCHIVE}" -d /usr/local/bin/tf/versions/${TERRAFORM_VERSION} && \
     ln -s /usr/local/bin/tf/versions/${TERRAFORM_VERSION}/terraform /usr/local/bin/terraform && \
-    rm terraform.zip
+    rm "${TERRAFORM_ARCHIVE}" terraform_SHA256SUMS
 
 # Install conftest
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ENV CONFTEST_VERSION=0.66.0
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN case $(uname -m) in x86_64|amd64) ARCH="x86_64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; esac && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${ARCH}.tar.gz && \
     curl -LOs https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/checksums.txt && \

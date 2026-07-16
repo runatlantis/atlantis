@@ -47,10 +47,17 @@ jobs:
           filters: |
             src:
               - 'Dockerfile'
+              - '.dockerignore'
               - 'docker-entrypoint.sh'
+              - 'goss.yaml'
+              - 'scripts/download-release.sh'
               - '.github/workflows/atlantis-image.yml'
-              - '**.go'
-              - 'go.*'
+              - 'cmd/**'
+              - 'server/**'
+              - 'testdrive/**'
+              - 'main.go'
+              - 'go.mod'
+              - 'go.sum'
 
   build:
     needs: [changes]
