@@ -283,6 +283,61 @@ func TestIsNewCommitStatus(t *testing.T) {
 	}
 }
 
+func TestShouldReturnCommitStatusWaitsForExpectedTerminalState(t *testing.T) {
+	success := func(state string) bool { return state == "success" }
+	failure := func(state string) bool { return state == "failure" }
+	tests := []struct {
+		name          string
+		state         string
+		inProgress    bool
+		expectedState func(string) bool
+		want          bool
+	}{
+		{
+			name:       "legacy polling returns any terminal status",
+			state:      "failure",
+			inProgress: false,
+			want:       true,
+		},
+		{
+			name:          "transient failure does not satisfy expected success",
+			state:         "failure",
+			inProgress:    false,
+			expectedState: success,
+			want:          false,
+		},
+		{
+			name:          "pending never returns",
+			state:         "pending",
+			inProgress:    true,
+			expectedState: success,
+			want:          false,
+		},
+		{
+			name:          "success satisfies expected success",
+			state:         "success",
+			inProgress:    false,
+			expectedState: success,
+			want:          true,
+		},
+		{
+			name:          "failure satisfies expected failure",
+			state:         "failure",
+			inProgress:    false,
+			expectedState: failure,
+			want:          true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldReturnCommitStatus(tt.state, tt.inProgress, tt.expectedState); got != tt.want {
+				t.Fatalf("shouldReturnCommitStatus(%q, %v) = %v, want %v", tt.state, tt.inProgress, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestE2ERunNonceIncludesPerRunEntropy(t *testing.T) {
 	t.Setenv("GITHUB_RUN_ID", "12345")
 	t.Setenv("GITHUB_RUN_ATTEMPT", "2")
