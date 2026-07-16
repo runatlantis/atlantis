@@ -60,6 +60,48 @@ func TestGetPlanFilename(t *testing.T) {
 	}
 }
 
+func TestIsRemotePlan(t *testing.T) {
+	const remotePlanHeader = "Atlantis: this plan was created by remote ops\n"
+
+	cases := []struct {
+		name     string
+		contents []byte
+		exp      bool
+	}{
+		{
+			name: "nil plan",
+		},
+		{
+			name:     "empty plan",
+			contents: []byte{},
+		},
+		{
+			name:     "one byte short",
+			contents: []byte(remotePlanHeader[:len(remotePlanHeader)-1]),
+		},
+		{
+			name:     "same length without header",
+			contents: []byte("Atlantis: this plan was created by local ops\n"),
+		},
+		{
+			name:     "exact header",
+			contents: []byte(remotePlanHeader),
+			exp:      true,
+		},
+		{
+			name:     "header with plan contents",
+			contents: []byte(remotePlanHeader + "plan contents"),
+			exp:      true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, runtime.IsRemotePlan(c.contents))
+		})
+	}
+}
+
 func TestProjectNameFromPlanfile(t *testing.T) {
 	cases := []struct {
 		workspace string

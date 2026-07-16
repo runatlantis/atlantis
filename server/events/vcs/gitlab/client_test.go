@@ -5,7 +5,9 @@ package gitlab
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,6 +57,12 @@ type GetCommitResponse struct {
 
 /* Empty struct for JSON marshalling */
 type EmptyStruct struct{}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 // Test that the base url gets set properly.
 func TestNewClient_BaseURL(t *testing.T) {
@@ -2092,6 +2100,9 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 			userName: "multiuser",
 			expErr:   "GET /users returned more than 1 user",
 		},
+		{
+			userName: "missing",
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.userName, func(t *testing.T) {
@@ -2108,6 +2119,8 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 					case "/api/v4/users?username=multiuser":
 						w.WriteHeader(http.StatusOK)
 						w.Write(multipleUsers) // nolint: errcheck
+					case "/api/v4/users?username=missing":
+						http.Error(w, "not found", http.StatusNotFound)
 					case "/api/v4/groups/someorg%2Fgroup1/members/123", "/api/v4/groups/someorg%2Fgroup2/members/123":
 						w.WriteHeader(http.StatusOK)
 						w.Write(groupMembershipSuccess) // nolint: errcheck
@@ -2145,6 +2158,85 @@ func TestClient_GetTeamNamesForUser(t *testing.T) {
 
 		})
 	}
+}
+
+func TestClient_GetTeamNamesForUser_TransportErrors(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	transportErr := errors.New("gitlab transport unavailable")
+
+	cases := []struct {
+		name       string
+		transport  http.RoundTripper
+		errContext string
+	}{
+		{
+			name: "listing users",
+			transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+				return nil, transportErr
+			}),
+			errContext: "GET /users",
+		},
+		{
+			name: "getting group membership",
+			transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				if req.URL.Path == "/api/v4/users" {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Status:     "200 OK",
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader(`[{"id":123,"username":"testuser"}]`)),
+						Request:    req,
+					}, nil
+				}
+				return nil, transportErr
+			}),
+			errContext: "GET /groups/someorg/group1/members/123",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			internalClient, err := gitlab.NewClient(
+				"token",
+				gitlab.WithBaseURL("https://gitlab.example"),
+				gitlab.WithHTTPClient(&http.Client{Transport: c.transport}),
+				gitlab.WithoutRetries(),
+			)
+			Ok(t, err)
+			client := &Client{
+				Client:           internalClient,
+				ConfiguredGroups: []string{"someorg/group1"},
+			}
+
+			teams, err := client.GetTeamNamesForUser(logger, models.Repo{}, models.User{Username: "testuser"})
+			Equals(t, 0, len(teams))
+			ErrContains(t, c.errContext, err)
+			Assert(t, errors.Is(err, transportErr), "expected the transport error, got %v", err)
+		})
+	}
+}
+
+func TestClient_GetTeamNamesForUser_ProviderError(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"message":"provider unavailable"}`)) // nolint: errcheck
+	}))
+	t.Cleanup(testServer.Close)
+
+	internalClient, err := gitlab.NewClient(
+		"token",
+		gitlab.WithBaseURL(testServer.URL),
+		gitlab.WithoutRetries(),
+	)
+	Ok(t, err)
+	client := &Client{Client: internalClient}
+
+	teams, err := client.GetTeamNamesForUser(logger, models.Repo{}, models.User{Username: "testuser"})
+	Equals(t, 0, len(teams))
+	ErrContains(t, "GET /users returned: 500", err)
+	ErrContains(t, "provider unavailable", err)
 }
 
 func TestGithubClient_DiscardReviews(t *testing.T) {
