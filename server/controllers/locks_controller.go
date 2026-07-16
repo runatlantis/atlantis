@@ -130,13 +130,20 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-			l.Logger.Err("unable to update project status: %s", err)
+		statusUpdateErr := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus)
+		if statusUpdateErr != nil {
+			l.Logger.Err("unable to update project status: %s", statusUpdateErr)
 		}
 
 		// Once the lock has been deleted, comment back on the pull request.
-		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
-			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
+		var comment string
+		if statusUpdateErr != nil {
+			comment = fmt.Sprintf("**Warning**: The lock for dir: `%s` workspace: `%s` was deleted via the Atlantis UI, but Atlantis could not mark its plan discarded because durable plan state changed.\n\n"+
+				"Do not apply the existing plan. Run `plan` again after any in-progress plan finishes.", lock.Project.Path, lock.Workspace)
+		} else {
+			comment = fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+				"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
+		}
 		if err = l.VCSClient.CreateComment(l.Logger, lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
 			l.Logger.Warn("failed commenting on pull request: %s", err)
 		}

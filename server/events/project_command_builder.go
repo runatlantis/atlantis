@@ -1284,12 +1284,17 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		plans = filteredPlans
 	}
 
+	var runOnlyApplyProjects []runOnlyApplyProject
+	var runOnlyApplyKeys map[applyPlanKey]struct{}
 	if commentCmd.Name == command.Apply {
+		var runOnlyApplyDirs map[applyPlanKey]struct{}
+		runOnlyApplyProjects, runOnlyApplyKeys, runOnlyApplyDirs = p.findRunOnlyApplyProjectsWithoutManagedPlans(ctx, repoCfg, plans)
+		plans = filterNonConventionRunOnlyPlanArtifacts(plans, runOnlyApplyDirs)
 		hasActivePlan := false
 		if p.WorkingDirLocker != nil {
 			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
 		}
-		if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
+		if err := validatePlansForApplyWithPlanlessProjects(ctx, plans, hasActivePlan, runOnlyApplyKeys); err != nil {
 			return nil, err
 		}
 	}
@@ -1322,12 +1327,146 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 		cmds = append(cmds, commentCmds...)
 	}
+	for _, project := range runOnlyApplyProjects {
+		unlockFn, err := p.WorkingDirLocker.TryLock(
+			ctx.Pull.BaseRepo.FullName,
+			ctx.Pull.Num,
+			project.status.Workspace,
+			project.status.RepoRelDir,
+			project.status.ProjectName,
+			commentCmd.Name,
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer unlockFn()
+
+		commentCmds, err := p.buildProjectCommandCtxWithCfg(
+			ctx,
+			commentCmd.CommandName(),
+			commentCmd.SubName,
+			commentCmd.Flags,
+			defaultRepoDir,
+			project.status.RepoRelDir,
+			project.status.Workspace,
+			commentCmd.Verbose,
+			[]valid.Project{project.config},
+			&repoCfg,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("building command for dir '%s': %w", project.status.RepoRelDir, err)
+		}
+		cmds = append(cmds, commentCmds...)
+	}
 
 	sort.Slice(cmds, func(i, j int) bool {
 		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
 	})
 
 	return cmds, nil
+}
+
+type runOnlyApplyProject struct {
+	status models.ProjectStatus
+	config valid.Project
+}
+
+func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPlans(
+	ctx *command.Context,
+	repoCfg valid.RepoCfg,
+	plans []PendingPlan,
+) ([]runOnlyApplyProject, map[applyPlanKey]struct{}, map[applyPlanKey]struct{}) {
+	if ctx.PullStatus == nil {
+		return nil, nil, nil
+	}
+
+	conventionPlanKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		if pendingPlanUsesConventionPath(plan) {
+			conventionPlanKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+		}
+	}
+
+	var projects []runOnlyApplyProject
+	projectKeys := make(map[applyPlanKey]struct{})
+	projectDirs := make(map[applyPlanKey]struct{})
+	for _, status := range ctx.PullStatus.Projects {
+		key := newApplyPlanKey(status.Workspace, status.RepoRelDir, status.ProjectName)
+		projectCfg := findConfiguredProjectForStatus(repoCfg, status)
+		if projectCfg == nil {
+			continue
+		}
+		mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), *projectCfg, repoCfg)
+		if !hasRunOnlyApplySteps(mergedCfg.Workflow.Apply.Steps) {
+			continue
+		}
+		projectDirs[newApplyPlanKey(status.Workspace, status.RepoRelDir, "")] = struct{}{}
+
+		if _, ok := conventionPlanKeys[key]; ok {
+			continue
+		}
+		if _, ok := projectKeys[key]; ok {
+			continue
+		}
+		if status.PlanGeneration != "" || !statusRequiresPlanFileForGenericApply(status.Status) || !statusAllowedForApplyExecution(status.Status) {
+			continue
+		}
+
+		projects = append(projects, runOnlyApplyProject{status: status, config: *projectCfg})
+		projectKeys[key] = struct{}{}
+	}
+	return projects, projectKeys, projectDirs
+}
+
+func filterNonConventionRunOnlyPlanArtifacts(plans []PendingPlan, runOnlyDirs map[applyPlanKey]struct{}) []PendingPlan {
+	filtered := make([]PendingPlan, 0, len(plans))
+	for _, plan := range plans {
+		_, inRunOnlyDir := runOnlyDirs[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, "")]
+		if inRunOnlyDir && !pendingPlanUsesConventionPath(plan) {
+			continue
+		}
+		filtered = append(filtered, plan)
+	}
+	return filtered
+}
+
+func pendingPlanUsesConventionPath(plan PendingPlan) bool {
+	if plan.PlanFilePath == "" {
+		// PendingPlan implementations predating PlanFilePath only return
+		// convention-managed plan identities.
+		return true
+	}
+	expectedPath, err := pendingPlanFilePath(plan)
+	if err != nil {
+		// Preserve the plan for normal validation to reject unsafe paths.
+		return true
+	}
+	return filepath.Clean(plan.PlanFilePath) == filepath.Clean(expectedPath)
+}
+
+func findConfiguredProjectForStatus(repoCfg valid.RepoCfg, status models.ProjectStatus) *valid.Project {
+	statusDir := filepath.Clean(status.RepoRelDir)
+	for i := range repoCfg.Projects {
+		project := &repoCfg.Projects[i]
+		if filepath.Clean(project.Dir) != statusDir || project.Workspace != status.Workspace || project.GetName() != status.ProjectName {
+			continue
+		}
+		return project
+	}
+	return nil
+}
+
+func hasRunOnlyApplySteps(steps []valid.Step) bool {
+	hasRun := false
+	for _, step := range steps {
+		switch step.StepName {
+		case "apply":
+			return false
+		case "run":
+			hasRun = true
+		}
+	}
+	return hasRun
 }
 
 // ValidatePlansForApply ensures discovered plans are valid for the current PR head.
@@ -1356,6 +1495,25 @@ func ValidatePlansForApplyWithCurrentHead(ctx *command.Context, plans []PendingP
 // apply lock before generic builder validation instead of trusting the
 // command-start pull snapshot.
 func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentPull models.PullRequest) error {
+	return validatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, currentPull, nil)
+}
+
+func validatePlansForApplyWithPlanlessProjects(
+	ctx *command.Context,
+	plans []PendingPlan,
+	hasActivePlan bool,
+	planlessProjects map[applyPlanKey]struct{},
+) error {
+	return validatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, ctx.Pull, planlessProjects)
+}
+
+func validatePlansForApplyWithCurrentPull(
+	ctx *command.Context,
+	plans []PendingPlan,
+	hasActivePlan bool,
+	currentPull models.PullRequest,
+	planlessProjects map[applyPlanKey]struct{},
+) error {
 	if currentPull.HeadCommit != "" || currentPull.BaseBranch != "" {
 		ctxCopy := *ctx
 		if currentPull.HeadCommit != "" {
@@ -1370,12 +1528,12 @@ func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingP
 		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
 	}
 	if len(plans) > 0 {
-		return validateFoundPlans(ctx, plans)
+		return validateFoundPlans(ctx, plans, planlessProjects)
 	}
-	return validateNoPlansFound(ctx, hasActivePlan)
+	return validateNoPlansFound(ctx, hasActivePlan, planlessProjects)
 }
 
-func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
+func validateFoundPlans(ctx *command.Context, plans []PendingPlan, planlessProjects map[applyPlanKey]struct{}) error {
 	if ctx.PullStatus == nil {
 		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
 	}
@@ -1394,6 +1552,12 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 				plan.RepoRelDir, plan.Workspace, plan.ProjectName,
 			)
 		}
+		if proj.PlanGeneration != "" {
+			return fmt.Errorf(
+				"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+			)
+		}
 		if !statusAllowedForDiscoveredPlan(proj.Status) {
 			return fmt.Errorf(
 				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
@@ -1402,10 +1566,10 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		}
 	}
 
-	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys)
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys, planlessProjects)
 }
 
-func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
+func validateNoPlansFound(ctx *command.Context, hasActivePlan bool, planlessProjects map[applyPlanKey]struct{}) error {
 	if ctx.PullStatus == nil {
 		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
@@ -1414,7 +1578,7 @@ func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 		return err
 	}
 
-	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil, planlessProjects)
 }
 
 func shortSHA(sha string) string {
@@ -1451,7 +1615,7 @@ func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool
 
 func statusBlocksGenericApplyWithoutPlan(status models.ProjectPlanStatus) bool {
 	switch status {
-	case models.ErroredPlanStatus, models.PlanningPlanStatus:
+	case models.ErroredPlanStatus:
 		return true
 	default:
 		return false
@@ -1481,10 +1645,30 @@ func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
 	}
 }
 
-func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
+func validatePullStatusHasPlanFiles(
+	pullStatus *models.PullStatus,
+	planKeys map[applyPlanKey]struct{},
+	planlessProjects map[applyPlanKey]struct{},
+) error {
 	for _, proj := range pullStatus.Projects {
-		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+		key := newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)
+		if proj.PlanGeneration != "" {
+			return fmt.Errorf(
+				"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+			)
+		}
+		if _, ok := planKeys[key]; ok {
 			continue
+		}
+		if _, ok := planlessProjects[key]; ok {
+			if statusAllowedForApplyExecution(proj.Status) {
+				continue
+			}
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+			)
 		}
 		if statusRequiresPlanFileForGenericApply(proj.Status) {
 			return fmt.Errorf(
@@ -1493,12 +1677,6 @@ func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[
 			)
 		}
 		if statusBlocksGenericApplyWithoutPlan(proj.Status) {
-			if proj.Status == models.PlanningPlanStatus {
-				return fmt.Errorf(
-					"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
-					proj.RepoRelDir, proj.Workspace, proj.ProjectName,
-				)
-			}
 			return fmt.Errorf(
 				"plan for dir %q workspace %q project %q errored and cannot be applied without a plan file; run `atlantis plan`",
 				proj.RepoRelDir, proj.Workspace, proj.ProjectName,

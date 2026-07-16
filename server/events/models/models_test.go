@@ -5,6 +5,7 @@
 package models_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -1281,7 +1282,8 @@ func TestPullStatus_StatusCount(t *testing.T) {
 				Status: models.PassedPolicyCheckStatus,
 			},
 			{
-				Status: models.PlanningPlanStatus,
+				Status:         models.ErroredPlanStatus,
+				PlanGeneration: "generation-1",
 			},
 		},
 	}
@@ -1289,15 +1291,66 @@ func TestPullStatus_StatusCount(t *testing.T) {
 	Equals(t, 2, ps.StatusCount(models.PlannedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.AppliedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredApplyStatus))
-	Equals(t, 0, ps.StatusCount(models.ErroredPlanStatus))
+	Equals(t, 1, ps.StatusCount(models.ErroredPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.DiscardedPlanStatus))
 	Equals(t, 1, ps.StatusCount(models.ErroredPolicyCheckStatus))
 	Equals(t, 1, ps.StatusCount(models.PassedPolicyCheckStatus))
-	Equals(t, 1, ps.StatusCount(models.PlanningPlanStatus))
 }
 
-func TestPlanningPlanStatusString(t *testing.T) {
-	Equals(t, "planning", models.PlanningPlanStatus.String())
+func TestActivePlanGenerationUsesV046CompatibleStatus(t *testing.T) {
+	active := models.ProjectStatus{
+		Status:         models.ErroredPlanStatus,
+		PlanGeneration: "generation-1",
+	}
+	Assert(t, active.PlanGeneration != "", "expected active plan generation")
+	Equals(t, 0, int(active.Status))
+
+	serialized, err := json.Marshal(active)
+	Ok(t, err)
+	var persisted struct {
+		Status models.ProjectPlanStatus
+	}
+	Ok(t, json.Unmarshal(serialized, &persisted))
+	Equals(t, models.ErroredPlanStatus, persisted.Status)
+	Assert(t, !legacyV046StatusAllowedForApplyExecution(persisted.Status), "expected v0.46.0 apply eligibility to reject active generation status")
+	Equals(t, "plan_errored", legacyV046ProjectPlanStatusString(persisted.Status))
+
+	ordinaryError := models.ProjectStatus{Status: models.ErroredPlanStatus}
+	Equals(t, "", ordinaryError.PlanGeneration)
+	Equals(t, "plan_errored", ordinaryError.Status.String())
+}
+
+func legacyV046StatusAllowedForApplyExecution(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func legacyV046ProjectPlanStatusString(status models.ProjectPlanStatus) string {
+	switch status {
+	case 0:
+		return "plan_errored"
+	case 1:
+		return "planned"
+	case 2:
+		return "planned_no_changes"
+	case 3:
+		return "apply_errored"
+	case 4:
+		return "applied"
+	case 5:
+		return "plan_discarded"
+	case 6:
+		return "policy_check_errored"
+	case 7:
+		return "policy_check_passed"
+	default:
+		panic("missing String() impl for v0.46.0 ProjectPlanStatus")
+	}
 }
 
 func TestPlanSuccessStats(t *testing.T) {

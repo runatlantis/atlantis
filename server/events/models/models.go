@@ -871,9 +871,6 @@ const (
 	// PassedPolicyCheckStatus means that all policy checks passed or were
 	// approved.
 	PassedPolicyCheckStatus
-	// PlanningPlanStatus means a new plan generation has invalidated the
-	// previously recorded plan but has not yet persisted its final result.
-	PlanningPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -895,8 +892,6 @@ func (p ProjectPlanStatus) String() string {
 		return "policy_check_errored"
 	case PassedPolicyCheckStatus:
 		return "policy_check_passed"
-	case PlanningPlanStatus:
-		return "planning"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}

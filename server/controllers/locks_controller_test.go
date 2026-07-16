@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -345,6 +346,72 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			Status:     models.DiscardedPlanStatus,
 		},
 	}, status.Projects)
+}
+
+func TestDeleteLock_ActivePlanGenerationReportsStatusUpdateFailure(t *testing.T) {
+	RegisterMockTestingT(t)
+	const (
+		repoName     = "owner/repo"
+		projectPath  = "path"
+		workspace    = "workspace"
+		projectName  = "active-plan"
+		generationID = "generation-1"
+	)
+	pull := models.PullRequest{BaseRepo: models.Repo{FullName: repoName}}
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	defer closeTestDatabase(t, database)
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{{
+		Command:     command.Plan,
+		RepoRelDir:  projectPath,
+		Workspace:   workspace,
+		ProjectName: projectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{TerraformOutput: "tf-output"},
+		},
+	}})
+	Ok(t, err)
+	_, err = database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace:   workspace,
+		RepoRelDir:  projectPath,
+		ProjectName: projectName,
+	}}, generationID)
+	Ok(t, err)
+
+	deleteLock := mocks2.NewMockDeleteLockCommand()
+	When(deleteLock.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: workspace,
+		Project: models.Project{
+			Path:         projectPath,
+			ProjectName:  projectName,
+			RepoFullName: repoName,
+		},
+	}, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	controller := controllers.LocksController{
+		DeleteLockCommand: deleteLock,
+		Logger:            logging.NewNoopLogger(t),
+		VCSClient:         vcsClient,
+		Database:          database,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
+	response := httptest.NewRecorder()
+
+	controller.DeleteLock(response, req)
+
+	ResponseContains(t, response, http.StatusOK, "Deleted lock id 'id'")
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "lock"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "could not mark its plan discarded"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "Do not apply the existing plan"), "got: %s", comment)
+	status, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected active generation to remain")
+	Equals(t, models.ErroredPlanStatus, status.Projects[0].Status)
+	Equals(t, generationID, status.Projects[0].PlanGeneration)
 }
 
 func TestDeleteLock_CommentFailed(t *testing.T) {

@@ -343,6 +343,44 @@ func TestProjectOutputWrapper(t *testing.T) {
 	}
 }
 
+func TestProjectOutputWrapper_DowngradesPlanSuccessAfterPersistenceFailure(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Plan,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "deferred-plan-status",
+	}
+	projectOutput := command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+		ProjectCommandRunner: mockProjectCommandRunner,
+	}
+	When(mockProjectCommandRunner.Plan(ctx)).ThenReturn(projectOutput)
+
+	result := runner.Plan(ctx)
+
+	Equals(t, projectOutput, result)
+	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
+	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.SuccessCommitStatus, &projectOutput)
+
+	commandResult := command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectCommandOutput: projectOutput,
+		Command:              command.Plan,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+		ProjectName:          ctx.ProjectName,
+	}}}
+	runner.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, commandResult, models.FailedCommitStatus)
+
+	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &projectOutput)
+}
+
 func TestProjectOutputWrapper_DefersRemoteApplyURLSuccessStatus(t *testing.T) {
 	RegisterMockTestingT(t)
 	ctx := command.ProjectContext{
@@ -1412,6 +1450,154 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 	Equals(t, "current plan", string(contents))
 }
 
+func TestProjectCommandRunner_ActivePlanGenerationRejectsApplyWithoutDeletingPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "active-generation",
+		Pull:        pull,
+		BaseRepo:    pull.BaseRepo,
+		Steps:       valid.DefaultApplyStage.Steps,
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName),
+	})
+	Ok(t, err)
+	_, err = database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace:   ctx.Workspace,
+		RepoRelDir:  ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+	}}, "generation-1")
+	Ok(t, err)
+
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	const marker = "replica-a-active-plan"
+	Ok(t, os.WriteFile(planPath, []byte(marker), 0600))
+
+	replicaA := events.NewDefaultWorkingDirLocker()
+	releaseReplicaA, err := replicaA.TryLock(
+		pull.BaseRepo.FullName,
+		pull.Num,
+		ctx.Workspace,
+		ctx.RepoRelDir,
+		ctx.ProjectName,
+		command.Plan,
+	)
+	Ok(t, err)
+	defer releaseReplicaA()
+
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockApply := mocks.NewMockStepRunner()
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Eq(ctx.Pull),
+		Any[models.User](),
+		Eq(ctx.Workspace),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(
+		Any[command.ProjectContext](),
+		Any[[]string](),
+		Eq(repoDir),
+		Any[map[string]string](),
+	)).ThenReturn("applied completed generation", nil)
+
+	replicaBRunner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database},
+	}
+
+	activeResult := replicaBRunner.Apply(ctx)
+
+	Assert(t, activeResult.Error != nil, "expected active generation to reject apply")
+	Assert(t, strings.Contains(activeResult.Error.Error(), "plan is incomplete"), "got: %s", activeResult.Error)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, marker, string(contents))
+	mockApply.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+
+	_, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{
+		plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName),
+	})
+	Ok(t, err)
+
+	completedResult := replicaBRunner.Apply(ctx)
+
+	Ok(t, completedResult.Error)
+	Equals(t, "applied completed generation", completedResult.ApplySuccess)
+	mockApply.VerifyWasCalledOnce().Run(
+		Any[command.ProjectContext](), Any[[]string](), Eq(repoDir), Any[map[string]string]())
+}
+
+func TestApplyPlanValidator_StaleMissingStatusDoesNotDeleteNewGenerationPlan(t *testing.T) {
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	project := models.ProjectStatus{
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "new-generation",
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Workspace:   project.Workspace,
+		RepoRelDir:  project.RepoRelDir,
+		ProjectName: project.ProjectName,
+		Pull:        pull,
+	}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	marker := []byte("new generation after stale status read")
+	fetcher := &beginGenerationAfterStatusReadFetcher{
+		database: database,
+		project:  project,
+		planPath: planPath,
+		marker:   marker,
+	}
+	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: fetcher}
+
+	err := validator.ValidateProjectPlan(ctx, repoDir)
+
+	Assert(t, err != nil, "expected stale missing status to reject apply")
+	Assert(t, strings.Contains(err.Error(), "no current plan status found"), "got: %s", err)
+	Assert(t, fetcher.started, "expected generation to begin after the stale status read")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, marker, contents)
+	status, statusErr := database.GetPullStatus(pull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "expected active generation status")
+	Equals(t, 1, len(status.Projects))
+	Equals(t, models.ErroredPlanStatus, status.Projects[0].Status)
+	Equals(t, "generation-after-status-read", status.Projects[0].PlanGeneration)
+}
+
 func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.T) {
 	db := newTestBoltDB(t)
 	repoDir := t.TempDir()
@@ -1433,15 +1619,17 @@ func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.
 	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	const baseMismatchMarker = "different-base-plan"
+	Ok(t, os.WriteFile(planPath, []byte(baseMismatchMarker), 0600))
 	validator := &events.DefaultApplyPlanValidator{PullStatusFetcher: db}
 
 	err = validator.ValidateProjectPlan(ctx, repoDir)
 
 	Assert(t, err != nil, "expected base branch mismatch")
 	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
-	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected stale-base plan file to be deleted")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, baseMismatchMarker, string(contents))
 }
 
 func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyBaseWhenLiveBaseKnown(t *testing.T) {
@@ -2798,7 +2986,8 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	const policyBlockedMarker = "policy-blocked-plan"
+	Ok(t, os.WriteFile(planPath, []byte(policyBlockedMarker), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
 		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
@@ -2807,8 +2996,9 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 
 	Assert(t, res.Error != nil, "expected policy-check status error")
 	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
-	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected rejected plan file to be deleted")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, policyBlockedMarker, string(contents))
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
@@ -2923,7 +3113,8 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 	})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	const newerCommandMarker = "newer-command-plan"
+	Ok(t, os.WriteFile(planPath, []byte(newerCommandMarker), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
 		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
@@ -2932,8 +3123,9 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 
 	Assert(t, res.Error != nil, "expected stale PullStatus error")
 	Assert(t, strings.Contains(res.Error.Error(), "recorded plan status is from commit"), "got: %s", res.Error)
-	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, newerCommandMarker, string(contents))
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
@@ -2971,7 +3163,8 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+	const marker = "stale-validation-plan"
+	Ok(t, os.WriteFile(planPath, []byte(marker), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
 		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
@@ -2979,25 +3172,13 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected stale PullStatus error")
-	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "expected stale plan file to be deleted")
-	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
-		{
-			Command:     command.Apply,
-			Workspace:   ctx.Workspace,
-			RepoRelDir:  ctx.RepoRelDir,
-			ProjectName: ctx.ProjectName,
-			ProjectCommandOutput: command.ProjectCommandOutput{
-				Error: errors.New("validation rejected plan"),
-			},
-		},
-	})
-	Ok(t, err)
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, marker, string(contents))
 	pullStatus, err := db.GetPullStatus(ctx.Pull)
 	Ok(t, err)
-	err = events.ValidatePlansForApply(&command.Context{Log: logging.NewNoopLogger(t), Pull: ctx.Pull, PullStatus: pullStatus}, nil)
-	Assert(t, err != nil, "expected later generic apply to reject errored apply status without plan file")
-	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
+	Assert(t, pullStatus != nil, "expected stale PullStatus to remain")
+	Equals(t, stalePull.HeadCommit, pullStatus.Pull.HeadCommit)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
@@ -3039,6 +3220,29 @@ type fakeLivePullHeadFetcher struct {
 	head string
 	base string
 	err  error
+}
+
+type beginGenerationAfterStatusReadFetcher struct {
+	database *boltdb.BoltDB
+	project  models.ProjectStatus
+	planPath string
+	marker   []byte
+	started  bool
+}
+
+func (f *beginGenerationAfterStatusReadFetcher) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	status, err := f.database.GetPullStatus(pull)
+	if err != nil || f.started {
+		return status, err
+	}
+	f.started = true
+	if _, err := f.database.BeginPlanGeneration(pull, []models.ProjectStatus{f.project}, "generation-after-status-read"); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(f.planPath, f.marker, 0600); err != nil {
+		return nil, err
+	}
+	return status, nil
 }
 
 func (f fakeLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {

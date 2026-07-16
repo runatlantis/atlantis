@@ -43,6 +43,7 @@ func TestPendingPlanFinder_FindIncludingNotGitDir(t *testing.T) {
 	// Only the plan from the git workspace should be found; the reviews dir is skipped.
 	Equals(t, 1, len(plans))
 	Equals(t, gitDirName, plans[0].Workspace)
+	Equals(t, filepath.Join(gitDir, "default.tfplan"), plans[0].PlanFilePath)
 }
 
 // Non-directory entries (files, symlinks) in the pull dir should be silently skipped.
@@ -273,6 +274,7 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 			var actPlansComparable []events.PendingPlan
 			for _, p := range actPlans {
 				p.RepoDir = strings.ReplaceAll(p.RepoDir, tmpDir, "???")
+				p.PlanFilePath = ""
 				actPlansComparable = append(actPlansComparable, p)
 			}
 			Equals(t, c.expPlans, actPlansComparable)

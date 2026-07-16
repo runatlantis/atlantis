@@ -4,6 +4,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -68,16 +70,22 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		result = runProjectCmds(cmds, p.prjCmdRunner.PolicyCheck)
 	}
 
-	// Quiet policy checks unless there's an error
-	if result.HasErrors() || !p.quietPolicyChecks {
-		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
-	}
-
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
+		ctx.CommandHasErrors = true
+		result.Error = fmt.Errorf("writing policy check results: %w", err)
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+		return
 	}
 
+	// Quiet policy checks unless there's an error.
+	if result.HasErrors() || !p.quietPolicyChecks {
+		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
+	}
 	p.updateCommitStatus(ctx, pullStatus)
 }
 

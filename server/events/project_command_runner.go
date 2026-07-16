@@ -165,6 +165,10 @@ type DeferredApplyStatusPublisher interface {
 	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
 }
 
+type DeferredPlanStatusPublisher interface {
+	PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+}
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
 
 type JobMessageSender interface {
@@ -231,12 +235,28 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	return result
 }
 
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Command != command.Plan || projectResult.PlanSuccess == nil || projectResult.Error != nil || projectResult.Failure != "" {
+			continue
+		}
+		ctx, ok := deferredProjectContext(projectCmds, projectResult, command.Plan)
+		if !ok || ctx.SuppressVCSStatus {
+			continue
+		}
+		projectOutput := projectResult.ProjectCommandOutput
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &projectOutput); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+		}
+	}
+}
+
 func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
 	for _, projectResult := range result.ProjectResults {
 		if projectResult.Command != command.Apply || projectResult.ApplySuccess == "" || projectResult.Error != nil || projectResult.Failure != "" {
 			continue
 		}
-		ctx, ok := deferredApplyProjectContext(projectCmds, projectResult)
+		ctx, ok := deferredProjectContext(projectCmds, projectResult, command.Apply)
 		if !ok || ctx.SuppressVCSStatus {
 			continue
 		}
@@ -247,9 +267,9 @@ func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []comman
 	}
 }
 
-func deferredApplyProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult) (command.ProjectContext, bool) {
+func deferredProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult, commandName command.Name) (command.ProjectContext, bool) {
 	for _, ctx := range projectCmds {
-		if ctx.CommandName == command.Apply &&
+		if ctx.CommandName == commandName &&
 			ctx.RepoRelDir == result.RepoRelDir &&
 			ctx.Workspace == result.Workspace &&
 			ctx.ProjectName == result.ProjectName {

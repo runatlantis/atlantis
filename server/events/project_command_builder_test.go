@@ -3506,6 +3506,187 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	}
 }
 
+func TestDefaultProjectCommandBuilder_BuildMultiApply_RunOnlyWorkflowWithoutManagedPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+	atlantisYAML := `
+version: 3
+projects:
+- name: custom-plan-path
+  dir: custom-plan-path
+  workflow: custom-plan-path
+- name: managed-plan
+  dir: managed-plan
+workflows:
+  custom-plan-path:
+    plan:
+      steps:
+      - run: terraform plan -out custom-atlantis.tfplan
+    apply:
+      steps:
+      - run: terraform apply custom-atlantis.tfplan
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"custom-plan-path": map[string]any{
+				"main.tf":                nil,
+				"custom-atlantis.tfplan": nil,
+			},
+			"managed-plan": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	customPlanPath := filepath.Join(tmpDir, "default", "custom-plan-path", "custom-atlantis.tfplan")
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+	)
+
+	buildApply := func(currentPull models.PullRequest, statusPull models.PullRequest, projects ...models.ProjectStatus) ([]command.ProjectContext, error) {
+		return builder.BuildApplyCommands(&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  currentPull,
+			PullStatus: &models.PullStatus{
+				Pull:     statusPull,
+				Projects: projects,
+			},
+		}, &events.CommentCommand{Name: command.Apply})
+	}
+
+	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
+	customProject := models.ProjectStatus{
+		RepoRelDir:  "custom-plan-path",
+		Workspace:   "default",
+		ProjectName: "custom-plan-path",
+		Status:      models.PlannedPlanStatus,
+	}
+	ctxs, err := buildApply(pull, pull, customProject)
+
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "custom-plan-path", ctxs[0].ProjectName)
+	Equals(t, "custom-plan-path", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "run", ctxs[0].Steps[0].StepName)
+	Equals(t, "", ctxs[0].ExpectedPlanHash)
+	_, err = os.Stat(customPlanPath)
+	Ok(t, err)
+
+	t.Run("rejects stale pull status", func(t *testing.T) {
+		_, err := buildApply(
+			models.PullRequest{HeadCommit: "def456", BaseBranch: "main"},
+			pull,
+			customProject,
+		)
+		Assert(t, err != nil, "expected stale pull status to reject apply")
+		Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+	})
+
+	t.Run("rejects active plan generation", func(t *testing.T) {
+		activeProject := customProject
+		activeProject.Status = models.ErroredPlanStatus
+		activeProject.PlanGeneration = "generation-1"
+		_, err := buildApply(pull, pull, activeProject)
+		Assert(t, err != nil, "expected active plan generation to reject apply")
+		Assert(t, strings.Contains(err.Error(), "plan is incomplete"), "got: %s", err)
+	})
+
+	t.Run("does not ignore unmatched convention plan", func(t *testing.T) {
+		stalePlanPath := filepath.Join(
+			tmpDir,
+			"default",
+			"custom-plan-path",
+			runtime.GetPlanFilename("default", "stale"),
+		)
+		Ok(t, os.WriteFile(stalePlanPath, []byte("stale plan"), 0600))
+		_, err := buildApply(pull, pull, customProject)
+		Assert(t, err != nil, "expected unmatched convention plan to reject apply")
+		Assert(t, strings.Contains(err.Error(), "no matching plan status exists"), "got: %s", err)
+		Ok(t, os.Remove(stalePlanPath))
+	})
+
+	t.Run("managed apply still requires convention plan", func(t *testing.T) {
+		Ok(t, os.Remove(customPlanPath))
+		_, err := buildApply(pull, pull, models.ProjectStatus{
+			RepoRelDir:  "managed-plan",
+			Workspace:   "default",
+			ProjectName: "managed-plan",
+			Status:      models.PlannedPlanStatus,
+		})
+		Assert(t, err != nil, "expected managed apply without plan file to fail")
+		Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
+	})
+
+	t.Run("mixed managed and run-only projects preserve managed plan hash", func(t *testing.T) {
+		Ok(t, os.WriteFile(customPlanPath, []byte("custom plan"), 0600))
+		managedProject := models.ProjectStatus{
+			RepoRelDir:  "managed-plan",
+			Workspace:   "default",
+			ProjectName: "managed-plan",
+			Status:      models.PlannedPlanStatus,
+		}
+		managedPlanPath := filepath.Join(
+			tmpDir,
+			"default",
+			"managed-plan",
+			runtime.GetPlanFilename(managedProject.Workspace, managedProject.ProjectName),
+		)
+		Ok(t, os.WriteFile(managedPlanPath, []byte("managed plan"), 0600))
+
+		ctxs, err := buildApply(pull, pull, customProject, managedProject)
+		Ok(t, err)
+		Equals(t, 2, len(ctxs))
+		for _, ctx := range ctxs {
+			switch ctx.ProjectName {
+			case "custom-plan-path":
+				Equals(t, "", ctx.ExpectedPlanHash)
+			case "managed-plan":
+				Assert(t, ctx.ExpectedPlanHash != "", "expected managed plan hash")
+			default:
+				t.Fatalf("unexpected project %q", ctx.ProjectName)
+			}
+		}
+	})
+}
+
 // Test that autodiscover.ignore_paths is respected during multi-apply.
 // Plans in ignored paths (e.g. .terraform/modules/) should not be applied.
 func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) {
