@@ -698,7 +698,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t
 	Equals(t, "apply skipped because an earlier execution group failed", results[1].Error)
 }
 
-func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t *testing.T) {
+func TestAPIRemediationExecutor_ExecuteApplyProjectsSkipsPRRequirements(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
@@ -728,7 +728,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
-			Assert(t, !ctx.SkipPRRequirements, "remediation apply must not bypass PR-state requirements during pre-apply plan")
+			Assert(t, ctx.SkipPRRequirements, "remediation apply must bypass PR-only requirements (approved/mergeable) during pre-apply plan")
 			Assert(t, ctx.SuppressVCSStatus, "remediation apply should suppress normal VCS status writes")
 			cmd := args[1].(*events.CommentCommand)
 			return ReturnValues{[]command.ProjectContext{{
@@ -741,7 +741,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
-			Assert(t, !ctx.SkipPRRequirements, "remediation apply must not bypass PR-state requirements during apply")
+			Assert(t, ctx.SkipPRRequirements, "remediation apply must bypass PR-only requirements (approved/mergeable) during apply")
 			Assert(t, ctx.SuppressVCSStatus, "remediation apply should suppress normal VCS status writes")
 			cmd := args[1].(*events.CommentCommand)
 			return ReturnValues{[]command.ProjectContext{{
@@ -760,7 +760,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	})
 	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 		projectCtx := args[0].(command.ProjectContext)
-		Assert(t, !projectCtx.SkipPRRequirements, "remediation apply project context must not bypass PR-state requirements")
+		Assert(t, projectCtx.SkipPRRequirements, "remediation apply project context must bypass PR-only requirements (approved/mergeable)")
 		Assert(t, projectCtx.SuppressVCSStatus, "remediation apply project context should suppress normal VCS status writes")
 		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
 	})
