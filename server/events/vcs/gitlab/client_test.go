@@ -2177,6 +2177,20 @@ func TestClient_GetTeamNamesForUser_TransportErrors(t *testing.T) {
 			errContext: "GET /users",
 		},
 		{
+			name: "listing users when net/http discards a simultaneous response",
+			transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				// net/http deliberately discards a response returned alongside an error.
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Status:     "404 Not Found",
+					Header:     make(http.Header),
+					Body:       http.NoBody,
+					Request:    req,
+				}, transportErr
+			}),
+			errContext: "GET /users",
+		},
+		{
 			name: "getting group membership",
 			transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				if req.URL.Path == "/api/v4/users" {

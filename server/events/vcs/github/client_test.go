@@ -1474,6 +1474,30 @@ func TestClient_GetFileContent(t *testing.T) {
 		Assert(t, errors.Is(err, transportErr), "expected the transport error, got %v", err)
 	})
 
+	t.Run("transport error discards a simultaneous response", func(t *testing.T) {
+		transportErr := errors.New("github transport unavailable")
+		client, err := github.New("github.com", transportCredentials{
+			client: &http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					// net/http deliberately discards a response returned alongside an error.
+					return &http.Response{
+						StatusCode: http.StatusNotFound,
+						Status:     "404 Not Found",
+						Header:     make(http.Header),
+						Body:       http.NoBody,
+						Request:    req,
+					}, transportErr
+				}),
+			},
+		}, github.Config{}, 0, logger)
+		Ok(t, err)
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Assert(t, found, "expected a discarded response to remain a transport failure, not a missing file")
+		Equals(t, 0, len(content))
+		Assert(t, errors.Is(err, transportErr), "expected the transport error, got %v", err)
+	})
+
 	t.Run("server error preserves GitHub error", func(t *testing.T) {
 		testServer := httptest.NewTLSServer(
 			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

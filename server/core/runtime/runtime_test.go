@@ -76,10 +76,6 @@ func TestIsRemotePlan(t *testing.T) {
 			contents: []byte{},
 		},
 		{
-			name:     "one byte short",
-			contents: []byte(remotePlanHeader[:len(remotePlanHeader)-1]),
-		},
-		{
 			name:     "same length without header",
 			contents: []byte("Atlantis: this plan was created by local ops\n"),
 		},
@@ -98,6 +94,12 @@ func TestIsRemotePlan(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			Equals(t, c.exp, runtime.IsRemotePlan(c.contents))
+		})
+	}
+
+	for prefixLen := range len(remotePlanHeader) {
+		t.Run(fmt.Sprintf("truncated header length %d", prefixLen), func(t *testing.T) {
+			Equals(t, false, runtime.IsRemotePlan([]byte(remotePlanHeader[:prefixLen])))
 		})
 	}
 }
