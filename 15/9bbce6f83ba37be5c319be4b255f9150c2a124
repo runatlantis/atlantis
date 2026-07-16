@@ -1,0 +1,30 @@
+server/events/project_command_runner_test.go
+  s_2a3e2ffe398070::t_4b042c944f92f7 952-953,962-1014
+  s_2a3e2ffe398070::t_d40a7c4b2e3fed 1015,1017-1100
+  s_2a3e2ffe398070::t_a282fbde7ee461 1016
+server/events/apply_plan_validator.go
+  s_2a3e2ffe398070::t_d48f1d7e971774 26-29,64-103,105-108,111,114,119,128,131,134,139,142,146,149,151,154,157
+server/events/project_command_runner.go
+  s_2a3e2ffe398070::t_d48f1d7e971774 917-925
+server/events/command_runner_test.go
+  s_2a3e2ffe398070::t_0265955400ac26 1121-1122
+  s_2a3e2ffe398070::t_4b042c944f92f7 1068-1069
+server/events/plan_command_runner.go
+  s_2a3e2ffe398070::t_d48f1d7e971774 416-418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "159bbce6f83ba37be5c319be4b255f9150c2a124",
+  "prompts": {},
+  "sessions": {
+    "s_2a3e2ffe398070": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f5be8-fc9f-7442-9630-9cda5e921418",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

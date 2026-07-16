@@ -1,0 +1,19 @@
+server/events/project_command_builder_test.go
+  s_138b00afe532a5::t_c935e72982ea10 3688-3803
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6fcc294ddd2e4c2f08c165e6a7884fe718a8ae99",
+  "prompts": {},
+  "sessions": {
+    "s_138b00afe532a5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f6af9-219c-7b40-9267-b6a16218fdb3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
