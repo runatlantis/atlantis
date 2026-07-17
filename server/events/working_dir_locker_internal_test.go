@@ -19,9 +19,9 @@ func TestWorkingDirLockMetadata(t *testing.T) {
 		wantURL  string
 	}{
 		{
-			name:     "GitHub strips credentials and git suffix",
+			name:     "GitHub strips URL-escaped credentials and git suffix",
 			hostType: models.Github,
-			cloneURL: "https://user:token@github.com/owner/repo.git",
+			cloneURL: "https://user:p%40ss%2Fw%3Ford%23@github.com/owner/repo.git",
 			wantURL:  "https://github.com/owner/repo/commit/" + sha,
 		},
 		{

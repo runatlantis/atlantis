@@ -132,6 +132,9 @@ func WorkingDirLockMetadataForPull(pull models.PullRequest) WorkingDirLockMetada
 		return metadata
 	}
 
+	// PullRequest has no head repository metadata, so commit links use the base
+	// repository. Fork commits are normally exposed there via the PR ref, though
+	// the link can be unavailable before that ref exists or after it is garbage-collected.
 	switch pull.BaseRepo.VCSHost.Type {
 	case models.Github, models.Gitlab, models.Gitea:
 		repoURL, err := url.Parse(pull.BaseRepo.CloneURL)
