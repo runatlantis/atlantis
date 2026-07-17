@@ -6,6 +6,7 @@ package github_test
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +25,28 @@ import (
 
 	"github.com/shurcooL/githubv4"
 )
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+type transportCredentials struct {
+	client *http.Client
+}
+
+func (c transportCredentials) Client() (*http.Client, error) {
+	return c.client, nil
+}
+
+func (transportCredentials) GetToken() (string, error) {
+	return "", nil
+}
+
+func (transportCredentials) GetUser() (string, error) {
+	return "test-user", nil
+}
 
 // GetModifiedFiles should make multiple requests if more than one page
 // and concat results.
@@ -1432,6 +1455,65 @@ func TestClient_GetFileContent(t *testing.T) {
 		Ok(t, err)
 		Assert(t, !found, "expected file to not be found")
 		Equals(t, 0, len(content))
+	})
+
+	t.Run("transport error is returned without a response", func(t *testing.T) {
+		transportErr := errors.New("github transport unavailable")
+		client, err := github.New("github.com", transportCredentials{
+			client: &http.Client{
+				Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
+					return nil, transportErr
+				}),
+			},
+		}, github.Config{}, 0, logger)
+		Ok(t, err)
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Assert(t, found, "expected a transport failure to remain distinct from a missing file")
+		Equals(t, 0, len(content))
+		Assert(t, errors.Is(err, transportErr), "expected the transport error, got %v", err)
+	})
+
+	t.Run("transport error discards a simultaneous response", func(t *testing.T) {
+		transportErr := errors.New("github transport unavailable")
+		client, err := github.New("github.com", transportCredentials{
+			client: &http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					// net/http deliberately discards a response returned alongside an error.
+					return &http.Response{
+						StatusCode: http.StatusNotFound,
+						Status:     "404 Not Found",
+						Header:     make(http.Header),
+						Body:       http.NoBody,
+						Request:    req,
+					}, transportErr
+				}),
+			},
+		}, github.Config{}, 0, logger)
+		Ok(t, err)
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Assert(t, found, "expected a discarded response to remain a transport failure, not a missing file")
+		Equals(t, 0, len(content))
+		Assert(t, errors.Is(err, transportErr), "expected the transport error, got %v", err)
+	})
+
+	t.Run("server error preserves GitHub error", func(t *testing.T) {
+		testServer := httptest.NewTLSServer(
+			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				http.Error(w, `{"message":"provider unavailable"}`, http.StatusInternalServerError)
+			}))
+		t.Cleanup(testServer.Close)
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+		Ok(t, err)
+		defer disableSSLVerification()()
+
+		found, content, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+		Assert(t, found, "expected a provider failure to remain distinct from a missing file")
+		Equals(t, 0, len(content))
+		ErrContains(t, "provider unavailable", err)
 	})
 
 	t.Run("file over 1MB falls back to blobs API", func(t *testing.T) {

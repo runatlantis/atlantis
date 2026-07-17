@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.26.4
+go 1.26.5
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -48,6 +48,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/uber-go/tally/v4 v4.1.17
 	github.com/urfave/negroni/v3 v3.1.1
+	github.com/zclconf/go-cty v1.16.3
 	gitlab.com/gitlab-org/api/client-go v0.161.1
 	go.etcd.io/bbolt v1.4.3
 	go.uber.org/mock v0.6.0
@@ -136,7 +137,6 @@ require (
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
-	github.com/zclconf/go-cty v1.16.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
