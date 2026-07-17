@@ -95,6 +95,7 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
+	AutoplanRuns                    *AutoplanRunCoordinator
 }
 
 // Post handles POST webhook requests.
@@ -584,17 +585,7 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 
 	switch eventType {
 	case models.OpenedPullEvent, models.UpdatedPullEvent:
-		// If the pull request was opened or updated, we will try to autoplan.
-
-		// Respond with success and then actually execute the command asynchronously.
-		// We use a goroutine so that this function returns and the connection is
-		// closed.
-		if !e.TestingMode {
-			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
-		} else {
-			// When testing we want to wait for everything to complete.
-			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
-		}
+		e.startAutoplan(autoplanRequest{baseRepo: baseRepo, headRepo: headRepo, pull: pull, user: user})
 		return HTTPResponse{
 			body: "Processing...",
 		}
@@ -622,6 +613,23 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 		}
 	}
 	return HTTPResponse{}
+}
+
+func (e *VCSEventsController) startAutoplan(request autoplanRequest) {
+	if e.TestingMode {
+		e.CommandRunner.RunAutoplanCommand(request.baseRepo, request.headRepo, request.pull, request.user)
+		return
+	}
+	if next, started := e.AutoplanRuns.start(request); started {
+		go e.runAutoplan(next)
+	}
+}
+
+func (e *VCSEventsController) runAutoplan(request autoplanRequest) {
+	e.CommandRunner.RunAutoplanCommand(request.baseRepo, request.headRepo, request.pull, request.user)
+	if next, started := e.AutoplanRuns.complete(request); started {
+		go e.runAutoplan(next)
+	}
 }
 
 func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
