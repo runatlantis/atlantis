@@ -1002,10 +1002,48 @@ func TestAPIController_NoPRRequestsUseSyntheticHardenedAPIContext(t *testing.T) 
 			Assert(t, capturedCtx.Pull.Num < 0, "expected no-PR API request to use an isolated synthetic pull number")
 			Assert(t, capturedCtx.Pull.HardenedNonPRRefCheckout, "expected no-PR API request to use hardened checkout")
 			Assert(t, capturedCtx.SkipPRModifiedFiles, "expected no-PR API request to skip PR modified-file lookups")
+			Assert(t, capturedCtx.SkipPRRequirements, "expected no-PR API request to skip PR-only requirements like approved/mergeable")
 			Assert(t, capturedCtx.FailOnTeamAllowlistDenied, "expected no-PR API request to fail closed on team allowlist denial")
 			Assert(t, capturedCtx.RunPolicyChecks, "expected API request to run policy checks when generated")
 			Assert(t, capturedCtx.SortByExecutionOrder, "expected API request to honor execution-order sorting")
 			Assert(t, capturedCtx.ExactProjectNameMatching, "expected API project selectors to use exact names")
+		})
+	}
+}
+
+func TestAPIController_PRRequestsDoNotSkipPRRequirements(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call func(*controllers.APIController, http.ResponseWriter, *http.Request)
+	}{
+		{name: "plan", call: (*controllers.APIController).Plan},
+		{name: "apply", call: (*controllers.APIController).Apply},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			var capturedCtx *command.Context
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					capturedCtx = args[0].(*command.Context)
+					return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"default"},
+				PR:         42,
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			tc.call(ac, w, req)
+
+			Equals(t, http.StatusOK, w.Code)
+			Assert(t, capturedCtx != nil, "expected plan command builder to be called")
+			Assert(t, capturedCtx.Pull.Num == 42, "expected API request with PR to use the provided PR number")
+			Assert(t, !capturedCtx.SkipPRRequirements, "API request with a real PR must not skip PR-only requirements")
 		})
 	}
 }

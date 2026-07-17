@@ -47,10 +47,17 @@ jobs:
           filters: |
             src:
               - 'Dockerfile'
+              - '.dockerignore'
               - 'docker-entrypoint.sh'
+              - 'goss.yaml'
+              - 'scripts/download-release.sh'
               - '.github/workflows/atlantis-image.yml'
-              - '**.go'
-              - 'go.*'
+              - 'cmd/**'
+              - 'server/**'
+              - 'testdrive/**'
+              - 'main.go'
+              - 'go.mod'
+              - 'go.sum'
 
   build:
     needs: [changes]
@@ -111,7 +118,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -143,7 +150,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+      uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
