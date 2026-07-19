@@ -223,7 +223,13 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), "", common})
+		renderedContext := ""
+		if len(res.ProjectResults) > 0 {
+			projectResultsCommon := common
+			projectResultsCommon.Verbose = false
+			renderedContext = m.renderProjectResults(ctx, res.ProjectResults, projectResultsCommon, res.ApplyExecutionOrderProgress)
+		}
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), renderedContext, common})
 	}
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})

@@ -101,6 +101,53 @@ func TestRenderErr(t *testing.T) {
 	}
 }
 
+func TestRenderErrWithProjectResults(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logger.Info("apply log")
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				Workspace:  "default",
+				RepoRelDir: "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "Apply complete! Resources: 1 added, 0 changed, 0 destroyed.",
+				},
+			},
+		},
+		Error: errors.New("recording apply results: database unavailable; run `atlantis plan` before applying again"),
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, Verbose: true}
+
+	rendered := r.Render(ctx, res, cmd)
+
+	Assert(t, strings.Contains(rendered, "Apply complete! Resources: 1 added, 0 changed, 0 destroyed."), "expected successful apply output, got: %s", rendered)
+	Assert(t, strings.Contains(rendered, "recording apply results: database unavailable; run `atlantis plan` before applying again"), "expected persistence error, got: %s", rendered)
+	Equals(t, 1, strings.Count(rendered, "<details><summary>Log</summary>"))
+	Equals(t, 1, strings.Count(rendered, "[INFO] apply log"))
+}
+
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string

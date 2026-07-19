@@ -271,25 +271,21 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
-	if !result.HasErrors() {
-		result.ApplyExecutionOrderProgress = applyContinuation
-	}
-
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	currentPull := applyPullWithLiveIdentity(pull, livePull)
 	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
 		ctx.Log.Warn("not publishing apply success status because %s", err)
 		ctx.CommandHasErrors = true
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		return
 	}
+	if !result.HasErrors() {
+		result.ApplyExecutionOrderProgress = applyContinuation
+	}
+	a.pullUpdater.updatePull(ctx, cmd, result)
 
 	a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus)
 	a.updateCommitStatus(ctx, pullStatus)
