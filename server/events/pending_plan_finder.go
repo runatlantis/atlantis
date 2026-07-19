@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
@@ -23,6 +24,7 @@ type PendingPlanFinder interface {
 
 // DefaultPendingPlanFinder finds unapplied plans.
 type DefaultPendingPlanFinder struct {
+	Log               logging.SimpleLogging
 	DataDir           string
 	LocalPlanStoreDir string
 }
@@ -56,6 +58,12 @@ func (p PendingPlan) planRepoDir() string {
 func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 	plans, _, err := p.findWithAbsPaths(pullDir)
 	return plans, err
+}
+
+func (p *DefaultPendingPlanFinder) debug(format string, args ...any) {
+	if p.Log != nil {
+		p.Log.Debug(format, args...)
+	}
 }
 
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
@@ -157,6 +165,7 @@ func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]Pendin
 func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPullDir string) ([]PendingPlan, []string, error) {
 	workspaceDirs, err := os.ReadDir(planPullDir)
 	if os.IsNotExist(err) {
+		p.debug("plan store pull directory %q does not exist", planPullDir)
 		return nil, nil, nil
 	}
 	if err != nil {
@@ -176,6 +185,7 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 	var absPaths []string
 	for _, workspaceDir := range workspaceDirs {
 		if !workspaceDir.IsDir() {
+			p.debug("skipping plan store entry %q because it is not a directory", filepath.Join(absPlanPullDir, workspaceDir.Name()))
 			continue
 		}
 
@@ -184,17 +194,24 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		if err != nil {
 			return nil, nil, err
 		}
-		if _, err := os.Stat(cloneRepoDir); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+		cloneRepoInfo, err := os.Stat(cloneRepoDir)
+		if os.IsNotExist(err) {
+			p.debug("skipping plan store workspace %q because clone directory %q does not exist", workspace, cloneRepoDir)
+			continue
+		}
+		if err != nil {
 			return nil, nil, err
+		}
+		if !cloneRepoInfo.IsDir() {
+			p.debug("skipping plan store workspace %q because clone path %q is not a directory", workspace, cloneRepoDir)
+			continue
 		}
 		workspaceIsGitRoot, err := isGitWorkTreeRoot(cloneRepoDir)
 		if err != nil {
 			return nil, nil, err
 		}
 		if !workspaceIsGitRoot {
+			p.debug("skipping plan store workspace %q because clone directory %q is not a git worktree root", workspace, cloneRepoDir)
 			continue
 		}
 		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)

@@ -649,6 +649,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{
+		Log:               logger,
 		DataDir:           userConfig.DataDir,
 		LocalPlanStoreDir: userConfig.EnableLocalStores,
 	}
