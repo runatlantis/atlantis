@@ -63,7 +63,7 @@ delete_source_branch_on_merge: true # Available since v0.15.0
 parallel_plan: true # Available since v0.17.0
 parallel_apply: true # Available since v0.17.0
 abort_on_execution_order_fail: true # Available since v0.17.0
-pause_apply_between_execution_order_groups: true # Available since v0.47.0
+pause_apply_between_execution_order_groups: true
 projects:
 - name: my-project-name # Available since v0.1.0
   branch: /main/ # Available since v0.21.0
