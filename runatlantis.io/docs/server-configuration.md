@@ -643,16 +643,6 @@ rejected while read-only drift detection remains available. This flag does not b
 repository `apply_requirements`; requirements that need pull request state fail closed for
 non-PR remediation requests. Defaults to `false`.
 
-### `--enable-local-stores`
-
-```bash
-atlantis server --enable-local-stores="path/to/local/plan/dir"
-# or
-ATLANTIS_ENABLE_LOCAL_STORES="path/to/local/plan/dir"
-```
-
-Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--enable-local-stores`.
-
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
@@ -1257,6 +1247,16 @@ until all changed projects are applied.
 Defaults to `false`.
 
 Only supported on GitLab
+
+### `--plan-store-dir`
+
+```bash
+atlantis server --plan-store-dir="path/to/local/plan/dir"
+# or
+ATLANTIS_PLAN_STORE_DIR="path/to/local/plan/dir"
+```
+
+Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--plan-store-dir`.
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 

@@ -546,7 +546,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:           userConfig.DataDir,
-		LocalPlanStoreDir: userConfig.EnableLocalStores,
+		LocalPlanStoreDir: userConfig.PlanStoreDir,
 		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:     userConfig.CheckoutDepth,
 		GithubAppEnabled:  githubAppEnabled,
@@ -651,7 +651,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{
 		Log:               logger,
 		DataDir:           userConfig.DataDir,
-		LocalPlanStoreDir: userConfig.EnableLocalStores,
+		LocalPlanStoreDir: userConfig.PlanStoreDir,
 	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
@@ -714,7 +714,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
 		terraformClient,
-		userConfig.EnableLocalStores,
+		userConfig.PlanStoreDir,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)

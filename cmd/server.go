@@ -80,7 +80,6 @@ const (
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
-	EnableLocalStoresFlag            = "enable-local-stores"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
@@ -120,6 +119,7 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	PlanStoreDirFlag                 = "plan-store-dir"
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
@@ -321,10 +321,6 @@ var stringFlags = map[string]stringFlag{
 		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
 	},
-	EnableLocalStoresFlag: {
-		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
-		defaultValue: "",
-	},
 	ExecutableName: {
 		description:  "Comment command executable name.",
 		defaultValue: DefaultExecutableName,
@@ -436,6 +432,10 @@ var stringFlags = map[string]stringFlag{
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
+	},
+	PlanStoreDirFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
 	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
@@ -937,7 +937,7 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
-	if err := s.setEnableLocalStoresDir(&userConfig); err != nil {
+	if err := s.setPlanStoreDir(&userConfig); err != nil {
 		return err
 	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
@@ -1248,15 +1248,15 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 	return nil
 }
 
-// setEnableLocalStoresDir checks if ~ was used in enable-local-stores and converts it to the actual
+// setPlanStoreDir checks if ~ was used in plan-store-dir and converts it to the actual
 // home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
-func (s *ServerCmd) setEnableLocalStoresDir(userConfig *server.UserConfig) error {
-	if userConfig.EnableLocalStores == "" {
-		userConfig.EnableLocalStores = userConfig.DataDir
+func (s *ServerCmd) setPlanStoreDir(userConfig *server.UserConfig) error {
+	if userConfig.PlanStoreDir == "" {
+		userConfig.PlanStoreDir = userConfig.DataDir
 		return nil
 	}
 
-	finalPath := userConfig.EnableLocalStores
+	finalPath := userConfig.PlanStoreDir
 	if strings.HasPrefix(finalPath, "~/") {
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
@@ -1267,9 +1267,9 @@ func (s *ServerCmd) setEnableLocalStoresDir(userConfig *server.UserConfig) error
 
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return fmt.Errorf("making enable-local-stores absolute: %w", err)
+		return fmt.Errorf("making plan-store-dir absolute: %w", err)
 	}
-	userConfig.EnableLocalStores = finalPath
+	userConfig.PlanStoreDir = finalPath
 	return nil
 }
 
