@@ -8,6 +8,7 @@ package runtime
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const (
@@ -103,11 +105,28 @@ func GetPlanFilename(workspace string, projName string) string {
 }
 
 // GetPlanFileDir returns the directory where Atlantis stores the plan file for ctx.
+// When LocalPlanStoreDir is set to data-dir, this must mirror FileWorkspace.cloneDir
+// plus ctx.RepoRelDir so default installs keep the legacy on-disk layout.
 func GetPlanFileDir(ctx command.ProjectContext, projectPath string) string {
 	if ctx.LocalPlanStoreDir == "" {
 		return projectPath
 	}
 	return filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir, ctx.BaseRepo.FullName, strconv.Itoa(ctx.Pull.Num), ctx.Workspace, ctx.RepoRelDir)
+}
+
+// EnsurePlanFileDir creates the directory for ctx's generated Terraform plan file.
+func EnsurePlanFileDir(ctx command.ProjectContext, projectPath string) error {
+	if ctx.LocalPlanStoreDir == "" {
+		return nil
+	}
+	planFileDir := GetPlanFileDir(ctx, projectPath)
+	if err := utils.EnsureSubPath(filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir), planFileDir); err != nil {
+		return fmt.Errorf("plan file path traversal detected: %w", err)
+	}
+	if err := os.MkdirAll(planFileDir, 0700); err != nil {
+		return fmt.Errorf("creating plan file directory: %w", err)
+	}
+	return nil
 }
 
 // GetPlanFilePath returns the full path to the generated Terraform plan file.

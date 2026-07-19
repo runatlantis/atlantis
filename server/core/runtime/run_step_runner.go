@@ -55,6 +55,11 @@ func (r *RunStepRunner) Run(
 		return "", err
 	}
 
+	planFile := GetPlanFilePath(ctx, path)
+	if err := EnsurePlanFileDir(ctx, path); err != nil {
+		return "", err
+	}
+
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
 		"ATLANTIS_TERRAFORM_DISTRIBUTION": tfDistribution.BinName(),
@@ -69,7 +74,7 @@ func (r *RunStepRunner) Run(
 		"HEAD_REPO_NAME":                  ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":                 ctx.HeadRepo.Owner,
 		"PATH":                            fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                        GetPlanFilePath(ctx, path),
+		"PLANFILE":                        planFile,
 		"SHOWFILE":                        filepath.Join(path, ctx.GetShowResultFileName()),
 		"POLICYCHECKFILE":                 filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":                    ctx.ProjectName,

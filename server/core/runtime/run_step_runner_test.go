@@ -6,6 +6,7 @@ package runtime_test
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -23,6 +24,43 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+func TestRunStepRunner_CreatesLocalPlanStoreDir(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
+	defaultVersion, err := version.NewVersion("0.11.0")
+	Ok(t, err)
+	When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
+		ThenReturn(nil)
+
+	projectPath := t.TempDir()
+	planStoreDir := t.TempDir()
+	planPath := filepath.Join(planStoreDir, "repos", "owner", "repo", "2", "default", "project", "default.tfplan")
+	logger := logging.NewNoopLogger(t)
+	r := runtime.RunStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: defaultDistribution,
+		DefaultTFVersion:      defaultVersion,
+	}
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalPlanStoreDir: planStoreDir,
+		Log:               logger,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "project",
+		Workspace:  "default",
+	}
+
+	_, err = r.Run(ctx, nil, `printf plan > "$PLANFILE"`, projectPath, nil, false, nil, nil)
+	Ok(t, err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
 
 func TestRunStepRunner_Run(t *testing.T) {
 	testRegexSecret := regexp.MustCompile(`((?i)Secret:\s")[^"]*`)

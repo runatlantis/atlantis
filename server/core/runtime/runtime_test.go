@@ -5,6 +5,7 @@ package runtime_test
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -61,6 +62,29 @@ func TestGetPlanFilename(t *testing.T) {
 			Equals(t, c.exp, runtime.GetPlanFilename(c.workspace, c.projectName))
 		})
 	}
+}
+
+func TestEnsurePlanFileDir(t *testing.T) {
+	projectPath := t.TempDir()
+	planStoreDir := t.TempDir()
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalPlanStoreDir: planStoreDir,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "modules/app",
+		Workspace:  "default",
+	}
+
+	Ok(t, runtime.EnsurePlanFileDir(ctx, projectPath))
+	_, err := os.Stat(runtime.GetPlanFileDir(ctx, projectPath))
+	Ok(t, err)
+
+	ctx.BaseRepo.FullName = "../../outside"
+	ErrContains(t, "plan file path traversal detected", runtime.EnsurePlanFileDir(ctx, projectPath))
 }
 
 func TestGetPlanFilePath(t *testing.T) {
