@@ -46,13 +46,38 @@ the `--auto-merge-method` option.
 atlantis apply --auto-merge-method <method>
 ```
 
-The `method` must be one of:
+The `method` is one of a normalised set of values that Atlantis translates onto
+each provider's own merge strategy:
 
-- merge
-- rebase
-- squash
+- `merge` — merge with a merge commit
+- `rebase` — rebase onto the base branch
+- `squash` — squash the commits into one
+- `fast-forward` — fast-forward the base branch, i.e. merge without a merge commit
 
-This is currently only implemented for the GitHub VCS.
+Not every provider can perform every method. If a method is not supported for
+the pull request's provider, the command is rejected with the list of methods
+that provider does support:
+
+| Method         | GitHub | Gitea / Forgejo | GitLab | Bitbucket Cloud | Bitbucket Server | Azure DevOps |
+|----------------|:------:|:---------------:|:------:|:---------------:|:----------------:|:------------:|
+| `merge`        |   ✓    |        ✓        |   ✓    |        ✓        |        ✓         |      ✓       |
+| `rebase`       |   ✓    |        ✓        |        |                 |        ✓         |      ✓       |
+| `squash`       |   ✓    |        ✓        |   ✓    |        ✓        |        ✓         |      ✓       |
+| `fast-forward` |        |        ✓        |        |        ✓        |        ✓         |              |
+
+A method must also be permitted by the repository's own settings. If the
+requested method is disabled for the repository (for example, squash merges are
+turned off), the merge API rejects it and Atlantis reports the failure.
+
+:::tip NOTE
+Each provider maps the normalised method onto its native strategy:
+GitLab only lets squashing be toggled when accepting a merge request (the
+merge/fast-forward/rebase choice is fixed by the project's merge method
+setting), so it supports only `merge` and `squash`. On Bitbucket Server the
+methods map to the `no-ff`, `rebase-ff`, `squash` and `ff-only` strategies
+respectively, and on Azure DevOps to the `noFastForward`, `rebase` and `squash`
+strategies. `fast-forward` requires the base branch to be fast-forwardable.
+:::
 
 ## Requirements
 

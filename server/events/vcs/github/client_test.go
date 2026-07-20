@@ -1227,7 +1227,7 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 		allowMerge        bool
 		allowRebase       bool
 		allowSquash       bool
-		mergeMethodOption string
+		mergeMethodOption models.MergeMethod
 		expMethod         string
 		expErr            string
 	}{
@@ -1312,7 +1312,15 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "unknown",
 			expMethod:         "",
-			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
+			expErr:            `merge method "unknown" is not supported for GitHub, supported methods are: merge, rebase, squash`,
+		},
+		"merge with fast-forward: not supported by GitHub": {
+			allowMerge:        true,
+			allowRebase:       true,
+			allowSquash:       true,
+			mergeMethodOption: models.MergeMethodFastForward,
+			expMethod:         "",
+			expErr:            `merge method "fast-forward" is not supported for GitHub, supported methods are: merge, rebase, squash`,
 		},
 	}
 

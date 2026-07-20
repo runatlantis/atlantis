@@ -333,6 +333,24 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	owner, project, repoName := SplitAzureDevopsRepoFullName(pull.BaseRepo.FullName)
 	descriptor := "Atlantis Terraform Pull Request Automation"
 
+	// Translate the normalised merge method onto an Azure DevOps merge
+	// strategy. An empty method keeps the historic default of a no
+	// fast-forward merge. Azure DevOps has no pure fast-forward strategy, so
+	// that method falls through to the unsupported error. This is validated
+	// before any API call so an unsupported method fails fast.
+	mcm := azuredevops.NoFastForward.String()
+	switch pullOptions.MergeMethod {
+	case "", models.MergeMethodMerge:
+		mcm = azuredevops.NoFastForward.String()
+	case models.MergeMethodRebase:
+		mcm = azuredevops.Rebase.String()
+	case models.MergeMethodSquash:
+		mcm = azuredevops.Squash.String()
+	default:
+		return fmt.Errorf("merge method %q is not supported for Azure DevOps, supported methods are: %s",
+			pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.AzureDevops)))
+	}
+
 	userID, err := g.Client.UserEntitlements.GetUserID(g.ctx, g.UserName, owner)
 	if err != nil {
 		return fmt.Errorf("getting user id, User name: %s Organization %s : %w", g.UserName, owner, err)
@@ -347,8 +365,6 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		ID:         userID,
 		ImageURL:   &imageURL,
 	}
-	// Set default pull request completion options
-	mcm := azuredevops.NoFastForward.String()
 	twi := new(bool)
 	*twi = true
 	completionOpts := azuredevops.GitPullRequestCompletionOptions{
