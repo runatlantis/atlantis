@@ -31,20 +31,33 @@ command with the `--auto-merge-disabled` option.
 
 ## How to set the merge method for automerge
 
-If automerge is enabled, you can set a default merge method with the
-`--automerge-method` server flag or `ATLANTIS_AUTOMERGE_METHOD` environment
-variable.
+If automerge is enabled, the merge method can be set in three places. From
+lowest to highest priority:
 
-```shell
-atlantis server --automerge-method <method>
-```
+1. The `--automerge-method` server flag (or `ATLANTIS_AUTOMERGE_METHOD`
+   environment variable), which sets the default for every repo:
 
-You can override the server default for a single `atlantis apply` command with
-the `--auto-merge-method` option.
+    ```shell
+    atlantis server --automerge-method <method>
+    ```
 
-```shell
-atlantis apply --auto-merge-method <method>
-```
+2. The `automerge_method` key in a repo's `atlantis.yaml`, which overrides the
+   server default for that repo:
+
+    ```yaml
+    version: 3
+    automerge: true
+    automerge_method: <method>
+    projects:
+    - dir: .
+    ```
+
+3. The `--auto-merge-method` flag on a single `atlantis apply` command, which
+   overrides both of the above for that command:
+
+    ```shell
+    atlantis apply --auto-merge-method <method>
+    ```
 
 The `method` is one of a normalised set of values that Atlantis translates onto
 each provider's own merge strategy:

@@ -55,6 +55,7 @@ proyecto configurado manualmente, el proyecto configurado manualmente tendrá pr
 ```yaml
 version: 3 # Available since v0.1.0
 automerge: true # Available since v0.15.0
+automerge_method: merge # Optional, one of "merge", "rebase", "squash" or "fast-forward" depending on the VCS provider
 autodiscover: # Available since v0.18.0
   mode: auto
   ignore_paths:
@@ -184,6 +185,8 @@ Habilitar estas opciones puede reducir significativamente la duración de los pl
 Usa `--parallel-pool-size` para configurar el número máximo de plans y applies que pueden ejecutarse en paralelo. El valor predeterminado es 15.
 
 Los plans y applies en paralelo funcionan tanto entre múltiples directorios como entre múltiples workspaces.
+
+`parallel_plan` también aplica a los plans y policy checks iniciados a través de la [API](api-endpoints.md), como `POST /api/plan` y `POST /api/drift/detect`. Los applies iniciados a través de la API se siguen ejecutando un proyecto a la vez.
 
 ### Configurar Planning
 
@@ -446,14 +449,15 @@ workflows:
 allowed_regexp_prefixes:
 ```
 
-| Key                           | Type                                                   | Default | Required | Description                                                                                                                              |
-| ----------------------------- | ------------------------------------------------------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| version                       | int                                                    | none    | **yes**  | Esta key es requerida y debe establecerse en `3`.                                                                                        |
-| automerge                     | bool                                                   | `false` | no       | Fusiona automáticamente el pull request cuando todos los plans están aplicados.                                                          |
-| delete_source_branch_on_merge | bool                                                   | `false` | no       | Elimina automáticamente la rama fuente al fusionar.                                                                                      |
-| projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lista los proyectos en este repo.                                                                                                        |
-| workflows<br />_(restricted)_ | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Workflows personalizados.                                                                                                                |
-| allowed_regexp_prefixes       | array\[string\]                                        | `[]`    | no       | Lista los prefijos regexp permitidos para usar cuando se usa la flag [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd). |
+| Key                           | Type                                                   | Default | Required | Description                                                                                                                                      |
+| ----------------------------- | ------------------------------------------------------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| version                       | int                                                    | none    | **yes**  | Esta key es requerida y debe establecerse en `3`.                                                                                                |
+| automerge                     | bool                                                   | `false` | no       | Fusiona automáticamente el pull request cuando todos los plans están aplicados.                                                                  |
+| automerge_method              | string                                                 | none    | no       | Método de fusión para la fusión automática: `merge`, `rebase`, `squash` o `fast-forward` (los valores soportados varían según el proveedor VCS). |
+| delete_source_branch_on_merge | bool                                                   | `false` | no       | Elimina automáticamente la rama fuente al fusionar.                                                                                              |
+| projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lista los proyectos en este repo.                                                                                                                |
+| workflows<br />_(restricted)_ | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Workflows personalizados.                                                                                                                        |
+| allowed_regexp_prefixes       | array\[string\]                                        | `[]`    | no       | Lista los prefijos regexp permitidos para usar cuando se usa la flag [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd).         |
 
 ### Project
 
