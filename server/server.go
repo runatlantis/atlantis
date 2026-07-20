@@ -798,6 +798,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:             vcsClient,
 		GlobalAutomerge:       userConfig.Automerge,
 		GlobalAutomergeMethod: userConfig.AutomergeMethod,
+		AutomergeRetryCount:   userConfig.AutomergeRetryCount,
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
