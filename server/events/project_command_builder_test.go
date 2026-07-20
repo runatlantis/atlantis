@@ -5795,6 +5795,10 @@ func (m *mockExternalPlanStore) ListWorkspaces(owner, repo string, pullNum int) 
 	return m.workspaces, nil
 }
 func (m *mockExternalPlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
+	// Capability probe uses empty pullDir; real stores no-op that path.
+	if pullDir == "" {
+		return nil
+	}
 	if m.restoreFn != nil {
 		return m.restoreFn(pullDir, owner, repo, pullNum)
 	}
