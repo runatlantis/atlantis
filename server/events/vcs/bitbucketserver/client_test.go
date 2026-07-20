@@ -195,6 +195,104 @@ func TestClient_MergePull(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestClient_MergePullMergeMethod(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	pullRequest, err := os.ReadFile(filepath.Join("testdata", "pull-request.json"))
+	Ok(t, err)
+
+	newPull := func(testServerURL string) models.PullRequest {
+		return models.PullRequest{
+			Num: 1,
+			BaseRepo: models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				SanitizedCloneURL: fmt.Sprintf("%s/scm/ow/repo.git", testServerURL),
+				VCSHost:           models.VCSHost{Type: models.BitbucketServer, Hostname: "bitbucket.org"},
+			},
+		}
+	}
+
+	t.Run("translates the normalised merge method to a strategyId", func(t *testing.T) {
+		cases := []struct {
+			method      models.MergeMethod
+			expStrategy string
+		}{
+			{models.MergeMethodMerge, "no-ff"},
+			{models.MergeMethodRebase, "rebase-ff"},
+			{models.MergeMethodSquash, "squash"},
+			{models.MergeMethodFastForward, "ff-only"},
+		}
+		for _, c := range cases {
+			t.Run(string(c.method), func(t *testing.T) {
+				var gotStrategy string
+				testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+						w.Write(pullRequest) // nolint: errcheck
+					case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge?version=3":
+						Equals(t, "POST", r.Method)
+						var body struct {
+							StrategyID string `json:"strategyId"`
+						}
+						Ok(t, json.NewDecoder(r.Body).Decode(&body))
+						gotStrategy = body.StrategyID
+						w.Write(pullRequest) // nolint: errcheck
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+				defer testServer.Close()
+
+				client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+				Ok(t, err)
+				Ok(t, client.MergePull(logger, newPull(testServer.URL), models.PullRequestOptions{MergeMethod: c.method}))
+				Equals(t, c.expStrategy, gotStrategy)
+			})
+		}
+	})
+
+	t.Run("sends no strategy when no method is requested", func(t *testing.T) {
+		var gotBody string
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+				w.Write(pullRequest) // nolint: errcheck
+			case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge?version=3":
+				b, err := io.ReadAll(r.Body)
+				Ok(t, err)
+				gotBody = string(b)
+				w.Write(pullRequest) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+		defer testServer.Close()
+
+		client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+		Ok(t, err)
+		Ok(t, client.MergePull(logger, newPull(testServer.URL), models.PullRequestOptions{}))
+		Equals(t, "", gotBody)
+	})
+
+	t.Run("rejects an unsupported merge method without calling the API", func(t *testing.T) {
+		called := false
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+		Ok(t, err)
+		err = client.MergePull(logger, newPull(testServer.URL), models.PullRequestOptions{MergeMethod: "bogus"})
+		Assert(t, err != nil, "expected an error for an unsupported merge method")
+		Assert(t, !called, "no API call should be made for an unsupported method")
+	})
+}
+
 // Test that we delete the source branch in our call to merge the pull
 // request.
 func TestClient_MergePullDeleteSourceBranch(t *testing.T) {
