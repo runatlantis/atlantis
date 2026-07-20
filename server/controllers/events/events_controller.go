@@ -95,7 +95,7 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
-	AutoplanRuns                    *AutoplanRunCoordinator
+	AutoplanRuns                    *AutoplanRunCoordinator `validate:"required"`
 }
 
 // Post handles POST webhook requests.

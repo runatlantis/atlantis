@@ -8,6 +8,7 @@ import (
 
 type autoplanRunKey struct {
 	host       models.VCSHostType
+	hostname   string
 	repository string
 	pullNum    int
 }
@@ -83,6 +84,7 @@ func (c *AutoplanRunCoordinator) matchesExistingRun(run autoplanRun, request aut
 func autoplanKey(request autoplanRequest) autoplanRunKey {
 	return autoplanRunKey{
 		host:       request.baseRepo.VCSHost.Type,
+		hostname:   request.baseRepo.VCSHost.Hostname,
 		repository: request.baseRepo.FullName,
 		pullNum:    request.pull.Num,
 	}

@@ -41,7 +41,7 @@ func TestHandlePullRequestEventCoalescesAndSerializesAutoplans(t *testing.T) {
 		TestingMode:          false,
 		AutoplanRuns:         NewAutoplanRunCoordinator(),
 	}
-	baseRepo := models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	baseRepo := models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github, Hostname: "github.com"}}
 	first := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "first"}
 	second := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "second"}
 	third := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "third"}
@@ -60,6 +60,25 @@ func TestHandlePullRequestEventCoalescesAndSerializesAutoplans(t *testing.T) {
 
 	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, third, models.User{}, models.UpdatedPullEvent)
 	expectAutoplan(t, runner.started, "third")
+}
+
+func TestAutoplanRunCoordinatorSeparatesVCSHosts(t *testing.T) {
+	coordinator := NewAutoplanRunCoordinator()
+	github := autoplanRequest{
+		baseRepo: models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github, Hostname: "github.com"}},
+		pull:     models.PullRequest{Num: 1, HeadCommit: "same-commit"},
+	}
+	githubEnterprise := autoplanRequest{
+		baseRepo: models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github, Hostname: "github.example.com"}},
+		pull:     models.PullRequest{Num: 1, HeadCommit: "same-commit"},
+	}
+
+	if _, started := coordinator.start(github); !started {
+		t.Fatal("expected github.com autoplan to start")
+	}
+	if _, started := coordinator.start(githubEnterprise); !started {
+		t.Fatal("expected GitHub Enterprise autoplan to start")
+	}
 }
 
 func expectAutoplan(t *testing.T, runs <-chan models.PullRequest, commit string) {
