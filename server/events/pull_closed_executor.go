@@ -93,14 +93,21 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	var workspaceErr error
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
-		return fmt.Errorf("cleaning workspace: %w", err)
+		workspaceErr = fmt.Errorf("cleaning workspace: %w", err)
 	}
 
+	// Always attempt external plan cleanup even if workspace deletion failed,
+	// so S3 objects are not orphaned when local delete errors.
 	if p.PlanStore != nil {
 		if err := p.PlanStore.DeleteForPull(repo.Owner, repo.Name, pull.Num); err != nil {
 			logger.Warn("failed to delete plans from external store: %s", err)
 		}
+	}
+
+	if workspaceErr != nil {
+		return workspaceErr
 	}
 
 	// Finally, delete locks. We do this last because when someone
