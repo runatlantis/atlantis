@@ -96,6 +96,27 @@ Atlantis will automatically run `terraform plan`
 which can run arbitrary code if given a malicious Terraform configuration.
 :::
 
+### `--allow-unverified-webhook-signatures`
+
+```bash
+atlantis server --allow-unverified-webhook-signatures
+# or
+ATLANTIS_ALLOW_UNVERIFIED_WEBHOOK_SIGNATURES=true
+```
+
+Accept webhook requests that carry a signature or token header even when Atlantis
+has no webhook secret configured to validate them. Defaults to `false`.
+
+By default Atlantis rejects such requests because they indicate a misconfiguration:
+a webhook secret was configured on the VCS host but the matching secret
+(e.g. `--gh-webhook-secret`) was not set in Atlantis, so the webhook would be
+accepted without any validation.
+
+:::warning SECURITY WARNING
+Enabling this allows unauthenticated webhook requests to be processed. Only use
+it as a temporary escape hatch while fixing your webhook secret configuration.
+:::
+
 ### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
