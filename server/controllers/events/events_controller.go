@@ -116,7 +116,7 @@ func (e *VCSEventsController) checkUnverifiedSignature(r *http.Request, secretCo
 	for _, h := range headers {
 		if r.Header.Get(h) != "" {
 			return fmt.Sprintf(
-				"request contained a %s header but Atlantis has no webhook secret configured to validate it; set %s to match the secret configured on the webhook, or set --allow-unverified-webhook-signatures to accept unverified webhooks",
+				"request contained the %s header but Atlantis has no webhook secret configured to validate it; set %s to match the secret configured on the webhook, or set --allow-unverified-webhook-signatures to accept unverified webhooks",
 				h, secretFlagName)
 		}
 	}

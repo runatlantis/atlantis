@@ -1301,7 +1301,7 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
 	if (userConfig.AzureDevopsUser != "" || userConfig.AzureDevopsWebhookUser != "") && (userConfig.AzureDevopsWebhookUser == "" || userConfig.AzureDevopsWebhookPassword == "") && !s.SilenceOutput {
-		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
+		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps")
 	}
 }
 
