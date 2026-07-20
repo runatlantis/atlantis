@@ -423,12 +423,24 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		RepoCfgVersion:            rCfg.Version,
 		PolicySets:                g.PolicySets,
 		DeleteSourceBranchOnMerge: deleteSourceBranchOnMerge,
+		AutoMergeMethod:           autoMergeMethodFromRepoCfg(rCfg),
 		ExecutionOrderGroup:       proj.ExecutionOrderGroup,
 		RepoLocks:                 repoLocks,
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
 		SilencePRComments:         silencePRComments,
 	}
+}
+
+// autoMergeMethodFromRepoCfg returns the automerge_method set in the repo's
+// atlantis.yaml, or the empty string if it is unset. The empty string leaves
+// the merge method to the --auto-merge-method comment flag or the
+// --automerge-method server default.
+func autoMergeMethodFromRepoCfg(rCfg RepoCfg) string {
+	if rCfg.AutomergeMethod != nil {
+		return *rCfg.AutomergeMethod
+	}
+	return ""
 }
 
 // DefaultProjCfg returns the default project config for all projects under the

@@ -34,6 +34,13 @@ func IsMergeMethodValidForHost(host models.VCSHostType, method models.MergeMetho
 	return slices.Contains(supportedMergeMethods[host], method)
 }
 
+// IsMergeMethod reports whether method is one of the normalised merge methods
+// that at least one VCS host can perform. It is used to validate configuration
+// (e.g. the atlantis.yaml automerge_method key) before the VCS host is known.
+func IsMergeMethod(method models.MergeMethod) bool {
+	return slices.Contains(AllSupportedMergeMethods(), method)
+}
+
 // AllSupportedMergeMethods returns the sorted union of every merge method any
 // VCS host can perform. It is used to validate the server-side
 // --automerge-method flag, which is set before the VCS host of an individual
