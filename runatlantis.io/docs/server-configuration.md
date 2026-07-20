@@ -1513,6 +1513,16 @@ ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS=true
 
 `--silence-vcs-status-no-projects` will tell Atlantis to ignore setting VCS status on any command if none of the modified files are part of a project defined in the `atlantis.yaml` file.
 
+### `--silence-vcs-status-pre-workflow-hook`
+
+```bash
+atlantis server --silence-vcs-status-pre-workflow-hook
+# or
+ATLANTIS_SILENCE_VCS_STATUS_PRE_WORKFLOW_HOOK=true
+```
+
+`--silence-vcs-status-pre-workflow-hook` will tell Atlantis to skip posting VCS commit status updates for pre-workflow hooks. The hooks still run normally and any errors still propagate; only the pending/success/failure status checks are suppressed.
+
 ### `--skip-clone-no-changes` <Badge text="v0.15.0" type="info"/>
 
 ```bash
