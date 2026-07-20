@@ -242,9 +242,11 @@ type PullRequestOptions struct {
 	// When DeleteSourceBranchOnMerge flag is set to true VCS deletes the source branch after the PR is merged
 	// Applied by GitLab & AzureDevops
 	DeleteSourceBranchOnMerge bool
-	// MergeMethod specifies the merge method for the VCS
-	// Implemented only for Github
-	MergeMethod string
+	// MergeMethod specifies the normalised merge method Atlantis should use.
+	// Each VCS client translates it onto its provider's own merge strategy and
+	// errors if the provider cannot perform it (see common.SupportedMergeMethods).
+	// The zero value leaves the choice to the provider's default.
+	MergeMethod MergeMethod
 }
 
 type PullRequestState int

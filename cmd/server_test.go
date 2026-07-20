@@ -611,9 +611,14 @@ func TestExecute_ValidateAutomergeMethod(t *testing.T) {
 			"",
 		},
 		{
-			"invalid method",
 			"fast-forward",
-			"invalid --automerge-method: must be one of [merge rebase squash]",
+			"fast-forward",
+			"",
+		},
+		{
+			"invalid method",
+			"fast-forward-only",
+			"invalid --automerge-method: must be one of [fast-forward merge rebase squash]",
 		},
 	}
 

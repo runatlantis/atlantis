@@ -42,7 +42,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	ctx.Log.Info("automerging pull request")
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
-	pullOptions.MergeMethod = mergeMethod
+	pullOptions.MergeMethod = models.MergeMethod(mergeMethod)
 	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
 
 	if err != nil {

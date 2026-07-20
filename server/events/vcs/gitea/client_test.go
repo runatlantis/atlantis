@@ -4,6 +4,7 @@
 package gitea_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -336,6 +337,71 @@ func TestClient_GetModifiedFilesPaginationEmergencyBreak(t *testing.T) {
 	Equals(t, []string{}, files)
 	Equals(t, 500, len(pages))
 	Equals(t, 500, pages[len(pages)-1])
+}
+
+func TestClient_MergePullMergeMethod(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repo := models.Repo{Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 1, HeadCommit: "abc123", BaseRepo: repo}
+
+	// mergeStyleCapturer returns a handler that records the merge style ("Do"
+	// field) Gitea receives and answers with a successful merge.
+	mergeStyleCapturer := func(t *testing.T, gotStyle *string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/repos/owner/repo/pulls/1/merge" {
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			var body struct {
+				Do string `json:"Do"`
+			}
+			Ok(t, json.NewDecoder(r.Body).Decode(&body))
+			*gotStyle = body.Do
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+
+	t.Run("translates the normalised merge method to a Gitea merge style", func(t *testing.T) {
+		var gotStyle string
+		client := newTestClient(t, 2, mergeStyleCapturer(t, &gotStyle))
+
+		err := client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: models.MergeMethodFastForward})
+		Ok(t, err)
+		Equals(t, "fast-forward-only", gotStyle)
+	})
+
+	t.Run("translates rebase to the Gitea rebase style", func(t *testing.T) {
+		var gotStyle string
+		client := newTestClient(t, 2, mergeStyleCapturer(t, &gotStyle))
+
+		err := client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: models.MergeMethodRebase})
+		Ok(t, err)
+		Equals(t, "rebase", gotStyle)
+	})
+
+	t.Run("defaults to a merge commit when no method is requested", func(t *testing.T) {
+		var gotStyle string
+		client := newTestClient(t, 2, mergeStyleCapturer(t, &gotStyle))
+
+		err := client.MergePull(logger, pull, models.PullRequestOptions{})
+		Ok(t, err)
+		Equals(t, "merge", gotStyle)
+	})
+
+	t.Run("rejects an unsupported merge method without calling the API", func(t *testing.T) {
+		called := false
+		client := newTestClient(t, 2, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/merge") {
+				called = true
+			}
+			http.Error(w, "not found", http.StatusNotFound)
+		})
+
+		err := client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: "bogus"})
+		Assert(t, err != nil, "expected an error for an unsupported merge method")
+		Assert(t, !called, "the merge API should not be called for an unsupported method")
+	})
 }
 
 func newTestClient(t *testing.T, pageSize int, apiHandler http.HandlerFunc) *gitea.Client {
