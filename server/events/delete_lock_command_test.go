@@ -122,7 +122,90 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 }
 
 func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
-	t.Log("If a single lock is successfully deleted")
+	t.Log("If a single lock is successfully deleted, working dir is deleted by default")
+	logger := logging.NewNoopLogger(t)
+	repoName := "reponame"
+	pullNum := 2
+	workspace := "default"
+
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	workingDir := events.NewMockWorkingDir()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: repoName},
+		Num:      pullNum,
+	}
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{
+		{
+			Pull:      pull,
+			Workspace: workspace,
+			Project: models.Project{
+				Path:         ".",
+				RepoFullName: pull.BaseRepo.FullName,
+				ProjectName:  "projectname",
+			},
+		},
+	}, nil,
+	)
+	dlc := events.DefaultDeleteLockCommand{
+		Locker:     l,
+		WorkingDir: workingDir,
+	}
+	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
+	Ok(t, err)
+	workingDir.VerifyWasCalled(Once()).DeleteForWorkspace(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace))
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
+}
+
+func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
+	t.Log("If multiple locks are successfully deleted, working dirs are deleted by default")
+	logger := logging.NewNoopLogger(t)
+	repoName := "reponame"
+	pullNum := 2
+	workspace := "default"
+
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	workingDir := events.NewMockWorkingDir()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: repoName},
+		Num:      pullNum,
+	}
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{
+		{
+			Pull:      pull,
+			Workspace: workspace,
+			Project: models.Project{
+				Path:         "path1",
+				RepoFullName: pull.BaseRepo.FullName,
+			},
+		},
+		{
+			Pull:      pull,
+			Workspace: workspace,
+			Project: models.Project{
+				Path:         "path2",
+				RepoFullName: pull.BaseRepo.FullName,
+			},
+		},
+	}, nil,
+	)
+	dlc := events.DefaultDeleteLockCommand{
+		Locker:     l,
+		WorkingDir: workingDir,
+	}
+	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
+	Ok(t, err)
+	workingDir.VerifyWasCalled(Once()).DeleteForWorkspace(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace))
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
+}
+
+func TestDeleteLocksByPull_SingleSuccess_SkipWorkingDirDeletion(t *testing.T) {
+	t.Log("If SkipWorkingDirDeletionOnUnlock is set, only plan files are deleted")
 	logger := logging.NewNoopLogger(t)
 	repoName := "reponame"
 	pullNum := 2
@@ -151,58 +234,14 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 	}, nil,
 	)
 	dlc := events.DefaultDeleteLockCommand{
-		Locker:     l,
-		WorkingDir: workingDir,
+		Locker:                         l,
+		WorkingDir:                     workingDir,
+		SkipWorkingDirDeletionOnUnlock: true,
 	}
 	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
 	Ok(t, err)
 	workingDir.VerifyWasCalled(Once()).DeletePlan(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace),
 		Eq(path), Eq(projectName))
-}
-
-func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
-	t.Log("If multiple locks are successfully deleted")
-	logger := logging.NewNoopLogger(t)
-	repoName := "reponame"
-	pullNum := 2
-	path1 := "path1"
-	path2 := "path2"
-	workspace := "default"
-	projectName := ""
-
-	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
-	ctrl := gomock.NewController(t)
-	l := lockmocks.NewMockLocker(ctrl)
-	workingDir := events.NewMockWorkingDir()
-	pull := models.PullRequest{
-		BaseRepo: models.Repo{FullName: repoName},
-		Num:      pullNum,
-	}
-	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{
-		{
-			Pull:      pull,
-			Workspace: workspace,
-			Project: models.Project{
-				Path:         path1,
-				RepoFullName: pull.BaseRepo.FullName,
-			},
-		},
-		{
-			Pull:      pull,
-			Workspace: workspace,
-			Project: models.Project{
-				Path:         path2,
-				RepoFullName: pull.BaseRepo.FullName,
-			},
-		},
-	}, nil,
-	)
-	dlc := events.DefaultDeleteLockCommand{
-		Locker:     l,
-		WorkingDir: workingDir,
-	}
-	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
-	Ok(t, err)
-	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path1, projectName)
-	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path2, projectName)
+	workingDir.VerifyWasCalled(Never()).DeleteForWorkspace(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())
 }
