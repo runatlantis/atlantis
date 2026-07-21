@@ -309,13 +309,19 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			cmdErr := fmt.Errorf("getting remote update failed: %w: %s", err, strings.TrimSpace(string(output)))
-			logger.Err("%s", cmdErr.Error())
+			sanitizedOutput := w.sanitizeGitCredentials(string(output), p.BaseRepo, headRepo)
+			sanitizedErr := w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo)
+			cmdErr := fmt.Errorf("getting remote update failed: %s: %s", sanitizedErr, strings.TrimSpace(sanitizedOutput))
+			logger.Err("%s", cmdErr)
 			return true, cmdErr
 		}
 	}
 
-	return w.hasDiverged(logger, cloneDir)
+	diverged, err := w.hasDiverged(logger, cloneDir)
+	if err != nil {
+		return diverged, fmt.Errorf("%s", w.sanitizeGitCredentials(err.Error(), p.BaseRepo, headRepo))
+	}
+	return diverged, nil
 }
 
 func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) (bool, error) {
@@ -336,7 +342,11 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	if len(autoplanWhenModified) > 0 {
 		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFiles)
 	}
-	return w.hasDiverged(logger, cloneDir)
+	diverged, err := w.hasDiverged(logger, cloneDir)
+	if err != nil {
+		return diverged, fmt.Errorf("%s", w.sanitizeGitCredentials(err.Error(), pullRequest.BaseRepo, models.Repo{}))
+	}
+	return diverged, nil
 }
 
 func (w *FileWorkspace) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) (bool, error) {
@@ -421,7 +431,11 @@ func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir strin
 func (w *FileWorkspace) hasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) (bool, error) {
 	if pullRequest.BaseBranch == "" {
 		logger.Debug("HasDiverged: pull request base branch is empty, using git status divergence check")
-		return w.hasDiverged(logger, cloneDir)
+		diverged, err := w.hasDiverged(logger, cloneDir)
+		if err != nil {
+			return diverged, fmt.Errorf("%s", w.sanitizeGitCredentials(err.Error(), pullRequest.BaseRepo, models.Repo{}))
+		}
+		return diverged, nil
 	}
 
 	divergedFiles, err := w.getDivergedFilesFromPullHead(logger, cloneDir, pullRequest)

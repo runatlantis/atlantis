@@ -1257,6 +1257,114 @@ func TestMergeAgain_RemoteUpdateFails(t *testing.T) {
 	Assert(t, merged == true, "MergeAgain should report merged=true when the divergence check fails so callers treat the working tree as stale")
 }
 
+// buildMergeCheckoutWorkspace sets up a merge-checkout workspace the way Atlantis
+// does on first clone: clone main, fetch the PR branch from "source", and merge.
+// Returns the workspace dir. Used by the credential-sanitization tests below.
+func buildMergeCheckoutWorkspace(t *testing.T, repoDir string) string {
+	t.Helper()
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	return workspaceDir
+}
+
+// TestMergeAgain_RemoteUpdateFailureSanitizesCredentials verifies that when
+// recheckDiverged's "git remote update" fails, the raw command output — which git
+// echoes the failing remote's URL into (e.g. "fatal: '<url>' does not appear to be
+// a git repository") - is sanitized before it's embedded in the returned error.
+// That error is surfaced all the way to the PR's job output, so a credentialed
+// clone URL (base or head/fork) must never appear in it verbatim.
+func TestMergeAgain_RemoteUpdateFailureSanitizesCredentials(t *testing.T) {
+	repoDir := initRepo(t)
+	buildMergeCheckoutWorkspace(t, repoDir)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Bogus clone URLs standing in for credentialed URLs. Each embeds a unique
+	// marker so we can assert it's stripped from the returned error, regardless
+	// of which remote(s) git's fatal output happens to mention.
+	secretBaseURL := filepath.Join(t.TempDir(), "base-secret-token-AKIABASE")
+	secretHeadURL := filepath.Join(t.TempDir(), "head-secret-token-AKIAHEAD")
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+	headRepo := models.Repo{CloneURL: secretHeadURL, SanitizedCloneURL: "***head-sanitized***"}
+
+	_, err := wd.MergeAgain(logging.NewNoopLogger(t), headRepo, pullRequest, "default")
+	assert.Error(t, err)
+	assert.NotContains(t, err.Error(), secretBaseURL, "returned error must not leak the base repo's credentialed clone URL")
+	assert.NotContains(t, err.Error(), secretHeadURL, "returned error must not leak the head repo's credentialed clone URL")
+}
+
+// TestHasDiverged_FetchFailureSanitizesCredentials verifies that a "git fetch"
+// failure against the "origin" remote, hit via the plain (non-pattern) path in
+// both HasDiverged and HasDivergedFromPullHead, never leaks the base repo's
+// credentialed clone URL into the returned error — git echoes the failing
+// remote's URL verbatim into its fatal output, so hasDiverged's returned error
+// must be sanitized by its callers before it escapes this package.
+func TestHasDiverged_FetchFailureSanitizesCredentials(t *testing.T) {
+	repoDir := initRepo(t)
+	workspaceDir := buildMergeCheckoutWorkspace(t, repoDir)
+
+	// The "origin" remote must actually be set to the same value reported as
+	// BaseRepo.CloneURL below, since that's what recheckDiverged/production code
+	// would have configured — otherwise there'd be nothing for sanitization to match.
+	secretBaseURL := filepath.Join(t.TempDir(), "base-secret-token-AKIABASE")
+	runCmd(t, workspaceDir, "git", "remote", "set-url", "origin", secretBaseURL)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	logger := logging.NewNoopLogger(t)
+
+	t.Run("HasDiverged, no patterns", func(t *testing.T) {
+		pullRequest := models.PullRequest{
+			BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+			HeadBranch: "pr-branch",
+			BaseBranch: "main",
+		}
+		_, err := wd.HasDiverged(logger, workspaceDir, ".", nil, pullRequest)
+		assert.Error(t, err)
+		assert.NotContains(t, err.Error(), secretBaseURL, "HasDiverged error must not leak the base repo's credentialed clone URL")
+	})
+
+	t.Run("HasDivergedFromPullHead, no patterns, empty BaseBranch", func(t *testing.T) {
+		// An empty BaseBranch routes HasDivergedFromPullHead into hasDiverged's
+		// plain git-status fallback instead of the getDivergedFilesFromPullHead path.
+		pullRequest := models.PullRequest{
+			BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+			HeadBranch: "pr-branch",
+		}
+		_, err := wd.HasDivergedFromPullHead(logger, workspaceDir, ".", nil, pullRequest)
+		assert.Error(t, err)
+		assert.NotContains(t, err.Error(), secretBaseURL, "HasDivergedFromPullHead error must not leak the base repo's credentialed clone URL")
+	})
+}
+
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
