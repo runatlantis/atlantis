@@ -1209,6 +1209,54 @@ func TestMergeAgain_ConcurrentDiverged(t *testing.T) {
 	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
 }
 
+// TestMergeAgain_RemoteUpdateFails verifies that when recheckDiverged's "git
+// remote update" fails (e.g. the base repo's clone URL is no longer reachable),
+// MergeAgain propagates that error instead of swallowing it, so the caller
+// aborts the plan rather than running against a working tree it couldn't
+// confirm was up to date.
+func TestMergeAgain_RemoteUpdateFails(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// Create a PR branch with a PR-specific commit.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	// Build the Atlantis merge-checkout workspace: clone main, fetch the PR
+	// branch, and merge — exactly what Atlantis does on first clone.
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Point the base repo's clone URL at a path that isn't a git remote at all,
+	// so recheckDiverged's "git remote update" fails when it tries to fetch.
+	bogusCloneURL := filepath.Join(t.TempDir(), "does-not-exist")
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: bogusCloneURL},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+
+	merged, err := wd.MergeAgain(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, pullRequest, "default")
+	ErrContains(t, "getting remote update failed", err)
+	Assert(t, merged == true, "MergeAgain should report merged=true when the divergence check fails so callers treat the working tree as stale")
+}
+
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
