@@ -334,7 +334,7 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	defer unlockGitRefLock()
 
 	if len(autoplanWhenModified) > 0 {
-		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFiles), nil
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFiles)
 	}
 	return w.hasDiverged(logger, cloneDir)
 }
@@ -353,7 +353,7 @@ func (w *FileWorkspace) HasDivergedFromPullHead(logger logging.SimpleLogging, cl
 	defer unlockGitRefLock()
 
 	if len(autoplanWhenModified) > 0 {
-		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFilesFromPullHead), nil
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFilesFromPullHead)
 	}
 	return w.hasDivergedFromPullHead(logger, cloneDir, pullRequest)
 }
@@ -437,19 +437,22 @@ func (w *FileWorkspace) hasDivergedFromPullHead(logger logging.SimpleLogging, cl
 
 // hasDivergedForPatterns checks if the base branch has new commits that affect files
 // matching the given when_modified patterns. Caller must hold gitRefLock and gitReadLock.
-func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest, getDivergedFiles func(logging.SimpleLogging, string, models.PullRequest) ([]string, error)) bool {
+// If there are any errors we return (true, err) since we prefer to assume divergence
+// for safety and don't want to plan against stale code, but the caller can still
+// distinguish a confirmed divergence from a failed check.
+func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest, getDivergedFiles func(logging.SimpleLogging, string, models.PullRequest) ([]string, error)) (bool, error) {
 	logger.Debug("HasDiverged: running targeted divergence check for project %s with %d patterns",
 		projectPath, len(autoplanWhenModified))
 
 	nonEmptyChangedFiles, err := getDivergedFiles(logger, cloneDir, pullRequest)
 	if err != nil {
 		logger.Warn("HasDiverged: getting changed files has failed: %s", err)
-		return true
+		return true, err
 	}
 
 	if len(nonEmptyChangedFiles) == 0 {
 		logger.Debug("HasDiverged: no changed files found in divergent commits")
-		return false
+		return false, nil
 	}
 
 	logger.Debug("HasDiverged: found %d changed files in divergent commits", len(nonEmptyChangedFiles))
@@ -474,7 +477,7 @@ func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, clo
 	pm, err := patternmatcher.New(whenModifiedRelToRepoRoot)
 	if err != nil {
 		logger.Warn("HasDiverged: creating pattern matcher has failed: %s", err)
-		return true
+		return true, err
 	}
 
 	for _, file := range nonEmptyChangedFiles {
@@ -485,12 +488,12 @@ func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, clo
 		}
 		if match {
 			logger.Debug("HasDiverged: file %q matched patterns - branch has diverged", file)
-			return true
+			return true, nil
 		}
 	}
 
 	logger.Debug("HasDiverged: no changed files matched the patterns - no divergence")
-	return false
+	return false, nil
 }
 
 func divergedFilesCommandError(action string, err error, output []byte) error {

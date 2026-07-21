@@ -2469,6 +2469,59 @@ func TestHasDiverged_PatternMatching(t *testing.T) {
 	}
 }
 
+// TestHasDiverged_WithPatterns_FetchFails verifies that when autoplanWhenModified
+// patterns are set, a "git fetch" failure inside the targeted divergence check
+// (hasDivergedForPatterns) is propagated as a real error instead of being silently
+// converted into an indistinguishable diverged=true result.
+func TestHasDiverged_WithPatterns_FetchFails(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// Create a PR branch with a PR-specific commit.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	// Build the Atlantis merge-checkout workspace: clone main, fetch the PR
+	// branch, and merge — exactly what Atlantis does on first clone.
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Break the origin remote so the "git fetch" inside getDivergedFiles fails.
+	bogusRemote := filepath.Join(t.TempDir(), "does-not-exist")
+	runCmd(t, workspaceDir, "git", "remote", "set-url", "origin", bogusRemote)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+	logger := logging.NewNoopLogger(t)
+	patterns := []string{"*.tf"}
+
+	hasDiverged, err := wd.HasDiverged(logger, workspaceDir, ".", patterns, pullRequest)
+	ErrContains(t, "fetching repo", err)
+	Assert(t, hasDiverged == true, "HasDiverged should assume divergence when the underlying fetch fails")
+
+	hasDivergedFromPullHead, err := wd.HasDivergedFromPullHead(logger, workspaceDir, ".", patterns, pullRequest)
+	ErrContains(t, "fetching repo", err)
+	Assert(t, hasDivergedFromPullHead == true, "HasDivergedFromPullHead should assume divergence when the underlying fetch fails")
+}
+
 func initRepo(t *testing.T) string {
 	repoDir := t.TempDir()
 	runCmd(t, repoDir, "git", "init", "--initial-branch=main")
