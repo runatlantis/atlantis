@@ -1561,24 +1561,24 @@ func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
 	}
 
 	hasDiverged, err := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
-	Equals(t, false, hasDiverged)
 	assert.NoError(t, err)
+	Equals(t, false, hasDiverged)
 
 	hasDiverged, err = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
-	Equals(t, false, hasDiverged)
 	assert.NoError(t, err)
+	Equals(t, false, hasDiverged)
 
 	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
-	Equals(t, true, hasDiverged)
 	assert.NoError(t, err)
+	Equals(t, true, hasDiverged)
 
 	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
-	Equals(t, true, hasDiverged)
 	assert.NoError(t, err)
+	Equals(t, true, hasDiverged)
 
 	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
-	Equals(t, false, hasDiverged)
 	assert.NoError(t, err)
+	Equals(t, false, hasDiverged)
 }
 
 func TestHasDiverged_PatternHasDiverged(t *testing.T) {
