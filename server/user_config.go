@@ -6,6 +6,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -37,6 +38,7 @@ type UserConfig struct {
 	BitbucketToken              string `mapstructure:"bitbucket-token"`
 	BitbucketUser               string `mapstructure:"bitbucket-user"`
 	BitbucketWebhookSecret      string `mapstructure:"bitbucket-webhook-secret"`
+	BitbucketWebhookSecretFile  string `mapstructure:"bitbucket-webhook-secret-file"`
 	CheckoutDepth               int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
@@ -66,6 +68,7 @@ type UserConfig struct {
 	GithubTokenFile                 string `mapstructure:"gh-token-file"`
 	GithubUser                      string `mapstructure:"gh-user"`
 	GithubWebhookSecret             string `mapstructure:"gh-webhook-secret"`
+	GithubWebhookSecretFile         string `mapstructure:"gh-webhook-secret-file"`
 	GithubOrg                       string `mapstructure:"gh-org"`
 	GithubAppID                     int64  `mapstructure:"gh-app-id"`
 	GithubAppKey                    string `mapstructure:"gh-app-key"`
@@ -77,12 +80,14 @@ type UserConfig struct {
 	GiteaToken                      string `mapstructure:"gitea-token"`
 	GiteaUser                       string `mapstructure:"gitea-user"`
 	GiteaWebhookSecret              string `mapstructure:"gitea-webhook-secret"`
+	GiteaWebhookSecretFile          string `mapstructure:"gitea-webhook-secret-file"`
 	GiteaPageSize                   int    `mapstructure:"gitea-page-size"`
 	GitlabHostname                  string `mapstructure:"gitlab-hostname"`
 	GitlabGroupAllowlist            string `mapstructure:"gitlab-group-allowlist"`
 	GitlabToken                     string `mapstructure:"gitlab-token"`
 	GitlabUser                      string `mapstructure:"gitlab-user"`
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
+	GitlabWebhookSecretFile         string `mapstructure:"gitlab-webhook-secret-file"`
 	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
@@ -217,6 +222,43 @@ func (u UserConfig) ToWebhookHttpHeaders() (map[string][]string, error) {
 		}
 	}
 	return headers, nil
+}
+
+// ToBitbucketWebhookSecret provides the webhook secret either directly or by reading
+// the file the secret is written into
+func (u UserConfig) ToBitbucketWebhookSecret() ([]byte, error) {
+	return credentialFromVarOrFile(u.BitbucketWebhookSecret, u.BitbucketWebhookSecretFile)
+}
+
+// ToGithubWebhookSecret provides the webhook secret either directly or by reading
+// the file the secret is written into
+func (u UserConfig) ToGithubWebhookSecret() ([]byte, error) {
+	return credentialFromVarOrFile(u.GithubWebhookSecret, u.GithubWebhookSecretFile)
+}
+
+// ToGiteaWebhookSecret provides the webhook secret either directly or by reading
+// the file the secret is written into
+func (u UserConfig) ToGiteaWebhookSecret() ([]byte, error) {
+	return credentialFromVarOrFile(u.GiteaWebhookSecret, u.GiteaWebhookSecretFile)
+}
+
+// ToGitlabWebhookSecret provides the webhook secret either directly or by reading
+// the file the secret is written into
+func (u UserConfig) ToGitlabWebhookSecret() ([]byte, error) {
+	return credentialFromVarOrFile(u.GitlabWebhookSecret, u.GitlabWebhookSecretFile)
+}
+
+func credentialFromVarOrFile(credentialVar string, credentialFile string) ([]byte, error) {
+	if credentialFile != "" {
+		credential, err := os.ReadFile(credentialFile)
+		if err != nil {
+			return nil, err
+		}
+
+		return credential, nil
+	}
+
+	return []byte(credentialVar), nil
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed
