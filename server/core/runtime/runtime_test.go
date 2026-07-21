@@ -106,6 +106,8 @@ func TestGetPlanFilePath(t *testing.T) {
 
 	ctx.LocalPlanStoreDir = ""
 	Equals(t, filepath.Join(projectPath, "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
+}
+
 func TestIsRemotePlan(t *testing.T) {
 	const remotePlanHeader = "Atlantis: this plan was created by remote ops\n"
 
