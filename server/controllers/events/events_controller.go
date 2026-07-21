@@ -95,6 +95,32 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
+	// AllowUnverifiedWebhookSignatures disables the safety check that rejects
+	// webhook requests that carry a signature or token header when Atlantis
+	// has no corresponding webhook secret configured to validate them. Such
+	// requests indicate that a secret was configured on the VCS host but not
+	// in Atlantis, so by default they are rejected.
+	AllowUnverifiedWebhookSignatures bool
+}
+
+// checkUnverifiedSignature returns an error message if the request carries a
+// webhook signature or token header that Atlantis cannot validate because no
+// webhook secret is configured. This indicates a misconfiguration: a secret
+// was set on the VCS host's webhook but not in Atlantis, so the webhook would
+// otherwise be accepted without any validation. Returns an empty string if
+// the request is acceptable.
+func (e *VCSEventsController) checkUnverifiedSignature(r *http.Request, secretConfigured bool, secretFlagName string, headers ...string) string {
+	if secretConfigured || e.AllowUnverifiedWebhookSignatures {
+		return ""
+	}
+	for _, h := range headers {
+		if r.Header.Get(h) != "" {
+			return fmt.Sprintf(
+				"request contained the %s header but Atlantis has no webhook secret configured to validate it; set %s to match the secret configured on the webhook, or set --allow-unverified-webhook-signatures to accept unverified webhooks",
+				h, secretFlagName)
+		}
+	}
+	return ""
 }
 
 // Post handles POST webhook requests.
@@ -167,6 +193,11 @@ type HTTPResponse struct {
 }
 
 func (e *VCSEventsController) handleGithubPost(w http.ResponseWriter, r *http.Request) {
+	if msg := e.checkUnverifiedSignature(r, len(e.GithubWebhookSecret) > 0, "--gh-webhook-secret", "X-Hub-Signature-256", "X-Hub-Signature"); msg != "" {
+		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", msg)
+		return
+	}
+
 	// Validate the request against the optional webhook secret.
 	payload, err := e.GithubRequestValidator.Validate(r, e.GithubWebhookSecret)
 	if err != nil {
@@ -224,6 +255,10 @@ func (e *VCSEventsController) handleBitbucketCloudPost(w http.ResponseWriter, r 
 		e.respond(w, logging.Error, http.StatusBadRequest, "Unable to read body: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
+	if msg := e.checkUnverifiedSignature(r, len(e.BitbucketWebhookSecret) > 0, "--bitbucket-webhook-secret", bitbucketSignatureHeader); msg != "" {
+		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", msg)
+		return
+	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
@@ -260,6 +295,10 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 		e.respond(w, logging.Info, http.StatusOK, "Successfully received %s event %s=%s", eventType, bitbucketServerRequestIDHeader, reqID)
 		return
 	}
+	if msg := e.checkUnverifiedSignature(r, len(e.BitbucketWebhookSecret) > 0, "--bitbucket-webhook-secret", bitbucketSignatureHeader); msg != "" {
+		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", msg)
+		return
+	}
 	if len(e.BitbucketWebhookSecret) > 0 {
 		if err := common.ValidateSignature(body, sig, e.BitbucketWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
@@ -281,6 +320,14 @@ func (e *VCSEventsController) handleBitbucketServerPost(w http.ResponseWriter, r
 }
 
 func (e *VCSEventsController) handleAzureDevopsPost(w http.ResponseWriter, r *http.Request) {
+	credsConfigured := len(e.AzureDevopsWebhookBasicUser) > 0 && len(e.AzureDevopsWebhookBasicPassword) > 0
+	if !credsConfigured && !e.AllowUnverifiedWebhookSignatures {
+		if _, _, ok := r.BasicAuth(); ok {
+			e.respond(w, logging.Warn, http.StatusUnauthorized, "request contained Basic auth credentials but Atlantis has no credentials configured to validate them; set --azuredevops-webhook-user and --azuredevops-webhook-password to match the credentials configured on the webhook, or set --allow-unverified-webhook-signatures to accept unverified webhooks")
+			return
+		}
+	}
+
 	// Validate the request against the optional basic auth username and password.
 	payload, err := e.AzureDevopsRequestValidator.Validate(r, e.AzureDevopsWebhookBasicUser, e.AzureDevopsWebhookBasicPassword)
 	if err != nil {
@@ -326,6 +373,10 @@ func (e *VCSEventsController) handleGiteaPost(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	if msg := e.checkUnverifiedSignature(r, len(e.GiteaWebhookSecret) > 0, "--gitea-webhook-secret", giteaSignatureHeader); msg != "" {
+		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", msg)
+		return
+	}
 	if len(e.GiteaWebhookSecret) > 0 {
 		if err := gitea.ValidateSignature(body, signature, e.GiteaWebhookSecret); err != nil {
 			e.respond(w, logging.Warn, http.StatusBadRequest, "%s", fmt.Errorf("request did not pass validation: %w", err).Error())
@@ -625,6 +676,10 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 }
 
 func (e *VCSEventsController) handleGitlabPost(w http.ResponseWriter, r *http.Request) {
+	if msg := e.checkUnverifiedSignature(r, len(e.GitlabWebhookSecret) > 0, "--gitlab-webhook-secret", "X-Gitlab-Token"); msg != "" {
+		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", msg)
+		return
+	}
 	event, err := e.GitlabRequestParserValidator.ParseAndValidate(r, e.GitlabWebhookSecret)
 	if err != nil {
 		e.respond(w, logging.Warn, http.StatusBadRequest, "%s", err.Error())

@@ -116,6 +116,99 @@ func TestPost_InvalidGitlabSecret(t *testing.T) {
 	ResponseContains(t, w, http.StatusBadRequest, "err")
 }
 
+func TestPost_GithubSignedButNoSecretConfigured(t *testing.T) {
+	t.Log("when the github request is signed but atlantis has no webhook secret configured a 400 is returned")
+	for _, header := range []string{"X-Hub-Signature-256", "X-Hub-Signature"} {
+		t.Run(header, func(t *testing.T) {
+			e, _, _, _, _, _, _, _, _ := setup(t)
+			e.GithubWebhookSecret = nil
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+			req.Header.Set(githubHeader, "value")
+			req.Header.Set(header, "sha256=deadbeef")
+			e.Post(w, req)
+			ResponseContains(t, w, http.StatusBadRequest, "no webhook secret configured")
+		})
+	}
+}
+
+func TestPost_GithubSignedButNoSecretConfiguredAllowed(t *testing.T) {
+	t.Log("when the github request is signed, atlantis has no webhook secret configured but unverified signatures are allowed, the request is handled")
+	e, v, _, _, _, _, _, _, _ := setup(t)
+	e.GithubWebhookSecret = nil
+	e.AllowUnverifiedWebhookSignatures = true
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+	req.Header.Set(githubHeader, "value")
+	req.Header.Set("X-Hub-Signature-256", "sha256=deadbeef")
+	When(v.Validate(req, nil)).ThenReturn([]byte(`{"not an event": ""}`), nil)
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusOK, "Ignoring unsupported event")
+}
+
+func TestPost_GitlabTokenButNoSecretConfigured(t *testing.T) {
+	t.Log("when the gitlab request has a token but atlantis has no webhook secret configured a 400 is returned")
+	e, _, _, _, _, _, _, _, _ := setup(t)
+	e.GitlabWebhookSecret = nil
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+	req.Header.Set(gitlabHeader, "value")
+	req.Header.Set("X-Gitlab-Token", "some-token")
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "no webhook secret configured")
+}
+
+func TestPost_GiteaSignedButNoSecretConfigured(t *testing.T) {
+	t.Log("when the gitea request is signed but atlantis has no webhook secret configured a 400 is returned")
+	e, _, _, _, _, _, _, _, _ := setup(t)
+	e.GiteaWebhookSecret = nil
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+	req.Header.Set(giteaHeader, "value")
+	req.Header.Set("X-Gitea-Signature", "deadbeef")
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "no webhook secret configured")
+}
+
+func TestPost_BitbucketSignedButNoSecretConfigured(t *testing.T) {
+	t.Log("when the bitbucket request is signed but atlantis has no webhook secret configured a 400 is returned")
+	cases := []struct {
+		name            string
+		host            models.VCSHostType
+		requestIDHeader string
+	}{
+		{"cloud", models.BitbucketCloud, "X-Request-UUID"},
+		{"server", models.BitbucketServer, "X-Request-ID"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e, _, _, _, _, _, _, _, _ := setup(t)
+			e.SupportedVCSHosts = append(e.SupportedVCSHosts, c.host)
+			e.BitbucketWebhookSecret = nil
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+			req.Header.Set("X-Event-Key", "pullrequest:created")
+			req.Header.Set(c.requestIDHeader, "request-id")
+			req.Header.Set("X-Hub-Signature", "sha256=deadbeef")
+			e.Post(w, req)
+			ResponseContains(t, w, http.StatusBadRequest, "no webhook secret configured")
+		})
+	}
+}
+
+func TestPost_AzureDevopsBasicAuthButNoCredsConfigured(t *testing.T) {
+	t.Log("when the azuredevops request has basic auth but atlantis has no webhook credentials configured a 401 is returned")
+	e, _, _, _, _, _, _, _, _ := setup(t)
+	e.AzureDevopsWebhookBasicUser = nil
+	e.AzureDevopsWebhookBasicPassword = nil
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(nil))
+	req.Header.Set(azuredevopsHeader, "value")
+	req.SetBasicAuth("user", "pass")
+	e.Post(w, req)
+	ResponseContains(t, w, http.StatusUnauthorized, "no credentials configured")
+}
+
 func TestPost_UnsupportedGithubEvent(t *testing.T) {
 	t.Log("when the event type is an unsupported github event we ignore it")
 	e, v, _, _, _, _, _, _, _ := setup(t)
