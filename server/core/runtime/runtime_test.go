@@ -5,9 +5,13 @@ package runtime_test
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -58,6 +62,50 @@ func TestGetPlanFilename(t *testing.T) {
 			Equals(t, c.exp, runtime.GetPlanFilename(c.workspace, c.projectName))
 		})
 	}
+}
+
+func TestEnsurePlanFileDir(t *testing.T) {
+	projectPath := t.TempDir()
+	planStoreDir := t.TempDir()
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalPlanStoreDir: planStoreDir,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "modules/app",
+		Workspace:  "default",
+	}
+
+	Ok(t, runtime.EnsurePlanFileDir(ctx, projectPath))
+	_, err := os.Stat(runtime.GetPlanFileDir(ctx, projectPath))
+	Ok(t, err)
+
+	ctx.BaseRepo.FullName = "../../outside"
+	ErrContains(t, "plan file path traversal detected", runtime.EnsurePlanFileDir(ctx, projectPath))
+}
+
+func TestGetPlanFilePath(t *testing.T) {
+	projectPath := filepath.Join("data", "repos", "owner", "repo", "2", "default", "modules", "app")
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalPlanStoreDir: filepath.Join("plans"),
+		ProjectName:       "project/name",
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "modules/app",
+		Workspace:  "default",
+	}
+
+	Equals(t, filepath.Join("plans", "repos", "owner", "repo", "2", "default", "modules", "app", "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
+
+	ctx.LocalPlanStoreDir = ""
+	Equals(t, filepath.Join(projectPath, "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
 }
 
 func TestIsRemotePlan(t *testing.T) {

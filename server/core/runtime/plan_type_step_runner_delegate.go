@@ -6,7 +6,6 @@ package runtime
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 )
@@ -35,7 +34,7 @@ func (p *planTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error)
 }
 
 func (p *planTypeStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planFile := GetPlanFilePath(ctx, path)
 	remotePlan, err := p.isRemotePlan(planFile)
 
 	if err != nil {

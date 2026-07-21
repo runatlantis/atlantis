@@ -452,7 +452,7 @@ ATLANTIS_DATA_DIR="path/to/data/dir"
 ```
 
 Directory where Atlantis will store its data. Will be created if it doesn't exist.
-Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
+Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans by default, and downloaded
 Terraform binaries here. If Atlantis loses this directory, [locks](locking.md)
 will be lost and unapplied plans will be lost.
 
@@ -1247,6 +1247,16 @@ until all changed projects are applied.
 Defaults to `false`.
 
 Only supported on GitLab
+
+### `--plan-store-dir`
+
+```bash
+atlantis server --plan-store-dir="path/to/local/plan/dir"
+# or
+ATLANTIS_PLAN_STORE_DIR="path/to/local/plan/dir"
+```
+
+Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--plan-store-dir`.
 
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 

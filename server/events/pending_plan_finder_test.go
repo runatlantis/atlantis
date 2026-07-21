@@ -280,6 +280,35 @@ func TestPendingPlanFinder_Find(t *testing.T) {
 	}
 }
 
+func TestPendingPlanFinder_FindSeparateLocalPlanStore(t *testing.T) {
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	clonePullDir := filepath.Join(dataDir, "repos", "owner", "repo", "7")
+	cloneWorkspaceDir := filepath.Join(clonePullDir, "default")
+	Ok(t, os.MkdirAll(cloneWorkspaceDir, 0700))
+	runCmd(t, cloneWorkspaceDir, "git", "init")
+
+	planWorkspaceDir := filepath.Join(planStoreDir, "repos", "owner", "repo", "7", "default")
+	planPath := filepath.Join(planWorkspaceDir, "project", "default.tfplan")
+	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
+	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
+
+	pf := &events.DefaultPendingPlanFinder{
+		DataDir:           dataDir,
+		LocalPlanStoreDir: planStoreDir,
+	}
+	plans, err := pf.Find(clonePullDir)
+	Ok(t, err)
+	Equals(t, []events.PendingPlan{
+		{
+			RepoDir:    cloneWorkspaceDir,
+			PlanDir:    planWorkspaceDir,
+			RepoRelDir: "project",
+			Workspace:  "default",
+		},
+	}, plans)
+}
+
 // If a planfile is checked in to git, we shouldn't use it.
 func TestPendingPlanFinder_FindPlanCheckedIn(t *testing.T) {
 	tmpDir := DirStructure(t, map[string]any{

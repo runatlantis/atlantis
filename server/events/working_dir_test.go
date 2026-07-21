@@ -2443,6 +2443,126 @@ func TestFileWorkspace_DeleteRemovesOnlyManagedSubPaths(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestFileWorkspace_DeleteRemovesSeparatePlanStorePaths(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:           dataDir,
+		LocalPlanStoreDir: planStoreDir,
+	}
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+
+	defaultWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	otherWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "other")
+	otherPullWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "2", "default")
+	Ok(t, os.MkdirAll(defaultWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherPullWorkspaceDir, 0700))
+
+	defaultPlanFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	otherPlanFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "other", "default.tfplan")
+	otherPullPlanFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "2", "default", "default.tfplan")
+	createPlanFile(t, defaultPlanFile)
+	createPlanFile(t, otherPlanFile)
+	createPlanFile(t, otherPullPlanFile)
+
+	Ok(t, fileWorkspace.DeleteForWorkspace(logger, repo, pull, "default"))
+	assertPathMissing(t, defaultWorkspaceDir)
+	assertPathMissing(t, defaultPlanFile)
+	assertPathExists(t, otherWorkspaceDir)
+	assertPathExists(t, otherPlanFile)
+	assertPathExists(t, otherPullWorkspaceDir)
+	assertPathExists(t, otherPullPlanFile)
+
+	Ok(t, fileWorkspace.Delete(logger, repo, pull))
+	assertPathMissing(t, filepath.Join(dataDir, "repos", "owner", "repo", "1"))
+	assertPathMissing(t, filepath.Join(planStoreDir, "repos", "owner", "repo", "1"))
+	assertPathExists(t, otherPullWorkspaceDir)
+	assertPathExists(t, otherPullPlanFile)
+}
+
+func TestClone_ForceCloneDeletesSeparatePlanWorkspace(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+	stalePlanFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	createPlanFile(t, stalePlanFile)
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalPlanStoreDir:           planStoreDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	assertPathExists(t, cloneDir)
+	assertPathMissing(t, stalePlanFile)
+}
+
+func TestClone_UpdateDeletesSeparatePlanStoreStalePlans(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+
+	cloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	Ok(t, os.MkdirAll(filepath.Dir(cloneDir), 0700))
+	runCmd(t, dataDir, "git", "clone", repoDir, cloneDir)
+
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	pull.HeadCommit = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	planWorkspaceDir := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "default")
+	workspacePlanFile := filepath.Join(planWorkspaceDir, "default.tfplan")
+	projectPlanFile := filepath.Join(planWorkspaceDir, "project", "default.tfplan")
+	terragruntPlanFile := filepath.Join(planWorkspaceDir, ".terragrunt-cache", "project", "default.tfplan")
+	createPlanFile(t, workspacePlanFile)
+	createPlanFile(t, projectPlanFile)
+	createPlanFile(t, terragruntPlanFile)
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalPlanStoreDir:           planStoreDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	updatedCloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	Equals(t, cloneDir, updatedCloneDir)
+	Equals(t, pull.HeadCommit, strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD")))
+	assertPathMissing(t, workspacePlanFile)
+	assertPathMissing(t, projectPlanFile)
+	assertPathExists(t, terragruntPlanFile)
+}
+
 func TestFileWorkspace_PathTraversal(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	dataDir := t.TempDir()
@@ -2524,6 +2644,20 @@ func createPlanFile(t *testing.T, path string) {
 
 	Ok(t, os.MkdirAll(filepath.Dir(path), 0700))
 	Ok(t, os.WriteFile(path, []byte("plan"), 0600))
+}
+
+func assertPathExists(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	Ok(t, err)
+}
+
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	Assert(t, os.IsNotExist(err), "expected %q to be deleted, got %v", path, err)
 }
 
 func ignorePlanFiles(t *testing.T, cloneDir string) {

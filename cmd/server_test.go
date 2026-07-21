@@ -119,6 +119,7 @@ var testFlags = map[string]any{
 	AllowDraftPRs:                    true,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
+	PlanStoreDirFlag:                 "/plans",
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
 	PendingApplyStatusFlag:           false,
@@ -200,6 +201,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
+		PlanStoreDirFlag:                 dataDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
 		RepoAllowlistFlag:                "*",
 		VarFileAllowlistFlag:             dataDir,
@@ -293,6 +295,7 @@ func TestNormalizePath(t *testing.T) {
 var pathFlags = map[string]struct{}{
 	DataDirFlag:                      {},
 	MarkdownTemplateOverridesDirFlag: {},
+	PlanStoreDirFlag:                 {},
 }
 
 func TestExecute_Flags(t *testing.T) {
@@ -448,6 +451,36 @@ func TestAllFlagsDocumented(t *testing.T) {
 		}
 	}
 
+}
+
+func TestExecute_ExpandHomeInPlanStoreDir(t *testing.T) {
+	t.Log("If ~ is used as a plan-store-dir path, should expand to absolute home path")
+	c := setup(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+		PlanStoreDirFlag:  "~/this/is/a/path",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/this/is/a/path", passedConfig.PlanStoreDir)
+}
+
+func TestExecute_RelativePlanStoreDir(t *testing.T) {
+	t.Log("Should convert relative plan-store-dir to absolute.")
+	c := setupWithDefaults(map[string]any{
+		PlanStoreDirFlag: "../",
+	}, t)
+
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.PlanStoreDir)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {

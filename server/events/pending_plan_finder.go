@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
@@ -22,19 +23,33 @@ type PendingPlanFinder interface {
 }
 
 // DefaultPendingPlanFinder finds unapplied plans.
-type DefaultPendingPlanFinder struct{}
+type DefaultPendingPlanFinder struct {
+	Log               logging.SimpleLogging
+	DataDir           string
+	LocalPlanStoreDir string
+}
 
 // PendingPlan is a plan that has not been applied.
 type PendingPlan struct {
 	// RepoDir is the absolute path to the root of the repo that holds this
-	// plan.
+	// plan's workspace clone.
 	RepoDir string
+	// PlanDir is the absolute path to the root of the workspace plan store.
+	// If empty, RepoDir is used for backward compatibility.
+	PlanDir string
 	// RepoRelDir is the relative path from the repo to the project that
 	// the plan is for.
 	RepoRelDir string
 	// Workspace is the workspace this plan should execute in.
 	Workspace   string
 	ProjectName string
+}
+
+func (p PendingPlan) planRepoDir() string {
+	if p.PlanDir != "" {
+		return p.PlanDir
+	}
+	return p.RepoDir
 }
 
 // Find finds all pending plans in pullDir. pullDir should be the working
@@ -45,7 +60,43 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 	return plans, err
 }
 
+func (p *DefaultPendingPlanFinder) debug(format string, args ...any) {
+	if p.Log != nil {
+		p.Log.Debug(format, args...)
+	}
+}
+
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
+	planPullDir, separatePlanDir, err := p.planPullDir(pullDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	if separatePlanDir {
+		return p.findInPlanStore(pullDir, planPullDir)
+	}
+	return p.findInGitWorkspaces(pullDir)
+}
+
+func (p *DefaultPendingPlanFinder) planPullDir(pullDir string) (string, bool, error) {
+	if p.DataDir == "" || p.LocalPlanStoreDir == "" {
+		return pullDir, false, nil
+	}
+
+	cloneRoot := filepath.Clean(filepath.Join(p.DataDir, workingDirPrefix))
+	cleanPullDir := filepath.Clean(pullDir)
+	relPullDir, err := filepath.Rel(cloneRoot, cleanPullDir)
+	if err != nil {
+		return "", false, fmt.Errorf("checking pull directory %q: %w", pullDir, err)
+	}
+	if relPullDir == ".." || filepath.IsAbs(relPullDir) || strings.HasPrefix(relPullDir, ".."+string(filepath.Separator)) {
+		return "", false, fmt.Errorf("pull directory %q escapes clone root %q", pullDir, cloneRoot)
+	}
+
+	planPullDir := filepath.Join(p.LocalPlanStoreDir, workingDirPrefix, relPullDir)
+	return planPullDir, filepath.Clean(planPullDir) != cleanPullDir, nil
+}
+
+func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]PendingPlan, []string, error) {
 	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
 		return nil, nil, err
@@ -106,6 +157,101 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 				})
 				absPaths = append(absPaths, filepath.Join(repoDir, file))
 			}
+		}
+	}
+	return plans, absPaths, nil
+}
+
+func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPullDir string) ([]PendingPlan, []string, error) {
+	workspaceDirs, err := os.ReadDir(planPullDir)
+	if os.IsNotExist(err) {
+		p.debug("plan store pull directory %q does not exist", planPullDir)
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	absClonePullDir, err := filepath.Abs(clonePullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute clone pull directory: %w", err)
+	}
+	absPlanPullDir, err := filepath.Abs(planPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute plan pull directory: %w", err)
+	}
+
+	var plans []PendingPlan
+	var absPaths []string
+	for _, workspaceDir := range workspaceDirs {
+		if !workspaceDir.IsDir() {
+			p.debug("skipping plan store entry %q because it is not a directory", filepath.Join(absPlanPullDir, workspaceDir.Name()))
+			continue
+		}
+
+		workspace := workspaceDir.Name()
+		cloneRepoDir, err := workspaceRepoDir(absClonePullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+		cloneRepoInfo, err := os.Stat(cloneRepoDir)
+		if os.IsNotExist(err) {
+			p.debug("skipping plan store workspace %q because clone directory %q does not exist", workspace, cloneRepoDir)
+			continue
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if !cloneRepoInfo.IsDir() {
+			p.debug("skipping plan store workspace %q because clone path %q is not a directory", workspace, cloneRepoDir)
+			continue
+		}
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(cloneRepoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			p.debug("skipping plan store workspace %q because clone directory %q is not a git worktree root", workspace, cloneRepoDir)
+			continue
+		}
+		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := filepath.WalkDir(planRepoDir, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				if entry.Name() == ".terragrunt-cache" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if filepath.Ext(path) != ".tfplan" {
+				return nil
+			}
+
+			relFile, err := filepath.Rel(planRepoDir, path)
+			if err != nil {
+				return fmt.Errorf("checking plan path %q: %w", path, err)
+			}
+			projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(relFile))
+			if err != nil {
+				return err
+			}
+			plans = append(plans, PendingPlan{
+				RepoDir:     cloneRepoDir,
+				PlanDir:     planRepoDir,
+				RepoRelDir:  filepath.Dir(relFile),
+				Workspace:   workspace,
+				ProjectName: projectName,
+			})
+			absPaths = append(absPaths, path)
+			return nil
+		}); err != nil {
+			return nil, nil, err
 		}
 	}
 	return plans, absPaths, nil

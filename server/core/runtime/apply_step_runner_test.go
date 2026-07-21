@@ -115,6 +115,47 @@ func TestRun_Success(t *testing.T) {
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
 
+func TestRun_UsesLocalPlanStoreDir(t *testing.T) {
+	projectPath := t.TempDir()
+	planStoreDir := t.TempDir()
+	planPath := filepath.Join(planStoreDir, "repos", "owner", "repo", "2", "workspace", "env", "workspace.tfplan")
+	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
+	Ok(t, os.WriteFile(planPath, nil, 0600))
+
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		EscapedCommentArgs: []string{"comment", "args"},
+		LocalPlanStoreDir:  planStoreDir,
+		Log:                logger,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "env",
+		Workspace:  "workspace",
+	}
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("output", nil)
+
+	output, err := o.Run(ctx, []string{"extra", "args"}, projectPath, map[string]string(nil))
+	Ok(t, err)
+	Equals(t, "output", output)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, projectPath, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	// When running for a project, the planfile has a different name.
 	tmpDir := t.TempDir()

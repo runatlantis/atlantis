@@ -8,7 +8,10 @@ package runtime
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	version "github.com/hashicorp/go-version"
@@ -17,6 +20,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 )
 
 const (
@@ -24,6 +28,7 @@ const (
 	// a link to the run url will be output.
 	lineBeforeRunURL     = "To view this run in a browser, visit:"
 	planfileSlashReplace = "::"
+	planStoreReposDir    = "repos"
 )
 
 // TerraformExec brings the interface from TerraformClient into this package
@@ -97,6 +102,41 @@ func GetPlanFilename(workspace string, projName string) string {
 	}
 	projName = strings.ReplaceAll(projName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.tfplan", projName, workspace)
+}
+
+// GetPlanFileDir returns the directory where Atlantis stores the plan file for ctx.
+// When LocalPlanStoreDir is set to data-dir, this must mirror FileWorkspace.cloneDir
+// plus ctx.RepoRelDir so default installs keep the legacy on-disk layout.
+func GetPlanFileDir(ctx command.ProjectContext, projectPath string) string {
+	if ctx.LocalPlanStoreDir == "" {
+		return projectPath
+	}
+	return filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir, ctx.BaseRepo.FullName, strconv.Itoa(ctx.Pull.Num), ctx.Workspace, ctx.RepoRelDir)
+}
+
+// EnsurePlanFileDir creates the directory for ctx's generated Terraform plan file.
+func EnsurePlanFileDir(ctx command.ProjectContext, projectPath string) error {
+	if ctx.LocalPlanStoreDir == "" {
+		return nil
+	}
+	planFileDir := GetPlanFileDir(ctx, projectPath)
+	if err := utils.EnsureSubPath(filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir), planFileDir); err != nil {
+		return fmt.Errorf("plan file path traversal detected: %w", err)
+	}
+	if err := os.MkdirAll(planFileDir, 0700); err != nil {
+		return fmt.Errorf("creating plan file directory: %w", err)
+	}
+	return nil
+}
+
+// GetPlanFilePath returns the full path to the generated Terraform plan file.
+func GetPlanFilePath(ctx command.ProjectContext, projectPath string) string {
+	return filepath.Join(GetPlanFileDir(ctx, projectPath), GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+}
+
+// GetPlanPullDir returns the root directory for all plan files for a pull request.
+func GetPlanPullDir(localPlanStoreDir string, r models.Repo, p models.PullRequest) string {
+	return filepath.Join(localPlanStoreDir, planStoreReposDir, r.FullName, strconv.Itoa(p.Num))
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated
