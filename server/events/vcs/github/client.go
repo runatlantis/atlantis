@@ -195,7 +195,7 @@ listloop:
 			}
 			if err != nil {
 				ghErr, ok := err.(*github.ErrorResponse)
-				if ok && ghErr.Response.StatusCode == 404 {
+				if ok && ghErr.Response != nil && ghErr.Response.StatusCode == 404 {
 					// (hopefully) transient 404, retry after backoff
 					continue
 				}
@@ -967,7 +967,7 @@ func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 			return pull, nil
 		}
 		ghErr, ok := err.(*github.ErrorResponse)
-		if !ok || ghErr.Response.StatusCode != 404 {
+		if !ok || ghErr.Response == nil || ghErr.Response.StatusCode != 404 {
 			return pull, err
 		}
 	}
@@ -1205,7 +1205,7 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", repo.Owner, repo.Name, fileName, resp.StatusCode)
 	}
 
-	if resp.StatusCode == http.StatusNotFound {
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}
 	if err != nil {

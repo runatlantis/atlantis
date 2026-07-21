@@ -50,6 +50,39 @@ func TestRun_NoPlanFile(t *testing.T) {
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
 }
 
+func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops"), 0600)
+	Ok(t, err)
+
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:        logger,
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+	}
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	applyErr := errors.New("terraform rejected truncated plan")
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+	}
+
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("", applyErr)
+	_, err = o.Run(ctx, nil, tmpDir, nil)
+
+	Assert(t, errors.Is(err, applyErr), "expected the local apply error, got %v", err)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", fmt.Sprintf("%q", planPath)}, nil, tfDistribution, nil, "workspace")
+	_, statErr := os.Stat(planPath)
+	Ok(t, statErr)
+}
+
 func TestRun_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	planPath := filepath.Join(tmpDir, "workspace.tfplan")

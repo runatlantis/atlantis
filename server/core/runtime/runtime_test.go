@@ -106,6 +106,48 @@ func TestGetPlanFilePath(t *testing.T) {
 
 	ctx.LocalPlanStoreDir = ""
 	Equals(t, filepath.Join(projectPath, "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
+func TestIsRemotePlan(t *testing.T) {
+	const remotePlanHeader = "Atlantis: this plan was created by remote ops\n"
+
+	cases := []struct {
+		name     string
+		contents []byte
+		exp      bool
+	}{
+		{
+			name: "nil plan",
+		},
+		{
+			name:     "empty plan",
+			contents: []byte{},
+		},
+		{
+			name:     "same length without header",
+			contents: []byte("Atlantis: this plan was created by local ops\n"),
+		},
+		{
+			name:     "exact header",
+			contents: []byte(remotePlanHeader),
+			exp:      true,
+		},
+		{
+			name:     "header with plan contents",
+			contents: []byte(remotePlanHeader + "plan contents"),
+			exp:      true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, runtime.IsRemotePlan(c.contents))
+		})
+	}
+
+	for prefixLen := range len(remotePlanHeader) {
+		t.Run(fmt.Sprintf("truncated header length %d", prefixLen), func(t *testing.T) {
+			Equals(t, false, runtime.IsRemotePlan([]byte(remotePlanHeader[:prefixLen])))
+		})
+	}
 }
 
 func TestProjectNameFromPlanfile(t *testing.T) {
