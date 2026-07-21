@@ -5,6 +5,8 @@ package server_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server"
@@ -193,6 +195,94 @@ func TestUserConfig_ToLogLevel(t *testing.T) {
 				LogLevel: c.userLvl,
 			}
 			Equals(t, c.expLvl, u.ToLogLevel())
+		})
+	}
+}
+
+func TestUserConfig_ToWebhookSecret(t *testing.T) {
+	secretValue := "fakesecret"
+	secretValueWithNewline := "fakesecret\n"
+
+	tempDir := t.TempDir()
+	secretFilePath := filepath.Join(tempDir, "webhook-secret")
+	secretWithNewlineFilePath := filepath.Join(tempDir, "webhook-secret-newline")
+
+	os.WriteFile(secretFilePath, []byte(secretValue), 0600)                       // nolint: errcheck
+	os.WriteFile(secretWithNewlineFilePath, []byte(secretValueWithNewline), 0600) // nolint: errcheck
+
+	cases := []struct {
+		name   string
+		config server.UserConfig
+	}{
+		{
+			name: "secret from file",
+			config: server.UserConfig{
+				BitbucketWebhookSecretFile: secretFilePath,
+				GithubWebhookSecretFile:    secretFilePath,
+				GiteaWebhookSecretFile:     secretFilePath,
+				GitlabWebhookSecretFile:    secretFilePath,
+			},
+		},
+		{
+			name: "secret from file with trailing newline",
+			config: server.UserConfig{
+				BitbucketWebhookSecretFile: secretWithNewlineFilePath,
+				GithubWebhookSecretFile:    secretWithNewlineFilePath,
+				GiteaWebhookSecretFile:     secretWithNewlineFilePath,
+				GitlabWebhookSecretFile:    secretWithNewlineFilePath,
+			},
+		},
+		{
+			name: "secret from config flag",
+			config: server.UserConfig{
+				BitbucketWebhookSecret: secretValue,
+				GithubWebhookSecret:    secretValue,
+				GiteaWebhookSecret:     secretValue,
+				GitlabWebhookSecret:    secretValue,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			toWebhookSecretInner(t, c.config, []byte(secretValue))
+		})
+	}
+}
+
+type getSecret func() ([]byte, error)
+
+func toWebhookSecretInner(t *testing.T, config server.UserConfig, expected []byte) {
+	cases := []struct {
+		name string
+		f    getSecret
+	}{
+		{
+			"bitbucket",
+			config.ToBitbucketWebhookSecret,
+		},
+		{
+			"github",
+			config.ToGithubWebhookSecret,
+		},
+		{
+			"gitea",
+			config.ToGiteaWebhookSecret,
+		},
+		{
+			"gitlab",
+			config.ToGitlabWebhookSecret,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			secret, err := c.f()
+			if err != nil {
+				t.Errorf("failed to read file: %v", err)
+			}
+
+			Equals(t, expected, secret)
 		})
 	}
 }

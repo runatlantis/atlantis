@@ -395,7 +395,7 @@ This means that an attacker could spoof calls to Atlantis and cause it to perfor
 :::
 
 ::: warning SECURITY WARNING
-The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--bitbucket-webhook-secret-file` to mitigate that risk.
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--bitbucket-webhook-secret-file` to mitigate that risk.
 :::
 
 ### `--bitbucket-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
@@ -906,7 +906,7 @@ This means that an attacker could spoof calls to Atlantis and cause it to perfor
 :::
 
 ::: warning SECURITY WARNING
-The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-webhook-secret-file` to mitigate that risk.
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-webhook-secret-file` to mitigate that risk.
 :::
 
 ### `--gh-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
@@ -980,7 +980,7 @@ This means that an attacker could spoof calls to Atlantis and cause it to perfor
 :::
 
 ::: warning SECURITY WARNING
-The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitea-webhook-secret-file` to mitigate that risk.
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitea-webhook-secret-file` to mitigate that risk.
 :::
 
 ### `--gitea-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
@@ -1068,7 +1068,7 @@ This means that an attacker could spoof calls to Atlantis and cause it to perfor
 :::
 
 ::: warning SECURITY WARNING
-The contents of the private key will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitlab-webhook-secret-file` to mitigate that risk.
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitlab-webhook-secret-file` to mitigate that risk.
 :::
 
 ### `--gitlab-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>

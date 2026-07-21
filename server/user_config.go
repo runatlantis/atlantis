@@ -4,6 +4,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -249,16 +250,18 @@ func (u UserConfig) ToGitlabWebhookSecret() ([]byte, error) {
 }
 
 func credentialFromVarOrFile(credentialVar string, credentialFile string) ([]byte, error) {
+	var secret []byte
 	if credentialFile != "" {
-		credential, err := os.ReadFile(credentialFile)
+		var err error
+		secret, err = os.ReadFile(credentialFile)
 		if err != nil {
 			return nil, err
 		}
-
-		return credential, nil
+	} else {
+		secret = []byte(credentialVar)
 	}
 
-	return []byte(credentialVar), nil
+	return bytes.TrimSuffix(secret, []byte{0xA}), nil
 }
 
 // ToLogLevel returns the LogLevel object corresponding to the user-passed

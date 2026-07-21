@@ -444,7 +444,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	gitlabebhookSecret, err := userConfig.ToGitlabWebhookSecret()
+	gitlabWebhookSecret, err := userConfig.ToGitlabWebhookSecret()
 	if err != nil {
 		return nil, err
 	}
@@ -1085,7 +1085,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GithubWebhookSecret:             githubWebhookSecret,
 		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:             gitlabebhookSecret,
+		GitlabWebhookSecret:             gitlabWebhookSecret,
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		EmojiReaction:                   userConfig.EmojiReaction,
