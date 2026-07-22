@@ -669,7 +669,10 @@ var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
 
 // DefaultExecutableName is the value of ExecutableName Atlantis uses unless
 // an operator overrides it via --executable-name / ATLANTIS_EXECUTABLE_NAME.
-// Kept in sync with cmd.DefaultExecutableName.
+// This is intentionally a separate literal from cmd.DefaultExecutableName:
+// server/events cannot import cmd (cmd imports server, so the reverse would
+// be an import cycle). If the default executable name ever changes, update
+// both constants.
 const DefaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
