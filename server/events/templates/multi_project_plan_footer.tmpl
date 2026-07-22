@@ -3,7 +3,12 @@
 ### Plan Summary
 
 {{ len .Results }} projects, {{ .NumPlansWithChanges }} with changes, {{ .NumPlansWithNoChanges }} with no changes, {{ .NumPlanFailures }} failed
-{{ if and (not .PlansDeleted) (ne .DisableApplyAll true) }}
+{{ if .SuggestFailedPlanCommand }}
+* :repeat: To **re-run failed plans**, comment:
+  ```shell
+  {{ .ExecutableName }} plan --failed
+  ```
+{{ else if and (not .ApplyBlocked) (ne .DisableApplyAll true) }}
 * :fast_forward: To **apply** all unapplied plans from this {{ .VcsRequestType }}, comment:
   ```shell
   {{ .ExecutableName }} apply

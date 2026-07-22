@@ -195,6 +195,15 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	if failedProjects := ctx.ErroredPlanProjects(); len(failedProjects) > 0 {
+		ctx.Log.Info("blocking apply because %d plan(s) failed", len(failedProjects))
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Failure: failedPlansApplyBlockFailure(failedProjects)})
+		return
+	}
+
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
