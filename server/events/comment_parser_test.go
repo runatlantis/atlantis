@@ -279,6 +279,20 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 }
 
+func TestParse_NoMisspellWarningForCustomExecutableName(t *testing.T) {
+	t.Log("given a custom (non-default) ExecutableName, misspell-based 'did you mean'" +
+		" should not fire even when a comment is Levenshtein-close to it, since operators" +
+		" running multiple Atlantis servers against one repo would otherwise see spurious replies")
+	cp := events.CommentParser{
+		GithubUser:     "github-user",
+		ExecutableName: "atlantis-sec",
+	}
+	// "atlantis-dev" is Levenshtein distance 2 from "atlantis-sec".
+	r := cp.Parse("atlantis-dev unlock", models.Github)
+	Assert(t, r.CommentResponse == "",
+		"expected no did-you-mean CommentResponse, got %q", r.CommentResponse)
+}
+
 func TestParse_InvalidCommand(t *testing.T) {
 	t.Log("given a comment with an invalid atlantis command, should return " +
 		"a warning.")
