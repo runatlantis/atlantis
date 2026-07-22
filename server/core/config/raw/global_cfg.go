@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -31,8 +32,15 @@ type ExternalStores struct {
 
 // PlanStoreConfig is the raw schema for plan storage configuration.
 type PlanStoreConfig struct {
-	Type string        `yaml:"type" json:"type"`
-	S3   S3StoreConfig `yaml:"s3" json:"s3"`
+	Type  string           `yaml:"type" json:"type"`
+	S3    S3StoreConfig    `yaml:"s3" json:"s3"`
+	Redis RedisStoreConfig `yaml:"redis" json:"redis"`
+}
+
+// RedisStoreConfig is the raw schema for the redis plan store. The connection
+// reuses the server's redis flags; keys are derived per PR project like locks.
+type RedisStoreConfig struct {
+	TTL string `yaml:"ttl" json:"ttl"`
 }
 
 // S3StoreConfig is the raw schema for S3 plan store configuration.
@@ -50,22 +58,39 @@ func (e ExternalStores) Validate() error {
 }
 
 func (p PlanStoreConfig) Validate() error {
-	if p.Type == "" {
+	switch p.Type {
+	case "":
 		return nil
+	case "s3":
+		if p.S3.Bucket == "" {
+			return fmt.Errorf("external_stores.plan_store.s3.bucket is required when type is 's3'")
+		}
+		if p.S3.Region == "" {
+			return fmt.Errorf("external_stores.plan_store.s3.region is required when type is 's3'")
+		}
+		return nil
+	case "redis":
+		if p.Redis.TTL != "" {
+			d, err := time.ParseDuration(p.Redis.TTL)
+			if err != nil {
+				return fmt.Errorf("external_stores.plan_store.redis.ttl %q is not a valid duration: %w", p.Redis.TTL, err)
+			}
+			if d < 0 {
+				return fmt.Errorf("external_stores.plan_store.redis.ttl %q must not be negative", p.Redis.TTL)
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported plan store type %q: only 's3' and 'redis' are supported", p.Type)
 	}
-	if p.Type != "s3" {
-		return fmt.Errorf("unsupported plan store type %q: only 's3' is supported", p.Type)
-	}
-	if p.S3.Bucket == "" {
-		return fmt.Errorf("external_stores.plan_store.s3.bucket is required when type is 's3'")
-	}
-	if p.S3.Region == "" {
-		return fmt.Errorf("external_stores.plan_store.s3.region is required when type is 's3'")
-	}
-	return nil
 }
 
 func (e ExternalStores) ToValid() valid.ExternalStores {
+	// TTL parses cleanly because Validate already rejected a malformed value.
+	var redisTTL time.Duration
+	if e.PlanStore.Redis.TTL != "" {
+		redisTTL, _ = time.ParseDuration(e.PlanStore.Redis.TTL)
+	}
 	return valid.ExternalStores{
 		PlanStore: valid.PlanStoreConfig{
 			Type: e.PlanStore.Type,
@@ -76,6 +101,9 @@ func (e ExternalStores) ToValid() valid.ExternalStores {
 				Endpoint:       e.PlanStore.S3.Endpoint,
 				ForcePathStyle: e.PlanStore.S3.ForcePathStyle,
 				Profile:        e.PlanStore.S3.Profile,
+			},
+			Redis: valid.RedisStoreConfig{
+				TTL: redisTTL,
 			},
 		},
 	}
