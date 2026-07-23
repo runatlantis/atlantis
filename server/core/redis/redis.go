@@ -709,7 +709,8 @@ func (r *RedisDB) updatePullAtomically(key string, tolerateUnreadable bool, upda
 			return newStatus, nil
 		}
 		if attempt+1 < maxAttempts {
-			time.Sleep(time.Duration(rand.IntN(10)+1) * time.Millisecond)
+			retryDelay := time.Duration(rand.IntN(10)+1) * time.Millisecond //nolint:gosec // Retry jitter is not security-sensitive.
+			time.Sleep(retryDelay)
 		}
 	}
 	return models.PullStatus{}, errors.New("db transaction failed: pull status changed too many times")
