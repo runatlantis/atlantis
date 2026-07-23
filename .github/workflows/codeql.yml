@@ -54,8 +54,17 @@ jobs:
         with:
           filters: |
             src:
-              - '**.go'
-              - '**.js4'
+              - '**/*.go'
+              - '**/*.js'
+              - '**/*.mjs'
+              - '**/*.cjs'
+              - '**/*.ts'
+              - '**/*.mts'
+              - '**/*.cts'
+              - '**/*.vue'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/codeql.yml'
 
   analyze:
     needs: [changes]
