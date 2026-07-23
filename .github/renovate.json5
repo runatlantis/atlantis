@@ -106,7 +106,7 @@
       "matchFileNames": ["Dockerfile"],
       "matchPackageNames": ["golang"],
       "versioning": "docker",
-      "allowedVersions": "/-alpine$/"
+      "allowedVersions": "/-alpine3\\.24$/"
     },
     // Include testdata files for go-github updates
     {
