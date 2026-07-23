@@ -101,6 +101,53 @@ func TestRenderErr(t *testing.T) {
 	}
 }
 
+func TestRenderErrWithProjectResults(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logger.Info("apply log")
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				Workspace:  "default",
+				RepoRelDir: "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "Apply complete! Resources: 1 added, 0 changed, 0 destroyed.",
+				},
+			},
+		},
+		Error: errors.New("recording apply results: database unavailable; run `atlantis plan` before applying again"),
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, Verbose: true}
+
+	rendered := r.Render(ctx, res, cmd)
+
+	Assert(t, strings.Contains(rendered, "Apply complete! Resources: 1 added, 0 changed, 0 destroyed."), "expected successful apply output, got: %s", rendered)
+	Assert(t, strings.Contains(rendered, "recording apply results: database unavailable; run `atlantis plan` before applying again"), "expected persistence error, got: %s", rendered)
+	Equals(t, 1, strings.Count(rendered, "<details><summary>Log</summary>"))
+	Equals(t, 1, strings.Count(rendered, "[INFO] apply log"))
+}
+
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string
@@ -3243,6 +3290,138 @@ $$$
 2 projects, 2 successful, 0 failed, 0 errored
 `
 	Equals(t, normalize(exp), normalize(rendered))
+}
+
+func TestRenderApplyExecutionOrderProgress(t *testing.T) {
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{Type: models.Github},
+			},
+		},
+	}
+
+	newRenderer := func(languageCode string, executableName string) *events.MarkdownRenderer {
+		if executableName == "" {
+			executableName = "atlantis"
+		}
+		return events.NewMarkdownRenderer(
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			"",
+			executableName,
+			false,
+			false,
+			i18n.TranslatorConfig{LanguageCode: languageCode},
+		)
+	}
+
+	projectResult := func(projectName string) command.ProjectResult {
+		return command.ProjectResult{
+			ProjectName: projectName,
+			RepoRelDir:  projectName,
+			Workspace:   "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				ApplySuccess: "Apply complete!",
+			},
+		}
+	}
+
+	cases := []struct {
+		name             string
+		languageCode     string
+		executableName   string
+		projectResults   []command.ProjectResult
+		progress         *command.ApplyExecutionOrderProgress
+		expectedFooter   string
+		unexpectedFooter string
+	}{
+		{
+			name:           "single project",
+			languageCode:   "en",
+			projectResults: []command.ProjectResult{projectResult("dev")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup:  1,
+				RemainingExecutionOrderGroups: []int{2, 4},
+			},
+			expectedFooter: "Atlantis paused after `execution_order_group` 1.\n\n" +
+				"Remaining execution order groups: 2, 4.\n\n" +
+				"Run `atlantis apply` to apply the next `execution_order_group`.",
+		},
+		{
+			name:           "multiple projects",
+			languageCode:   "en",
+			projectResults: []command.ProjectResult{projectResult("dev-a"), projectResult("dev-b")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup:  3,
+				RemainingExecutionOrderGroups: []int{5, 8},
+			},
+			expectedFooter: "Atlantis paused after `execution_order_group` 3.\n\n" +
+				"Remaining execution order groups: 5, 8.\n\n" +
+				"Run `atlantis apply` to apply the next `execution_order_group`.",
+		},
+		{
+			name:           "Spanish",
+			languageCode:   "es",
+			projectResults: []command.ProjectResult{projectResult("desarrollo")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup:  1,
+				RemainingExecutionOrderGroups: []int{2, 3},
+			},
+			expectedFooter: "Atlantis se detuvo después de `execution_order_group` 1.\n\n" +
+				"Grupos de orden de ejecución restantes: 2, 3.\n\n" +
+				"Ejecuta `atlantis apply` para aplicar el siguiente `execution_order_group`.",
+			unexpectedFooter: "Atlantis paused after",
+		},
+		{
+			name:           "custom executable name",
+			languageCode:   "en",
+			executableName: "custom-atlantis",
+			projectResults: []command.ProjectResult{projectResult("dev")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup:  1,
+				RemainingExecutionOrderGroups: []int{2},
+			},
+			expectedFooter:   "Run `custom-atlantis apply` to apply the next `execution_order_group`.",
+			unexpectedFooter: "Run `atlantis apply`",
+		},
+		{
+			name:             "without progress metadata",
+			languageCode:     "en",
+			projectResults:   []command.ProjectResult{projectResult("dev")},
+			unexpectedFooter: "Atlantis paused after",
+		},
+		{
+			name:           "without remaining groups",
+			languageCode:   "en",
+			projectResults: []command.ProjectResult{projectResult("production")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup: 4,
+			},
+			unexpectedFooter: "Atlantis paused after",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rendered := newRenderer(tc.languageCode, tc.executableName).Render(ctx, command.Result{
+				ProjectResults:              tc.projectResults,
+				ApplyExecutionOrderProgress: tc.progress,
+			}, &events.CommentCommand{Name: command.Apply})
+
+			if tc.expectedFooter != "" {
+				Assert(t, strings.Contains(rendered, tc.expectedFooter), "expected footer %q in rendered output:\n%s", tc.expectedFooter, rendered)
+			}
+			if tc.unexpectedFooter != "" {
+				Assert(t, !strings.Contains(rendered, tc.unexpectedFooter), "did not expect footer %q in rendered output:\n%s", tc.unexpectedFooter, rendered)
+			}
+		})
+	}
 }
 
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {

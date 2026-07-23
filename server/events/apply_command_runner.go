@@ -195,6 +195,8 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	projectCmds, applyContinuation := selectApplyExecutionOrderGroup(projectCmds, cmd.IsForSpecificProject())
+
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
@@ -234,6 +236,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		ctx.Log.Err("fetching live pull request after apply: %s", err)
 		ctx.CommandHasErrors = true
 		result.Error = fmt.Errorf("fetching live pull request after apply: %w", err)
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
@@ -254,27 +257,35 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	livePull = finalLivePull
 	ctx.CommandHasErrors = result.HasErrors()
 
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
+		ctx.CommandHasErrors = true
+		if !result.HasErrors() {
+			result.Error = fmt.Errorf("recording apply results: %w; run `atlantis plan` before applying again", err)
+		}
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
-
 	currentPull := applyPullWithLiveIdentity(pull, livePull)
 	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
 		ctx.Log.Warn("not publishing apply success status because %s", err)
 		ctx.CommandHasErrors = true
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		return
 	}
+	if !result.HasErrors() {
+		result.ApplyExecutionOrderProgress = applyContinuation
+	}
+	a.pullUpdater.updatePull(ctx, cmd, result)
 
 	a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus)
 	a.updateCommitStatus(ctx, pullStatus)
@@ -460,6 +471,43 @@ func (a *ApplyCommandRunner) IsLocked() (bool, error) {
 
 func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
+}
+
+func selectApplyExecutionOrderGroup(projectCmds []command.ProjectContext, targeted bool) ([]command.ProjectContext, *command.ApplyExecutionOrderProgress) {
+	if targeted || len(projectCmds) == 0 || !projectCmds[0].PauseApplyBetweenExecutionOrderGroups {
+		return projectCmds, nil
+	}
+
+	lowestGroup := projectCmds[0].ExecutionOrderGroup
+	groups := make(map[int]struct{})
+	for _, projectCmd := range projectCmds {
+		groups[projectCmd.ExecutionOrderGroup] = struct{}{}
+		if projectCmd.ExecutionOrderGroup < lowestGroup {
+			lowestGroup = projectCmd.ExecutionOrderGroup
+		}
+	}
+	if len(groups) == 1 {
+		return projectCmds, nil
+	}
+
+	selected := make([]command.ProjectContext, 0, len(projectCmds))
+	remainingGroups := make([]int, 0, len(groups)-1)
+	for group := range groups {
+		if group != lowestGroup {
+			remainingGroups = append(remainingGroups, group)
+		}
+	}
+	for _, projectCmd := range projectCmds {
+		if projectCmd.ExecutionOrderGroup == lowestGroup {
+			selected = append(selected, projectCmd)
+		}
+	}
+	slices.Sort(remainingGroups)
+
+	return selected, &command.ApplyExecutionOrderProgress{
+		CompletedExecutionOrderGroup:  lowestGroup,
+		RemainingExecutionOrderGroups: remainingGroups,
+	}
 }
 
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {

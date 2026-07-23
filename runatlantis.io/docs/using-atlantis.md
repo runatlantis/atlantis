@@ -152,8 +152,9 @@ atlantis apply [options] -- [terraform apply flags]
 Runs `terraform apply` for the plan that matches the directory/project/workspace.
 
 ::: tip
-If no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans from this pull request**.
+By default, if no directory/project/workspace is specified, ex. `atlantis apply`, this command will apply **all unapplied plans from this pull request**.
 This includes all projects that have been planned manually with `atlantis plan` `-p`/`-d`/`-w` since the last autoplan or `atlantis plan` command.
+When [`pause_apply_between_execution_order_groups`](repo-level-atlantis-yaml.md#order-of-planningapplying) is enabled, an unscoped `atlantis apply` applies only the lowest remaining execution order group and must be run again to advance to the next group. Applies targeted with `-p`, `-d`, or `-w` are unchanged.
 For Atlantis commands to work,  Atlantis needs to know the location where the plan file is. For that, you can use $PLANFILE which will contain the path of the plan file to be used in your custom steps. i.e `terraform plan -out $PLANFILE`
 :::
 

@@ -139,6 +139,8 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
 	AbortOnExecutionOrderFail bool
+	// If a broad apply should stop after the lowest pending execution order group.
+	PauseApplyBetweenExecutionOrderGroups bool
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string
