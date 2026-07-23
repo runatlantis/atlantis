@@ -1599,6 +1599,147 @@ func TestDefaultProjectCommandBuilder_AutoDiscoverModeEnabledDefaultsEmptyToAuto
 	}))
 }
 
+func TestRepoRelDirWithinRoot(t *testing.T) {
+	tests := []struct {
+		name      string
+		root      string
+		candidate string
+		expected  bool
+	}{
+		{
+			name:      "root equality",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform"),
+			expected:  true,
+		},
+		{
+			name:      "nested descendant",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  true,
+		},
+		{
+			name:      "repository root equality",
+			root:      ".",
+			candidate: ".",
+			expected:  true,
+		},
+		{
+			name:      "repository root descendant",
+			root:      ".",
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  true,
+		},
+		{
+			name:      "cleaned project root",
+			root:      filepath.FromSlash("stacks/./platform"),
+			candidate: filepath.Join("stacks", "platform", "staging"),
+			expected:  true,
+		},
+		{
+			name:      "cleaned descendant",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.FromSlash("stacks/platform/dev/../staging"),
+			expected:  true,
+		},
+		{
+			name:      "sibling with shared prefix",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform-other"),
+			expected:  false,
+		},
+		{
+			name:      "parent traversal",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "..", "platform-other"),
+			expected:  false,
+		},
+		{
+			name:      "multiple parent traversal",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "..", "..", "outside"),
+			expected:  false,
+		},
+		{
+			name:      "absolute root",
+			root:      filepath.Join(string(filepath.Separator), "stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  false,
+		},
+		{
+			name:      "absolute candidate",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join(string(filepath.Separator), "stacks", "platform", "dev"),
+			expected:  false,
+		},
+		{
+			name:      "absolute root and candidate",
+			root:      filepath.Join(string(filepath.Separator), "stacks", "platform"),
+			candidate: filepath.Join(string(filepath.Separator), "stacks", "platform", "dev"),
+			expected:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			Equals(t, test.expected, repoRelDirWithinRoot(test.root, test.candidate))
+		})
+	}
+}
+
+func TestFilterNonConventionRunOnlyPlanArtifacts(t *testing.T) {
+	repoDir := filepath.Join(string(filepath.Separator), "repo")
+	customNestedPath := filepath.Join(repoDir, "stacks", "platform", "dev", "atlantis.tfplan")
+	managedNestedPath := filepath.Join(repoDir, "stacks", "platform", "managed-child", "managed-child-default.tfplan")
+	conventionLookingPath := filepath.Join(repoDir, "stacks", "platform", "generated", "default.tfplan")
+	siblingCustomPath := filepath.Join(repoDir, "stacks", "platform-other", "dev", "atlantis.tfplan")
+	otherWorkspaceCustomPath := filepath.Join(repoDir, "stacks", "platform", "staging", "atlantis.tfplan")
+	plans := []PendingPlan{
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "dev"),
+			Workspace:    "default",
+			PlanFilePath: customNestedPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "managed-child"),
+			Workspace:    "default",
+			ProjectName:  "managed-child",
+			PlanFilePath: managedNestedPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "generated"),
+			Workspace:    "default",
+			PlanFilePath: conventionLookingPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform-other", "dev"),
+			Workspace:    "default",
+			PlanFilePath: siblingCustomPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "staging"),
+			Workspace:    "other",
+			PlanFilePath: otherWorkspaceCustomPath,
+		},
+	}
+
+	filtered := filterNonConventionRunOnlyPlanArtifacts(plans, []runOnlyApplyRoot{
+		{workspace: "default", repoRelDir: filepath.FromSlash("stacks/./platform")},
+		{workspace: "default", repoRelDir: filepath.Join("stacks", "platform")},
+	})
+
+	Equals(t, 4, len(filtered))
+	Equals(t, managedNestedPath, filtered[0].PlanFilePath)
+	Equals(t, conventionLookingPath, filtered[1].PlanFilePath)
+	Equals(t, siblingCustomPath, filtered[2].PlanFilePath)
+	Equals(t, otherWorkspaceCustomPath, filtered[3].PlanFilePath)
+}
+
 func mustVersion(v string) *version.Version {
 	vers, err := version.NewVersion(v)
 	if err != nil {

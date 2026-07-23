@@ -240,10 +240,9 @@ func (g GithubClient) GetCommitStatus(ctx context.Context, branchName, statusCon
 	return result, nil
 }
 
-// GetProjectStatuses returns all per-project Atlantis plan status contexts
-// and their states. These have the form "atlantis/plan: <ProjectID>".
-// The aggregate "atlantis/plan" status is excluded.
-func (g GithubClient) GetProjectStatuses(ctx context.Context, branchName string) (map[string]string, error) {
+// GetProjectStatuses returns all per-project Atlantis status contexts for a
+// command. The aggregate "atlantis/<command>" status is excluded.
+func (g GithubClient) GetProjectStatuses(ctx context.Context, branchName, command string) (map[string]string, error) {
 	combinedStatus, _, err := g.client.Repositories.GetCombinedStatus(ctx, g.ownerName, g.repoName, branchName, nil)
 	if err != nil {
 		return nil, err
@@ -252,7 +251,7 @@ func (g GithubClient) GetProjectStatuses(ctx context.Context, branchName string)
 	result := make(map[string]string)
 	for _, status := range combinedStatus.Statuses {
 		statusCtx := status.GetContext()
-		if strings.HasPrefix(statusCtx, projectStatusPrefix) {
+		if strings.HasPrefix(statusCtx, atlantisProjectStatusPrefix(command)) {
 			result[statusCtx] = status.GetState()
 		}
 	}

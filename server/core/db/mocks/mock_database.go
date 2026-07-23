@@ -42,6 +42,21 @@ func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
 }
 
+// BeginPlanGeneration mocks base method.
+func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeginPlanGeneration", pull, projects, generation)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BeginPlanGeneration indicates an expected call of BeginPlanGeneration.
+func (mr *MockDatabaseMockRecorder) BeginPlanGeneration(pull, projects, generation any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGeneration), pull, projects, generation)
+}
+
 // CheckCommandLock mocks base method.
 func (m *MockDatabase) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 	m.ctrl.T.Helper()
@@ -69,6 +84,21 @@ func (m *MockDatabase) Close() error {
 func (mr *MockDatabaseMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabase)(nil).Close))
+}
+
+// CompletePlanGeneration mocks base method.
+func (m *MockDatabase) CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompletePlanGeneration", pull, generation, newResults)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CompletePlanGeneration indicates an expected call of CompletePlanGeneration.
+func (mr *MockDatabaseMockRecorder) CompletePlanGeneration(pull, generation, newResults any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompletePlanGeneration", reflect.TypeOf((*MockDatabase)(nil).CompletePlanGeneration), pull, generation, newResults)
 }
 
 // DeletePullStatus mocks base method.
@@ -157,6 +187,21 @@ func (m *MockDatabase) Ping() error {
 func (mr *MockDatabaseMockRecorder) Ping() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDatabase)(nil).Ping))
+}
+
+// ReplacePullWithResults mocks base method.
+func (m *MockDatabase) ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplacePullWithResults", pull, newResults)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplacePullWithResults indicates an expected call of ReplacePullWithResults.
+func (mr *MockDatabaseMockRecorder) ReplacePullWithResults(pull, newResults any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplacePullWithResults", reflect.TypeOf((*MockDatabase)(nil).ReplacePullWithResults), pull, newResults)
 }
 
 // TryLock mocks base method.
