@@ -24,7 +24,9 @@ permissions:
 
 env:
   TERRAFORM_VERSION: 1.11.1
+  # Keep the checksum in sync with the versioned archive URL.
   NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+  NGROK_DOWNLOAD_SHA256: 7d5cf30be47a38d937958dff61a2b175a289bdbf72fdc20774a6dceeaaaa3dbf
 
 jobs:
   changes:
@@ -163,6 +165,7 @@ jobs:
       - name: Setup ngrok
         run: |
           wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -208,6 +211,7 @@ jobs:
       - name: Setup ngrok
         run: |
           wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
