@@ -1,0 +1,38 @@
+server/events/apply_command_runner.go
+  s_f95c74433d5088::t_bd50b3af0550cf 261
+server/events/plan_command_runner.go
+  s_f95c74433d5088::t_bd50b3af0550cf 372-373
+server/events/command_runner_test.go
+  s_f95c74433d5088::t_1e8e72d9ecedd1 794-795,797-844
+  s_f95c74433d5088::t_f4d84a7b7dce94 796
+  s_f95c74433d5088::t_bd50b3af0550cf 1617
+server/controllers/locks_controller.go
+  s_f95c74433d5088::t_bd50b3af0550cf 141
+server/events/gitea_pull_status_integration_test.go
+  s_f95c74433d5088::t_51fa6afa6d68df 153
+runatlantis.io/docs/using-atlantis.md
+  s_f95c74433d5088::t_bd50b3af0550cf 86-96
+server/events/project_command_builder_test.go
+  s_f95c74433d5088::t_51fa6afa6d68df 3580,3780,3995
+server/core/redis/redis.go
+  s_f95c74433d5088::t_bd50b3af0550cf 13,669,711-712
+  s_f95c74433d5088::t_cc17b0c9f6fb29 713
+server/controllers/locks_controller_test.go
+  s_f95c74433d5088::t_bd50b3af0550cf 408
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "af5823d5574ad2b6018d6cce195cbe9e4a3cbbc4",
+  "prompts": {},
+  "sessions": {
+    "s_f95c74433d5088": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8cb0-4e70-7fa0-828e-b9289c245c2f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
