@@ -166,6 +166,10 @@ type DriftProjectAPI struct {
 	LastChecked time.Time `json:"last_checked"`
 	// Error contains any error message if detection failed.
 	Error string `json:"error,omitempty"`
+	// PlanOutput is the raw terraform plan text captured during detection.
+	// It is populated for detection responses only and is empty for status
+	// responses, which are served from storage where plan text is not persisted.
+	PlanOutput string `json:"plan_output,omitempty"`
 }
 
 // DriftDetailsAPI is the API representation of drift details.
@@ -201,6 +205,7 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 		HasDrift:       pd.Drift.HasDrift,
 		LastChecked:    pd.LastChecked,
 		Error:          pd.Error,
+		PlanOutput:     pd.PlanOutput,
 	}
 
 	if pd.Drift.HasDrift {

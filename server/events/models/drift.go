@@ -316,6 +316,12 @@ type ProjectDrift struct {
 	LastChecked time.Time `json:"last_checked"`
 	// Error contains any error message if drift detection failed for this project.
 	Error string `json:"error,omitempty"`
+	// PlanOutput is the raw terraform plan text, populated during detection
+	// for the API response only. It is NOT persisted: DetectDrift clears it
+	// before calling DriftStorage.Store, so it never reaches storage and never
+	// appears in the drift status endpoint. The json:"-" tag is belt-and-suspenders
+	// for any future storage backend that serializes ProjectDrift to JSON.
+	PlanOutput string `json:"-"`
 }
 
 // DriftStatusResponse is the API response for GET /api/drift/status.
