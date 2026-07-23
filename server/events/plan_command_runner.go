@@ -369,6 +369,8 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		pullStatus = *noProjectPullStatus
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
+	} else if len(projectCmds) == 0 {
+		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	} else {
 		pullStatus, err = p.dbUpdater.completePlanGeneration(pull, planGeneration, result.ProjectResults)
 	}

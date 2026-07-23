@@ -791,6 +791,57 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 	)
 }
 
+func TestPlanCommandRunner_TargetedNoProjectsPreservesPullStatus(t *testing.T) {
+	_ = setup(t)
+	planCommandRunner.SilenceNoProjects = false
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	existingProject := command.ProjectResult{
+		Command:     command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "existing-project",
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		},
+	}
+	_, err := dbUpdater.Database.UpdatePullWithResults(pull, []command.ProjectResult{existingProject})
+	Ok(t, err)
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: "unknown-project"}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(nil, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected an unknown targeted project to remain a no-op")
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+
+	status, err := dbUpdater.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected existing PullStatus to remain")
+	Equals(t, 1, len(status.Projects))
+	project := projectStatus(t, status, existingProject.Workspace, existingProject.RepoRelDir, existingProject.ProjectName)
+	Equals(t, models.PlannedPlanStatus, project.Status)
+	Equals(t, "", project.PlanGeneration)
+}
+
 func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if an apply command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)
@@ -1563,6 +1614,7 @@ func TestApplyCommandRunner_ActivePlanGenerationWriteFailsCommandAndProjectStatu
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("apply")).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "active plan generation"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "one or more apply steps may have completed"), "got: %s", comment)
 }
 
 func TestPlanCommandRunner_DeletePlansFailureAfterGenerationStartFailsPlanAndApply(t *testing.T) {

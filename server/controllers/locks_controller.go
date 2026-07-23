@@ -138,7 +138,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		// Once the lock has been deleted, comment back on the pull request.
 		var comment string
 		if statusUpdateErr != nil {
-			comment = fmt.Sprintf("**Warning**: The lock for dir: `%s` workspace: `%s` was deleted via the Atlantis UI, but Atlantis could not mark its plan discarded because durable plan state changed.\n\n"+
+			comment = fmt.Sprintf("**Warning**: The lock for dir: `%s` workspace: `%s` was deleted via the Atlantis UI, but Atlantis could not update its durable plan status.\n\n"+
 				"Do not apply the existing plan. Run `plan` again after any in-progress plan finishes.", lock.Project.Path, lock.Workspace)
 		} else {
 			comment = fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+

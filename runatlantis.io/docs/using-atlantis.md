@@ -83,6 +83,17 @@ atlantis plan -w staging
 An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
 :::
 
+### Interrupted plans and durable state recovery
+
+Atlantis records plan and apply results in durable state before posting the result comment. If Atlantis is interrupted
+after the write, the stored state can be newer than the latest pull request comment.
+
+An interrupted plan generation intentionally blocks apply and policy-result updates for its projects. Run
+`atlantis plan` again after the in-progress command has stopped to replace the incomplete generation. If the stored
+pull request status cannot be read, close and reopen the pull request after Atlantis processes the close event, then
+run a fresh plan. If an apply runs but its result cannot be stored, verify the infrastructure state before retrying
+because one or more apply steps may already have executed.
+
 ### Additional Terraform flags
 
 If `terraform plan` requires additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`
