@@ -228,10 +228,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
-		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = github.Config{
-				AllowMergeableBypassApply: true,
-			}
+		githubConfig = github.Config{
+			AllowMergeableBypassApply: userConfig.GithubAllowMergeableBypassApply,
+			MergeQueueEnabled:         userConfig.GithubMergeQueueEnabled,
 		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
@@ -1105,6 +1104,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ExecutableName:                  userConfig.ExecutableName,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
+		CommitStatusUpdater:             commitStatusUpdater,
+		GithubMergeQueueEnabled:         userConfig.GithubMergeQueueEnabled,
 		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
