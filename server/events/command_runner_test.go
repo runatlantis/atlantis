@@ -199,6 +199,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
 		testConfig.PendingApplyStatus,
+		testConfig.DisableAutomergeLabel,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -1897,6 +1898,7 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		false,
 		pullReqStatusFetcher,
 		false,
+		"no-auto-merge",
 	)
 	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
 }
