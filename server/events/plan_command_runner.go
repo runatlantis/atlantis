@@ -167,6 +167,12 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 	p.updatePendingCommitStatus(ctx, command.Plan)
 
+	if p.DiscardApprovalOnPlan {
+		if err := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); err != nil {
+			ctx.Log.Err("failed to remove approvals: %s", err)
+		}
+	}
+
 	// discard previous plans that might not be relevant anymore
 	ctx.Log.Debug("deleting previous plans and locks")
 	if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
