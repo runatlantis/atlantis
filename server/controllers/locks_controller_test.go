@@ -16,15 +16,14 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
-	"github.com/runatlantis/atlantis/server/core/boltdb"
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/events"
 
-	"github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	mocks2 "github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -46,7 +45,7 @@ func TestCreateApplyLock(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		l := mocks.NewMockApplyLocker(ctrl)
-		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
+		l.EXPECT().LockApply().Return(coordination.ApplyCommandLock{
 			Locked: true,
 			Time:   lockTime,
 		}, nil)
@@ -66,7 +65,7 @@ func TestCreateApplyLock(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		l := mocks.NewMockApplyLocker(ctrl)
-		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
+		l.EXPECT().LockApply().Return(coordination.ApplyCommandLock{
 			Locked: false,
 		}, errors.New("failed to acquire lock"))
 
@@ -302,7 +301,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
-	var database db.Database
+	var database coordination.Store
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
@@ -328,7 +327,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDirLocker:  workingDirLocker,
 		WorkingDir:        workingDir,
-		Database:          database,
+		CoordinationStore: database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -359,7 +358,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var database db.Database
+	var database coordination.Store
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
@@ -371,7 +370,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
-		Database:          database,
+		CoordinationStore: database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -387,7 +386,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var database db.Database
+	var database coordination.Store
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
@@ -408,7 +407,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
-		Database:          database,
+		CoordinationStore: database,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
 	}
@@ -422,7 +421,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 			"To `apply` this plan you must run `plan` again."), Eq(""))
 }
 
-func closeTestDatabase(t *testing.T, database db.Database) {
+func closeTestDatabase(t *testing.T, database coordination.Store) {
 	t.Helper()
 	Ok(t, database.Close())
 }

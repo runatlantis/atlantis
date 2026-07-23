@@ -11,8 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -23,14 +22,14 @@ import (
 type LocksController struct {
 	AtlantisVersion    string                       `validate:"required"`
 	AtlantisURL        *url.URL                     `validate:"required"`
-	Locker             locking.Locker               `validate:"required"`
+	Locker             coordination.Locker          `validate:"required"`
 	Logger             logging.SimpleLogging        `validate:"required"`
-	ApplyLocker        locking.ApplyLocker          `validate:"required"`
+	ApplyLocker        coordination.ApplyLocker     `validate:"required"`
 	VCSClient          vcs.Client                   `validate:"required"`
 	LockDetailTemplate web_templates.TemplateWriter `validate:"required"`
 	WorkingDir         events.WorkingDir            `validate:"required"`
 	WorkingDirLocker   events.WorkingDirLocker      `validate:"required"`
-	Database           db.Database                  `validate:"required"`
+	CoordinationStore  coordination.Store           `validate:"required"`
 	DeleteLockCommand  events.DeleteLockCommand     `validate:"required"`
 }
 
@@ -130,7 +129,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
+		if err := l.CoordinationStore.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
 			l.Logger.Err("unable to update project status: %s", err)
 		}
 

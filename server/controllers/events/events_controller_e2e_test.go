@@ -23,10 +23,11 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
-	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
@@ -51,7 +52,7 @@ import (
 // Because if depends on the version, we need to upgrade test base image before e2e fix it.
 const conftestCommand = "conftest"
 
-var applyLocker locking.ApplyLocker
+var applyLocker coordination.ApplyLocker
 var userConfig server.UserConfig
 
 type NoopTFDownloader struct{}
@@ -1388,12 +1389,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	b, err := boltdb.New(dataDir)
 	Ok(t, err)
 	database := b
-	lockingClient := locking.NewClient(b)
-	noOpLocker := locking.NewNoOpLocker()
-	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
+	lockingClient := coordination.NewLockingClient(b)
+	applyLocker = coordination.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
 		Locker:         lockingClient,
-		NoOpLocker:     noOpLocker,
 		VCSClient:      e2eVCSClient,
 		ExecutableName: "atlantis",
 	}
@@ -1495,7 +1494,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"auto",
 		statsScope,
 		terraformClient,
-		&runtime.LocalPlanStore{},
+		&planstore.LocalPlanStore{},
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
@@ -1533,16 +1532,16 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			defaultTFVersion,
 			statusUpdater,
 			asyncTfExec,
-			&runtime.LocalPlanStore{},
+			&planstore.LocalPlanStore{},
 		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
-			PlanStore:         &runtime.LocalPlanStore{},
+			PlanStore:         &planstore.LocalPlanStore{},
 		},
-		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
-		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &planstore.LocalPlanStore{}),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &planstore.LocalPlanStore{}),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFDistribution:   defaultTFDistribution,
@@ -1559,11 +1558,11 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
 			PullStatusFetcher: database,
 		},
-		PlanStore: &runtime.LocalPlanStore{},
+		PlanStore: &planstore.LocalPlanStore{},
 	}
 
-	dbUpdater := &events.DBUpdater{
-		Database: database,
+	pullStatusUpdater := &coordination.PullStatusUpdater{
+		Store: database,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -1589,7 +1588,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		e2eStatusUpdater,
 		projectCommandRunner,
@@ -1611,7 +1610,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
@@ -1634,7 +1633,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		cancellationTracker,
 		autoMerger,
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		database,
 		parallelPoolSize,
 		silenceNoProjects,
@@ -1650,7 +1649,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		projectCommandBuilder,
 		projectCommandRunner,
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		silenceNoProjects,
 		false,
 		e2eVCSClient,
@@ -1673,7 +1672,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -1682,7 +1681,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
@@ -1726,7 +1725,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			Locker:                   lockingClient,
 			VCSClient:                e2eVCSClient,
 			WorkingDir:               workingDir,
-			Database:                 database,
+			CoordinationStore:        database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},

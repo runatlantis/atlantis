@@ -18,8 +18,8 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
@@ -68,7 +68,7 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
-		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		Any[models.Project](), AnyBool())).ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	expEnvs := map[string]string{
 		"name": "value",
@@ -146,7 +146,7 @@ func TestDefaultProjectCommandRunner_PlanSuppressesCustomRunStepStreaming(t *tes
 		ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	ctx := command.ProjectContext{
 		Log:               logging.NewNoopLogger(t),
@@ -427,7 +427,7 @@ func TestProjectOutputWrapperDoesNotReplayStreamedStepOutput(t *testing.T) {
 
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
@@ -495,7 +495,7 @@ func TestProjectOutputWrapperDoesNotReplayCustomRunStepOutput(t *testing.T) {
 		ThenReturn(nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
@@ -568,7 +568,7 @@ func TestProjectOutputWrapperPreservesNonStreamedEnvStepOutput(t *testing.T) {
 		ThenReturn(nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
@@ -683,7 +683,7 @@ func TestDefaultProjectCommandRunner_PlanUndivergedBlocksAfterMergeAgain(t *test
 	repoDir := t.TempDir()
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](),
@@ -724,7 +724,7 @@ func TestDefaultProjectCommandRunner_PlanChecksProjectPathAfterMergeAgain(t *tes
 	}
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
 
 	res := runner.Plan(ctx)
 
@@ -763,7 +763,7 @@ func TestDefaultProjectCommandRunner_PlanValidationFailureKeepsLockWhenDeletePla
 	unlockCalls := 0
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
 		Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error {
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error {
 			unlockCalls++
 			return nil
 		}}, nil)
@@ -900,7 +900,7 @@ func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 	When(mockApply.Run(ctx, nil, repoDir, map[string]string{})).ThenReturn("apply", nil)
 
 	res := runner.Apply(ctx)
@@ -945,7 +945,7 @@ func TestProjectCommandRunner_ApplyRevalidatesImmediatelyBeforeApplyStep(t *test
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -990,7 +990,7 @@ func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2003,7 +2003,7 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 	Ok(t, err)
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2061,7 +2061,7 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
 		ThenReturn("apply ok", nil)
 
@@ -2114,7 +2114,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2176,7 +2176,7 @@ func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testin
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2246,7 +2246,7 @@ func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContent
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2296,7 +2296,7 @@ func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2363,7 +2363,7 @@ func TestProjectCommandRunner_UnchangedIdentityApplyStillSucceeds(t *testing.T) 
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2414,7 +2414,7 @@ func runProjectApplyWithBaseChangeAfterApplyStep(t *testing.T) (command.ProjectC
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	return runner.Apply(ctx), mockSender, calls
 }
@@ -2456,7 +2456,7 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2519,7 +2519,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAft
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2581,7 +2581,7 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2629,7 +2629,7 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	res := runner.Apply(ctx)
 
@@ -2803,7 +2803,7 @@ func erroredPolicyProjectResult(ctx command.ProjectContext) command.ProjectResul
 	}
 }
 
-func newTestBoltDB(t *testing.T) *boltdb.BoltDB {
+func newTestBoltDB(t *testing.T) *boltdb.Store {
 	t.Helper()
 	db, err := boltdb.New(t.TempDir())
 	Ok(t, err)
@@ -2842,7 +2842,7 @@ func newNonPRAPIApplyRunner(t *testing.T, repoDir string) (*events.DefaultProjec
 	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
-		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 	When(mockRequirementHandler.ValidateApplyProject(Any[string](), Any[command.ProjectContext]())).ThenReturn("", nil)
 	When(mockRequirementHandler.ValidateProjectDependencies(Any[command.ProjectContext]())).ThenReturn("", nil)
 	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("applied", nil)
@@ -3045,7 +3045,7 @@ func TestDefaultProjectCommandRunner_Apply(t *testing.T) {
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -3128,7 +3128,7 @@ func TestDefaultProjectCommandRunner_ApplyRunStepFailure(t *testing.T) {
 		Any[string](),
 		Any[models.Project](),
 		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
+	)).ThenReturn(&events.ProjectLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
 	}, nil)
@@ -3181,7 +3181,7 @@ func TestDefaultProjectCommandRunner_ApplySuppressesApplyWebhooks(t *testing.T) 
 		Any[string](),
 		Any[models.Project](),
 		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
+	)).ThenReturn(&events.ProjectLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
 	}, nil)
@@ -3240,7 +3240,7 @@ func TestDefaultProjectCommandRunner_RunEnvSteps(t *testing.T) {
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
-		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+		Any[models.Project](), AnyBool())).ThenReturn(&events.ProjectLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
 
 	ctx := command.ProjectContext{
 		Log: logging.NewNoopLogger(t),
@@ -3318,7 +3318,7 @@ func TestDefaultProjectCommandRunner_Import(t *testing.T) {
 					Any[string](),
 					Any[models.Project](),
 					AnyBool(),
-				)).ThenReturn(&events.TryLockResponse{
+				)).ThenReturn(&events.ProjectLockResponse{
 					LockAcquired: true,
 					LockKey:      "lock-key",
 				}, nil)
@@ -3562,7 +3562,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckNames(t *testing.T) {
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -3691,7 +3691,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_EmptyOutputsArray(t *test
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 				UnlockFn:     func() error { return nil },
@@ -3856,7 +3856,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheckFailureDetection(t *testin
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -3989,7 +3989,7 @@ func TestDefaultProjectCommandRunner_CustomPolicyCheck_NoPreOrPostConftestOutput
 				Any[string](),
 				Any[models.Project](),
 				Any[bool](),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -4586,7 +4586,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies(t *testing.T) {
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -4666,7 +4666,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies_DuplicateApproval(t *testin
 		Any[string](),
 		Any[models.Project](),
 		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
+	)).ThenReturn(&events.ProjectLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
 	}, nil)
@@ -4739,7 +4739,7 @@ func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverPreservesDormant
 		Any[string](),
 		Any[models.Project](),
 		AnyBool(),
-	)).ThenReturn(&events.TryLockResponse{
+	)).ThenReturn(&events.ProjectLockResponse{
 		LockAcquired: true,
 		LockKey:      "lock-key",
 	}, nil)
@@ -4881,7 +4881,7 @@ func TestDefaultProjectCommandRunner_PolicyCheck_StickyCarryOverBehavior(t *test
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -5030,7 +5030,7 @@ func TestDefaultProjectCommandRunner_ApprovePolicies_HashAwareApproval(t *testin
 				Any[string](),
 				Any[models.Project](),
 				AnyBool(),
-			)).ThenReturn(&events.TryLockResponse{
+			)).ThenReturn(&events.ProjectLockResponse{
 				LockAcquired: true,
 				LockKey:      "lock-key",
 			}, nil)
@@ -5168,7 +5168,7 @@ func TestDefaultProjectCommandRunner_PathTraversal(t *testing.T) {
 					Any[string](),
 					Any[models.Project](),
 					AnyBool(),
-				)).ThenReturn(&events.TryLockResponse{
+				)).ThenReturn(&events.ProjectLockResponse{
 					LockAcquired: true,
 					LockKey:      "lock-key",
 					UnlockFn: func() error {

@@ -4,6 +4,7 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -14,7 +15,7 @@ func NewApprovePoliciesCommandRunner(
 	prjCommandBuilder ProjectApprovePoliciesCommandBuilder,
 	prjCommandRunner ProjectApprovePoliciesCommandRunner,
 	pullUpdater *PullUpdater,
-	dbUpdater *DBUpdater,
+	pullStatusUpdater *coordination.PullStatusUpdater,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
 	vcsClient vcs.Client,
@@ -24,7 +25,7 @@ func NewApprovePoliciesCommandRunner(
 		prjCmdBuilder:              prjCommandBuilder,
 		prjCmdRunner:               prjCommandRunner,
 		pullUpdater:                pullUpdater,
-		dbUpdater:                  dbUpdater,
+		pullStatusUpdater:          pullStatusUpdater,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
 		vcsClient:                  vcsClient,
@@ -34,7 +35,7 @@ func NewApprovePoliciesCommandRunner(
 type ApprovePoliciesCommandRunner struct {
 	commitStatusUpdater CommitStatusUpdater
 	pullUpdater         *PullUpdater
-	dbUpdater           *DBUpdater
+	pullStatusUpdater   *coordination.PullStatusUpdater
 	prjCmdBuilder       ProjectApprovePoliciesCommandBuilder
 	prjCmdRunner        ProjectApprovePoliciesCommandRunner
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
@@ -86,7 +87,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 		result,
 	)
 
-	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := a.pullStatusUpdater.Update(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 		return

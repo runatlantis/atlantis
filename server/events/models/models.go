@@ -339,6 +339,20 @@ func GenerateLockKey(project Project, workspace string) string {
 	return fmt.Sprintf("%s/%s/%s/%s", project.RepoFullName, project.Path, workspace, project.ProjectName)
 }
 
+// lockKeyRegex matches and captures {repoFullName}/{path}/{workspace}/{projectName}
+// where path can have multiple /'s in it.
+var lockKeyRegex = regexp.MustCompile(`^(.*?\/.*?)\/(.*)\/(.*)\/(.*)$`)
+
+// ParseLockKey splits a lock key in the format produced by GenerateLockKey
+// into its project and workspace, erroring on keys in an older format.
+func ParseLockKey(key string) (Project, string, error) {
+	matches := lockKeyRegex.FindStringSubmatch(key)
+	if len(matches) != 5 {
+		return Project{}, "", errors.New("invalid key format")
+	}
+	return Project{RepoFullName: matches[1], Path: matches[2], ProjectName: matches[4]}, matches[3], nil
+}
+
 // NewProject constructs a Project. Use this constructor because it
 // sets Path correctly.
 func NewProject(repoFullName string, path string, projectName string) Project {

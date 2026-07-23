@@ -6,7 +6,6 @@ package redis
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,15 +14,14 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 var ctx = context.Background()
 
-// RedisDB is a database using Redis 6+
-type RedisDB struct { // nolint: revive
+// Store implements coordination.Store on Redis 6+.
+type Store struct { // nolint: revive
 	client redis.Cmdable
 }
 
@@ -49,98 +47,20 @@ const unlockIfOwnedByPullScript = "" +
 	"redis.call(\"DEL\", KEYS[1])\n" +
 	"return value\n"
 
-// Config holds configuration for Redis connections.
-type Config struct {
-	Hostname           string
-	Port               int
-	Password           string
-	Username           string
-	TLSEnabled         bool
-	InsecureSkipVerify bool
-	DB                 int
-	// ClusterAddresses is a list of cluster node addresses. When set, cluster mode is used.
-	ClusterAddresses []string
-}
-
-// New creates a new RedisDB for client interactions with redis.
-// Deprecated: Use NewWithConfig for new code.
-func New(hostname string, port int, password string, tlsEnabled bool, insecureSkipVerify bool, db int) (*RedisDB, error) {
-	return NewWithConfig(Config{
-		Hostname:           hostname,
-		Port:               port,
-		Password:           password,
-		TLSEnabled:         tlsEnabled,
-		InsecureSkipVerify: insecureSkipVerify,
-		DB:                 db,
-	})
-}
-
-// NewWithConfig creates a new RedisDB based on the provided configuration.
-// It automatically selects the appropriate Redis client type:
-// - If ClusterAddresses is set, uses Redis Cluster mode
-// - Otherwise, uses single-node mode
-func NewWithConfig(cfg Config) (*RedisDB, error) {
-	var rdb redis.Cmdable
-
-	var tlsConfig *tls.Config
-	if cfg.TLSEnabled {
-		tlsConfig = &tls.Config{
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: cfg.InsecureSkipVerify, //nolint:gosec // In some cases, users may want to use this at their own caution
-		}
-	}
-
-	// Determine which Redis client to use based on configuration
-	var connDesc string
-	switch {
-	case len(cfg.ClusterAddresses) > 0:
-		// Filter out empty addresses
-		var addrs []string
-		for _, addr := range cfg.ClusterAddresses {
-			trimmed := strings.TrimSpace(addr)
-			if trimmed != "" {
-				addrs = append(addrs, trimmed)
-			}
-		}
-		if len(addrs) == 0 {
-			return nil, errors.New("redis cluster addresses provided but all are empty")
-		}
-		rdb = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:     addrs,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			TLSConfig: tlsConfig,
-		})
-		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
-	default:
-		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
-		rdb = redis.NewClient(&redis.Options{
-			Addr:      address,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			DB:        cfg.DB,
-			TLSConfig: tlsConfig,
-		})
-		connDesc = address
-	}
-
-	// Check if connection is valid
-	err := rdb.Ping(ctx).Err()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to redis at %s: %w", connDesc, err)
-	}
-
+// NewStore wraps a connected Redis client as the coordination store,
+// migrating old lock keys.
+func NewStore(client redis.Cmdable) (*Store, error) {
 	// Migrate old lock keys to new format with a bounded timeout.
 	// Non-fatal: if migration times out or fails, remaining keys will be
 	// retried on next startup. This avoids blocking boot on large key sets.
 	migrateCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := migrateOldLockKeys(migrateCtx, rdb); err != nil {
+	if err := migrateOldLockKeys(migrateCtx, client); err != nil {
 		log.Printf("WARN: lock key migration incomplete (will retry next startup): %v", err)
 	}
 
-	return &RedisDB{
-		client: rdb,
+	return &Store{
+		client: client,
 	}, nil
 }
 
@@ -156,7 +76,7 @@ func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 		// Remove the "pr/" prefix to validate the key format
 		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
 
-		_, err := locking.IsCurrentLocking(keyWithoutPrefix)
+		_, _, err := models.ParseLockKey(keyWithoutPrefix)
 		if err != nil {
 			var currLock models.ProjectLock
 			oldValue, err := rdb.Get(ctx, oldKey).Result()
@@ -189,18 +109,11 @@ func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 	return nil
 }
 
-// NewWithClient is used for testing.
-func NewWithClient(client *redis.Client, _ string, _ string) (*RedisDB, error) {
-	return &RedisDB{
-		client: client,
-	}, nil
-}
-
 // TryLock attempts to create a new lock. If the lock is
 // acquired, it will return true and the lock returned will be newLock.
 // If the lock is not acquired, it will return false and the current
 // lock that is preventing this lock from being acquired.
-func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+func (r *Store) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	var currLock models.ProjectLock
 	key := r.lockKey(newLock.Project, newLock.Workspace)
 	newLockSerialized, _ := json.Marshal(newLock)
@@ -228,7 +141,7 @@ func (r *RedisDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock,
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.ProjectLock, error) {
+func (r *Store) Unlock(project models.Project, workspace string) (*models.ProjectLock, error) {
 	var lock models.ProjectLock
 	key := r.lockKey(project, workspace)
 
@@ -247,7 +160,7 @@ func (r *RedisDB) Unlock(project models.Project, workspace string) (*models.Proj
 }
 
 // UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
-func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+func (r *Store) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
 	key := r.lockKey(project, workspace)
 	val, err := r.client.Eval(ctx, unlockIfOwnedByPullScript, []string{key}, pullNum).Result()
 	if err == redis.Nil {
@@ -272,7 +185,7 @@ func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, 
 }
 
 // List lists all current locks.
-func (r *RedisDB) List() ([]models.ProjectLock, error) {
+func (r *Store) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	iter := r.client.Scan(ctx, 0, "pr*", 0).Iterator()
 	for iter.Next(ctx) {
@@ -295,7 +208,7 @@ func (r *RedisDB) List() ([]models.ProjectLock, error) {
 
 // GetLock returns a pointer to the lock for that project and workspace.
 // If there is no lock, it returns a nil pointer.
-func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.ProjectLock, error) {
+func (r *Store) GetLock(project models.Project, workspace string) (*models.ProjectLock, error) {
 	key := r.lockKey(project, workspace)
 
 	val, err := r.client.Get(ctx, key).Result()
@@ -315,7 +228,7 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (r *Store) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 
 	iter := r.client.Scan(ctx, 0, fmt.Sprintf("pr/%s*", repoFullName), 0).Iterator()
@@ -343,7 +256,7 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Proje
 	return locks, nil
 }
 
-func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
+func (r *Store) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
 
 	lock := command.Lock{
 		CommandName: cmdName,
@@ -370,7 +283,7 @@ func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*comman
 	return nil, errors.New("db transaction failed: lock already exists")
 }
 
-func (r *RedisDB) UnlockCommand(cmdName command.Name) error {
+func (r *Store) UnlockCommand(cmdName command.Name) error {
 	cmdLockKey := r.commandLockKey(cmdName)
 	_, err := r.client.Get(ctx, cmdLockKey).Result()
 	if err == redis.Nil {
@@ -383,7 +296,7 @@ func (r *RedisDB) UnlockCommand(cmdName command.Name) error {
 
 }
 
-func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
+func (r *Store) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 	cmdLock := command.Lock{}
 
 	cmdLockKey := r.commandLockKey(cmdName)
@@ -402,7 +315,7 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 
 // UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (r *Store) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return err
@@ -435,7 +348,7 @@ func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string,
 	return nil
 }
 
-func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+func (r *Store) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return nil, err
@@ -448,7 +361,7 @@ func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, er
 	return pullStatus, nil
 }
 
-func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
+func (r *Store) DeletePullStatus(pull models.PullRequest) error {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return err
@@ -460,7 +373,7 @@ func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
 	return nil
 }
 
-func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+func (r *Store) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return models.PullStatus{}, err
@@ -568,7 +481,7 @@ func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRe
 	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
 }
 
-func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
+func (r *Store) getPull(key string) (*models.PullStatus, error) {
 	val, err := r.client.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, nil
@@ -583,7 +496,7 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 	return &p, nil
 }
 
-func (r *RedisDB) writePull(key string, pull models.PullStatus) error {
+func (r *Store) writePull(key string, pull models.PullStatus) error {
 	serialized, err := json.Marshal(pull)
 	if err != nil {
 		return fmt.Errorf("serializing: %w", err)
@@ -595,7 +508,7 @@ func (r *RedisDB) writePull(key string, pull models.PullStatus) error {
 	return nil
 }
 
-func (r *RedisDB) deletePull(key string) error {
+func (r *Store) deletePull(key string) error {
 	err := r.client.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("DB Transaction failed: %w", err)
@@ -603,15 +516,15 @@ func (r *RedisDB) deletePull(key string) error {
 	return nil
 }
 
-func (r *RedisDB) lockKey(p models.Project, workspace string) string {
+func (r *Store) lockKey(p models.Project, workspace string) string {
 	return fmt.Sprintf("pr/%s", models.GenerateLockKey(p, workspace))
 }
 
-func (r *RedisDB) commandLockKey(cmdName command.Name) string {
+func (r *Store) commandLockKey(cmdName command.Name) string {
 	return fmt.Sprintf("global/%s/lock", cmdName)
 }
 
-func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
+func (r *Store) pullKey(pull models.PullRequest) (string, error) {
 	hostname := pull.BaseRepo.VCSHost.Hostname
 	if strings.Contains(hostname, pullKeySeparator) {
 		return "", fmt.Errorf("vcs hostname %q contains illegal string %q", hostname, pullKeySeparator)
@@ -624,7 +537,7 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num), nil
 }
 
-func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
+func (r *Store) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
@@ -635,13 +548,13 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 }
 
 // Ping checks the Redis connection health.
-func (r *RedisDB) Ping() error {
+func (r *Store) Ping() error {
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return r.client.Ping(pingCtx).Err()
 }
 
-func (r *RedisDB) Close() error {
+func (r *Store) Close() error {
 	// Prefer a narrower interface and return an explicit error for unsupported client types.
 	if closer, ok := r.client.(interface{ Close() error }); ok {
 		return closer.Close()
