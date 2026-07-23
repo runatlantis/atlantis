@@ -1,0 +1,19 @@
+server/events/project_command_runner.go
+  s_f95c74433d5088::t_3995a9d3450c5d 930-932
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "e215a31371d446ef26c5fa678419fae6783ef2e0",
+  "prompts": {},
+  "sessions": {
+    "s_f95c74433d5088": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8cb0-4e70-7fa0-828e-b9289c245c2f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
