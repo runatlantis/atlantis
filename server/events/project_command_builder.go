@@ -1703,8 +1703,12 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 				)...)
 		}
 	} else {
-		// Ignore the project if silenced with projects set in the repo config
-		if p.SilenceNoProjects && repoCfgPtr != nil && len(repoCfgPtr.Projects) > 0 {
+		// Ignore the project if silenced with projects set in the repo config.
+		// When autodiscover is enabled, a dir without an explicit YAML entry may
+		// still be a legitimate project found by PendingPlanFinder (apply-all) or
+		// changed-file discovery (plan). Don't silence it in that case.
+		if p.SilenceNoProjects && repoCfgPtr != nil && len(repoCfgPtr.Projects) > 0 &&
+			!p.autoDiscoverModeEnabled(ctx, *repoCfgPtr) {
 			ctx.Log.Debug("silencing is in effect, project will be ignored")
 			return []command.ProjectContext{}, nil
 		}
