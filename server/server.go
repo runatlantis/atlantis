@@ -429,6 +429,26 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, fmt.Errorf("parsing --%s flag %q: %w", config.AtlantisURLFlag, userConfig.AtlantisURL, err)
 	}
 
+	bitbucketWebhookSecret, err := userConfig.ToBitbucketWebhookSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	githubWebhookSecret, err := userConfig.ToGithubWebhookSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	giteaWebhookSecret, err := userConfig.ToGiteaWebhookSecret()
+	if err != nil {
+		return nil, err
+	}
+
+	gitlabWebhookSecret, err := userConfig.ToGitlabWebhookSecret()
+	if err != nil {
+		return nil, err
+	}
+
 	underlyingRouter := mux.NewRouter()
 	router := &Router{
 		AtlantisURL:               parsedURL,
@@ -1095,21 +1115,21 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                          logger,
 		Scope:                           statsScope,
 		ApplyDisabled:                   disableApply,
-		GithubWebhookSecret:             []byte(userConfig.GithubWebhookSecret),
+		GithubWebhookSecret:             githubWebhookSecret,
 		GithubRequestValidator:          &events_controllers.DefaultGithubRequestValidator{},
 		GitlabRequestParserValidator:    &events_controllers.DefaultGitlabRequestParserValidator{},
-		GitlabWebhookSecret:             []byte(userConfig.GitlabWebhookSecret),
+		GitlabWebhookSecret:             gitlabWebhookSecret,
 		RepoAllowlistChecker:            repoAllowlist,
 		SilenceAllowlistErrors:          userConfig.SilenceAllowlistErrors,
 		EmojiReaction:                   userConfig.EmojiReaction,
 		ExecutableName:                  userConfig.ExecutableName,
 		SupportedVCSHosts:               supportedVCSHosts,
 		VCSClient:                       vcsClient,
-		BitbucketWebhookSecret:          []byte(userConfig.BitbucketWebhookSecret),
+		BitbucketWebhookSecret:          bitbucketWebhookSecret,
 		AzureDevopsWebhookBasicUser:     []byte(userConfig.AzureDevopsWebhookUser),
 		AzureDevopsWebhookBasicPassword: []byte(userConfig.AzureDevopsWebhookPassword),
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
-		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
+		GiteaWebhookSecret:              giteaWebhookSecret,
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,
