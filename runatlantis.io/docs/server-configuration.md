@@ -1543,6 +1543,16 @@ ATLANTIS_SLACK_TOKEN='token'
 
 API token for Slack notifications. See [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
+### `--slack-include-body`
+
+```bash
+atlantis server --slack-include-body=false
+# or (recommended)
+ATLANTIS_SLACK_INCLUDE_BODY=false
+```
+
+Whether to include pull request body in the Slack message under an extra "description" field. Defaults to true.
+
 ### `--ssl-cert-file` <Badge text="v0.2.4+" type="info"/>
 
 ```bash

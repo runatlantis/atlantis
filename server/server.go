@@ -402,7 +402,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, fmt.Errorf("parsing webhook http headers: %w", err)
 	}
 	webhookClients := webhooks.Clients{
-		Slack: webhooks.NewSlackClient(userConfig.SlackToken),
+		Slack: webhooks.NewSlackClient(userConfig.SlackToken, userConfig.SlackIncludeBody),
 		Http:  &webhooks.HttpClient{Client: http.DefaultClient, Headers: webhookHeaders},
 	}
 	webhooksManager, err := webhooks.NewMultiWebhookSender(webhooksConfig, webhookClients)
