@@ -150,6 +150,7 @@ projects:
 		"auto",
 		scope,
 		tfclientmocks.NewMockClient(),
+		nil,
 	)
 	ctx := &command.Context{
 		Log:        logger,

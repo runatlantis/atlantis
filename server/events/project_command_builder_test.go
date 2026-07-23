@@ -3577,6 +3577,7 @@ workflows:
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
 		tfclientmocks.NewMockClient(),
+		nil,
 	)
 
 	buildApply := func(currentPull models.PullRequest, statusPull models.PullRequest, projects ...models.ProjectStatus) ([]command.ProjectContext, error) {
@@ -3776,6 +3777,7 @@ workflows:
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
 		tfclientmocks.NewMockClient(),
+		nil,
 	)
 
 	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
@@ -3990,6 +3992,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_AutodiscoveredRunOnlyWorkf
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
 		tfclientmocks.NewMockClient(),
+		nil,
 	)
 
 	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}

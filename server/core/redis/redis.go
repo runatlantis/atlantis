@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -665,7 +666,7 @@ func (r *RedisDB) CompletePlanGeneration(pull models.PullRequest, generation str
 
 func (r *RedisDB) updatePullAtomically(key string, tolerateUnreadable bool, update func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
 	const maxAttempts = 32
-	for range maxAttempts {
+	for attempt := range maxAttempts {
 		serializedCurrent, err := r.client.Get(ctx, key).Result()
 		exists := true
 		if err == redis.Nil {
@@ -706,6 +707,9 @@ func (r *RedisDB) updatePullAtomically(key string, tolerateUnreadable bool, upda
 		}
 		if swapped == 1 {
 			return newStatus, nil
+		}
+		if attempt+1 < maxAttempts {
+			time.Sleep(time.Duration(rand.IntN(10)+1) * time.Millisecond)
 		}
 	}
 	return models.PullStatus{}, errors.New("db transaction failed: pull status changed too many times")

@@ -405,7 +405,7 @@ func TestDeleteLock_ActivePlanGenerationReportsStatusUpdateFailure(t *testing.T)
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("")).GetCapturedArguments()
 	Assert(t, strings.Contains(comment, "lock"), "got: %s", comment)
-	Assert(t, strings.Contains(comment, "could not mark its plan discarded"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "could not update its durable plan status"), "got: %s", comment)
 	Assert(t, strings.Contains(comment, "Do not apply the existing plan"), "got: %s", comment)
 	status, err := database.GetPullStatus(pull)
 	Ok(t, err)
