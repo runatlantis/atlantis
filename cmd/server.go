@@ -18,7 +18,9 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -251,7 +253,8 @@ var stringFlags = map[string]stringFlag{
 	},
 	AutomergeMethodFlag: {
 		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
-			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+			"Valid values are: " + ValidAutomergeMethodNames + ". " +
+			"Not every VCS provider supports every method; see https://www.runatlantis.io/docs/automerging.html for details.",
 		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
@@ -752,8 +755,15 @@ var int64Flags = map[string]int64Flag{
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
 // ValidAutomergeMethods are the valid merge methods that can be set for the
-// automerge-method flag.
-var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
+// automerge-method flag. Because the server flag is set before the VCS host of
+// any individual pull request is known, it is validated against the union of
+// every provider's supported methods; the host-specific check happens later in
+// the comment parser and each VCS client's MergePull.
+var ValidAutomergeMethods = common.AllSupportedMergeMethods()
+
+// ValidAutomergeMethodNames renders ValidAutomergeMethods for use in the flag
+// description.
+var ValidAutomergeMethodNames = common.FormatMergeMethods(ValidAutomergeMethods)
 
 type stringFlag struct {
 	description  string
@@ -1094,7 +1104,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
 	}
 
-	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, models.MergeMethod(userConfig.AutomergeMethod)) {
 		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
 	}
 

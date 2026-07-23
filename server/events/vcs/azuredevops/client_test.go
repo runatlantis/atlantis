@@ -5,6 +5,7 @@ package azuredevops_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -147,6 +148,90 @@ func TestAzureDevopsClient_MergePull(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAzureDevopsClient_MergePullMergeMethod(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	userIDResponse := `{"members":[{"id":"6416203b-98bb-4910-8f8a-b12aa19a399f"}],"totalCount":0,"items":[{"id":"6416203b-98bb-4910-8f8a-b12aa19a399f"}]}`
+	pull := models.PullRequest{
+		Num: 22,
+		BaseRepo: models.Repo{
+			FullName: "owner/project/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+
+	newServer := func(t *testing.T, gotStrategy *string) *httptest.Server {
+		return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/owner/project/_apis/git/repositories/repo/pullrequests/22?api-version=5.1-preview.1":
+				var body struct {
+					CompletionOptions struct {
+						MergeStrategy string `json:"mergeStrategy"`
+					} `json:"completionOptions"`
+				}
+				Ok(t, json.NewDecoder(r.Body).Decode(&body))
+				*gotStrategy = body.CompletionOptions.MergeStrategy
+				w.Write([]byte(adMergeSuccess)) // nolint: errcheck
+			case "/owner/_apis/userentitlements?$filter=name+eq+'user'&$api-version=6.0-preview.3":
+				w.Write([]byte(userIDResponse)) // nolint: errcheck
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+			}
+		}))
+	}
+
+	t.Run("translates the normalised merge method to a merge strategy", func(t *testing.T) {
+		cases := []struct {
+			method      models.MergeMethod
+			expStrategy string
+		}{
+			{"", "noFastForward"},
+			{models.MergeMethodMerge, "noFastForward"},
+			{models.MergeMethodRebase, "rebase"},
+			{models.MergeMethodSquash, "squash"},
+		}
+		for _, c := range cases {
+			t.Run(string(c.method), func(t *testing.T) {
+				var gotStrategy string
+				testServer := newServer(t, &gotStrategy)
+				defer testServer.Close()
+
+				testServerURL, err := url.Parse(testServer.URL)
+				Ok(t, err)
+				client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+				Ok(t, err)
+				client.Client.VsaexBaseURL = *testServerURL
+				defer common.DisableSSLVerification()()
+
+				err = client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: c.method})
+				Ok(t, err)
+				Equals(t, c.expStrategy, gotStrategy)
+			})
+		}
+	})
+
+	t.Run("rejects an unsupported merge method without calling the API", func(t *testing.T) {
+		called := false
+		testServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		testServerURL, err := url.Parse(testServer.URL)
+		Ok(t, err)
+		client, err := azuredevopsclient.New(testServerURL.Host, "user", "token")
+		Ok(t, err)
+		client.Client.VsaexBaseURL = *testServerURL
+		defer common.DisableSSLVerification()()
+
+		err = client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: models.MergeMethodFastForward})
+		Assert(t, err != nil, "expected an error for an unsupported merge method")
+		Assert(t, !called, "no API call should be made for an unsupported method")
+	})
 }
 
 func TestAzureDevopsClient_UpdateStatus(t *testing.T) {

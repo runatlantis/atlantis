@@ -5,9 +5,12 @@ package raw
 
 import (
 	"errors"
+	"fmt"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 )
 
 // DefaultEmojiReaction is the default emoji reaction for repos
@@ -24,6 +27,7 @@ type RepoCfg struct {
 	PolicySets                PolicySets          `yaml:"policies,omitempty"`
 	AutoDiscover              *AutoDiscover       `yaml:"autodiscover,omitempty"`
 	Automerge                 *bool               `yaml:"automerge,omitempty"`
+	AutomergeMethod           *string             `yaml:"automerge_method,omitempty"`
 	ParallelApply             *bool               `yaml:"parallel_apply,omitempty"`
 	ParallelPlan              *bool               `yaml:"parallel_plan,omitempty"`
 	DeleteSourceBranchOnMerge *bool               `yaml:"delete_source_branch_on_merge,omitempty"`
@@ -45,10 +49,21 @@ func (r RepoCfg) Validate() error {
 		}
 		return nil
 	}
+	validAutomergeMethod := func(value any) error {
+		method := value.(*string)
+		if method == nil {
+			return nil
+		}
+		if !common.IsMergeMethod(models.MergeMethod(*method)) {
+			return fmt.Errorf("must be one of %s", common.FormatMergeMethods(common.AllSupportedMergeMethods()))
+		}
+		return nil
+	}
 	return validation.ValidateStruct(&r,
 		validation.Field(&r.Version, validation.By(equals2)),
 		validation.Field(&r.Projects),
 		validation.Field(&r.Workflows),
+		validation.Field(&r.AutomergeMethod, validation.By(validAutomergeMethod)),
 	)
 }
 
@@ -92,6 +107,7 @@ func (r RepoCfg) ToValid() valid.RepoCfg {
 		Workflows:                 validWorkflows,
 		AutoDiscover:              autoDiscover,
 		Automerge:                 automerge,
+		AutomergeMethod:           r.AutomergeMethod,
 		ParallelApply:             parallelApply,
 		ParallelPlan:              parallelPlan,
 		ParallelPolicyCheck:       parallelPlan,

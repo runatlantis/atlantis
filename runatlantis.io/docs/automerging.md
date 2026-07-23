@@ -31,28 +31,66 @@ command with the `--auto-merge-disabled` option.
 
 ## How to set the merge method for automerge
 
-If automerge is enabled, you can set a default merge method with the
-`--automerge-method` server flag or `ATLANTIS_AUTOMERGE_METHOD` environment
-variable.
+If automerge is enabled, the merge method can be set in three places. From
+lowest to highest priority:
 
-```shell
-atlantis server --automerge-method <method>
-```
+1. The `--automerge-method` server flag (or `ATLANTIS_AUTOMERGE_METHOD`
+   environment variable), which sets the default for every repo:
 
-You can override the server default for a single `atlantis apply` command with
-the `--auto-merge-method` option.
+    ```shell
+    atlantis server --automerge-method <method>
+    ```
 
-```shell
-atlantis apply --auto-merge-method <method>
-```
+2. The `automerge_method` key in a repo's `atlantis.yaml`, which overrides the
+   server default for that repo:
 
-The `method` must be one of:
+    ```yaml
+    version: 3
+    automerge: true
+    automerge_method: <method>
+    projects:
+    - dir: .
+    ```
 
-- merge
-- rebase
-- squash
+3. The `--auto-merge-method` flag on a single `atlantis apply` command, which
+   overrides both of the above for that command:
 
-This is currently only implemented for the GitHub VCS.
+    ```shell
+    atlantis apply --auto-merge-method <method>
+    ```
+
+The `method` is one of a normalised set of values that Atlantis translates onto
+each provider's own merge strategy:
+
+- `merge` — merge with a merge commit
+- `rebase` — rebase onto the base branch
+- `squash` — squash the commits into one
+- `fast-forward` — fast-forward the base branch, i.e. merge without a merge commit
+
+Not every provider can perform every method. If a method is not supported for
+the pull request's provider, the command is rejected with the list of methods
+that provider does support:
+
+| Method         | GitHub | Gitea / Forgejo | GitLab | Bitbucket Cloud | Bitbucket Server | Azure DevOps |
+|----------------|:------:|:---------------:|:------:|:---------------:|:----------------:|:------------:|
+| `merge`        |   ✓    |        ✓        |   ✓    |        ✓        |        ✓         |      ✓       |
+| `rebase`       |   ✓    |        ✓        |        |                 |        ✓         |      ✓       |
+| `squash`       |   ✓    |        ✓        |   ✓    |        ✓        |        ✓         |      ✓       |
+| `fast-forward` |        |        ✓        |        |        ✓        |        ✓         |              |
+
+A method must also be permitted by the repository's own settings. If the
+requested method is disabled for the repository (for example, squash merges are
+turned off), the merge API rejects it and Atlantis reports the failure.
+
+:::tip NOTE
+Each provider maps the normalised method onto its native strategy:
+GitLab only lets squashing be toggled when accepting a merge request (the
+merge/fast-forward/rebase choice is fixed by the project's merge method
+setting), so it supports only `merge` and `squash`. On Bitbucket Server the
+methods map to the `no-ff`, `rebase-ff`, `squash` and `ff-only` strategies
+respectively, and on Azure DevOps to the `noFastForward`, `rebase` and `squash`
+strategies. `fast-forward` requires the base branch to be fast-forwardable.
+:::
 
 ## Requirements
 

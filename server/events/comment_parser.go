@@ -19,6 +19,7 @@ import (
 	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/utils"
 	"github.com/spf13/pflag"
 )
@@ -263,7 +264,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Apply the plan for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
-		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
+		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. Supported values depend on the VCS provider.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.ApprovePolicies.String():
 		name = command.ApprovePolicies
@@ -347,8 +348,14 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 		}
 
-		if vcsHost != models.Github {
-			err := fmt.Sprintf("--%s is not currently implemented for %s", autoMergeMethodFlagLong, vcsHost.String())
+		supportedMethods := common.SupportedMergeMethods(vcsHost)
+		if len(supportedMethods) == 0 {
+			err := fmt.Sprintf("--%s is not supported for %s", autoMergeMethodFlagLong, vcsHost.String())
+			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+		}
+
+		if !common.IsMergeMethodValidForHost(vcsHost, models.MergeMethod(autoMergeMethod)) {
+			err := fmt.Sprintf("--%s must be one of: %s for %s", autoMergeMethodFlagLong, common.FormatMergeMethods(supportedMethods), vcsHost.String())
 			return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 		}
 	}
