@@ -1203,15 +1203,7 @@ func (s *Server) SetupRoutes() {
 	}
 
 	if s.EnableProfilingAPI {
-		for p, h := range map[string]http.HandlerFunc{
-			"/":        pprof.Index,
-			"/cmdline": pprof.Cmdline,
-			"/profile": pprof.Profile,
-			"/symbol":  pprof.Symbol,
-			"/trace":   pprof.Trace,
-		} {
-			s.Router.HandleFunc("/debug/pprof"+p, h).Methods("GET")
-		}
+		s.Router.PathPrefix("/debug/pprof/").HandlerFunc(pprof.Index).Methods("GET")
 	}
 }
 
