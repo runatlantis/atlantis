@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -206,7 +206,7 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 				workingDir:        &planCleanupWorkingDir{pullDir: pullDir},
 				workingDirLocker:  workingDirLocker,
 				pendingPlanFinder: finder,
-				lockingLocker:     locker,
+				locker:            locker,
 			}
 			ctx := &command.Context{
 				Log:  logging.NewNoopLogger(t),
@@ -252,7 +252,7 @@ func TestPlanCommandRunner_DeletePlanLocksForPendingPlansReleasesOnlyPendingPlan
 			unrelatedKey:   lockForPull(repo, pull.Num),
 		},
 	}
-	runner := &PlanCommandRunner{lockingLocker: locker}
+	runner := &PlanCommandRunner{locker: locker}
 	ctx := &command.Context{
 		Log:  logging.NewNoopLogger(t),
 		Pull: pull,
@@ -311,7 +311,7 @@ type unlockIfOwnedByPullCall struct {
 }
 
 type recordingPlanCleanupLocker struct {
-	locking.Locker
+	coordination.Locker
 	locksByKey               map[string]models.ProjectLock
 	unlockIfOwnedByPullCalls []unlockIfOwnedByPullCall
 	deletedKeys              []string

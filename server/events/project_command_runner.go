@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -24,16 +25,6 @@ import (
 )
 
 const OperationComplete = true
-
-// DirNotExistErr is an error caused by the directory not existing.
-type DirNotExistErr struct {
-	RepoRelDir string
-}
-
-// Error implements the error interface.
-func (d DirNotExistErr) Error() string {
-	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
-}
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
 
@@ -342,7 +333,7 @@ type DefaultProjectCommandRunner struct {
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
-	PlanStore                 runtime.PlanStore
+	PlanStore                 planstore.PlanStore
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -581,7 +572,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
 
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	var failure string
@@ -829,7 +820,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	// Validate requirements after refreshing the merge checkout so project path
@@ -884,7 +875,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return "", "", "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)
@@ -988,7 +979,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 		return "", "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return "", "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
@@ -1017,7 +1008,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateImportProject(repoDir, ctx)
@@ -1066,7 +1057,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", command.DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
@@ -1107,7 +1098,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 func (p *DefaultProjectCommandRunner) ensurePlanLoaded(ctx command.ProjectContext, absPath string) error {
 	store := p.PlanStore
 	if store == nil {
-		store = &runtime.LocalPlanStore{}
+		store = &planstore.LocalPlanStore{}
 	}
 	planPath, err := safePlanFilePath(ctx, absPath)
 	if err != nil {

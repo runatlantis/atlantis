@@ -6,7 +6,6 @@ package events
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -35,8 +34,6 @@ type DefaultApplyPlanValidator struct {
 	PullStatusFetcher   PullStatusFetcher
 	LivePullHeadFetcher LivePullHeadFetcher
 }
-
-var errStaleCommandHead = errors.New("stale command head")
 
 func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.ProjectContext) error {
 	if v == nil || v.LivePullHeadFetcher == nil {
@@ -76,17 +73,17 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		if livePull.BaseBranch != "" {
 			currentPull.BaseBranch = livePull.BaseBranch
 		}
-		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+		if err := models.PullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
 			return err
 		}
 		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
 			return err
 		}
-	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
+	} else if err := models.PullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
 		return rejectProjectPlan(planPath, "%s", err)
 	}
 
-	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
+	proj := pullStatus.FindProject(ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
 	if proj == nil {
 		return rejectProjectPlan(planPath,
 			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
@@ -136,9 +133,9 @@ func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.Pu
 	if livePull.HeadCommit != "" && ctx.Pull.HeadCommit != "" && looksLikeCommitSHA(ctx.Pull.HeadCommit) && ctx.Pull.HeadCommit != livePull.HeadCommit {
 		return fmt.Errorf(
 			"%w: pull request head changed from %s to %s; run `atlantis plan` before apply",
-			errStaleCommandHead,
-			shortSHA(ctx.Pull.HeadCommit),
-			shortSHA(livePull.HeadCommit),
+			command.ErrStaleCommandHead,
+			models.ShortSHA(ctx.Pull.HeadCommit),
+			models.ShortSHA(livePull.HeadCommit),
 		)
 	}
 	commandBase := strings.TrimSpace(ctx.Pull.BaseBranch)
@@ -148,7 +145,7 @@ func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.Pu
 	}
 	return fmt.Errorf(
 		"%w: pull request base branch changed from %q to %q; run `atlantis plan` before apply",
-		errStaleCommandHead,
+		command.ErrStaleCommandHead,
 		commandBase,
 		liveBase,
 	)
@@ -266,60 +263,4 @@ func looksLikeCommitSHA(s string) bool {
 		return false
 	}
 	return true
-}
-
-func pullStatusFreshForPull(pull models.PullRequest, statusPull models.PullRequest) bool {
-	return pullStatusFreshnessError(pull, statusPull, "recorded plan status") == nil
-}
-
-func pullStatusFreshnessError(pull models.PullRequest, statusPull models.PullRequest, subject string) error {
-	return pullStatusFreshnessErrorWithMissingFields(pull, statusPull, subject, false)
-}
-
-func pullStatusApplyEligibilityError(pull models.PullRequest, statusPull models.PullRequest, subject string) error {
-	return pullStatusFreshnessErrorWithMissingFields(pull, statusPull, subject, true)
-}
-
-func pullStatusFreshnessErrorWithMissingFields(pull models.PullRequest, statusPull models.PullRequest, subject string, rejectMissing bool) error {
-	verb := "is"
-	if subject == "plans" {
-		verb = "are"
-	}
-	if rejectMissing && pull.HeadCommit != "" && statusPull.HeadCommit == "" {
-		return fmt.Errorf(
-			"%s %s missing a recorded head commit while current head is %s; run `atlantis plan` before apply",
-			subject,
-			verb,
-			shortSHA(pull.HeadCommit),
-		)
-	}
-	if pull.HeadCommit != "" && statusPull.HeadCommit != "" && statusPull.HeadCommit != pull.HeadCommit {
-		return fmt.Errorf(
-			"%s %s from commit %s but current head is %s; run `atlantis plan` before apply",
-			subject,
-			verb,
-			shortSHA(statusPull.HeadCommit),
-			shortSHA(pull.HeadCommit),
-		)
-	}
-	currentBase := strings.TrimSpace(pull.BaseBranch)
-	statusBase := strings.TrimSpace(statusPull.BaseBranch)
-	if rejectMissing && currentBase != "" && statusBase == "" {
-		return fmt.Errorf(
-			"%s %s missing a recorded base branch while current base branch is %q; run `atlantis plan` before apply",
-			subject,
-			verb,
-			currentBase,
-		)
-	}
-	if currentBase != "" && statusBase != "" && statusBase != currentBase {
-		return fmt.Errorf(
-			"%s %s for base branch %q but current base branch is %q; run `atlantis plan` before apply",
-			subject,
-			verb,
-			statusBase,
-			currentBase,
-		)
-	}
-	return nil
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
@@ -292,7 +293,7 @@ terraform {
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -393,7 +394,7 @@ func TestDefaultProjectCommandBuilder_OpenTofuWorkspaceDetection(t *testing.T) {
 				false, false,
 				"auto",
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -781,7 +782,7 @@ projects:
 					userConfig.IncludeGitUntrackedFiles,
 					c.AutoDiscoverModeUserCfg,
 					scope,
-					terraformClient, &runtime.LocalPlanStore{},
+					terraformClient, &planstore.LocalPlanStore{},
 				)
 
 				var actCtxs []command.ProjectContext
@@ -877,7 +878,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildPlanCommands(&command.Context{
@@ -964,7 +965,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfig
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildPlanCommands(&command.Context{
@@ -1044,7 +1045,7 @@ func TestDefaultProjectCommandBuilder_PathSelectorRespectsBranchFilteredProjects
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	mainCtxs, err := builder.BuildPlanCommands(&command.Context{
@@ -1140,7 +1141,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITea
 				defaultUserConfig.IncludeGitUntrackedFiles,
 				defaultUserConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(&command.Context{
@@ -1229,7 +1230,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	cmdCtx := &command.Context{Log: logger, Scope: scope}
@@ -1316,7 +1317,7 @@ func TestDefaultProjectCommandBuilder_BuildWorkspaceOnlyCommand_IgnorePathsNotSk
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
 	cmdCtx := &command.Context{
@@ -1388,7 +1389,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWit
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
@@ -1502,7 +1503,7 @@ projects:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -1566,7 +1567,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesHeadCommitForRe
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -1631,7 +1632,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirRespectsGlobProject
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -1702,7 +1703,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFailsOpenWhenRemote
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -1763,7 +1764,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirAllowsAuthoritative
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -1825,7 +1826,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesGlobalIgnoreWhe
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
 	ctx := &command.Context{
@@ -1900,7 +1901,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
 	ctx := &command.Context{
@@ -1961,7 +1962,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
 	ctx := &command.Context{
@@ -2037,7 +2038,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithLo
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	ctx := &command.Context{
 		Log:      logger,
@@ -2095,7 +2096,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithou
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
 	ctx := &command.Context{
@@ -2180,7 +2181,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	cmdCtx := &command.Context{Log: logger, Scope: scope}
@@ -2293,7 +2294,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
 
@@ -2377,7 +2378,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTar
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
 
@@ -2456,7 +2457,7 @@ projects:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	cmdCtx := &command.Context{Log: logger, Scope: scope}
@@ -2894,7 +2895,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2999,7 +3000,7 @@ projects:
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
 		tfclientmocks.NewMockClient(),
-		&runtime.LocalPlanStore{},
+		&planstore.LocalPlanStore{},
 	)
 
 	actCtxs, err := builder.BuildPlanCommands(&command.Context{
@@ -3365,7 +3366,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -3464,7 +3465,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -3586,7 +3587,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -3702,7 +3703,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -3819,7 +3820,7 @@ autodiscover:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -3912,7 +3913,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -4009,7 +4010,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgno
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
@@ -4101,7 +4102,7 @@ projects:
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctx := &command.Context{
@@ -4190,7 +4191,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -4381,7 +4382,7 @@ projects:
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -4526,7 +4527,7 @@ projects:
 			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
-			terraformClient, &runtime.LocalPlanStore{},
+			terraformClient, &planstore.LocalPlanStore{},
 		)
 
 		var actCtxs []command.ProjectContext
@@ -4611,7 +4612,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
@@ -4700,7 +4701,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient, &runtime.LocalPlanStore{},
+		terraformClient, &planstore.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
@@ -4831,7 +4832,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -4943,7 +4944,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient, &runtime.LocalPlanStore{},
+				terraformClient, &planstore.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -5775,7 +5776,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 	Equals(t, 1, len(ctxs))
 }
 
-// mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
+// mockExternalPlanStore satisfies the planstore.PlanStore interface for testing
 // the external plan store recovery path.
 type mockExternalPlanStore struct {
 	workspaces []string

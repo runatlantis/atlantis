@@ -4,12 +4,13 @@
 package events
 
 import (
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 func NewPolicyCheckCommandRunner(
-	dbUpdater *DBUpdater,
+	pullStatusUpdater *coordination.PullStatusUpdater,
 	pullUpdater *PullUpdater,
 	commitStatusUpdater CommitStatusUpdater,
 	projectCommandRunner ProjectPolicyCheckCommandRunner,
@@ -18,7 +19,7 @@ func NewPolicyCheckCommandRunner(
 	quietPolicyChecks bool,
 ) *PolicyCheckCommandRunner {
 	return &PolicyCheckCommandRunner{
-		dbUpdater:                  dbUpdater,
+		pullStatusUpdater:          pullStatusUpdater,
 		pullUpdater:                pullUpdater,
 		commitStatusUpdater:        commitStatusUpdater,
 		prjCmdRunner:               projectCommandRunner,
@@ -29,7 +30,7 @@ func NewPolicyCheckCommandRunner(
 }
 
 type PolicyCheckCommandRunner struct {
-	dbUpdater           *DBUpdater
+	pullStatusUpdater   *coordination.PullStatusUpdater
 	pullUpdater         *PullUpdater
 	commitStatusUpdater CommitStatusUpdater
 	prjCmdRunner        ProjectPolicyCheckCommandRunner
@@ -73,7 +74,7 @@ func (p *PolicyCheckCommandRunner) Run(ctx *command.Context, cmds []command.Proj
 		p.pullUpdater.updatePull(ctx, PolicyCheckCommand{}, result)
 	}
 
-	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := p.pullStatusUpdater.Update(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 	}

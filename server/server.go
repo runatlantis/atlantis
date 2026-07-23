@@ -33,12 +33,11 @@ import (
 	prometheus "github.com/uber-go/tally/v4/prometheus"
 	"github.com/urfave/negroni/v3"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/backends"
 	cfg "github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/drift"
-	"github.com/runatlantis/atlantis/server/core/redis"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -49,7 +48,7 @@ import (
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -101,8 +100,8 @@ type Server struct {
 	StatsScope                     tally.Scope
 	StatsReporter                  tally.BaseStatsReporter
 	StatsCloser                    io.Closer
-	Locker                         locking.Locker
-	ApplyLocker                    locking.ApplyLocker
+	Locker                         coordination.Locker
+	ApplyLocker                    coordination.ApplyLocker
 	VCSEventsController            *events_controllers.VCSEventsController
 	GithubAppController            *controllers.GithubAppController
 	LocksController                *controllers.LocksController
@@ -126,7 +125,7 @@ type Server struct {
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
-	database                       db.Database
+	coordinationStore              coordination.Store
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -489,30 +488,24 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		},
 	)
 
-	var lockingClient locking.Locker
-	var applyLockingClient locking.ApplyLocker
-	var database db.Database
+	var locker coordination.Locker
+	var applyLockingClient coordination.ApplyLocker
+	var coordinationStore coordination.Store
 
-	switch dbtype := userConfig.LockingDBType; dbtype {
-	case "redis":
-		var clusterAddrs []string
-		if userConfig.RedisClusterAddresses != "" {
-			for addr := range strings.SplitSeq(userConfig.RedisClusterAddresses, ",") {
-				trimmed := strings.TrimSpace(addr)
-				if trimmed == "" {
-					continue
-				}
-				clusterAddrs = append(clusterAddrs, trimmed)
+	var clusterAddrs []string
+	if userConfig.RedisClusterAddresses != "" {
+		for addr := range strings.SplitSeq(userConfig.RedisClusterAddresses, ",") {
+			trimmed := strings.TrimSpace(addr)
+			if trimmed == "" {
+				continue
 			}
+			clusterAddrs = append(clusterAddrs, trimmed)
 		}
-		switch {
-		case len(clusterAddrs) > 0:
-			logger.Info("Utilizing Redis DB in cluster mode, addresses: %s", strings.Join(clusterAddrs, ", "))
-		default:
-			logger.Info("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort)
-		}
-		database, err = redis.NewWithConfig(redis.Config{
-			Hostname:           userConfig.RedisHost,
+	}
+	resolvedBackends, storeBindings, err := backends.Resolve(globalCfg.Backends, globalCfg.Stores, backends.Legacy{
+		LockingDBType: userConfig.LockingDBType,
+		Redis: valid.RedisBackend{
+			Host:               userConfig.RedisHost,
 			Port:               userConfig.RedisPort,
 			Password:           userConfig.RedisPassword,
 			Username:           userConfig.RedisUsername,
@@ -520,28 +513,29 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			InsecureSkipVerify: userConfig.RedisInsecureSkipVerify,
 			DB:                 userConfig.RedisDB,
 			ClusterAddresses:   clusterAddrs,
-		})
-		if err != nil {
-			return nil, err
-		}
-	case "boltdb":
-		logger.Info("Utilizing BoltDB")
-		database, err = boltdb.New(userConfig.DataDir)
-		if err != nil {
-			return nil, err
-		}
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	backendRegistry := backends.NewRegistry(logger, userConfig.DataDir, resolvedBackends)
+
+	coordinationBackend, err := backendRegistry.Get(storeBindings.Coordination)
+	if err != nil {
+		return nil, err
+	}
+	coordinationStore, err = coordination.NewStore(logger, coordinationBackend)
+	if err != nil {
+		return nil, err
 	}
 
-	noOpLocker := locking.NewNoOpLocker()
 	if userConfig.DisableRepoLocking {
 		logger.Info("Repo Locking is disabled")
-		lockingClient = noOpLocker
-	} else {
-		lockingClient = locking.NewClient(database)
 	}
+	locker = coordination.NewLockingClient(coordinationStore)
 	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
-	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
+	applyLockingClient = coordination.NewApplyClient(coordinationStore, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
@@ -585,16 +579,16 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:         lockingClient,
-		NoOpLocker:     noOpLocker,
-		VCSClient:      vcsClient,
-		ExecutableName: userConfig.ExecutableName,
+		Locker:             locker,
+		VCSClient:          vcsClient,
+		DisableRepoLocking: userConfig.DisableRepoLocking,
+		ExecutableName:     userConfig.ExecutableName,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
-		Locker:           lockingClient,
-		WorkingDir:       workingDir,
-		WorkingDirLocker: workingDirLocker,
-		Database:         database,
+		Locker:            locker,
+		WorkingDir:        workingDir,
+		WorkingDirLocker:  workingDirLocker,
+		CoordinationStore: coordinationStore,
 	}
 
 	eventParser := &events.EventParser{
@@ -670,31 +664,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater: commitStatusUpdater,
 		Router:              router,
 	}
-	var planStore runtime.PlanStore
-	if userConfig.EnableExternalStores {
-		psCfg := globalCfg.ExternalStores.PlanStore
-		if psCfg.Type == "" {
-			return nil, fmt.Errorf("--enable-external-stores is set but no external_stores.plan_store.type is configured in the server-side repo config")
-		}
-		switch psCfg.Type {
-		case "s3":
-			logger.Info("initializing S3 plan store (bucket=%s, region=%s)", psCfg.S3.Bucket, psCfg.S3.Region)
-			planStore, err = runtime.NewS3PlanStore(runtime.S3PlanStoreConfig{
-				Bucket:         psCfg.S3.Bucket,
-				Region:         psCfg.S3.Region,
-				Prefix:         psCfg.S3.Prefix,
-				Endpoint:       psCfg.S3.Endpoint,
-				ForcePathStyle: psCfg.S3.ForcePathStyle,
-				Profile:        psCfg.S3.Profile,
-			}, logger)
-			if err != nil {
-				return nil, fmt.Errorf("initializing S3 plan store: %w", err)
-			}
-		default:
-			return nil, fmt.Errorf("unsupported plan store type %q", psCfg.Type)
-		}
-	} else {
-		planStore = &runtime.LocalPlanStore{}
+	plansBackend, err := backendRegistry.Get(storeBindings.Plans)
+	if err != nil {
+		return nil, err
+	}
+	planStore, err := planstore.New(logger, plansBackend)
+	if err != nil {
+		return nil, err
 	}
 
 	deleteLockCommand.PlanStore = planStore
@@ -703,9 +679,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		logger,
 		&events.PullClosedExecutor{
-			Locker:                   lockingClient,
+			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Database:                 database,
+			CoordinationStore:        coordinationStore,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
@@ -813,12 +789,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:          workingDirLocker,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
-		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: coordinationStore, LivePullHeadFetcher: livePullHeadFetcher},
 		PlanStore:                 planStore,
 	}
 
-	dbUpdater := &events.DBUpdater{
-		Database: database,
+	pullStatusUpdater := &coordination.PullStatusUpdater{
+		Store: coordinationStore,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -844,7 +820,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 
 	policyCheckCommandRunner := events.NewPolicyCheckCommandRunner(
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		commitStatusUpdater,
 		instrumentedProjectCmdRunner,
@@ -865,14 +841,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 		cancellationTracker,
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
-		database,
-		lockingClient,
+		coordinationStore,
+		locker,
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
@@ -888,8 +864,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		cancellationTracker,
 		autoMerger,
 		pullUpdater,
-		dbUpdater,
-		database,
+		pullStatusUpdater,
+		coordinationStore,
 		userConfig.ParallelPoolSize,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoProjects,
@@ -904,7 +880,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		userConfig.SilenceNoProjects,
 		userConfig.SilenceVCSStatusNoPlans,
 		vcsClient,
@@ -927,7 +903,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
@@ -936,7 +912,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
@@ -1006,7 +982,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              database,
+		PullStatusFetcher:              coordinationStore,
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
@@ -1018,14 +994,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	locksController := &controllers.LocksController{
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
-		Locker:             lockingClient,
+		Locker:             locker,
 		ApplyLocker:        applyLockingClient,
 		Logger:             logger,
 		VCSClient:          vcsClient,
 		LockDetailTemplate: web_templates.LockTemplate,
 		WorkingDir:         workingDir,
 		WorkingDirLocker:   workingDirLocker,
-		Database:           database,
+		CoordinationStore:  coordinationStore,
 		DeleteLockCommand:  deleteLockCommand,
 	}
 
@@ -1042,7 +1018,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		Logger:                   logger,
 		ProjectJobsTemplate:      web_templates.ProjectJobsTemplate,
 		ProjectJobsErrorTemplate: web_templates.ProjectJobsErrorTemplate,
-		Database:                 database,
+		CoordinationStore:        coordinationStore,
 		WsMux:                    wsMux,
 		KeyGenerator:             controllers.JobIDKeyGenerator{},
 		StatsScope:               statsScope.SubScope("api"),
@@ -1050,7 +1026,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	apiController := &controllers.APIController{
 		APISecret:                       []byte(userConfig.APISecret),
-		Locker:                          lockingClient,
+		Locker:                          locker,
 		Logger:                          logger,
 		Parser:                          eventParser,
 		ProjectCommandBuilder:           projectCommandBuilder,
@@ -1069,7 +1045,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDirLocker:                workingDirLocker,
 		CommitStatusUpdater:             commitStatusUpdater,
 		PullReqStatusFetcher:            pullReqStatusFetcher,
-		PullStatusFetcher:               database,
+		PullStatusFetcher:               coordinationStore,
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 	}
@@ -1131,7 +1107,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:                     statsScope,
 		StatsReporter:                  statsReporter,
 		StatsCloser:                    closer,
-		Locker:                         lockingClient,
+		Locker:                         locker,
 		ApplyLocker:                    applyLockingClient,
 		VCSEventsController:            eventsController,
 		GithubAppController:            githubAppController,
@@ -1153,7 +1129,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
-		database:                       database,
+		coordinationStore:              coordinationStore,
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1267,9 +1243,9 @@ func (s *Server) Start() error {
 		s.Logger.Err("%s", err.Error())
 	}
 
-	// Attempt to close the database
+	// Attempt to close the coordination store
 	if err := s.closeDatabase(1 * time.Second); err != nil {
-		s.Logger.Err("while closing database: %v", err)
+		s.Logger.Err("while closing coordination store: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -1299,20 +1275,20 @@ func (s *Server) waitForDrain() {
 	}
 }
 
-// closeDatabase attempts to close the database, waiting up to the given timeout.
+// closeDatabase attempts to close the coordination store, waiting up to the given timeout.
 func (s *Server) closeDatabase(timeout time.Duration) error {
-	if s.database == nil {
+	if s.coordinationStore == nil {
 		return nil
 	}
-	s.Logger.Info("Shutting down database")
+	s.Logger.Info("Shutting down coordinationStore")
 
 	done := make(chan error, 1)
-	go func() { done <- s.database.Close() }()
+	go func() { done <- s.coordinationStore.Close() }()
 	select {
 	case err := <-done:
 		return err
 	case <-time.After(timeout):
-		return fmt.Errorf("database close timed out after %s", timeout)
+		return fmt.Errorf("coordinationStore close timed out after %s", timeout)
 	}
 }
 
@@ -1427,8 +1403,8 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 // dependency is unreachable. Suitable for K8s readiness probes.
 func (s *Server) Readyz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if s.database != nil {
-		if err := s.database.Ping(); err != nil {
+	if s.coordinationStore != nil {
+		if err := s.coordinationStore.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
 			return

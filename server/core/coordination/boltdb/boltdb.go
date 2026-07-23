@@ -1,7 +1,7 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package boltdb handles our database layer using BoltDB.
+// Package boltdb implements the coordination store on a local BoltDB file.
 package boltdb
 
 import (
@@ -15,14 +15,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	bolt "go.etcd.io/bbolt"
 )
 
-// BoltDB is a database using BoltDB
-type BoltDB struct {
+// Store implements coordination.Store on BoltDB.
+type Store struct {
 	db                    *bolt.DB
 	locksBucketName       []byte
 	pullsBucketName       []byte
@@ -36,9 +35,10 @@ const (
 	pullKeySeparator      = "::"
 )
 
-// New returns a valid locker. We need to be able to write to dataDir
-// since bolt stores its data as a file
-func New(dataDir string) (*BoltDB, error) {
+// New opens (creating if needed) the atlantis.db file under dataDir and
+// builds the store on it. Production wiring opens the file through the
+// backends registry and calls NewStore; this remains for tests.
+func New(dataDir string) (*Store, error) {
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return nil, fmt.Errorf("creating data dir: %w", err)
 	}
@@ -49,9 +49,15 @@ func New(dataDir string) (*BoltDB, error) {
 		}
 		return nil, fmt.Errorf("starting BoltDB: %w", err)
 	}
+	return NewStore(db)
+}
 
+// NewStore builds the coordination store on an opened bolt database,
+// creating its buckets and migrating old lock keys.
+func NewStore(db *bolt.DB) (*Store, error) {
 	// Create the buckets.
-	err = db.Update(func(tx *bolt.Tx) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		var err error
 		if _, err = tx.CreateBucketIfNotExists([]byte(locksBucketName)); err != nil {
 			return fmt.Errorf("creating bucket %q: %w", locksBucketName, err)
 		}
@@ -85,7 +91,7 @@ func New(dataDir string) (*BoltDB, error) {
 		var migrations []migration
 
 		if err := bucket.ForEach(func(oldKey, oldValue []byte) error {
-			_, err := locking.IsCurrentLocking(string(oldKey))
+			_, _, err := models.ParseLockKey(string(oldKey))
 			if err != nil {
 				var currLock models.ProjectLock
 				if err := json.Unmarshal(oldValue, &currLock); err != nil {
@@ -119,7 +125,7 @@ func New(dataDir string) (*BoltDB, error) {
 		log.Printf("warning: failed to migrate BoltDB lock keys: %v", err)
 	}
 
-	return &BoltDB{
+	return &Store{
 		db:                    db,
 		locksBucketName:       []byte(locksBucketName),
 		pullsBucketName:       []byte(pullsBucketName),
@@ -128,8 +134,8 @@ func New(dataDir string) (*BoltDB, error) {
 }
 
 // NewWithDB is used for testing.
-func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error) {
-	return &BoltDB{
+func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*Store, error) {
+	return &Store{
 		db:                    db,
 		locksBucketName:       []byte(bucket),
 		pullsBucketName:       []byte(pullsBucketName),
@@ -141,7 +147,7 @@ func NewWithDB(db *bolt.DB, bucket string, globalBucket string) (*BoltDB, error)
 // acquired, it will return true and the lock returned will be newLock.
 // If the lock is not acquired, it will return false and the current
 // lock that is preventing this lock from being acquired.
-func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
+func (b *Store) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, error) {
 	var lockAcquired bool
 	var currLock models.ProjectLock
 	key := b.lockKey(newLock.Project, newLock.Workspace)
@@ -178,7 +184,7 @@ func (b *BoltDB) TryLock(newLock models.ProjectLock) (bool, models.ProjectLock, 
 // If there is no lock, then it will return a nil pointer.
 // If there is a lock, then it will delete it, and then return a pointer
 // to the deleted lock.
-func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
+func (b *Store) Unlock(p models.Project, workspace string) (*models.ProjectLock, error) {
 	var lock models.ProjectLock
 	foundLock := false
 	key := b.lockKey(p, workspace)
@@ -203,7 +209,7 @@ func (b *BoltDB) Unlock(p models.Project, workspace string) (*models.ProjectLock
 }
 
 // UnlockIfOwnedByPull deletes a lock only if it is still owned by pullNum.
-func (b *BoltDB) UnlockIfOwnedByPull(p models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+func (b *Store) UnlockIfOwnedByPull(p models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
 	var lock models.ProjectLock
 	foundLock := false
 	key := b.lockKey(p, workspace)
@@ -235,7 +241,7 @@ func (b *BoltDB) UnlockIfOwnedByPull(p models.Project, workspace string, pullNum
 }
 
 // List lists all current locks.
-func (b *BoltDB) List() ([]models.ProjectLock, error) {
+func (b *Store) List() ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	var locksBytes [][]byte
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -265,7 +271,7 @@ func (b *BoltDB) List() ([]models.ProjectLock, error) {
 // LockCommand attempts to create a new lock for a CommandName.
 // If the lock doesn't exists, it will create a lock and return a pointer to it.
 // If the lock already exists, it will return an "lock already exists" error
-func (b *BoltDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
+func (b *Store) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
 	lock := command.Lock{
 		CommandName: cmdName,
 		LockMetadata: command.LockMetadata{
@@ -296,7 +302,7 @@ func (b *BoltDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command
 
 // UnlockCommand removes CommandName lock if present.
 // If there are no lock it returns an error.
-func (b *BoltDB) UnlockCommand(cmdName command.Name) error {
+func (b *Store) UnlockCommand(cmdName command.Name) error {
 	transactionErr := b.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.globalLocksBucketName)
 
@@ -316,7 +322,7 @@ func (b *BoltDB) UnlockCommand(cmdName command.Name) error {
 
 // CheckCommandLock checks if CommandName lock was set.
 // If the lock exists return the pointer to the lock object, otherwise return nil
-func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
+func (b *Store) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 	cmdLock := command.Lock{}
 
 	found := false
@@ -344,7 +350,7 @@ func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 }
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
-func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+func (b *Store) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 	err := b.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(b.locksBucketName).Cursor()
@@ -376,7 +382,7 @@ func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Projec
 
 // GetLock returns a pointer to the lock for that project and workspace.
 // If there is no lock, it returns a nil pointer.
-func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLock, error) {
+func (b *Store) GetLock(p models.Project, workspace string) (*models.ProjectLock, error) {
 	key := b.lockKey(p, workspace)
 	var lockBytes []byte
 	err := b.db.View(func(tx *bolt.Tx) error {
@@ -404,7 +410,7 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+func (b *Store) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return models.PullStatus{}, err
@@ -517,7 +523,7 @@ func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRe
 
 // GetPullStatus returns the status for pull.
 // If there is no status, returns a nil pointer.
-func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+func (b *Store) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return nil, err
@@ -536,7 +542,7 @@ func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, err
 }
 
 // DeletePullStatus deletes the status for pull.
-func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
+func (b *Store) DeletePullStatus(pull models.PullRequest) error {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return err
@@ -552,7 +558,7 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 }
 
 // UpdateProjectStatus updates project status.
-func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (b *Store) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return err
@@ -586,7 +592,7 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 	return nil
 }
 
-func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
+func (b *Store) pullKey(pull models.PullRequest) ([]byte, error) {
 	hostname := pull.BaseRepo.VCSHost.Hostname
 	if strings.Contains(hostname, pullKeySeparator) {
 		return nil, fmt.Errorf("vcs hostname %q contains illegal string %q", hostname, pullKeySeparator)
@@ -600,15 +606,15 @@ func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
 		nil
 }
 
-func (b *BoltDB) commandLockKey(cmdName command.Name) string {
+func (b *Store) commandLockKey(cmdName command.Name) string {
 	return fmt.Sprintf("%s/lock", cmdName)
 }
 
-func (b *BoltDB) lockKey(p models.Project, workspace string) string {
+func (b *Store) lockKey(p models.Project, workspace string) string {
 	return models.GenerateLockKey(p, workspace)
 }
 
-func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.PullStatus, error) {
+func (b *Store) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.PullStatus, error) {
 	serialized := bucket.Get(key)
 	if serialized == nil {
 		return nil, nil
@@ -621,7 +627,7 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 	return &p, nil
 }
 
-func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.PullStatus) error {
+func (b *Store) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.PullStatus) error {
 	serialized, err := json.Marshal(pull)
 	if err != nil {
 		return fmt.Errorf("serializing: %w", err)
@@ -629,7 +635,7 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
+func (b *Store) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
 	return models.ProjectStatus{
 		Workspace:    p.Workspace,
 		RepoRelDir:   p.RepoRelDir,
@@ -640,12 +646,12 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 }
 
 // Ping checks the database connection health.
-func (b *BoltDB) Ping() error {
+func (b *Store) Ping() error {
 	return b.db.View(func(tx *bolt.Tx) error {
 		return nil
 	})
 }
 
-func (b *BoltDB) Close() error {
+func (b *Store) Close() error {
 	return b.db.Close()
 }

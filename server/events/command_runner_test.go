@@ -13,10 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -24,7 +23,7 @@ import (
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
-	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	lockingmocks "github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -51,7 +50,7 @@ var pullReqStatusFetcher *vcsmocks.MockPullReqStatusFetcher
 // TODO: refactor these into their own unit tests.
 // these were all split out from default command runner in an effort to improve
 // readability however the tests were kept as is.
-var dbUpdater *events.DBUpdater
+var pullStatusUpdater *coordination.PullStatusUpdater
 var pullUpdater *events.PullUpdater
 var autoMerger *events.AutoMerger
 var policyCheckCommandRunner *events.PolicyCheckCommandRunner
@@ -74,11 +73,11 @@ type TestConfig struct {
 	silenceVCSStatusNoProjects bool
 	StatusName                 string
 	discardApprovalOnPlan      bool
-	database                   db.Database
+	database                   coordination.Store
 	DisableUnlockLabel         string
 	DisableAutomergeLabel      string
 	PendingApplyStatus         bool
-	applyLockCheckerReturn     locking.ApplyCommandLock
+	applyLockCheckerReturn     coordination.ApplyCommandLock
 	applyLockCheckerErr        error
 	workingDirLocker           events.WorkingDirLocker
 	livePullHeadFetcher        events.LivePullHeadFetcher
@@ -148,8 +147,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	// Plan cleanup only deletes selected on_plan locks through owner-scoped cleanup.
 	lockingLocker.EXPECT().UnlockIfOwnedByPull(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 
-	dbUpdater = &events.DBUpdater{
-		Database: testConfig.database,
+	pullStatusUpdater = &coordination.PullStatusUpdater{
+		Store: testConfig.database,
 	}
 
 	pullUpdater = &events.PullUpdater{
@@ -164,7 +163,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	}
 
 	policyCheckCommandRunner = events.NewPolicyCheckCommandRunner(
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		commitUpdater,
 		projectCommandRunner,
@@ -188,7 +187,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
@@ -211,7 +210,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		cancellationTracker,
 		autoMerger,
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		testConfig.database,
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
@@ -227,7 +226,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		projectCommandBuilder,
 		projectCommandRunner,
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		testConfig.SilenceNoProjects,
 		testConfig.silenceVCSStatusNoProjects,
 		vcsClient,
@@ -250,7 +249,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	importCommandRunner = events.NewImportCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		pullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -259,7 +258,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 
 	stateCommandRunner = events.NewStateCommandRunner(
 		pullUpdater,
-		dbUpdater,
+		pullStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
@@ -473,7 +472,7 @@ func TestRunCommentCommandPlan_NoProjectsWritesCurrentEmptyPullStatus(t *testing
 
 	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "old-project",
@@ -492,7 +491,7 @@ func TestRunCommentCommandPlan_NoProjectsWritesCurrentEmptyPullStatus(t *testing
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -512,7 +511,7 @@ func TestRunCommentCommandPlan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
 	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -529,7 +528,7 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
 	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "old-project",
@@ -554,7 +553,7 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 	_, err = os.Stat(oldPlanPath)
 	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -570,7 +569,7 @@ func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T
 	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
 	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "old-project",
@@ -595,7 +594,7 @@ func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 	_, err = os.Stat(oldPlanPath)
 	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -649,7 +648,7 @@ func TestRunCommentCommandPlan_NoProjectsEmptyPullStatusWriteFailureIsUserVisibl
 		HeadRepo: testdata.GithubRepo,
 		Trigger:  command.CommentTrigger,
 	}
-	closer := dbUpdater.Database.(interface{ Close() error })
+	closer := pullStatusUpdater.Store.(interface{ Close() error })
 	Ok(t, closer.Close())
 
 	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, nil)
@@ -695,7 +694,7 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	applyCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, nil)
 	Ok(t, err)
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -719,7 +718,7 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusNoOpsSafely(t *testing.T) {
 
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, nil)
 	Ok(t, err)
 
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
@@ -752,7 +751,7 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusDoesNotSucceedWhilePlanInFlight(
 
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, nil)
 	Ok(t, err)
 
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
@@ -871,7 +870,7 @@ func TestPlanCommandRunner_HoldsPlanLockDuringPullStatusWrite(t *testing.T) {
 	realDB := newTestBoltDB(t)
 	writeObserved := false
 	database := assertPlanLockDB{
-		Database:     realDB,
+		Store:        realDB,
 		t:            t,
 		locker:       locker,
 		repoFullName: testdata.GithubRepo.FullName,
@@ -939,7 +938,7 @@ func TestPlanCommandRunner_AutoplanHoldsPlanLockDuringPullStatusWrite(t *testing
 	realDB := newTestBoltDB(t)
 	writeObserved := false
 	database := assertPlanLockDB{
-		Database:     realDB,
+		Store:        realDB,
 		t:            t,
 		locker:       locker,
 		repoFullName: testdata.GithubRepo.FullName,
@@ -1340,7 +1339,7 @@ func TestImportOrStateRm_DiscardedPlanStatusAllowsLaterGenericApply(t *testing.T
 			_ = setup(t)
 			logger := logging.NewNoopLogger(t)
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				{
 					Command:     command.Plan,
 					RepoRelDir:  tc.projectCmd.RepoRelDir,
@@ -1376,7 +1375,7 @@ func TestImportOrStateRm_DiscardedPlanStatusAllowsLaterGenericApply(t *testing.T
 				stateCommandRunner.Run(ctx, &tc.cmd)
 			}
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 			Ok(t, err)
 			Assert(t, pullStatus != nil, "expected PullStatus")
 			Equals(t, 1, len(pullStatus.Projects))
@@ -1414,7 +1413,7 @@ func TestImportCommandRunner_DiscardedPlanDBFailureIsUserVisible(t *testing.T) {
 		Trigger:  command.CommentTrigger,
 	}
 
-	closer := dbUpdater.Database.(interface{ Close() error })
+	closer := pullStatusUpdater.Store.(interface{ Close() error })
 	Ok(t, closer.Close())
 
 	When(pullReqStatusFetcher.FetchPullStatus(logger, modelPull)).ThenReturn(models.PullReqStatus{}, nil)
@@ -1453,7 +1452,7 @@ func TestStateCommandRunner_DiscardedPlanDBFailureIsUserVisible(t *testing.T) {
 		Trigger:  command.CommentTrigger,
 	}
 
-	closer := dbUpdater.Database.(interface{ Close() error })
+	closer := pullStatusUpdater.Store.(interface{ Close() error })
 	Ok(t, closer.Close())
 
 	When(projectCommandBuilder.BuildStateRmCommands(ctx, &cmd)).ThenReturn([]command.ProjectContext{projectCmd}, nil)
@@ -1528,7 +1527,7 @@ func TestImportOrStateRm_DoesNotDiscardPlanStatusOnErrorOrFailure(t *testing.T) 
 			_ = setup(t)
 			logger := logging.NewNoopLogger(t)
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				{
 					Command:     command.Plan,
 					RepoRelDir:  tc.projectCmd.RepoRelDir,
@@ -1566,7 +1565,7 @@ func TestImportOrStateRm_DoesNotDiscardPlanStatusOnErrorOrFailure(t *testing.T) 
 				stateCommandRunner.Run(ctx, &cmd)
 			}
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 			Ok(t, err)
 			Assert(t, pullStatus != nil, "expected PullStatus")
 			Equals(t, 1, len(pullStatus.Projects))
@@ -1611,7 +1610,7 @@ func TestImportOrStateRm_DiscardsOnlyExistingPullStatusProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_ = setup(t)
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projB"),
 			})
@@ -1619,7 +1618,7 @@ func TestImportOrStateRm_DiscardsOnlyExistingPullStatusProject(t *testing.T) {
 
 			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 			Ok(t, err)
 			Equals(t, models.PlannedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projA").Status)
 			Equals(t, models.DiscardedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projB").Status)
@@ -1666,7 +1665,7 @@ func TestImportOrStateRm_DoesNotCreateDiscardedStatusWithoutPullStatus(t *testin
 
 			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 			Ok(t, err)
 			Assert(t, pullStatus == nil, "expected no PullStatus to be created")
 		})
@@ -1709,14 +1708,14 @@ func TestImportOrStateRm_DoesNotCreateDiscardedStatusForMissingProject(t *testin
 		t.Run(tc.name, func(t *testing.T) {
 			_ = setup(t)
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
 			})
 			Ok(t, err)
 
 			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 			Ok(t, err)
 			Equals(t, 1, len(pullStatus.Projects))
 			Equals(t, models.PlannedPlanStatus, projectStatus(t, pullStatus, events.DefaultWorkspace, "dir1", "projA").Status)
@@ -1762,14 +1761,14 @@ func TestImportOrStateRm_DoesNotDiscardStaleHeadPullStatus(t *testing.T) {
 			stalePull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "old123"}
 			currentPull := stalePull
 			currentPull.HeadCommit = "new123"
-			_, err := dbUpdater.Database.UpdatePullWithResults(stalePull, []command.ProjectResult{
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(stalePull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
 			})
 			Ok(t, err)
 
 			runImportOrStateRmResult(t, currentPull, tc.cmd, tc.projectCmd, tc.output)
 
-			pullStatus, err := dbUpdater.Database.GetPullStatus(currentPull)
+			pullStatus, err := pullStatusUpdater.Store.GetPullStatus(currentPull)
 			Ok(t, err)
 			Assert(t, pullStatus != nil, "expected stale PullStatus to remain")
 			Equals(t, "old123", pullStatus.Pull.HeadCommit)
@@ -1820,7 +1819,7 @@ func plannedProjectResult(repoRelDir, workspace, projectName string) command.Pro
 }
 
 type assertPlanLockDB struct {
-	db.Database
+	coordination.Store
 	t            *testing.T
 	locker       events.WorkingDirLocker
 	repoFullName string
@@ -1831,7 +1830,7 @@ type assertPlanLockDB struct {
 func (a assertPlanLockDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
 	*a.called = true
 	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Plan), "expected plan lock during pull status write")
-	return a.Database.UpdatePullWithResults(pull, results)
+	return a.Store.UpdatePullWithResults(pull, results)
 }
 
 func projectStatus(t *testing.T, pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) models.ProjectStatus {
@@ -1849,8 +1848,8 @@ type failUnlockByPullLocker struct {
 	t *testing.T
 }
 
-func (l failUnlockByPullLocker) TryLock(models.Project, string, models.PullRequest, models.User) (locking.TryLockResponse, error) {
-	return locking.TryLockResponse{}, nil
+func (l failUnlockByPullLocker) TryLock(models.Project, string, models.PullRequest, models.User) (coordination.TryLockResponse, error) {
+	return coordination.TryLockResponse{}, nil
 }
 
 func (l failUnlockByPullLocker) Unlock(string) (*models.ProjectLock, error) {
@@ -1874,7 +1873,7 @@ func (l failUnlockByPullLocker) GetLock(string) (*models.ProjectLock, error) {
 	return nil, nil
 }
 
-func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locking.Locker, silenceNoProjects bool) {
+func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker coordination.Locker, silenceNoProjects bool) {
 	planCommandRunner = events.NewPlanCommandRunner(
 		false,
 		false,
@@ -1886,13 +1885,13 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
-		dbUpdater,
+		pullStatusUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		1,
 		silenceNoProjects,
-		dbUpdater.Database,
+		pullStatusUpdater.Store,
 		locker,
 		false,
 		pullReqStatusFetcher,
@@ -2191,8 +2190,8 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2216,7 +2215,7 @@ func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "old-project",
@@ -2234,7 +2233,7 @@ func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -2252,7 +2251,7 @@ func TestRunAutoplan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *testing.T)
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
 	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -2267,7 +2266,7 @@ func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 	oldPlanPath := filepath.Join(oldPlanDir, runtime.GetPlanFilename(events.DefaultWorkspace, ""))
 	Ok(t, os.WriteFile(oldPlanPath, []byte("old plan"), 0600))
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "old-project",
@@ -2291,7 +2290,7 @@ func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 	_, err = os.Stat(oldPlanPath)
 	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
-	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
+	pullStatus, err := pullStatusUpdater.Store.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
 	Equals(t, "abc123", pullStatus.Pull.HeadCommit)
@@ -2325,7 +2324,7 @@ func TestRunAutoplan_NoProjectsEmptyPullStatusWriteFailureIsUserVisible(t *testi
 		HeadRepo: testdata.GithubRepo,
 		Trigger:  command.AutoTrigger,
 	}
-	closer := dbUpdater.Database.(interface{ Close() error })
+	closer := pullStatusUpdater.Store.(interface{ Close() error })
 	Ok(t, closer.Close())
 
 	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
@@ -2350,8 +2349,8 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fal
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -2380,8 +2379,8 @@ func TestRunAutoplanCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Tru
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{
@@ -2412,8 +2411,8 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
@@ -2436,8 +2435,8 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2457,8 +2456,8 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2495,8 +2494,8 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2518,8 +2517,8 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
@@ -2573,8 +2572,8 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2600,8 +2599,8 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
@@ -2758,7 +2757,7 @@ func setupApplyWithAutoMerge(t *testing.T, options ...func(testConfig *TestConfi
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, nil)
 	Ok(t, err)
 	autoMerger.GlobalAutomerge = true
 	autoMerger.GlobalAutomergeMethod = ""
@@ -2782,8 +2781,8 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 		boltDB.Close()
 	})
 	Ok(t, err)
-	dbUpdater.Database = boltDB
-	applyCommandRunner.Database = boltDB
+	pullStatusUpdater.Store = boltDB
+	applyCommandRunner.CoordinationStore = boltDB
 	pull := testdata.Pull
 	pull.BaseRepo = testdata.GithubRepo
 	_, err = boltDB.UpdatePullWithResults(pull, []command.ProjectResult{

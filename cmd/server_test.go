@@ -117,7 +117,6 @@ var testFlags = map[string]any{
 	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
-	EnableExternalStoresFlag:         false,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
 	ParallelPlanFlag:                 true,

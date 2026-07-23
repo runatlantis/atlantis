@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -34,10 +35,10 @@ type planStepRunner struct {
 	DefaultTFVersion      *version.Version
 	CommitStatusUpdater   StatusUpdater
 	AsyncTFExec           AsyncTFExec
-	PlanStore             PlanStore
+	PlanStore             planstore.PlanStore
 }
 
-func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec, planStore PlanStore) Runner {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec, planStore planstore.PlanStore) Runner {
 	runner := &planStepRunner{
 		TerraformExecutor:     terraformExecutor,
 		DefaultTFDistribution: defaultTfDistribution,

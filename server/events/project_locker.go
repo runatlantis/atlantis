@@ -7,7 +7,7 @@ package events
 import (
 	"fmt"
 
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -24,19 +24,20 @@ type ProjectLocker interface {
 	// The third return value is a function that can be called to unlock the
 	// lock. It will only be set if the lock was acquired. Any errors will set
 	// error.
-	TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*TryLockResponse, error)
+	TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*ProjectLockResponse, error)
 }
 
 // DefaultProjectLocker implements ProjectLocker.
 type DefaultProjectLocker struct {
-	Locker         locking.Locker
-	NoOpLocker     locking.Locker
-	VCSClient      vcs.Client
-	ExecutableName string
+	Locker    coordination.Locker
+	VCSClient vcs.Client
+	// DisableRepoLocking skips lock acquisition entirely (--disable-repo-locking).
+	DisableRepoLocking bool
+	ExecutableName     string
 }
 
-// TryLockResponse is the result of trying to lock a project.
-type TryLockResponse struct {
+// ProjectLockResponse is the result of trying to lock a project.
+type ProjectLockResponse struct {
 	// LockAcquired is true if the lock was acquired.
 	LockAcquired bool
 	// LockFailureReason is the reason why the lock was not acquired. It will
@@ -51,13 +52,16 @@ type TryLockResponse struct {
 }
 
 // TryLock implements ProjectLocker.TryLock.
-func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*TryLockResponse, error) {
-	locker := p.Locker
-	if !repoLocking {
-		locker = p.NoOpLocker
+func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*ProjectLockResponse, error) {
+	if !repoLocking || p.DisableRepoLocking {
+		return &ProjectLockResponse{
+			LockAcquired: true,
+			UnlockFn:     func() error { return nil },
+			LockKey:      models.GenerateLockKey(project, workspace),
+		}, nil
 	}
 
-	lockAttempt, err := locker.TryLock(project, workspace, pull, user)
+	lockAttempt, err := p.Locker.TryLock(project, workspace, pull, user)
 	if err != nil {
 		return nil, err
 	}
@@ -71,16 +75,16 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 			link,
 			link,
 			p.ExecutableName)
-		return &TryLockResponse{
+		return &ProjectLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
 		}, nil
 	}
 	log.Info("Acquired lock with id '%s'", lockAttempt.LockKey)
-	return &TryLockResponse{
+	return &ProjectLockResponse{
 		LockAcquired: true,
 		UnlockFn: func() error {
-			_, err := locker.UnlockIfOwnedByPull(project, workspace, pull.Num)
+			_, err := p.Locker.UnlockIfOwnedByPull(project, workspace, pull.Num)
 			return err
 		},
 		LockKey: lockAttempt.LockKey,
