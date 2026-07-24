@@ -779,7 +779,7 @@ func TestRunApply_DoesNotReturnZeroProjectsWhilePlanInFlight(t *testing.T) {
 		tc.SilenceNoProjects = true
 		tc.workingDirLocker = locker
 	})
-	unlock, err := locker.TryLockPull(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan)
+	unlock, err := locker.TryLockPull(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlock()
 

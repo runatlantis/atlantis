@@ -395,7 +395,7 @@ func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullComman
 	if p.workingDirLocker == nil {
 		return func() {}, true
 	}
-	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		p.handleNoProjectPlanStateError(ctx, cmd, err)
 		return nil, false
@@ -509,7 +509,7 @@ func (p *PlanCommandRunner) deletePlansWithPostDelete(ctx *command.Context, post
 		}
 	}()
 	for _, plan := range plans {
-		unlockFn, err := p.workingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, command.Plan)
+		unlockFn, err := p.workingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			return nil, fmt.Errorf("locking pending plan for dir %q workspace %q project %q before deleting: %w", plan.RepoRelDir, plan.Workspace, plan.ProjectName, err)
 		}

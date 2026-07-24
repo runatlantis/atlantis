@@ -101,6 +101,132 @@ func TestRenderErr(t *testing.T) {
 	}
 }
 
+func TestRenderWorkingDirLockMetadata(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	const commitURL = "https://github.com/owner/repo/commit/" + sha
+	const jobURL = "https://atlantis.example.com/jobs/job-id"
+	metadata := events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL, JobURL: jobURL}
+	newLockError := func(ownerMetadata events.WorkingDirLockMetadata) error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Plan, ownerMetadata)
+		Ok(t, err)
+		_, err = locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newMultipleJobsLockError := func() error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLockPull("owner/repo", 1, command.Plan, metadata)
+		Ok(t, err)
+		for i, url := range []string{jobURL + "-1", jobURL + "-2"} {
+			_, err = locker.TryLock("owner/repo", 1, "default", ".", fmt.Sprintf("project-%d", i), command.Plan, events.WorkingDirLockMetadata{JobURL: url})
+			Ok(t, err)
+		}
+		_, err = locker.TryLockPull("owner/repo", 1, command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newRenderer := func(language string) *events.MarkdownRenderer {
+		return events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+	}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{BaseRepo: models.Repo{VCSHost: models.VCSHost{Type: models.Github}}},
+	}
+	ctx.Log.Info("log output")
+
+	t.Run("command error renders links before log", func(t *testing.T) {
+		rendered := newRenderer("en").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan, Verbose: true})
+		commitLink := "- Commit: [" + sha + "](" + commitURL + ")"
+		jobLink := "- Blocking job: [View Atlantis execution](" + jobURL + ")"
+		for _, text := range []string{"```\ncannot run", commitLink + "\n" + jobLink, "<details><summary>Log</summary>"} {
+			if !strings.Contains(rendered, text) {
+				t.Fatalf("expected %q in:\n%s", text, rendered)
+			}
+		}
+		if !(strings.Index(rendered, "```") < strings.Index(rendered, commitLink) && strings.Index(rendered, commitLink) < strings.Index(rendered, jobLink) && strings.Index(rendered, jobLink) < strings.Index(rendered, "<details><summary>Log</summary>")) {
+			t.Fatalf("unexpected command error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("link fallbacks are independent", func(t *testing.T) {
+		shaOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{HeadCommit: sha})}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(shaOnly, "for commit "+sha) || strings.Contains(shaOnly, "- Commit:") || strings.Contains(shaOnly, "- Blocking job:") {
+			t.Fatalf("unexpected SHA-only fallback:\n%s", shaOnly)
+		}
+		jobOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{JobURL: jobURL})}, &events.CommentCommand{Name: command.Plan})
+		if strings.Contains(jobOnly, "- Commit:") || !strings.Contains(jobOnly, "- Blocking job: [View Atlantis execution]("+jobURL+")") {
+			t.Fatalf("unexpected job-only fallback:\n%s", jobOnly)
+		}
+	})
+
+	t.Run("project error renders links before context", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: newLockError(metadata),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		if !(strings.Index(rendered, "```\ncannot run") >= 0 && strings.Index(rendered, "- Commit:") > strings.Index(rendered, "```\ncannot run") && strings.Index(rendered, "rendered context") > strings.Index(rendered, "- Blocking job:")) {
+			t.Fatalf("unexpected unwrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("wrapped project error keeps context in details and links after", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), newLockError(metadata)),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		closeDetails := strings.Index(rendered, "</details>")
+		if !(strings.Index(rendered, "rendered context") < closeDetails && closeDetails < strings.Index(rendered, "- Commit:") && strings.Index(rendered, "- Commit:") < strings.Index(rendered, "- Blocking job:")) {
+			t.Fatalf("unexpected wrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("Spanish template has the same link structure", func(t *testing.T) {
+		rendered := newRenderer("es").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(rendered, "- Commit: ["+sha+"]("+commitURL+")") || !strings.Contains(rendered, "- Trabajo bloqueante: [Ver ejecución de Atlantis]("+jobURL+")") {
+			t.Fatalf("expected localized links in:\n%s", rendered)
+		}
+	})
+
+	t.Run("multiple jobs notice is localized and outside error details", func(t *testing.T) {
+		for _, tt := range []struct {
+			language string
+			notice   string
+		}{
+			{language: "en", notice: "- Multiple Atlantis jobs are currently running for this commit."},
+			{language: "es", notice: "- Actualmente se están ejecutando varios trabajos de Atlantis para este commit."},
+		} {
+			t.Run(tt.language, func(t *testing.T) {
+				err := newMultipleJobsLockError()
+				unwrapped := newRenderer(tt.language).Render(ctx, command.Result{Error: err}, &events.CommentCommand{Name: command.Apply})
+				fence := strings.Index(unwrapped, "\n```\n- Commit:")
+				if notice := strings.Index(unwrapped, tt.notice); fence < 0 || notice < fence {
+					t.Fatalf("expected notice below fenced error:\n%s", unwrapped)
+				}
+
+				result := command.ProjectResult{ProjectCommandOutput: command.ProjectCommandOutput{Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), err)}}
+				wrapped := newRenderer(tt.language).Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Apply})
+				details := strings.Index(wrapped, "</details>")
+				if notice := strings.Index(wrapped, tt.notice); details < 0 || notice < details {
+					t.Fatalf("expected notice below wrapped error details:\n%s", wrapped)
+				}
+			})
+		}
+	})
+}
+
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string

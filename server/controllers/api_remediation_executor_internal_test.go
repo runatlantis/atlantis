@@ -273,7 +273,7 @@ func TestAPIRemediationExecutor_ExecuteApplyAbortsWhenPreApplyPlanHasErrors(t *t
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -348,7 +348,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSeedsPullStatusForDependenci
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -491,7 +491,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsFailsOnOmittedDependency(t *
 	applyLockChecker := NewMockApplyLocker(gmockCtrl)
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -593,7 +593,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -716,7 +716,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsSkipsPRRequirements(t *testi
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -879,7 +879,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsRejectsStaleCachedDrift(t *t
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	repoDir, checkedOutCommit := initRemediationGitRepo(t)
@@ -945,7 +945,7 @@ func TestDriftApply_NonPRMutableRefChangedDuringApplyFailsClosed(t *testing.T) {
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	repoDir, mainCommit, _, _ := initReachabilityGitRepo(t)
@@ -1047,7 +1047,7 @@ func TestDriftApply_NonPRReleaseBranchChangedNoProjectsFailsClosed(t *testing.T)
 	applyLockChecker := NewMockApplyLocker(gmockCtrl)
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	repoDir, _, _, _ := initReachabilityGitRepo(t)
@@ -1125,7 +1125,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsPolicyFailureSkipsApply(t *t
 	applyLockChecker := NewMockApplyLocker(gmockCtrl)
 	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
@@ -1306,7 +1306,7 @@ func TestAPIRemediationExecutor_ExecutePlanPreservesNamedTargetWorkspace(t *test
 	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 	workingDir := NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
