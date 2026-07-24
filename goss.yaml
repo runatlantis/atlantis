@@ -22,16 +22,20 @@ command:
     stdout: []
     stderr: []
 
+{{if eq .Env.EXPECT_TERRAFORM "true"}}
   # ensure terraform is available
   terraform-available:
     exec: "terraform version"
     exit-status: 0
     stdout: []
     stderr: []
+{{end}}
 
+{{if eq .Env.EXPECT_TOFU "true"}}
   # ensure tofu binary is available
   tofu-available:
     exec: "tofu version"
     exit-status: 0
     stdout: []
     stderr: []
+{{end}}
