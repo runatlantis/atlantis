@@ -2066,6 +2066,71 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
+// After a container restart, targeted apply re-clones without RestorePlans.
+// PlanStore.Load must run before ValidateProjectPlan so the .tfplan is on disk.
+func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("external-plan-bytes")
+	store := &restoringPlanStore{contents: planContents}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+		PlanStore:                 store,
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       valid.DefaultApplyStage.Steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	// Simulate post-reclone state: working dir exists, plan file does not.
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	_, statErr := os.Stat(planPath)
+	Assert(t, os.IsNotExist(statErr), "plan must be absent before Load")
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
+		ThenReturn("apply ok", nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "", res.Failure)
+	Equals(t, "apply ok", res.ApplySuccess)
+	Assert(t, store.loadCalls == 1, "expected one PlanStore.Load, got %d", store.loadCalls)
+	got, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, string(planContents), string(got))
+	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
 func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCommandStart(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -2648,6 +2713,31 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 type trackingWorkingDirLocker struct {
 	locked   bool
 	metadata events.WorkingDirLockMetadata
+}
+
+// restoringPlanStore writes contents to planPath on Load, simulating an
+// external store restoring a plan after a container restart / re-clone.
+type restoringPlanStore struct {
+	contents  []byte
+	loadCalls int
+}
+
+func (s *restoringPlanStore) Save(command.ProjectContext, string) error { return nil }
+func (s *restoringPlanStore) Load(_ command.ProjectContext, planPath string) error {
+	s.loadCalls++
+	if err := os.MkdirAll(filepath.Dir(planPath), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(planPath, s.contents, 0o600)
+}
+func (s *restoringPlanStore) Remove(command.ProjectContext, string) error { return nil }
+func (s *restoringPlanStore) ListWorkspaces(string, string, int) ([]string, error) {
+	return nil, nil
+}
+func (s *restoringPlanStore) RestorePlans(string, string, string, int) error { return nil }
+func (s *restoringPlanStore) DeleteForPull(string, string, int) error        { return nil }
+func (s *restoringPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
+	return nil
 }
 
 func planHashForContent(contents []byte) string {
