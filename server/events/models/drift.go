@@ -312,6 +312,9 @@ type ProjectDrift struct {
 	DetectionID string `json:"detection_id,omitempty"`
 	// Drift contains the drift summary for this project.
 	Drift DriftSummary `json:"drift"`
+	// PlanOutput contains the raw Terraform plan output for this project, if
+	// detection ran a plan successfully.
+	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when the drift was last detected.
 	LastChecked time.Time `json:"last_checked"`
 	// Error contains any error message if drift detection failed for this project.

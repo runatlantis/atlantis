@@ -312,6 +312,10 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 
 :::
 
+::: tip Workflow Order
+`POST /api/drift/remediate` acts on cached drift data. Run `POST /api/drift/detect` for the target repository/ref/projects first — remediation for a project with no cached drift record (or with `drift_only: true` and no detected drift) is a no-op for that project. See the "Cached Drift Required" tip below.
+:::
+
 #### Parameters
 
 | Name        | Type                 | Required    | Description                                                             |
@@ -671,6 +675,10 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 }'
 ```
 
+::: tip Plan Output
+When a project's plan runs successfully, the response includes `plan_output` — the raw Terraform plan text for that project. It is omitted when there is no plan output (for example, if the project errored before a plan ran).
+:::
+
 #### Sample Response (Success)
 
 ```json
@@ -697,6 +705,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
           "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
           "changes_outside": false
         },
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place\n\nPlan: 1 to add, 2 to change, 0 to destroy.",
         "last_checked": "2025-01-21T10:30:00Z"
       },
       {
@@ -850,6 +859,10 @@ Drift detection must be enabled on the Atlantis server. Destructive remediation 
 | Name | Type   | Required | Description                                |
 |------|--------|----------|--------------------------------------------|
 | id   | string | Yes      | The unique identifier of the remediation   |
+
+::: tip Which ID?
+The `id` here is the `id` field returned by a prior `POST /api/drift/remediate` call — not the `detection_id`/`id` returned by `POST /api/drift/detect`. Detection and remediation runs are tracked separately, each with their own ID space. To inspect the plan output for a remediation, call `POST /api/drift/remediate` first and use the `id` from its response.
+:::
 
 #### Query Parameters
 

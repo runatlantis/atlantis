@@ -2007,6 +2007,7 @@ func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolv
 		projectDrift.Drift = models.DriftSummary{HasDrift: false}
 	} else if pr.PlanSuccess != nil {
 		projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		projectDrift.PlanOutput = pr.PlanSuccess.TerraformOutput
 	}
 
 	return projectDrift
