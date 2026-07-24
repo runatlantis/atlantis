@@ -162,6 +162,9 @@ type DriftProjectAPI struct {
 	HasDrift bool `json:"has_drift"`
 	// Drift contains drift details if drift was detected.
 	Drift *DriftDetailsAPI `json:"drift,omitempty"`
+	// PlanOutput contains the raw Terraform plan output, if detection ran a
+	// plan successfully.
+	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when drift was last checked.
 	LastChecked time.Time `json:"last_checked"`
 	// Error contains any error message if detection failed.
@@ -199,6 +202,7 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 		ResolvedCommit: pd.ResolvedCommit,
 		DetectionID:    pd.DetectionID,
 		HasDrift:       pd.Drift.HasDrift,
+		PlanOutput:     pd.PlanOutput,
 		LastChecked:    pd.LastChecked,
 		Error:          pd.Error,
 	}
