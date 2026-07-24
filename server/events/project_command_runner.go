@@ -342,6 +342,7 @@ type DefaultProjectCommandRunner struct {
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
+	PlanStore                 runtime.PlanStore
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -913,6 +914,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
+	// External plan stores put .tfplan on disk only via Load/RestorePlans.
+	// Targeted apply re-clones without RestorePlans; Load must run before
+	// ValidateProjectPlan (which stats the local file) and before hashing.
+	if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
+		return "", "", "", err
+	}
+
 	if p.ApplyPlanValidator != nil {
 		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
 			return "", "", "", err
@@ -1089,6 +1097,26 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		Output:    strings.Join(outputs, "\n"),
 		RePlanCmd: rePlanCmd,
 	}, "", nil
+}
+
+// ensurePlanLoaded downloads the plan from the external store (if any) so it
+// exists at the expected local path before validation and terraform apply.
+// LocalPlanStore.Load is a no-op. Not called again before the second
+// ValidateProjectPlan in runSteps so pre-apply run steps that mutate the plan
+// still fail the re-check.
+func (p *DefaultProjectCommandRunner) ensurePlanLoaded(ctx command.ProjectContext, absPath string) error {
+	store := p.PlanStore
+	if store == nil {
+		store = &runtime.LocalPlanStore{}
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	if err := store.Load(ctx, planPath); err != nil {
+		return fmt.Errorf("loading plan: %w", err)
+	}
+	return nil
 }
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
