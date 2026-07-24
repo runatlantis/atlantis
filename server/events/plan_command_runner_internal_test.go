@@ -4,6 +4,7 @@
 package events
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -198,10 +199,12 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 			if tt.ctxPull.Num != 0 || tt.ctxPull.BaseRepo.FullName != "" {
 				ctxPull = tt.ctxPull
 			}
-			finder := &recordingPendingPlanFinder{}
+			finder := &recordingPendingPlanFinder{plans: pendingPlansForProjectCmds(pullDir, tt.projectCmds)}
 			locker := &recordingPlanCleanupLocker{locksByKey: tt.locksByKey}
+			workingDirLocker := NewDefaultWorkingDirLocker()
 			runner := &PlanCommandRunner{
 				workingDir:        &planCleanupWorkingDir{pullDir: pullDir},
+				workingDirLocker:  workingDirLocker,
 				pendingPlanFinder: finder,
 				lockingLocker:     locker,
 			}
@@ -210,10 +213,12 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 				Pull: ctxPull,
 			}
 
-			runner.deletePlansAndPlanLocks(ctx, tt.projectCmds)
+			if err := runner.deletePlansAndPlanLocks(ctx, tt.projectCmds); err != nil {
+				t.Fatalf("deletePlansAndPlanLocks returned error: %s", err)
+			}
 
-			if len(finder.deletedPullDirs) != 1 || finder.deletedPullDirs[0] != pullDir {
-				t.Fatalf("expected DeletePlans(%q), got %#v", pullDir, finder.deletedPullDirs)
+			if len(finder.findPullDirs) != 1 || finder.findPullDirs[0] != pullDir {
+				t.Fatalf("expected Find(%q), got %#v", pullDir, finder.findPullDirs)
 			}
 			if len(locker.unlockByPullCalls) != 0 {
 				t.Fatalf("expected no UnlockByPull calls, got %#v", locker.unlockByPullCalls)
@@ -234,14 +239,63 @@ func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
 	}
 }
 
-type recordingPendingPlanFinder struct {
-	PendingPlanFinder
-	deletedPullDirs []string
+func TestPlanCommandRunner_DeletePlanLocksForPendingPlansReleasesOnlyPendingPlanLocks(t *testing.T) {
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{BaseRepo: repo, Num: 1}
+	deletedPlanProject := models.NewProject(repo.FullName, "terraform", "prod")
+	unrelatedProject := models.NewProject(repo.FullName, "terraform/unrelated", "prod")
+	deletedPlanKey := models.GenerateLockKey(deletedPlanProject, "default")
+	unrelatedKey := models.GenerateLockKey(unrelatedProject, "default")
+	locker := &recordingPlanCleanupLocker{
+		locksByKey: map[string]models.ProjectLock{
+			deletedPlanKey: lockForPull(repo, pull.Num),
+			unrelatedKey:   lockForPull(repo, pull.Num),
+		},
+	}
+	runner := &PlanCommandRunner{lockingLocker: locker}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: pull,
+	}
+	plans := []PendingPlan{
+		{RepoRelDir: "terraform", Workspace: "default", ProjectName: "prod"},
+	}
+
+	if err := runner.deletePlanLocksForPendingPlans(ctx, plans); err != nil {
+		t.Fatalf("deletePlanLocksForPendingPlans returned error: %s", err)
+	}
+
+	expectedCalls := []unlockIfOwnedByPullCall{
+		{
+			key:       deletedPlanKey,
+			project:   deletedPlanProject,
+			workspace: "default",
+			pullNum:   pull.Num,
+		},
+	}
+	if !equalUnlockIfOwnedByPullCalls(locker.unlockIfOwnedByPullCalls, expectedCalls) {
+		t.Fatalf("expected UnlockIfOwnedByPull calls %#v, got %#v", expectedCalls, locker.unlockIfOwnedByPullCalls)
+	}
+	if !equalStringSlices(locker.deletedKeys, []string{deletedPlanKey}) {
+		t.Fatalf("expected deleted keys %#v, got %#v", []string{deletedPlanKey}, locker.deletedKeys)
+	}
+	if _, ok := locker.locksByKey[unrelatedKey]; !ok {
+		t.Fatalf("expected unrelated lock %q to remain", unrelatedKey)
+	}
+	if len(locker.unlockByPullCalls) != 0 {
+		t.Fatalf("expected no UnlockByPull calls, got %#v", locker.unlockByPullCalls)
+	}
 }
 
-func (r *recordingPendingPlanFinder) DeletePlans(pullDir string) error {
-	r.deletedPullDirs = append(r.deletedPullDirs, pullDir)
-	return nil
+type recordingPendingPlanFinder struct {
+	PendingPlanFinder
+	findPullDirs []string
+	plans        []PendingPlan
+}
+
+func (r *recordingPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
+	r.findPullDirs = append(r.findPullDirs, pullDir)
+	return r.plans, nil
 }
 
 type unlockByPullCall struct {
@@ -325,26 +379,29 @@ func expectedUnlockCall(project command.ProjectContext, pullNum int) unlockIfOwn
 	}
 }
 
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
+func pendingPlansForProjectCmds(pullDir string, projectCmds []command.ProjectContext) []PendingPlan {
+	plans := make([]PendingPlan, 0, len(projectCmds))
+	seen := make(map[string]bool)
+	for _, projectCmd := range projectCmds {
+		key := keyForProject(projectCmd)
+		if seen[key] {
+			continue
 		}
+		seen[key] = true
+		plans = append(plans, PendingPlan{
+			RepoDir:     pullDir,
+			RepoRelDir:  projectCmd.RepoRelDir,
+			Workspace:   projectCmd.Workspace,
+			ProjectName: projectCmd.ProjectName,
+		})
 	}
-	return true
+	return plans
+}
+
+func equalStringSlices(a, b []string) bool {
+	return slices.Equal(a, b)
 }
 
 func equalUnlockIfOwnedByPullCalls(calls []unlockIfOwnedByPullCall, expected []unlockIfOwnedByPullCall) bool {
-	if len(calls) != len(expected) {
-		return false
-	}
-	for i := range calls {
-		if calls[i] != expected[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(calls, expected)
 }

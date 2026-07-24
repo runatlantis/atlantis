@@ -51,6 +51,30 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
+func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
+	t.Log("when workspace.Delete fails, external plans are still cleaned up")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	store := &countingPlanStore{}
+	pce := events.PullClosedExecutor{
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+		PlanStore:          store,
+	}
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning workspace: disk full", actualErr.Error())
+	Equals(t, 1, store.deleteForPullCalls)
+}
+
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
@@ -389,4 +413,23 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Workspace:    "staging",
 	}
 	Equals(t, expectedPullInfo2, capturedArgs[1])
+}
+
+type countingPlanStore struct {
+	deleteForPullCalls int
+}
+
+func (s *countingPlanStore) Save(command.ProjectContext, string) error   { return nil }
+func (s *countingPlanStore) Load(command.ProjectContext, string) error   { return nil }
+func (s *countingPlanStore) Remove(command.ProjectContext, string) error { return nil }
+func (s *countingPlanStore) ListWorkspaces(string, string, int) ([]string, error) {
+	return nil, nil
+}
+func (s *countingPlanStore) RestorePlans(string, string, string, int) error { return nil }
+func (s *countingPlanStore) DeleteForPull(string, string, int) error {
+	s.deleteForPullCalls++
+	return nil
+}
+func (s *countingPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
+	return nil
 }

@@ -824,10 +824,13 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo
 	var teamNames []string
 
 	users, resp, err := g.Client.Users.ListUsers(&gitlab.ListUsersOptions{Username: &user.Username})
-	if resp.StatusCode == http.StatusNotFound {
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return teamNames, nil
 	}
 	if err != nil {
+		if resp == nil {
+			return nil, fmt.Errorf("GET /users: %w", err)
+		}
 		return nil, fmt.Errorf("GET /users returned: %d: %w", resp.StatusCode, err)
 	} else if len(users) == 0 {
 		return nil, errors.New("GET /users returned no user")
@@ -838,13 +841,16 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo
 	userID := users[0].ID
 	for _, groupName := range g.ConfiguredGroups {
 		membership, resp, err := g.Client.GroupMembers.GetGroupMember(groupName, userID)
-		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
+		if resp != nil && (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden) {
 			continue
 		}
 		if err != nil {
+			if resp == nil {
+				return nil, fmt.Errorf("GET /groups/%s/members/%d: %w", groupName, userID, err)
+			}
 			return nil, fmt.Errorf("GET /groups/%s/members/%d returned: %d: %w", groupName, userID, resp.StatusCode, err)
 		}
-		if resp.StatusCode == http.StatusOK && membership.State == "active" {
+		if resp != nil && resp.StatusCode == http.StatusOK && membership.State == "active" {
 			teamNames = append(teamNames, groupName)
 		}
 	}

@@ -640,6 +640,7 @@ If you need to modify the Docker image that we provide, for instance to add the 
     # copy a terraform binary of the version you need
     USER root
     COPY terragrunt /usr/local/bin/terragrunt
+    USER atlantis
     ```
 
 Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.

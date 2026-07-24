@@ -144,6 +144,65 @@ func TestSeedPullStatusFromPlanResultPreservesPlanStatusWhenPolicyCheckFollows(t
 	Equals(t, true, ctx.PullStatus.Projects[0].PolicyStatus[0].Passed)
 }
 
+func TestSeedPullStatusFromPlanResult_RecordsErroredPolicyCheckStatus(t *testing.T) {
+	ctx := &command.Context{}
+	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+			},
+		},
+		{
+			Command:     command.PolicyCheck,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("policy check failed"),
+			},
+		},
+	}})
+
+	Assert(t, ctx.PullStatus != nil, "expected pull status to be initialized")
+	Equals(t, 1, len(ctx.PullStatus.Projects))
+	Equals(t, models.ErroredPolicyCheckStatus, ctx.PullStatus.Projects[0].Status)
+}
+
+func TestSeedPullStatusFromPlanResult_RecordsPassedPolicyCheckStatusForChangedPlan(t *testing.T) {
+	ctx := &command.Context{}
+	seedPullStatusFromPlanResult(ctx, &command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command:     command.Plan,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+			},
+		},
+		{
+			Command:     command.PolicyCheck,
+			ProjectName: "network",
+			RepoRelDir:  "network",
+			Workspace:   events.DefaultWorkspace,
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PolicyCheckResults: &models.PolicyCheckResults{
+					PolicySetResults: []models.PolicySetResult{{PolicySetName: "default", Passed: true}},
+				},
+			},
+		},
+	}})
+
+	Assert(t, ctx.PullStatus != nil, "expected pull status to be initialized")
+	Equals(t, 1, len(ctx.PullStatus.Projects))
+	Equals(t, models.PassedPolicyCheckStatus, ctx.PullStatus.Projects[0].Status)
+	Equals(t, 1, len(ctx.PullStatus.Projects[0].PolicyStatus))
+}
+
 func TestVerifyNonPRBaseBranchReachabilityRedactsCredentialedFetchErrors(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	repoDir := t.TempDir()
@@ -639,7 +698,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsAbortsLaterExecutionGroups(t
 	Equals(t, "apply skipped because an earlier execution group failed", results[1].Error)
 }
 
-func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t *testing.T) {
+func TestAPIRemediationExecutor_ExecuteApplyProjectsSkipsPRRequirements(t *testing.T) {
 	RegisterMockTestingT(t)
 	gmockCtrl := gomock.NewController(t)
 	logger := logging.NewNoopLogger(t)
@@ -669,7 +728,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
-			Assert(t, !ctx.SkipPRRequirements, "remediation apply must not bypass PR-state requirements during pre-apply plan")
+			Assert(t, ctx.SkipPRRequirements, "remediation apply must bypass PR-only requirements (approved/mergeable) during pre-apply plan")
 			Assert(t, ctx.SuppressVCSStatus, "remediation apply should suppress normal VCS status writes")
 			cmd := args[1].(*events.CommentCommand)
 			return ReturnValues{[]command.ProjectContext{{
@@ -682,7 +741,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			ctx := args[0].(*command.Context)
-			Assert(t, !ctx.SkipPRRequirements, "remediation apply must not bypass PR-state requirements during apply")
+			Assert(t, ctx.SkipPRRequirements, "remediation apply must bypass PR-only requirements (approved/mergeable) during apply")
 			Assert(t, ctx.SuppressVCSStatus, "remediation apply should suppress normal VCS status writes")
 			cmd := args[1].(*events.CommentCommand)
 			return ReturnValues{[]command.ProjectContext{{
@@ -701,7 +760,7 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsDoesNotSkipPRRequirements(t 
 	})
 	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 		projectCtx := args[0].(command.ProjectContext)
-		Assert(t, !projectCtx.SkipPRRequirements, "remediation apply project context must not bypass PR-state requirements")
+		Assert(t, projectCtx.SkipPRRequirements, "remediation apply project context must bypass PR-only requirements (approved/mergeable)")
 		Assert(t, projectCtx.SuppressVCSStatus, "remediation apply project context should suppress normal VCS status writes")
 		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
 	})
@@ -865,6 +924,187 @@ func TestAPIRemediationExecutor_ExecuteApplyProjectsRejectsStaleCachedDrift(t *t
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
+func TestDriftApply_NonPRMutableRefChangedDuringApplyFailsClosed(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	repoDir, mainCommit, _, _ := initReachabilityGitRepo(t)
+	runRemediationGit(t, repoDir, "checkout", "-q", "main")
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Apply,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	projectCommandRunner := NewMockProjectCommandRunner()
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func([]Param) ReturnValues {
+		Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"changed\" {}\n"), 0600))
+		runRemediationGit(t, repoDir, "add", "main.tf")
+		runRemediationGit(t, repoDir, "commit", "-q", "-m", "advance main during apply")
+		runRemediationGit(t, repoDir, "push", "-q", "origin", "HEAD:main")
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                          locker,
+			ApplyLockChecker:                applyLockChecker,
+			Logger:                          logger,
+			Scope:                           metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:           projectCommandBuilder,
+			ProjectPlanCommandRunner:        projectCommandRunner,
+			ProjectPolicyCheckCommandRunner: projectCommandRunner,
+			ProjectApplyCommandRunner:       projectCommandRunner,
+			PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
+			WorkingDir:                      workingDir,
+			WorkingDirLocker:                workingDirLocker,
+			CommitStatusUpdater:             commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "main", "Github", []models.ProjectDrift{{
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      events.DefaultWorkspace,
+		Ref:            "main",
+		DetectionID:    "detect-1",
+		ResolvedCommit: mainCommit,
+		Drift:          models.DriftSummary{HasDrift: true},
+	}})
+
+	Assert(t, err != nil, "expected mutable ref movement to fail remediation apply")
+	Assert(t, strings.Contains(err.Error(), "changed"), "expected changed-ref error, got %v", err)
+	Equals(t, 1, len(results))
+	Equals(t, models.RemediationStatusFailed, results[0].Status)
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestDriftApply_NonPRReleaseBranchChangedNoProjectsFailsClosed(t *testing.T) {
+	RegisterMockTestingT(t)
+	gmockCtrl := gomock.NewController(t)
+	logger := logging.NewNoopLogger(t)
+	baseRepo := models.Repo{
+		FullName: "owner/repo",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+
+	locker := NewMockLocker(gmockCtrl)
+	locker.EXPECT().UnlockByPull(baseRepo.FullName, gomock.Any()).Return(nil, nil).AnyTimes()
+	applyLockChecker := NewMockApplyLocker(gmockCtrl)
+	applyLockChecker.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+	workingDirLocker := NewMockWorkingDirLocker()
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name]())).
+		ThenReturn(func() {}, nil)
+	workingDir := NewMockWorkingDir()
+	repoDir, _, _, _ := initReachabilityGitRepo(t)
+	releaseCommit := createRemediationGitBranch(t, repoDir, "release")
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(workingDir.Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+		ThenReturn(nil)
+
+	projectCommandBuilder := NewMockProjectCommandBuilder()
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func([]Param) ReturnValues {
+			advanceRemediationGitBranch(t, repoDir, "release")
+			return ReturnValues{[]command.ProjectContext{}, nil}
+		})
+	projectCommandRunner := NewMockProjectCommandRunner()
+	preWorkflowHooksCommandRunner := NewMockPreWorkflowHooksCommandRunner()
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	postWorkflowHooksCommandRunner := NewMockPostWorkflowHooksCommandRunner()
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(nil)
+	commitStatusUpdater := NewMockCommitStatusUpdater()
+	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).
+		ThenReturn(nil)
+
+	executor := &apiRemediationExecutor{
+		controller: &APIController{
+			Locker:                         locker,
+			ApplyLockChecker:               applyLockChecker,
+			Logger:                         logger,
+			Scope:                          metricstest.NewLoggingScope(t, logger, "null"),
+			ProjectCommandBuilder:          projectCommandBuilder,
+			ProjectPlanCommandRunner:       projectCommandRunner,
+			ProjectApplyCommandRunner:      projectCommandRunner,
+			PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+			PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+			WorkingDir:                     workingDir,
+			WorkingDirLocker:               workingDirLocker,
+			CommitStatusUpdater:            commitStatusUpdater,
+		},
+		baseRepo: baseRepo,
+		logger:   logger,
+	}
+
+	results, err := executor.ExecuteApplyProjects("owner/repo", "release", "Github", []models.ProjectDrift{{
+		ProjectName:    "app",
+		Path:           "app",
+		Workspace:      events.DefaultWorkspace,
+		Ref:            "release",
+		ResolvedCommit: releaseCommit,
+		Drift:          models.DriftSummary{HasDrift: true},
+	}})
+
+	Assert(t, err != nil, "expected moved release ref to fail remediation apply")
+	Assert(t, strings.Contains(err.Error(), "changed"), "expected changed-ref error, got %v", err)
+	Equals(t, 0, len(results))
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
@@ -1170,6 +1410,24 @@ func initReachabilityGitRepo(t *testing.T) (string, string, string, string) {
 	unrelatedCommit := strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
 
 	return repoDir, mainCommit, tagCommit, unrelatedCommit
+}
+
+func createRemediationGitBranch(t *testing.T, repoDir, branch string) string {
+	t.Helper()
+	runRemediationGit(t, repoDir, "checkout", "-q", "main")
+	runRemediationGit(t, repoDir, "checkout", "-q", "-b", branch)
+	runRemediationGit(t, repoDir, "push", "-q", "-u", "origin", branch)
+	return strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
+}
+
+func advanceRemediationGitBranch(t *testing.T, repoDir, branch string) string {
+	t.Helper()
+	runRemediationGit(t, repoDir, "checkout", "-q", branch)
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), []byte("resource \"null_resource\" \"release_changed\" {}\n"), 0600))
+	runRemediationGit(t, repoDir, "add", "main.tf")
+	runRemediationGit(t, repoDir, "commit", "-q", "-m", "advance "+branch)
+	runRemediationGit(t, repoDir, "push", "-q", "origin", "HEAD:"+branch)
+	return strings.TrimSpace(runRemediationGit(t, repoDir, "rev-parse", "HEAD"))
 }
 
 func remediationGitTempDir(t *testing.T) string {

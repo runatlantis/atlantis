@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -93,6 +94,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -125,6 +127,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDiscoverMode,
 			scope,
 			terraformClient,
+			planStore,
 		),
 		Logger: logger,
 		scope:  scope,
@@ -155,6 +158,7 @@ func NewProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -164,6 +168,7 @@ func NewProjectCommandBuilder(
 		WorkingDirLocker:         workingDirLocker,
 		GlobalCfg:                globalCfg,
 		PendingPlanFinder:        pendingPlanFinder,
+		PlanStore:                planStore,
 		SkipCloneNoChanges:       skipCloneNoChanges,
 		EnableRegExpCmd:          EnableRegExpCmd,
 		EnableAutoMerge:          EnableAutoMerge,
@@ -268,6 +273,8 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
+	// Persists plan files to external storage (S3) so they survive container restarts.
+	PlanStore runtime.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
@@ -1196,7 +1203,41 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		// Working dir is gone (e.g. container restart with emptyDir). Try to
+		// recover via the plan store. We must clone each workspace that has
+		// stored plans BEFORE restoring, otherwise Clone falls through to
+		// forceClone (os.RemoveAll) and wipes the just-restored plans.
+		ctx.Log.Info("pull directory missing, attempting to restore plans")
+		// Probe capability first to avoid pointless I/O on stores that don't
+		// support restore (e.g. LocalPlanStore).
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return nil, os.ErrNotExist
+		}
+		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
+		if listErr != nil {
+			return nil, fmt.Errorf("listing workspaces from external store: %w", listErr)
+		}
+		// No workspaces in the store means there's nothing to restore.
+		if len(workspaces) == 0 {
+			return nil, os.ErrNotExist
+		}
+		// Clone every workspace before restoring; this ensures each workspace
+		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
+		for _, workspace := range workspaces {
+			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
+				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
+			}
+		}
+		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
+		}
 	}
 
 	plans, err := p.PendingPlanFinder.Find(pullDir)
@@ -1243,6 +1284,16 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		plans = filteredPlans
 	}
 
+	if commentCmd.Name == command.Apply {
+		hasActivePlan := false
+		if p.WorkingDirLocker != nil {
+			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
+		}
+		if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
+			return nil, err
+		}
+	}
+
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		// Lock all the directories we need to run the command in
@@ -1255,6 +1306,20 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if err != nil {
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
+		if commentCmd.Name == command.Apply {
+			planBasePath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+			planPath, err := pendingPlanFilePath(plan)
+			if err != nil {
+				return nil, fmt.Errorf("validating plan path for dir %q: %w", plan.RepoRelDir, err)
+			}
+			planHash, err := hashFile(planBasePath, planPath)
+			if err != nil {
+				return nil, fmt.Errorf("hashing plan for dir '%s': %w", plan.RepoRelDir, err)
+			}
+			for i := range commentCmds {
+				commentCmds[i].ExpectedPlanHash = planHash
+			}
+		}
 		cmds = append(cmds, commentCmds...)
 	}
 
@@ -1263,6 +1328,205 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	})
 
 	return cmds, nil
+}
+
+// ValidatePlansForApply ensures discovered plans are valid for the current PR head.
+// When plans are found, validates each against current-head PullStatus.
+// When no plans are found, fails if no current PullStatus exists or if it is stale.
+func ValidatePlansForApply(ctx *command.Context, plans []PendingPlan) error {
+	return ValidatePlansForApplyWithActivePlan(ctx, plans, false)
+}
+
+func ValidatePlansForApplyWithActivePlan(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) error {
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, ctx.Pull)
+}
+
+// ValidatePlansForApplyWithCurrentHead validates plans against an authoritative
+// current head. This lets apply refresh the live PR head under the apply lock
+// before generic builder validation instead of trusting the command-start pull
+// snapshot.
+func ValidatePlansForApplyWithCurrentHead(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentHead string) error {
+	currentPull := ctx.Pull
+	currentPull.HeadCommit = currentHead
+	return ValidatePlansForApplyWithCurrentPull(ctx, plans, hasActivePlan, currentPull)
+}
+
+// ValidatePlansForApplyWithCurrentPull validates plans against an authoritative
+// current pull identity. This lets apply refresh the live PR head/base under the
+// apply lock before generic builder validation instead of trusting the
+// command-start pull snapshot.
+func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingPlan, hasActivePlan bool, currentPull models.PullRequest) error {
+	if currentPull.HeadCommit != "" || currentPull.BaseBranch != "" {
+		ctxCopy := *ctx
+		if currentPull.HeadCommit != "" {
+			ctxCopy.Pull.HeadCommit = currentPull.HeadCommit
+		}
+		if currentPull.BaseBranch != "" {
+			ctxCopy.Pull.BaseBranch = currentPull.BaseBranch
+		}
+		ctx = &ctxCopy
+	}
+	if hasActivePlan {
+		return fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
+	}
+	if len(plans) > 0 {
+		return validateFoundPlans(ctx, plans)
+	}
+	return validateNoPlansFound(ctx, hasActivePlan)
+}
+
+func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
+	if ctx.PullStatus == nil {
+		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
+	}
+
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+		return err
+	}
+
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if proj == nil {
+			return fmt.Errorf(
+				"plan file found for dir %q workspace %q project %q but no matching plan status exists; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName,
+			)
+		}
+		if !statusAllowedForDiscoveredPlan(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
+				plan.RepoRelDir, plan.Workspace, plan.ProjectName, proj.Status.String(),
+			)
+		}
+	}
+
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, planKeys)
+}
+
+func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
+	if ctx.PullStatus == nil {
+		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
+	}
+
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
+		return err
+	}
+
+	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
+}
+
+func shortSHA(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// statusAllowedForDiscoveredPlan returns true if a discovered .tfplan file
+// with this status is valid to build an apply command for. Includes
+// PlannedNoChangesPlanStatus (no-op plan can leave a .tfplan on disk) and
+// ErroredPolicyCheckStatus (let apply build the command and fail through
+// existing per-project apply-requirement handling).
+func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus, models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
+		models.ErroredPolicyCheckStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusBlocksGenericApplyWithoutPlan(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.ErroredPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+func statusIsSafeWithoutPlanFile(status models.ProjectPlanStatus) bool {
+	switch status {
+	case models.PlannedNoChangesPlanStatus, models.AppliedPlanStatus, models.DiscardedPlanStatus:
+		return true
+	default:
+		return false
+	}
+}
+
+type applyPlanKey struct {
+	workspace   string
+	repoRelDir  string
+	projectName string
+}
+
+func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
+	return applyPlanKey{
+		workspace:   workspace,
+		repoRelDir:  filepath.Clean(repoRelDir),
+		projectName: projectName,
+	}
+}
+
+func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
+	for _, proj := range pullStatus.Projects {
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		if statusRequiresPlanFileForGenericApply(proj.Status) {
+			return fmt.Errorf(
+				"plan file is missing for dir %q workspace %q project %q with status %q; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+			)
+		}
+		if statusBlocksGenericApplyWithoutPlan(proj.Status) {
+			return fmt.Errorf(
+				"plan for dir %q workspace %q project %q errored and cannot be applied without a plan file; run `atlantis plan`",
+				proj.RepoRelDir, proj.Workspace, proj.ProjectName,
+			)
+		}
+		if statusIsSafeWithoutPlanFile(proj.Status) {
+			continue
+		}
+		return fmt.Errorf(
+			"plan for dir %q workspace %q project %q has status %q and cannot be applied without a plan file; run `atlantis plan`",
+			proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String(),
+		)
+	}
+	return nil
+}
+
+func findProjectInPullStatus(pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	cleanDir := filepath.Clean(repoRelDir)
+	for i := range pullStatus.Projects {
+		proj := &pullStatus.Projects[i]
+		if proj.Workspace != workspace || filepath.Clean(proj.RepoRelDir) != cleanDir {
+			continue
+		}
+		if projectName != "" {
+			if proj.ProjectName == projectName {
+				return proj
+			}
+			continue
+		}
+		if proj.ProjectName == "" {
+			return proj
+		}
+	}
+	return nil
 }
 
 // buildProjectCommand builds an command for the single project
@@ -1284,17 +1548,22 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
-	if err != nil {
-		return projCtx, err
-	}
-	defer unlockFn()
-
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if errors.Is(err, os.ErrNotExist) {
-		return projCtx, errors.New("no working directory found–did you run plan?")
+		// Re-clone only if the plan store can recover plans externally.
+		// LocalPlanStore signals this via ErrRestoreNotSupported; external
+		// stores (S3) return nil and Load restores the plan in doApply before
+		// plan validation (this path does not call RestorePlans).
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return projCtx, errors.New("no working directory found–did you run plan?")
+		}
+		ctx.Log.Info("working directory missing, re-cloning repo for apply")
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
+		}
 	} else if err != nil {
 		return projCtx, err
 	}
@@ -1304,7 +1573,13 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	return p.buildProjectCommandCtx(
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
+	if err != nil {
+		return projCtx, err
+	}
+	defer unlockFn()
+
+	projCtx, err = p.buildProjectCommandCtx(
 		ctx,
 		cmd.Name,
 		cmd.SubName,
@@ -1317,6 +1592,38 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		ctx.API && cmd.Workspace != "",
 		cmd.Verbose,
 	)
+	if err != nil {
+		return projCtx, err
+	}
+	if cmd.Name == command.Apply {
+		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
+			return nil, err
+		}
+	}
+	return projCtx, nil
+}
+
+func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
+	for i := range projCtxs {
+		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)
+		if err != nil {
+			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
+		}
+		absPath := filepath.Join(repoDir, projCtxs[i].RepoRelDir)
+		planPath, err := safePlanFilePath(projCtxs[i], absPath)
+		if err != nil {
+			return fmt.Errorf("validating plan path for dir %q: %w", projCtxs[i].RepoRelDir, err)
+		}
+		planHash, err := hashFile(absPath, planPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return fmt.Errorf("hashing plan for dir '%s': %w", projCtxs[i].RepoRelDir, err)
+		}
+		projCtxs[i].ExpectedPlanHash = planHash
+	}
+	return nil
 }
 
 // buildProjectCommandCtx builds a context for a single or several projects identified

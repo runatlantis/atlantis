@@ -62,10 +62,11 @@ func (t *UserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	t.Transport.Password = token
+	transport := *t.Transport
+	transport.Password = token
 
 	// defer to the underlying transport
-	return t.Transport.RoundTrip(req)
+	return transport.RoundTrip(req)
 }
 
 // Client returns a client for basic auth user credentials.
@@ -100,7 +101,7 @@ func (c *UserCredentials) GetToken() (string, error) {
 			return "", fmt.Errorf("failed reading github token file: %w", err)
 		}
 
-		return string(content), nil
+		return strings.TrimSpace(string(content)), nil
 	}
 
 	return c.Token, nil

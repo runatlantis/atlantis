@@ -270,6 +270,11 @@ commands. We can use this functionality to enable
 
 You can either use your repo's `atlantis.yaml` file or the Atlantis server's `repos.yaml` file.
 
+Atlantis selects each project's Terraform distribution and version. In the workflows below,
+`ATLANTIS_TERRAFORM_DISTRIBUTION` expands to the executable prefix (`terraform` or `tofu`), and combining it with
+`ATLANTIS_TERRAFORM_VERSION` points Terragrunt at the same versioned binary. This also supports repositories containing
+both Terraform and OpenTofu projects.
+
 Given a directory structure:
 
 ```plain
@@ -285,7 +290,6 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TG_TF_PATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
@@ -296,7 +300,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -311,7 +315,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -321,7 +325,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           name: TF_VAR_author
           command: 'git show -s --format="%ae" $HEAD_COMMIT'
@@ -331,7 +335,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
@@ -351,7 +355,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -363,7 +367,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
