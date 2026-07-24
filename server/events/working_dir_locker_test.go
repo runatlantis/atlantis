@@ -5,6 +5,7 @@
 package events_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -46,7 +47,7 @@ func TestTryLockIncludesCommitMetadata(t *testing.T) {
 		want     string
 	}{
 		{name: "sha", metadata: events.WorkingDirLockMetadata{HeadCommit: sha}, want: "by \"plan\" for commit " + sha + "."},
-		{name: "url", metadata: events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL}, want: "by \"plan\" for commit " + sha + " (" + commitURL + ")."},
+		{name: "url remains structured", metadata: events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL}, want: "by \"plan\" for commit " + sha + "."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -66,7 +67,8 @@ func TestTryLockPullIncludesCommitMetadata(t *testing.T) {
 	_, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL})
 	Ok(t, err)
 	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
-	ErrContains(t, "by \"plan\" for commit "+sha+" ("+commitURL+").", err)
+	ErrContains(t, "by \"plan\" for commit "+sha+".", err)
+	Assert(t, !strings.Contains(err.Error(), commitURL), "expected commit URL to remain out of plain error: %s", err)
 }
 
 func TestTryLockSameCommand(t *testing.T) {

@@ -779,6 +779,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
+		ProjectJobURLGenerator:    router,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},

@@ -125,6 +125,60 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 }
 
+func TestDefaultProjectCommandRunner_ProjectLockJobURL(t *testing.T) {
+	const jobURL = "https://atlantis.example.com/jobs/job-id"
+	tests := []struct {
+		name        string
+		generateURL string
+		generateErr error
+		wantJobURL  string
+	}{
+		{name: "generated URL", generateURL: jobURL, wantJobURL: jobURL},
+		{name: "generation failure", generateURL: jobURL, generateErr: errors.New("route unavailable")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockVersion := mocks.NewMockStepRunner()
+			mockJobURLGenerator := jobmocks.NewMockProjectJobURLGenerator()
+			workingDirLocker := &trackingWorkingDirLocker{}
+			runner := events.DefaultProjectCommandRunner{
+				VersionStepRunner:      mockVersion,
+				WorkingDir:             mockWorkingDir,
+				WorkingDirLocker:       workingDirLocker,
+				ProjectJobURLGenerator: mockJobURLGenerator,
+			}
+			repoDir := t.TempDir()
+			ctx := command.ProjectContext{
+				Log:         logging.NewNoopLogger(t),
+				Steps:       []valid.Step{{StepName: "version"}},
+				Workspace:   "default",
+				RepoRelDir:  ".",
+				ProjectName: "project",
+				JobID:       "job-id",
+				Pull: models.PullRequest{
+					Num:        1,
+					HeadCommit: "head-sha",
+					BaseRepo:   models.Repo{FullName: "owner/repo"},
+				},
+			}
+			When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+			When(mockVersion.Run(ctx, nil, repoDir, map[string]string{})).ThenReturn("version", nil)
+			When(mockJobURLGenerator.GenerateProjectJobURL(ctx)).ThenReturn(tt.generateURL, tt.generateErr)
+
+			result := runner.Version(ctx)
+
+			Ok(t, result.Error)
+			Equals(t, "version", result.VersionSuccess)
+			Equals(t, "head-sha", workingDirLocker.metadata.HeadCommit)
+			Equals(t, tt.wantJobURL, workingDirLocker.metadata.JobURL)
+		})
+	}
+}
+
 func TestDefaultProjectCommandRunner_PlanSuppressesCustomRunStepStreaming(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockRun := mocks.NewMockCustomStepRunner()
@@ -2592,7 +2646,8 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 }
 
 type trackingWorkingDirLocker struct {
-	locked bool
+	locked   bool
+	metadata events.WorkingDirLockMetadata
 }
 
 func planHashForContent(contents []byte) string {
@@ -2610,8 +2665,9 @@ func (f fakeLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (mo
 	return models.PullRequest{HeadCommit: f.head, BaseBranch: f.base}, f.err
 }
 
-func (l *trackingWorkingDirLocker) TryLock(string, int, string, string, string, command.Name, events.WorkingDirLockMetadata) (func(), error) {
+func (l *trackingWorkingDirLocker) TryLock(_ string, _ int, _ string, _ string, _ string, _ command.Name, metadata events.WorkingDirLockMetadata) (func(), error) {
 	l.locked = true
+	l.metadata = metadata
 	return func() { l.locked = false }, nil
 }
 
