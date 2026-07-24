@@ -9,4 +9,16 @@
 {{ .RenderedContext }}
 {{- end }}
 </details>
+{{- if or .CommitURL .JobURL .MultipleJobs }}
+
+{{- if .CommitURL }}
+- Commit: [{{ .HeadCommit }}]({{ .CommitURL }})
+{{- end }}
+{{- if .JobURL }}
+- Trabajo bloqueante: [Ver ejecución de Atlantis]({{ .JobURL }})
+{{- end }}
+{{- if .MultipleJobs }}
+- Actualmente se están ejecutando varios trabajos de Atlantis para este commit.
+{{- end }}
+{{- end }}
 {{ end -}}

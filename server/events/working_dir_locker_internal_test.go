@@ -7,6 +7,7 @@ package events
 import (
 	"testing"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -76,5 +77,90 @@ func TestWorkingDirLockMetadataWithoutHeadCommit(t *testing.T) {
 	})
 	if metadata != (WorkingDirLockMetadata{}) {
 		t.Fatalf("expected empty metadata, got %#v", metadata)
+	}
+}
+
+func TestWorkingDirLockMetadataForProject(t *testing.T) {
+	ctx := command.ProjectContext{Pull: models.PullRequest{HeadCommit: "sha"}}
+	metadata := WorkingDirLockMetadataForProject(ctx, "https://atlantis.example.com/jobs/job-id")
+	if metadata.HeadCommit != "sha" || metadata.JobURL != "https://atlantis.example.com/jobs/job-id" {
+		t.Fatalf("unexpected metadata: %#v", metadata)
+	}
+}
+
+func TestWorkingDirLockErrorUsesOwnerMetadata(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	owner := WorkingDirLockMetadata{HeadCommit: "owner-sha", CommitURL: "owner-commit", JobURL: "owner-job"}
+	_, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Plan, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, WorkingDirLockMetadata{HeadCommit: "loser-sha", CommitURL: "loser-commit", JobURL: "loser-job"})
+	lockErr, ok := err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != owner {
+		t.Fatalf("expected owner metadata %#v, got %#v", owner, lockErr.metadata)
+	}
+}
+
+func TestTryLockPullUsesBlockingPlanProjectMetadata(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	owner := WorkingDirLockMetadata{HeadCommit: "owner-sha", CommitURL: "owner-commit", JobURL: "owner-job"}
+	_, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Plan, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLockPull("owner/repo", 1, command.Apply, WorkingDirLockMetadata{})
+	lockErr, ok := err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != owner || lockErr.multipleJobs {
+		t.Fatalf("unexpected lock error: %#v", lockErr)
+	}
+}
+
+func TestTryLockPullSelectsActiveProjectJobs(t *testing.T) {
+	const repo = "owner/repo"
+	const jobURL = "https://atlantis.example.com/jobs/job-id"
+	tests := []struct {
+		name         string
+		jobURLs      []string
+		wantJobURL   string
+		multipleJobs bool
+	}{
+		{name: "zero"},
+		{name: "one", jobURLs: []string{jobURL}, wantJobURL: jobURL},
+		{name: "duplicate URL is one job", jobURLs: []string{jobURL, jobURL}, wantJobURL: jobURL},
+		{name: "multiple", jobURLs: []string{jobURL + "-1", jobURL + "-2"}, multipleJobs: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			locker := NewDefaultWorkingDirLocker()
+			_, err := locker.TryLockPull(repo, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: "owner-sha", JobURL: "pull-job-is-ignored"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, url := range tt.jobURLs {
+				_, err = locker.TryLock(repo, 1, "workspace", ".", []string{"a", "b"}[i], command.Plan, WorkingDirLockMetadata{JobURL: url})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err = locker.TryLockPull(repo, 1, command.Apply, WorkingDirLockMetadata{JobURL: "loser-job"})
+			lockErr, ok := err.(*workingDirLockError)
+			if !ok {
+				t.Fatalf("expected typed lock error, got %T", err)
+			}
+			if lockErr.metadata.HeadCommit != "owner-sha" || lockErr.metadata.JobURL != tt.wantJobURL || lockErr.multipleJobs != tt.multipleJobs {
+				t.Fatalf("unexpected lock error: %#v", lockErr)
+			}
+			if lockErr.Error() != "cannot run \"apply\": pull request 1 is currently locked by \"plan\" for commit owner-sha.\nWait until the previous command is complete and try again" {
+				t.Fatalf("unexpected lock error message: %s", lockErr)
+			}
+		})
 	}
 }

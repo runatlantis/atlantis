@@ -24,6 +24,17 @@ import (
 type WorkingDirLockMetadata struct {
 	HeadCommit string
 	CommitURL  string
+	JobURL     string
+}
+
+type workingDirLockError struct {
+	message      string
+	metadata     WorkingDirLockMetadata
+	multipleJobs bool
+}
+
+func (e *workingDirLockError) Error() string {
+	return e.message
 }
 
 type workingDirLock struct {
@@ -66,8 +77,11 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
 	if currentLock, exists := d.locks[workspaceKey]; exists {
-		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q%s.\n"+
-			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock.Command, formatCommitSuffix(currentLock))
+		return func() {}, &workingDirLockError{
+			message: fmt.Sprintf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q%s.\n"+
+				"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock.Command, formatCommitSuffix(currentLock)),
+			metadata: currentLock.WorkingDirLockMetadata,
+		}
 	}
 	d.locks[workspaceKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
 	return func() {
@@ -81,12 +95,10 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 
 	pullKey := d.pullKey(repoFullName, pullNum)
 	if currentLock, exists := d.locks[pullKey]; exists {
-		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q%s.\n"+
-			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock.Command, formatCommitSuffix(currentLock))
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
 	if currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan); exists {
-		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q%s.\n"+
-			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock.Command, formatCommitSuffix(currentLock))
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
 	d.locks[pullKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
 	return func() {
@@ -112,18 +124,34 @@ func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum i
 	return workingDirLock{Command: cmdName}, false
 }
 
+func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int, cmdName command.Name, currentLock workingDirLock) error {
+	metadata := currentLock.WorkingDirLockMetadata
+	metadata.JobURL = ""
+	jobURLs := make(map[string]struct{})
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	pullKey := d.pullKey(repoFullName, pullNum)
+	for key, lock := range d.locks {
+		if key != pullKey && strings.HasPrefix(key, prefix) && lock.Command == currentLock.Command && lock.JobURL != "" {
+			jobURLs[lock.JobURL] = struct{}{}
+		}
+	}
+
+	multipleJobs := len(jobURLs) > 1
+	if len(jobURLs) == 1 {
+		for jobURL := range jobURLs {
+			metadata.JobURL = jobURL
+		}
+	}
+	message := fmt.Sprintf("cannot run %q: pull request %d is currently locked by %q%s.\n"+
+		"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock.Command, formatCommitSuffix(currentLock))
+	return &workingDirLockError{message: message, metadata: metadata, multipleJobs: multipleJobs}
+}
+
 func formatCommitSuffix(lock workingDirLock) string {
 	if lock.HeadCommit == "" {
 		return ""
 	}
-	// This message is rendered inside a fenced code block in PR comments, so
-	// markdown links would show literally. We emit the plain full SHA and, when
-	// available, the raw commit URL in parentheses so it can be copied and opened.
-	commitRef := lock.HeadCommit
-	if lock.CommitURL != "" {
-		commitRef = fmt.Sprintf("%s (%s)", lock.HeadCommit, lock.CommitURL)
-	}
-	return " for commit " + commitRef
+	return " for commit " + lock.HeadCommit
 }
 
 func WorkingDirLockMetadataForPull(pull models.PullRequest) WorkingDirLockMetadata {
@@ -151,6 +179,12 @@ func WorkingDirLockMetadataForPull(pull models.PullRequest) WorkingDirLockMetada
 		repoURL.Path = strings.TrimSuffix(repoURL.Path, ".git") + commitPath + pull.HeadCommit
 		metadata.CommitURL = repoURL.String()
 	}
+	return metadata
+}
+
+func WorkingDirLockMetadataForProject(ctx command.ProjectContext, jobURL string) WorkingDirLockMetadata {
+	metadata := WorkingDirLockMetadataForPull(ctx.Pull)
+	metadata.JobURL = jobURL
 	return metadata
 }
 
