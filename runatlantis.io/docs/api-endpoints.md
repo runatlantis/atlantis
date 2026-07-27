@@ -676,7 +676,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 ```
 
 ::: tip Plan Output
-When a project's plan runs successfully, the response includes `plan_output` — the raw Terraform plan text for that project. It is omitted when there is no plan output (for example, if the project errored before a plan ran).
+When a project's plan runs successfully, the response includes `plan_output` — the Terraform plan text for that project (whitespace-normalized for diff rendering, not unmodified Terraform stdout). It is omitted when there is no plan output (for example, if the project errored before a plan ran). `plan_output` is only returned by this detect response; it is not included in `GET /api/drift/status`, even though the underlying drift record is cached.
 :::
 
 #### Sample Response (Success)

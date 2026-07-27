@@ -162,8 +162,9 @@ type DriftProjectAPI struct {
 	HasDrift bool `json:"has_drift"`
 	// Drift contains drift details if drift was detected.
 	Drift *DriftDetailsAPI `json:"drift,omitempty"`
-	// PlanOutput contains the raw Terraform plan output, if detection ran a
-	// plan successfully.
+	// PlanOutput contains the Terraform plan output, if detection ran a
+	// plan successfully. Only populated on the detect response; omitted from
+	// status responses to avoid caching full plan text in status payloads.
 	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when drift was last checked.
 	LastChecked time.Time `json:"last_checked"`
@@ -192,7 +193,10 @@ type DriftDetailsAPI struct {
 }
 
 // NewDriftProjectAPI converts an internal ProjectDrift to its API representation.
-func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
+// includePlanOutput controls whether the (potentially large) cached plan text
+// is included; it should be true only for the immediate detect response, not
+// for status responses that read back cached drift records.
+func NewDriftProjectAPI(pd models.ProjectDrift, includePlanOutput bool) DriftProjectAPI {
 	result := DriftProjectAPI{
 		ProjectName:    pd.ProjectName,
 		Directory:      pd.Path,
@@ -202,9 +206,12 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 		ResolvedCommit: pd.ResolvedCommit,
 		DetectionID:    pd.DetectionID,
 		HasDrift:       pd.Drift.HasDrift,
-		PlanOutput:     pd.PlanOutput,
 		LastChecked:    pd.LastChecked,
 		Error:          pd.Error,
+	}
+
+	if includePlanOutput {
+		result.PlanOutput = pd.PlanOutput
 	}
 
 	if pd.Drift.HasDrift {
@@ -257,7 +264,7 @@ func NewDriftStatusAPI(ds models.DriftStatusResponse) DriftStatusAPI {
 
 	var withErrors, withoutDrift int
 	for _, p := range ds.Projects {
-		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
+		result.Projects = append(result.Projects, NewDriftProjectAPI(p, false))
 		if p.Error != "" {
 			withErrors++
 		}
@@ -301,7 +308,7 @@ func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionR
 
 	var withErrors, withoutDrift int
 	for _, p := range dr.Projects {
-		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
+		result.Projects = append(result.Projects, NewDriftProjectAPI(p, true))
 		if p.Error != "" {
 			withErrors++
 		}
