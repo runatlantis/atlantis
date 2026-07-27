@@ -1596,6 +1596,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	recloned := false
 	if errors.Is(err, os.ErrNotExist) {
 		// Re-clone only if the plan store can recover plans externally.
 		// LocalPlanStore signals this via ErrRestoreNotSupported; external
@@ -1605,10 +1606,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}
 		ctx.Log.Info("working directory missing, re-cloning repo for apply")
-		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 		if err != nil {
 			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
 		}
+		recloned = true
 	} else if err != nil {
 		return projCtx, err
 	}
@@ -1640,12 +1642,38 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	if err != nil {
 		return projCtx, err
 	}
+	if recloned {
+		if err := p.cloneMissingWorkspaces(ctx, projCtx); err != nil {
+			return nil, err
+		}
+	}
 	if cmd.Name == command.Apply {
 		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
 			return nil, err
 		}
 	}
 	return projCtx, nil
+}
+
+// cloneMissingWorkspaces checks out any workspace a resolved project needs that
+// isn't on disk yet. Recovering from a lost clone can only restore the default
+// workspace up front, since a project's workspace comes from atlantis.yaml and
+// that file is only readable once the default checkout exists. A targeted
+// command addressing a project by name (`-p`) supplies no workspace at all, so
+// a project pinned to a non-default workspace would otherwise never be cloned.
+func (p *DefaultProjectCommandBuilder) cloneMissingWorkspaces(ctx *command.Context, projCtxs []command.ProjectContext) error {
+	cloned := map[string]bool{DefaultWorkspace: true}
+	for _, projCtx := range projCtxs {
+		workspace := projCtx.Workspace
+		if workspace == "" || cloned[workspace] {
+			continue
+		}
+		cloned[workspace] = true
+		if _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); err != nil {
+			return fmt.Errorf("re-cloning workspace %q for apply: %w", workspace, err)
+		}
+	}
+	return nil
 }
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {

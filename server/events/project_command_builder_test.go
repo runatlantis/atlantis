@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -5821,6 +5822,9 @@ type fakeWorkingDir struct {
 	mocks.MockWorkingDir // embedded so unused methods don't need stubs
 	pullDir              string
 	cloneCalls           []string
+	// onClone runs after a workspace is cloned, to seed files a real clone
+	// would have brought with it (e.g. atlantis.yaml).
+	onClone func(workspace, dir string) error
 }
 
 func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, workspace string) (string, error) {
@@ -5838,6 +5842,11 @@ func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.
 	// can pick up restored .tfplan files as untracked.
 	if err := exec.Command("git", "-C", workspaceDir, "init").Run(); err != nil {
 		return "", err
+	}
+	if f.onClone != nil {
+		if err := f.onClone(workspace, workspaceDir); err != nil {
+			return "", err
+		}
 	}
 	return workspaceDir, nil
 }
@@ -6229,4 +6238,82 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 	}
 	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be recovered")
 	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be recovered")
+}
+
+// `apply -p name` carries no workspace, so recovery can only clone the default
+// workspace up front — a project's workspace comes from atlantis.yaml, which
+// can't be read until that clone exists. A project pinned to a non-default
+// workspace must still get a checkout, or apply fails on the missing dir.
+func TestDefaultProjectCommandBuilder_TargetedApplyRecovery_NonDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 5, BaseRepo: repo}
+
+	pullDir := t.TempDir()
+	atlantisYAML := `version: 3
+projects:
+- name: myproject
+  dir: project1
+  workspace: staging
+`
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+		onClone: func(_, dir string) error {
+			if err := os.MkdirAll(filepath.Join(dir, "project1"), 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte(atlantisYAML), 0o600)
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&mockExternalPlanStore{},
+	)
+
+	// Working dir is gone, so the targeted apply has to recover.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     pull,
+			HeadRepo: repo,
+		},
+		&events.CommentCommand{Name: command.Apply, ProjectName: "myproject"})
+	Ok(t, err)
+
+	Equals(t, 1, len(ctxs))
+	Equals(t, "staging", ctxs[0].Workspace)
+	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
+		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }
