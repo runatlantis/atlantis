@@ -32,9 +32,22 @@ func TestNewDriftProjectAPI_IncludesForgetCount(t *testing.T) {
 			HasDrift: true,
 			ToForget: 3,
 		},
-	})
+	}, true)
 
 	Assert(t, result.Drift != nil, "expected drift details")
 	Equals(t, 3, result.Drift.ToForget)
 	Equals(t, 3, result.Drift.TotalChanges)
+}
+
+func TestNewDriftProjectAPI_OmitsPlanOutputWhenNotRequested(t *testing.T) {
+	pd := models.ProjectDrift{
+		Drift:      models.DriftSummary{HasDrift: true},
+		PlanOutput: "Terraform will perform the following actions...",
+	}
+
+	withOutput := controllers.NewDriftProjectAPI(pd, true)
+	Equals(t, pd.PlanOutput, withOutput.PlanOutput)
+
+	withoutOutput := controllers.NewDriftProjectAPI(pd, false)
+	Equals(t, "", withoutOutput.PlanOutput)
 }
