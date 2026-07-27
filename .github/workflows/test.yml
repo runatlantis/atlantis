@@ -24,7 +24,9 @@ permissions:
 
 env:
   TERRAFORM_VERSION: 1.11.1
+  # Keep the checksum in sync with the versioned archive URL.
   NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+  NGROK_DOWNLOAD_SHA256: 7d5cf30be47a38d937958dff61a2b175a289bdbf72fdc20774a6dceeaaaa3dbf
 
 jobs:
   changes:
@@ -41,16 +43,19 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
         id: changes
         with:
           filters: |
             go:
-              - '**.go'
-              - '**.txt' # golden file test output
+              - '**/*.go'
+              - '**/*.txt' # golden file test output
               - 'go.*'
-              - '**.tmpl'
+              - '**/go.mod'
+              - '**/go.sum'
+              - '**/*.tmpl'
+              - 'Makefile'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
@@ -66,7 +71,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       # need to setup go toolchain explicitly
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
@@ -144,7 +149,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
@@ -160,6 +165,7 @@ jobs:
       - name: Setup ngrok
         run: |
           wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -189,7 +195,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
@@ -205,6 +211,7 @@ jobs:
       - name: Setup ngrok
         run: |
           wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
