@@ -46,8 +46,8 @@ func TestTryLockIncludesCommitMetadata(t *testing.T) {
 		metadata events.WorkingDirLockMetadata
 		want     string
 	}{
-		{name: "sha", metadata: events.WorkingDirLockMetadata{HeadCommit: sha}, want: "by \"plan\" for commit " + sha + "."},
-		{name: "url remains structured", metadata: events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL}, want: "by \"plan\" for commit " + sha + "."},
+		{name: "sha", metadata: events.WorkingDirLockMetadata{HeadCommit: sha}, want: "by \"plan\" for commit 0123456."},
+		{name: "url remains structured", metadata: events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL}, want: "by \"plan\" for commit 0123456."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -67,7 +67,7 @@ func TestTryLockPullIncludesCommitMetadata(t *testing.T) {
 	_, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL})
 	Ok(t, err)
 	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
-	ErrContains(t, "by \"plan\" for commit "+sha+".", err)
+	ErrContains(t, "by \"plan\" for commit 0123456.", err)
 	Assert(t, !strings.Contains(err.Error(), commitURL), "expected commit URL to remain out of plain error: %s", err)
 }
 

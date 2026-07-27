@@ -3,18 +3,7 @@
 ```
 {{ .Error }}
 ```
-{{- if or .CommitURL .JobURL .MultipleJobs }}
-
-{{- if .CommitURL }}
-- Commit: [{{ .HeadCommit }}]({{ .CommitURL }})
-{{- end }}
-{{- if .JobURL }}
-- Blocking job: [View Atlantis execution]({{ .JobURL }})
-{{- end }}
-{{- if .MultipleJobs }}
-- Multiple Atlantis jobs are currently running for this commit.
-{{- end }}
-{{- end }}
+{{- template "lockMetadata" . }}
 {{ if ne .RenderedContext "" -}}
 {{ if or .CommitURL .JobURL .MultipleJobs }}
 

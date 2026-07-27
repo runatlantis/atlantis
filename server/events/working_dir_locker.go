@@ -6,7 +6,6 @@ package events
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 	"sync"
 
@@ -97,7 +96,11 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	if currentLock, exists := d.locks[pullKey]; exists {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	if currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan); exists {
+	currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan, metadata.HeadCommit)
+	if !exists && metadata.HeadCommit != "" {
+		currentLock, exists = d.findCommandLock(repoFullName, pullNum, command.Plan, "")
+	}
+	if exists {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
 	d.locks[pullKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
@@ -110,18 +113,21 @@ func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum in
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	_, exists := d.findCommandLock(repoFullName, pullNum, cmdName)
+	_, exists := d.findCommandLock(repoFullName, pullNum, cmdName, "")
 	return exists
 }
 
-func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name) (workingDirLock, bool) {
+func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name, headCommit string) (workingDirLock, bool) {
 	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	var match workingDirLock
+	var matchKey string
 	for key, currentLock := range d.locks {
-		if strings.HasPrefix(key, prefix) && currentLock.Command == cmdName {
-			return currentLock, true
+		if strings.HasPrefix(key, prefix) && currentLock.Command == cmdName && (headCommit == "" || currentLock.HeadCommit == headCommit) && (matchKey == "" || key < matchKey) {
+			match = currentLock
+			matchKey = key
 		}
 	}
-	return workingDirLock{Command: cmdName}, false
+	return match, matchKey != ""
 }
 
 func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int, cmdName command.Name, currentLock workingDirLock) error {
@@ -131,7 +137,7 @@ func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int
 	prefix := d.pullLockPrefix(repoFullName, pullNum)
 	pullKey := d.pullKey(repoFullName, pullNum)
 	for key, lock := range d.locks {
-		if key != pullKey && strings.HasPrefix(key, prefix) && lock.Command == currentLock.Command && lock.JobURL != "" {
+		if key != pullKey && strings.HasPrefix(key, prefix) && lock.Command == currentLock.Command && lock.HeadCommit == currentLock.HeadCommit && lock.JobURL != "" {
 			jobURLs[lock.JobURL] = struct{}{}
 		}
 	}
@@ -151,33 +157,21 @@ func formatCommitSuffix(lock workingDirLock) string {
 	if lock.HeadCommit == "" {
 		return ""
 	}
-	return " for commit " + lock.HeadCommit
+	return " for commit " + shortSHA(lock.HeadCommit)
 }
 
 func WorkingDirLockMetadataForPull(pull models.PullRequest) WorkingDirLockMetadata {
 	metadata := WorkingDirLockMetadata{HeadCommit: pull.HeadCommit}
-	if pull.HeadCommit == "" {
+	if pull.HeadCommit == "" || pull.URL == "" {
 		return metadata
 	}
 
-	// PullRequest has no head repository metadata, so commit links use the base
-	// repository. Fork commits are normally exposed there via the PR ref, though
-	// the link can be unavailable before that ref exists or after it is garbage-collected.
+	pullURL := strings.TrimRight(pull.URL, "/")
 	switch pull.BaseRepo.VCSHost.Type {
-	case models.Github, models.Gitlab, models.Gitea:
-		repoURL, err := url.Parse(pull.BaseRepo.CloneURL)
-		if err != nil || (repoURL.Scheme != "http" && repoURL.Scheme != "https") || repoURL.Host == "" {
-			return metadata
-		}
-		repoURL.User = nil
-		repoURL.RawQuery = ""
-		repoURL.Fragment = ""
-		commitPath := "/commit/"
-		if pull.BaseRepo.VCSHost.Type == models.Gitlab {
-			commitPath = "/-/commit/"
-		}
-		repoURL.Path = strings.TrimSuffix(repoURL.Path, ".git") + commitPath + pull.HeadCommit
-		metadata.CommitURL = repoURL.String()
+	case models.Github, models.Gitea:
+		metadata.CommitURL = pullURL + "/commits/" + pull.HeadCommit
+	case models.Gitlab:
+		metadata.CommitURL = pullURL + "/diffs?commit_id=" + pull.HeadCommit
 	}
 	return metadata
 }

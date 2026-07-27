@@ -118,7 +118,7 @@ func TestRenderWorkingDirLockMetadata(t *testing.T) {
 		_, err := locker.TryLockPull("owner/repo", 1, command.Plan, metadata)
 		Ok(t, err)
 		for i, url := range []string{jobURL + "-1", jobURL + "-2"} {
-			_, err = locker.TryLock("owner/repo", 1, "default", ".", fmt.Sprintf("project-%d", i), command.Plan, events.WorkingDirLockMetadata{JobURL: url})
+			_, err = locker.TryLock("owner/repo", 1, "default", ".", fmt.Sprintf("project-%d", i), command.Plan, events.WorkingDirLockMetadata{HeadCommit: sha, JobURL: url})
 			Ok(t, err)
 		}
 		_, err = locker.TryLockPull("owner/repo", 1, command.Apply, events.WorkingDirLockMetadata{})
@@ -149,7 +149,7 @@ func TestRenderWorkingDirLockMetadata(t *testing.T) {
 
 	t.Run("link fallbacks are independent", func(t *testing.T) {
 		shaOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{HeadCommit: sha})}, &events.CommentCommand{Name: command.Plan})
-		if !strings.Contains(shaOnly, "for commit "+sha) || strings.Contains(shaOnly, "- Commit:") || strings.Contains(shaOnly, "- Blocking job:") {
+		if !strings.Contains(shaOnly, "for commit 0123456") || strings.Contains(shaOnly, "for commit "+sha) || strings.Contains(shaOnly, "- Commit:") || strings.Contains(shaOnly, "- Blocking job:") {
 			t.Fatalf("unexpected SHA-only fallback:\n%s", shaOnly)
 		}
 		jobOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{JobURL: jobURL})}, &events.CommentCommand{Name: command.Plan})
