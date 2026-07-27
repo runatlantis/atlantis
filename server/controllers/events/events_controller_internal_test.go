@@ -5,6 +5,7 @@ import (
 	"time"
 
 	coreevents "github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
@@ -12,6 +13,14 @@ type blockingAutoplanRunner struct {
 	started chan models.PullRequest
 	release chan struct{}
 	done    chan models.PullRequest
+}
+
+type staticLivePullHeadFetcher struct {
+	pull models.PullRequest
+}
+
+func (f staticLivePullHeadFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return f.pull, nil
 }
 
 func (r *blockingAutoplanRunner) RunCommentCommand(models.Repo, *models.Repo, *models.PullRequest, models.User, int, *coreevents.CommentCommand) {
@@ -35,22 +44,24 @@ func TestHandlePullRequestEventCoalescesAndSerializesAutoplans(t *testing.T) {
 		release: make(chan struct{}),
 		done:    make(chan models.PullRequest, 3),
 	}
+	baseRepo := models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github, Hostname: "github.com"}}
+	first := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "first"}
+	second := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "second"}
+	third := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "third"}
 	controller := VCSEventsController{
 		CommandRunner:        runner,
 		RepoAllowlistChecker: allowlist,
 		TestingMode:          false,
 		AutoplanRuns:         NewAutoplanRunCoordinator(),
+		LivePullHeadFetcher:  staticLivePullHeadFetcher{pull: third},
 	}
-	baseRepo := models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github, Hostname: "github.com"}}
-	first := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "first"}
-	second := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "second"}
-	third := models.PullRequest{BaseRepo: baseRepo, Num: 1, HeadCommit: "third"}
 
 	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, first, models.User{}, models.OpenedPullEvent)
 	expectAutoplan(t, runner.started, "first")
 	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, first, models.User{}, models.UpdatedPullEvent)
 	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, second, models.User{}, models.UpdatedPullEvent)
 	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, third, models.User{}, models.UpdatedPullEvent)
+	controller.handlePullRequestEvent(nil, baseRepo, baseRepo, second, models.User{}, models.UpdatedPullEvent)
 	expectNoAutoplan(t, runner.started)
 
 	close(runner.release)

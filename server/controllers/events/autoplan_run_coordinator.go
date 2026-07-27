@@ -14,8 +14,8 @@ type autoplanRunKey struct {
 }
 
 type autoplanRun struct {
-	request autoplanRequest
-	pending *autoplanRequest
+	request       autoplanRequest
+	pendingEvents uint64
 }
 
 type autoplanRequest struct {
@@ -43,42 +43,66 @@ func (c *AutoplanRunCoordinator) start(request autoplanRequest) (autoplanRequest
 		c.runs = make(map[autoplanRunKey]autoplanRun)
 	}
 	if run, exists := c.runs[key]; exists {
-		if c.matchesExistingRun(run, request) {
-			return autoplanRequest{}, false
+		if run.request.pull.HeadCommit != request.pull.HeadCommit {
+			run.pendingEvents++
+			c.runs[key] = run
 		}
-		run.pending = &request
-		c.runs[key] = run
 		return autoplanRequest{}, false
 	}
 	c.runs[key] = autoplanRun{request: request}
 	return request, true
 }
 
-func (c *AutoplanRunCoordinator) complete(request autoplanRequest) (autoplanRequest, bool) {
+func (c *AutoplanRunCoordinator) pendingEvents(request autoplanRequest) uint64 {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	key := autoplanKey(request)
 	run, exists := c.runs[key]
 	if !exists || run.request.pull.HeadCommit != request.pull.HeadCommit {
-		return autoplanRequest{}, false
+		return 0
 	}
-	if run.pending == nil {
-		delete(c.runs, key)
-		return autoplanRequest{}, false
-	}
-	next := *run.pending
-	run.request = next
-	run.pending = nil
-	c.runs[key] = run
-	return next, true
+	return run.pendingEvents
 }
 
-func (c *AutoplanRunCoordinator) matchesExistingRun(run autoplanRun, request autoplanRequest) bool {
-	if run.request.pull.HeadCommit == request.pull.HeadCommit {
-		return true
+func (c *AutoplanRunCoordinator) scheduleNext(request autoplanRequest, observedEvents uint64, livePull models.PullRequest) (autoplanRequest, bool, bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	key := autoplanKey(request)
+	run, exists := c.runs[key]
+	if !exists || run.request.pull.HeadCommit != request.pull.HeadCommit {
+		return autoplanRequest{}, false, false
 	}
-	return run.pending != nil && run.pending.pull.HeadCommit == request.pull.HeadCommit
+	if livePull.HeadCommit == "" {
+		return autoplanRequest{}, false, false
+	}
+	if livePull.HeadCommit == request.pull.HeadCommit {
+		if run.pendingEvents > observedEvents {
+			run.pendingEvents -= observedEvents
+			c.runs[key] = run
+			return autoplanRequest{}, false, true
+		}
+		return autoplanRequest{}, false, false
+	}
+	next := request
+	next.pull.HeadCommit = livePull.HeadCommit
+	next.pull.BaseBranch = livePull.BaseBranch
+	run.request = next
+	run.pendingEvents -= observedEvents
+	c.runs[key] = run
+	return next, true, false
+}
+
+func (c *AutoplanRunCoordinator) release(request autoplanRequest) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	key := autoplanKey(request)
+	run, exists := c.runs[key]
+	if exists && run.request.pull.HeadCommit == request.pull.HeadCommit {
+		delete(c.runs, key)
+	}
 }
 
 func autoplanKey(request autoplanRequest) autoplanRunKey {

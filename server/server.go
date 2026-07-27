@@ -1111,6 +1111,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AzureDevopsRequestValidator:     &events_controllers.DefaultAzureDevopsRequestValidator{},
 		GiteaWebhookSecret:              []byte(userConfig.GiteaWebhookSecret),
 		AutoplanRuns:                    events_controllers.NewAutoplanRunCoordinator(),
+		LivePullHeadFetcher:             livePullHeadFetcher,
 	}
 	githubAppController := &controllers.GithubAppController{
 		AtlantisURL:         parsedURL,

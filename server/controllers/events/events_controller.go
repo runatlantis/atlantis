@@ -95,7 +95,8 @@ type VCSEventsController struct {
 	AzureDevopsWebhookBasicPassword []byte
 	AzureDevopsRequestValidator     AzureDevopsRequestValidator `validate:"required"`
 	GiteaWebhookSecret              []byte
-	AutoplanRuns                    *AutoplanRunCoordinator `validate:"required"`
+	AutoplanRuns                    *AutoplanRunCoordinator    `validate:"required"`
+	LivePullHeadFetcher             events.LivePullHeadFetcher `validate:"required"`
 }
 
 // Post handles POST webhook requests.
@@ -563,24 +564,7 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 
 func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HTTPResponse {
 	if !e.RepoAllowlistChecker.IsAllowlisted(baseRepo.FullName, baseRepo.VCSHost.Hostname) {
-		// If the repo isn't allowlisted and we receive an opened pull request
-		// event we comment back on the pull request that the repo isn't
-		// allowlisted. This is because the user might be expecting Atlantis to
-		// autoplan. For other events, we just ignore them.
-		if eventType == models.OpenedPullEvent {
-			e.commentNotAllowlisted(baseRepo, pull.Num)
-		}
-
-		err := fmt.Errorf("pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
-
-		return HTTPResponse{
-			body: err.Error(),
-			err: HTTPError{
-				code:       http.StatusForbidden,
-				err:        err,
-				isSilenced: e.SilenceAllowlistErrors,
-			},
-		}
+		return e.notAllowlistedPullRequestResponse(baseRepo, pull, eventType)
 	}
 
 	switch eventType {
@@ -615,19 +599,27 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 	return HTTPResponse{}
 }
 
+func (e *VCSEventsController) notAllowlistedPullRequestResponse(baseRepo models.Repo, pull models.PullRequest, eventType models.PullRequestEventType) HTTPResponse {
+	if eventType == models.OpenedPullEvent {
+		e.commentNotAllowlisted(baseRepo, pull.Num)
+	}
+	err := fmt.Errorf("pull request event from non-allowlisted repo '%s/%s'", baseRepo.VCSHost.Hostname, baseRepo.FullName)
+	return HTTPResponse{
+		body: err.Error(),
+		err: HTTPError{
+			code:       http.StatusForbidden,
+			err:        err,
+			isSilenced: e.SilenceAllowlistErrors,
+		},
+	}
+}
+
 func (e *VCSEventsController) startAutoplan(request autoplanRequest) {
 	if e.TestingMode {
 		e.CommandRunner.RunAutoplanCommand(request.baseRepo, request.headRepo, request.pull, request.user)
 		return
 	}
 	if next, started := e.AutoplanRuns.start(request); started {
-		go e.runAutoplan(next)
-	}
-}
-
-func (e *VCSEventsController) runAutoplan(request autoplanRequest) {
-	e.CommandRunner.RunAutoplanCommand(request.baseRepo, request.headRepo, request.pull, request.user)
-	if next, started := e.AutoplanRuns.complete(request); started {
 		go e.runAutoplan(next)
 	}
 }
