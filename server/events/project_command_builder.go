@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/utils"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -318,6 +319,31 @@ func (p *DefaultProjectCommandBuilder) withLocalPlanStoreDir(projCtxs []command.
 		projCtxs[i].LocalPlanStoreDir = p.LocalPlanStoreDir
 	}
 	return projCtxs
+}
+
+// restorePullDir returns the directory an external plan store must restore into.
+// Restored plans are read back by PendingPlanFinder, which looks under
+// LocalPlanStoreDir, so restoring into the clone pull dir would leave them
+// undiscoverable. When LocalPlanStoreDir resolves to the data dir this is the
+// clone pull dir, so the default on-disk layout is unchanged.
+func (p *DefaultProjectCommandBuilder) restorePullDir(pullDir string, r models.Repo, pull models.PullRequest) (string, error) {
+	if p.LocalPlanStoreDir == "" {
+		return pullDir, nil
+	}
+	planPullDir := runtime.GetPlanPullDir(p.LocalPlanStoreDir, r, pull)
+	if err := utils.EnsureSubPath(filepath.Join(p.LocalPlanStoreDir, workingDirPrefix), planPullDir); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return planPullDir, nil
+}
+
+// withDefaultWorkspace appends DefaultWorkspace to workspaces if it isn't
+// already present, preserving the original order.
+func withDefaultWorkspace(workspaces []string) []string {
+	if slices.Contains(workspaces, DefaultWorkspace) {
+		return workspaces
+	}
+	return append(slices.Clone(workspaces), DefaultWorkspace)
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -1239,7 +1265,9 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 		// Clone every workspace before restoring; this ensures each workspace
 		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
-		for _, workspace := range workspaces {
+		// The default workspace is always cloned because it is read below as
+		// the source of truth for atlantis.yaml, even when it holds no plans.
+		for _, workspace := range withDefaultWorkspace(workspaces) {
 			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
 				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
 			}
@@ -1248,7 +1276,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if err != nil {
 			return nil, err
 		}
-		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+		restoreDir, err := p.restorePullDir(pullDir, ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(restoreDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
 			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
 		}
 	}

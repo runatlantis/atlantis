@@ -672,12 +672,23 @@ func (w *FileWorkspace) usesPRSourceRemote(head models.Repo, p models.PullReques
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// Plans held in a separate store are only invalidated when we are replacing
+	// an existing checkout. When the checkout is merely absent — a restart with
+	// an ephemeral repo volume — the stored plans still describe the commit
+	// they were created at, and apply re-validates them against the recorded
+	// pull status and plan hash before using them. Discarding them here would
+	// stop a separate plan store from ever outliving the working dir.
+	_, statErr := os.Stat(c.dir)
+	replacingCheckout := statErr == nil
+
 	err := os.RemoveAll(c.dir)
 	if err != nil {
 		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
 	}
-	if err := w.deletePlanWorkspaceIfSeparate(c.pr.BaseRepo, c.pr, c.dir); err != nil {
-		return err
+	if replacingCheckout {
+		if err := w.deletePlanWorkspaceIfSeparate(c.pr.BaseRepo, c.pr, c.dir); err != nil {
+			return err
+		}
 	}
 
 	// Create the directory and parents if necessary.

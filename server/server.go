@@ -699,7 +699,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, fmt.Errorf("unsupported plan store type %q", psCfg.Type)
 		}
 	} else {
-		planStore = &runtime.LocalPlanStore{}
+		local := &runtime.LocalPlanStore{}
+		// A plan store dir outside the data dir survives the loss of a
+		// checkout, so plans there can be recovered after a restart even
+		// without an external store.
+		if userConfig.PlanStoreDir != "" && filepath.Clean(userConfig.PlanStoreDir) != filepath.Clean(userConfig.DataDir) {
+			local.SeparatePlanDir = userConfig.PlanStoreDir
+		}
+		planStore = local
 	}
 
 	deleteLockCommand.PlanStore = planStore

@@ -2486,7 +2486,9 @@ func TestFileWorkspace_DeleteRemovesSeparatePlanStorePaths(t *testing.T) {
 	assertPathExists(t, otherPullPlanFile)
 }
 
-func TestClone_ForceCloneDeletesSeparatePlanWorkspace(t *testing.T) {
+// Re-cloning over an existing checkout invalidates any plan made against it,
+// so the separate plan store copy has to go too.
+func TestClone_ForceCloneDeletesSeparatePlanWorkspaceWhenReplacingCheckout(t *testing.T) {
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
 	planStoreDir := t.TempDir()
@@ -2501,6 +2503,11 @@ func TestClone_ForceCloneDeletesSeparatePlanWorkspace(t *testing.T) {
 	stalePlanFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
 	createPlanFile(t, stalePlanFile)
 
+	// A checkout that exists but isn't a usable git repo can't be reused, so
+	// Clone falls through to forceClone.
+	existingCloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	Ok(t, os.MkdirAll(existingCloneDir, 0700))
+
 	fileWorkspace := &events.FileWorkspace{
 		DataDir:                     dataDir,
 		LocalPlanStoreDir:           planStoreDir,
@@ -2513,6 +2520,38 @@ func TestClone_ForceCloneDeletesSeparatePlanWorkspace(t *testing.T) {
 	Ok(t, err)
 	assertPathExists(t, cloneDir)
 	assertPathMissing(t, stalePlanFile)
+}
+
+// A missing checkout is the restart case: the plan store holds the only
+// surviving copy of the plans, so cloning must not delete it. Staleness is
+// caught later by the recorded pull status and plan hash checks.
+func TestClone_ForceClonePreservesSeparatePlanWorkspaceWhenCheckoutMissing(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+	planFile := filepath.Join(planStoreDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	createPlanFile(t, planFile)
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalPlanStoreDir:           planStoreDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	assertPathExists(t, cloneDir)
+	assertPathExists(t, planFile)
 }
 
 func TestClone_UpdateDeletesSeparatePlanStoreStalePlans(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -28,7 +29,7 @@ const (
 	// a link to the run url will be output.
 	lineBeforeRunURL     = "To view this run in a browser, visit:"
 	planfileSlashReplace = "::"
-	planStoreReposDir    = "repos"
+	planStoreReposDir    = planstore.ReposDir
 )
 
 // TerraformExec brings the interface from TerraformClient into this package
@@ -136,7 +137,7 @@ func GetPlanFilePath(ctx command.ProjectContext, projectPath string) string {
 
 // GetPlanPullDir returns the root directory for all plan files for a pull request.
 func GetPlanPullDir(localPlanStoreDir string, r models.Repo, p models.PullRequest) string {
-	return filepath.Join(localPlanStoreDir, planStoreReposDir, r.FullName, strconv.Itoa(p.Num))
+	return planstore.PullDir(localPlanStoreDir, r.FullName, p.Num)
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated
