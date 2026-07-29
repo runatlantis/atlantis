@@ -2219,7 +2219,11 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
-		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
+		// PlanOutput is only ever returned in the immediate detect response;
+		// it is stripped before storing to keep drift records bounded in size.
+		storedDrift := projectDrift
+		storedDrift.PlanOutput = ""
+		if err := a.DriftStorage.Store(baseRepo.ID(), storedDrift); err != nil {
 			storeFailed = true
 			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
 			a.Logger.Warn("failed to store drift data: %v", err)

@@ -3914,13 +3914,15 @@ func TestAPIController_DetectDrift_IncludesPlanOutput(t *testing.T) {
 	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
 	ac.DriftStorage = driftStorage
 
-	body, _ := json.Marshal(models.DriftDetectionRequest{
+	body, err := json.Marshal(models.DriftDetectionRequest{
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
 		Projects:   []string{"app"},
 	})
-	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.DetectDrift(w, req)
@@ -3930,6 +3932,11 @@ func TestAPIController_DetectDrift_IncludesPlanOutput(t *testing.T) {
 	parseAPIResponse(t, w.Body.Bytes(), &result)
 	Equals(t, 1, len(result.Projects))
 	Equals(t, planOutput, result.Projects[0].PlanOutput)
+
+	_, stored := driftStorage.VerifyWasCalledOnce().
+		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]()).
+		GetCapturedArguments()
+	Equals(t, "", stored.PlanOutput)
 }
 
 func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {

@@ -314,7 +314,9 @@ type ProjectDrift struct {
 	Drift DriftSummary `json:"drift"`
 	// PlanOutput contains the formatted Terraform plan output for this
 	// project (whitespace-normalized for diff rendering, not unmodified
-	// stdout), if detection ran a plan successfully.
+	// stdout), if detection ran a plan successfully. This is transient: it is
+	// populated for the immediate detect response only and is cleared before
+	// the record is passed to drift storage, so it is never persisted.
 	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when the drift was last detected.
 	LastChecked time.Time `json:"last_checked"`
