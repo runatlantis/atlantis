@@ -183,7 +183,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var supportedVCSHosts []models.VCSHostType
 	var githubClient github.IGithubClient
 	var githubAppEnabled bool
-	var githubConfig github.Config
+	commentNamespace := common.NewCommentNamespace(userConfig.VCSCommentNamespace)
+	githubConfig := github.Config{
+		AllowMergeableBypassApply: userConfig.GithubAllowMergeableBypassApply,
+		CommentNamespace:          commentNamespace,
+	}
 	var githubCredentials github.Credentials
 	var gitlabClient *gitlab.Client
 	var bitbucketCloudClient *bitbucketcloud.Client
@@ -228,11 +232,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
-		if userConfig.GithubAllowMergeableBypassApply {
-			githubConfig = github.Config{
-				AllowMergeableBypassApply: true,
-			}
-		}
 		supportedVCSHosts = append(supportedVCSHosts, models.Github)
 		if userConfig.GithubUser != "" {
 			githubCredentials = &github.UserCredentials{
@@ -288,6 +287,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, err
 		}
 		gitlabClient.StatusRetryEnabled = userConfig.GitlabStatusRetryEnabled
+		gitlabClient.CommentNamespace = commentNamespace
 	}
 	if userConfig.BitbucketUser != "" {
 		if userConfig.BitbucketBaseURL == bitbucketcloud.BaseURL {
@@ -298,6 +298,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 				userConfig.BitbucketToken,
 				userConfig.BitbucketApiUser,
 				userConfig.AtlantisURL)
+			bitbucketCloudClient.CommentNamespace = commentNamespace
 		} else {
 			supportedVCSHosts = append(supportedVCSHosts, models.BitbucketServer)
 			var err error
@@ -331,6 +332,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		} else {
 			logger.Info("gitea client configured successfully")
 		}
+		giteaClient.CommentNamespace = commentNamespace
 	}
 
 	var supportedVCSHostsStr []string

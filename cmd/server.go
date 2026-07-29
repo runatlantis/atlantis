@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -150,6 +151,7 @@ const (
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
+	VCSCommentNamespaceFlag          = "vcs-comment-namespace"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
 	LanguageFlag                     = "language"
@@ -201,6 +203,7 @@ const (
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
 	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
+	DefaultVCSCommentNamespace          = ""
 	DefaultVCSStatusName                = "atlantis"
 	DefaultWebBasicAuth                 = false
 	DefaultWebUsername                  = "atlantis"
@@ -510,6 +513,11 @@ var stringFlags = map[string]stringFlag{
 		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
 			"Supports partial overrides and can be combined with --language.",
 	},
+	VCSCommentNamespaceFlag: {
+		description: "Namespace used to identify pull request comments created by this Atlantis instance." +
+			" Set a unique value per instance when multiple Atlantis servers share one VCS identity.",
+		defaultValue: DefaultVCSCommentNamespace,
+	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
@@ -596,7 +604,7 @@ var boolFlags = map[string]boolFlag{
 	},
 	HidePrevPlanComments: {
 		description: "Hide previous plan comments to reduce clutter in the PR. " +
-			"VCS support is limited to: GitHub.",
+			"Supported for GitHub, GitLab, Gitea, and Bitbucket Cloud.",
 		defaultValue: false,
 	},
 	IncludeGitUntrackedFiles: {
@@ -754,6 +762,8 @@ var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 // ValidAutomergeMethods are the valid merge methods that can be set for the
 // automerge-method flag.
 var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
+
+var validVCSCommentNamespace = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 type stringFlag struct {
 	description  string
@@ -1096,6 +1106,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
 		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
+	}
+
+	if userConfig.VCSCommentNamespace != "" && !validVCSCommentNamespace.MatchString(userConfig.VCSCommentNamespace) {
+		return fmt.Errorf("invalid --%s: must match %s", VCSCommentNamespaceFlag, validVCSCommentNamespace)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {

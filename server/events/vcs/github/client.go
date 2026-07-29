@@ -227,8 +227,10 @@ listloop:
 func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitHub pull request %d", pullNum)
 
-	comments := common.SplitComment(logger, comment, maxCommentLength, g.maxCommentsPerCommand, command)
+	commentLimit := g.config.CommentNamespace.ContentLimit(maxCommentLength, command)
+	comments := common.SplitComment(logger, comment, commentLimit, g.maxCommentsPerCommand, command)
 	for i := range comments {
+		comments[i] = g.config.CommentNamespace.Tag(comments[i], command)
 		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
 		if resp != nil {
 			logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
@@ -289,7 +291,11 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		if !strings.Contains(firstLine, strings.ToLower(command)) {
+		if g.config.CommentNamespace.Enabled() {
+			if !g.config.CommentNamespace.Owns(comment.GetBody(), command) {
+				continue
+			}
+		} else if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
 

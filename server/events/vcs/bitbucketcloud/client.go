@@ -18,6 +18,7 @@ import (
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -30,6 +31,8 @@ type Client struct {
 	password    string
 	BaseURL     string
 	atlantisURL string
+	// CommentNamespace identifies comments created by this Atlantis instance.
+	CommentNamespace common.CommentNamespace
 }
 
 // NewClient builds a bitbucket cloud client. atlantisURL is the
@@ -106,10 +109,11 @@ func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 }
 
 // CreateComment creates a comment on the merge request.
-func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, _ string) error {
+func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	// NOTE: I tried to find the maximum size of a comment for bitbucket.org but
 	// I got up to 200k chars without issue so for now I'm not going to bother
 	// to detect this.
+	comment = b.CommentNamespace.Tag(comment, command)
 	bodyBytes, err := json.Marshal(map[string]map[string]string{"content": {
 		"raw": comment,
 	}})
@@ -142,22 +146,27 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 	for _, c := range comments {
 		logger.Debug("Comment is %v", c.Content.Raw)
-		if strings.EqualFold(*c.User.UUID, me) {
-			// do the same crude filtering as github client does
-			body := strings.Split(c.Content.Raw, "\n")
-			logger.Debug("Body is %v", body)
-			if len(body) == 0 {
+		if !strings.EqualFold(*c.User.UUID, me) {
+			continue
+		}
+		body := strings.Split(c.Content.Raw, "\n")
+		logger.Debug("Body is %v", body)
+		if len(body) == 0 {
+			continue
+		}
+		if b.CommentNamespace.Enabled() {
+			if !b.CommentNamespace.Owns(c.Content.Raw, command) {
 				continue
 			}
+		} else {
 			firstLine := strings.ToLower(body[0])
-			if strings.Contains(firstLine, strings.ToLower(command)) {
-				// we found our old comment that references that command
-				logger.Debug("Deleting comment with id %d", *c.ID)
-				err = b.DeletePullRequestComment(repo, pullNum, *c.ID)
-				if err != nil {
-					return err
-				}
+			if !strings.Contains(firstLine, strings.ToLower(command)) {
+				continue
 			}
+		}
+		logger.Debug("Deleting comment with id %d", *c.ID)
+		if err = b.DeletePullRequestComment(repo, pullNum, *c.ID); err != nil {
+			return err
 		}
 	}
 	return nil
