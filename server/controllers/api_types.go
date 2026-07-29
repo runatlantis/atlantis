@@ -164,7 +164,9 @@ type DriftProjectAPI struct {
 	Drift *DriftDetailsAPI `json:"drift,omitempty"`
 	// PlanOutput contains the Terraform plan output, if detection ran a
 	// plan successfully. Only populated on the detect response; omitted from
-	// status responses to avoid caching full plan text in status payloads.
+	// status responses to reduce payload size. It is never persisted in
+	// drift storage, so it is unavailable when a status response is built
+	// from stored records.
 	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when drift was last checked.
 	LastChecked time.Time `json:"last_checked"`
@@ -193,9 +195,9 @@ type DriftDetailsAPI struct {
 }
 
 // NewDriftProjectAPI converts an internal ProjectDrift to its API representation.
-// includePlanOutput controls whether the (potentially large) cached plan text
-// is included; it should be true only for the immediate detect response, not
-// for status responses that read back cached drift records.
+// includePlanOutput controls whether the (potentially large) plan text is
+// included; it should be true only for the immediate detect response, since
+// PlanOutput is transient and is not persisted in drift storage.
 func NewDriftProjectAPI(pd models.ProjectDrift, includePlanOutput bool) DriftProjectAPI {
 	result := DriftProjectAPI{
 		ProjectName:    pd.ProjectName,
