@@ -9,7 +9,7 @@ jobs:
   labeler:
     permissions:
       pull-requests: write  # for codelytv/pr-size-labeler to add labels & comment on PRs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Label the PR size
     steps:
       - name: Harden Runner
