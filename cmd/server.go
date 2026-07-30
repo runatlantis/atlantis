@@ -53,6 +53,7 @@ const (
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	AutomergeMethodFlag              = "automerge-method"
+	AutomergeRetryCountFlag          = "automerge-retry-count"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
@@ -702,6 +703,13 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	AutomergeRetryCountFlag: {
+		description: fmt.Sprintf("Number of times to retry merging a pull request when automerge (--%s) is enabled and the merge fails. "+
+			"Retries use an exponential backoff and help work around transient VCS errors, such as GitHub branch protection or "+
+			"repository rulesets briefly reporting required status checks as pending right after Atlantis applies. "+
+			"Defaults to 0, which attempts the merge exactly once.", AutomergeFlag),
+		defaultValue: 0,
+	},
 	CheckoutDepthFlag: {
 		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +

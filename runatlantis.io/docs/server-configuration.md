@@ -165,6 +165,20 @@ Default merge method to use when automerging pull requests. Valid values are
 method is used. This can be overridden per command with the `--auto-merge-method`
 comment flag. Currently only implemented for GitHub.
 
+### `--automerge-retry-count`
+
+```bash
+atlantis server --automerge-retry-count=3
+# or
+ATLANTIS_AUTOMERGE_RETRY_COUNT=3
+```
+
+Number of times to retry merging a pull request when `--automerge` is enabled and
+the merge fails. Retries use an exponential backoff and help work around transient
+VCS errors, such as GitHub branch protection or repository rulesets briefly
+reporting required status checks as pending immediately after Atlantis applies.
+Defaults to `0`, which attempts the merge exactly once.
+
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
