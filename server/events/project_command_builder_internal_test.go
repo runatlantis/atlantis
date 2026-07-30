@@ -683,6 +683,7 @@ projects:
 				"",
 				false,
 				false,
+				false,
 				"auto",
 				statsScope,
 				terraformClient,
@@ -901,6 +902,7 @@ projects:
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
 				"",
+				false,
 				false,
 				false,
 				"auto",
@@ -1154,6 +1156,7 @@ workflows:
 				"",
 				false,
 				false,
+				false,
 				"auto",
 				statsScope,
 				terraformClient,
@@ -1307,6 +1310,7 @@ projects:
 				false,
 				"",
 				true,
+				false,
 				false,
 				"auto",
 				statsScope,
@@ -1553,6 +1557,7 @@ autodiscover:
 				"",
 				true,
 				false,
+				false,
 				"auto",
 				statsScope,
 				terraformClient,
@@ -1605,4 +1610,123 @@ func mustVersion(v string) *version.Version {
 		panic(err)
 	}
 	return vers
+}
+
+func TestFilterPlansForPartialApply_SkipsErroredAndUnplannedProjects(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	applyable, err := filterPlansForPartialApply(ctx, plans, false)
+
+	Ok(t, err)
+	Equals(t, 1, len(applyable))
+	Equals(t, "proj1", applyable[0].RepoRelDir)
+}
+
+func TestFilterPlansForPartialApply_FiltersPlanWithNonApplyableStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "default"},
+	}
+
+	applyable, err := filterPlansForPartialApply(ctx, plans, false)
+
+	Ok(t, err)
+	Equals(t, 1, len(applyable))
+	Equals(t, "proj1", applyable[0].RepoRelDir)
+}
+
+func TestFilterPlansForPartialApply_FiltersPlanWithoutMatchingStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "default"},
+	}
+
+	applyable, err := filterPlansForPartialApply(ctx, plans, false)
+
+	Ok(t, err)
+	Equals(t, 1, len(applyable))
+	Equals(t, "proj1", applyable[0].RepoRelDir)
+}
+
+func TestFilterPlansForPartialApply_StillRejectsStaleHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	_, err := filterPlansForPartialApply(ctx, plans, false)
+
+	Assert(t, err != nil, "expected stale head to be rejected even with partial apply")
+}
+
+func TestFilterPlansForPartialApply_StillRejectsNilPullStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: nil,
+	}
+
+	_, err := filterPlansForPartialApply(ctx, nil, false)
+
+	Assert(t, err != nil, "expected nil pull status to be rejected even with partial apply")
+}
+
+func TestFilterPlansForPartialApply_StillRejectsActivePlan(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+
+	_, err := filterPlansForPartialApply(ctx, nil, true)
+
+	Assert(t, err != nil, "expected in-flight plan to be rejected even with partial apply")
 }
