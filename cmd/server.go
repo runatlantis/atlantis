@@ -49,6 +49,7 @@ const (
 	AllowCommandsFlag                = "allow-commands"
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
+	AllowPartialApplyFlag            = "allow-partial-apply"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
@@ -538,6 +539,10 @@ var stringFlags = map[string]stringFlag{
 var boolFlags = map[string]boolFlag{
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
+	},
+	AllowPartialApplyFlag: {
+		description:  "Allow \"atlantis apply\" (without flags) to apply the subset of projects that have valid plans, skipping projects whose plans errored or are missing, instead of failing the whole command. Useful for workflows with inter-project dependencies (e.g. Terragrunt) that require iterative plan/apply cycles.",
 		defaultValue: false,
 	},
 	AutoplanModules: {
