@@ -1312,9 +1312,18 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 
 // TestPullStatus_UpdateOverwritesCorruptData verifies that
 // UpdatePullWithResults tolerates a pre-existing pull-status blob whose JSON
-// no longer matches the current Go shape (e.g. after upgrading across a
-// PullStatus schema change). The corrupt entry should be logged and
-// overwritten rather than causing every subsequent plan to fail.
+// no longer matches the current Go shape at all (e.g. after an incompatible
+// PullStatus schema change this repo doesn't know how to interpret). The
+// corrupt entry should be logged and overwritten rather than causing every
+// subsequent plan to fail.
+//
+// Note this is deliberately NOT the pre-v0.44.0 int-shaped
+// PolicySetStatus.Approvals format (see #6693) - that specific legacy shape
+// is now handled gracefully by PolicySetStatus.UnmarshalJSON rather than
+// being treated as corrupt; see TestPullStatus_UpdateHandlesLegacyPolicyApprovals
+// below for that case. This test uses a value (a string) that isn't valid in
+// either the current or legacy shape, to keep covering the truly-unreadable
+// fallback.
 func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	tmp := t.TempDir()
 
@@ -1348,7 +1357,7 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	// that the current Go types cannot unmarshal.
 	key := fmt.Appendf(nil, "%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":"bogus"}],"Status":0}],"Pull":{"Num":1}}`)
 	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
 	Ok(t, err)
 	err = raw.Update(func(tx *bolt.Tx) error {
@@ -1385,6 +1394,85 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Assert(t, got != nil, "expected non-nil pull status")
 	Equals(t, 1, len(got.Projects))
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+}
+
+// TestPullStatus_UpdateHandlesLegacyPolicyApprovals is the counterpart to
+// TestPullStatus_UpdateOverwritesCorruptData: it verifies the real bug from
+// #6693. A pull-status blob persisted before v0.44.0 (#6271), where
+// PolicySetStatus.Approvals was a plain int rather than
+// []PolicySetApproval, must be read successfully (not discarded as corrupt)
+// - with approvals reset to none, since real approver identities were never
+// stored in that format - and its policy status preserved across a
+// subsequent commit the same way a current-format entry would be.
+func TestPullStatus_UpdateHandlesLegacyPolicyApprovals(t *testing.T) {
+	tmp := t.TempDir()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	b, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, b.Close())
+
+	// Inject a pre-v0.44.0 pull-status blob: Approvals is a plain int (2)
+	// rather than []PolicySetApproval, at the same commit ("sha-A") as the
+	// pull being updated below.
+	key := fmt.Appendf(nil, "%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	legacy := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2,"Hashes":["h1"]}],"Status":0}],"Pull":{"Num":1,"HeadCommit":"sha-A"}}`)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	Ok(t, raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, legacy)
+	}))
+	Ok(t, raw.Close())
+
+	b, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer b.Close()
+
+	// A plain read must succeed, not error out as it did before the fix.
+	readBack, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, readBack != nil, "expected non-nil pull status")
+	Equals(t, 1, len(readBack.Projects[0].PolicyStatus))
+	Equals(t, 0, len(readBack.Projects[0].PolicyStatus[0].Approvals))
+
+	// Push a plan result at the same commit; the (approval-reset) policy
+	// status should be preserved, same as the current-format case.
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		{
+			Command:    command.Plan,
+			RepoRelDir: "mydir",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
+			},
+		},
+	})
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+	Assert(t, len(status.Projects[0].PolicyStatus) > 0, "expected legacy policy status to be preserved, not discarded")
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 0, len(status.Projects[0].PolicyStatus[0].Approvals))
 }
 
 // newTestDB returns a TestDB using a temporary path.

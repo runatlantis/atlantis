@@ -5,6 +5,7 @@
 package models_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -970,6 +971,156 @@ func TestPolicySetStatus_OwnerHasFullyApproved(t *testing.T) {
 			Equals(t, c.expected, c.status.OwnerHasFullyApproved(c.owner))
 		})
 	}
+}
+
+// Regression test for #6693: pull status records persisted to BoltDB before
+// v0.44.0 (#6271) stored Approvals as a plain int count. Deserializing such a
+// record must not fail outright - it should come back with zero approvals,
+// since the real approver identities were never stored in that format.
+func TestPolicySetStatus_UnmarshalJSON(t *testing.T) {
+	cases := []struct {
+		description string
+		json        string
+		expected    models.PolicySetStatus
+		expectErr   bool
+	}{
+		{
+			description: "current format with approvals",
+			json: `{
+				"PolicySetName": "policy1",
+				"Passed": true,
+				"Approvals": [{"Approver": "user1", "Hashes": ["h1", "h2"]}],
+				"Hashes": ["h1", "h2"],
+				"PolicyItemRegex": ""
+			}`,
+			expected: models.PolicySetStatus{
+				PolicySetName: "policy1",
+				Passed:        true,
+				Approvals:     []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1", "h2"}}},
+				Hashes:        []string{"h1", "h2"},
+			},
+		},
+		{
+			description: "current format with no approvals",
+			json: `{
+				"PolicySetName": "policy1",
+				"Passed": false,
+				"Approvals": null,
+				"Hashes": ["h1"]
+			}`,
+			expected: models.PolicySetStatus{
+				PolicySetName: "policy1",
+				Hashes:        []string{"h1"},
+			},
+		},
+		{
+			description: "legacy pre-v0.44.0 format with an int approval count",
+			json: `{
+				"PolicySetName": "policy1",
+				"Passed": false,
+				"Approvals": 2,
+				"Hashes": ["h1"]
+			}`,
+			expected: models.PolicySetStatus{
+				PolicySetName: "policy1",
+				Hashes:        []string{"h1"},
+			},
+		},
+		{
+			description: "legacy format with a zero approval count",
+			json: `{
+				"PolicySetName": "policy1",
+				"Approvals": 0,
+				"Hashes": ["h1"]
+			}`,
+			expected: models.PolicySetStatus{
+				PolicySetName: "policy1",
+				Hashes:        []string{"h1"},
+			},
+		},
+		{
+			description: "approvals field missing entirely",
+			json:        `{"PolicySetName": "policy1", "Hashes": ["h1"]}`,
+			expected: models.PolicySetStatus{
+				PolicySetName: "policy1",
+				Hashes:        []string{"h1"},
+			},
+		},
+		{
+			description: "approvals is neither an array nor an int",
+			json:        `{"PolicySetName": "policy1", "Approvals": "bogus"}`,
+			expectErr:   true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var actual models.PolicySetStatus
+			err := json.Unmarshal([]byte(c.json), &actual)
+			if c.expectErr {
+				Assert(t, err != nil, "expected an error, got nil")
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.expected, actual)
+		})
+	}
+}
+
+// Round-trip sanity check: marshaling then unmarshaling a PolicySetStatus with
+// real approvals (the normal, current-format case) must be lossless.
+func TestPolicySetStatus_MarshalUnmarshalRoundTrip(t *testing.T) {
+	orig := models.PolicySetStatus{
+		PolicySetName: "policy1",
+		Passed:        true,
+		Approvals: []models.PolicySetApproval{
+			{Approver: "user1", Hashes: []string{"h1", "h2"}},
+			{Approver: "user2", Hashes: []string{"h1"}},
+		},
+		Hashes:          []string{"h1", "h2"},
+		PolicyItemRegex: "some-regex",
+	}
+
+	data, err := json.Marshal(orig)
+	Ok(t, err)
+
+	var roundTripped models.PolicySetStatus
+	Ok(t, json.Unmarshal(data, &roundTripped))
+	Equals(t, orig, roundTripped)
+}
+
+// End-to-end regression test for #6693: a full PullStatus record, as actually
+// persisted to and read from BoltDB, with a nested pre-v0.44.0 legacy
+// PolicySetStatus.Approvals int. Before the fix, reading this record (e.g.
+// via GetPullStatus on `apply`) failed outright with a JSON type error.
+func TestPullStatus_UnmarshalJSON_LegacyNestedPolicyApprovals(t *testing.T) {
+	blob := `{
+		"Projects": [
+			{
+				"Workspace": "default",
+				"RepoRelDir": ".",
+				"ProjectName": "",
+				"PolicyStatus": [
+					{
+						"PolicySetName": "policy1",
+						"Passed": false,
+						"Approvals": 3,
+						"Hashes": ["h1"]
+					}
+				],
+				"Status": 0
+			}
+		],
+		"Pull": {}
+	}`
+
+	var status models.PullStatus
+	Ok(t, json.Unmarshal([]byte(blob), &status))
+
+	Equals(t, 1, len(status.Projects))
+	Equals(t, 1, len(status.Projects[0].PolicyStatus))
+	Assert(t, status.Projects[0].PolicyStatus[0].Approvals == nil,
+		"expected legacy int Approvals to deserialize to nil, got %v", status.Projects[0].PolicyStatus[0].Approvals)
+	Equals(t, "policy1", status.Projects[0].PolicyStatus[0].PolicySetName)
 }
 
 func TestNewPolicySetResult(t *testing.T) {
