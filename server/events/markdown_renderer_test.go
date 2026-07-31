@@ -142,7 +142,7 @@ func TestRenderWorkingDirLockMetadata(t *testing.T) {
 				t.Fatalf("expected %q in:\n%s", text, rendered)
 			}
 		}
-		if !(strings.Index(rendered, "```") < strings.Index(rendered, commitLink) && strings.Index(rendered, commitLink) < strings.Index(rendered, jobLink) && strings.Index(rendered, jobLink) < strings.Index(rendered, "<details><summary>Log</summary>")) {
+		if strings.Index(rendered, "```") >= strings.Index(rendered, commitLink) || strings.Index(rendered, commitLink) >= strings.Index(rendered, jobLink) || strings.Index(rendered, jobLink) >= strings.Index(rendered, "<details><summary>Log</summary>") {
 			t.Fatalf("unexpected command error ordering:\n%s", rendered)
 		}
 	})
@@ -170,7 +170,7 @@ func TestRenderWorkingDirLockMetadata(t *testing.T) {
 			},
 		}
 		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
-		if !(strings.Index(rendered, "```\ncannot run") >= 0 && strings.Index(rendered, "- Commit:") > strings.Index(rendered, "```\ncannot run") && strings.Index(rendered, "rendered context") > strings.Index(rendered, "- Blocking job:")) {
+		if !strings.Contains(rendered, "```\ncannot run") || strings.Index(rendered, "- Commit:") <= strings.Index(rendered, "```\ncannot run") || strings.Index(rendered, "rendered context") <= strings.Index(rendered, "- Blocking job:") {
 			t.Fatalf("unexpected unwrapped error ordering:\n%s", rendered)
 		}
 	})
@@ -188,7 +188,7 @@ func TestRenderWorkingDirLockMetadata(t *testing.T) {
 		}
 		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
 		closeDetails := strings.Index(rendered, "</details>")
-		if !(strings.Index(rendered, "rendered context") < closeDetails && closeDetails < strings.Index(rendered, "- Commit:") && strings.Index(rendered, "- Commit:") < strings.Index(rendered, "- Blocking job:")) {
+		if strings.Index(rendered, "rendered context") >= closeDetails || closeDetails >= strings.Index(rendered, "- Commit:") || strings.Index(rendered, "- Commit:") >= strings.Index(rendered, "- Blocking job:") {
 			t.Fatalf("unexpected wrapped error ordering:\n%s", rendered)
 		}
 	})
