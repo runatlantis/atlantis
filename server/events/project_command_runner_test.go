@@ -687,7 +687,7 @@ func TestDefaultProjectCommandRunner_PlanUndivergedBlocksAfterMergeAgain(t *test
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](),
-		Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+		Any[[]string](), Any[models.PullRequest]())).ThenReturn(true, nil)
 
 	res := runner.Plan(ctx)
 
@@ -770,7 +770,7 @@ func TestDefaultProjectCommandRunner_PlanValidationFailureKeepsLockWhenDeletePla
 	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string]())).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](),
-		Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
+		Any[[]string](), Any[models.PullRequest]())).ThenReturn(true, nil)
 	When(mockWorkingDir.DeletePlan(Any[logging.SimpleLogging](), Eq(ctx.Pull.BaseRepo), Eq(ctx.Pull),
 		Eq(ctx.Workspace), Eq(ctx.RepoRelDir), Eq(ctx.ProjectName))).ThenReturn(errors.New("delete failed"))
 
@@ -805,12 +805,12 @@ func (m *mergeCreatesProjectWorkingDir) GetWorkingDir(models.Repo, models.PullRe
 	return m.repoDir, nil
 }
 
-func (m *mergeCreatesProjectWorkingDir) HasDiverged(logging.SimpleLogging, string, string, []string, models.PullRequest) bool {
-	return false
+func (m *mergeCreatesProjectWorkingDir) HasDiverged(logging.SimpleLogging, string, string, []string, models.PullRequest) (bool, error) {
+	return false, nil
 }
 
-func (m *mergeCreatesProjectWorkingDir) HasDivergedFromPullHead(logging.SimpleLogging, string, string, []string, models.PullRequest) bool {
-	return false
+func (m *mergeCreatesProjectWorkingDir) HasDivergedFromPullHead(logging.SimpleLogging, string, string, []string, models.PullRequest) (bool, error) {
+	return false, nil
 }
 
 func (m *mergeCreatesProjectWorkingDir) GetDivergedFiles(logging.SimpleLogging, string, models.PullRequest) ([]string, error) {
@@ -863,7 +863,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	}
 	tmp := t.TempDir()
 	When(mockWorkingDir.GetWorkingDir(ctx.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(tmp, nil)
-	When(mockWorkingDir.HasDiverged(ctx.Log, tmp, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)).ThenReturn(true)
+	When(mockWorkingDir.HasDiverged(ctx.Log, tmp, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)).ThenReturn(true, nil)
 
 	res := runner.Apply(ctx)
 	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
