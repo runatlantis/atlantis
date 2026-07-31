@@ -726,6 +726,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 
 ::: tip Plan Output
 Each project includes a `plan_output` field carrying the raw Terraform plan text produced during detection (the same field `POST /api/drift/remediate` returns). This lets callers see *what* changed without a second remediation request. It reflects only this detection run and is not persisted: `GET /api/drift/status`, which is served from stored results, does not include `plan_output`.
+
+`plan_output` is not truncated. A detection that spans many drifted projects returns every project's full plan text in a single response, which can be large and is held in memory while the response is built. If you only need the drift counts, or you want to bound the response size, narrow the run with `projects` or `paths`.
 :::
 
 #### Error Responses
