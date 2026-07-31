@@ -244,6 +244,10 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
+	if ctx.CloneSkipped {
+		return
+	}
+
 	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
 }
 
@@ -560,7 +564,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	cmdRunner.Run(ctx, cmd)
-	if ctx.CommandSkipped {
+	if ctx.CommandSkipped || ctx.CloneSkipped {
 		return
 	}
 
