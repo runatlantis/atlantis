@@ -713,6 +713,40 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	)
 }
 
+func TestRunCommentCommandPlan_SilenceVCSStatusNoProjects_SkipsPostWorkflowHooks(t *testing.T) {
+	t.Log("when silenceVCSStatusNoProjects=true and no projects match, RunPostHooks must not be called")
+	setup(t, func(tc *TestConfig) {
+		tc.silenceVCSStatusNoProjects = true
+		tc.SilenceNoProjects = true
+	})
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+func TestRunCommentCommandApply_SilenceVCSStatusNoProjects_SkipsPostWorkflowHooks(t *testing.T) {
+	t.Log("when silenceVCSStatusNoProjects=true and no projects match, RunPostHooks must not be called on apply")
+	setup(t, func(tc *TestConfig) {
+		tc.silenceVCSStatusNoProjects = true
+		tc.SilenceNoProjects = true
+	})
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	Ok(t, err)
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
 func TestRunApply_NoProjectsAfterEmptyPullStatusNoOpsSafely(t *testing.T) {
 	vcsClient := setup(t)
 	applyCommandRunner.SilenceNoProjects = true
