@@ -23,6 +23,8 @@ func NewApplyCommandRunner(
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
 	cancellationTracker CancellationTracker,
+	preWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner,
+	postWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
@@ -36,44 +38,48 @@ func NewApplyCommandRunner(
 	disableAutomergeLabel string,
 ) *ApplyCommandRunner {
 	return &ApplyCommandRunner{
-		vcsClient:                  vcsClient,
-		DisableApplyAll:            disableApplyAll,
-		locker:                     applyCommandLocker,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              prjCommandBuilder,
-		prjCmdRunner:               prjCmdRunner,
-		cancellationTracker:        cancellationTracker,
-		autoMerger:                 autoMerger,
-		pullUpdater:                pullUpdater,
-		dbUpdater:                  dbUpdater,
-		Database:                   database,
-		parallelPoolSize:           parallelPoolSize,
-		SilenceNoProjects:          SilenceNoProjects,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		workingDirLocker:           workingDirLocker,
-		pullReqStatusFetcher:       pullReqStatusFetcher,
-		livePullHeadFetcher:        livePullHeadFetcher,
-		disableAutomergeLabel:      disableAutomergeLabel,
+		vcsClient:                      vcsClient,
+		DisableApplyAll:                disableApplyAll,
+		locker:                         applyCommandLocker,
+		commitStatusUpdater:            commitStatusUpdater,
+		prjCmdBuilder:                  prjCommandBuilder,
+		prjCmdRunner:                   prjCmdRunner,
+		cancellationTracker:            cancellationTracker,
+		preWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		autoMerger:                     autoMerger,
+		pullUpdater:                    pullUpdater,
+		dbUpdater:                      dbUpdater,
+		Database:                       database,
+		parallelPoolSize:               parallelPoolSize,
+		SilenceNoProjects:              SilenceNoProjects,
+		silenceVCSStatusNoProjects:     silenceVCSStatusNoProjects,
+		workingDirLocker:               workingDirLocker,
+		pullReqStatusFetcher:           pullReqStatusFetcher,
+		livePullHeadFetcher:            livePullHeadFetcher,
+		disableAutomergeLabel:          disableAutomergeLabel,
 	}
 }
 
 type ApplyCommandRunner struct {
-	DisableApplyAll       bool
-	Database              db.Database
-	locker                locking.ApplyLockChecker
-	vcsClient             vcs.Client
-	commitStatusUpdater   CommitStatusUpdater
-	prjCmdBuilder         ProjectApplyCommandBuilder
-	prjCmdRunner          ProjectApplyCommandRunner
-	cancellationTracker   CancellationTracker
-	autoMerger            *AutoMerger
-	pullUpdater           *PullUpdater
-	dbUpdater             *DBUpdater
-	parallelPoolSize      int
-	workingDirLocker      WorkingDirLocker
-	pullReqStatusFetcher  vcs.PullReqStatusFetcher
-	livePullHeadFetcher   LivePullHeadFetcher
-	disableAutomergeLabel string
+	DisableApplyAll                bool
+	Database                       db.Database
+	locker                         locking.ApplyLockChecker
+	vcsClient                      vcs.Client
+	commitStatusUpdater            CommitStatusUpdater
+	prjCmdBuilder                  ProjectApplyCommandBuilder
+	prjCmdRunner                   ProjectApplyCommandRunner
+	cancellationTracker            CancellationTracker
+	preWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
+	postWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
+	autoMerger                     *AutoMerger
+	pullUpdater                    *PullUpdater
+	dbUpdater                      *DBUpdater
+	parallelPoolSize               int
+	workingDirLocker               WorkingDirLocker
+	pullReqStatusFetcher           vcs.PullReqStatusFetcher
+	livePullHeadFetcher            LivePullHeadFetcher
+	disableAutomergeLabel          string
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -228,7 +234,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	preApplyPullStatus := ctx.PullStatus
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), wrapWithProjectWorkflowHooks(a.preWorkflowHooksCommandRunner, a.postWorkflowHooksCommandRunner, a.prjCmdRunner.Apply))
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
 		ctx.Log.Err("fetching live pull request after apply: %s", err)
