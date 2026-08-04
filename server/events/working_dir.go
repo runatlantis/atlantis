@@ -290,13 +290,13 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 	if w.usesPRSourceRemote(headRepo, p) {
 		cmds = append(cmds,
 			[]string{"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL},
-			[]string{"git", "remote", "update"},
+			[]string{"git", "remote", "update", "--prune"},
 		)
 	} else {
 		// On the GitHub App path the source (fork) remote isn't used to fetch the
 		// PR head, so only refresh origin. This avoids fetching a possibly
 		// inaccessible fork, which would fail and make us assume divergence.
-		cmds = append(cmds, []string{"git", "remote", "update", "origin"})
+		cmds = append(cmds, []string{"git", "remote", "update", "origin", "--prune"})
 	}
 
 	for _, args := range cmds {
@@ -389,7 +389,7 @@ func (w *FileWorkspace) GetDivergedFilesFromPullHead(logger logging.SimpleLoggin
 // gitRefLock(cloneDir) and gitReadLock(cloneDir) (or the write lock).
 func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir string) bool {
 	logger.Debug("HasDiverged: running git fetch in %s", cloneDir)
-	cmd := exec.Command("git", "fetch")
+	cmd := exec.Command("git", "fetch", "--prune")
 	cmd.Dir = cloneDir
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -506,7 +506,7 @@ func (w *FileWorkspace) getDivergedFilesFromPullHead(logger logging.SimpleLoggin
 
 func (w *FileWorkspace) getDivergedFilesFromRef(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest, startRef string) ([]string, error) {
 	logger.Debug("GetDivergedFiles: running git fetch")
-	fetchCmd := exec.Command("git", "fetch")
+	fetchCmd := exec.Command("git", "fetch", "--prune")
 	fetchCmd.Dir = cloneDir
 	outputFetch, err := fetchCmd.CombinedOutput()
 	if err != nil {
@@ -571,9 +571,9 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 	// On the GitHub App path the source (fork) remote isn't used to fetch the PR
 	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
 	// origin and avoid fetching a possibly inaccessible fork.
-	fetchArgs := []string{"fetch", "--all"}
+	fetchArgs := []string{"fetch", "--all", "--prune"}
 	if !w.usesPRSourceRemote(c.head, c.pr) {
-		fetchArgs = []string{"fetch", "origin"}
+		fetchArgs = []string{"fetch", "origin", "--prune"}
 	}
 	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
@@ -845,7 +845,7 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 	if err := w.wrappedGit(logger, c, "merge-base", c.pr.BaseBranch, "FETCH_HEAD"); err != nil {
 		// git merge-base returning error means that we did not receive enough commits in shallow clone.
 		// Fall back to retrieving full repo history.
-		if err := w.wrappedGit(logger, c, "fetch", "--unshallow"); err != nil {
+		if err := w.wrappedGit(logger, c, "fetch", "--unshallow", "--prune"); err != nil {
 			return err
 		}
 
