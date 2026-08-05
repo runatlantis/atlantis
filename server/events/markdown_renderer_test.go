@@ -1249,6 +1249,50 @@ Ran Plan for dir: $path$ workspace: $workspace$
 `,
 		},
 		{
+			"multiple failed plans",
+			command.Plan,
+			"",
+			[]command.ProjectResult{
+				{
+					RepoRelDir: "path",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
+				},
+				{
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Plan for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+---
+
+### 1. dir: $path$ workspace: $workspace$
+**Plan Failed**: failure
+
+---
+### 2. dir: $path2$ workspace: $workspace$
+**Plan Error**
+$$$
+error
+$$$
+
+---
+### Plan Summary
+
+2 projects, 0 with changes, 0 with no changes, 2 failed
+`,
+		},
+		{
 			"successful, failed, and errored plan",
 			command.Plan,
 			"",
@@ -1295,10 +1339,7 @@ $$$diff
 terraform-output
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-  $$$shell
-  atlantis apply -d path -w workspace
-  $$$
+This plan was saved, but apply is blocked until all plans succeed.
 * :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
 * :repeat: To **plan** this project again, comment:
   $$$shell
@@ -1321,13 +1362,9 @@ $$$
 
 3 projects, 1 with changes, 0 with no changes, 2 failed
 
-* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+* :repeat: To **re-run failed plans**, comment:
   $$$shell
-  atlantis apply
-  $$$
-* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
-  $$$shell
-  atlantis unlock
+  atlantis plan --failed
   $$$
 `,
 		},
@@ -3368,98 +3405,31 @@ Plan: 1 to add, 0 to change, 0 to destroy.
 	Equals(t, normalize(exp), normalize(rendered))
 }
 
-// Test rendering when there was an error in one of the plans and we deleted
-// all the plans as a result.
-func TestRenderProjectResults_PlansDeleted(t *testing.T) {
-	cases := map[string]struct {
-		res command.Result
-		exp string
-	}{
-		"one failure": {
-			res: command.Result{
-				ProjectResults: []command.ProjectResult{
-					{
-						RepoRelDir: ".",
-						Workspace:  "staging",
-						ProjectCommandOutput: command.ProjectCommandOutput{
-							Failure: "failure",
-						},
+func TestRenderProjectResults_FailedPlanBlocksApply(t *testing.T) {
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
+			},
+			{
+				RepoRelDir: ".",
+				Workspace:  "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "tf out",
+						LockURL:         "lock-url",
+						RePlanCmd:       "re-plan cmd",
+						ApplyCmd:        "apply cmd",
 					},
 				},
-				PlansDeleted: true,
 			},
-			exp: `
-Ran Plan for dir: $.$ workspace: $staging$
-
-**Plan Failed**: failure
-`,
 		},
-		"two failures": {
-			res: command.Result{
-				ProjectResults: []command.ProjectResult{
-					{
-						RepoRelDir: ".",
-						Workspace:  "staging",
-						ProjectCommandOutput: command.ProjectCommandOutput{
-							Failure: "failure",
-						},
-					},
-					{
-						RepoRelDir: ".",
-						Workspace:  "production",
-						ProjectCommandOutput: command.ProjectCommandOutput{
-							Failure: "failure",
-						},
-					},
-				},
-				PlansDeleted: true,
-			},
-			exp: `
-Ran Plan for 2 projects:
-
-1. dir: $.$ workspace: $staging$
-1. dir: $.$ workspace: $production$
----
-
-### 1. dir: $.$ workspace: $staging$
-**Plan Failed**: failure
-
----
-### 2. dir: $.$ workspace: $production$
-**Plan Failed**: failure
-
----
-### Plan Summary
-
-2 projects, 0 with changes, 0 with no changes, 2 failed
-`,
-		},
-		"one failure, one success": {
-			res: command.Result{
-				ProjectResults: []command.ProjectResult{
-					{
-						RepoRelDir: ".",
-						Workspace:  "staging",
-						ProjectCommandOutput: command.ProjectCommandOutput{
-							Failure: "failure",
-						},
-					},
-					{
-						RepoRelDir: ".",
-						Workspace:  "production",
-						ProjectCommandOutput: command.ProjectCommandOutput{
-							PlanSuccess: &models.PlanSuccess{
-								TerraformOutput: "tf out",
-								LockURL:         "lock-url",
-								RePlanCmd:       "re-plan cmd",
-								ApplyCmd:        "apply cmd",
-							},
-						},
-					},
-				},
-				PlansDeleted: true,
-			},
-			exp: `
+	}
+	exp := `
 Ran Plan for 2 projects:
 
 1. dir: $.$ workspace: $staging$
@@ -3475,51 +3445,126 @@ $$$diff
 tf out
 $$$
 
-This plan was not saved because one or more projects failed and automerge requires all plans pass.
+This plan was saved, but apply is blocked until all plans succeed.
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  $$$shell
+  re-plan cmd
+  $$$
 
 ---
 ### Plan Summary
 
 2 projects, 1 with changes, 0 with no changes, 1 failed
-`,
+
+* :repeat: To **re-run failed plans**, comment:
+  $$$shell
+  atlantis plan --failed
+  $$$
+`
+
+	mr := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	rendered := mr.Render(ctx, res, cmd)
+	Equals(t, normalize(exp), normalize(rendered))
+}
+
+// Custom template overrides that reference the deprecated PlanWasDeleted and
+// PlansDeleted fields must keep rendering: the fields are retained (always
+// false) even though the built-in templates no longer use them.
+func TestRenderProjectResults_DeprecatedPlanDeletionFieldsStillRender(t *testing.T) {
+	overridesDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(overridesDir, "plan_success_unwrapped.tmpl"), []byte(`
+{{ define "planSuccessUnwrapped" -}}
+{{ if .PlanWasDeleted }}legacy-plan-deleted{{ else }}legacy-compat-apply: {{ .ApplyCmd }}{{ end }}
+{{ end -}}
+`), 0o600)
+	Ok(t, err)
+	err = os.WriteFile(filepath.Join(overridesDir, "multi_project_plan_footer.tmpl"), []byte(`
+{{ define "multiProjectPlanFooter" -}}
+{{ if not .PlansDeleted }}legacy-compat-footer{{ end }}
+{{ end -}}
+`), 0o600)
+	Ok(t, err)
+
+	mr := events.NewMarkdownRenderer(
+		false,        // gitlabSupportsCommonMark
+		false,        // disableApplyAll
+		false,        // disableApply
+		false,        // disableMarkdownFolding
+		false,        // disableRepoLocking
+		false,        // enableDiffMarkdownFormat
+		overridesDir, // markdownTemplateOverridesDir
+		"atlantis",   // executableName
+		false,        // hideUnchangedPlanComments
+		false,        // quietPolicyChecks
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "tf out",
+						LockURL:         "lock-url",
+						RePlanCmd:       "re-plan cmd",
+						ApplyCmd:        "apply cmd",
+					},
+				},
+			},
+			{
+				RepoRelDir: ".",
+				Workspace:  "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "tf out",
+						LockURL:         "lock-url",
+						RePlanCmd:       "re-plan cmd",
+						ApplyCmd:        "apply cmd",
+					},
+				},
+			},
 		},
 	}
 
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			mr := events.NewMarkdownRenderer(
-				false,      // gitlabSupportsCommonMark
-				false,      // disableApplyAll
-				false,      // disableApply
-				false,      // disableMarkdownFolding
-				false,      // disableRepoLocking
-				false,      // enableDiffMarkdownFormat
-				"",         // markdownTemplateOverridesDir
-				"atlantis", // executableName
-				false,      // hideUnchangedPlanComments
-				false,      // quietPolicyChecks
-			)
-			logger := logging.NewNoopLogger(t).WithHistory()
-			logText := "log"
-			logger.Info("%s", logText)
-			ctx := &command.Context{
-				Log: logger,
-				Pull: models.PullRequest{
-					BaseRepo: models.Repo{
-						VCSHost: models.VCSHost{
-							Type: models.Github,
-						},
-					},
-				},
-			}
-			cmd := &events.CommentCommand{
-				Name:    command.Plan,
-				Verbose: false,
-			}
-			rendered := mr.Render(ctx, c.res, cmd)
-			Equals(t, normalize(c.exp), normalize(rendered))
-		})
-	}
+	rendered := mr.Render(ctx, res, &events.CommentCommand{Name: command.Plan})
+	Assert(t, !strings.Contains(rendered, "Failed to render template"), "expected no template error, got %q", rendered)
+	Assert(t, strings.Contains(rendered, "legacy-compat-apply: apply cmd"), "expected legacy PlanWasDeleted override to render its else branch, got %q", rendered)
+	Assert(t, !strings.Contains(rendered, "legacy-plan-deleted"), "expected PlanWasDeleted to be false, got %q", rendered)
+	Assert(t, strings.Contains(rendered, "legacy-compat-footer"), "expected legacy PlansDeleted override to render, got %q", rendered)
 }
 
 // test that id repo locking is disabled the link to unlock the project is not rendered
@@ -3933,10 +3978,7 @@ $$$diff
 terraform-output
 $$$
 
-* :arrow_forward: To **apply** this plan, comment:
-  $$$shell
-  atlantis apply -d path -w workspace
-  $$$
+This plan was saved, but apply is blocked until all plans succeed.
 * :repeat: To **plan** this project again, comment:
   $$$shell
   atlantis plan -d path -w workspace
@@ -3958,13 +4000,9 @@ $$$
 
 3 projects, 1 with changes, 0 with no changes, 2 failed
 
-* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+* :repeat: To **re-run failed plans**, comment:
   $$$shell
-  atlantis apply
-  $$$
-* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
-  $$$shell
-  atlantis unlock
+  atlantis plan --failed
   $$$
 `,
 		},

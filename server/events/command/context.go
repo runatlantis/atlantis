@@ -109,3 +109,11 @@ type Context struct {
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
 }
+
+// ErroredPlanProjects returns projects whose latest plan errored.
+func (c Context) ErroredPlanProjects() []models.ProjectStatus {
+	if c.PullStatus == nil {
+		return nil
+	}
+	return c.PullStatus.ErroredPlanProjects()
+}

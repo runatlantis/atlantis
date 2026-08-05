@@ -646,6 +646,30 @@ func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 	}
 }
 
+func TestParse_PlanFailed(t *testing.T) {
+	r := commentParser.Parse("atlantis plan --failed", models.Github)
+	Equals(t, "", r.CommentResponse)
+	Equals(t, &events.CommentCommand{
+		Name:            command.Plan,
+		FailedPlansOnly: true,
+	}, r.Command)
+}
+
+func TestParse_PlanFailedCannotUseProjectSelectors(t *testing.T) {
+	comments := []string{
+		"atlantis plan --failed -d dir",
+		"atlantis plan --failed -w workspace",
+		"atlantis plan --failed -p project",
+	}
+	for _, comment := range comments {
+		t.Run(comment, func(t *testing.T) {
+			r := commentParser.Parse(comment, models.Github)
+			Assert(t, strings.Contains(r.CommentResponse, "Error: cannot use --failed at same time as"),
+				"For comment %q expected CommentResponse %q to contain --failed validation error", comment, r.CommentResponse)
+		})
+	}
+}
+
 func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
 		flags        string
@@ -1211,6 +1235,7 @@ func TestParse_VCSUsername(t *testing.T) {
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
+      --failed             Run plan only for projects with failed plans.
   -p, --project string     Which project to run plan for. Refers to the name of the
                            project configured in a repo config file. Cannot be used
                            at same time as workspace or dir flags.

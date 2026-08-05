@@ -138,13 +138,15 @@ type CommentCommand struct {
 	PolicySet string
 	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.
 	ClearPolicyApproval bool
+	// FailedPlansOnly is true if plan should re-run only projects with failed plans.
+	FailedPlansOnly bool
 }
 
 // IsForSpecificProject returns true if the command is for a specific dir, workspace
 // or project name. Otherwise it's a command like "atlantis plan" or "atlantis
 // apply".
 func (c CommentCommand) IsForSpecificProject() bool {
-	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
+	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != "" || c.FailedPlansOnly
 }
 
 // Dir returns the dir of this command.
@@ -174,7 +176,7 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, policyset=%q, auto-merge-disabled=%t, auto-merge-method=%s, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.AutoMergeDisabled, c.AutoMergeMethod, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, policyset=%q, auto-merge-disabled=%t, auto-merge-method=%s, clear-policy-approval=%t, failed=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.AutoMergeDisabled, c.AutoMergeMethod, c.ClearPolicyApproval, c.FailedPlansOnly, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.

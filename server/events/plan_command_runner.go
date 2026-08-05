@@ -179,14 +179,6 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
-	}
-
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
@@ -197,9 +189,8 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
-	// Check if there are any planned projects and if there are any errors or if plans are being deleted
-	if len(policyCheckCmds) > 0 &&
-		(!result.HasErrors() && !result.PlansDeleted) {
+	// Check if there are any planned projects and if there are any errors.
+	if len(policyCheckCmds) > 0 && !result.HasErrors() {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
 
@@ -305,6 +296,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		return
 	}
+
+	if cmd.FailedPlansOnly && len(projectCmds) == 0 {
+		if err := p.vcsClient.CreateComment(ctx.Log, baseRepo, pull.Num, noFailedPlansComment, command.Plan.String()); err != nil {
+			ctx.Log.Err("unable to comment: %s", err)
+		}
+		return
+	}
+
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 	if len(projectCmds) > 0 {
 		p.updatePendingCommitStatus(ctx, command.Plan)
@@ -325,14 +324,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
-
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
-	}
 
 	p.pullUpdater.updatePull(
 		ctx,
@@ -357,8 +348,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
-	if len(result.ProjectResults) > 0 &&
-		(!result.HasErrors() && !result.PlansDeleted) {
+	if len(result.ProjectResults) > 0 && !result.HasErrors() {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
@@ -580,6 +570,8 @@ func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, pr
 	}
 	return nil
 }
+
+const noFailedPlansComment = "No failed plans to re-run."
 
 func (p *PlanCommandRunner) partitionProjectCmds(
 	ctx *command.Context,

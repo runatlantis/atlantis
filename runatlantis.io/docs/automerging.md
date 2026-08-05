@@ -74,10 +74,17 @@ atlantis apply -d dir1
 ```
 
 Even though that plan succeeded, because **all** plans must succeed for **any** plans
-to be saved.
+to be applied.
 
-Once I fix the issue in `dir2`, I can push a new commit which will trigger an
-autoplan. Then I will be able to apply both plans.
+Atlantis keeps the successful plan for `dir1/`, but blocks apply while `dir2/`
+is still failed. Once I fix the issue in `dir2`, I can push a new commit which
+will trigger an autoplan, or I can re-run only failed plans:
+
+```shell
+atlantis plan --failed
+```
+
+Then I will be able to apply both plans.
 
 ### All Plans must be applied
 
