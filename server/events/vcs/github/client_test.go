@@ -2223,7 +2223,7 @@ func TestClient_GetPullLabels_EmptyResponse(t *testing.T) {
 }
 
 func TestClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
-	logger := logging.NewNoopLogger(t)
+	logger := logging.NewNoopLogger(t).WithHistory()
 	calls := 0
 	maxCalls := 2
 
@@ -2270,5 +2270,8 @@ func TestClient_SecondaryRateLimitHandling_CreateComment(t *testing.T) {
 
 	// Verify that the number of calls is greater than maxCalls, indicating that retries occurred
 	Assert(t, calls > maxCalls, "Expected more than %d calls due to rate limiting, but got %d", maxCalls, calls)
+	history := logger.GetHistory()
+	Assert(t, strings.Contains(history, "GitHub secondary rate limit detected; pausing requests until"), "Expected the secondary rate limit wait to be logged")
+	Assert(t, strings.Contains(history, "(accumulated wait:"), "Expected the accumulated rate limit wait to be logged")
 
 }
