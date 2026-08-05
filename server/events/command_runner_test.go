@@ -2212,6 +2212,50 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 }
 
+// Regression test for #6712: when project command building determines no
+// project was modified and skips the clone (setting ctx.CloneSkipped), post
+// workflow hooks - which assume a clone/working dir exists - must not run.
+// Previously RunPostHooks was called unconditionally after autoplan, forcing
+// an otherwise-skipped clone right back and defeating skip-clone-no-changes.
+func TestRunAutoplanCommand_SkipsPostHooksWhenCloneSkipped(t *testing.T) {
+	setup(t)
+	tmp := t.TempDir()
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).Then(func(args []Param) ReturnValues {
+		ctx := args[0].(*command.Context)
+		ctx.CloneSkipped = true
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+// Comment-command counterpart of TestRunAutoplanCommand_SkipsPostHooksWhenCloneSkipped:
+// an "atlantis plan" comment that resolves to no modified projects (clone
+// skipped) must also not run post-workflow hooks. Regression test for #6712.
+func TestRunCommentCommand_SkipsPostHooksWhenCloneSkipped(t *testing.T) {
+	setup(t)
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Plan}
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).Then(func(args []Param) ReturnValues {
+		ctx := args[0].(*command.Context)
+		ctx.CloneSkipped = true
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
 func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
