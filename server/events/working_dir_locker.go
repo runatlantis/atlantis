@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_working_dir_locker.go WorkingDirLocker
@@ -19,15 +20,36 @@ import (
 // this from happening because a specific repo/pull/workspace has a single workspace
 // on disk and we haven't written Atlantis (yet) to handle concurrent execution
 // within this workspace.
+type WorkingDirLockMetadata struct {
+	HeadCommit string
+	CommitURL  string
+	JobURL     string
+}
+
+type workingDirLockError struct {
+	message      string
+	metadata     WorkingDirLockMetadata
+	multipleJobs bool
+}
+
+func (e *workingDirLockError) Error() string {
+	return e.message
+}
+
+type workingDirLock struct {
+	Command command.Name
+	WorkingDirLockMetadata
+}
+
 type WorkingDirLocker interface {
 	// TryLockPull tries to acquire a pull-level lock for a command. It is used to
 	// coordinate commands that can make pull-wide plan state inconsistent.
-	TryLockPull(repoFullName string, pullNum int, cmdName command.Name) (func(), error)
+	TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
 	// be printed to the pull request.
-	TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error)
+	TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
 	// HasCommandLock reports whether this pull request has an active lock for cmdName.
 	HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool
 	// UnlockByPull unlocks all workspaces for a specific pull request
@@ -39,44 +61,49 @@ type DefaultWorkingDirLocker struct {
 	// mutex prevents against multiple threads calling functions on this struct
 	// concurrently. It's only used for entry/exit to each function.
 	mutex sync.Mutex
-	// locks is a map of workspaces showing the name of the command locking it
-	locks map[string]command.Name
+	// locks is a map of workspaces and their owning command metadata.
+	locks map[string]workingDirLock
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
 func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{locks: make(map[string]command.Name)}
+	return &DefaultWorkingDirLocker{locks: make(map[string]workingDirLock)}
 }
 
-func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
 	if currentLock, exists := d.locks[workspaceKey]; exists {
-		return func() {}, fmt.Errorf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q.\n"+
-			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock)
+		return func() {}, &workingDirLockError{
+			message: fmt.Sprintf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q%s.\n"+
+				"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock.Command, formatCommitSuffix(currentLock)),
+			metadata: currentLock.WorkingDirLockMetadata,
+		}
 	}
-	d.locks[workspaceKey] = cmdName
+	d.locks[workspaceKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
 	return func() {
 		d.unlock(repoFullName, pullNum, workspace, path, projectName)
 	}, nil
 }
 
-func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	pullKey := d.pullKey(repoFullName, pullNum)
 	if currentLock, exists := d.locks[pullKey]; exists {
-		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q.\n"+
-			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock)
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	if currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan); exists {
-		return func() {}, fmt.Errorf("cannot run %q: pull request %d is currently locked by %q.\n"+
-			"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock)
+	currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan, metadata.HeadCommit)
+	if !exists && metadata.HeadCommit != "" {
+		currentLock, exists = d.findCommandLock(repoFullName, pullNum, command.Plan, "")
 	}
-	d.locks[pullKey] = cmdName
+	if exists {
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+	}
+	d.locks[pullKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
 	return func() {
 		d.unlockPull(repoFullName, pullNum)
 	}, nil
@@ -86,18 +113,73 @@ func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum in
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	_, exists := d.findCommandLock(repoFullName, pullNum, cmdName)
+	_, exists := d.findCommandLock(repoFullName, pullNum, cmdName, "")
 	return exists
 }
 
-func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name) (command.Name, bool) {
+func (d *DefaultWorkingDirLocker) findCommandLock(repoFullName string, pullNum int, cmdName command.Name, headCommit string) (workingDirLock, bool) {
 	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	var match workingDirLock
+	var matchKey string
 	for key, currentLock := range d.locks {
-		if strings.HasPrefix(key, prefix) && currentLock == cmdName {
-			return currentLock, true
+		if strings.HasPrefix(key, prefix) && currentLock.Command == cmdName && (headCommit == "" || currentLock.HeadCommit == headCommit) && (matchKey == "" || key < matchKey) {
+			match = currentLock
+			matchKey = key
 		}
 	}
-	return cmdName, false
+	return match, matchKey != ""
+}
+
+func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int, cmdName command.Name, currentLock workingDirLock) error {
+	metadata := currentLock.WorkingDirLockMetadata
+	metadata.JobURL = ""
+	jobURLs := make(map[string]struct{})
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	pullKey := d.pullKey(repoFullName, pullNum)
+	for key, lock := range d.locks {
+		if key != pullKey && strings.HasPrefix(key, prefix) && lock.Command == currentLock.Command && lock.HeadCommit == currentLock.HeadCommit && lock.JobURL != "" {
+			jobURLs[lock.JobURL] = struct{}{}
+		}
+	}
+
+	multipleJobs := len(jobURLs) > 1
+	if len(jobURLs) == 1 {
+		for jobURL := range jobURLs {
+			metadata.JobURL = jobURL
+		}
+	}
+	message := fmt.Sprintf("cannot run %q: pull request %d is currently locked by %q%s.\n"+
+		"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock.Command, formatCommitSuffix(currentLock))
+	return &workingDirLockError{message: message, metadata: metadata, multipleJobs: multipleJobs}
+}
+
+func formatCommitSuffix(lock workingDirLock) string {
+	if lock.HeadCommit == "" {
+		return ""
+	}
+	return " for commit " + shortSHA(lock.HeadCommit)
+}
+
+func WorkingDirLockMetadataForPull(pull models.PullRequest) WorkingDirLockMetadata {
+	metadata := WorkingDirLockMetadata{HeadCommit: pull.HeadCommit}
+	if pull.HeadCommit == "" || pull.URL == "" {
+		return metadata
+	}
+
+	pullURL := strings.TrimRight(pull.URL, "/")
+	switch pull.BaseRepo.VCSHost.Type {
+	case models.Github, models.Gitea:
+		metadata.CommitURL = pullURL + "/commits/" + pull.HeadCommit
+	case models.Gitlab:
+		metadata.CommitURL = pullURL + "/diffs?commit_id=" + pull.HeadCommit
+	}
+	return metadata
+}
+
+func WorkingDirLockMetadataForProject(ctx command.ProjectContext, jobURL string) WorkingDirLockMetadata {
+	metadata := WorkingDirLockMetadataForPull(ctx.Pull)
+	metadata.JobURL = jobURL
+	return metadata
 }
 
 // UnlockByPull unlocks all workspaces for a specific pull request
