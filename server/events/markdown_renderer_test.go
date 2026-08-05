@@ -4967,6 +4967,77 @@ Ran Plan for 3 projects:
   $$$
 `,
 		},
+		{
+			"hide cancelled plan errors when hide unchanged plans is enabled",
+			command.Plan,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("operation cancelled via `atlantis cancel` command"),
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname2",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("operation cancelled via `atlantis cancel` command"),
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Plan for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+---
+
+### 1. dir: $path$ workspace: $workspace$
+$$$diff
+terraform-output
+$$$
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To **plan** this project again, comment:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+### Plan Summary
+
+3 projects, 1 with changes, 0 with no changes, 2 failed
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
 	}
 
 	r := events.NewMarkdownRenderer(
@@ -5020,3 +5091,46 @@ Ran Plan for 3 projects:
 		})
 	}
 }
+
+func TestRenderProjectResultsHideUnchangedPlansDoesNotHideNonCancellationErrors(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		true,       // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+
+	logger := logging.NewNoopLogger(t).WithHistory()
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{Type: models.Github},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("some plan error"),
+				},
+			},
+		},
+	}
+
+	cmd := &events.CommentCommand{Name: command.Plan}
+	rendered := r.Render(ctx, res, cmd)
+
+	Assert(t, strings.Contains(rendered, "some plan error"), "expected non-cancellation plan errors to be rendered")
+}
+
