@@ -299,7 +299,7 @@ func TestApplyCommandRunner_IgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T)
 func TestApplyCommandRunner_IgnoredTargetedDirSkipsWhenPlanInFlight(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockPlan()
 
@@ -323,7 +323,7 @@ func TestApplyCommandRunner_MergeCheckoutIgnoredTargetSkipsBeforeApplyLock(t *te
 func TestApplyCommandRunner_LocalConfigIgnoredTargetSkipsWhenPlanInFlight(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockPlan()
 
@@ -432,7 +432,7 @@ func testApplyCommandRunnerTargetedApplyBlocksWhenPlanInFlight(t *testing.T, cmd
 		tc.workingDirLocker = locker
 	})
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan)
+	unlockPlan, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockPlan()
 
