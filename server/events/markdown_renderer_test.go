@@ -272,6 +272,26 @@ func TestRenderErrWithProjectResults(t *testing.T) {
 	Assert(t, strings.Contains(rendered, "recording apply results: database unavailable; run `atlantis plan` before applying again"), "expected persistence error, got: %s", rendered)
 	Equals(t, 1, strings.Count(rendered, "<details><summary>Log</summary>"))
 	Equals(t, 1, strings.Count(rendered, "[INFO] apply log"))
+
+	planResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				Workspace:  "default",
+				RepoRelDir: "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+				},
+			},
+		},
+		Error: errors.New("recording plan results: database unavailable"),
+	}
+
+	planRendered := r.Render(ctx, planResult, &events.CommentCommand{Name: command.Plan, Verbose: true})
+
+	Assert(t, strings.Contains(planRendered, "recording plan results: database unavailable"), "expected plan error, got: %s", planRendered)
+	Assert(t, !strings.Contains(planRendered, "Plan: 1 to add"), "expected non-apply error to preserve error-only rendering, got: %s", planRendered)
+	Equals(t, 1, strings.Count(planRendered, "<details><summary>Log</summary>"))
+	Equals(t, 1, strings.Count(planRendered, "[INFO] apply log"))
 }
 
 func TestRenderFailure(t *testing.T) {

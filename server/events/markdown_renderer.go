@@ -229,7 +229,7 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 
 	if res.Error != nil {
 		renderedContext := ""
-		if len(res.ProjectResults) > 0 {
+		if cmd.CommandName() == command.Apply && len(res.ProjectResults) > 0 {
 			projectResultsCommon := common
 			projectResultsCommon.Verbose = false
 			renderedContext = m.renderProjectResults(ctx, res.ProjectResults, projectResultsCommon, res.ApplyExecutionOrderProgress)
