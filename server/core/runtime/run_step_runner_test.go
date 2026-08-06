@@ -48,6 +48,12 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Version: "v2.3.4",
 		},
 		{
+			Command:           "echo hidden",
+			ExpOut:            "",
+			Version:           "v2.3.4",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+		},
+		{
 			Command: `printf \'your main.tf file does not provide default region.\\ncheck\'`,
 			ExpOut:  "'your\n",
 		},
