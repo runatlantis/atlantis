@@ -1779,16 +1779,16 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	Ok(t, err)
 
 	firstCmd := &events.CommentCommand{
-		Name:              command.Apply,
-		AutoMergeDisabled: true,
-		Verbose:           true,
-		Flags:             []string{"-lock-timeout=10m"},
+		Name:            command.Apply,
+		AutoMergeMethod: "rebase",
+		Verbose:         true,
+		Flags:           []string{"-lock-timeout=10m"},
 	}
 	secondCmd := &events.CommentCommand{
-		Name:              command.Apply,
-		AutoMergeDisabled: true,
-		Verbose:           true,
-		Flags:             []string{"-lock-timeout=10m"},
+		Name:            command.Apply,
+		AutoMergeMethod: "rebase",
+		Verbose:         true,
+		Flags:           []string{"-lock-timeout=10m"},
 	}
 	ctx := &command.Context{
 		User:     testdata.User,
@@ -1828,7 +1828,7 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	buildCalls := 0
 	When(projectCommandBuilder.BuildApplyCommands(Eq(ctx), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
 		parsedCmd := params[1].(*events.CommentCommand)
-		Assert(t, parsedCmd.AutoMergeDisabled, "expected each independently parsed continuation to preserve automerge disable")
+		Equals(t, "rebase", parsedCmd.AutoMergeMethod)
 		Assert(t, parsedCmd.Verbose, "expected each independently parsed continuation to preserve verbose output")
 		Equals(t, []string{"-lock-timeout=10m"}, parsedCmd.Flags)
 		buildCalls++
@@ -1863,12 +1863,16 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	_, _, _, firstComment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
 	).GetCapturedArguments()
-	Assert(t, strings.Contains(firstComment, "```shell\natlantis apply --auto-merge-disabled --verbose -- -lock-timeout=10m\n```"), "got comment: %s", firstComment)
+	Assert(t, strings.Contains(firstComment, "```shell\natlantis apply --auto-merge-method rebase --verbose -- -lock-timeout=10m\n```"), "got comment: %s", firstComment)
 
 	applyCommandRunner.Run(ctx, secondCmd)
 
 	projectCommandRunner.VerifyWasCalledOnce().Apply(production)
-	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+	vcsClient.VerifyWasCalledOnce().MergePull(
+		Any[logging.SimpleLogging](),
+		Eq(pull),
+		Eq(models.PullRequestOptions{MergeMethod: "rebase"}),
+	)
 	pullStatus, err = database.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
@@ -1882,6 +1886,69 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 		Eq(command.Apply),
 		Eq(models.ProjectCounts{Success: 3, Total: 3}),
 	)
+}
+
+func TestApplyCommandRunner_StagedApplyRejectsMixedDeleteSourceBranchSettings(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult("dev", events.DefaultWorkspace, "dev"),
+		plannedProjectResult("production", events.DefaultWorkspace, "production"),
+	})
+	Ok(t, err)
+
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	dev := command.ProjectContext{
+		CommandName:                           command.Apply,
+		RepoRelDir:                            "dev",
+		Workspace:                             events.DefaultWorkspace,
+		ProjectName:                           "dev",
+		AutomergeEnabled:                      true,
+		ExecutionOrderGroup:                   1,
+		PauseApplyBetweenExecutionOrderGroups: true,
+		DeleteSourceBranchOnMerge:             false,
+		Pull:                                  pull,
+	}
+	production := dev
+	production.RepoRelDir = "production"
+	production.ProjectName = "production"
+	production.ExecutionOrderGroup = 2
+	production.DeleteSourceBranchOnMerge = true
+
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{dev, production}, nil)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected mixed pull-level merge settings to reject staged apply")
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(pull),
+		Eq(models.FailedCommitStatus),
+		Eq(command.Apply),
+	)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
+	).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "different delete_source_branch_on_merge values"), "got comment: %s", comment)
 }
 
 func TestApplyCommandRunner_TargetedWorkspaceBypassesExecutionOrderPause(t *testing.T) {

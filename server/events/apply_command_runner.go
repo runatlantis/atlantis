@@ -196,10 +196,19 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	projectCmds, applyContinuation := selectApplyExecutionOrderGroup(projectCmds, cmd.IsForSpecificProject())
+	selectedProjectCmds, applyContinuation := selectApplyExecutionOrderGroup(projectCmds, cmd.IsForSpecificProject())
 	if applyContinuation != nil {
+		if err := stagedApplyDeleteSourceBranchError(projectCmds, a.autoMerger.automergeEnabled(projectCmds), cmd.AutoMergeDisabled); err != nil {
+			ctx.CommandHasErrors = true
+			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+				ctx.Log.Warn("unable to update commit status: %s", statusErr)
+			}
+			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+			return
+		}
 		applyContinuation.ContinuationCommandArgs = buildApplyContinuationCommandArgs(cmd)
 	}
+	projectCmds = selectedProjectCmds
 
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
@@ -534,6 +543,20 @@ func buildApplyContinuationCommandArgs(cmd *CommentCommand) string {
 		}
 	}
 	return strings.Join(args, " ")
+}
+
+func stagedApplyDeleteSourceBranchError(projectCmds []command.ProjectContext, automergeEnabled, automergeDisabled bool) error {
+	if !automergeEnabled || automergeDisabled || len(projectCmds) == 0 {
+		return nil
+	}
+
+	deleteSourceBranch := projectCmds[0].DeleteSourceBranchOnMerge
+	for _, projectCmd := range projectCmds[1:] {
+		if projectCmd.DeleteSourceBranchOnMerge != deleteSourceBranch {
+			return errors.New("staged apply cannot automerge projects with different delete_source_branch_on_merge values; configure one value or run apply with --auto-merge-disabled")
+		}
+	}
+	return nil
 }
 
 func quoteCommentArg(arg string) string {
