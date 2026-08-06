@@ -306,6 +306,30 @@ func TestRestorePlans_Success(t *testing.T) {
 	assert.Equal(t, []byte("plan-rds"), got2)
 }
 
+// With a separate --plan-store-dir the destination tree won't exist yet after a
+// restart, so restore has to create it rather than fail.
+func TestRestorePlans_DestinationDoesNotExist(t *testing.T) {
+	mock := &mockS3Client{
+		listOutput: &s3.ListObjectsV2Output{
+			Contents: []s3types.Object{
+				{Key: aws.String("pfx/acme/infra/42/default/modules/vpc/plan.tfplan")},
+			},
+		},
+		getObjects: map[string][]byte{
+			"pfx/acme/infra/42/default/modules/vpc/plan.tfplan": []byte("plan-vpc"),
+		},
+	}
+	store := planstore.NewS3PlanStoreWithClient(mock, "bucket", "pfx", logging.NewNoopLogger(t))
+	pullDir := filepath.Join(t.TempDir(), "planstore", "repos", "acme", "infra", "42")
+
+	err := store.RestorePlans(pullDir, "acme", "infra", 42)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(filepath.Join(pullDir, "default", "modules", "vpc", "plan.tfplan"))
+	require.NoError(t, err)
+	assert.Equal(t, []byte("plan-vpc"), got)
+}
+
 func TestRestorePlans_NoPlansFound(t *testing.T) {
 	mock := &mockS3Client{
 		listOutput: &s3.ListObjectsV2Output{

@@ -5,9 +5,11 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -5820,6 +5822,9 @@ type fakeWorkingDir struct {
 	mocks.MockWorkingDir // embedded so unused methods don't need stubs
 	pullDir              string
 	cloneCalls           []string
+	// onClone runs after a workspace is cloned, to seed files a real clone
+	// would have brought with it (e.g. atlantis.yaml).
+	onClone func(workspace, dir string) error
 }
 
 func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, workspace string) (string, error) {
@@ -5837,6 +5842,11 @@ func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.
 	// can pick up restored .tfplan files as untracked.
 	if err := exec.Command("git", "-C", workspaceDir, "init").Run(); err != nil {
 		return "", err
+	}
+	if f.onClone != nil {
+		if err := f.onClone(workspace, workspaceDir); err != nil {
+			return "", err
+		}
 	}
 	return workspaceDir, nil
 }
@@ -5961,4 +5971,349 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t
 	stagingPlan, err := os.ReadFile(filepath.Join(pullDir, "staging", "project1", "staging.tfplan"))
 	Ok(t, err)
 	Equals(t, "plan-data", string(stagingPlan))
+}
+
+// When --plan-store-dir points somewhere other than --data-dir, an external
+// plan store must restore into the plan store tree, because that is the only
+// place PendingPlanFinder looks. Restoring into the clone pull dir instead
+// leaves the plans undiscoverable and apply reports "no plans found".
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparatePlanStoreDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{Num: 7, BaseRepo: repo}
+
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	pullDir := filepath.Join(dataDir, "repos", "owner", "repo", "7")
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	// Record where the store was told to restore, and write the plans there.
+	var restoreDir string
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default", "staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			restoreDir = pullDirArg
+			for _, ws := range []string{"default", "staging"} {
+				projDir := filepath.Join(pullDirArg, ws, "project1")
+				if err := os.MkdirAll(projDir, 0o700); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(projDir, ws+".tfplan"), []byte("plan-data"), 0o600); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalPlanStoreDir: planStoreDir},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+	builder.LocalPlanStoreDir = planStoreDir
+
+	// Trigger the missing-pullDir path.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  pull,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	// Restore must target the plan store tree, not the clone pull dir.
+	Equals(t, filepath.Join(planStoreDir, "repos", "owner", "repo", "7"), restoreDir)
+
+	// Both restored plans must then be discoverable.
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+		Equals(t, planStoreDir, c.LocalPlanStoreDir)
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be found")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be found")
+}
+
+// Recovery must work when the store only holds plans for non-default
+// workspaces. The default workspace is still needed as the source of truth for
+// atlantis.yaml, so it has to be cloned even though it has no stored plans.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_OnlyNonDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	pullDir := t.TempDir()
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			projDir := filepath.Join(pullDirArg, "staging", "project1")
+			if err := os.MkdirAll(projDir, 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(projDir, "staging.tfplan"), []byte("plan-data"), 0o600)
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	Equals(t, 1, len(ctxs))
+	Equals(t, "staging", ctxs[0].Workspace)
+}
+
+// A separate --plan-store-dir already outlives the checkout, so losing the
+// working dir is recoverable without any external store: the plans are still on
+// disk and the workspaces just need re-cloning. Exercised end to end with a real
+// FileWorkspace because recovery depends on the clone not wiping the plans.
+func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	planStoreDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 3, BaseRepo: repo, HeadBranch: "branch", BaseBranch: "main"}
+
+	workingDir := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalPlanStoreDir:           planStoreDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	// Plans survived the restart in the plan store; the checkout did not.
+	for _, ws := range []string{"default", "staging"} {
+		createPlanFile(t, filepath.Join(planStoreDir, "repos", "owner", "repo", "3", ws, "project1", ws+".tfplan"))
+	}
+	assertPathMissing(t, filepath.Join(dataDir, "repos", "owner", "repo", "3"))
+
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalPlanStoreDir: planStoreDir},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&runtime.LocalPlanStore{SeparatePlanDir: planStoreDir},
+	)
+	builder.LocalPlanStoreDir = planStoreDir
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     pull,
+			HeadRepo: repo,
+			PullStatus: &models.PullStatus{
+				// Recovery still has to satisfy the staleness checks, which
+				// compare the recorded pull against the live one.
+				Pull: pull,
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+		Equals(t, planStoreDir, c.LocalPlanStoreDir)
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be recovered")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be recovered")
+}
+
+// `apply -p name` carries no workspace, so recovery can only clone the default
+// workspace up front — a project's workspace comes from atlantis.yaml, which
+// can't be read until that clone exists. A project pinned to a non-default
+// workspace must still get a checkout, or apply fails on the missing dir.
+func TestDefaultProjectCommandBuilder_TargetedApplyRecovery_NonDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 5, BaseRepo: repo}
+
+	pullDir := t.TempDir()
+	atlantisYAML := `version: 3
+projects:
+- name: myproject
+  dir: project1
+  workspace: staging
+`
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+		onClone: func(_, dir string) error {
+			if err := os.MkdirAll(filepath.Join(dir, "project1"), 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte(atlantisYAML), 0o600)
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&mockExternalPlanStore{},
+	)
+
+	// Working dir is gone, so the targeted apply has to recover.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     pull,
+			HeadRepo: repo,
+		},
+		&events.CommentCommand{Name: command.Apply, ProjectName: "myproject"})
+	Ok(t, err)
+
+	Equals(t, 1, len(ctxs))
+	Equals(t, "staging", ctxs[0].Workspace)
+	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
+		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }

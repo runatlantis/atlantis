@@ -33,7 +33,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		return "", errors.New("cannot run apply with -target because we are applying an already generated plan. Instead, run -target with atlantis plan")
 	}
 
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	if loadErr := a.PlanStore.Load(ctx, planPath); loadErr != nil {
 		return "", fmt.Errorf("loading plan: %w", loadErr)
 	}

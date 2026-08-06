@@ -545,10 +545,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
-		DataDir:          userConfig.DataDir,
-		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
-		CheckoutDepth:    userConfig.CheckoutDepth,
-		GithubAppEnabled: githubAppEnabled,
+		DataDir:           userConfig.DataDir,
+		LocalPlanStoreDir: userConfig.PlanStoreDir,
+		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
+		CheckoutDepth:     userConfig.CheckoutDepth,
+		GithubAppEnabled:  githubAppEnabled,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -634,7 +635,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	)
 	defaultTfDistribution := terraformClient.DefaultDistribution()
 	defaultTfVersion := terraformClient.DefaultVersion()
-	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{
+		Log:               logger,
+		DataDir:           userConfig.DataDir,
+		LocalPlanStoreDir: userConfig.PlanStoreDir,
+	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
@@ -694,7 +699,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, fmt.Errorf("unsupported plan store type %q", psCfg.Type)
 		}
 	} else {
-		planStore = &runtime.LocalPlanStore{}
+		local := &runtime.LocalPlanStore{}
+		// A plan store dir outside the data dir survives the loss of a
+		// checkout, so plans there can be recovered after a restart even
+		// without an external store.
+		if userConfig.PlanStoreDir != "" && filepath.Clean(userConfig.PlanStoreDir) != filepath.Clean(userConfig.DataDir) {
+			local.SeparatePlanDir = userConfig.PlanStoreDir
+		}
+		planStore = local
 	}
 
 	deleteLockCommand.PlanStore = planStore
@@ -740,6 +752,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		terraformClient,
 		planStore,
+		userConfig.PlanStoreDir,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
