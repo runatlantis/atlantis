@@ -8,6 +8,7 @@ package command
 type ApplyExecutionOrderProgress struct {
 	CompletedExecutionOrderGroup  int
 	RemainingExecutionOrderGroups []int
+	ContinuationCommandArgs       string
 }
 
 // Result is the result of running a Command.

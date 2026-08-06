@@ -1778,7 +1778,18 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	})
 	Ok(t, err)
 
-	cmd := &events.CommentCommand{Name: command.Apply}
+	firstCmd := &events.CommentCommand{
+		Name:              command.Apply,
+		AutoMergeDisabled: true,
+		Verbose:           true,
+		Flags:             []string{"-lock-timeout=10m"},
+	}
+	secondCmd := &events.CommentCommand{
+		Name:              command.Apply,
+		AutoMergeDisabled: true,
+		Verbose:           true,
+		Flags:             []string{"-lock-timeout=10m"},
+	}
 	ctx := &command.Context{
 		User:     testdata.User,
 		Log:      logging.NewNoopLogger(t),
@@ -1815,7 +1826,11 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	}
 
 	buildCalls := 0
-	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+	When(projectCommandBuilder.BuildApplyCommands(Eq(ctx), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
+		parsedCmd := params[1].(*events.CommentCommand)
+		Assert(t, parsedCmd.AutoMergeDisabled, "expected each independently parsed continuation to preserve automerge disable")
+		Assert(t, parsedCmd.Verbose, "expected each independently parsed continuation to preserve verbose output")
+		Equals(t, []string{"-lock-timeout=10m"}, parsedCmd.Flags)
 		buildCalls++
 		if buildCalls == 1 {
 			return ReturnValues{[]command.ProjectContext{production, devA, devB}, nil}
@@ -1826,7 +1841,7 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	When(projectCommandRunner.Apply(devB)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "dev-b applied"})
 	When(projectCommandRunner.Apply(production)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "production applied"})
 
-	applyCommandRunner.Run(ctx, cmd)
+	applyCommandRunner.Run(ctx, firstCmd)
 
 	projectCommandRunner.VerifyWasCalledOnce().Apply(devA)
 	projectCommandRunner.VerifyWasCalledOnce().Apply(devB)
@@ -1848,12 +1863,12 @@ func TestApplyCommandRunner_PausesBetweenExecutionOrderGroups(t *testing.T) {
 	_, _, _, firstComment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
 	).GetCapturedArguments()
-	Assert(t, strings.Contains(firstComment, "Run `atlantis apply` to apply the next `execution_order_group`."), "got comment: %s", firstComment)
+	Assert(t, strings.Contains(firstComment, "```shell\natlantis apply --auto-merge-disabled --verbose -- -lock-timeout=10m\n```"), "got comment: %s", firstComment)
 
-	applyCommandRunner.Run(ctx, cmd)
+	applyCommandRunner.Run(ctx, secondCmd)
 
 	projectCommandRunner.VerifyWasCalledOnce().Apply(production)
-	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(pull), Any[models.PullRequestOptions]())
+	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
 	pullStatus, err = database.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)

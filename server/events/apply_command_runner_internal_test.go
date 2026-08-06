@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -160,6 +161,51 @@ func TestSelectApplyExecutionOrderGroup(t *testing.T) {
 			}
 			if !slices.Equal(continuation.RemainingExecutionOrderGroups, test.wantRemaining) {
 				t.Fatalf("remaining groups = %v, want %v", continuation.RemainingExecutionOrderGroups, test.wantRemaining)
+			}
+		})
+	}
+}
+
+func TestBuildApplyContinuationCommandArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  *CommentCommand
+		want []string
+	}{
+		{
+			name: "no options",
+			cmd:  &CommentCommand{Name: command.Apply},
+			want: []string{"atlantis", "apply"},
+		},
+		{
+			name: "automerge disabled verbose and terraform flags",
+			cmd: &CommentCommand{
+				Name:              command.Apply,
+				AutoMergeDisabled: true,
+				Verbose:           true,
+				Flags:             []string{"-lock-timeout=10m", "value with spaces", "it's", ""},
+			},
+			want: []string{"atlantis", "apply", "--auto-merge-disabled", "--verbose", "--", "-lock-timeout=10m", "value with spaces", "it's", ""},
+		},
+		{
+			name: "automerge method",
+			cmd:  &CommentCommand{Name: command.Apply, AutoMergeMethod: "rebase"},
+			want: []string{"atlantis", "apply", "--auto-merge-method", "rebase"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commandLine := "atlantis apply"
+			if args := buildApplyContinuationCommandArgs(test.cmd); args != "" {
+				commandLine += " " + args
+			}
+			got, err := shlex.Split(commandLine)
+			if err != nil {
+				t.Fatalf("parsing continuation command %q: %v", commandLine, err)
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("parsed continuation command = %q, want %q; command was %q", got, test.want, commandLine)
 			}
 		})
 	}

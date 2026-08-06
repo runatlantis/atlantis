@@ -3497,7 +3497,8 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 			},
 			expectedFooter: "Atlantis paused after `execution_order_group` 1.\n\n" +
 				"Remaining execution order groups: 2, 4.\n\n" +
-				"Run `atlantis apply` to apply the next `execution_order_group`.",
+				"Run the following command to apply the next `execution_order_group`:\n\n" +
+				"```shell\natlantis apply\n```",
 		},
 		{
 			name:           "multiple projects",
@@ -3509,7 +3510,8 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 			},
 			expectedFooter: "Atlantis paused after `execution_order_group` 3.\n\n" +
 				"Remaining execution order groups: 5, 8.\n\n" +
-				"Run `atlantis apply` to apply the next `execution_order_group`.",
+				"Run the following command to apply the next `execution_order_group`:\n\n" +
+				"```shell\natlantis apply\n```",
 		},
 		{
 			name:           "Spanish",
@@ -3521,7 +3523,8 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 			},
 			expectedFooter: "Atlantis se detuvo después de `execution_order_group` 1.\n\n" +
 				"Grupos de orden de ejecución restantes: 2, 3.\n\n" +
-				"Ejecuta `atlantis apply` para aplicar el siguiente `execution_order_group`.",
+				"Ejecuta el siguiente comando para aplicar el próximo `execution_order_group`:\n\n" +
+				"```shell\natlantis apply\n```",
 			unexpectedFooter: "Atlantis paused after",
 		},
 		{
@@ -3533,8 +3536,19 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 				CompletedExecutionOrderGroup:  1,
 				RemainingExecutionOrderGroups: []int{2},
 			},
-			expectedFooter:   "Run `custom-atlantis apply` to apply the next `execution_order_group`.",
-			unexpectedFooter: "Run `atlantis apply`",
+			expectedFooter:   "```shell\ncustom-atlantis apply\n```",
+			unexpectedFooter: "```shell\natlantis apply\n```",
+		},
+		{
+			name:           "command-scoped options",
+			languageCode:   "en",
+			projectResults: []command.ProjectResult{projectResult("dev")},
+			progress: &command.ApplyExecutionOrderProgress{
+				CompletedExecutionOrderGroup:  1,
+				RemainingExecutionOrderGroups: []int{2},
+				ContinuationCommandArgs:       "--auto-merge-disabled --verbose -- -lock-timeout=10m",
+			},
+			expectedFooter: "```shell\natlantis apply --auto-merge-disabled --verbose -- -lock-timeout=10m\n```",
 		},
 		{
 			name:             "without progress metadata",
