@@ -36,6 +36,15 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 			},
 			true,
 		},
+		"approve_policies success": {
+			command.ProjectResult{
+				Command: command.ApprovePolicies,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
+			},
+			true,
+		},
 		"apply success": {
 			command.ProjectResult{
 				Command: command.Apply,
@@ -65,8 +74,23 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 			command.ProjectResult{Command: command.Plan},
 			false,
 		},
+		"plan does not use apply output as success": {
+			command.ProjectResult{
+				Command: command.Plan,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "unexpected apply output",
+				},
+			},
+			false,
+		},
 		"policy check without result payload": {
 			command.ProjectResult{Command: command.PolicyCheck},
+			false,
+		},
+		"unsupported command": {
+			command.ProjectResult{
+				Command: command.Unlock,
+			},
 			false,
 		},
 		"failure": {
