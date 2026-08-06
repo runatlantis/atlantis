@@ -561,7 +561,7 @@ func stagedApplyDeleteSourceBranchError(projectCmds []command.ProjectContext, au
 
 func quoteCommentArg(arg string) string {
 	if arg != "" && strings.IndexFunc(arg, func(r rune) bool {
-		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("_@%+=:,./-", r))
+		return !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-", r)
 	}) == -1 {
 		return arg
 	}
