@@ -356,6 +356,13 @@ When `silence_pr_comments` includes `apply`, Atlantis also suppresses the staged
 footer. The remaining groups still stay pending, but an operator must run the next unscoped
 `atlantis apply` without a PR-comment prompt.
 
+::: warning GitHub mergeable requirements between checkpoints
+The combined `atlantis/apply` status remains pending while later groups have not been applied. If
+GitHub requires that status and the repo also uses the `mergeable` apply requirement, enable
+[`--gh-allow-mergeable-bypass-apply`](command-requirements.md#github) so Atlantis does not block the
+next checkpoint on its own pending status.
+:::
+
 ::: warning Targeted applies bypass staged checkpoints
 This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
 or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
