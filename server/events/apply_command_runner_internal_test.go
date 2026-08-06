@@ -107,6 +107,17 @@ func TestSelectApplyExecutionOrderGroup(t *testing.T) {
 			wantContinuation: true,
 		},
 		{
+			name: "unset group zero is selected before a positive group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "explicit", ExecutionOrderGroup: 2, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "unset", PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects:     []string{"unset"},
+			wantCompleted:    0,
+			wantRemaining:    []int{2},
+			wantContinuation: true,
+		},
+		{
 			name: "targeted apply preserves every group",
 			projectCmds: []command.ProjectContext{
 				{ProjectName: "first", ExecutionOrderGroup: 1, PauseApplyBetweenExecutionOrderGroups: true},

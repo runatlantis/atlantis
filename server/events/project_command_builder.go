@@ -1284,6 +1284,10 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		plans = filteredPlans
 	}
 
+	if commentCmd.Name == command.Apply && repoCfg.PauseApplyBetweenExecutionOrderGroups {
+		plans = filterAppliedPlansForPausedApply(ctx, plans)
+	}
+
 	if commentCmd.Name == command.Apply {
 		hasActivePlan := false
 		if p.WorkingDirLocker != nil {
@@ -1329,6 +1333,29 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	})
 
 	return cmds, nil
+}
+
+// filterAppliedPlansForPausedApply ignores planfiles left behind after Atlantis
+// has authoritatively recorded that the matching project was applied. This can
+// happen when a custom run step applies $PLANFILE without removing it, or when
+// the built-in apply succeeds but removing the planfile fails. The caller only
+// uses this for the opt-in staged broad-apply path so generic apply validation
+// remains unchanged when the feature is disabled.
+func filterAppliedPlansForPausedApply(ctx *command.Context, plans []PendingPlan) []PendingPlan {
+	if ctx.PullStatus == nil {
+		return plans
+	}
+
+	filteredPlans := make([]PendingPlan, 0, len(plans))
+	for _, plan := range plans {
+		project := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if project != nil && project.Status == models.AppliedPlanStatus {
+			ctx.Log.Debug("ignoring surviving planfile for applied dir %q workspace %q project %q", plan.RepoRelDir, plan.Workspace, plan.ProjectName)
+			continue
+		}
+		filteredPlans = append(filteredPlans, plan)
+	}
+	return filteredPlans
 }
 
 // ValidatePlansForApply ensures discovered plans are valid for the current PR head.
