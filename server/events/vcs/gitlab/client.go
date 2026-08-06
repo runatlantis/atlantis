@@ -41,6 +41,8 @@ type Client struct {
 	PollingTimeout time.Duration
 	// StatusRetryEnabled enables enhanced retry logic for pipeline status updates.
 	StatusRetryEnabled bool
+	// CommentNamespace identifies comments created by this Atlantis instance.
+	CommentNamespace common.CommentNamespace
 }
 
 // legacyMergeRequest captures fields that GitLab still returns in the API but
@@ -196,8 +198,10 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 // CreateComment creates a comment on the merge request.
 func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on GitLab merge request %d", pullNum)
-	comments := common.SplitComment(logger, comment, maxCommentLength, 0, command)
+	commentLimit := g.CommentNamespace.ContentLimit(maxCommentLength, command)
+	comments := common.SplitComment(logger, comment, commentLimit, 0, command)
 	for _, c := range comments {
+		c = g.CommentNamespace.Tag(c, command)
 		_, resp, err := g.Client.Notes.CreateMergeRequestNote(repo.FullName, pullNum, &gitlab.CreateMergeRequestNoteOptions{Body: gitlab.Ptr(c)})
 		if resp != nil {
 			logger.Debug("POST /projects/%s/merge_requests/%d/notes returned: %d", repo.FullName, pullNum, resp.StatusCode)
@@ -250,7 +254,8 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		return fmt.Errorf("error getting currentuser: %w", err)
 	}
 
-	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
+	const supersededCommentPrefix = "<!--- +-Superseded Command-+ --->"
+	summaryHeader := fmt.Sprintf("%s<details><summary>Superseded Atlantis %s</summary>", supersededCommentPrefix, command)
 	summaryFooter := "</details>"
 	lineFeed := "\n"
 
@@ -265,8 +270,14 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 			continue
 		}
 		firstLine := strings.ToLower(body[0])
-		// Skip processing comments that don't contain the command or contain the summary header in the first line
-		if !strings.Contains(firstLine, strings.ToLower(command)) || firstLine == strings.ToLower(summaryHeader) {
+		if strings.HasPrefix(firstLine, strings.ToLower(supersededCommentPrefix)) {
+			continue
+		}
+		if g.CommentNamespace.Enabled() {
+			if !g.CommentNamespace.Owns(comment.Body, command) {
+				continue
+			}
+		} else if !strings.Contains(firstLine, strings.ToLower(command)) {
 			continue
 		}
 

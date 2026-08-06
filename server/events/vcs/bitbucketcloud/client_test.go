@@ -14,6 +14,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -654,4 +655,62 @@ func TestClient_HidePRComments(t *testing.T) {
 		}, 5, "plan", "")
 	Ok(t, err)
 	Equals(t, 2, called)
+}
+
+func TestClient_HidePRCommentsNamespace(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	user, err := os.ReadFile(filepath.Join("testdata", "user.json"))
+	Ok(t, err)
+	comments := `{
+		"values": [
+			{
+				"id": 1,
+				"content": {"raw": "Ran Plan\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->"},
+				"user": {"uuid": "{00000000-0000-0000-0000-000000000001}"}
+			},
+			{
+				"id": 2,
+				"content": {"raw": "Ran Plan\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->"},
+				"user": {"uuid": "{00000000-0000-0000-0000-000000000001}"}
+			},
+			{
+				"id": 3,
+				"content": {"raw": "Ran Plan"},
+				"user": {"uuid": "{00000000-0000-0000-0000-000000000001}"}
+			}
+		]
+	}`
+
+	deleted := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments":
+			w.Write([]byte(comments)) // nolint: errcheck
+		case "/2.0/user":
+			w.Write(user) // nolint: errcheck
+		case "/2.0/repositories/myorg/myrepo/pullrequests/5/comments/1":
+			Assert(t, r.Method == http.MethodDelete, "expected namespace-owned comment to be deleted")
+			deleted++
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	client.CommentNamespace = common.NewCommentNamespace("instance-a")
+	err = client.HidePrevCommandComments(logger, models.Repo{
+		FullName: "myorg/myrepo",
+		Owner:    "owner",
+		Name:     "myrepo",
+		VCSHost: models.VCSHost{
+			Type:     models.BitbucketCloud,
+			Hostname: "bitbucket.org",
+		},
+	}, 5, "plan", "")
+	Ok(t, err)
+	Equals(t, 1, deleted)
 }

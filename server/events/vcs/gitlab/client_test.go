@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
@@ -1865,10 +1866,16 @@ func TestClient_HideOldComments(t *testing.T) {
 	pullNum := 123
 
 	userCommentIDs := [1]string{"1"}
-	planCommentIDs := [2]string{"3", "5"}
+	planCommentIDs := [4]string{"3", "5", "6", "7"}
 	systemCommentIDs := [1]string{"4"}
 	summaryCommentIDs := [1]string{"2"}
-	planComments := [3]string{"Ran Plan for 2 projects:", "Ran Plan for dir: `stack1` workspace: `default`", "Ran Plan for 2 projects:"}
+	planComments := [5]string{
+		"Ran Plan for 2 projects:",
+		"Ran Plan for dir: `stack1` workspace: `default`",
+		"Ran Plan for 2 projects:",
+		"Ran Plan for dir: `stack1` workspace: `default`\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->",
+		"Ran Plan for dir: `stack2` workspace: `default`\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->",
+	}
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>",
 		command.Plan.TitleString())
 	summaryFooter := "</details>"
@@ -1884,7 +1891,11 @@ func TestClient_HideOldComments(t *testing.T) {
 		fmt.Sprintf(`{"id":%s,"body":"System comment","author":{"id": %d, "username":"%s", "email":"%s"},"system": true,"project_id": %d}`,
 			systemCommentIDs[0], authorID, authorUserName, authorEmail, pullNum) + "," +
 		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
-			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) +
+			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[2], planComments[3], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[3], planComments[4], authorID, authorUserName, authorEmail, pullNum) +
 		"]"
 
 	repo := models.Repo{
@@ -1898,33 +1909,51 @@ func TestClient_HideOldComments(t *testing.T) {
 	}
 
 	cases := []struct {
+		name                 string
+		namespace            string
 		dir                  string
 		processedComments    int
 		processedCommentIds  []string
 		processedPlanComment []string
 	}{
 		{
-			"",
-			2,
-			[]string{planCommentIDs[0], planCommentIDs[1]},
-			[]string{planComments[0], planComments[1]},
+			name:                 "legacy matching",
+			processedComments:    4,
+			processedCommentIds:  []string{planCommentIDs[0], planCommentIDs[1], planCommentIDs[2], planCommentIDs[3]},
+			processedPlanComment: []string{planComments[0], planComments[1], planComments[3], planComments[4]},
 		},
 		{
-			"stack1",
-			1,
-			[]string{planCommentIDs[1]},
-			[]string{planComments[1]},
+			name:                 "legacy matching with stack1",
+			dir:                  "stack1",
+			processedComments:    2,
+			processedCommentIds:  []string{planCommentIDs[1], planCommentIDs[2]},
+			processedPlanComment: []string{planComments[1], planComments[3]},
 		},
 		{
-			"stack2",
-			0,
-			[]string{},
-			[]string{},
+			name:                 "legacy matching with stack2",
+			dir:                  "stack2",
+			processedComments:    1,
+			processedCommentIds:  []string{planCommentIDs[3]},
+			processedPlanComment: []string{planComments[4]},
+		},
+		{
+			name:                 "instance A owns only its comment",
+			namespace:            "instance-a",
+			processedComments:    1,
+			processedCommentIds:  []string{planCommentIDs[2]},
+			processedPlanComment: []string{planComments[3]},
+		},
+		{
+			name:                 "instance B owns only its comment",
+			namespace:            "instance-b",
+			processedComments:    1,
+			processedCommentIds:  []string{planCommentIDs[3]},
+			processedPlanComment: []string{planComments[4]},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.dir, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			gitlabClientUnderTest = true
 			defer func() { gitlabClientUnderTest = false }()
 			gotNotePutCalls := make([]notePutCallDetails, 0, 1)
@@ -1976,6 +2005,7 @@ func TestClient_HideOldComments(t *testing.T) {
 				Client:  internalClient,
 				Version: nil,
 			}
+			client.CommentNamespace = common.NewCommentNamespace(c.namespace)
 
 			err = client.HidePrevCommandComments(logger, repo, pullNum, command.Plan.TitleString(), c.dir)
 			Ok(t, err)
@@ -1986,8 +2016,8 @@ func TestClient_HideOldComments(t *testing.T) {
 			for i := 0; i < c.processedComments; i++ {
 				Equals(t, c.processedCommentIds[i], gotNotePutCalls[i].noteID)
 				Equals(t, summaryHeader, gotNotePutCalls[i].comment[0])
-				Equals(t, c.processedPlanComment[i], gotNotePutCalls[i].comment[1])
-				Equals(t, summaryFooter, gotNotePutCalls[i].comment[2])
+				Equals(t, c.processedPlanComment[i], strings.Join(gotNotePutCalls[i].comment[1:len(gotNotePutCalls[i].comment)-2], "\n"))
+				Equals(t, summaryFooter, gotNotePutCalls[i].comment[len(gotNotePutCalls[i].comment)-2])
 			}
 		})
 	}

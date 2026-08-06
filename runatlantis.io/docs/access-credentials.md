@@ -88,6 +88,10 @@ Repositories must be manually registered with the created GitHub app to allow At
 
 ::: tip NOTE
 Passing the additional flag `--gh-app-slug` will modify the name of the App when posting comments on a Pull Request.
+
+If multiple Atlantis instances share this App and use `--hide-prev-plan-comments`, assign
+each instance a unique [`--vcs-comment-namespace`](server-configuration.md#vcs-comment-namespace)
+so it only hides comments created by that instance.
 :::
 
 #### Permissions
@@ -135,7 +139,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
-* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
+* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well. Multiple instances sharing these credentials should use distinct [`--vcs-comment-namespace`](server-configuration.md#vcs-comment-namespace) values so one instance cannot delete another's comments.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)

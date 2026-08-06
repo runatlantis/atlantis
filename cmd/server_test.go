@@ -153,6 +153,7 @@ var testFlags = map[string]any{
 	TFETokenFlag:                     "my-token",
 	UseTFPluginCache:                 true,
 	VarFileAllowlistFlag:             "/path",
+	VCSCommentNamespaceFlag:          "instance-a",
 	VCSStatusName:                    "my-status",
 	IgnoreVCSStatusNames:             "",
 	WebhookHttpHeaders:               `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
@@ -622,6 +623,47 @@ func TestExecute_ValidateAutomergeMethod(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			c := setupWithDefaults(map[string]any{
 				AutomergeMethodFlag: testCase.method,
+			}, t)
+
+			err := c.Execute()
+			if testCase.expectErr != "" {
+				ErrEquals(t, testCase.expectErr, err)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
+}
+
+func TestExecute_ValidateVCSCommentNamespace(t *testing.T) {
+	cases := []struct {
+		name      string
+		namespace string
+		expectErr string
+	}{
+		{
+			name: "empty namespace is disabled",
+		},
+		{
+			name:      "safe namespace",
+			namespace: "prod-us-east-1",
+		},
+		{
+			name:      "namespace cannot contain spaces",
+			namespace: "prod east",
+			expectErr: "invalid --vcs-comment-namespace: must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+		},
+		{
+			name:      "namespace cannot inject an HTML comment",
+			namespace: "prod-->",
+			expectErr: "invalid --vcs-comment-namespace: must match ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{
+				VCSCommentNamespaceFlag: testCase.namespace,
 			}, t)
 
 			err := c.Execute()

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -336,6 +337,36 @@ func TestClient_GetModifiedFilesPaginationEmergencyBreak(t *testing.T) {
 	Equals(t, []string{}, files)
 	Equals(t, 500, len(pages))
 	Equals(t, 500, pages[len(pages)-1])
+}
+
+func TestClient_HidePrevCommandCommentsNamespace(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	edited := make([]string, 0, 1)
+
+	client := newTestClient(t, 10, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/owner/repo/issues/1/comments":
+			_, _ = w.Write([]byte(`[
+				{"id":1,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->","user":{"login":"user"}},
+				{"id":2,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->","user":{"login":"user"}},
+				{"id":3,"body":"Ran Plan for dir: stack1","user":{"login":"user"}},
+				{"id":4,"body":"Ran Plan for dir: stack2\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->","user":{"login":"user"}}
+			]`))
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			_, _ = w.Write([]byte(`{"login":"user"}`))
+		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/repos/owner/repo/issues/comments/"):
+			edited = append(edited, strings.TrimPrefix(r.URL.Path, "/repos/owner/repo/issues/comments/"))
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+	client.CommentNamespace = common.NewCommentNamespace("instance-a")
+
+	err := client.HidePrevCommandComments(logger, models.Repo{Owner: "owner", Name: "repo"}, 1, "plan", "stack1")
+	Ok(t, err)
+	Equals(t, []string{"1"}, edited)
 }
 
 func newTestClient(t *testing.T, pageSize int, apiHandler http.HandlerFunc) *gitea.Client {

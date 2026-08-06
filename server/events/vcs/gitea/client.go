@@ -13,6 +13,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -27,6 +28,8 @@ type Client struct {
 	token       string
 	pageSize    int
 	ctx         context.Context
+	// CommentNamespace identifies comments created by this Atlantis instance.
+	CommentNamespace common.CommentNamespace
 }
 
 type GiteaPRReviewSummary struct {
@@ -136,6 +139,7 @@ func (c *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 // CreateComment creates a comment on the merge request. As far as we're aware, Gitea has no built in max comment length right now.
 func (c *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	logger.Debug("Creating comment on Gitea pull request %d", pullNum)
+	comment = c.CommentNamespace.Tag(comment, command)
 
 	opt := gitea.CreateIssueCommentOption{
 		Body: comment,
@@ -184,7 +188,6 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 	nextPage := int(1)
 	for {
-		// Initialize ListIssueCommentOptions with the current page
 		opts := gitea.ListIssueCommentOptions{
 			ListOptions: gitea.ListOptions{
 				Page:     nextPage,
@@ -203,8 +206,6 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		}
 
 		allComments = append(allComments, comments...)
-
-		// Break the loop if there are no more pages to fetch
 		if resp.NextPage == 0 {
 			break
 		}
@@ -221,7 +222,8 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		return err
 	}
 
-	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>", command)
+	const supersededCommentPrefix = "<!--- +-Superseded Command-+ --->"
+	summaryHeader := fmt.Sprintf("%s<details><summary>Superseded Atlantis %s</summary>", supersededCommentPrefix, command)
 	summaryFooter := "</details>"
 	lineFeed := "\n"
 
@@ -231,7 +233,21 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		}
 
 		body := strings.Split(comment.Body, "\n")
-		if len(body) == 0 || (!strings.Contains(strings.ToLower(body[0]), strings.ToLower(command)) && dir != "" && !strings.Contains(strings.ToLower(body[0]), strings.ToLower(dir))) {
+		if len(body) == 0 {
+			continue
+		}
+		firstLine := strings.ToLower(body[0])
+		if strings.HasPrefix(firstLine, strings.ToLower(supersededCommentPrefix)) {
+			continue
+		}
+		if c.CommentNamespace.Enabled() {
+			if !c.CommentNamespace.Owns(comment.Body, command) {
+				continue
+			}
+			if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+				continue
+			}
+		} else if !strings.Contains(firstLine, strings.ToLower(command)) && dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
 			continue
 		}
 

@@ -1051,12 +1051,14 @@ atlantis server --hide-prev-plan-comments
 ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
-Hide previous plan comments to declutter PRs. This is only supported in
-GitHub and GitLab and Bitbucket currently and is not enabled by default.
+Hide previous command comments to declutter pull requests. This is not enabled by default.
+GitHub minimizes matching comments; GitLab and Gitea wrap them as superseded; Bitbucket
+Cloud deletes them because it does not support hiding comments.
 
-For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
-
-For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
+When multiple Atlantis servers share one VCS user or App, configure a unique
+[`--vcs-comment-namespace`](#vcs-comment-namespace) on every instance so they do not
+hide one another's comments. For GitHub, ensure `--gh-user` or `--gh-app-slug` identifies
+the account that posts Atlantis comments.
 
 When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
 
@@ -1666,6 +1668,27 @@ ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
 Comma-separated list of additional directory paths where [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) can be read from.
 The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
 If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
+
+### `--vcs-comment-namespace`
+
+```bash
+atlantis server --vcs-comment-namespace="atlantis-dev"
+# or
+ATLANTIS_VCS_COMMENT_NAMESPACE="atlantis-dev"
+```
+
+Optional namespace used to identify pull request comments created by one Atlantis instance.
+This is useful when multiple Atlantis servers share a VCS user or App and enable
+[`--hide-prev-plan-comments`](#hide-prev-plan-comments). Give each instance a unique,
+stable value to prevent it from hiding comments created by another instance.
+
+The default is empty, which preserves the legacy author, command, and directory matching.
+When a namespace is configured, Atlantis adds a hidden marker to every new comment chunk and
+only hides comments carrying the same namespace. Existing unmarked comments are left visible.
+Changing the namespace starts a new comment ownership generation.
+
+`--vcs-comment-namespace` is independent from [`--vcs-status-name`](#vcs-status-name),
+although multi-instance deployments will often assign both settings the same value.
 
 ### `--vcs-status-name` <Badge text="v0.42.0+" type="info"/>
 
