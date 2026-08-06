@@ -1744,6 +1744,7 @@ func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, rep
 		}
 		allowlistCtx := models.TeamAllowlistCheckerContext{
 			BaseRepo:           projCtx.BaseRepo,
+			CheckType:          "project",
 			CommandName:        projCtx.CommandName.String(),
 			EscapedCommentArgs: projCtx.EscapedCommentArgs,
 			HeadRepo:           projCtx.HeadRepo,
