@@ -211,6 +211,40 @@ func TestBuildApplyContinuationCommandArgs(t *testing.T) {
 	}
 }
 
+func TestStagedApplyDeleteSourceBranchError(t *testing.T) {
+	mixed := []command.ProjectContext{
+		{ProjectName: "dev", DeleteSourceBranchOnMerge: false},
+		{ProjectName: "production", DeleteSourceBranchOnMerge: true},
+	}
+	consistent := []command.ProjectContext{
+		{ProjectName: "dev", DeleteSourceBranchOnMerge: true},
+		{ProjectName: "production", DeleteSourceBranchOnMerge: true},
+	}
+
+	tests := []struct {
+		name              string
+		projectCmds       []command.ProjectContext
+		automergeEnabled  bool
+		automergeDisabled bool
+		wantError         bool
+	}{
+		{name: "mixed settings with automerge", projectCmds: mixed, automergeEnabled: true, wantError: true},
+		{name: "consistent settings with automerge", projectCmds: consistent, automergeEnabled: true},
+		{name: "mixed settings without automerge", projectCmds: mixed},
+		{name: "mixed settings with command override", projectCmds: mixed, automergeEnabled: true, automergeDisabled: true},
+		{name: "no projects", automergeEnabled: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := stagedApplyDeleteSourceBranchError(test.projectCmds, test.automergeEnabled, test.automergeDisabled)
+			if (err != nil) != test.wantError {
+				t.Fatalf("error = %v, wantError = %t", err, test.wantError)
+			}
+		})
+	}
+}
+
 type recordingDeferredApplyRunner struct {
 	output   command.ProjectCommandOutput
 	statuses []models.CommitStatus
