@@ -99,5 +99,8 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
+	if p.Command == Apply {
+		return p.Error == nil && p.Failure == ""
+	}
 	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
 }
