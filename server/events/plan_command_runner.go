@@ -38,6 +38,8 @@ func NewPlanCommandRunner(
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
 	cancellationTracker CancellationTracker,
+	preWorkflowHooksCommandRunner PreWorkflowHooksCommandRunner,
+	postWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner,
 	dbUpdater *DBUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
@@ -52,27 +54,29 @@ func NewPlanCommandRunner(
 
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
-		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
-		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
-		vcsClient:                  vcsClient,
-		pendingPlanFinder:          pendingPlanFinder,
-		workingDir:                 workingDir,
-		workingDirLocker:           workingDirLocker,
-		commitStatusUpdater:        commitStatusUpdater,
-		prjCmdBuilder:              projectCommandBuilder,
-		prjCmdRunner:               projectCommandRunner,
-		cancellationTracker:        cancellationTracker,
-		dbUpdater:                  dbUpdater,
-		pullUpdater:                pullUpdater,
-		policyCheckCommandRunner:   policyCheckCommandRunner,
-		autoMerger:                 autoMerger,
-		parallelPoolSize:           parallelPoolSize,
-		SilenceNoProjects:          SilenceNoProjects,
-		pullStatusFetcher:          pullStatusFetcher,
-		lockingLocker:              lockingLocker,
-		DiscardApprovalOnPlan:      discardApprovalOnPlan,
-		pullReqStatusFetcher:       pullReqStatusFetcher,
-		PendingApplyStatus:         PendingApplyStatus,
+		silenceVCSStatusNoPlans:        silenceVCSStatusNoPlans,
+		silenceVCSStatusNoProjects:     silenceVCSStatusNoProjects,
+		vcsClient:                      vcsClient,
+		pendingPlanFinder:              pendingPlanFinder,
+		workingDir:                     workingDir,
+		workingDirLocker:               workingDirLocker,
+		commitStatusUpdater:            commitStatusUpdater,
+		prjCmdBuilder:                  projectCommandBuilder,
+		prjCmdRunner:                   projectCommandRunner,
+		cancellationTracker:            cancellationTracker,
+		preWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
+		dbUpdater:                      dbUpdater,
+		pullUpdater:                    pullUpdater,
+		policyCheckCommandRunner:       policyCheckCommandRunner,
+		autoMerger:                     autoMerger,
+		parallelPoolSize:               parallelPoolSize,
+		SilenceNoProjects:              SilenceNoProjects,
+		pullStatusFetcher:              pullStatusFetcher,
+		lockingLocker:                  lockingLocker,
+		DiscardApprovalOnPlan:          discardApprovalOnPlan,
+		pullReqStatusFetcher:           pullReqStatusFetcher,
+		PendingApplyStatus:             PendingApplyStatus,
 	}
 }
 
@@ -86,21 +90,23 @@ type PlanCommandRunner struct {
 	silenceVCSStatusNoPlans bool
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
-	silenceVCSStatusNoProjects bool
-	commitStatusUpdater        CommitStatusUpdater
-	pendingPlanFinder          PendingPlanFinder
-	workingDir                 WorkingDir
-	workingDirLocker           WorkingDirLocker
-	prjCmdBuilder              ProjectPlanCommandBuilder
-	prjCmdRunner               ProjectPlanCommandRunner
-	cancellationTracker        CancellationTracker
-	dbUpdater                  *DBUpdater
-	pullUpdater                *PullUpdater
-	policyCheckCommandRunner   *PolicyCheckCommandRunner
-	autoMerger                 *AutoMerger
-	parallelPoolSize           int
-	pullStatusFetcher          PullStatusFetcher
-	lockingLocker              locking.Locker
+	silenceVCSStatusNoProjects     bool
+	commitStatusUpdater            CommitStatusUpdater
+	pendingPlanFinder              PendingPlanFinder
+	workingDir                     WorkingDir
+	workingDirLocker               WorkingDirLocker
+	prjCmdBuilder                  ProjectPlanCommandBuilder
+	prjCmdRunner                   ProjectPlanCommandRunner
+	cancellationTracker            CancellationTracker
+	preWorkflowHooksCommandRunner  PreWorkflowHooksCommandRunner
+	postWorkflowHooksCommandRunner PostWorkflowHooksCommandRunner
+	dbUpdater                      *DBUpdater
+	pullUpdater                    *PullUpdater
+	policyCheckCommandRunner       *PolicyCheckCommandRunner
+	autoMerger                     *AutoMerger
+	parallelPoolSize               int
+	pullStatusFetcher              PullStatusFetcher
+	lockingLocker                  locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
 	DiscardApprovalOnPlan bool
@@ -177,7 +183,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), wrapWithProjectWorkflowHooks(p.preWorkflowHooksCommandRunner, p.postWorkflowHooksCommandRunner, p.prjCmdRunner.Plan))
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -323,7 +329,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), wrapWithProjectWorkflowHooks(p.preWorkflowHooksCommandRunner, p.postWorkflowHooksCommandRunner, p.prjCmdRunner.Plan))
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {

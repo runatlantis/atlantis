@@ -82,6 +82,7 @@ func (s WorkflowHook) ToValid() *valid.WorkflowHook {
 			Shell:           s.StringVal["shell"],
 			ShellArgs:       s.StringVal["shellArgs"],
 			Commands:        s.StringVal["commands"],
+			Scope:           s.StringVal["scope"],
 		}
 	}
 

@@ -95,6 +95,10 @@ func (r *configuredPreWorkflowHooksCommandRunner) RunPreHooks(_ *command.Context
 	return r.err
 }
 
+func (r *configuredPreWorkflowHooksCommandRunner) RunPreHooksForProject(_ command.ProjectContext) error {
+	return r.err
+}
+
 func (r *configuredPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(_ *command.Context) bool {
 	return r.hasHooks
 }
@@ -188,6 +192,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
+		preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -209,6 +215,8 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
+		preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
@@ -1886,6 +1894,8 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		projectCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
+		preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,

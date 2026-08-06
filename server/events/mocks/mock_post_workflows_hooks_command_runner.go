@@ -43,6 +43,21 @@ func (mock *MockPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 	return _ret0
 }
 
+func (mock *MockPostWorkflowHooksCommandRunner) RunPostHooksForProject(pctx command.ProjectContext, commandHasErrors bool) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockPostWorkflowHooksCommandRunner().")
+	}
+	_params := []pegomock.Param{pctx, commandHasErrors}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("RunPostHooksForProject", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockPostWorkflowHooksCommandRunner) VerifyWasCalledOnce() *VerifierMockPostWorkflowHooksCommandRunner {
 	return &VerifierMockPostWorkflowHooksCommandRunner{
 		mock:                   mock,
@@ -109,6 +124,41 @@ func (c *MockPostWorkflowHooksCommandRunner_RunPostHooks_OngoingVerification) Ge
 			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockPostWorkflowHooksCommandRunner) RunPostHooksForProject(pctx command.ProjectContext, commandHasErrors bool) *MockPostWorkflowHooksCommandRunner_RunPostHooksForProject_OngoingVerification {
+	_params := []pegomock.Param{pctx, commandHasErrors}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunPostHooksForProject", _params, verifier.timeout)
+	return &MockPostWorkflowHooksCommandRunner_RunPostHooksForProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockPostWorkflowHooksCommandRunner_RunPostHooksForProject_OngoingVerification struct {
+	mock              *MockPostWorkflowHooksCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockPostWorkflowHooksCommandRunner_RunPostHooksForProject_OngoingVerification) GetCapturedArguments() (command.ProjectContext, bool) {
+	pctx, commandHasErrors := c.GetAllCapturedArguments()
+	return pctx[len(pctx)-1], commandHasErrors[len(commandHasErrors)-1]
+}
+
+func (c *MockPostWorkflowHooksCommandRunner_RunPostHooksForProject_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 []bool) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]bool, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(bool)
 			}
 		}
 	}
