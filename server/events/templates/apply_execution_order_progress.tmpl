@@ -5,7 +5,11 @@ Atlantis paused after `execution_order_group` {{ .CompletedExecutionOrderGroup }
 
 Remaining execution order groups: {{ join ", " .RemainingExecutionOrderGroups }}.
 
-Run `{{ $.ExecutableName }} apply` to apply the next `execution_order_group`.
+Run the following command to apply the next `execution_order_group`:
+
+```shell
+{{ $.ExecutableName }} apply{{ with .ContinuationCommandArgs }} {{ . }}{{ end }}
+```
 {{ end -}}
 {{ end -}}
 {{ end -}}

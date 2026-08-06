@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -196,6 +197,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	projectCmds, applyContinuation := selectApplyExecutionOrderGroup(projectCmds, cmd.IsForSpecificProject())
+	if applyContinuation != nil {
+		applyContinuation.ContinuationCommandArgs = buildApplyContinuationCommandArgs(cmd)
+	}
 
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
@@ -506,6 +510,39 @@ func selectApplyExecutionOrderGroup(projectCmds []command.ProjectContext, target
 		CompletedExecutionOrderGroup:  lowestGroup,
 		RemainingExecutionOrderGroups: remainingGroups,
 	}
+}
+
+func buildApplyContinuationCommandArgs(cmd *CommentCommand) string {
+	if cmd == nil {
+		return ""
+	}
+
+	var args []string
+	if cmd.AutoMergeDisabled {
+		args = append(args, "--auto-merge-disabled")
+	}
+	if cmd.AutoMergeMethod != "" {
+		args = append(args, "--auto-merge-method", quoteCommentArg(cmd.AutoMergeMethod))
+	}
+	if cmd.Verbose {
+		args = append(args, "--verbose")
+	}
+	if len(cmd.Flags) > 0 {
+		args = append(args, "--")
+		for _, flag := range cmd.Flags {
+			args = append(args, quoteCommentArg(flag))
+		}
+	}
+	return strings.Join(args, " ")
+}
+
+func quoteCommentArg(arg string) string {
+	if arg != "" && strings.IndexFunc(arg, func(r rune) bool {
+		return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("_@%+=:,./-", r))
+	}) == -1 {
+		return arg
+	}
+	return "'" + strings.ReplaceAll(arg, "'", "'\"'\"'") + "'"
 }
 
 func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
