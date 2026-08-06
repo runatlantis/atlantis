@@ -1193,6 +1193,17 @@ Markdown templates which may have overrides can be found [markdown templates dir
 Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
 possible to diverge from expected behavior, if care is not taken when overriding default templates.
 
+When [`pause_apply_between_execution_order_groups`](repo-level-atlantis-yaml.md#order-of-planningapplying) is enabled,
+custom `singleProjectApply` and `multiProjectApply` templates must include this partial invocation to show the completed
+group, remaining groups, and instruction to run `atlantis apply` again:
+
+```gotemplate
+{{ template "applyExecutionOrderProgress" . }}
+```
+
+Atlantis still pauses between groups when this partial is omitted, but the apply comment will not explain how to
+continue.
+
 Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
 ### `--max-comments-per-command` <Badge text="v0.32.0+" type="info"/>
