@@ -355,6 +355,11 @@ unscoped `atlantis apply` again. Atlantis will not skip a lower group while it s
 plan. If automerge is enabled, Atlantis waits until all planned projects have been applied before
 merging the pull request.
 
+Staged progression uses the remaining plan files. A custom apply workflow implemented with a `run`
+step must remove `$PLANFILE` after a successful apply; otherwise the next unscoped apply fails closed
+and requires a new plan. When Atlantis uses an external plan store, use the built-in `apply` step so
+Atlantis can remove both the local and externally stored plan.
+
 If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
