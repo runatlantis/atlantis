@@ -261,9 +261,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 		ctx.CommandHasErrors = true
-		if !result.HasErrors() {
-			result.Error = fmt.Errorf("recording apply results: %w; run `atlantis plan` before applying again", err)
-		}
+		result.Error = fmt.Errorf("recording apply results: %w; run `atlantis plan` before applying again", err)
 		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
