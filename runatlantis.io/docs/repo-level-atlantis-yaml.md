@@ -343,6 +343,10 @@ If more groups remain after the selected group succeeds, the apply comment lists
 groups and tells the user to run `atlantis apply` again. Projects in the selected group still honor
 `parallel_apply`, so projects in that group can run concurrently while later groups remain pending.
 
+Each repeated `atlantis apply` is an independent command. Atlantis reads the repo configuration
+again and validates the remaining current-head plan files at every checkpoint. This setting does not
+pin a plan-file or dynamic-configuration snapshot across separate comments.
+
 ::: warning Targeted applies bypass staged checkpoints
 This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
 or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
