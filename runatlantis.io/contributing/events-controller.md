@@ -86,7 +86,7 @@ documentation.
 - [BitBucket Pull Request](https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/#Pull-request-events)
 - [GitHub Pull Request](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)
 - [GitLab Merge Request](https://docs.gitlab.com/user/project/integrations/webhook_events/#merge-request-events)
-- [Gitea Webhooks](https://docs.gitea.com/next/usage/webhooks)
+- [Gitea Webhooks](https://docs.gitea.com/1.24/usage/webhooks)
 
 </details>
 
