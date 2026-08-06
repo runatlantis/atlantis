@@ -352,6 +352,10 @@ run for every repeated command. A post-workflow hook therefore runs after each s
 only after the final execution order group. Hooks do not currently receive checkpoint-specific
 metadata.
 
+When `silence_pr_comments` includes `apply`, Atlantis also suppresses the staged continuation
+footer. The remaining groups still stay pending, but an operator must run the next unscoped
+`atlantis apply` without a PR-comment prompt.
+
 ::: warning Targeted applies bypass staged checkpoints
 This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
 or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
