@@ -690,6 +690,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			if err != nil {
 				return nil, fmt.Errorf("initializing S3 plan store: %w", err)
 			}
+		case "redis":
+			redisDB, ok := database.(*redis.RedisDB)
+			if !ok {
+				return nil, fmt.Errorf("external_stores.plan_store.type is 'redis' but --locking-db-type is not 'redis'; the redis plan store reuses the locking connection")
+			}
+			logger.Info("initializing redis plan store (ttl=%s)", psCfg.Redis.TTL)
+			planStore = runtime.NewRedisPlanStore(redisDB.Client(), psCfg.Redis.TTL, logger)
 		default:
 			return nil, fmt.Errorf("unsupported plan store type %q", psCfg.Type)
 		}

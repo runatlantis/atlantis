@@ -14,5 +14,6 @@ type S3PlanStoreConfig = planstore.S3PlanStoreConfig
 var (
 	NewS3PlanStore           = planstore.NewS3PlanStore
 	NewS3PlanStoreWithClient = planstore.NewS3PlanStoreWithClient
+	NewRedisPlanStore        = planstore.NewRedisPlanStore
 	ErrRestoreNotSupported   = planstore.ErrRestoreNotSupported
 )
