@@ -90,6 +90,7 @@ func NewInstrumentedProjectCommandBuilder(
 	RestrictFileList bool,
 	DefaultTFDistribution string,
 	SilenceNoProjects bool,
+	AllowPartialApply bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
@@ -123,6 +124,7 @@ func NewInstrumentedProjectCommandBuilder(
 			RestrictFileList,
 			DefaultTFDistribution,
 			SilenceNoProjects,
+			AllowPartialApply,
 			IncludeGitUntrackedFiles,
 			AutoDiscoverMode,
 			scope,
@@ -154,6 +156,7 @@ func NewProjectCommandBuilder(
 	RestrictFileList bool,
 	DefaultTFDistribution string,
 	SilenceNoProjects bool,
+	AllowPartialApply bool,
 	IncludeGitUntrackedFiles bool,
 	AutoDiscoverMode string,
 	scope tally.Scope,
@@ -179,6 +182,7 @@ func NewProjectCommandBuilder(
 		RestrictFileList:         RestrictFileList,
 		DefaultTFDistribution:    DefaultTFDistribution,
 		SilenceNoProjects:        SilenceNoProjects,
+		AllowPartialApply:        AllowPartialApply,
 		IncludeGitUntrackedFiles: IncludeGitUntrackedFiles,
 		AutoDiscoverMode:         AutoDiscoverMode,
 		ProjectCommandContextBuilder: NewProjectCommandContextBuilder(
@@ -299,6 +303,10 @@ type DefaultProjectCommandBuilder struct {
 	DefaultTFDistribution string
 	// User config option: Ignore PR if none of the modified files are part of a project.
 	SilenceNoProjects bool
+	// User config option: Allow the generic apply command to apply the subset of
+	// projects with valid plans, skipping projects whose plans errored or are
+	// missing, instead of failing the whole command.
+	AllowPartialApply bool
 	// User config option: Include git untracked files in the modified file list.
 	IncludeGitUntrackedFiles bool
 	// User config option: Controls auto-discovery of projects in a repository.
@@ -1289,7 +1297,12 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if p.WorkingDirLocker != nil {
 			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
 		}
-		if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
+		if p.AllowPartialApply {
+			plans, err = filterPlansForPartialApply(ctx, plans, hasActivePlan)
+			if err != nil {
+				return nil, err
+			}
+		} else if err := ValidatePlansForApplyWithActivePlan(ctx, plans, hasActivePlan); err != nil {
 			return nil, err
 		}
 	}
@@ -1373,6 +1386,49 @@ func ValidatePlansForApplyWithCurrentPull(ctx *command.Context, plans []PendingP
 		return validateFoundPlans(ctx, plans)
 	}
 	return validateNoPlansFound(ctx, hasActivePlan)
+}
+
+// filterPlansForPartialApply returns the subset of discovered plans that are
+// valid to apply for the current PR head. Unlike strict validation, projects
+// whose plans errored, have a non-applyable status, or are missing a plan file
+// are skipped with a warning instead of failing the whole command. Staleness
+// and in-flight-plan checks still fail the command.
+func filterPlansForPartialApply(ctx *command.Context, plans []PendingPlan, hasActivePlan bool) ([]PendingPlan, error) {
+	if hasActivePlan {
+		return nil, fmt.Errorf("a plan is currently running for this pull request; wait for it to finish before applying")
+	}
+	if ctx.PullStatus == nil {
+		return nil, fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
+	}
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+		return nil, err
+	}
+
+	var applyable []PendingPlan
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if proj == nil {
+			ctx.Log.Warn("partial apply: skipping plan for dir %q workspace %q project %q because no matching plan status exists", plan.RepoRelDir, plan.Workspace, plan.ProjectName)
+			continue
+		}
+		if !statusAllowedForDiscoveredPlan(proj.Status) {
+			ctx.Log.Warn("partial apply: skipping plan for dir %q workspace %q project %q because status %q is not applyable", plan.RepoRelDir, plan.Workspace, plan.ProjectName, proj.Status.String())
+			continue
+		}
+		applyable = append(applyable, plan)
+	}
+	for _, proj := range ctx.PullStatus.Projects {
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		if statusIsSafeWithoutPlanFile(proj.Status) {
+			continue
+		}
+		ctx.Log.Warn("partial apply: skipping project dir %q workspace %q project %q with status %q because no plan file exists; run `atlantis plan` to include it", proj.RepoRelDir, proj.Workspace, proj.ProjectName, proj.Status.String())
+	}
+	return applyable, nil
 }
 
 func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
