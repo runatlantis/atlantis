@@ -1976,6 +1976,23 @@ func TestApplyCommandRunner_PausedGroupFailureDoesNotAdvertiseContinuation(t *te
 }
 
 func TestApplyCommandRunner_PausedGroupPersistenceFailureRequiresReplan(t *testing.T) {
+	t.Run("successful apply", func(t *testing.T) {
+		testApplyCommandRunnerPausedGroupPersistenceFailureRequiresReplan(
+			t,
+			command.ProjectCommandOutput{ApplySuccess: "dev applied"},
+			"dev applied",
+		)
+	})
+	t.Run("failed apply", func(t *testing.T) {
+		testApplyCommandRunnerPausedGroupPersistenceFailureRequiresReplan(
+			t,
+			command.ProjectCommandOutput{Error: errors.New("terraform apply failed")},
+			"terraform apply failed",
+		)
+	})
+}
+
+func testApplyCommandRunnerPausedGroupPersistenceFailureRequiresReplan(t *testing.T, applyOutput command.ProjectCommandOutput, expectedProjectOutput string) {
 	controller := gomock.NewController(t)
 	database := dbmocks.NewMockDatabase(controller)
 	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
@@ -2018,7 +2035,7 @@ func TestApplyCommandRunner_PausedGroupPersistenceFailureRequiresReplan(t *testi
 		PauseApplyBetweenExecutionOrderGroups: true,
 	}
 	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{dev, production}, nil)
-	When(projectCommandRunner.Apply(dev)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "dev applied"})
+	When(projectCommandRunner.Apply(dev)).ThenReturn(applyOutput)
 
 	applyCommandRunner.Run(ctx, cmd)
 
@@ -2035,7 +2052,7 @@ func TestApplyCommandRunner_PausedGroupPersistenceFailureRequiresReplan(t *testi
 	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(pull.Num), Any[string](), Eq(command.Apply.String()),
 	).GetCapturedArguments()
-	Assert(t, strings.Contains(comment, "dev applied"), "got comment: %s", comment)
+	Assert(t, strings.Contains(comment, expectedProjectOutput), "got comment: %s", comment)
 	Assert(t, strings.Contains(comment, "run `atlantis plan` before applying again"), "got comment: %s", comment)
 	Assert(t, !strings.Contains(comment, "Atlantis paused after"), "got comment: %s", comment)
 	Assert(t, !strings.Contains(comment, "apply the next `execution_order_group`"), "got comment: %s", comment)
