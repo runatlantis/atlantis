@@ -127,6 +127,16 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 			expErr: "yaml: construct errors: line 2: cannot construct !!str `notabool` into bool",
 		},
 		{
+			description: "pause apply between execution order groups not a boolean",
+			input:       "version: 3\npause_apply_between_execution_order_groups: notabool",
+			exp: raw.RepoCfg{
+				Version:   nil,
+				Projects:  nil,
+				Workflows: nil,
+			},
+			expErr: "yaml: construct errors: line 2: cannot construct !!str `notabool` into bool",
+		},
+		{
 			description: "should use values if set",
 			input: `
 version: 3
@@ -137,6 +147,7 @@ autodiscover:
   - foo/*
 parallel_apply: true
 parallel_plan: false
+pause_apply_between_execution_order_groups: true
 repo_locks:
   mode: on_apply
 projects:
@@ -167,10 +178,11 @@ allowed_regexp_prefixes:
 					Mode:        &autoDiscoverEnabled,
 					IgnorePaths: []string{"foo/*"},
 				},
-				Automerge:     Bool(true),
-				ParallelApply: Bool(true),
-				ParallelPlan:  Bool(false),
-				RepoLocks:     &raw.RepoLocks{Mode: &repoLocksOnApply},
+				Automerge:                             Bool(true),
+				ParallelApply:                         Bool(true),
+				ParallelPlan:                          Bool(false),
+				PauseApplyBetweenExecutionOrderGroups: Bool(true),
+				RepoLocks:                             &raw.RepoLocks{Mode: &repoLocksOnApply},
 				Projects: []raw.Project{
 					{
 						Dir:              String("mydir"),
@@ -284,48 +296,53 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
-			description: "automerge, parallel_apply, abort_on_execution_order_fail omitted",
+			description: "apply behavior settings omitted",
 			input: raw.RepoCfg{
 				Version: Int(2),
 			},
 			exp: valid.RepoCfg{
-				Version:                   2,
-				Automerge:                 nil,
-				ParallelApply:             nil,
-				AbortOnExecutionOrderFail: false,
-				Workflows:                 map[string]valid.Workflow{},
+				Version:                               2,
+				Automerge:                             nil,
+				ParallelApply:                         nil,
+				AbortOnExecutionOrderFail:             false,
+				PauseApplyBetweenExecutionOrderGroups: false,
+				Workflows:                             map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge, parallel_apply, abort_on_execution_order_fail true",
+			description: "apply behavior settings true",
 			input: raw.RepoCfg{
-				Version:                   Int(2),
-				Automerge:                 Bool(true),
-				ParallelApply:             Bool(true),
-				AbortOnExecutionOrderFail: Bool(true),
+				Version:                               Int(2),
+				Automerge:                             Bool(true),
+				ParallelApply:                         Bool(true),
+				AbortOnExecutionOrderFail:             Bool(true),
+				PauseApplyBetweenExecutionOrderGroups: Bool(true),
 			},
 			exp: valid.RepoCfg{
-				Version:                   2,
-				Automerge:                 Bool(true),
-				ParallelApply:             Bool(true),
-				AbortOnExecutionOrderFail: true,
-				Workflows:                 map[string]valid.Workflow{},
+				Version:                               2,
+				Automerge:                             Bool(true),
+				ParallelApply:                         Bool(true),
+				AbortOnExecutionOrderFail:             true,
+				PauseApplyBetweenExecutionOrderGroups: true,
+				Workflows:                             map[string]valid.Workflow{},
 			},
 		},
 		{
-			description: "automerge, parallel_apply, abort_on_execution_order_fail false",
+			description: "apply behavior settings false",
 			input: raw.RepoCfg{
-				Version:                   Int(2),
-				Automerge:                 Bool(false),
-				ParallelApply:             Bool(false),
-				AbortOnExecutionOrderFail: Bool(false),
+				Version:                               Int(2),
+				Automerge:                             Bool(false),
+				ParallelApply:                         Bool(false),
+				AbortOnExecutionOrderFail:             Bool(false),
+				PauseApplyBetweenExecutionOrderGroups: Bool(false),
 			},
 			exp: valid.RepoCfg{
-				Version:                   2,
-				Automerge:                 Bool(false),
-				ParallelApply:             Bool(false),
-				AbortOnExecutionOrderFail: false,
-				Workflows:                 map[string]valid.Workflow{},
+				Version:                               2,
+				Automerge:                             Bool(false),
+				ParallelApply:                         Bool(false),
+				AbortOnExecutionOrderFail:             false,
+				PauseApplyBetweenExecutionOrderGroups: false,
+				Workflows:                             map[string]valid.Workflow{},
 			},
 		},
 		{

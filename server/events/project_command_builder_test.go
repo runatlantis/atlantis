@@ -3400,8 +3400,20 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
+	atlantisYAML := "version: 3\n" +
+		"pause_apply_between_execution_order_groups: true\n" +
+		"projects:\n" +
+		"  - dir: project1\n" +
+		"    workspace: workspace1\n" +
+		"  - dir: project2\n" +
+		"    workspace: workspace1\n" +
+		"  - dir: project1\n" +
+		"    workspace: workspace2\n" +
+		"  - dir: project2\n" +
+		"    workspace: workspace2\n"
 	tmpDir := DirStructure(t, map[string]any{
 		"workspace1": map[string]any{
+			"atlantis.yaml": atlantisYAML,
 			"project1": map[string]any{
 				"main.tf":           nil,
 				"workspace1.tfplan": nil,
@@ -3432,6 +3444,11 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		Any[models.Repo](),
 		Any[models.PullRequest]())).
 		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(events.DefaultWorkspace))).
+		ThenReturn(filepath.Join(tmpDir, "workspace1"), nil)
 
 	logger := logging.NewNoopLogger(t)
 	userConfig := defaultUserConfig
@@ -3503,7 +3520,77 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	for _, ctx := range ctxs {
 		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+		Assert(t, ctx.PauseApplyBetweenExecutionOrderGroups, "expected broad apply context to inherit pause setting")
 	}
+
+	t.Run("staged apply rejects a planfile without a matching planned status", func(t *testing.T) {
+		_, err := builder.BuildApplyCommands(
+			&command.Context{
+				Log:   logger,
+				Scope: scope,
+				Pull:  models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "project1", Workspace: "workspace1", Status: models.AppliedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					},
+				},
+			},
+			&events.CommentCommand{Name: command.Apply})
+		Assert(t, err != nil, "expected staged apply to reject an applied project planfile")
+		Assert(t, strings.Contains(err.Error(), models.AppliedPlanStatus.String()), "got: %s", err)
+	})
+
+	t.Run("staged apply rejects stale status before using discovered plans", func(t *testing.T) {
+		_, err := builder.BuildApplyCommands(
+			&command.Context{
+				Log:   logger,
+				Scope: scope,
+				Pull:  models.PullRequest{HeadCommit: "current"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "stale"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "project1", Workspace: "workspace1", Status: models.AppliedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					},
+				},
+			},
+			&events.CommentCommand{Name: command.Apply})
+		Assert(t, err != nil, "expected stale pull status to be rejected")
+		Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+	})
+
+	t.Run("disabled staged apply also rejects a planfile without a matching planned status", func(t *testing.T) {
+		disabledYAML := strings.Replace(atlantisYAML, "pause_apply_between_execution_order_groups: true", "pause_apply_between_execution_order_groups: false", 1)
+		Ok(t, os.WriteFile(filepath.Join(tmpDir, "workspace1", valid.DefaultAtlantisFile), []byte(disabledYAML), 0o600))
+		t.Cleanup(func() {
+			Ok(t, os.WriteFile(filepath.Join(tmpDir, "workspace1", valid.DefaultAtlantisFile), []byte(atlantisYAML), 0o600))
+		})
+
+		_, err := builder.BuildApplyCommands(
+			&command.Context{
+				Log:   logger,
+				Scope: scope,
+				Pull:  models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "project1", Workspace: "workspace1", Status: models.AppliedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+						{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					},
+				},
+			},
+			&events.CommentCommand{Name: command.Apply})
+		Assert(t, err != nil, "expected ordinary apply to reject an applied project planfile")
+		Assert(t, strings.Contains(err.Error(), models.AppliedPlanStatus.String()), "got: %s", err)
+	})
 }
 
 // Test that autodiscover.ignore_paths is respected during multi-apply.
