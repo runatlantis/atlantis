@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -144,15 +145,49 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 	}, nil
 }
 
+// scanKeys returns all keys matching pattern.
+// On Redis Cluster, go-redis ClusterClient.Scan only hits one node. We must
+// SCAN every master or UnlockByPull/List miss locks on other hash slots.
+func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string, error) {
+	var (
+		keys []string
+		mu   sync.Mutex
+	)
+	scanNode := func(ctx context.Context, c redis.Cmdable) error {
+		iter := c.Scan(ctx, 0, match, 0).Iterator()
+		for iter.Next(ctx) {
+			mu.Lock()
+			keys = append(keys, iter.Val())
+			mu.Unlock()
+		}
+		return iter.Err()
+	}
+
+	if cc, ok := client.(*redis.ClusterClient); ok {
+		if err := cc.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+			return scanNode(ctx, master)
+		}); err != nil {
+			return nil, err
+		}
+		return keys, nil
+	}
+
+	if err := scanNode(ctx, client); err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
 // migrateOldLockKeys migrates old lock key format to new format.
 // Old format: pr/{repoFullName}/{path}/{workspace}
 // New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
-// Uses Scan instead of Keys for compatibility with Redis Cluster (Scan fans out
-// across all nodes via go-redis ClusterClient, whereas Keys does not).
+// Scans all cluster masters so keys on every hash slot are considered.
 func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
-	iter := rdb.Scan(ctx, 0, "pr/*", 0).Iterator()
-	for iter.Next(ctx) {
-		oldKey := iter.Val()
+	oldKeys, err := scanKeys(ctx, rdb, "pr/*")
+	if err != nil {
+		return fmt.Errorf("failed scanning for old lock keys: %w", err)
+	}
+	for _, oldKey := range oldKeys {
 		// Remove the "pr/" prefix to validate the key format
 		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
 
@@ -182,9 +217,6 @@ func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 				return errors.Wrapf(err, "failed to delete old lock key %s", oldKey)
 			}
 		}
-	}
-	if err := iter.Err(); err != nil {
-		return fmt.Errorf("failed scanning for old lock keys: %w", err)
 	}
 	return nil
 }
@@ -273,21 +305,25 @@ func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, 
 
 // List lists all current locks.
 func (r *RedisDB) List() ([]models.ProjectLock, error) {
+	keys, err := scanKeys(ctx, r.client, "pr/*")
+	if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
+
 	var locks []models.ProjectLock
-	iter := r.client.Scan(ctx, 0, "pr*", 0).Iterator()
-	for iter.Next(ctx) {
+	for _, key := range keys {
 		var lock models.ProjectLock
-		val, err := r.client.Get(ctx, iter.Val()).Result()
-		if err != nil {
+		val, err := r.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			// Key deleted between SCAN and GET (concurrent unlock / reshard).
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("db transaction failed: %w", err)
 		}
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", iter.Val(), err)
+			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", key, err)
 		}
 		locks = append(locks, lock)
-	}
-	if err := iter.Err(); err != nil {
-		return locks, fmt.Errorf("db transaction failed: %w", err)
 	}
 
 	return locks, nil
@@ -316,17 +352,24 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
 func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
-	var locks []models.ProjectLock
+	// Trailing slash so repo "owner/repo" does not match "owner/repo2".
+	keys, err := scanKeys(ctx, r.client, fmt.Sprintf("pr/%s/*", repoFullName))
+	if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
 
-	iter := r.client.Scan(ctx, 0, fmt.Sprintf("pr/%s*", repoFullName), 0).Iterator()
-	for iter.Next(ctx) {
+	var locks []models.ProjectLock
+	for _, key := range keys {
 		var lock models.ProjectLock
-		val, err := r.client.Get(ctx, iter.Val()).Result()
-		if err != nil {
+		val, err := r.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			// Key deleted between SCAN and GET (concurrent unlock / reshard).
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("db transaction failed: %w", err)
 		}
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", iter.Val(), err)
+			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", key, err)
 		}
 		if lock.Pull.Num == pullNum {
 			locks = append(locks, lock)
@@ -334,10 +377,6 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Proje
 				return locks, fmt.Errorf("unlocking repo %s, path %s, workspace %s: %w", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace, err)
 			}
 		}
-	}
-
-	if err := iter.Err(); err != nil {
-		return locks, fmt.Errorf("db transaction failed: %w", err)
 	}
 
 	return locks, nil
