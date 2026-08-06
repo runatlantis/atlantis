@@ -180,11 +180,12 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
+		// We keep any successful plans (and their locks) so that projects
+		// which planned cleanly can still be applied individually. Automerge
+		// itself already refuses to merge until every project in the pull
+		// request has been successfully applied, so nothing else needs to
+		// gate on this failure here.
+		ctx.Log.Info("not automerging because one or more projects had errors, but keeping successful plans so they can still be applied")
 	}
 
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
@@ -197,9 +198,8 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
-	// Check if there are any planned projects and if there are any errors or if plans are being deleted
-	if len(policyCheckCmds) > 0 &&
-		(!result.HasErrors() && !result.PlansDeleted) {
+	// Check if there are any planned projects and if there are any errors
+	if len(policyCheckCmds) > 0 && !result.HasErrors() {
 		// Run policy_check command
 		ctx.Log.Info("Running policy_checks for all plans")
 
@@ -327,11 +327,12 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
+		// We keep any successful plans (and their locks) so that projects
+		// which planned cleanly can still be applied individually. Automerge
+		// itself already refuses to merge until every project in the pull
+		// request has been successfully applied, so nothing else needs to
+		// gate on this failure here.
+		ctx.Log.Info("not automerging because one or more projects had errors, but keeping successful plans so they can still be applied")
 	}
 
 	p.pullUpdater.updatePull(
@@ -357,8 +358,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
-	if len(result.ProjectResults) > 0 &&
-		(!result.HasErrors() && !result.PlansDeleted) {
+	if len(result.ProjectResults) > 0 && !result.HasErrors() {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
