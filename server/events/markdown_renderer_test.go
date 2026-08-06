@@ -3523,7 +3523,7 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 			},
 			expectedFooter: "Atlantis se detuvo después de `execution_order_group` 1.\n\n" +
 				"Grupos de orden de ejecución restantes: 2, 3.\n\n" +
-				"Ejecuta el siguiente comando para aplicar el próximo `execution_order_group`:\n\n" +
+				"Ejecuta el siguiente comando para aplicar el próximo `execution_order_group`:\n\n" + //nolint:misspell // "comando" is Spanish for "command".
 				"```shell\natlantis apply\n```",
 			unexpectedFooter: "Atlantis paused after",
 		},
