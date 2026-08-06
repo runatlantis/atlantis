@@ -752,6 +752,12 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		&gitlab.AcceptMergeRequestOptions{
 			MergeCommitMessage:       &commitMsg,
 			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
+			// SHA is required by GitLab 19.2+ when "Require a commit SHA on the
+			// merge requests API" is enabled (default for groups created on
+			// 19.2+); the API returns 400 "SHA must be provided when merging"
+			// without it. It also acts as an optimistic-concurrency check that
+			// the source branch HEAD has not changed since the plan/apply.
+			SHA: &pull.HeadCommit,
 		})
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
