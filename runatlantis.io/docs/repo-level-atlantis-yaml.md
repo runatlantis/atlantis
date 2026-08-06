@@ -369,6 +369,10 @@ or `-w` keep their current behavior and can apply a later group directly. Do not
 as an authorization boundary when users are allowed to run targeted applies.
 :::
 
+The setting applies to unscoped pull-request comment commands. Apply requests made through the
+[API](api-endpoints.md) remain explicitly targeted by project or path, and automated remediation
+flows are not paused between execution order groups.
+
 If a project in the selected group fails, later groups remain pending and Atlantis does not prompt
 the user to advance. Resolve the failure using the normal apply or re-plan workflow, then run an
 unscoped `atlantis apply` again. Atlantis will not skip a lower group while it still has a pending
