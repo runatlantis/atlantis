@@ -27,17 +27,17 @@ func NewMockProjectLocker(options ...pegomock.Option) *MockProjectLocker {
 func (mock *MockProjectLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockProjectLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*events.TryLockResponse, error) {
+func (mock *MockProjectLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*events.ProjectLockResponse, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectLocker().")
 	}
 	_params := []pegomock.Param{log, pull, user, workspace, project, repoLocking}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", _params, []reflect.Type{reflect.TypeOf((**events.TryLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var _ret0 *events.TryLockResponse
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLock", _params, []reflect.Type{reflect.TypeOf((**events.ProjectLockResponse)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 *events.ProjectLockResponse
 	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
-			_ret0 = _result[0].(*events.TryLockResponse)
+			_ret0 = _result[0].(*events.ProjectLockResponse)
 		}
 		if _result[1] != nil {
 			_ret1 = _result[1].(error)

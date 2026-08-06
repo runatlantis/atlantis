@@ -493,6 +493,35 @@ Each servers handle different repository config files.
 | policies   | Policies.                                             | none      | no       | List of policy sets to run and associated metadata                                    |
 | metrics    | Metrics.                                              | none      | no       | Map of metric configuration                                                           |
 | team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuration of team permission checking                                             |
+| backends   | [Backends](#backends-and-stores)                      | none      | no       | Connection config for storage backends (redis, s3).                                  |
+| stores     | [Stores](#backends-and-stores)                        | see below | no       | Binds each store (coordination, plans) to a backend.                                 |
+
+### Backends And Stores
+
+A backend declares how to reach a storage service; a store binds one kind of Atlantis data to a backend. `coordination` holds project locks, the global apply lock, and pull status (backends `boltdb` or `redis`, default `boltdb`); `plans` holds plan files so applies survive restarts and replica changes (backends `filesystem` or `s3`, default `filesystem`). The defaults live under the server's `--data-dir` and need no configuration.
+
+```yaml
+backends:
+  redis:
+    host: redis.internal
+    port: 6379
+    tls_enabled: true
+    password: hunter2
+  s3:
+    bucket: atlantis-data
+    region: us-east-1
+    prefix: some/team
+
+stores:
+  coordination:
+    backend: redis
+  plans:
+    backend: s3
+```
+
+`backends.boltdb` accepts `data_dir` (defaults to `--data-dir`, holding the `atlantis.db` file). `backends.redis` accepts `host`, `port` (default 6379), `username`, `password`, `db`, `tls_enabled`, `insecure_skip_verify`, and `cluster_addresses` (mutually exclusive with `host`). `backends.s3` accepts `bucket` and `region` (both required), `prefix`, `endpoint`, `force_path_style`, and `profile`; credentials come from the AWS SDK default chain. `prefix` namespaces all Atlantis objects within the bucket, and each store appends its own segment under it (plans write to `<prefix>/plans/...`), so stores sharing the backend never collide.
+
+`stores.coordination` replaces `--locking-db-type` and the `--redis-*` flags, which keep working while unset and are deprecated.
 
 ::: tip A Note On Defaults
 

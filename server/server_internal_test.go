@@ -10,8 +10,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/db/mocks"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -34,7 +34,7 @@ func TestServer_CloseDatabase(t *testing.T) {
 			closeFn:     func() error { return nil },
 		},
 		{
-			description: "returns database error",
+			description: "returns coordinationStore error",
 			closeFn:     func() error { return errors.New("boom") },
 			expectedErr: "boom",
 		},
@@ -48,28 +48,28 @@ func TestServer_CloseDatabase(t *testing.T) {
 			expectedDuration: time.Second,
 		},
 		{
-			description: "nil database",
-			closeFn:     nil, // nil means database itself is nil
+			description: "nil coordinationStore",
+			closeFn:     nil, // nil means coordinationStore itself is nil
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.description, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				var database db.Database
+				var coordinationStore coordination.Store
 				if tt.closeFn != nil {
 					ctrl := gomock.NewController(t)
-					m := mocks.NewMockDatabase(ctrl)
+					m := mocks.NewMockStore(ctrl)
 					closeFn := tt.closeFn
 					m.EXPECT().Close().DoAndReturn(func() error {
 						return closeFn()
 					})
-					database = m
+					coordinationStore = m
 				}
 
 				s := &Server{
-					database: database,
-					Logger:   logging.NewNoopLogger(t),
+					coordinationStore: coordinationStore,
+					Logger:            logging.NewNoopLogger(t),
 				}
 
 				start := time.Now()

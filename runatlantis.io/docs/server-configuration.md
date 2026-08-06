@@ -643,16 +643,6 @@ rejected while read-only drift detection remains available. This flag does not b
 repository `apply_requirements`; requirements that need pull request state fail closed for
 non-PR remediation requests. Defaults to `false`.
 
-### `--enable-external-stores`
-
-```bash
-atlantis server --enable-external-stores
-# or
-ATLANTIS_ENABLE_EXTERNAL_STORES=true
-```
-
-Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
-
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
@@ -1158,6 +1148,8 @@ ATLANTIS_LOCKING_DB_TYPE="<boltdb|redis>"
 ```
 
 The locking database type to use for storing plan and apply locks. Defaults to `boltdb`.
+
+Deprecated: configure the coordination store through the `backends` and `stores` blocks in the [server-side repo config](server-side-repo-config.md#backends-and-stores) instead; this flag and the `--redis-*` flags keep working while those blocks are unset.
 
 Notes:
 

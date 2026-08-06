@@ -10,14 +10,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
 
 	. "github.com/petergtz/pegomock/v4"
-	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	lockmocks "github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -43,7 +43,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Database:           db,
+		CoordinationStore:  db,
 	}
 	err = errors.New("err")
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
@@ -66,7 +66,7 @@ func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Database:           db,
+		CoordinationStore:  db,
 		PlanStore:          store,
 	}
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
@@ -91,7 +91,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Database:           db,
+		CoordinationStore:  db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
@@ -115,10 +115,10 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	})
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
-		Locker:     l,
-		VCSClient:  cp,
-		WorkingDir: w,
-		Database:   db,
+		Locker:            l,
+		VCSClient:         cp,
+		WorkingDir:        w,
+		CoordinationStore: db,
 	}
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -216,10 +216,10 @@ func TestCleanUpPullComments(t *testing.T) {
 			})
 			Ok(t, err)
 			pce := events.PullClosedExecutor{
-				Locker:     l,
-				VCSClient:  cp,
-				WorkingDir: w,
-				Database:   db,
+				Locker:            l,
+				VCSClient:         cp,
+				WorkingDir:        w,
+				CoordinationStore: db,
 			}
 			t.Log("testing: " + c.Description)
 			l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(c.Locks, nil)
@@ -300,7 +300,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Database:                 database,
+			CoordinationStore:        database,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
@@ -374,7 +374,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Locker:                   locker,
 		VCSClient:                client,
 		WorkingDir:               workingDir,
-		Database:                 db,
+		CoordinationStore:        db,
 		PullClosedTemplate:       &events.PullClosedEventTemplate{},
 		LogStreamResourceCleaner: resourceCleaner,
 	}

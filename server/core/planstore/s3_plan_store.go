@@ -17,7 +17,6 @@ import (
 	securejoin "github.com/cyphar/filepath-securejoin"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -33,64 +32,12 @@ type S3Client interface {
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 }
 
-// S3PlanStoreConfig holds configuration for connecting to S3.
-type S3PlanStoreConfig struct {
-	Bucket         string
-	Region         string
-	Prefix         string
-	Endpoint       string
-	ForcePathStyle bool
-	Profile        string
-}
-
 // S3PlanStore implements PlanStore by persisting plan files to S3.
 type S3PlanStore struct {
 	client S3Client
 	bucket string
 	prefix string
 	logger logging.SimpleLogging
-}
-
-// NewS3PlanStore creates an S3PlanStore using the AWS SDK default credential chain.
-func NewS3PlanStore(cfg S3PlanStoreConfig, logger logging.SimpleLogging) (*S3PlanStore, error) {
-	var opts []func(*awsconfig.LoadOptions) error
-	opts = append(opts, awsconfig.WithRegion(cfg.Region))
-
-	if cfg.Profile != "" {
-		opts = append(opts, awsconfig.WithSharedConfigProfile(cfg.Profile))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("loading AWS config: %w", err)
-	}
-
-	var s3Opts []func(*s3.Options)
-	if cfg.Endpoint != "" {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cfg.Endpoint)
-			if cfg.ForcePathStyle {
-				o.UsePathStyle = true
-			}
-		})
-	} else if cfg.ForcePathStyle {
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.UsePathStyle = true
-		})
-	}
-
-	client := s3.NewFromConfig(awsCfg, s3Opts...)
-
-	if _, err := client.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(cfg.Bucket),
-	}); err != nil {
-		return nil, fmt.Errorf("validating S3 plan store bucket %q: %w", cfg.Bucket, err)
-	}
-
-	return NewS3PlanStoreWithClient(client, cfg.Bucket, cfg.Prefix, logger), nil
 }
 
 // s3OpTimeout is the per-operation timeout for S3 API calls.

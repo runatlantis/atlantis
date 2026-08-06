@@ -8,8 +8,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -18,15 +17,15 @@ import (
 func NewApplyCommandRunner(
 	vcsClient vcs.Client,
 	disableApplyAll bool,
-	applyCommandLocker locking.ApplyLockChecker,
+	applyCommandLocker coordination.ApplyLockChecker,
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
 	prjCmdRunner ProjectApplyCommandRunner,
 	cancellationTracker CancellationTracker,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
-	dbUpdater *DBUpdater,
-	database db.Database,
+	pullStatusUpdater *coordination.PullStatusUpdater,
+	database coordination.Store,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	silenceVCSStatusNoProjects bool,
@@ -45,8 +44,8 @@ func NewApplyCommandRunner(
 		cancellationTracker:        cancellationTracker,
 		autoMerger:                 autoMerger,
 		pullUpdater:                pullUpdater,
-		dbUpdater:                  dbUpdater,
-		Database:                   database,
+		pullStatusUpdater:          pullStatusUpdater,
+		CoordinationStore:          database,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		silenceVCSStatusNoProjects: silenceVCSStatusNoProjects,
@@ -59,8 +58,8 @@ func NewApplyCommandRunner(
 
 type ApplyCommandRunner struct {
 	DisableApplyAll       bool
-	Database              db.Database
-	locker                locking.ApplyLockChecker
+	CoordinationStore     coordination.Store
+	locker                coordination.ApplyLockChecker
 	vcsClient             vcs.Client
 	commitStatusUpdater   CommitStatusUpdater
 	prjCmdBuilder         ProjectApplyCommandBuilder
@@ -68,7 +67,7 @@ type ApplyCommandRunner struct {
 	cancellationTracker   CancellationTracker
 	autoMerger            *AutoMerger
 	pullUpdater           *PullUpdater
-	dbUpdater             *DBUpdater
+	pullStatusUpdater     *coordination.PullStatusUpdater
 	parallelPoolSize      int
 	workingDirLocker      WorkingDirLocker
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
@@ -259,7 +258,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		cmd,
 		result)
 
-	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := a.pullStatusUpdater.Update(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 		return
@@ -282,7 +281,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if result.HasErrors() {
 		return
 	}
-	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+	if err := models.PullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		ctx.Log.Warn("not automerging because %s", err)
 		return
 	}
@@ -314,15 +313,15 @@ func livePullIdentityChangedDuringApply(before models.PullRequest, after models.
 	if before.HeadCommit != "" && after.HeadCommit != "" && before.HeadCommit != after.HeadCommit {
 		return fmt.Errorf(
 			"%w: pull request head changed from %s to %s while apply was running; run `atlantis plan` before apply",
-			errStaleCommandHead,
-			shortSHA(before.HeadCommit),
-			shortSHA(after.HeadCommit),
+			command.ErrStaleCommandHead,
+			models.ShortSHA(before.HeadCommit),
+			models.ShortSHA(after.HeadCommit),
 		)
 	}
 	if before.BaseBranch != "" && after.BaseBranch != "" && before.BaseBranch != after.BaseBranch {
 		return fmt.Errorf(
 			"%w: pull request base branch changed from %q to %q while apply was running; run `atlantis plan` before apply",
-			errStaleCommandHead,
+			command.ErrStaleCommandHead,
 			before.BaseBranch,
 			after.BaseBranch,
 		)
@@ -346,24 +345,24 @@ func applyResultStatusUpdateError(result command.Result, pullStatus models.PullS
 		if preApplyPullStatus == nil {
 			return errors.New("apply produced no project results and no recorded plan status was available")
 		}
-		if err := pullStatusApplyEligibilityError(currentPull, preApplyPullStatus.Pull, "recorded plan status"); err != nil {
+		if err := models.PullStatusApplyEligibilityError(currentPull, preApplyPullStatus.Pull, "recorded plan status"); err != nil {
 			return err
 		}
 	}
-	if staleApplyResultForCurrentPull(commandPull, result.ProjectResults) && !pullStatusFreshForPull(commandPull, pullStatus.Pull) {
+	if commandPull.HeadCommit != "" && command.HasApplyResult(result.ProjectResults) && !models.PullStatusFreshForPull(commandPull, pullStatus.Pull) {
 		return fmt.Errorf(
 			"%w: apply result was for head %s base %q but recorded apply status is for head %s base %q",
-			errStaleCommandHead,
-			shortSHA(commandPull.HeadCommit),
+			command.ErrStaleCommandHead,
+			models.ShortSHA(commandPull.HeadCommit),
 			commandPull.BaseBranch,
-			shortSHA(pullStatus.Pull.HeadCommit),
+			models.ShortSHA(pullStatus.Pull.HeadCommit),
 			pullStatus.Pull.BaseBranch,
 		)
 	}
 	if applyResultHasStaleCommandHead(result.ProjectResults) {
-		return fmt.Errorf("%w: apply result is stale", errStaleCommandHead)
+		return fmt.Errorf("%w: apply result is stale", command.ErrStaleCommandHead)
 	}
-	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+	if err := models.PullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		return err
 	}
 	if result.HasErrors() && pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {
@@ -374,7 +373,7 @@ func applyResultStatusUpdateError(result command.Result, pullStatus models.PullS
 
 func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {
 	for _, result := range results {
-		if errors.Is(result.Error, errStaleCommandHead) {
+		if errors.Is(result.Error, command.ErrStaleCommandHead) {
 			return true
 		}
 	}
@@ -383,9 +382,9 @@ func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {
 
 func (a *ApplyCommandRunner) currentNoProjectApplyPullStatus(ctx *command.Context, pull models.PullRequest, currentPull models.PullRequest) (*models.PullStatus, error) {
 	pullStatus := ctx.PullStatus
-	if pullStatus == nil && a.Database != nil {
+	if pullStatus == nil && a.CoordinationStore != nil {
 		var err error
-		pullStatus, err = a.Database.GetPullStatus(pull)
+		pullStatus, err = a.CoordinationStore.GetPullStatus(pull)
 		if err != nil {
 			return nil, fmt.Errorf("fetching recorded plan status: %w", err)
 		}
@@ -393,17 +392,17 @@ func (a *ApplyCommandRunner) currentNoProjectApplyPullStatus(ctx *command.Contex
 	if pullStatus == nil {
 		return nil, errors.New("no recorded plan status found")
 	}
-	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+	if err := models.PullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
 		return nil, err
 	}
 	return pullStatus, nil
 }
 
 func (a *ApplyCommandRunner) refreshPullStatus(ctx *command.Context, pull models.PullRequest) error {
-	if a.Database == nil {
+	if a.CoordinationStore == nil {
 		return nil
 	}
-	pullStatus, err := a.Database.GetPullStatus(pull)
+	pullStatus, err := a.CoordinationStore.GetPullStatus(pull)
 	if err != nil {
 		return err
 	}
