@@ -254,14 +254,16 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	livePull = finalLivePull
 	ctx.CommandHasErrors = result.HasErrors()
 
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
+		ctx.CommandHasErrors = true
+		result.Error = fmt.Errorf("writing apply results after execution; one or more apply steps may have completed, so verify infrastructure state before retrying: %w", err)
+		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
 
@@ -269,13 +271,16 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
 		ctx.Log.Warn("not publishing apply success status because %s", err)
 		ctx.CommandHasErrors = true
+		result.Error = err
 		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
+		a.pullUpdater.updatePull(ctx, cmd, result)
 		return
 	}
 
+	a.pullUpdater.updatePull(ctx, cmd, result)
 	a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus)
 	a.updateCommitStatus(ctx, pullStatus)
 

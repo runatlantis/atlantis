@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
@@ -81,6 +82,7 @@ type TestConfig struct {
 	applyLockCheckerReturn     locking.ApplyCommandLock
 	applyLockCheckerErr        error
 	workingDirLocker           events.WorkingDirLocker
+	planLocker                 locking.Locker
 	livePullHeadFetcher        events.LivePullHeadFetcher
 }
 
@@ -147,6 +149,11 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	applyLockChecker.EXPECT().CheckApplyLock().Return(testConfig.applyLockCheckerReturn, testConfig.applyLockCheckerErr).AnyTimes()
 	// Plan cleanup only deletes selected on_plan locks through owner-scoped cleanup.
 	lockingLocker.EXPECT().UnlockIfOwnedByPull(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	lockingLocker.EXPECT().GetLock(gomock.Any()).Return(nil, nil).AnyTimes()
+	planLocker := testConfig.planLocker
+	if planLocker == nil {
+		planLocker = lockingLocker
+	}
 
 	dbUpdater = &events.DBUpdater{
 		Database: testConfig.database,
@@ -195,7 +202,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.database,
-		lockingLocker,
+		planLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
 		testConfig.PendingApplyStatus,
@@ -519,7 +526,7 @@ func TestRunCommentCommandPlan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *
 	Equals(t, 0, len(pullStatus.Projects))
 }
 
-func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
+func TestRunCommentCommandPlan_NoProjectsRetainsOldPlanFilesAndClearsPullStatus(t *testing.T) {
 	_ = setup(t)
 	planCommandRunner.SilenceNoProjects = true
 
@@ -544,16 +551,12 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	var pull github.PullRequest
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
-		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
-	}, nil)
-
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
-	_, err = os.Stat(oldPlanPath)
-	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	contents, err := os.ReadFile(oldPlanPath)
+	Ok(t, err)
+	Equals(t, "old plan", string(contents))
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
@@ -561,7 +564,116 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 	Equals(t, 0, len(pullStatus.Projects))
 }
 
-func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T) {
+func TestRunCommentCommandPlan_NoProjectsPreservesActiveGenerationPlan(t *testing.T) {
+	vcsClient := setup(t)
+	planCommandRunner.SilenceNoProjects = true
+
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	project := models.ProjectStatus{
+		Workspace:   events.DefaultWorkspace,
+		RepoRelDir:  "active-project",
+		ProjectName: "active-project",
+	}
+	_, err := dbUpdater.Database.BeginPlanGeneration(modelPull, []models.ProjectStatus{project}, "generation-1")
+	Ok(t, err)
+
+	planDir := t.TempDir()
+	planPath := filepath.Join(planDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
+	marker := []byte("active generation marker")
+	Ok(t, os.WriteFile(planPath, marker, 0600))
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(nil, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected no-project replacement to reject the active generation")
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	contents, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, marker, contents)
+	status, statusErr := dbUpdater.Database.GetPullStatus(modelPull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "expected active generation status")
+	active := projectStatus(t, status, project.Workspace, project.RepoRelDir, project.ProjectName)
+	Equals(t, models.ErroredPlanStatus, active.Status)
+	Equals(t, "generation-1", active.PlanGeneration)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(modelPull.BaseRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "active plan generation"), "got: %s", comment)
+}
+
+func TestRunCommentCommandPlan_NoProjectsPreservesGenerationStartedAfterReplacement(t *testing.T) {
+	underlying := newTestBoltDB(t)
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	project := models.ProjectStatus{
+		Workspace:   events.DefaultWorkspace,
+		RepoRelDir:  "active-project",
+		ProjectName: "active-project",
+	}
+	planRoot := t.TempDir()
+	planDir := filepath.Join(planRoot, project.RepoRelDir)
+	Ok(t, os.MkdirAll(planDir, 0700))
+	planPath := filepath.Join(planDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
+	marker := []byte("generation started after replacement")
+	database := &beginGenerationAfterReplaceDB{
+		Database: underlying,
+		project:  project,
+		planPath: planPath,
+		marker:   marker,
+	}
+	_ = setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	planCommandRunner.SilenceNoProjects = true
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(nil, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, database.started, "expected generation to begin after empty status replacement")
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	contents, err := os.ReadFile(planPath)
+	Ok(t, err)
+	Equals(t, marker, contents)
+	status, err := underlying.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected active generation status")
+	active := projectStatus(t, status, project.Workspace, project.RepoRelDir, project.ProjectName)
+	Equals(t, models.ErroredPlanStatus, active.Status)
+	Assert(t, active.PlanGeneration != "", "expected active generation marker")
+}
+
+func TestRunCommentCommandPlan_NoProjectsNonSilencedRetainsOldPlanFiles(t *testing.T) {
 	_ = setup(t)
 
 	tmp := t.TempDir()
@@ -585,16 +697,12 @@ func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T
 	var pull github.PullRequest
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
-		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
-	}, nil)
-
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
-	_, err = os.Stat(oldPlanPath)
-	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	contents, err := os.ReadFile(oldPlanPath)
+	Ok(t, err)
+	Equals(t, "old plan", string(contents))
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
@@ -606,32 +714,26 @@ func TestRunCommentCommandPlan_NoProjectsDoesNotUnlockActiveLocks(t *testing.T) 
 	vcsClient := setup(t)
 	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, true)
 
-	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	var pull github.PullRequest
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 }
 
 func TestRunCommentCommandPlan_NoProjectsNonSilencedDoesNotUnlockByPull(t *testing.T) {
 	vcsClient := setup(t)
 	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, false)
 
-	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	var pull github.PullRequest
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 }
 
 func TestRunCommentCommandPlan_NoProjectsEmptyPullStatusWriteFailureIsUserVisible(t *testing.T) {
@@ -687,6 +789,57 @@ func TestRunCommentCommandPlan_NoProjectsTarget_SilenceEnabled(t *testing.T) {
 		Eq[command.Name](command.Plan),
 		Eq(models.ProjectCounts{}),
 	)
+}
+
+func TestPlanCommandRunner_TargetedNoProjectsPreservesPullStatus(t *testing.T) {
+	_ = setup(t)
+	planCommandRunner.SilenceNoProjects = false
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	existingProject := command.ProjectResult{
+		Command:     command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "existing-project",
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		},
+	}
+	_, err := dbUpdater.Database.UpdatePullWithResults(pull, []command.ProjectResult{existingProject})
+	Ok(t, err)
+
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: "unknown-project"}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(nil, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected an unknown targeted project to remain a no-op")
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+
+	status, err := dbUpdater.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected existing PullStatus to remain")
+	Equals(t, 1, len(status.Projects))
+	project := projectStatus(t, status, existingProject.Workspace, existingProject.RepoRelDir, existingProject.ProjectName)
+	Equals(t, models.PlannedPlanStatus, project.Status)
+	Equals(t, "", project.PlanGeneration)
 }
 
 func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
@@ -817,7 +970,6 @@ func TestPlanCommandRunner_HoldsPlanInFlightLockAcrossCleanupPlanAndDBWrite(t *t
 		BaseRepo:    testdata.GithubRepo,
 		Pull:        modelPull,
 	}
-
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).Then(func(args []Param) ReturnValues {
@@ -968,6 +1120,1229 @@ func TestPlanCommandRunner_AutoplanHoldsPlanLockDuringPullStatusWrite(t *testing
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
 	Assert(t, writeObserved, "expected autoplan pull status write to be observed")
+}
+
+func TestPlanCommandRunner_AutoplanPersistsPullStatusBeforePublishingSuccess(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "gitea-autoplan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	tmp := t.TempDir()
+	statusVisibleWhenCommented := false
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(vcsClient.CreateComment(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(modelPull.Num),
+		Any[string](),
+		Eq("plan"),
+	)).Then(func([]Param) ReturnValues {
+		pullStatus, err := database.GetPullStatus(modelPull)
+		Ok(t, err)
+		if pullStatus != nil {
+			for _, project := range pullStatus.Projects {
+				if project.Workspace == projectCtx.Workspace &&
+					project.RepoRelDir == projectCtx.RepoRelDir &&
+					project.ProjectName == projectCtx.ProjectName &&
+					project.Status == models.PlannedPlanStatus {
+					statusVisibleWhenCommented = true
+					break
+				}
+			}
+		}
+		return ReturnValues{nil}
+	})
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	Assert(t, statusVisibleWhenCommented, "expected persisted PullStatus before successful autoplan comment was published")
+}
+
+func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmediateApply(t *testing.T) {
+	underlying := newTestBoltDB(t)
+	database := &blockingPlanCompletionDB{
+		Database: underlying,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "immediate-autoplan-apply",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+		Steps:       valid.DefaultPlanStage.Steps,
+	}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.AutoTrigger,
+	}
+	tmp := t.TempDir()
+	var successCommentVisible atomic.Bool
+	var successStatusVisible atomic.Bool
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(vcsClient.CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("plan"),
+	)).Then(func([]Param) ReturnValues {
+		successCommentVisible.Store(true)
+		return ReturnValues{nil}
+	})
+	When(commitUpdater.UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts](),
+	)).Then(func([]Param) ReturnValues {
+		successStatusVisible.Store(true)
+		return ReturnValues{nil}
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+	}()
+	<-database.started
+
+	Assert(t, !successCommentVisible.Load(), "successful plan comment became visible before PullStatus completion")
+	Assert(t, !successStatusVisible.Load(), "successful plan status became visible before PullStatus completion")
+	inProgress, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, inProgress != nil, "expected durable in-progress PullStatus")
+	Equals(t, models.ErroredPlanStatus, inProgress.Projects[0].Status)
+	Assert(t, inProgress.Projects[0].PlanGeneration != "", "expected active generation marker")
+
+	close(database.release)
+	<-done
+	Assert(t, successCommentVisible.Load(), "expected successful plan comment after PullStatus completion")
+	Assert(t, successStatusVisible.Load(), "expected successful plan status after PullStatus completion")
+	persisted, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, persisted != nil, "expected persisted PullStatus")
+	Equals(t, models.PlannedPlanStatus, persisted.Projects[0].Status)
+
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockApply := mocks.NewMockStepRunner()
+	repoDir := t.TempDir()
+	applyCtx := projectCtx
+	applyCtx.CommandName = command.Apply
+	applyCtx.Steps = valid.DefaultApplyStage.Steps
+	applyCtx.Log = logging.NewNoopLogger(t)
+	projectDir := filepath.Join(repoDir, applyCtx.RepoRelDir)
+	Ok(t, os.MkdirAll(projectDir, 0755))
+	planPath := filepath.Join(projectDir, runtime.GetPlanFilename(applyCtx.Workspace, applyCtx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("persisted autoplan generation"), 0600))
+	When(mockWorkingDir.GetWorkingDir(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(applyCtx.Pull), Any[models.User](), Eq(applyCtx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Eq(projectDir), Any[map[string]string]())).ThenReturn("applied immediate autoplan", nil)
+	applyRunner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database},
+	}
+
+	applyResult := applyRunner.Apply(applyCtx)
+
+	Ok(t, applyResult.Error)
+	Equals(t, "applied immediate autoplan", applyResult.ApplySuccess)
+}
+
+func TestApprovePoliciesCommandRunner_CannotReplaceActivePlanGeneration(t *testing.T) {
+	underlying := newTestBoltDB(t)
+	database := &blockingPlanCompletionDB{
+		Database: underlying,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	released := false
+	defer func() {
+		if !released {
+			close(database.release)
+		}
+	}()
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	planCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "concurrent-policy-approval",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+		Steps:       valid.DefaultPlanStage.Steps,
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(planCtx.RepoRelDir, planCtx.Workspace, planCtx.ProjectName),
+	})
+	Ok(t, err)
+	approveCtx := planCtx
+	approveCtx.CommandName = command.ApprovePolicies
+	approveCtx.ProjectPolicyStatus = []models.PolicySetStatus{{
+		PolicySetName: "production",
+		Hashes:        []string{"policy-hash"},
+	}}
+	planCommandCtx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	planCmd := &events.CommentCommand{Name: command.Plan, ProjectName: planCtx.ProjectName}
+	When(projectCommandBuilder.BuildPlanCommands(planCommandCtx, planCmd)).ThenReturn([]command.ProjectContext{planCtx}, nil)
+	When(projectCommandRunner.Plan(planCtx)).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "final generation plan"},
+	})
+
+	planDone := make(chan struct{})
+	go func() {
+		defer close(planDone)
+		planCommandRunner.Run(planCommandCtx, planCmd)
+	}()
+	<-database.started
+
+	activeBefore, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, activeBefore != nil, "expected active generation")
+	activeProjectBefore := projectStatus(t, activeBefore, planCtx.Workspace, planCtx.RepoRelDir, planCtx.ProjectName)
+	Assert(t, activeProjectBefore.PlanGeneration != "", "expected nonempty generation")
+	activeGeneration := activeProjectBefore.PlanGeneration
+
+	approveCommandCtx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	approveCmd := &events.CommentCommand{Name: command.ApprovePolicies, ProjectName: approveCtx.ProjectName}
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(approveCommandCtx, approveCmd)).ThenReturn([]command.ProjectContext{approveCtx}, nil)
+	When(projectCommandRunner.ApprovePolicies(approveCtx)).ThenReturn(command.ProjectCommandOutput{
+		PolicyCheckResults: &models.PolicyCheckResults{PolicySetResults: []models.PolicySetResult{{
+			PolicySetName: "production",
+			Passed:        true,
+			Hashes:        []string{"policy-hash"},
+		}}},
+	})
+
+	approvePoliciesCommandRunner.Run(approveCommandCtx, approveCmd)
+
+	Assert(t, approveCommandCtx.CommandHasErrors, "expected concurrent approval persistence to fail the command")
+	activeAfter, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, activeAfter != nil, "expected active generation after approval attempt")
+	activeProjectAfter := projectStatus(t, activeAfter, planCtx.Workspace, planCtx.RepoRelDir, planCtx.ProjectName)
+	Equals(t, activeGeneration, activeProjectAfter.PlanGeneration)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.PolicyCheck),
+		Any[models.ProjectCounts](),
+	)
+	_, _, _, approveComment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("approve_policies")).GetCapturedArguments()
+	Assert(t, strings.Contains(approveComment, "active plan generation"), "got: %s", approveComment)
+
+	close(database.release)
+	released = true
+	<-planDone
+	Assert(t, !planCommandCtx.CommandHasErrors, "expected matching plan generation completion to succeed")
+	completed, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, completed != nil, "expected completed plan generation")
+	completedProject := projectStatus(t, completed, planCtx.Workspace, planCtx.RepoRelDir, planCtx.ProjectName)
+	Equals(t, models.PlannedPlanStatus, completedProject.Status)
+	Equals(t, "", completedProject.PlanGeneration)
+
+	finalPlanMarker := "matching generation final plan"
+	repoDir := t.TempDir()
+	projectDir := filepath.Join(repoDir, planCtx.RepoRelDir)
+	Ok(t, os.MkdirAll(projectDir, 0755))
+	planPath := filepath.Join(projectDir, runtime.GetPlanFilename(planCtx.Workspace, planCtx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte(finalPlanMarker), 0600))
+	applyCtx := planCtx
+	applyCtx.CommandName = command.Apply
+	applyCtx.Steps = valid.DefaultApplyStage.Steps
+	applyCtx.Log = logging.NewNoopLogger(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	When(mockWorkingDir.GetWorkingDir(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Eq(applyCtx.Pull),
+		Any[models.User](),
+		Eq(applyCtx.Workspace),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	applyStep := &planMarkerApplyStepRunner{t: t, planPath: planPath, marker: finalPlanMarker}
+	applyRunner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           applyStep,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database},
+	}
+
+	applyResult := applyRunner.Apply(applyCtx)
+
+	Ok(t, applyResult.Error)
+	Equals(t, "applied matching generation", applyResult.ApplySuccess)
+	Equals(t, 1, applyStep.calls)
+}
+
+func TestPolicyCheckCommandRunner_ActivePlanGenerationWriteFailsCommand(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.PolicyCheck,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "concurrent-policy-check",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	_, err = database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace:   projectCtx.Workspace,
+		RepoRelDir:  projectCtx.RepoRelDir,
+		ProjectName: projectCtx.ProjectName,
+	}}, "generation-1")
+	Ok(t, err)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandRunner.PolicyCheck(projectCtx)).ThenReturn(command.ProjectCommandOutput{
+		PolicyCheckResults: &models.PolicyCheckResults{PolicySetResults: []models.PolicySetResult{{
+			PolicySetName: "production",
+			Passed:        true,
+		}}},
+	})
+
+	policyCheckCommandRunner.Run(ctx, []command.ProjectContext{projectCtx})
+
+	Assert(t, ctx.CommandHasErrors, "expected policy-check persistence rejection to fail command")
+	status, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected active generation")
+	project := projectStatus(t, status, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+	Equals(t, models.ErroredPlanStatus, project.Status)
+	Equals(t, "generation-1", project.PlanGeneration)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.PolicyCheck))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.PolicyCheck),
+		Any[models.ProjectCounts](),
+	)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("policy_check")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "active plan generation"), "got: %s", comment)
+}
+
+func TestApplyCommandRunner_ActivePlanGenerationWriteFailsCommandAndProjectStatus(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	applyCtx := command.ProjectContext{
+		CommandName: command.Apply,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "concurrent-apply",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+		Log:         logging.NewNoopLogger(t),
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(applyCtx.RepoRelDir, applyCtx.Workspace, applyCtx.ProjectName),
+	})
+	Ok(t, err)
+	_, err = database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace:   applyCtx.Workspace,
+		RepoRelDir:  applyCtx.RepoRelDir,
+		ProjectName: applyCtx.ProjectName,
+	}}, "generation-1")
+	Ok(t, err)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: applyCtx.ProjectName}
+	projectOutput := command.ProjectCommandOutput{ApplySuccess: "stale apply result"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{applyCtx}, nil)
+	When(projectCommandRunner.Apply(applyCtx)).ThenReturn(projectOutput)
+	jobURLSetter := mocks.NewMockJobURLSetter()
+	jobMessageSender := mocks.NewMockJobMessageSender()
+	wrappedProjectRunner := &events.ProjectOutputWrapper{
+		ProjectCommandRunner: projectCommandRunner,
+		JobURLSetter:         jobURLSetter,
+		JobMessageSender:     jobMessageSender,
+	}
+	runner := events.NewApplyCommandRunner(
+		vcsClient,
+		false,
+		applyLockChecker,
+		commitUpdater,
+		projectCommandBuilder,
+		wrappedProjectRunner,
+		cancellationTracker,
+		autoMerger,
+		pullUpdater,
+		dbUpdater,
+		database,
+		1,
+		false,
+		false,
+		events.NewDefaultWorkingDirLocker(),
+		pullReqStatusFetcher,
+		nil,
+		"",
+	)
+
+	runner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected apply persistence rejection to fail command")
+	status, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected active generation")
+	project := projectStatus(t, status, applyCtx.Workspace, applyCtx.RepoRelDir, applyCtx.ProjectName)
+	Equals(t, models.ErroredPlanStatus, project.Status)
+	Equals(t, "generation-1", project.PlanGeneration)
+	jobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(applyCtx, command.Apply, models.PendingCommitStatus, nil)
+	jobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(
+		Eq(applyCtx), Eq(command.Apply), Eq(models.FailedCommitStatus), Any[*command.ProjectCommandOutput]())
+	jobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(
+		Eq(applyCtx), Eq(command.Apply), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Any[models.ProjectCounts](),
+	)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("apply")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "active plan generation"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "one or more apply steps may have completed"), "got: %s", comment)
+}
+
+func TestPlanCommandRunner_DeletePlansFailureAfterGenerationStartFailsPlanAndApply(t *testing.T) {
+	for _, trigger := range []command.Trigger{command.AutoTrigger, command.CommentTrigger} {
+		t.Run(fmt.Sprintf("trigger-%d", trigger), func(t *testing.T) {
+			underlying := newTestBoltDB(t)
+			vcsClient := setup(t, func(tc *TestConfig) {
+				tc.database = underlying
+			})
+			pull := models.PullRequest{
+				BaseRepo:   testdata.GithubRepo,
+				State:      models.OpenPullState,
+				Num:        testdata.Pull.Num,
+				HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				BaseBranch: "main",
+			}
+			projectCtx := command.ProjectContext{
+				CommandName: command.Plan,
+				RepoRelDir:  "infrastructure",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "cleanup-failure",
+				BaseRepo:    pull.BaseRepo,
+				Pull:        pull,
+				Steps:       valid.DefaultPlanStage.Steps,
+			}
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+				Pull:     pull,
+				HeadRepo: pull.BaseRepo,
+				Trigger:  trigger,
+			}
+			cmd := &events.CommentCommand{Name: command.Plan}
+			if trigger == command.AutoTrigger {
+				When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+			} else {
+				When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+			}
+			pullDir := t.TempDir()
+			When(workingDir.GetPullDir(pull.BaseRepo, pull)).ThenReturn(pullDir, nil)
+			When(pendingPlanFinder.Find(pullDir)).ThenReturn(nil, errors.New("injected pending plan lookup failure"))
+
+			planCommandRunner.Run(ctx, cmd)
+
+			Assert(t, ctx.CommandHasErrors, "expected cleanup failure to fail %s plan", trigger)
+			status, err := underlying.GetPullStatus(pull)
+			Ok(t, err)
+			Assert(t, status != nil, "expected durable incomplete generation")
+			project := projectStatus(t, status, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+			Assert(t, project.PlanGeneration != "", "expected cleanup failure to retain generation")
+			projectCommandRunner.VerifyWasCalled(Never()).Plan(projectCtx)
+			commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+				Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+			commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+				Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+			_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+			Assert(t, strings.Contains(comment, "injected pending plan lookup failure"), "got: %s", comment)
+		})
+	}
+}
+
+func TestPlanCommandRunner_AbortOnExecutionOrderFailureCompletesPlanGeneration(t *testing.T) {
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.parallelPoolSize = 2
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	first := command.ProjectContext{
+		CommandName:               command.Plan,
+		RepoRelDir:                "first",
+		Workspace:                 events.DefaultWorkspace,
+		ProjectName:               "first",
+		BaseRepo:                  pull.BaseRepo,
+		Pull:                      pull,
+		Steps:                     valid.DefaultPlanStage.Steps,
+		ExecutionOrderGroup:       0,
+		ParallelPlanEnabled:       true,
+		AbortOnExecutionOrderFail: true,
+	}
+	second := first
+	second.RepoRelDir = "second"
+	second.ProjectName = "second"
+	second.ExecutionOrderGroup = 1
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	pullDir := t.TempDir()
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{first, second}, nil)
+	When(workingDir.GetPullDir(pull.BaseRepo, pull)).ThenReturn(pullDir, nil)
+	When(pendingPlanFinder.Find(pullDir)).ThenReturn(nil, nil)
+	When(projectCommandRunner.Plan(first)).ThenReturn(command.ProjectCommandOutput{Error: errors.New("first execution group failed")})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected failed execution group to fail plan")
+	projectCommandRunner.VerifyWasCalledOnce().Plan(first)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(second)
+	status, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected completed PullStatus")
+	firstStatus := projectStatus(t, status, first.Workspace, first.RepoRelDir, first.ProjectName)
+	secondStatus := projectStatus(t, status, second.Workspace, second.RepoRelDir, second.ProjectName)
+	Equals(t, models.ErroredPlanStatus, firstStatus.Status)
+	Equals(t, models.ErroredPlanStatus, secondStatus.Status)
+	Equals(t, "", firstStatus.PlanGeneration)
+	Equals(t, "", secondStatus.PlanGeneration)
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "first execution group failed"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "earlier execution-order group failed"), "got: %s", comment)
+	Assert(t, !strings.Contains(comment, "persisting plan results"), "generation completion unexpectedly failed: %s", comment)
+}
+
+func TestPlanCommandRunner_AutoplanPersistenceFailureFailsClosed(t *testing.T) {
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "gitea-autoplan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	policyCtx := projectCtx
+	policyCtx.CommandName = command.PolicyCheck
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.AutoTrigger,
+	}
+	tmp := t.TempDir()
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx, policyCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark autoplan errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "persisting plan results"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "invalidating previous plan state before planning"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(policyCtx)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectCtx)
+}
+
+func TestPlanCommandRunner_AutoplanFinalPersistenceFailureLeavesGenerationNonApplyable(t *testing.T) {
+	underlying := newTestBoltDB(t)
+	database := &failNextPullStatusWriteDB{Database: underlying}
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "autoplan-replan",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+		Steps:       []valid.Step{{StepName: "run", RunCommand: "custom-plan-command"}},
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.AutoTrigger,
+	}
+	tmp := t.TempDir()
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	database.failNextUpdate = true
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	Assert(t, ctx.CommandHasErrors, "expected final autoplan persistence failure to fail the command")
+	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+	status, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected durable PullStatus")
+	project := projectStatus(t, status, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+	Equals(t, models.ErroredPlanStatus, project.Status)
+	Assert(t, project.PlanGeneration != "", "expected active generation marker")
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+}
+
+func TestPlanCommandRunner_ManualPlanPersistenceFailureFailsClosed(t *testing.T) {
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  "infrastructure",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "manual-plan",
+		BaseRepo:    testdata.GithubRepo,
+		Pull:        modelPull,
+	}
+	policyCtx := projectCtx
+	policyCtx.CommandName = command.PolicyCheck
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	tmp := t.TempDir()
+	closer := dbUpdater.Database.(interface{ Close() error })
+	Ok(t, closer.Close())
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx, policyCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected PullStatus persistence failure to mark manual plan errored")
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "Plan Error"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "persisting plan results"), "got: %s", comment)
+	Assert(t, strings.Contains(comment, "invalidating previous plan state before planning"), "got: %s", comment)
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+	projectCommandRunner.VerifyWasCalled(Never()).PolicyCheck(policyCtx)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectCtx)
+}
+
+func TestPlanCommandRunner_FailedManagedReplanInvalidatesPreviousPlanGeneration(t *testing.T) {
+	assertFailedReplanInvalidatesPreviousPlanGeneration(t, valid.DefaultPlanStage.Steps, valid.DefaultApplyStage.Steps, true, nil)
+}
+
+func TestPlanCommandRunner_FailedRunOnlyReplanInvalidatesPreviousPlanGeneration(t *testing.T) {
+	runOnlyPlan := []valid.Step{{StepName: "run", RunCommand: "some-custom-plan-command custom-plan-path"}}
+	assertFailedReplanInvalidatesPreviousPlanGeneration(t, runOnlyPlan, []valid.Step{{
+		StepName:   "run",
+		RunCommand: "some-custom-apply-command custom-plan-path",
+	}}, false, nil)
+}
+
+func TestPlanCommandRunner_FailedReplanReportsManagedPlanCleanupFailure(t *testing.T) {
+	assertFailedReplanInvalidatesPreviousPlanGeneration(
+		t,
+		valid.DefaultPlanStage.Steps,
+		valid.DefaultApplyStage.Steps,
+		true,
+		errors.New("injected managed plan cleanup failure"),
+	)
+}
+
+func TestPlanCommandRunner_FailedReplanReleasesOnlyLockCreatedByGeneration(t *testing.T) {
+	RegisterMockTestingT(t)
+	underlying := newTestBoltDB(t)
+	database := &failNextPullStatusWriteDB{Database: underlying}
+	planLocker := &trackingPlanGenerationLocker{}
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:   command.Plan,
+		RepoRelDir:    ".",
+		Workspace:     events.DefaultWorkspace,
+		ProjectName:   "locked-replan",
+		BaseRepo:      pull.BaseRepo,
+		Pull:          pull,
+		Steps:         valid.DefaultPlanStage.Steps,
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.planLocker = planLocker
+	})
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: projectCtx.ProjectName}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).Then(func([]Param) ReturnValues {
+		planLocker.lock = &models.ProjectLock{
+			Pull:      pull,
+			Project:   models.NewProject(pull.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName),
+			Workspace: projectCtx.Workspace,
+		}
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+	database.failNextUpdate = true
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected final persistence failure")
+	Equals(t, 1, planLocker.unlockIfOwnedCalls)
+	Equals(t, 0, planLocker.unlockByPullCalls)
+	Assert(t, planLocker.lock == nil, "expected generation-created plan lock to be released")
+}
+
+func TestPlanCommandRunner_FailedTargetedReplanPreservesPreexistingPlanLock(t *testing.T) {
+	RegisterMockTestingT(t)
+	underlying := newTestBoltDB(t)
+	database := &failNextPullStatusWriteDB{Database: underlying}
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:   command.Plan,
+		RepoRelDir:    ".",
+		Workspace:     events.DefaultWorkspace,
+		ProjectName:   "locked-replan",
+		BaseRepo:      pull.BaseRepo,
+		Pull:          pull,
+		Steps:         valid.DefaultPlanStage.Steps,
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
+	preexistingLock := &models.ProjectLock{
+		Pull:      pull,
+		Project:   models.NewProject(pull.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName),
+		Workspace: projectCtx.Workspace,
+	}
+	planLocker := &trackingPlanGenerationLocker{lock: preexistingLock}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.planLocker = planLocker
+	})
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: projectCtx.ProjectName}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	database.failNextUpdate = true
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected final persistence failure")
+	Equals(t, 0, planLocker.unlockIfOwnedCalls)
+	Equals(t, 0, planLocker.unlockByPullCalls)
+	Assert(t, planLocker.lock == preexistingLock, "expected preexisting plan lock to remain")
+}
+
+func TestPlanCommandRunner_FailedReplanDoesNotCleanNewerGeneration(t *testing.T) {
+	RegisterMockTestingT(t)
+	underlying := newTestBoltDB(t)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:   command.Plan,
+		RepoRelDir:    ".",
+		Workspace:     events.DefaultWorkspace,
+		ProjectName:   "superseded-replan",
+		BaseRepo:      pull.BaseRepo,
+		Pull:          pull,
+		Steps:         valid.DefaultPlanStage.Steps,
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+	database := &supersedePlanCompletionDB{
+		Database: underlying,
+		project: models.ProjectStatus{
+			Workspace:   projectCtx.Workspace,
+			RepoRelDir:  projectCtx.RepoRelDir,
+			ProjectName: projectCtx.ProjectName,
+		},
+	}
+	planLocker := &trackingPlanGenerationLocker{}
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.planLocker = planLocker
+	})
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: projectCtx.ProjectName}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).Then(func([]Param) ReturnValues {
+		planLocker.lock = &models.ProjectLock{
+			Pull:      pull,
+			Project:   models.NewProject(pull.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName),
+			Workspace: projectCtx.Workspace,
+		}
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected superseded final persistence to fail the replan")
+	workingDir.(*mocks.MockWorkingDir).VerifyWasCalled(Never()).DeletePlan(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[string](), Any[string]())
+	Equals(t, 0, planLocker.unlockIfOwnedCalls)
+	Equals(t, 0, planLocker.unlockByPullCalls)
+	Assert(t, planLocker.lock != nil, "expected the newer generation lock to remain")
+	status, err := underlying.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected newer plan generation status")
+	Equals(t, models.ErroredPlanStatus, status.Projects[0].Status)
+	Equals(t, "newer-generation", status.Projects[0].PlanGeneration)
+}
+
+func assertFailedReplanInvalidatesPreviousPlanGeneration(t *testing.T, planSteps, applySteps []valid.Step, expectManagedPlanCleanup bool, cleanupError error) {
+	t.Helper()
+	RegisterMockTestingT(t)
+
+	underlying := newTestBoltDB(t)
+	database := &failNextPullStatusWriteDB{Database: underlying}
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	projectCtx := command.ProjectContext{
+		CommandName: command.Plan,
+		RepoRelDir:  ".",
+		Workspace:   events.DefaultWorkspace,
+		ProjectName: "replanned-project",
+		BaseRepo:    pull.BaseRepo,
+		Pull:        pull,
+		Steps:       planSteps,
+	}
+	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
+	})
+	Ok(t, err)
+
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	cmd := &events.CommentCommand{Name: command.Plan, ProjectName: projectCtx.ProjectName}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "new plan generation"},
+	})
+	if cleanupError != nil {
+		When(workingDir.(*mocks.MockWorkingDir).DeletePlan(
+			Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(projectCtx.Workspace), Eq(projectCtx.RepoRelDir), Eq(projectCtx.ProjectName))).ThenReturn(cleanupError)
+	}
+	database.failNextUpdate = true
+
+	planCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected failed PullStatus persistence to fail the replan")
+	if expectManagedPlanCleanup {
+		workingDir.(*mocks.MockWorkingDir).VerifyWasCalledOnce().DeletePlan(
+			Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(projectCtx.Workspace), Eq(projectCtx.RepoRelDir), Eq(projectCtx.ProjectName))
+	} else {
+		workingDir.(*mocks.MockWorkingDir).VerifyWasCalled(Never()).DeletePlan(
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string](), Any[string](), Any[string]())
+	}
+	if cleanupError != nil {
+		_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+			Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("plan")).GetCapturedArguments()
+		Assert(t, strings.Contains(comment, "injected PullStatus persistence failure"), "got: %s", comment)
+		Assert(t, strings.Contains(comment, cleanupError.Error()), "got: %s", comment)
+	}
+
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockApply := mocks.NewMockStepRunner()
+	mockRun := mocks.NewMockCustomStepRunner()
+	repoDir := t.TempDir()
+	applyCtx := projectCtx
+	applyCtx.CommandName = command.Apply
+	applyCtx.Steps = applySteps
+	applyCtx.Log = logging.NewNoopLogger(t)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(applyCtx.Workspace, applyCtx.ProjectName))
+	Ok(t, os.WriteFile(planPath, []byte("new unpersisted plan generation"), 0600))
+	customPlanPath := filepath.Join(repoDir, "custom-plan-path")
+	Ok(t, os.WriteFile(customPlanPath, []byte("new unpersisted custom plan generation"), 0600))
+	When(mockWorkingDir.GetWorkingDir(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(applyCtx.Pull.BaseRepo, applyCtx.Pull, applyCtx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(applyCtx.Pull), Any[models.User](), Eq(applyCtx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		RunStepRunner:             mockRun,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database},
+	}
+
+	result := runner.Apply(applyCtx)
+
+	Assert(t, result.Error != nil, "expected failed replan generation to reject apply")
+	Assert(t, strings.Contains(result.Error.Error(), "plan is incomplete"), "got: %s", result.Error)
+	Assert(t, strings.Contains(result.Error.Error(), "run `atlantis plan`"), "got: %s", result.Error)
+	mockApply.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	mockRun.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](),
+		Any[*valid.CommandShell](),
+		Any[string](),
+		Any[string](),
+		Any[map[string]string](),
+		AnyBool(),
+		Any[[]valid.PostProcessRunOutputOption](),
+		Any[[]*regexp.Regexp](),
+	)
+}
+
+type failNextPullStatusWriteDB struct {
+	db.Database
+	failNextUpdate bool
+}
+
+type beginGenerationAfterReplaceDB struct {
+	db.Database
+	project  models.ProjectStatus
+	planPath string
+	marker   []byte
+	started  bool
+}
+
+type blockingPlanCompletionDB struct {
+	db.Database
+	started chan struct{}
+	release chan struct{}
+}
+
+func (d *beginGenerationAfterReplaceDB) ReplacePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	status, err := d.Database.ReplacePullWithResults(pull, results)
+	if err != nil || d.started {
+		return status, err
+	}
+	d.started = true
+	if _, err := d.BeginPlanGeneration(pull, []models.ProjectStatus{d.project}, "generation-after-replace"); err != nil {
+		return models.PullStatus{}, err
+	}
+	if err := os.WriteFile(d.planPath, d.marker, 0600); err != nil {
+		return models.PullStatus{}, err
+	}
+	return status, nil
+}
+
+type supersedePlanCompletionDB struct {
+	db.Database
+	project models.ProjectStatus
+}
+
+type trackingPlanGenerationLocker struct {
+	lock               *models.ProjectLock
+	unlockIfOwnedCalls int
+	unlockByPullCalls  int
+}
+
+type planMarkerApplyStepRunner struct {
+	t        *testing.T
+	planPath string
+	marker   string
+	calls    int
+}
+
+func (r *planMarkerApplyStepRunner) Run(command.ProjectContext, []string, string, map[string]string) (string, error) {
+	r.calls++
+	contents, err := os.ReadFile(r.planPath)
+	if err != nil {
+		return "", fmt.Errorf("reading final plan generation: %w", err)
+	}
+	Equals(r.t, r.marker, string(contents))
+	return "applied matching generation", nil
+}
+
+func (l *trackingPlanGenerationLocker) TryLock(models.Project, string, models.PullRequest, models.User) (locking.TryLockResponse, error) {
+	return locking.TryLockResponse{}, nil
+}
+
+func (l *trackingPlanGenerationLocker) Unlock(string) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
+func (l *trackingPlanGenerationLocker) UnlockIfOwnedByPull(_ models.Project, _ string, pullNum int) (*models.ProjectLock, error) {
+	l.unlockIfOwnedCalls++
+	if l.lock == nil || l.lock.Pull.Num != pullNum {
+		return nil, nil
+	}
+	unlocked := l.lock
+	l.lock = nil
+	return unlocked, nil
+}
+
+func (l *trackingPlanGenerationLocker) List() (map[string]models.ProjectLock, error) {
+	return nil, nil
+}
+
+func (l *trackingPlanGenerationLocker) UnlockByPull(string, int) ([]models.ProjectLock, error) {
+	l.unlockByPullCalls++
+	return nil, nil
+}
+
+func (l *trackingPlanGenerationLocker) GetLock(string) (*models.ProjectLock, error) {
+	return l.lock, nil
+}
+
+func (d *blockingPlanCompletionDB) CompletePlanGeneration(pull models.PullRequest, generation string, results []command.ProjectResult) (models.PullStatus, error) {
+	close(d.started)
+	<-d.release
+	return d.Database.CompletePlanGeneration(pull, generation, results)
+}
+
+func (d *supersedePlanCompletionDB) CompletePlanGeneration(pull models.PullRequest, _ string, _ []command.ProjectResult) (models.PullStatus, error) {
+	if _, err := d.BeginPlanGeneration(pull, []models.ProjectStatus{d.project}, "newer-generation"); err != nil {
+		return models.PullStatus{}, fmt.Errorf("starting newer plan generation: %w", err)
+	}
+	return models.PullStatus{}, errors.New("injected superseded PullStatus persistence failure")
+}
+
+func (d *failNextPullStatusWriteDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	if d.failNextUpdate {
+		d.failNextUpdate = false
+		return models.PullStatus{}, errors.New("injected PullStatus persistence failure")
+	}
+	return d.Database.UpdatePullWithResults(pull, results)
+}
+
+func (d *failNextPullStatusWriteDB) CompletePlanGeneration(pull models.PullRequest, generation string, results []command.ProjectResult) (models.PullStatus, error) {
+	if d.failNextUpdate {
+		d.failNextUpdate = false
+		return models.PullStatus{}, errors.New("injected PullStatus persistence failure")
+	}
+	return d.Database.CompletePlanGeneration(pull, generation, results)
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
@@ -1834,6 +3209,18 @@ func (a assertPlanLockDB) UpdatePullWithResults(pull models.PullRequest, results
 	return a.Database.UpdatePullWithResults(pull, results)
 }
 
+func (a assertPlanLockDB) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string) (models.PullStatus, error) {
+	*a.called = true
+	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Plan), "expected plan lock during plan generation invalidation")
+	return a.Database.BeginPlanGeneration(pull, projects, generation)
+}
+
+func (a assertPlanLockDB) CompletePlanGeneration(pull models.PullRequest, generation string, results []command.ProjectResult) (models.PullStatus, error) {
+	*a.called = true
+	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Plan), "expected plan lock during plan generation completion")
+	return a.Database.CompletePlanGeneration(pull, generation, results)
+}
+
 func projectStatus(t *testing.T, pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) models.ProjectStatus {
 	t.Helper()
 	for _, project := range pullStatus.Projects {
@@ -2259,7 +3646,7 @@ func TestRunAutoplan_NoProjectsMissingPullDirWritesEmptyPullStatus(t *testing.T)
 	Equals(t, 0, len(pullStatus.Projects))
 }
 
-func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
+func TestRunAutoplan_NoProjectsRetainsOldPlanFilesAndClearsPullStatus(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
 	oldPlanDir := filepath.Join(tmp, "old-project")
@@ -2281,16 +3668,12 @@ func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{}, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{
-		{RepoDir: tmp, RepoRelDir: "old-project", Workspace: events.DefaultWorkspace},
-	}, nil)
-
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
-	_, err = os.Stat(oldPlanPath)
-	Assert(t, os.IsNotExist(err), "expected old plan file to be removed")
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
+	contents, err := os.ReadFile(oldPlanPath)
+	Ok(t, err)
+	Equals(t, "old plan", string(contents))
 	pullStatus, err := dbUpdater.Database.GetPullStatus(modelPull)
 	Ok(t, err)
 	Assert(t, pullStatus != nil, "expected current empty PullStatus")
@@ -2302,15 +3685,13 @@ func TestRunAutoplan_NoProjectsDoesNotUnlockActiveLocks(t *testing.T) {
 	vcsClient := setup(t)
 	installPlanCommandRunnerLocker(vcsClient, failUnlockByPullLocker{t: t}, false)
 
-	tmp := t.TempDir()
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
 		ThenReturn([]command.ProjectContext{}, nil)
-	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 }
 
 func TestRunAutoplan_NoProjectsEmptyPullStatusWriteFailureIsUserVisible(t *testing.T) {
@@ -2425,7 +3806,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.FailOnPreWorkflowHookError = false
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 }
 
 func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_True(t *testing.T) {
@@ -2586,7 +3967,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+	pendingPlanFinder.VerifyWasCalled(Never()).Find(Any[string]())
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }

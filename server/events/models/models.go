@@ -832,6 +832,10 @@ type ProjectStatus struct {
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
+	// PlanGeneration identifies an in-progress plan attempt. It is persisted so
+	// another Atlantis replica cannot authorize the previous plan while new plan
+	// artifacts are being generated.
+	PlanGeneration string `json:",omitempty"`
 	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.

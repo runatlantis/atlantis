@@ -6,6 +6,7 @@ package events
 import (
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -13,6 +14,30 @@ import (
 
 type DBUpdater struct {
 	Database db.Database
+}
+
+func (c *DBUpdater) beginPlanGeneration(pull models.PullRequest, projectCmds []command.ProjectContext) (string, models.PullStatus, error) {
+	generation := uuid.NewString()
+	projects := make([]models.ProjectStatus, 0, len(projectCmds))
+	seen := make(map[applyPlanKey]struct{}, len(projectCmds))
+	for _, projectCtx := range projectCmds {
+		key := newApplyPlanKey(projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		projects = append(projects, models.ProjectStatus{
+			Workspace:   projectCtx.Workspace,
+			RepoRelDir:  projectCtx.RepoRelDir,
+			ProjectName: projectCtx.ProjectName,
+		})
+	}
+	status, err := c.Database.BeginPlanGeneration(pull, projects, generation)
+	return generation, status, err
+}
+
+func (c *DBUpdater) completePlanGeneration(pull models.PullRequest, generation string, results []command.ProjectResult) (models.PullStatus, error) {
+	return c.Database.CompletePlanGeneration(pull, generation, results)
 }
 
 func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
@@ -82,10 +107,8 @@ func staleApplyResultForCurrentPull(pull models.PullRequest, results []command.P
 }
 
 func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
-	if err := c.Database.DeletePullStatus(pull); err != nil {
-		return models.PullStatus{}, err
-	}
-	return c.updateDB(ctx, pull, results)
+	ctx.Log.Debug("replacing DB pull results")
+	return c.Database.ReplacePullWithResults(pull, results)
 }
 
 func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) error {
