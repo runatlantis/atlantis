@@ -3525,8 +3525,8 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		Assert(t, ctx.PauseApplyBetweenExecutionOrderGroups, "expected broad apply context to inherit pause setting")
 	}
 
-	t.Run("staged apply ignores a surviving planfile for an applied project", func(t *testing.T) {
-		ctxs, err := builder.BuildApplyCommands(
+	t.Run("staged apply rejects a planfile without a matching planned status", func(t *testing.T) {
+		_, err := builder.BuildApplyCommands(
 			&command.Context{
 				Log:   logger,
 				Scope: scope,
@@ -3542,16 +3542,11 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 				},
 			},
 			&events.CommentCommand{Name: command.Apply})
-		Ok(t, err)
-		Equals(t, 3, len(ctxs))
-		for _, ctx := range ctxs {
-			if ctx.RepoRelDir == "project1" && ctx.Workspace == "workspace1" {
-				t.Fatal("applied project with surviving planfile was rebuilt for apply")
-			}
-		}
+		Assert(t, err != nil, "expected staged apply to reject an applied project planfile")
+		Assert(t, strings.Contains(err.Error(), models.AppliedPlanStatus.String()), "got: %s", err)
 	})
 
-	t.Run("staged apply still rejects stale status after filtering an applied planfile", func(t *testing.T) {
+	t.Run("staged apply rejects stale status before using discovered plans", func(t *testing.T) {
 		_, err := builder.BuildApplyCommands(
 			&command.Context{
 				Log:   logger,
@@ -3568,11 +3563,11 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 				},
 			},
 			&events.CommentCommand{Name: command.Apply})
-		Assert(t, err != nil, "expected stale pull status to remain rejected")
+		Assert(t, err != nil, "expected stale pull status to be rejected")
 		Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
 	})
 
-	t.Run("disabled staged apply preserves applied-planfile validation", func(t *testing.T) {
+	t.Run("disabled staged apply also rejects a planfile without a matching planned status", func(t *testing.T) {
 		disabledYAML := strings.Replace(atlantisYAML, "pause_apply_between_execution_order_groups: true", "pause_apply_between_execution_order_groups: false", 1)
 		Ok(t, os.WriteFile(filepath.Join(tmpDir, "workspace1", valid.DefaultAtlantisFile), []byte(disabledYAML), 0o600))
 		t.Cleanup(func() {
@@ -3595,7 +3590,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 				},
 			},
 			&events.CommentCommand{Name: command.Apply})
-		Assert(t, err != nil, "expected disabled staged apply to reject an applied project planfile")
+		Assert(t, err != nil, "expected ordinary apply to reject an applied project planfile")
 		Assert(t, strings.Contains(err.Error(), models.AppliedPlanStatus.String()), "got: %s", err)
 	})
 }
