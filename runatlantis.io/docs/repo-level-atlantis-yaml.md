@@ -342,8 +342,12 @@ project selected by the normal Atlantis behavior.
 If more groups remain after the selected group succeeds, the apply comment lists the remaining
 groups and tells the user to run `atlantis apply` again. Projects in the selected group still honor
 `parallel_apply`, so projects in that group can run concurrently while later groups remain pending.
-Targeted applies using `-p`, `-d`, or `-w` keep their current behavior and do not pause based on
-execution order groups.
+
+::: warning Targeted applies bypass staged checkpoints
+This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
+or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
+as an authorization boundary when users are allowed to run targeted applies.
+:::
 
 If a project in the selected group fails, later groups remain pending and Atlantis does not prompt
 the user to advance. Resolve the failure using the normal apply or re-plan workflow, then run an
