@@ -3584,6 +3584,57 @@ func TestRenderApplyExecutionOrderProgress(t *testing.T) {
 	}
 }
 
+func TestRenderApplyExecutionOrderProgress_CustomTemplateCollisionIsFeatureGated(t *testing.T) {
+	templatesDir := t.TempDir()
+	override := `
+{{ define "applyExecutionOrderProgress" }}legacy collision{{ end }}
+{{ define "atlantis.applyExecutionOrderProgress" }}staged collision{{ end }}
+`
+	Ok(t, os.WriteFile(filepath.Join(templatesDir, "progress.tmpl"), []byte(override), 0o600))
+
+	renderer := events.NewMarkdownRenderer(
+		false,
+		false,
+		false,
+		false,
+		false,
+		false,
+		templatesDir,
+		"atlantis",
+		false,
+		false,
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{VCSHost: models.VCSHost{Type: models.Github}},
+		},
+	}
+	result := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				RepoRelDir: ".",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "Apply complete!",
+				},
+			},
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply}
+
+	featureDisabled := renderer.Render(ctx, result, cmd)
+	Assert(t, !strings.Contains(featureDisabled, "collision"), "feature-disabled apply rendered a custom progress template:\n%s", featureDisabled)
+
+	result.ApplyExecutionOrderProgress = &command.ApplyExecutionOrderProgress{
+		CompletedExecutionOrderGroup:  1,
+		RemainingExecutionOrderGroups: []int{2},
+	}
+	featureEnabled := renderer.Render(ctx, result, cmd)
+	Assert(t, strings.Contains(featureEnabled, "staged collision"), "feature-enabled apply did not render the namespaced override:\n%s", featureEnabled)
+	Assert(t, !strings.Contains(featureEnabled, "legacy collision"), "legacy unnamespaced template was invoked:\n%s", featureEnabled)
+}
+
 func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	mr := events.NewMarkdownRenderer(
 		false,      // gitlabSupportsCommonMark

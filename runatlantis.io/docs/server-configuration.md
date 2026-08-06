@@ -1198,7 +1198,7 @@ custom `singleProjectApply` and `multiProjectApply` templates must include this 
 group, remaining groups, and instruction to run `atlantis apply` again:
 
 ```gotemplate
-{{ template "applyExecutionOrderProgress" . }}
+{{ template "atlantis.applyExecutionOrderProgress" . }}
 ```
 
 Atlantis still pauses between groups when this partial is omitted, but the apply comment will not explain how to

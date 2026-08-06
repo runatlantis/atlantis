@@ -7,6 +7,8 @@
 ---
 {{ end -}}
 {{ template "multiProjectApplyFooter" . -}}
-{{ template "applyExecutionOrderProgress" . -}}
+{{ with .ApplyExecutionOrderProgress -}}
+{{ template "atlantis.applyExecutionOrderProgress" $ -}}
+{{ end -}}
 {{ template "log" . -}}
 {{ end -}}

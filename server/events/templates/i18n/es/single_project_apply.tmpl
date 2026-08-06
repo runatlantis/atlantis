@@ -3,6 +3,8 @@
 Se ejecutó {{ .Command }} para {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
 
 {{ $result.Rendered }}
-{{ template "applyExecutionOrderProgress" . -}}
+{{ with .ApplyExecutionOrderProgress -}}
+{{ template "atlantis.applyExecutionOrderProgress" $ -}}
+{{ end -}}
 {{ template "log" . -}}
 {{ end -}}
