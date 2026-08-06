@@ -347,6 +347,11 @@ Each repeated `atlantis apply` is an independent command. Atlantis reads the rep
 again and validates the remaining current-head plan files at every checkpoint. This setting does not
 pin a plan-file or dynamic-configuration snapshot across separate comments.
 
+[Pre-workflow hooks](pre-workflow-hooks.md) and [post-workflow hooks](post-workflow-hooks.md) also
+run for every repeated command. A post-workflow hook therefore runs after each selected group, not
+only after the final execution order group. Hooks do not currently receive checkpoint-specific
+metadata.
+
 ::: warning Targeted applies bypass staged checkpoints
 This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
 or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
