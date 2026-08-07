@@ -313,7 +313,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 :::
 
 ::: tip Workflow Order
-`POST /api/drift/remediate` acts on cached drift data. Run `POST /api/drift/detect` for the target repository/ref/projects first — remediation for a project with no cached drift record (or with `drift_only: true` and no detected drift) is a no-op for that project. See the "Cached Drift Required" tip below.
+`POST /api/drift/remediate` with `action: "plan"` (the default) runs a fresh plan even without cached drift data — it does not require a prior `POST /api/drift/detect` call. Only `action: "apply"` (or `drift_only: true`) requires a cached drift record for each targeted project/path/workspace. See the "Cached Drift Required" tip below.
 :::
 
 #### Parameters
@@ -618,6 +618,7 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 | type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                |
 | projects    | []string             | No          | List of project names to check. If empty, all are checked           |
 | paths       | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used            |
+| include_plan_output | boolean     | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
 
 #### DriftDetectionPath
 
@@ -654,7 +655,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
     "repository": "owner/repo",
     "ref": "main",
     "type": "Github",
-    "projects": ["vpc", "ec2"]
+    "projects": ["vpc", "ec2"],
+    "include_plan_output": true
 }'
 ```
 
@@ -676,7 +678,11 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 ```
 
 ::: tip Plan Output
-When a project's plan runs successfully, the response includes `plan_output` — the Terraform plan text for that project (whitespace-normalized for diff rendering, not unmodified Terraform stdout). It is omitted when there is no plan output (for example, if the project errored before a plan ran). `plan_output` is only returned by this detect response; it is not included in `GET /api/drift/status`, even though the underlying drift record is cached.
+Set `include_plan_output: true` on the request to have the response include `plan_output` for each project — the Terraform plan text for that project. For the built-in plan step this is typically normalized for diff rendering; the exact content depends on the configured workflow, since a custom `run` step can produce arbitrary, unnormalized output instead. It defaults to `false`, since plan text can be large; when omitted or `false`, `plan_output` is not included even for projects with a successful plan. It is also omitted when there is no plan output (for example, if the project errored before a plan ran). `plan_output` is only ever returned by this detect response; it is never included in `GET /api/drift/status`, since it is never persisted to drift storage.
+:::
+
+::: warning Plan Output May Contain Sensitive Data
+Before this field existed, `POST /api/drift/detect` only returned numeric drift counts. With `include_plan_output: true`, responses can include resource attribute values and, for custom `run`-step workflows, arbitrary command output. The endpoint's auth boundary is unchanged (the same API token as other drift/remediation endpoints), so this is not a new authorization gap, but the data sensitivity of the response changes materially when this field is enabled. Only `run`-step filter-regex redaction (if configured) applies to plan output; it is not otherwise scrubbed.
 :::
 
 #### Sample Response (Success)

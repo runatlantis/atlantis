@@ -195,10 +195,10 @@ type DriftDetailsAPI struct {
 }
 
 // NewDriftProjectAPI converts an internal ProjectDrift to its API representation.
-// includePlanOutput controls whether the (potentially large) plan text is
-// included; it should be true only for the immediate detect response, since
-// PlanOutput is transient and is not persisted in drift storage.
-func NewDriftProjectAPI(pd models.ProjectDrift, includePlanOutput bool) DriftProjectAPI {
+// PlanOutput is never copied here since it is transient and not persisted in
+// drift storage; callers that want it on the immediate detect response set
+// result.PlanOutput explicitly after calling this function.
+func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 	result := DriftProjectAPI{
 		ProjectName:    pd.ProjectName,
 		Directory:      pd.Path,
@@ -210,10 +210,6 @@ func NewDriftProjectAPI(pd models.ProjectDrift, includePlanOutput bool) DriftPro
 		HasDrift:       pd.Drift.HasDrift,
 		LastChecked:    pd.LastChecked,
 		Error:          pd.Error,
-	}
-
-	if includePlanOutput {
-		result.PlanOutput = pd.PlanOutput
 	}
 
 	if pd.Drift.HasDrift {
@@ -266,7 +262,7 @@ func NewDriftStatusAPI(ds models.DriftStatusResponse) DriftStatusAPI {
 
 	var withErrors, withoutDrift int
 	for _, p := range ds.Projects {
-		result.Projects = append(result.Projects, NewDriftProjectAPI(p, false))
+		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
 		if p.Error != "" {
 			withErrors++
 		}
@@ -300,7 +296,9 @@ type DriftDetectionResultAPI struct {
 }
 
 // NewDriftDetectionResultAPI converts an internal DriftDetectionResult to its API representation.
-func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionResultAPI {
+// includePlanOutput controls whether plan_output is included for each project;
+// callers should pass the request's IncludePlanOutput flag.
+func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult, includePlanOutput bool) DriftDetectionResultAPI {
 	result := DriftDetectionResultAPI{
 		ID:         dr.ID,
 		Repository: dr.Repository,
@@ -310,7 +308,11 @@ func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionR
 
 	var withErrors, withoutDrift int
 	for _, p := range dr.Projects {
-		result.Projects = append(result.Projects, NewDriftProjectAPI(p, true))
+		proj := NewDriftProjectAPI(p)
+		if includePlanOutput {
+			proj.PlanOutput = p.PlanOutput
+		}
+		result.Projects = append(result.Projects, proj)
 		if p.Error != "" {
 			withErrors++
 		}
