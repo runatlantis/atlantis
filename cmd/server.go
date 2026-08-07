@@ -43,7 +43,8 @@ const (
 	// Flag names.
 	ADWebhookPasswordFlag            = "azuredevops-webhook-password" // nolint: gosec
 	ADWebhookUserFlag                = "azuredevops-webhook-user"
-	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
+	ADTokenFlag                      = "azuredevops-token"      // nolint: gosec
+	ADTokenFileFlag                  = "azuredevops-token-file" // nolint: gosec
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
@@ -210,6 +211,13 @@ const (
 var stringFlags = map[string]stringFlag{
 	ADTokenFlag: {
 		description: "Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN environment variable.",
+	},
+	ADTokenFileFlag: {
+		description: "A path to a file containing the Azure DevOps token of the API user. " +
+			"When set, the token is re-read from this file on every request and before each git operation, " +
+			"so an externally-rotated token is picked up without restarting Atlantis. " +
+			"Requires --write-git-creds for git operations. " +
+			"Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN_FILE environment variable.",
 	},
 	ADUserFlag: {
 		description: "Azure DevOps username of API user.",
@@ -1110,12 +1118,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// 5. bitbucket user and token set
 	// 6. azuredevops user and token set
 	// 7. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHUserFlag, GHTokenFileFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHUserFlag, GHTokenFileFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag, ADUserFlag, ADTokenFileFlag)
 	if ((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
 		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
 		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
-		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
+		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "" && userConfig.AzureDevopsTokenFile == "")) {
 		return vcsErr
+	}
+	if userConfig.AzureDevopsUser != "" {
+		if (userConfig.AzureDevopsToken != "") && (userConfig.AzureDevopsTokenFile != "") {
+			return vcsErr
+		}
 	}
 	if userConfig.GithubUser != "" {
 		if (userConfig.GithubToken == "") == (userConfig.GithubTokenFile == "") {
@@ -1162,6 +1175,8 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	// Warn if any tokens have newlines.
 	for name, token := range map[string]string{
+		ADTokenFlag:                userConfig.AzureDevopsToken,
+		ADTokenFileFlag:            userConfig.AzureDevopsTokenFile,
 		GHTokenFlag:                userConfig.GithubToken,
 		GHTokenFileFlag:            userConfig.GithubTokenFile,
 		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,

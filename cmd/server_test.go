@@ -50,6 +50,7 @@ func (s *ServerStarterMock) Start() error {
 var testFlags = map[string]any{
 	ADHostnameFlag:                   "dev.azure.com",
 	ADTokenFlag:                      "ad-token",
+	ADTokenFileFlag:                  "",
 	ADUserFlag:                       "ad-user",
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
@@ -683,7 +684,7 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-user/--gh-token-file or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-user/--gh-token-file or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token or --azuredevops-user/--azuredevops-token-file must be set"
 	cases := []struct {
 		description string
 		flags       map[string]any
@@ -897,6 +898,30 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 				ADTokenFlag: "token",
 			},
 			false,
+		},
+		{
+			"azuredevops user and azuredevops token-file set and should be successful",
+			map[string]any{
+				ADUserFlag:      "user",
+				ADTokenFileFlag: "/path/to/token",
+			},
+			false,
+		},
+		{
+			"just azuredevops token-file set",
+			map[string]any{
+				ADTokenFileFlag: "/path/to/token",
+			},
+			true,
+		},
+		{
+			"azuredevops user with both token and token-file set",
+			map[string]any{
+				ADUserFlag:      "user",
+				ADTokenFlag:     "token",
+				ADTokenFileFlag: "/path/to/token",
+			},
+			true,
 		},
 		{
 			"all set should be successful",

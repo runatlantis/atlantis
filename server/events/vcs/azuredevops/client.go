@@ -26,15 +26,68 @@ type Client struct {
 	UserName string
 }
 
-// NewClient returns a valid Azure DevOps client.
-func New(hostname string, userName string, token string) (*Client, error) {
-	tp := azuredevops.BasicAuthTransport{
-		Username: "",
-		Password: strings.TrimSpace(token),
+// tokenTransport is an http.RoundTripper that re-reads the token from the
+// configured Credentials on every request and applies it as basic auth. This
+// allows an externally-rotated token (e.g. written to a file) to be picked up
+// without restarting Atlantis. It holds no per-request mutable state, so it is
+// safe for concurrent use.
+type tokenTransport struct {
+	credentials Credentials
+	// base is the underlying transport used to perform the request. When nil,
+	// http.DefaultTransport is used (which is also what honours
+	// common.DisableSSLVerification in tests).
+	base http.RoundTripper
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	token, err := t.credentials.GetToken()
+	if err != nil {
+		return nil, fmt.Errorf("getting azure devops token: %w", err)
 	}
-	httpClient := tp.Client()
-	httpClient.Timeout = time.Second * 10
-	var adClient, err = azuredevops.NewClient(httpClient)
+	token = strings.TrimSpace(token)
+
+	// Fail fast with a clear error rather than sending an empty credential
+	// (which Azure DevOps answers with a generic 401 that is easily mistaken
+	// for a wrong token). This happens when the backing token file is briefly
+	// empty mid-rotation or was wiped; the next request recovers once the token
+	// is restored.
+	if token == "" {
+		return nil, errors.New("azure devops token is empty")
+	}
+
+	// The RoundTripper contract requires that we not modify the supplied
+	// request and that the transport be safe for concurrent use, so set the
+	// credentials on a clone rather than mutating shared state.
+	clone := req.Clone(req.Context())
+	clone.SetBasicAuth("", token)
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	return base.RoundTrip(clone)
+}
+
+// New returns a valid Azure DevOps client authenticating with a static token.
+func New(hostname string, userName string, token string) (*Client, error) {
+	return NewClientForCredentials(hostname, &PATCredentials{User: userName, Token: token})
+}
+
+// NewClientForCredentials returns a valid Azure DevOps client that obtains its
+// token from the provided Credentials on every request.
+func NewClientForCredentials(hostname string, credentials Credentials) (*Client, error) {
+	userName, err := credentials.GetUser()
+	if err != nil {
+		return nil, fmt.Errorf("getting azure devops user: %w", err)
+	}
+
+	httpClient := &http.Client{
+		Transport: &tokenTransport{
+			credentials: credentials,
+		},
+		Timeout: time.Second * 10,
+	}
+	adClient, err := azuredevops.NewClient(httpClient)
 	if err != nil {
 		return nil, err
 	}

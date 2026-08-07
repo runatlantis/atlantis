@@ -189,6 +189,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var bitbucketCloudClient *bitbucketcloud.Client
 	var bitbucketServerClient *bitbucketserver.Client
 	var azuredevopsClient *azuredevops.Client
+	var azuredevopsCredentials azuredevops.Credentials
 	var giteaClient *gitea.Client
 
 	policyChecksEnabled := false
@@ -315,8 +316,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.AzureDevopsUser != "" {
 		supportedVCSHosts = append(supportedVCSHosts, models.AzureDevops)
 
+		azuredevopsCredentials = &azuredevops.PATCredentials{
+			User:      userConfig.AzureDevopsUser,
+			Token:     userConfig.AzureDevopsToken,
+			TokenFile: userConfig.AzureDevopsTokenFile,
+		}
+
 		var err error
-		azuredevopsClient, err = azuredevops.New(userConfig.AzureDevOpsHostname, userConfig.AzureDevopsUser, userConfig.AzureDevopsToken)
+		azuredevopsClient, err = azuredevops.NewClientForCredentials(userConfig.AzureDevOpsHostname, azuredevopsCredentials)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +375,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			}
 		}
 		if userConfig.AzureDevopsUser != "" {
-			if err := common.WriteGitCreds(userConfig.AzureDevopsUser, userConfig.AzureDevopsToken, "dev.azure.com", home, logger, false); err != nil {
+			token, err := azuredevopsCredentials.GetToken()
+			if err != nil {
+				return nil, err
+			}
+			if err := common.WriteGitCreds(userConfig.AzureDevopsUser, token, "dev.azure.com", home, logger, false); err != nil {
 				return nil, err
 			}
 		}
@@ -578,6 +589,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if userConfig.GithubUser != "" && userConfig.GithubTokenFile != "" && userConfig.WriteGitCreds {
 		githubTokenRotator := github.NewTokenRotator(logger, githubCredentials, userConfig.GithubHostname, userConfig.GithubUser, home)
 		tokenJd, err := githubTokenRotator.GenerateJob()
+		if err != nil {
+			return nil, fmt.Errorf("could not write credentials: %w", err)
+		}
+		scheduledExecutorService.AddJob(tokenJd)
+	}
+
+	if userConfig.AzureDevopsUser != "" && userConfig.AzureDevopsTokenFile != "" && userConfig.WriteGitCreds {
+		azuredevopsTokenRotator := azuredevops.NewTokenRotator(logger, azuredevopsCredentials, "dev.azure.com", userConfig.AzureDevopsUser, home)
+		tokenJd, err := azuredevopsTokenRotator.GenerateJob()
 		if err != nil {
 			return nil, fmt.Errorf("could not write credentials: %w", err)
 		}
