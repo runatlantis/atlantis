@@ -2220,10 +2220,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
 		// PlanOutput is only ever returned in the immediate detect response;
-		// it is stripped before storing to keep drift records bounded in size.
-		storedDrift := projectDrift
-		storedDrift.PlanOutput = ""
-		if err := a.DriftStorage.Store(baseRepo.ID(), storedDrift); err != nil {
+		// Store strips it before persisting, so it is never persisted.
+		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			storeFailed = true
 			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
 			a.Logger.Warn("failed to store drift data: %v", err)
@@ -2247,7 +2245,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to API DTO and return
-	apiResult := NewDriftDetectionResultAPI(detectionResult)
+	apiResult := NewDriftDetectionResultAPI(detectionResult, request.IncludePlanOutput)
 
 	code := http.StatusOK
 	if driftDetectionHasErrors(detectionResult) {

@@ -96,10 +96,13 @@ func NewInMemoryStorage() *InMemoryStorage {
 	}
 }
 
-// Store saves a drift result for a project.
+// Store saves a drift result for a project. PlanOutput is transient and is
+// stripped here so it is never persisted, regardless of what the caller passed in.
 func (s *InMemoryStorage) Store(repository string, drift models.ProjectDrift) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	drift.PlanOutput = ""
 
 	if s.data[repository] == nil {
 		s.data[repository] = make(map[driftCacheKey]models.ProjectDrift)

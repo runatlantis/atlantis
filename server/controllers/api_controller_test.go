@@ -3915,6 +3915,48 @@ func TestAPIController_DetectDrift_IncludesPlanOutput(t *testing.T) {
 	ac.DriftStorage = driftStorage
 
 	body, err := json.Marshal(models.DriftDetectionRequest{
+		Repository:        "Repo",
+		Ref:               "main",
+		Type:              "Gitlab",
+		Projects:          []string{"app"},
+		IncludePlanOutput: true,
+	})
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, w.Body.Bytes(), &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, planOutput, result.Projects[0].PlanOutput)
+
+	driftStorage.VerifyWasCalledOnce().
+		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]())
+}
+
+func TestAPIController_DetectDrift_OmitsPlanOutputByDefault(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	planOutput := "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place\n\nPlan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, err := json.Marshal(models.DriftDetectionRequest{
 		Repository: "Repo",
 		Ref:        "main",
 		Type:       "Gitlab",
@@ -3931,12 +3973,7 @@ func TestAPIController_DetectDrift_IncludesPlanOutput(t *testing.T) {
 	var result controllers.DriftDetectionResultAPI
 	parseAPIResponse(t, w.Body.Bytes(), &result)
 	Equals(t, 1, len(result.Projects))
-	Equals(t, planOutput, result.Projects[0].PlanOutput)
-
-	_, stored := driftStorage.VerifyWasCalledOnce().
-		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]()).
-		GetCapturedArguments()
-	Equals(t, "", stored.PlanOutput)
+	Equals(t, "", result.Projects[0].PlanOutput)
 }
 
 func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {
