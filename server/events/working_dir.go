@@ -646,14 +646,19 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 }
 
 // usesPRSourceRemote reports whether the "source" remote (the PR's head repo,
-// e.g. a fork) is actually used to fetch the PR head. On the GitHub App path
-// mergeToBaseBranch fetches "pull/<n>/head" from origin instead (see
-// GithubAppEnabled handling there), so the source remote is never used and we
-// skip creating/updating it. Fetching the head repo otherwise only slows down
-// "git remote update"/"git fetch --all" and, when the App installation can't
-// read the fork, fails and makes recheckDiverged spuriously assume divergence.
+// e.g. a fork) is actually used to fetch the PR head. When we instead fetch
+// "pull/<n>/head" from origin — on the GitHub App path, or with the merge
+// checkout strategy (see mergeToBaseBranch) — the source remote is never used
+// and we skip creating/updating it. Both cases read the PR head from the base
+// repo, so a fork PR works even when the fork itself isn't reachable (no App
+// installation on it, or a base-repo-scoped token). Fetching the head repo
+// otherwise only slows down "git remote update"/"git fetch --all" and, when the
+// fork can't be read, fails and makes recheckDiverged spuriously assume divergence.
 func (w *FileWorkspace) usesPRSourceRemote(head models.Repo, p models.PullRequest) bool {
-	return head.VCSHost.Type != models.Github || !w.GithubAppEnabled || p.Num <= 0
+	if head.VCSHost.Type != models.Github || p.Num <= 0 {
+		return true
+	}
+	return !w.GithubAppEnabled && !w.CheckoutMerge
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
@@ -826,7 +831,13 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := prSourceRemote
-	if c.head.VCSHost.Type == models.Github && w.GithubAppEnabled && c.pr.Num > 0 {
+	// Fetch the PR head from the base repo's refs/pull/<n>/head rather than the
+	// fork's "source" remote when we can: on the GitHub App path, or whenever the
+	// merge checkout strategy is used (the merge target already lives in the base
+	// repo). This lets fork PRs merge without access to the fork — the base repo
+	// exposes the head — which matters when there's no App installation on the
+	// fork or only a base-repo-scoped token is available.
+	if c.head.VCSHost.Type == models.Github && (w.GithubAppEnabled || w.CheckoutMerge) && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
 	}

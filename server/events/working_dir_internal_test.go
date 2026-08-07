@@ -35,3 +35,35 @@ func TestIsUnsafeNonPRRef(t *testing.T) {
 		})
 	}
 }
+
+func TestUsesPRSourceRemote(t *testing.T) {
+	github := models.Repo{VCSHost: models.VCSHost{Type: models.Github}}
+	gitlab := models.Repo{VCSHost: models.VCSHost{Type: models.Gitlab}}
+	for _, tc := range []struct {
+		name          string
+		head          models.Repo
+		num           int
+		appEnabled    bool
+		checkoutMerge bool
+		want          bool
+	}{
+		// GitHub PR: the source (fork) remote is skipped in favour of
+		// pull/<n>/head from origin when either the App path or the merge
+		// checkout strategy is used.
+		{name: "github token+branch uses source remote", head: github, num: 1, want: true},
+		{name: "github app skips source remote", head: github, num: 1, appEnabled: true, want: false},
+		{name: "github merge skips source remote", head: github, num: 1, checkoutMerge: true, want: false},
+		{name: "github app+merge skips source remote", head: github, num: 1, appEnabled: true, checkoutMerge: true, want: false},
+		// Non-GitHub always uses the source remote (no pull ref on origin).
+		{name: "gitlab merge still uses source remote", head: gitlab, num: 1, checkoutMerge: true, want: true},
+		// API-driven runs (num <= 0) have no pull ref, so keep the source remote.
+		{name: "github merge but non-PR uses source remote", head: github, num: -1, checkoutMerge: true, appEnabled: true, want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &FileWorkspace{GithubAppEnabled: tc.appEnabled, CheckoutMerge: tc.checkoutMerge}
+			if got := w.usesPRSourceRemote(tc.head, models.PullRequest{Num: tc.num}); got != tc.want {
+				t.Fatalf("usesPRSourceRemote() = %t, want %t", got, tc.want)
+			}
+		})
+	}
+}
