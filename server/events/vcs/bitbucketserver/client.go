@@ -302,6 +302,26 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		return err
 	}
 
+	// Translate the normalised merge method onto a Bitbucket Server merge
+	// strategy id. An empty method sends no strategy so Bitbucket uses the
+	// repository default. This is validated before any API call so an
+	// unsupported method fails fast.
+	var strategyID string
+	switch pullOptions.MergeMethod {
+	case "":
+	case models.MergeMethodMerge:
+		strategyID = "no-ff"
+	case models.MergeMethodRebase:
+		strategyID = "rebase-ff"
+	case models.MergeMethodSquash:
+		strategyID = "squash"
+	case models.MergeMethodFastForward:
+		strategyID = "ff-only"
+	default:
+		return fmt.Errorf("merge method %q is not supported for Bitbucket Server, supported methods are: %s",
+			pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.BitbucketServer)))
+	}
+
 	// We need to make a get pull request API call to get the correct "version".
 	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
@@ -316,7 +336,20 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		return fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
-	_, err = b.makeRequest("POST", path, nil)
+
+	var mergeBody io.Reader
+	if strategyID != "" {
+		bodyBytes, err := json.Marshal(map[string]any{
+			"version":    *pullResp.Version,
+			"strategyId": strategyID,
+		})
+		if err != nil {
+			return fmt.Errorf("json encoding: %w", err)
+		}
+		mergeBody = bytes.NewBuffer(bodyBytes)
+	}
+
+	_, err = b.makeRequest("POST", path, mergeBody)
 	if err != nil {
 		return err
 	}

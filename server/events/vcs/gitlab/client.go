@@ -746,13 +746,33 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		g.WaitForSuccessPipeline(logger, context.Background(), pull)
 	}
 
+	acceptOptions := gitlab.AcceptMergeRequestOptions{
+		MergeCommitMessage:       &commitMsg,
+		ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
+	}
+
+	// GitLab does not let the merge commit vs. fast-forward vs. rebase strategy
+	// be chosen at accept time; that is fixed by the project's merge method
+	// setting. Squashing is the only thing selectable through the API, so only
+	// the merge and squash methods are translated here.
+	switch pullOptions.MergeMethod {
+	case "":
+		// Leave the squash option unset so GitLab uses the project default.
+	case models.MergeMethodMerge:
+		squash := false
+		acceptOptions.Squash = &squash
+	case models.MergeMethodSquash:
+		squash := true
+		acceptOptions.Squash = &squash
+	default:
+		return fmt.Errorf("merge method %q is not supported for GitLab, supported methods are: %s",
+			pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.Gitlab)))
+	}
+
 	_, resp, err = g.Client.MergeRequests.AcceptMergeRequest(
 		pull.BaseRepo.FullName,
 		pull.Num,
-		&gitlab.AcceptMergeRequestOptions{
-			MergeCommitMessage:       &commitMsg,
-			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
-		})
+		&acceptOptions)
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}

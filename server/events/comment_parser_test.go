@@ -378,6 +378,65 @@ func TestParse_InvalidFlags(t *testing.T) {
 	}
 }
 
+func TestParse_AutoMergeMethod(t *testing.T) {
+	cases := []struct {
+		description string
+		comment     string
+		vcsHost     models.VCSHostType
+		expMethod   string
+		expErr      string
+	}{
+		{
+			description: "github accepts squash",
+			comment:     "atlantis apply --auto-merge-method squash",
+			vcsHost:     models.Github,
+			expMethod:   "squash",
+		},
+		{
+			description: "gitea accepts fast-forward",
+			comment:     "atlantis apply --auto-merge-method fast-forward",
+			vcsHost:     models.Gitea,
+			expMethod:   "fast-forward",
+		},
+		{
+			description: "bitbucket cloud accepts fast-forward",
+			comment:     "atlantis apply --auto-merge-method fast-forward",
+			vcsHost:     models.BitbucketCloud,
+			expMethod:   "fast-forward",
+		},
+		{
+			description: "github rejects a method it does not support",
+			comment:     "atlantis apply --auto-merge-method fast-forward",
+			vcsHost:     models.Github,
+			expErr:      "--auto-merge-method must be one of: merge, rebase, squash for Github",
+		},
+		{
+			description: "gitea rejects an unknown method",
+			comment:     "atlantis apply --auto-merge-method bogus",
+			vcsHost:     models.Gitea,
+			expErr:      "--auto-merge-method must be one of: merge, rebase, squash, fast-forward for Gitea",
+		},
+		{
+			description: "cannot combine with auto-merge-disabled",
+			comment:     "atlantis apply --auto-merge-method squash --auto-merge-disabled",
+			vcsHost:     models.Github,
+			expErr:      "cannot use --auto-merge-method at the same time as --auto-merge-disabled",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, c.vcsHost)
+			if c.expErr != "" {
+				Assert(t, strings.Contains(r.CommentResponse, c.expErr),
+					"expected CommentResponse %q to contain %q", r.CommentResponse, c.expErr)
+				return
+			}
+			Equals(t, "", r.CommentResponse)
+			Equals(t, c.expMethod, r.Command.AutoMergeMethod)
+		})
+	}
+}
+
 func TestParse_RelativeDirPath(t *testing.T) {
 	t.Log("if -d is used with a relative path, should return an error")
 	comments := []string{
@@ -1221,8 +1280,8 @@ var PlanUsage = `Usage of plan:
 var ApplyUsage = `Usage of apply:
       --auto-merge-disabled        Disable automerge after apply.
       --auto-merge-method string   Specifies the merge method for the VCS if
-                                   automerge is enabled. (Currently only implemented
-                                   for GitHub)
+                                   automerge is enabled. Supported values depend on
+                                   the VCS provider.
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
   -p, --project string             Apply the plan for this project. Refers to the
