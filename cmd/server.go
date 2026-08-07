@@ -63,6 +63,7 @@ const (
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
 	BitbucketWebhookSecretFlag       = "bitbucket-webhook-secret"
+	BitbucketWebhookSecretFileFlag   = "bitbucket-webhook-secret-file"
 	CheckoutDepthFlag                = "checkout-depth"
 	CheckoutStrategyFlag             = "checkout-strategy"
 	ConfigFlag                       = "config"
@@ -97,18 +98,21 @@ const (
 	GHAppSlugFlag                    = "gh-app-slug"
 	GHAppInstallationIDFlag          = "gh-app-installation-id"
 	GHOrganizationFlag               = "gh-org"
-	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
+	GHWebhookSecretFlag              = "gh-webhook-secret" // nolint: gosec
+	GHWebhookSecretFileFlag          = "gh-webhook-secret-file"
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
 	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
+	GiteaWebhookSecretFileFlag       = "gitea-webhook-secret-file"
 	GiteaPageSizeFlag                = "gitea-page-size"
 	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabWebhookSecretFileFlag      = "gitlab-webhook-secret-file"
 	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
@@ -289,6 +293,10 @@ var stringFlags = map[string]stringFlag{
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_BITBUCKET_WEBHOOK_SECRET environment variable.",
 	},
+	BitbucketWebhookSecretFileFlag: {
+		description:  "A path to a file containing the secret used to validate Bitbucket webhooks.",
+		defaultValue: "",
+	},
 	CheckoutStrategyFlag: {
 		description: "How to check out pull requests. Accepts either 'branch' (default) or 'merge'." +
 			" If set to branch, Atlantis will check out the source branch of the pull request." +
@@ -371,6 +379,10 @@ var stringFlags = map[string]stringFlag{
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GH_WEBHOOK_SECRET environment variable.",
 	},
+	GHWebhookSecretFileFlag: {
+		description:  "A path to a file containing the secret used to validate GitHub webhooks.",
+		defaultValue: "",
+	},
 	GiteaBaseURLFlag: {
 		description: "Base URL of Gitea server installation. Must include 'http://' or 'https://'.",
 	},
@@ -386,6 +398,10 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
+	},
+	GiteaWebhookSecretFileFlag: {
+		description:  "A path to a file containing the secret used to validate Gitea webhooks.",
+		defaultValue: "",
 	},
 	GitlabGroupAllowlistFlag: {
 		description: "Comma separated list of key-value pairs representing the GitLab groups and the operations that " +
@@ -413,6 +429,10 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+	},
+	GitlabWebhookSecretFileFlag: {
+		description:  "A path to a file containing the secret used to validate GitLab webhooks.",
+		defaultValue: "",
 	},
 	APISecretFlag: {
 		description: "Secret used to validate requests made to the /api/* endpoints",
