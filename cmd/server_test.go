@@ -111,20 +111,22 @@ var testFlags = map[string]any{
 	IncludeGitUntrackedFiles:         false,
 	LanguageFlag:                     "es",
 	LanguageConfigFileFlag:           "",
-	LockingDBType:                    "boltdb",
+	LockingDBType:                    "redis",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
 	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
 	EnableExternalStoresFlag:         false,
+	InternalCommandTokenFlag:         "internal-token",
+	OwnershipTTLSecondsFlag:          30,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
 	PendingApplyStatusFlag:           false,
 	QuietPolicyChecks:                false,
-	RedisHost:                        "",
+	RedisHost:                        "redis.example.com",
 	RedisInsecureSkipVerify:          false,
 	RedisPassword:                    "",
 	RedisPort:                        6379,
@@ -132,6 +134,8 @@ var testFlags = map[string]any{
 	RedisDB:                          0,
 	RedisUsername:                    "",
 	RedisClusterAddresses:            "",
+	ReplicaAdvertiseURLFlag:          "http://replica-0:4141",
+	ReplicaIDFlag:                    "replica-0",
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
@@ -171,6 +175,130 @@ var testFlags = map[string]any{
 	EnableDriftDetectionFlag:         true,
 	EnableDriftRemediationFlag:       true,
 	EnableProfilingAPI:               false,
+}
+
+func TestExecute_ReplicaRoutingValidation(t *testing.T) {
+	valid := func() map[string]any {
+		return map[string]any{
+			GHUserFlag:               "user",
+			GHTokenFlag:              "token",
+			RepoAllowlistFlag:        "*",
+			LockingDBType:            "redis",
+			RedisHost:                "redis.example.com",
+			ReplicaAdvertiseURLFlag:  "http://replica-0.atlantis-headless:4141/base",
+			InternalCommandTokenFlag: "internal-token",
+			OwnershipTTLSecondsFlag:  30,
+		}
+	}
+
+	t.Run("valid single node", func(t *testing.T) {
+		c := setup(valid(), t)
+		Ok(t, c.Execute())
+	})
+
+	t.Run("valid with external plan storage", func(t *testing.T) {
+		flags := valid()
+		flags[EnableExternalStoresFlag] = true
+		c := setup(flags, t)
+		Ok(t, c.Execute())
+	})
+
+	t.Run("plain redis locking does not enable routing", func(t *testing.T) {
+		c := setup(map[string]any{
+			GHUserFlag:        "user",
+			GHTokenFlag:       "token",
+			RepoAllowlistFlag: "*",
+			LockingDBType:     "redis",
+			RedisHost:         "redis.example.com",
+		}, t)
+		Ok(t, c.Execute())
+	})
+
+	t.Run("valid cluster", func(t *testing.T) {
+		flags := valid()
+		delete(flags, RedisHost)
+		flags[RedisClusterAddresses] = "redis-0:6379,redis-1:6379,redis-2:6379"
+		c := setup(flags, t)
+		Ok(t, c.Execute())
+	})
+
+	tests := []struct {
+		name      string
+		configure func(map[string]any)
+		expected  string
+	}{
+		{
+			name: "requires redis locking database",
+			configure: func(flags map[string]any) {
+				flags[LockingDBType] = "boltdb"
+			},
+			expected: "replica routing requires --locking-db-type=redis",
+		},
+		{
+			name: "requires redis endpoint",
+			configure: func(flags map[string]any) {
+				delete(flags, RedisHost)
+			},
+			expected: "replica routing requires --redis-host or --redis-cluster-addresses",
+		},
+		{
+			name: "requires advertise URL",
+			configure: func(flags map[string]any) {
+				delete(flags, ReplicaAdvertiseURLFlag)
+			},
+			expected: "--replica-advertise-url must be set when replica routing is configured",
+		},
+		{
+			name: "rejects unsafe advertise URL",
+			configure: func(flags map[string]any) {
+				flags[ReplicaAdvertiseURLFlag] = "http://user:password@replica-0:4141/path?token=value"
+			},
+			expected: "--replica-advertise-url must be an absolute HTTP(S) URL without credentials, query, or fragment",
+		},
+		{
+			name: "requires internal token",
+			configure: func(flags map[string]any) {
+				delete(flags, InternalCommandTokenFlag)
+			},
+			expected: "--internal-command-token must be set when replica routing is configured",
+		},
+		{
+			name: "requires safe TTL",
+			configure: func(flags map[string]any) {
+				flags[OwnershipTTLSecondsFlag] = 9
+			},
+			expected: "--ownership-ttl-seconds must be at least 10",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			flags := valid()
+			test.configure(flags)
+			c := setup(flags, t)
+			ErrEquals(t, test.expected, c.Execute())
+		})
+	}
+}
+
+func TestInit_ReplicaRoutingFlagContract(t *testing.T) {
+	c := setup(map[string]any{}, t)
+	if c.Flags().Lookup("enable-replica-routing") != nil {
+		t.Fatal("--enable-replica-routing must not be exposed")
+	}
+	for flag, expected := range map[string][]string{
+		InternalCommandTokenFlag: {"activates replica routing"},
+		OwnershipTTLSecondsFlag:  {"does not activate replica routing"},
+		ReplicaAdvertiseURLFlag:  {"activates replica routing"},
+		ReplicaIDFlag:            {"Defaults to the process hostname", "activates replica routing"},
+	} {
+		usage := c.Flags().Lookup(flag).Usage
+		for _, text := range expected {
+			if !strings.Contains(usage, text) {
+				t.Errorf("--%s help %q does not contain %q", flag, usage, text)
+			}
+		}
+	}
 }
 
 func TestExecute_Defaults(t *testing.T) {

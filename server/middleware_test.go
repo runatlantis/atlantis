@@ -35,6 +35,12 @@ func TestRequestLogger_WebAuthentication(t *testing.T) {
 			expNextHandler: true,
 		},
 		{
+			name:           "internal command endpoint uses its own authentication",
+			path:           "/internal/commands/comment",
+			expStatus:      http.StatusNoContent,
+			expNextHandler: true,
+		},
+		{
 			name:           "root remains protected",
 			path:           "/",
 			expStatus:      http.StatusUnauthorized,

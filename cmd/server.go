@@ -111,6 +111,7 @@ const (
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
 	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
+	InternalCommandTokenFlag         = "internal-command-token"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -118,6 +119,7 @@ const (
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
+	OwnershipTTLSecondsFlag          = "ownership-ttl-seconds"
 	ParallelPoolSize                 = "parallel-pool-size"
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
@@ -132,6 +134,8 @@ const (
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
 	RedisUsername                    = "redis-username"
 	RedisClusterAddresses            = "redis-cluster-addresses"
+	ReplicaAdvertiseURLFlag          = "replica-advertise-url"
+	ReplicaIDFlag                    = "replica-id"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -197,6 +201,7 @@ const (
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
+	DefaultOwnershipTTLSeconds          = 30
 	DefaultTFDistribution               = TFDistributionTerraform
 	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
 	DefaultTFDownload                   = true
@@ -417,6 +422,9 @@ var stringFlags = map[string]stringFlag{
 	APISecretFlag: {
 		description: "Secret used to validate requests made to the /api/* endpoints",
 	},
+	InternalCommandTokenFlag: {
+		description: "Shared secret used to authenticate internal command forwarding. Configuring it activates replica routing. Prefer the ATLANTIS_INTERNAL_COMMAND_TOKEN environment variable.",
+	},
 	LockingDBType: {
 		description:  "The locking database type to use for storing plan and apply locks.",
 		defaultValue: DefaultLockingDBType,
@@ -445,6 +453,12 @@ var stringFlags = map[string]stringFlag{
 	RedisClusterAddresses: {
 		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
 			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
+	},
+	ReplicaAdvertiseURLFlag: {
+		description: "Internal HTTP(S) URL used by other Atlantis replicas to forward commands to this replica. Configuring it activates replica routing.",
+	},
+	ReplicaIDFlag: {
+		description: "Optional stable unique identifier override for this Atlantis replica. Defaults to the process hostname. Configuring it activates replica routing.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -719,6 +733,10 @@ var intFlags = map[string]intFlag{
 	ParallelPoolSize: {
 		description:  "Max size of the wait group that runs parallel plans and applies (if enabled).",
 		defaultValue: DefaultParallelPoolSize,
+	},
+	OwnershipTTLSecondsFlag: {
+		description:  "TTL in seconds for renewable pull request ownership leases. This setting does not activate replica routing by itself.",
+		defaultValue: DefaultOwnershipTTLSeconds,
 	},
 	PortFlag: {
 		description:  "Port to bind to.",
@@ -1037,6 +1055,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
 	}
+	if c.OwnershipTTLSeconds == 0 {
+		c.OwnershipTTLSeconds = DefaultOwnershipTTLSeconds
+	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution
 	}
@@ -1191,6 +1212,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		if userConfig.RedisDB != DefaultRedisDB {
 			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
 		}
+	}
+	if err := userConfig.ValidateReplicaRouting(); err != nil {
+		return err
 	}
 
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
