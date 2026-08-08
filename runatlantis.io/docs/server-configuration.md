@@ -653,6 +653,8 @@ ATLANTIS_ENABLE_EXTERNAL_STORES=true
 
 Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
 
+External plan storage can be combined with [Redis replica routing](redis-replica-routing.md). After ownership moves, the new owner can restore a plan only when its stored head commit matches the pull request.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
@@ -1098,6 +1100,15 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
+### `--internal-command-token`
+
+```bash
+# recommended
+ATLANTIS_INTERNAL_COMMAND_TOKEN="shared-internal-secret"
+```
+
+Shared secret used to authenticate command forwarding between replicas. Configuring this value, `--replica-advertise-url`, or `--replica-id` activates replica-routing validation, so configure the complete routing group on every replica. Expose the internal command endpoints only to trusted Atlantis replicas. Prefer the environment variable over a command-line argument so the secret is not exposed in process arguments.
+
 ### `--language` <Badge text="v0.45.0+" type="info"/>
 
 ```bash
@@ -1206,6 +1217,16 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
 
 When command output exceeds the VCS comment size limit (or when this limit applies), Atlantis splits the output into multiple comments using **intelligent comment splitting**. Split points are chosen so that markdown structure is preserved: the splitter detects whether it is inside a code block (`` ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
+
+### `--ownership-ttl-seconds`
+
+```bash
+atlantis server --ownership-ttl-seconds=30
+# or
+ATLANTIS_OWNERSHIP_TTL_SECONDS=30
+```
+
+TTL in seconds for renewable pull request ownership leases. Defaults to `30` and must be at least `10`. A failed owner becomes eligible for replacement after its lease expires. This setting does not activate replica routing by itself.
 
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
@@ -1361,6 +1382,26 @@ ATLANTIS_REDIS_USERNAME="myuser"
 ```
 
 The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
+
+### `--replica-advertise-url`
+
+```bash
+atlantis server --replica-advertise-url="http://atlantis-0.atlantis-headless:4141"
+# or
+ATLANTIS_REPLICA_ADVERTISE_URL="http://atlantis-0.atlantis-headless:4141"
+```
+
+Absolute internal HTTP(S) URL used by other replicas to forward commands to this replica. Configuring it activates replica routing and requires Redis locking plus `--internal-command-token`. The URL may include a base path but must not include credentials, a query, or a fragment. In Kubernetes, use a stable per-pod DNS name rather than the load-balanced Service address.
+
+### `--replica-id`
+
+```bash
+atlantis server --replica-id="atlantis-0"
+# or
+ATLANTIS_REPLICA_ID="atlantis-0"
+```
+
+Optional stable unique identifier override for this replica. By default, Atlantis uses the process hostname. In Kubernetes, that is normally the pod name from a StatefulSet; do not use the worker-node hostname. A process-specific claim ID additionally fences a restarted process from adopting an old lease that used the same replica ID.
 
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 

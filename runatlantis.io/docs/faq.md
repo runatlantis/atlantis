@@ -12,13 +12,12 @@ Terraform locking can be used alongside Atlantis locking since Atlantis is simpl
 
 **Q: How to run Atlantis in high availability mode? Does it need to be?**
 
-A: Atlantis server can easily be run under the supervision of an init system like `upstart` or `systemd` to make sure `atlantis server` is always running.
+A: For active multi-replica webhook handling, use [Redis replica routing](redis-replica-routing.md). It stores locks, metadata, and pull request ownership in Redis, then forwards each command to that pull request's owner.
 
-Atlantis, by default, stores all locking and Terraform plans locally on disk under the `--data-dir` directory (defaults to `~/.atlantis`). If multiple Atlantis hosts are run by utilizing a shared redis backend, then it's important that the `data-dir` is using a shared filesystem between hosts.
+- With local plan storage, plans stay on the owner's disk and owner loss requires re-plan.
+- With `--enable-external-stores`, a new owner can restore an external plan when its stored head commit still matches the pull request.
 
-However, if you were to lose the data, all you would need to do is run `atlantis plan` again on the pull requests that are open. If someone tries to run `atlantis apply` after the data has been lost then they will get an error back, so they will have to re-plan anyway.
-
-For fully stateless HA (no shared filesystem or persistent volume), Atlantis supports external plan storage via `--enable-external-stores` with an S3-compatible backend. Plans are uploaded to S3 after `terraform plan` and restored automatically when a different replica handles the `apply`. Combined with Redis for locking (`--locking-db-type=redis`), this allows running multiple Atlantis replicas with `emptyDir` volumes. See [server configuration](server-configuration.md) for details.
+External plan storage also works without replica routing. In every configuration, Atlantis rejects apply when no valid current plan is available.
 
 **Q: How to add SSL to Atlantis server?**
 
