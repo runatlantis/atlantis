@@ -8,7 +8,7 @@ ARG GOLANG_TAG=1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG DEFAULT_TERRAFORM_VERSION=1.14.9
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.12.3
+ARG DEFAULT_OPENTOFU_VERSION=1.12.5
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.66.0
 
