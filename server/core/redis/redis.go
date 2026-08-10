@@ -146,8 +146,10 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 }
 
 // scanKeys returns all keys matching pattern.
-// On Redis Cluster, go-redis ClusterClient.Scan only hits one node. We must
-// SCAN every master or UnlockByPull/List miss locks on other hash slots.
+// On Redis Cluster, go-redis ClusterClient.Scan only hits one node, so we
+// SCAN every master. Single-node clients use a normal SCAN. Callers still
+// choose MATCH carefully: UnlockByPull uses pr/{repo}/* so owner/repo does
+// not match owner/repo2 on single-node or cluster.
 func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string, error) {
 	var (
 		keys []string
@@ -181,7 +183,7 @@ func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string
 // migrateOldLockKeys migrates old lock key format to new format.
 // Old format: pr/{repoFullName}/{path}/{workspace}
 // New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
-// Scans all cluster masters so keys on every hash slot are considered.
+// Uses scanKeys so Redis Cluster does not skip keys on other hash slots.
 func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 	oldKeys, err := scanKeys(ctx, rdb, "pr/*")
 	if err != nil {
@@ -352,7 +354,7 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
 func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
-	// Trailing slash so repo "owner/repo" does not match "owner/repo2".
+	// pr/{repo}/* so owner/repo does not match owner/repo2 (single-node and cluster).
 	keys, err := scanKeys(ctx, r.client, fmt.Sprintf("pr/%s/*", repoFullName))
 	if err != nil {
 		return nil, fmt.Errorf("db transaction failed: %w", err)
