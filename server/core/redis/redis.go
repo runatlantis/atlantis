@@ -145,12 +145,19 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 	}, nil
 }
 
+// masterScanner walks every Redis Cluster master. *redis.ClusterClient
+// implements this; tests can pass a fake with multiple standalone clients.
+type masterScanner interface {
+	ForEachMaster(context.Context, func(context.Context, *redis.Client) error) error
+}
+
+var _ masterScanner = (*redis.ClusterClient)(nil)
+
 // scanKeys returns all keys matching pattern.
-// On Redis Cluster, go-redis ClusterClient.Scan only hits one node, so we
-// SCAN every master. Single-node clients use a normal SCAN. Callers still
-// choose MATCH carefully: UnlockByPull uses pr/{repo}/* so owner/repo does
-// not match owner/repo2 on single-node or cluster.
-func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string, error) {
+// A masterScanner (including ClusterClient) is scanned on every master.
+// Other Cmdable clients use a normal SCAN. UnlockByPull uses pr/{repo}/*
+// so owner/repo does not match owner/repo2 on single-node or cluster.
+func scanKeys(ctx context.Context, client any, match string) ([]string, error) {
 	var (
 		keys []string
 		mu   sync.Mutex
@@ -165,8 +172,8 @@ func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string
 		return iter.Err()
 	}
 
-	if cc, ok := client.(*redis.ClusterClient); ok {
-		if err := cc.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
+	if ms, ok := client.(masterScanner); ok {
+		if err := ms.ForEachMaster(ctx, func(ctx context.Context, master *redis.Client) error {
 			return scanNode(ctx, master)
 		}); err != nil {
 			return nil, err
@@ -174,7 +181,11 @@ func scanKeys(ctx context.Context, client redis.Cmdable, match string) ([]string
 		return keys, nil
 	}
 
-	if err := scanNode(ctx, client); err != nil {
+	c, ok := client.(redis.Cmdable)
+	if !ok {
+		return nil, fmt.Errorf("unsupported redis client type %T", client)
+	}
+	if err := scanNode(ctx, c); err != nil {
 		return nil, err
 	}
 	return keys, nil
