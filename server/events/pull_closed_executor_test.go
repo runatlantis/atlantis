@@ -118,7 +118,7 @@ func TestCleanUpPullWorkspaceErrStillUnlocks(t *testing.T) {
 }
 
 func TestCleanUpPullUnlockErr(t *testing.T) {
-	t.Log("when locker.UnlockByPull returns an error, we return it")
+	t.Log("when locker.UnlockByPull returns an error, we return it and keep pull status")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
@@ -130,16 +130,27 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 		db.Close()
 	})
 	Ok(t, err)
+	_, err = db.UpdatePullWithResults(testdata.Pull, []command.ProjectResult{{
+		RepoRelDir:  "path",
+		Workspace:   "default",
+		ProjectName: "proj",
+	}})
+	Ok(t, err)
+	cleaner := mocks.NewMockResourceCleaner()
 	pce := events.PullClosedExecutor{
-		Locker:             l,
-		WorkingDir:         w,
-		Database:           db,
-		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Locker:                   l,
+		WorkingDir:               w,
+		Database:                 db,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: cleaner,
 	}
 	err = errors.New("err")
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
+	status, err := db.GetPullStatus(testdata.Pull)
+	Ok(t, err)
+	Assert(t, status != nil, "pull status must remain when unlock fails")
 }
 
 func TestCleanUpPullNoLocks(t *testing.T) {

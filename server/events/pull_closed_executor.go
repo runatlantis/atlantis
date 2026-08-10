@@ -115,10 +115,9 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
 		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleaning up locks: %w", err))
-	}
-
-	// Delete pull from DB.
-	if err := p.Database.DeletePullStatus(pull); err != nil {
+	} else if err := p.Database.DeletePullStatus(pull); err != nil {
+		// Drop pull status only after locks are gone. A Redis outage that
+		// fails UnlockByPull must not erase the plan record while locks remain.
 		logger.Err("deleting pull from db: %s", err)
 	}
 
