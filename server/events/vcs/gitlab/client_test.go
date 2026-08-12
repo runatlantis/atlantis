@@ -1866,15 +1866,17 @@ func TestClient_HideOldComments(t *testing.T) {
 	pullNum := 123
 
 	userCommentIDs := [1]string{"1"}
-	planCommentIDs := [4]string{"3", "5", "6", "7"}
+	planCommentIDs := [6]string{"3", "5", "6", "7", "8", "9"}
 	systemCommentIDs := [1]string{"4"}
 	summaryCommentIDs := [1]string{"2"}
-	planComments := [5]string{
+	planComments := [7]string{
 		"Ran Plan for 2 projects:",
 		"Ran Plan for dir: `stack1` workspace: `default`",
 		"Ran Plan for 2 projects:",
 		"Ran Plan for dir: `stack1` workspace: `default`\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->",
 		"Ran Plan for dir: `stack2` workspace: `default`\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->",
+		"Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command= -->",
+		"Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command=apply -->",
 	}
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>",
 		command.Plan.TitleString())
@@ -1895,7 +1897,11 @@ func TestClient_HideOldComments(t *testing.T) {
 		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
 			planCommentIDs[2], planComments[3], authorID, authorUserName, authorEmail, pullNum) + "," +
 		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
-			planCommentIDs[3], planComments[4], authorID, authorUserName, authorEmail, pullNum) +
+			planCommentIDs[3], planComments[4], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[4], planComments[5], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":%q,"author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[5], planComments[6], authorID, authorUserName, authorEmail, pullNum) +
 		"]"
 
 	repo := models.Repo{
@@ -1918,9 +1924,9 @@ func TestClient_HideOldComments(t *testing.T) {
 	}{
 		{
 			name:                 "legacy matching",
-			processedComments:    4,
-			processedCommentIds:  []string{planCommentIDs[0], planCommentIDs[1], planCommentIDs[2], planCommentIDs[3]},
-			processedPlanComment: []string{planComments[0], planComments[1], planComments[3], planComments[4]},
+			processedComments:    6,
+			processedCommentIds:  []string{planCommentIDs[0], planCommentIDs[1], planCommentIDs[2], planCommentIDs[3], planCommentIDs[4], planCommentIDs[5]},
+			processedPlanComment: []string{planComments[0], planComments[1], planComments[3], planComments[4], planComments[5], planComments[6]},
 		},
 		{
 			name:                 "legacy matching with stack1",
@@ -1939,9 +1945,9 @@ func TestClient_HideOldComments(t *testing.T) {
 		{
 			name:                 "instance A owns only its comment",
 			namespace:            "instance-a",
-			processedComments:    1,
-			processedCommentIds:  []string{planCommentIDs[2]},
-			processedPlanComment: []string{planComments[3]},
+			processedComments:    2,
+			processedCommentIds:  []string{planCommentIDs[2], planCommentIDs[4]},
+			processedPlanComment: []string{planComments[3], planComments[5]},
 		},
 		{
 			name:                 "instance B owns only its comment",

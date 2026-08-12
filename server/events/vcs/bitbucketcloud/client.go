@@ -113,7 +113,6 @@ func (b *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 	// NOTE: I tried to find the maximum size of a comment for bitbucket.org but
 	// I got up to 200k chars without issue so for now I'm not going to bother
 	// to detect this.
-	comment = b.CommentNamespace.Tag(comment, command)
 	bodyBytes, err := json.Marshal(map[string]map[string]string{"content": {
 		"raw": comment,
 	}})
@@ -132,6 +131,11 @@ func (b *Client) ReactToComment(_ logging.SimpleLogging, _ models.Repo, _ int, _
 }
 
 func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, _ string) error {
+	if b.CommentNamespace.Enabled() {
+		logger.Warn("Skipping previous Bitbucket Cloud comment deletion because hidden comment namespaces are unsupported")
+		return nil
+	}
+
 	// there is no way to hide comment, so delete them instead
 	me, err := b.GetMyUUID()
 	if err != nil {
@@ -154,15 +158,9 @@ func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		if len(body) == 0 {
 			continue
 		}
-		if b.CommentNamespace.Enabled() {
-			if !b.CommentNamespace.Owns(c.Content.Raw, command) {
-				continue
-			}
-		} else {
-			firstLine := strings.ToLower(body[0])
-			if !strings.Contains(firstLine, strings.ToLower(command)) {
-				continue
-			}
+		firstLine := strings.ToLower(body[0])
+		if !strings.Contains(firstLine, strings.ToLower(command)) {
+			continue
 		}
 		logger.Debug("Deleting comment with id %d", *c.ID)
 		if err = b.DeletePullRequestComment(repo, pullNum, *c.ID); err != nil {

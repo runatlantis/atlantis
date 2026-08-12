@@ -2814,12 +2814,30 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 }
 
 func TestRunCommentCommand_DrainOngoing(t *testing.T) {
-	t.Log("if drain is ongoing then a message should be displayed")
-	vcsClient := setup(t)
-	drainer.ShutdownBlocking()
-	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, nil)
-	vcsClient.VerifyWasCalledOnce().CreateComment(
-		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("Atlantis server is shutting down, please try again later."), Eq(""))
+	cases := []struct {
+		name            string
+		cmd             *events.CommentCommand
+		expectedCommand string
+	}{
+		{
+			name: "unknown command",
+		},
+		{
+			name:            "plan command",
+			cmd:             &events.CommentCommand{Name: command.Plan},
+			expectedCommand: "plan",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			vcsClient := setup(t)
+			drainer.ShutdownBlocking()
+			ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, c.cmd)
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("Atlantis server is shutting down, please try again later."), Eq(c.expectedCommand))
+		})
+	}
 }
 
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {

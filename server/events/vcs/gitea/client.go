@@ -240,14 +240,13 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 		if strings.HasPrefix(firstLine, strings.ToLower(supersededCommentPrefix)) {
 			continue
 		}
-		if c.CommentNamespace.Enabled() {
-			if !c.CommentNamespace.Owns(comment.Body, command) {
-				continue
-			}
-			if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
-				continue
-			}
-		} else if !strings.Contains(firstLine, strings.ToLower(command)) && dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+		if !c.CommentNamespace.Owns(comment.Body) {
+			continue
+		}
+		if !c.CommentNamespace.MatchesCommand(comment.Body, command) {
+			continue
+		}
+		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
 			continue
 		}
 

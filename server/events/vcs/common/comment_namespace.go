@@ -39,7 +39,10 @@ func (n CommentNamespace) Marker(command string) string {
 // unchanged when namespacing is disabled or body already has the marker.
 func (n CommentNamespace) Tag(body, command string) string {
 	marker := n.Marker(command)
-	if marker == "" || n.Owns(body, command) {
+	if marker == "" {
+		return body
+	}
+	if markerCommand, ok := n.markerCommand(body); ok && markerCommand == normalizeCommentCommand(command) {
 		return body
 	}
 	if strings.HasSuffix(body, "\n") {
@@ -48,14 +51,31 @@ func (n CommentNamespace) Tag(body, command string) string {
 	return body + "\n" + marker
 }
 
-// Owns reports whether body belongs to this namespace and command. A disabled
-// namespace imposes no ownership check so providers retain legacy matching.
-func (n CommentNamespace) Owns(body, command string) bool {
-	marker := n.Marker(command)
-	if marker == "" {
+// Owns reports whether body's final marker belongs to this namespace. A
+// disabled namespace imposes no ownership check so providers retain legacy
+// matching.
+func (n CommentNamespace) Owns(body string) bool {
+	if !n.Enabled() {
 		return true
 	}
-	return strings.HasSuffix(strings.TrimRight(body, "\r\n"), marker)
+	_, ok := n.markerCommand(body)
+	return ok
+}
+
+// MatchesCommand reports whether body belongs to command. A non-empty marker
+// command is authoritative. Empty marker commands and disabled namespaces use
+// the legacy first-line match.
+func (n CommentNamespace) MatchesCommand(body, command string) bool {
+	if n.Enabled() {
+		markerCommand, ok := n.markerCommand(body)
+		if !ok {
+			return false
+		}
+		if markerCommand != "" {
+			return markerCommand == normalizeCommentCommand(command)
+		}
+	}
+	return firstLineMatchesCommand(body, command)
 }
 
 // ContentLimit reserves enough space to append a marker and newline while
@@ -66,6 +86,31 @@ func (n CommentNamespace) ContentLimit(maxLength int, command string) int {
 		return maxLength
 	}
 	return maxLength - len(marker) - 1
+}
+
+func (n CommentNamespace) markerCommand(body string) (string, bool) {
+	trimmedBody := strings.TrimRight(body, "\r\n")
+	lastLineStart := strings.LastIndexByte(trimmedBody, '\n') + 1
+	markerLine := trimmedBody[lastLineStart:]
+
+	payload, ok := strings.CutPrefix(markerLine, "<!-- atlantis-comment:v1 namespace=")
+	if !ok {
+		return "", false
+	}
+	payload, ok = strings.CutSuffix(payload, " -->")
+	if !ok {
+		return "", false
+	}
+	namespace, command, ok := strings.Cut(payload, " command=")
+	if !ok || namespace != n.value {
+		return "", false
+	}
+	return command, true
+}
+
+func firstLineMatchesCommand(body, command string) bool {
+	firstLine, _, _ := strings.Cut(body, "\n")
+	return strings.Contains(strings.ToLower(firstLine), strings.ToLower(command))
 }
 
 func normalizeCommentCommand(command string) string {

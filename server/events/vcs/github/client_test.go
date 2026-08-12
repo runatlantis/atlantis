@@ -292,7 +292,9 @@ func TestClient_HideOldComments(t *testing.T) {
 	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}},
 	{"node_id": "11", "body": "Ran Plan for dir: 'stack1' workspace: 'default'\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->", "user": {"login": "AtlantisUser"}},
 	{"node_id": "12", "body": "Ran Plan for dir: 'stack2' workspace: 'default'\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->", "user": {"login": "AtlantisUser"}},
-	{"node_id": "13", "body": "Continued Plan output from previous comment.\nasd\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->", "user": {"login": "AtlantisUser"}}
+	{"node_id": "13", "body": "Continued Plan output from previous comment.\nasd\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "14", "body": "Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command= -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "15", "body": "Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command=apply -->", "user": {"login": "AtlantisUser"}}
 ]`, "'", "`")
 	minimizeResp := "{}"
 	type graphQLCall struct {
@@ -310,8 +312,8 @@ func TestClient_HideOldComments(t *testing.T) {
 	}{
 		{
 			name:                "legacy matching",
-			processedComments:   7,
-			processedCommentIds: []string{"6", "8", "9", "10", "11", "12", "13"},
+			processedComments:   9,
+			processedCommentIds: []string{"6", "8", "9", "10", "11", "12", "13", "14", "15"},
 		},
 		{
 			name:                "legacy matching with stack1",
@@ -328,8 +330,8 @@ func TestClient_HideOldComments(t *testing.T) {
 		{
 			name:                "instance A owns only its comments",
 			namespace:           "instance-a",
-			processedComments:   2,
-			processedCommentIds: []string{"11", "13"},
+			processedComments:   3,
+			processedCommentIds: []string{"11", "13", "14"},
 		},
 		{
 			name:                "instance B owns only its comments",
