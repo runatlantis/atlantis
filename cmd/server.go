@@ -831,7 +831,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 	s.Viper.AutomaticEnv()
 	s.Viper.SetTypeByDefaultValue(true)
 
-	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
+	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags, int64Flags))
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		s.printErr(err)
@@ -908,6 +908,12 @@ func (s *ServerCmd) preRun() error {
 // which viper picks up and fails to parse as integers.
 func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
 	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+	for name, f := range int64Flags {
 		val := s.Viper.GetString(name)
 		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
 			s.Viper.Set(name, f.defaultValue)

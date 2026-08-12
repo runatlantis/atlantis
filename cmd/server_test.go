@@ -1466,6 +1466,22 @@ func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
 	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
 }
 
+func TestSanitizeKubernetesServiceLinks_Int64Flags(t *testing.T) {
+	t.Log("Kubernetes service link env vars should also be sanitized for int64 flags")
+	envKey := "ATLANTIS_GH_APP_ID"
+	os.Setenv(envKey, "tcp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, int64(0), passedConfig.GithubAppID)
+}
+
 func TestDefaultAutoplanFileList_ContainsExpectedPatterns(t *testing.T) {
 	// Pin the public server default independently of the constant.
 	// If a pattern is accidentally removed, this test fails.
