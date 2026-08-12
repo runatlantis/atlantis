@@ -472,6 +472,131 @@ Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 	}
 }
 
+func TestRun_DraftPlan(t *testing.T) {
+	// DraftPlan should skip refresh and locking but still write a planfile
+	// via -out so that show/policy_check have something to read.
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+
+	tfVersion, _ := version.NewVersion("1.0.0")
+	logger := logging.NewNoopLogger(t)
+	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTfExec)
+	tmpDir := t.TempDir()
+
+	expPlanArgs := []string{"plan",
+		"-input=false",
+		"-refresh=false",
+		"-lock=false",
+		"-out",
+		fmt.Sprintf("%q", filepath.Join(tmpDir, "workspace.tfplan")),
+		"extra",
+		"args",
+		"comment",
+		"args",
+	}
+	ctx := command.ProjectContext{
+		Log:                logger,
+		CommandName:        command.DraftPlan,
+		Workspace:          "workspace",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+	When(terraform.RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")).ThenReturn("output", nil)
+
+	output, err := s.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
+	Ok(t, err)
+
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfVersion, "workspace")
+	Equals(t, "output", output)
+}
+
+func TestRun_RemoteOps_DraftPlan(t *testing.T) {
+	// Even for remote ops, draftplan must leave a (fake) planfile on disk so
+	// that show/policy_check have something to read, unlike before when
+	// draftplan skipped writing it entirely.
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:                logger,
+		CommandName:        command.DraftPlan,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+			Owner:    "owner",
+			Name:     "repo",
+		},
+	}
+	RegisterMockTestingT(t)
+	terraform := mocks.NewMockClient()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	tfVersion, _ := version.NewVersion("1.1.0")
+	asyncTf := &remotePlanMock{}
+	s := runtime.NewPlanStepRunner(terraform, tfVersion, commitStatusUpdater, asyncTf)
+	absProjectPath := t.TempDir()
+
+	When(terraform.RunCommandWithVersion(
+		ctx,
+		absProjectPath,
+		[]string{"workspace", "show"},
+		map[string]string(nil),
+		tfVersion,
+		"default")).ThenReturn("default\n", nil)
+
+	expPlanArgs := []string{"plan",
+		"-input=false",
+		"-refresh=false",
+		"-lock=false",
+		"-out",
+		fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+		"extra",
+		"args",
+		"comment",
+		"args",
+	}
+
+	remoteOpsErr := strings.Join([]string{
+		"╷",
+		"│ Error: Saving a generated plan is currently not supported",
+		"│ ",
+		"│ Terraform Cloud does not support saving the generated execution plan",
+		"│ locally at this time.",
+		"╵",
+		"",
+	}, "\n")
+	planErr := errors.New("exit status 1: err")
+	planOutput := "\n" + remoteOpsErr
+	asyncTf.LinesToSend = remotePlanOutput
+	When(terraform.RunCommandWithVersion(ctx, absProjectPath, expPlanArgs, map[string]string(nil), tfVersion, "default")).
+		ThenReturn(planOutput, planErr)
+
+	_, err := s.Run(ctx, []string{"extra", "args"}, absProjectPath, map[string]string(nil))
+	Ok(t, err)
+
+	expRemotePlanArgs := []string{"plan", "-input=false", "-no-color", "-refresh=false", "-lock=false", "extra", "args", "comment", "args"}
+	Equals(t, expRemotePlanArgs, asyncTf.CalledArgs)
+
+	// Verify that the fake plan file still gets written for draftplan.
+	bytes, err := os.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
+	Ok(t, err)
+	Assert(t, strings.HasPrefix(string(bytes), "Atlantis: this plan was created by remote ops"), "expect remote plan")
+}
+
 // Test striping output method
 func TestStripRefreshingFromPlanOutput(t *testing.T) {
 	tfVersion0135, _ := version.NewVersion("0.13.5")

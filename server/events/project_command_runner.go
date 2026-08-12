@@ -521,6 +521,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		RePlanCmd:          ctx.RePlanCmd,
 		ApplyCmd:           ctx.ApplyCmd,
 		ApprovePoliciesCmd: ctx.ApprovePoliciesCmd,
+		IsDraftPlan:        ctx.IsDraftPlan,
 	}
 
 	// Using this function instead of catching failed policy runs with errors, for cases when '--no-fail' is passed to conftest.

@@ -43,6 +43,13 @@ func (a *DefaultCommandRequirementHandler) ValidatePlanProject(repoDir string, c
 }
 
 func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
+	// A draftplan is an unlocked, unrefreshed preview and must never be
+	// applied. Its plan status is distinct from a real plan's, so this
+	// check can't be bypassed by configuring apply_requirements.
+	if ctx.ProjectPlanStatus == models.DraftPlannedPlanStatus || ctx.ProjectPlanStatus == models.DraftPlannedNoChangesPlanStatus {
+		return "This project's most recent plan was a draftplan preview, which is not locked and may not reflect the latest state. Run 'atlantis plan' to generate an applyable plan before running apply.", nil
+	}
+
 	for _, req := range ctx.ApplyRequirements {
 		switch req {
 		case raw.ApprovedRequirement:

@@ -145,6 +145,7 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
+		cmdName == command.DraftPlan,
 	)
 
 	projectCmds = append(projectCmds, projectCmdContext)
@@ -195,7 +196,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		terraformClient,
 	)
 
-	if cmdName == command.Plan && prjCfg.PolicyCheck {
+	if (cmdName == command.Plan || cmdName == command.DraftPlan) && prjCfg.PolicyCheck {
 		ctx.Log.Debug("Building project command context for %s", command.PolicyCheck)
 		steps := prjCfg.Workflow.PolicyCheck.Steps
 
@@ -217,6 +218,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
+			cmdName == command.DraftPlan,
 		))
 	}
 
@@ -242,6 +244,7 @@ func newProjectCommandContext(ctx *command.Context,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
+	isDraftPlan bool,
 ) command.ProjectContext {
 
 	var projectPlanStatus models.ProjectPlanStatus
@@ -306,6 +309,7 @@ func newProjectCommandContext(ctx *command.Context,
 		JobID:                      uuid.New().String(),
 		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
 		AbortOnExcecutionOrderFail: abortOnExcecutionOrderFail,
+		IsDraftPlan:                isDraftPlan,
 	}
 }
 

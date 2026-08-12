@@ -288,11 +288,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
-	if cmd.Name == command.Plan && len(result.ProjectResults) > 0 &&
+	// Draftplan also runs policy checks so that violations are visible
+	// before a real, locked plan is ever generated.
+	if (cmd.Name == command.Plan || cmd.Name == command.DraftPlan) && len(result.ProjectResults) > 0 &&
 		!(result.HasErrors() || result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for %s", cmd.String())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
-	} else if len(projectCmds) == 0 && cmd.Name == command.Plan && !cmd.IsForSpecificProject() {
+	} else if len(projectCmds) == 0 && (cmd.Name == command.Plan || cmd.Name == command.DraftPlan) && !cmd.IsForSpecificProject() {
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects planned/policy_checked/applied successfully because some users require
 		// the Atlantis status to be passing for all pull requests.
