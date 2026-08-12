@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -251,7 +252,8 @@ var stringFlags = map[string]stringFlag{
 	},
 	AutomergeMethodFlag: {
 		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
-			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+			"Valid values are 'merge', 'rebase', 'squash', and 'merge-queue'. 'merge-queue' adds the pull request to the base branch's " +
+			"GitHub merge queue instead of merging it directly. Currently only implemented for GitHub.",
 		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
@@ -753,7 +755,7 @@ var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
 // ValidAutomergeMethods are the valid merge methods that can be set for the
 // automerge-method flag.
-var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash", github.MergeQueueMergeMethod}
 
 type stringFlag struct {
 	description  string
