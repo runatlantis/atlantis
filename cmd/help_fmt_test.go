@@ -29,3 +29,16 @@ func TestUsageTmplExcludesHiddenInt64Flags(t *testing.T) {
 		t.Error("usage template includes hidden int64 flag")
 	}
 }
+
+func TestUsageTmplRendersInt64Default(t *testing.T) {
+	withDefault := map[string]int64Flag{
+		"defaulted-int64-flag": {
+			description:  "flag with default",
+			defaultValue: 42,
+		},
+	}
+	out := usageTmpl(map[string]stringFlag{}, map[string]intFlag{}, map[string]boolFlag{}, withDefault)
+	if !strings.Contains(out, `(default 42)`) {
+		t.Error("usage template does not render the default value of an int64 flag")
+	}
+}
