@@ -12,6 +12,15 @@
 ```
 {{ end -}}
 {{- end }}
+{{- if .IsDraftPlan }}
+{{- if not .PolicyCleared }}
+#### Policy Approval Status:
+```
+{{ .PolicyApprovalSummary }}
+```
+{{- end }}
+* :warning: This is a draftplan preview: it is not locked and may not reflect the latest state. Run `atlantis plan` to generate an applyable plan.
+{{- else }}
 {{- if .PolicyCleared }}
 * :arrow_forward: To **apply** this plan, comment:
   ```shell
@@ -32,4 +41,5 @@
   ```shell
   {{ .RePlanCmd }}
   ```
+{{- end }}
 {{ end -}}

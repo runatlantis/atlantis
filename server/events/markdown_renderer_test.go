@@ -1292,6 +1292,145 @@ $$$
 	}
 }
 
+func TestRenderProjectResults_DraftPlanPolicyCheck(t *testing.T) {
+	cases := []struct {
+		Description    string
+		ProjectResults []command.ProjectResult
+		Expected       string
+	}{
+		{
+			"draftplan policy check cleared shows no apply/replan CTA",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:        true,
+									ReqApprovals:  1,
+								},
+							},
+							LockURL:     "lock-url",
+							RePlanCmd:   "atlantis plan -d path -w workspace",
+							ApplyCmd:    "atlantis apply -d path -w workspace",
+							IsDraftPlan: true,
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+
+* :warning: This is a draftplan preview: it is not locked and may not reflect the latest state. Run ` + "`atlantis plan`" + ` to generate an applyable plan.
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"draftplan policy check with violations shows approval status but no apply CTA",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.",
+									Passed:        false,
+									ReqApprovals:  1,
+								},
+							},
+							LockURL:            "lock-url",
+							RePlanCmd:          "atlantis plan -d path -w workspace",
+							ApplyCmd:           "atlantis apply -d path -w workspace",
+							ApprovePoliciesCmd: "atlantis approve_policies -d path -w workspace",
+							IsDraftPlan:        true,
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :warning: This is a draftplan preview: it is not locked and may not reflect the latest state. Run ` + "`atlantis plan`" + ` to generate an applyable plan.
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{ProjectResults: c.ProjectResults}
+			cmd := &events.CommentCommand{Name: command.PolicyCheck}
+			s := r.Render(ctx, res, cmd)
+			Equals(t, normalize(c.Expected), normalize(s))
+		})
+	}
+}
+
 func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
 	cases := []struct {
 		Description    string

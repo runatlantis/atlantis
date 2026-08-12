@@ -78,6 +78,9 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	// IsDraftPlan is true if this stage was triggered by a draftplan command
+	// (or the policy_check that followed one) rather than a full plan.
+	IsDraftPlan bool
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.

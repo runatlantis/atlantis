@@ -165,6 +165,47 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	}
 }
 
+func TestPlanCommandRunner_DraftPlanTriggersPolicyCheck(t *testing.T) {
+	RegisterMockTestingT(t)
+	setup(t)
+
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.DraftPlan}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{
+		{CommandName: command.DraftPlan, RepoRelDir: "somedir", Workspace: "default"},
+		{CommandName: command.PolicyCheck, RepoRelDir: "somedir", Workspace: "default"},
+	}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PolicyCheckResults: &models.PolicyCheckResults{},
+	})
+
+	planCommandRunner.Run(ctx, cmd)
+
+	// A draftplan should still run the policy_check step for its projects,
+	// same as a real plan would, so violations surface before a real,
+	// locked plan is ever generated.
+	projectCommandRunner.VerifyWasCalledOnce().PolicyCheck(Any[command.ProjectContext]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq[models.CommitStatus](models.SuccessCommitStatus),
+		Eq[command.Name](command.PolicyCheck),
+		Eq(1),
+		Eq(1),
+	)
+}
+
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)

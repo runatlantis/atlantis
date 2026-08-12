@@ -485,6 +485,9 @@ type PolicyCheckResults struct {
 	// branch we're merging into has been updated since we cloned and merged
 	// it.
 	HasDiverged bool
+	// IsDraftPlan is true if this policy check ran against a draftplan
+	// preview rather than a full plan, in which case ApplyCmd is not usable.
+	IsDraftPlan bool
 }
 
 // ImportSuccess is the result of a successful import run.
@@ -615,6 +618,14 @@ const (
 	// PassedPolicyCheckStatus means that there was an unapplied plan that was
 	// discarded due to a project being unlocked
 	PassedPolicyCheckStatus
+	// DraftPlannedPlanStatus means that a draftplan has been successfully
+	// generated with changes. Unlike PlannedPlanStatus, this plan was not
+	// taken under a lock or against refreshed state, so it cannot be applied.
+	DraftPlannedPlanStatus
+	// DraftPlannedNoChangesPlanStatus means that a draftplan has been
+	// successfully generated with "No changes". Like DraftPlannedPlanStatus,
+	// this cannot be applied.
+	DraftPlannedNoChangesPlanStatus
 )
 
 // String returns a string representation of the status.
@@ -636,6 +647,10 @@ func (p ProjectPlanStatus) String() string {
 		return "policy_check_errored"
 	case PassedPolicyCheckStatus:
 		return "policy_check_passed"
+	case DraftPlannedPlanStatus:
+		return "draft_planned"
+	case DraftPlannedNoChangesPlanStatus:
+		return "draft_planned_no_changes"
 	default:
 		panic("missing String() impl for ProjectPlanStatus")
 	}

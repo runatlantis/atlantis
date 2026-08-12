@@ -61,7 +61,7 @@ func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	switch p.Command {
 
-	case Plan, DraftPlan:
+	case Plan:
 		if p.Error != nil {
 			return models.ErroredPlanStatus
 		} else if p.Failure != "" {
@@ -70,6 +70,15 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 			return models.PlannedNoChangesPlanStatus
 		}
 		return models.PlannedPlanStatus
+	case DraftPlan:
+		if p.Error != nil {
+			return models.ErroredPlanStatus
+		} else if p.Failure != "" {
+			return models.ErroredPlanStatus
+		} else if p.PlanSuccess.NoChanges() {
+			return models.DraftPlannedNoChangesPlanStatus
+		}
+		return models.DraftPlannedPlanStatus
 	case PolicyCheck, ApprovePolicies:
 		if p.Error != nil {
 			return models.ErroredPolicyCheckStatus
