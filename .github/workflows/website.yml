@@ -86,6 +86,15 @@ jobs:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
 
+      - name: Translation integrity
+        # Translated pages must keep their source's code samples, flag names,
+        # link targets and VitePress container markers. Runs on every website
+        # PR so hand-edits to a locale are checked too, not just the output of
+        # the translate-docs workflow.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/check-translation-integrity.mjs $locales
+
       - name: Link Checker
         id: lychee
         uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
