@@ -9,14 +9,18 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/ownership"
+	commandpkg "github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 // ErrOwnershipChanged asks an ingress replica to resolve ownership one more time.
 var ErrOwnershipChanged = errors.New("pull request ownership changed")
+
+const ownershipOperationTimeout = 5 * time.Second
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_dispatcher.go CommandDispatcher
 
@@ -94,16 +98,26 @@ func (d *RoutedCommandDispatcher) DispatchPullClosed(command PullClosedDispatch)
 }
 
 func (d *RoutedCommandDispatcher) route(key ownership.Key, execute func(string) error, forward func(ownership.Record) error) error {
+	ctx, cancel := boundedOwnershipContext(context.Background())
+	defer cancel()
+
 	for attempt := 0; attempt < 2; attempt++ {
-		if err := d.owners.Ready(context.Background()); err != nil {
+		if err := d.owners.Ready(ctx); err != nil {
 			return fmt.Errorf("checking ownership readiness: %w", err)
 		}
-		owner, err := d.owners.Claim(context.Background(), key)
+		owner, err := d.owners.Claim(ctx, key)
 		if err != nil {
 			return fmt.Errorf("claiming command owner: %w", err)
 		}
 		if owner.ReplicaID == d.replicaID && d.owners.Owns(key, owner.ClaimID) {
-			return execute(owner.ClaimID)
+			err = execute(owner.ClaimID)
+			if err == nil {
+				return nil
+			}
+			if errors.Is(err, ErrOwnershipChanged) && attempt == 0 {
+				continue
+			}
+			return err
 		}
 
 		err = forward(owner)
@@ -154,15 +168,35 @@ func (e *LocalCommandExecutor) ExecuteComment(command CommentDispatch, claimID s
 		statePull = *pull
 	}
 	logger := e.commandLogger(baseRepo, command.PullNum)
-	if err := e.prepare(command.OwnershipKey(), claimID, logger, baseRepo, statePull); err != nil {
-		return err
-	}
 	if e.Runner == nil {
 		return errors.New("command runner is required")
 	}
+	lease, release, localStateReset, err := e.acquire(command.OwnershipKey(), claimID, logger, baseRepo, statePull, true)
+	if err != nil {
+		return err
+	}
+	if lease == nil {
+		e.run(func() {
+			e.Runner.RunCommentCommand(baseRepo, headRepo, pull, command.User, command.PullNum, command.Command)
+		})
+		return nil
+	}
+	routedRunner, ok := e.Runner.(RoutedCommandRunner)
+	if !ok {
+		release()
+		return errors.New("routed command runner is required")
+	}
+	if err := lease.Admit(context.Background()); err != nil {
+		release()
+		return err
+	}
 
 	e.run(func() {
-		e.Runner.RunCommentCommand(baseRepo, headRepo, pull, command.User, command.PullNum, command.Command)
+		defer release()
+		routedRunner.RunRoutedCommentCommand(
+			baseRepo, headRepo, pull, command.User, command.PullNum, command.Command,
+			commandpkg.RoutingContext{Lease: lease, RecoverExternalPlans: localStateReset},
+		)
 	})
 	return nil
 }
@@ -178,15 +212,35 @@ func (e *LocalCommandExecutor) ExecuteAutoplan(command AutoplanDispatch, claimID
 	}
 	pull := command.Pull.ToModel(baseRepo)
 	logger := e.commandLogger(baseRepo, pull.Num)
-	if err := e.prepare(command.OwnershipKey(), claimID, logger, baseRepo, pull); err != nil {
-		return err
-	}
 	if e.Runner == nil {
 		return errors.New("command runner is required")
 	}
+	lease, release, localStateReset, err := e.acquire(command.OwnershipKey(), claimID, logger, baseRepo, pull, true)
+	if err != nil {
+		return err
+	}
+	if lease == nil {
+		e.run(func() {
+			e.Runner.RunAutoplanCommand(baseRepo, headRepo, pull, command.User)
+		})
+		return nil
+	}
+	routedRunner, ok := e.Runner.(RoutedCommandRunner)
+	if !ok {
+		release()
+		return errors.New("routed command runner is required")
+	}
+	if err := lease.Admit(context.Background()); err != nil {
+		release()
+		return err
+	}
 
 	e.run(func() {
-		e.Runner.RunAutoplanCommand(baseRepo, headRepo, pull, command.User)
+		defer release()
+		routedRunner.RunRoutedAutoplanCommand(
+			baseRepo, headRepo, pull, command.User,
+			commandpkg.RoutingContext{Lease: lease, RecoverExternalPlans: localStateReset},
+		)
 	})
 	return nil
 }
@@ -198,14 +252,39 @@ func (e *LocalCommandExecutor) ExecutePullClosed(command PullClosedDispatch, cla
 	}
 	pull := command.Pull.ToModel(baseRepo)
 	logger := e.commandLogger(baseRepo, pull.Num)
-	if err := e.prepare(command.OwnershipKey(), claimID, logger, baseRepo, pull); err != nil {
-		return err
-	}
 	if e.PullCleaner == nil {
 		return errors.New("pull cleaner is required")
 	}
-	if err := e.PullCleaner.CleanUpPull(logger, baseRepo, pull); err != nil {
+	key := command.OwnershipKey()
+	lease, release, _, err := e.acquire(key, claimID, logger, baseRepo, pull, false)
+	if err != nil {
 		return err
+	}
+	if lease != nil {
+		if err := lease.Admit(context.Background()); err != nil {
+			release()
+			return err
+		}
+	}
+
+	e.run(func() {
+		defer release()
+		if err := e.finishPullClosed(key, claimID, logger, baseRepo, pull); err != nil && logger != nil {
+			logger.Err("unable to finish pull request cleanup: %s", err)
+		}
+	})
+	return nil
+}
+
+func (e *LocalCommandExecutor) finishPullClosed(
+	key ownership.Key,
+	claimID string,
+	logger logging.SimpleLogging,
+	baseRepo models.Repo,
+	pull models.PullRequest,
+) error {
+	if err := e.PullCleaner.CleanUpPull(logger, baseRepo, pull); err != nil {
+		return fmt.Errorf("cleaning up closed pull request: %w", err)
 	}
 	if claimID == "" {
 		return nil
@@ -213,10 +292,12 @@ func (e *LocalCommandExecutor) ExecutePullClosed(command PullClosedDispatch, cla
 	if e.Owners == nil {
 		return errors.New("ownership store is required")
 	}
-	if err := e.Owners.Release(context.Background(), command.OwnershipKey(), claimID); err != nil {
+	ctx, cancel := boundedOwnershipContext(context.Background())
+	defer cancel()
+	if err := e.Owners.Release(ctx, key, claimID); err != nil {
 		return fmt.Errorf("releasing pull request ownership: %w", err)
 	}
-	if err := e.ClaimGuard.Forget(command.OwnershipKey(), claimID); err != nil {
+	if err := e.ClaimGuard.Forget(key, claimID); err != nil {
 		return fmt.Errorf("forgetting local ownership claim: %w", err)
 	}
 	return nil
@@ -229,22 +310,68 @@ func (e *LocalCommandExecutor) hydrate(ref RepoRef) (models.Repo, error) {
 	return e.Hydrator.HydrateRepo(ref)
 }
 
-func (e *LocalCommandExecutor) prepare(key ownership.Key, claimID string, logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+func (e *LocalCommandExecutor) acquire(
+	key ownership.Key,
+	claimID string,
+	logger logging.SimpleLogging,
+	repo models.Repo,
+	pull models.PullRequest,
+	resetLocalState bool,
+) (commandpkg.ExecutionLease, func(), bool, error) {
+	noopRelease := func() {}
 	if claimID == "" {
-		return nil
+		return nil, noopRelease, false, nil
 	}
 	if e.ClaimGuard == nil {
-		return errors.New("local claim guard is required")
+		return nil, noopRelease, false, errors.New("local claim guard is required")
 	}
-	if e.WorkingDir == nil {
-		return errors.New("working directory is required")
+	if resetLocalState && e.WorkingDir == nil {
+		return nil, noopRelease, false, errors.New("working directory is required")
 	}
-	if err := e.ClaimGuard.Prepare(key, claimID, func() error {
-		return e.WorkingDir.Delete(logger, repo, pull)
-	}); err != nil {
-		return fmt.Errorf("resetting local pull state for new owner: %w", err)
+	if e.Owners == nil {
+		return nil, noopRelease, false, errors.New("ownership store is required")
+	}
+	lease := &ownershipExecutionLease{owners: e.Owners, key: key, claimID: claimID}
+	var reset func() error
+	if resetLocalState {
+		reset = func() error {
+			if err := e.WorkingDir.Delete(logger, repo, pull); err != nil {
+				return fmt.Errorf("resetting local pull state for new owner: %w", err)
+			}
+			return nil
+		}
+	}
+	release, localStateReset, err := e.ClaimGuard.Acquire(key, claimID, func() error {
+		return lease.Admit(context.Background())
+	}, reset)
+	if err != nil {
+		return nil, noopRelease, false, err
+	}
+	return lease, release, localStateReset, nil
+}
+
+type ownershipExecutionLease struct {
+	owners  ownership.Store
+	key     ownership.Key
+	claimID string
+}
+
+func (l *ownershipExecutionLease) Admit(ctx context.Context) error {
+	ctx, cancel := boundedOwnershipContext(ctx)
+	defer cancel()
+
+	admitted, err := l.owners.Admit(ctx, l.key, l.claimID)
+	if err != nil {
+		return fmt.Errorf("admitting ownership claim: %w", err)
+	}
+	if !admitted {
+		return ErrOwnershipChanged
 	}
 	return nil
+}
+
+func boundedOwnershipContext(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(parent, ownershipOperationTimeout)
 }
 
 func (e *LocalCommandExecutor) commandLogger(repo models.Repo, pullNum int) logging.SimpleLogging {

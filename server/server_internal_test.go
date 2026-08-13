@@ -85,6 +85,9 @@ func (s *shutdownOwnerStore) Claim(context.Context, ownership.Key) (ownership.Re
 func (s *shutdownOwnerStore) Current(context.Context, ownership.Key) (ownership.Record, bool, error) {
 	return ownership.Record{}, false, nil
 }
+func (s *shutdownOwnerStore) Admit(context.Context, ownership.Key, string) (bool, error) {
+	return true, nil
+}
 func (s *shutdownOwnerStore) Owns(ownership.Key, string) bool { return false }
 func (s *shutdownOwnerStore) Release(context.Context, ownership.Key, string) error {
 	return nil

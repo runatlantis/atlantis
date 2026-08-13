@@ -5,6 +5,7 @@
 package events
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1139,6 +1140,11 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
 	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	defer unlock()
+	if ctx.ExecutionLease != nil {
+		if err := ctx.ExecutionLease.Admit(context.Background()); err != nil {
+			return outputs, fmt.Errorf("admitting project execution: %w", err)
+		}
+	}
 
 	envs := make(map[string]string)
 	for _, step := range steps {

@@ -5,6 +5,7 @@
 package events_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -123,6 +124,51 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 			mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)
 		}
 	}
+}
+
+func TestDefaultProjectCommandRunner_RejectsLostOwnershipBeforeSteps(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockInit := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	locked := false
+	leaseErr := events.ErrOwnershipChanged
+	lease := executionLeaseFunc(func(context.Context) error {
+		Assert(t, locked, "expected the Git read lock before lease admission")
+		return leaseErr
+	})
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		InitStepRunner:            mockInit,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockCommandRequirementHandler,
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).Then(func([]Param) ReturnValues {
+		locked = true
+		return ReturnValues{func() { locked = false }}
+	})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	ctx := command.ProjectContext{
+		Log:            logging.NewNoopLogger(t),
+		Steps:          []valid.Step{{StepName: "init"}},
+		Workspace:      "default",
+		RepoRelDir:     ".",
+		ExecutionLease: lease,
+	}
+
+	res := runner.Plan(ctx)
+
+	Assert(t, errors.Is(res.Error, leaseErr), "got: %v", res.Error)
+	Assert(t, !locked, "expected the Git read lock to be released")
+	mockWorkingDir.VerifyWasCalledOnce().GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockInit.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
 func TestDefaultProjectCommandRunner_ProjectLockJobURL(t *testing.T) {
@@ -2713,6 +2759,12 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 type trackingWorkingDirLocker struct {
 	locked   bool
 	metadata events.WorkingDirLockMetadata
+}
+
+type executionLeaseFunc func(context.Context) error
+
+func (f executionLeaseFunc) Admit(ctx context.Context) error {
+	return f(ctx)
 }
 
 // restoringPlanStore writes contents to planPath on Load, simulating an

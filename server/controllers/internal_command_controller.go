@@ -6,6 +6,7 @@ package controllers
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -97,6 +98,10 @@ func (c *InternalCommandController) handle(
 		return
 	}
 	if err := execute(claimID); err != nil {
+		if errors.Is(err, events.ErrOwnershipChanged) {
+			http.Error(w, "pull request ownership changed", http.StatusConflict)
+			return
+		}
 		http.Error(w, "command execution unavailable", http.StatusServiceUnavailable)
 		return
 	}

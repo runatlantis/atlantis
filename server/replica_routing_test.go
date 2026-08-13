@@ -191,6 +191,9 @@ func (s *serverOwnerStore) Claim(context.Context, ownership.Key) (ownership.Reco
 func (s *serverOwnerStore) Current(context.Context, ownership.Key) (ownership.Record, bool, error) {
 	return ownership.Record{}, false, nil
 }
+func (s *serverOwnerStore) Admit(context.Context, ownership.Key, string) (bool, error) {
+	return true, nil
+}
 func (s *serverOwnerStore) Owns(ownership.Key, string) bool { return false }
 func (s *serverOwnerStore) Release(context.Context, ownership.Key, string) error {
 	return nil

@@ -119,6 +119,49 @@ func TestOwnerStore_RenewExtendsTTL(t *testing.T) {
 	require.Equal(t, claim, current)
 }
 
+func TestOwnerStore_AdmitRenewsExactLiveClaim(t *testing.T) {
+	mr := miniredis.RunT(t)
+	store := newTestOwnerStoreWithTTL(t, mr, "atlantis-0", testOwnerURL, 30*time.Second)
+	key := testOwnershipKey(65)
+
+	claim, err := store.Claim(context.Background(), key)
+	require.NoError(t, err)
+	mr.FastForward(20 * time.Second)
+
+	admitted, err := store.Admit(context.Background(), key, claim.ClaimID)
+	require.NoError(t, err)
+	require.True(t, admitted)
+	mr.FastForward(20 * time.Second)
+
+	current, found, err := store.Current(context.Background(), key)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, claim, current)
+}
+
+func TestOwnerStore_AdmitRejectsReplacementClaim(t *testing.T) {
+	mr := miniredis.RunT(t)
+	storeA := newTestOwnerStoreWithTTL(t, mr, "atlantis-0", testOwnerURL, 30*time.Second)
+	storeB := newTestOwnerStoreWithTTL(t, mr, "atlantis-1", "http://atlantis-1.atlantis-headless:4141", 30*time.Second)
+	key := testOwnershipKey(66)
+
+	oldClaim, err := storeA.Claim(context.Background(), key)
+	require.NoError(t, err)
+	mr.FastForward(31 * time.Second)
+	replacement, err := storeB.Claim(context.Background(), key)
+	require.NoError(t, err)
+	require.NotEqual(t, oldClaim.ClaimID, replacement.ClaimID)
+
+	admitted, err := storeA.Admit(context.Background(), key, oldClaim.ClaimID)
+	require.NoError(t, err)
+	require.False(t, admitted)
+
+	current, found, err := storeA.Current(context.Background(), key)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, replacement, current)
+}
+
 func TestOwnerStore_RenewsOwnedClaimsInOnePipeline(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redislib.NewClient(&redislib.Options{Addr: mr.Addr()})
@@ -167,12 +210,14 @@ func TestOwnerStore_RenewalFailureHealthStartsAtAttemptTime(t *testing.T) {
 		require.NoError(t, store.Close())
 		require.NoError(t, client.Close())
 	})
-	_, err = store.Claim(context.Background(), testOwnershipKey(64))
+	key := testOwnershipKey(64)
+	claim, err := store.Claim(context.Background(), key)
 	require.NoError(t, err)
 
 	store.renewOwned(context.Background())
 
 	require.Error(t, store.Ready(context.Background()))
+	require.True(t, store.Owns(key, claim.ClaimID), "a transport failure must not erase the local claim")
 }
 
 func TestOwnerStore_ReusedReplicaIDDoesNotOwnPriorProcessClaim(t *testing.T) {

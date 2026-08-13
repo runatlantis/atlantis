@@ -43,6 +43,37 @@ func TestReplicaRouting_DistributesPRsAndPreservesWholePRAffinity(t *testing.T) 
 	require.Equal(t, 1, h.diskB.deleteCount(202))
 }
 
+func TestReplicaRouting_LeaseReplacementDuringResetReroutesBeforeExecution(t *testing.T) {
+	h := newHAHarness(t)
+	const pullNum = 250
+	resetStarted, continueReset := h.diskA.blockNextDelete()
+	dispatch := haCommentDispatch(t, pullNum, "default", command.Plan)
+	dispatchErr := make(chan error, 1)
+	go func() {
+		dispatchErr <- h.dispatcherA.DispatchComment(dispatch)
+	}()
+
+	select {
+	case <-resetStarted:
+	case <-time.After(time.Second):
+		t.Fatal("local reset did not start")
+	}
+	h.redis.FastForward(31 * time.Second)
+	replacement, err := h.storeB.Claim(context.Background(), haOwnershipKey(pullNum))
+	require.NoError(t, err)
+	require.Equal(t, "replica-b", replacement.ReplicaID)
+	close(continueReset)
+	select {
+	case err := <-dispatchErr:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("stale dispatch did not reroute")
+	}
+
+	require.Empty(t, h.runnerA.snapshot(), "expired owner must not start the command after reset")
+	require.Equal(t, []haRunnerCall{{PullNum: pullNum, Workspace: "default", Command: command.Plan}}, h.runnerB.snapshot())
+}
+
 func TestReplicaRouting_OwnerLossRequiresReplanAndKeepsSamePRLockUsable(t *testing.T) {
 	h := newHAHarness(t)
 	const pullNum = 303
@@ -172,9 +203,11 @@ func (*haRepoHydrator) HydrateRepo(ref events.RepoRef) (models.Repo, error) {
 }
 
 type haPlanDisk struct {
-	mu      sync.Mutex
-	plans   map[int]bool
-	deletes map[int]int
+	mu             sync.Mutex
+	plans          map[int]bool
+	deletes        map[int]int
+	deleteStarted  chan struct{}
+	continueDelete chan struct{}
 }
 
 func newHAPlanDisk() *haPlanDisk {
@@ -183,10 +216,26 @@ func newHAPlanDisk() *haPlanDisk {
 
 func (d *haPlanDisk) Delete(_ logging.SimpleLogging, _ models.Repo, pull models.PullRequest) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	d.plans[pull.Num] = false
 	d.deletes[pull.Num]++
+	deleteStarted := d.deleteStarted
+	continueDelete := d.continueDelete
+	d.deleteStarted = nil
+	d.continueDelete = nil
+	d.mu.Unlock()
+	if deleteStarted != nil {
+		close(deleteStarted)
+		<-continueDelete
+	}
 	return nil
+}
+
+func (d *haPlanDisk) blockNextDelete() (<-chan struct{}, chan<- struct{}) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.deleteStarted = make(chan struct{})
+	d.continueDelete = make(chan struct{})
+	return d.deleteStarted, d.continueDelete
 }
 
 func (d *haPlanDisk) setPlan(pullNum int, present bool) {
@@ -234,6 +283,14 @@ func (r *haCommandRunner) RunCommentCommand(_ models.Repo, _ *models.Repo, pull 
 }
 
 func (r *haCommandRunner) RunAutoplanCommand(models.Repo, models.Repo, models.PullRequest, models.User) {
+}
+
+func (r *haCommandRunner) RunRoutedCommentCommand(base models.Repo, head *models.Repo, pull *models.PullRequest, user models.User, pullNum int, cmd *events.CommentCommand, _ command.RoutingContext) {
+	r.RunCommentCommand(base, head, pull, user, pullNum, cmd)
+}
+
+func (r *haCommandRunner) RunRoutedAutoplanCommand(base models.Repo, head models.Repo, pull models.PullRequest, user models.User, _ command.RoutingContext) {
+	r.RunAutoplanCommand(base, head, pull, user)
 }
 
 func (r *haCommandRunner) snapshot() []haRunnerCall {

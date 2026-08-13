@@ -40,6 +40,13 @@ type CommandRunner interface {
 	RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User)
 }
 
+// RoutedCommandRunner accepts owner-local routing state without changing the
+// direct command runner interface used by API and non-HA callers.
+type RoutedCommandRunner interface {
+	RunRoutedCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand, routing command.RoutingContext)
+	RunRoutedAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, routing command.RoutingContext)
+}
+
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_github_pull_getter.go GithubPullGetter
 
 // GithubPullGetter makes API calls to get pull requests.
@@ -143,6 +150,15 @@ type DefaultCommandRunner struct {
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
 func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User) {
+	c.runAutoplanCommand(baseRepo, headRepo, pull, user, command.RoutingContext{})
+}
+
+// RunRoutedAutoplanCommand runs autoplan with owner-local routing state.
+func (c *DefaultCommandRunner) RunRoutedAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, routing command.RoutingContext) {
+	c.runAutoplanCommand(baseRepo, headRepo, pull, user, routing)
+}
+
+func (c *DefaultCommandRunner) runAutoplanCommand(baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, routing command.RoutingContext) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pull.Num, ShutdownComment, command.Plan.String()); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
@@ -184,13 +200,15 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	ctx := &command.Context{
-		User:       user,
-		Log:        log,
-		Scope:      scope,
-		Pull:       pull,
-		HeadRepo:   headRepo,
-		PullStatus: status,
-		Trigger:    command.AutoTrigger,
+		User:                 user,
+		Log:                  log,
+		Scope:                scope,
+		Pull:                 pull,
+		HeadRepo:             headRepo,
+		PullStatus:           status,
+		Trigger:              command.AutoTrigger,
+		ExecutionLease:       routing.Lease,
+		RecoverExternalPlans: routing.RecoverExternalPlans,
 	}
 	if !c.validateCtxAndComment(ctx, command.Autoplan, true) {
 		return
@@ -462,6 +480,15 @@ func (c *DefaultCommandRunner) validateCommentCommand(ctx *command.Context, base
 // the event is further validated before making an additional (potentially
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
+	c.runCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, command.RoutingContext{})
+}
+
+// RunRoutedCommentCommand runs a comment command with owner-local routing state.
+func (c *DefaultCommandRunner) RunRoutedCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand, routing command.RoutingContext) {
+	c.runCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, cmd, routing)
+}
+
+func (c *DefaultCommandRunner) runCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand, routing command.RoutingContext) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
 		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
@@ -503,6 +530,8 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		PolicySet:            cmd.PolicySet,
 		ClearPolicyApproval:  cmd.ClearPolicyApproval,
 		TeamAllowlistChecker: c.TeamAllowlistChecker,
+		ExecutionLease:       routing.Lease,
+		RecoverExternalPlans: routing.RecoverExternalPlans,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name, true) {

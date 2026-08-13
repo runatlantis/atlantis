@@ -133,6 +133,25 @@ func TestInternalCommandController_ReturnsUnavailableWithoutExecuting(t *testing
 	}
 }
 
+func TestInternalCommandController_ReturnsConflictWhenExecutionLosesOwnership(t *testing.T) {
+	owners := &internalOwnerStore{
+		found:   true,
+		current: ownership.Record{ReplicaID: "replica-1", ClaimID: "claim-1"},
+		owns:    true,
+	}
+	controller := controllers.InternalCommandController{
+		Token:     "internal-secret",
+		ReplicaID: "replica-1",
+		Owners:    owners,
+		Executor:  &internalCommandExecutor{commentErr: events.ErrOwnershipChanged},
+	}
+
+	recorder := performInternalRequest(t, controller.Comment, internalCommentDispatch(), "internal-secret", "claim-1")
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "ownership changed")
+}
+
 func performInternalRequest(t *testing.T, handler http.HandlerFunc, payload any, token, claimID string) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(payload)
@@ -172,6 +191,9 @@ func (s *internalOwnerStore) Claim(context.Context, ownership.Key) (ownership.Re
 func (s *internalOwnerStore) Current(context.Context, ownership.Key) (ownership.Record, bool, error) {
 	s.currentCalls++
 	return s.current, s.found, s.currentErr
+}
+func (s *internalOwnerStore) Admit(context.Context, ownership.Key, string) (bool, error) {
+	return true, nil
 }
 func (s *internalOwnerStore) Owns(ownership.Key, string) bool { return s.owns }
 func (s *internalOwnerStore) Release(context.Context, ownership.Key, string) error {

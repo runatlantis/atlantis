@@ -160,6 +160,21 @@ func (s *OwnerStore) Claim(ctx context.Context, key ownership.Key) (ownership.Re
 	return current, nil
 }
 
+// Admit renews the exact local claim only when Redis still contains it.
+func (s *OwnerStore) Admit(ctx context.Context, key ownership.Key, claimID string) (bool, error) {
+	redisKey, err := redisOwnershipKey(key)
+	if err != nil {
+		return false, err
+	}
+	s.mu.RLock()
+	owned, ok := s.owned[redisKey]
+	s.mu.RUnlock()
+	if !ok || owned.record.InstanceID != s.instanceID || owned.record.ClaimID != claimID {
+		return false, nil
+	}
+	return s.renewSerialized(ctx, redisKey, owned.serialized)
+}
+
 // Current returns the current live ownership record, if one exists.
 func (s *OwnerStore) Current(ctx context.Context, key ownership.Key) (ownership.Record, bool, error) {
 	redisKey, err := redisOwnershipKey(key)
@@ -311,6 +326,8 @@ func (s *OwnerStore) renewOwned(ctx context.Context) {
 	for redisKey, command := range commands {
 		renewed, err := command.Int()
 		if err != nil {
+			// A transport failure does not prove that ownership changed. Readiness
+			// fences new work while the local claim remains tracked for retry.
 			renewalErr = errors.Join(renewalErr, fmt.Errorf("renewing PR ownership: %w", err))
 			continue
 		}

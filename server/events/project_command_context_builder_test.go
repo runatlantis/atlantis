@@ -4,6 +4,7 @@
 package events_test
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -156,6 +157,8 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 		SuppressVCSStatus:     true,
 		SuppressJobOutput:     true,
 		SuppressApplyWebhooks: true,
+		ExecutionLease:        executionLeaseFunc(func(context.Context) error { return nil }),
+		RecoverExternalPlans:  true,
 	}
 	apiResult := subject.BuildProjectContext(apiCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
 	assert.True(t, apiResult[0].API)
@@ -163,6 +166,8 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 	assert.True(t, apiResult[0].SuppressVCSStatus)
 	assert.True(t, apiResult[0].SuppressJobOutput)
 	assert.True(t, apiResult[0].SuppressApplyWebhooks)
+	assert.NotNil(t, apiResult[0].ExecutionLease)
+	assert.True(t, apiResult[0].RecoverExternalPlans)
 
 	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
 	normalCtx := &command.Context{Log: logging.NewNoopLogger(t)}
@@ -172,4 +177,6 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 	assert.False(t, normalResult[0].SuppressVCSStatus)
 	assert.False(t, normalResult[0].SuppressJobOutput)
 	assert.False(t, normalResult[0].SuppressApplyWebhooks)
+	assert.Nil(t, normalResult[0].ExecutionLease)
+	assert.False(t, normalResult[0].RecoverExternalPlans)
 }

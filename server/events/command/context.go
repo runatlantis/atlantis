@@ -4,10 +4,24 @@
 package command
 
 import (
+	"context"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
 )
+
+// ExecutionLease fences the start of routed command work against its current
+// distributed ownership claim.
+type ExecutionLease interface {
+	Admit(context.Context) error
+}
+
+// RoutingContext carries owner-local execution state through command runners.
+type RoutingContext struct {
+	Lease                ExecutionLease
+	RecoverExternalPlans bool
+}
 
 // Trigger represents the how the command was triggered
 type Trigger int
@@ -108,4 +122,10 @@ type Context struct {
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
+
+	// ExecutionLease is present only for commands accepted through replica routing.
+	ExecutionLease ExecutionLease
+
+	// RecoverExternalPlans marks a newly prepared local ownership generation.
+	RecoverExternalPlans bool
 }

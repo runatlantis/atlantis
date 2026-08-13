@@ -56,6 +56,7 @@ type Record struct {
 // Store coordinates pull request ownership across Atlantis replicas.
 type Store interface {
 	Claim(ctx context.Context, key Key) (Record, error)
+	Admit(ctx context.Context, key Key, claimID string) (bool, error)
 	Current(ctx context.Context, key Key) (Record, bool, error)
 	Owns(key Key, claimID string) bool
 	Release(ctx context.Context, key Key, claimID string) error
