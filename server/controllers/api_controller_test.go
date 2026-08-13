@@ -4249,6 +4249,141 @@ func TestAPIController_DetectDriftEmptySelectorsDiscoverAllProjects(t *testing.T
 	Assert(t, capturedCtx.SortByExecutionOrder, "expected drift API contexts to opt into execution-order sorting")
 }
 
+// A group-scoped detection plans only the group's projects and records the
+// group on each drift result so remediation can target it later.
+func TestAPIController_DetectDriftByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	var capturedCmd *events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCmd = args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+				Group:       "infra",
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	var stored models.ProjectDrift
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			stored = args[1].(models.ProjectDrift)
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCmd != nil, "expected project command builder to be called")
+	Equals(t, "infra", capturedCmd.Group)
+	Assert(t, capturedCmd.DiscoverAllProjects, "expected group detection to enumerate all projects and filter by group")
+	Equals(t, "infra", stored.Group)
+
+	// A partial detection must not reconcile storage: that would delete the
+	// drift records of every project outside the group.
+	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
+	driftStorage.VerifyWasCalled(Never()).DeleteMatching(Any[string](), Any[drift.GetOptions]())
+}
+
+func TestAPIController_DetectDriftGroupValidation(t *testing.T) {
+	cases := map[string]struct {
+		request models.DriftDetectionRequest
+		expErr  string
+	}{
+		"group with projects": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group:    "infra",
+				Projects: []string{"app"},
+			},
+			expErr: "group cannot be combined with projects or paths",
+		},
+		"group with paths": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "infra",
+				Paths: []models.DriftDetectionPath{{Directory: "app"}},
+			},
+			expErr: "group cannot be combined with projects or paths",
+		},
+		"group with unsafe characters": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "my group",
+			},
+			expErr: "group must contain only URL safe characters",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			ac.DriftStorage = driftmocks.NewMockStorage()
+
+			body, _ := json.Marshal(c.request)
+			req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.DetectDrift(w, req)
+
+			Equals(t, http.StatusBadRequest, w.Code)
+			Assert(t, strings.Contains(w.Body.String(), c.expErr),
+				"expected body %q to contain %q", w.Body.String(), c.expErr)
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+func TestAPIController_DriftStatus_GroupFilter(t *testing.T) {
+	ac, _, _ := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	var capturedOpts drift.GetOptions
+	When(driftStorage.Get(Any[string](), Any[drift.GetOptions]())).
+		Then(func(args []Param) ReturnValues {
+			capturedOpts = args[1].(drift.GetOptions)
+			return ReturnValues{[]models.ProjectDrift{}, nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	req, _ := http.NewRequest("GET", "/api/drift/status?repository=Repo&type=Gitlab&group=infra", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, "infra", capturedOpts.Group)
+}
+
+func TestAPIController_DriftStatus_InvalidGroupFilter(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+
+	req, _ := http.NewRequest("GET", "/api/drift/status?repository=Repo&type=Gitlab&group=my%20group", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	Assert(t, strings.Contains(w.Body.String(), "group must contain only URL safe characters"),
+		"expected group validation error, got %q", w.Body.String())
+}
+
 func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	var capturedCtx *command.Context
