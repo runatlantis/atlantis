@@ -123,20 +123,22 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 			return nil, errors.New("redis cluster addresses provided but all are empty")
 		}
 		rdb = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:     addrs,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			TLSConfig: tlsConfig,
+			Addrs:                 addrs,
+			Username:              cfg.Username,
+			Password:              cfg.Password,
+			TLSConfig:             tlsConfig,
+			ContextTimeoutEnabled: true,
 		})
 		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
 	default:
 		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
 		rdb = redis.NewClient(&redis.Options{
-			Addr:      address,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			DB:        cfg.DB,
-			TLSConfig: tlsConfig,
+			Addr:                  address,
+			Username:              cfg.Username,
+			Password:              cfg.Password,
+			DB:                    cfg.DB,
+			TLSConfig:             tlsConfig,
+			ContextTimeoutEnabled: true,
 		})
 		connDesc = address
 	}
@@ -381,7 +383,7 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
 
-	keys, err := scanRedisKeys(ctx, r.client, fmt.Sprintf("pr/%s*", repoFullName))
+	keys, err := scanRedisKeys(ctx, r.client, fmt.Sprintf("pr/%s/*", escapeRedisGlob(repoFullName)))
 	if err != nil {
 		return nil, fmt.Errorf("db transaction failed: %w", err)
 	}
@@ -394,7 +396,7 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Proje
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
 			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", key, err)
 		}
-		if lock.Pull.Num == pullNum {
+		if lock.Project.RepoFullName == repoFullName && lock.Pull.Num == pullNum {
 			deleted, err := r.UnlockIfOwnedByPull(lock.Project, lock.Workspace, pullNum)
 			if err != nil {
 				return locks, fmt.Errorf("unlocking repo %s, path %s, workspace %s: %w", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace, err)
@@ -406,6 +408,19 @@ func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.Proje
 	}
 
 	return locks, nil
+}
+
+func escapeRedisGlob(value string) string {
+	var escaped strings.Builder
+	escaped.Grow(len(value))
+	for _, char := range value {
+		switch char {
+		case '*', '?', '[', ']', '\\':
+			escaped.WriteByte('\\')
+		}
+		escaped.WriteRune(char)
+	}
+	return escaped.String()
 }
 
 func (r *RedisDB) LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error) {
