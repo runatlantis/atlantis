@@ -6317,3 +6317,223 @@ projects:
 	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
 		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }
+
+// Test that `atlantis plan -g <group>` only plans the modified projects that
+// belong to that group.
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsByGroup(t *testing.T) {
+	atlantisYAML := `version: 3
+projects:
+- dir: project1
+  group: infra
+- dir: project2
+  group: apps
+- dir: project3
+`
+	cases := map[string]struct {
+		Group      string
+		ExpDirs    []string
+		ExpErrText string
+	}{
+		"no group plans everything modified": {
+			Group:   "",
+			ExpDirs: []string{"project1", "project2", "project3"},
+		},
+		"group selects its projects": {
+			Group:   "infra",
+			ExpDirs: []string{"project1"},
+		},
+		"projects without a group are in the default group": {
+			Group:   "default",
+			ExpDirs: []string{"project3"},
+		},
+		"undefined group errors": {
+			Group:      "nope",
+			ExpErrText: "running commands for group \"nope\" is not allowed because this repo is only configured for the following groups: apps, default, infra",
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	userConfig := defaultUserConfig
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, map[string]any{
+				"project1": map[string]any{"main.tf": nil},
+				"project2": map[string]any{"main.tf": nil},
+				"project3": map[string]any{"main.tf": nil},
+			})
+			err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(atlantisYAML), 0600)
+			Ok(t, err)
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmpDir, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn([]string{"project1/main.tf", "project2/main.tf", "project3/main.tf"}, nil)
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				userConfig.SkipCloneNoChanges,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
+				userConfig.SilenceNoProjects,
+				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
+				scope,
+				tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildPlanCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+				},
+				&events.CommentCommand{
+					Name:  command.Plan,
+					Group: c.Group,
+				})
+			if c.ExpErrText != "" {
+				ErrEquals(t, c.ExpErrText, err)
+				return
+			}
+			Ok(t, err)
+			var actDirs []string
+			for _, ctx := range ctxs {
+				actDirs = append(actDirs, ctx.RepoRelDir)
+			}
+			Equals(t, c.ExpDirs, actDirs)
+		})
+	}
+}
+
+// Test that `atlantis apply -g <group>` only applies the pending plans of the
+// projects that belong to that group.
+func TestDefaultProjectCommandBuilder_BuildApplyCommandsByGroup(t *testing.T) {
+	atlantisYAML := `version: 3
+projects:
+- dir: project1
+  group: infra
+- dir: project2
+  group: apps
+`
+	cases := map[string]struct {
+		Group      string
+		ExpDirs    []string
+		ExpErrText string
+	}{
+		"no group applies all plans": {
+			Group:   "",
+			ExpDirs: []string{"project1", "project2"},
+		},
+		"group selects its plans": {
+			Group:   "apps",
+			ExpDirs: []string{"project2"},
+		},
+		"undefined group errors": {
+			Group:      "nope",
+			ExpErrText: "running commands for group \"nope\" is not allowed because this repo is only configured for the following groups: apps, default, infra",
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	userConfig := defaultUserConfig
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, map[string]any{
+				"default": map[string]any{
+					"atlantis.yaml": atlantisYAML,
+					"project1": map[string]any{
+						"main.tf":        nil,
+						"default.tfplan": nil,
+					},
+					"project2": map[string]any{
+						"main.tf":        nil,
+						"default.tfplan": nil,
+					},
+				},
+			})
+			// Initialize git repo so .tfplan files get picked up as untracked.
+			runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmpDir, nil)
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+				ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				nil,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				userConfig.SkipCloneNoChanges,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
+				userConfig.SilenceNoProjects,
+				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
+				scope,
+				tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildApplyCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+					Pull:  models.PullRequest{HeadCommit: "abc123"},
+					PullStatus: &models.PullStatus{
+						Pull: models.PullRequest{HeadCommit: "abc123"},
+						Projects: []models.ProjectStatus{
+							{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+							{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+						},
+					},
+				},
+				&events.CommentCommand{
+					Name:  command.Apply,
+					Group: c.Group,
+				})
+			if c.ExpErrText != "" {
+				ErrEquals(t, c.ExpErrText, err)
+				return
+			}
+			Ok(t, err)
+			var actDirs []string
+			for _, ctx := range ctxs {
+				actDirs = append(actDirs, ctx.RepoRelDir)
+			}
+			Equals(t, c.ExpDirs, actDirs)
+		})
+	}
+}

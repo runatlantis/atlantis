@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -30,6 +31,8 @@ const (
 	dirFlagShort                 = "d"
 	projectFlagLong              = "project"
 	projectFlagShort             = "p"
+	groupFlagLong                = "group"
+	groupFlagShort               = "g"
 	policySetFlagLong            = "policy-set"
 	policySetFlagShort           = ""
 	autoMergeDisabledFlagLong    = "auto-merge-disabled"
@@ -241,6 +244,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	var workspace string
 	var dir string
 	var project string
+	var group string
 	var policySet string
 	var clearPolicyApproval bool
 	var verbose bool
@@ -258,6 +262,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Switch to this Terraform workspace before planning.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run plan in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Which project to run plan for. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.StringVarP(&group, groupFlagLong, groupFlagShort, "", "Which group of projects to run plan for. Refers to the group of the projects configured in a repo config file. Cannot be used at same time as project, workspace or dir flags.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Apply.String():
 		name = command.Apply
@@ -266,6 +271,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Apply the plan for this Terraform workspace.")
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Apply the plan for this directory, relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Apply the plan for this project. Refers to the name of the project configured in a repo config file. Cannot be used at same time as workspace or dir flags.")
+		flagSet.StringVarP(&group, groupFlagLong, groupFlagShort, "", "Apply the plans for this group of projects. Refers to the group of the projects configured in a repo config file. Cannot be used at same time as project, workspace or dir flags.")
 		flagSet.BoolVarP(&autoMergeDisabled, autoMergeDisabledFlagLong, autoMergeDisabledFlagShort, false, "Disable automerge after apply.")
 		flagSet.StringVarP(&autoMergeMethod, autoMergeMethodFlagLong, autoMergeMethodFlagShort, "", "Specifies the merge method for the VCS if automerge is enabled. (Currently only implemented for GitHub)")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
@@ -343,6 +349,20 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
+	// A group selects a set of projects so it can't be combined with the flags
+	// that select a single project.
+	if group != "" && (project != "" || workspace != "" || dir != "") {
+		err := fmt.Sprintf("cannot use -%s/--%s at same time as -%s/--%s, -%s/--%s or -%s/--%s", groupFlagShort, groupFlagLong, projectFlagShort, projectFlagLong, dirFlagShort, dirFlagLong, workspaceFlagShort, workspaceFlagLong)
+		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
+	}
+
+	// The group is used to match against the group configured in the repo
+	// config file so apply the same character restrictions we apply to project
+	// names.
+	if group != "" && group != url.QueryEscape(group) {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid group: %q", group), cmd, flagSet)}
+	}
+
 	if autoMergeMethod != "" {
 		if autoMergeDisabled {
 			err := fmt.Sprintf("cannot use --%s at the same time as --%s", autoMergeMethodFlagLong, autoMergeDisabledFlagLong)
@@ -356,7 +376,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	return CommentParseResult{
-		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, policySet, clearPolicyApproval),
+		Command: NewCommentCommand(dir, extraArgs, name, subName, verbose, autoMergeDisabled, autoMergeMethod, workspace, project, group, policySet, clearPolicyApproval),
 	}
 }
 

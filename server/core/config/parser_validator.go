@@ -350,6 +350,7 @@ func (p *ParserValidator) copyProjectWithDir(original raw.Project, newDir string
 		Dir:                       &dirCopy,
 		Branch:                    original.Branch,
 		Workspace:                 original.Workspace,
+		Group:                     original.Group,
 		Workflow:                  original.Workflow,
 		TerraformDistribution:     original.TerraformDistribution,
 		TerraformVersion:          original.TerraformVersion,

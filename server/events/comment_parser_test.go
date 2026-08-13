@@ -706,6 +706,87 @@ func TestParse_UsingProjectAtSameTimeAsWorkspaceOrDir(t *testing.T) {
 	}
 }
 
+func TestParse_UsingGroupAtSameTimeAsProjectWorkspaceOrDir(t *testing.T) {
+	cases := []string{
+		"atlantis plan -g mygroup -p project",
+		"atlantis plan -g mygroup -d dir",
+		"atlantis plan -g mygroup -w workspace",
+		"atlantis apply --group mygroup -p project",
+		"atlantis apply --group mygroup -d dir",
+		"atlantis apply --group mygroup -w workspace",
+	}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "Error: cannot use -g/--group at same time as -p/--project, -d/--dir or -w/--workspace"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_Group(t *testing.T) {
+	cases := []struct {
+		comment  string
+		expGroup string
+	}{
+		{"atlantis plan", ""},
+		{"atlantis plan -g mygroup", "mygroup"},
+		{"atlantis plan --group mygroup", "mygroup"},
+		{"atlantis apply -g mygroup", "mygroup"},
+		{"atlantis apply --group my-group_1", "my-group_1"},
+	}
+	for _, c := range cases {
+		t.Run(c.comment, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			Assert(t, r.CommentResponse == "", "expected no comment response but got %q", r.CommentResponse)
+			Equals(t, c.expGroup, r.Command.Group)
+		})
+	}
+}
+
+func TestParse_InvalidGroup(t *testing.T) {
+	cases := []string{
+		"atlantis plan -g 'my group'",
+		"atlantis plan -g my/group",
+		"atlantis apply -g 'my group'",
+	}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "Error: invalid group"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+// A group targets a set of projects so it isn't a "generic" command that owns
+// the whole pull request's plans/status.
+func TestCommentCommand_IsGeneric(t *testing.T) {
+	cases := []struct {
+		description string
+		cmd         events.CommentCommand
+		exp         bool
+	}{
+		{"no flags", events.CommentCommand{}, true},
+		{"group", events.CommentCommand{Group: "mygroup"}, false},
+		{"dir", events.CommentCommand{RepoRelDir: "dir"}, false},
+		{"workspace", events.CommentCommand{Workspace: "staging"}, false},
+		{"project", events.CommentCommand{ProjectName: "proj"}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			Equals(t, c.exp, c.cmd.IsGeneric())
+			// A group alone must not look like a single-project command,
+			// otherwise the builder would not consider all projects.
+			if c.cmd.Group != "" {
+				Equals(t, false, c.cmd.IsForSpecificProject())
+			}
+		})
+	}
+}
+
 func TestParse_Parsing(t *testing.T) {
 	cases := []struct {
 		flags        string
@@ -1271,6 +1352,10 @@ func TestParse_VCSUsername(t *testing.T) {
 var PlanUsage = `Usage of plan:
   -d, --dir string         Which directory to run plan in relative to root of repo,
                            ex. 'child/dir'.
+  -g, --group string       Which group of projects to run plan for. Refers to the
+                           group of the projects configured in a repo config file.
+                           Cannot be used at same time as project, workspace or dir
+                           flags.
   -p, --project string     Which project to run plan for. Refers to the name of the
                            project configured in a repo config file. Cannot be used
                            at same time as workspace or dir flags.
@@ -1285,6 +1370,10 @@ var ApplyUsage = `Usage of apply:
                                    for GitHub)
   -d, --dir string                 Apply the plan for this directory, relative to
                                    root of repo, ex. 'child/dir'.
+  -g, --group string               Apply the plans for this group of projects.
+                                   Refers to the group of the projects configured in
+                                   a repo config file. Cannot be used at same time
+                                   as project, workspace or dir flags.
   -p, --project string             Apply the plan for this project. Refers to the
                                    name of the project configured in a repo config
                                    file. Cannot be used at same time as workspace or

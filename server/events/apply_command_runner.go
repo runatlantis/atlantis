@@ -206,8 +206,8 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 				ctx.CommandHasErrors = true
 				return
 			}
-			if cmd.IsForSpecificProject() {
-				// With a specific apply, just reset the status so it's not stuck in pending state
+			if !cmd.IsGeneric() {
+				// With a specific or group apply, just reset the status so it's not stuck in pending state
 				ctx.Log.Debug("resetting VCS status")
 				a.updateCommitStatus(ctx, *pullStatus)
 			} else {

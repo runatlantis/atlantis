@@ -252,7 +252,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	var noProjectPullStatus *models.PullStatus
-	if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+	if len(projectCmds) == 0 && cmd.IsGeneric() {
 		ctx.Log.Info("determined there was no project to run plan in")
 		pullStatus, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull)
 		if err != nil {
@@ -262,11 +262,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		noProjectPullStatus = &pullStatus
 	}
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
-		if cmd.IsForSpecificProject() {
+		if !cmd.IsGeneric() {
 			ctx.Log.Info("determined there was no project to run plan in")
 		}
 		if !p.silenceVCSStatusNoProjects {
-			if cmd.IsForSpecificProject() {
+			if !cmd.IsGeneric() {
 				// With a specific plan, just reset the status so it's not stuck in pending state
 				pullStatus, err := p.pullStatusFetcher.GetPullStatus(pull)
 				if err != nil {
@@ -312,7 +312,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	// if the plan is generic, new plans will be generated based on changes
 	// discard previous plans that might not be relevant anymore
-	if !cmd.IsForSpecificProject() && len(projectCmds) > 0 {
+	if cmd.IsGeneric() && len(projectCmds) > 0 {
 		ctx.Log.Debug("deleting previous plans and locks")
 		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
 			if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
@@ -342,7 +342,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var pullStatus models.PullStatus
 	if noProjectPullStatus != nil {
 		pullStatus = *noProjectPullStatus
-	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+	} else if len(projectCmds) == 0 && cmd.IsGeneric() {
 		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
 	} else {
 		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
@@ -361,7 +361,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		(!result.HasErrors() && !result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
-	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+	} else if len(projectCmds) == 0 && cmd.IsGeneric() {
 		// If there were no projects modified, we set successful commit statuses
 		// with 0/0 projects planned/policy_checked/applied successfully because some users require
 		// the Atlantis status to be passing for all pull requests.

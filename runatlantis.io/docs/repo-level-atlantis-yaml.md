@@ -68,6 +68,7 @@ projects:
   branch: /main/ # Available since v0.21.0
   dir: . # Available since v0.1.0
   workspace: default # Available since v0.1.0
+  group: default
   terraform_distribution: terraform # Available since v0.33.0
   terraform_version: v0.11.0 # Available since v0.1.0
   delete_source_branch_on_merge: true # Available since v0.17.0
@@ -315,6 +316,48 @@ projects:
 to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-side-repo-config.md#repos-can-set-their-own-apply-requirements).
 :::
 
+### Planning and applying by group
+
+Projects can be tagged with a `group` so that a whole set of them can be planned
+or applied with a single comment:
+
+```yaml
+version: 3
+projects:
+   - dir: network
+     group: infra
+   - dir: dns
+     group: infra
+   - dir: app1
+     group: apps
+   - dir: app2
+     # No group set, so this project is in the `default` group.
+```
+
+```bash
+# Plans network/ and dns/ (only the ones modified in this pull request).
+atlantis plan -g infra
+
+# Applies the pending plans for network/ and dns/.
+atlantis apply -g infra
+
+# Plans app2/, which has no group of its own.
+atlantis plan -g default
+```
+
+A group command only touches the projects in that group: unlike a bare
+`atlantis plan`, `atlantis plan -g infra` doesn't discard plans that were created
+for projects in other groups. `-g`/`--group` can't be combined with `-p`, `-d` or
+`-w` since those target a single project, and Atlantis errors out if the group
+isn't used by any project in the repo config, so a typo doesn't silently do
+nothing.
+
+::: warning NOTE
+If the server is run with [`--disable-apply-all`](server-configuration.md#disable-apply-all),
+`atlantis apply -g group` is rejected along with `atlantis apply`: that flag
+requires a specific project, directory or workspace.
+:::
+
 ### Order of planning/applying
 
 ```yaml
@@ -462,6 +505,7 @@ name: myname
 branch: /mybranch/
 dir: mydir
 workspace: myworkspace
+group: mygroup
 execution_order_group: 0
 delete_source_branch_on_merge: false
 repo_locking: true # deprecated: use repo_locks instead
@@ -483,6 +527,7 @@ workflow: myworkflow
 | branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                     |
 | dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
 | workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for the project. Atlantis switches to it at plan/apply. No `/`, `\\`, `..`, `$`, whitespace or control chars, nor start with `-` or `~`. |
+| group                                   | string                  | `"default"`     | no       | The group this project belongs to. Use `atlantis plan -g mygroup` / `atlantis apply -g mygroup` to plan or apply every project in the group at once. Projects that don't set a group belong to the `default` group.                     |
 | execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                         |
 | delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
 | repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |

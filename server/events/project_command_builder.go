@@ -348,7 +348,7 @@ func withDefaultWorkspace(workspaces []string) []string {
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
 func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
-	projCtxs, err := p.buildAllCommandsByCfg(ctx, command.Plan, "", nil, false)
+	projCtxs, err := p.buildAllCommandsByCfg(ctx, command.Plan, "", nil, false, "")
 	if err != nil {
 		return nil, err
 	}
@@ -367,11 +367,11 @@ func (p *DefaultProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Contex
 func (p *DefaultProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if cmd.DiscoverAllProjects {
 		ctx.Log.Debug("Building plan command for all configured and auto-discovered projects")
-		return p.buildAllProjectsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllProjectsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose, cmd.Group)
 	}
 	if !cmd.IsForSpecificProject() {
 		ctx.Log.Debug("Building plan command for all affected projects")
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose, cmd.Group)
 	}
 	ctx.Log.Debug("Building plan command for specific project with directory: '%v', workspace: '%v', project: '%v'",
 		cmd.RepoRelDir, cmd.Workspace, cmd.ProjectName)
@@ -403,7 +403,7 @@ func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		// import discard a plan file, so use buildAllCommandsByCfg instead buildAllProjectCommandsByPlan.
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose, cmd.Group)
 	}
 	return p.buildProjectCommand(ctx, cmd)
 }
@@ -411,7 +411,7 @@ func (p *DefaultProjectCommandBuilder) BuildImportCommands(ctx *command.Context,
 func (p *DefaultProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		// state rm discard a plan file, so use buildAllCommandsByCfg instead buildAllProjectCommandsByPlan.
-		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose)
+		return p.buildAllCommandsByCfg(ctx, cmd.CommandName(), cmd.SubName, cmd.Flags, cmd.Verbose, cmd.Group)
 	}
 	return p.buildProjectCommand(ctx, cmd)
 }
@@ -817,7 +817,7 @@ func (p *DefaultProjectCommandBuilder) discoverAllProjectDirs(ctx *command.Conte
 	return projectDirs, nil
 }
 
-func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool, group string) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName, WorkingDirLockMetadataForPull(ctx.Pull))
@@ -838,10 +838,15 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 		return nil, err
 	}
 
+	if err := repoCfg.ValidateGroupAllowed(group); err != nil {
+		return nil, err
+	}
+
 	mergedProjectCfgs, err := p.getAllMergedProjectCfgs(ctx, repoDir, repoCfg)
 	if err != nil {
 		return nil, err
 	}
+	mergedProjectCfgs = filterMergedProjectCfgsByGroup(ctx, mergedProjectCfgs, group)
 
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
@@ -888,7 +893,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
 // modified in this ctx.
-func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
+func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool, group string) ([]command.ProjectContext, error) {
 	// We'll need the list of modified files.
 	modifiedFiles, err := p.VCSClient.GetModifiedFiles(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
@@ -938,12 +943,17 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 		return nil, err
 	}
 
+	if err := repoCfg.ValidateGroupAllowed(group); err != nil {
+		return nil, err
+	}
+
 	var projCtxs []command.ProjectContext
 
 	mergedProjectCfgs, err := p.getMergedProjectCfgs(ctx, repoDir, modifiedFiles, repoCfg)
 	if err != nil {
 		return nil, err
 	}
+	mergedProjectCfgs = filterMergedProjectCfgsByGroup(ctx, mergedProjectCfgs, group)
 
 	automerge := p.EnableAutoMerge
 	parallelApply := p.EnableParallelApply
@@ -1308,6 +1318,10 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		return nil, err
 	}
 
+	if err := repoCfg.ValidateGroupAllowed(commentCmd.Group); err != nil {
+		return nil, err
+	}
+
 	// Filter out untracked plan files in paths matching autodiscover.ignore_paths,
 	// but only when autodiscovery is active, matching the plan-path behavior in
 	// getMergedProjectCfgs. Preserve ignored-path plans already present in pull
@@ -1367,6 +1381,8 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 		cmds = append(cmds, commentCmds...)
 	}
+
+	cmds = filterProjectContextsByGroup(ctx, cmds, commentCmd.Group)
 
 	sort.Slice(cmds, func(i, j int) bool {
 		return cmds[i].ExecutionOrderGroup < cmds[j].ExecutionOrderGroup
@@ -1806,6 +1822,51 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 
 	// Filter projects to only include ones the user is authorized for
 	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
+}
+
+// filterMergedProjectCfgsByGroup returns only the project configs belonging to
+// group. An empty group means the command wasn't targeted at a group so all
+// configs are returned.
+func filterMergedProjectCfgsByGroup(ctx *command.Context, cfgs []valid.MergedProjectCfg, group string) []valid.MergedProjectCfg {
+	if group == "" {
+		return cfgs
+	}
+	filtered := make([]valid.MergedProjectCfg, 0, len(cfgs))
+	for _, cfg := range cfgs {
+		if projectGroup(cfg.Group) != group {
+			ctx.Log.Debug("ignoring project at dir '%s', workspace: '%s' because it is not in group '%s'", cfg.RepoRelDir, cfg.Workspace, group)
+			continue
+		}
+		filtered = append(filtered, cfg)
+	}
+	return filtered
+}
+
+// filterProjectContextsByGroup returns only the project contexts belonging to
+// group. An empty group means the command wasn't targeted at a group so all
+// contexts are returned.
+func filterProjectContextsByGroup(ctx *command.Context, projCtxs []command.ProjectContext, group string) []command.ProjectContext {
+	if group == "" {
+		return projCtxs
+	}
+	filtered := make([]command.ProjectContext, 0, len(projCtxs))
+	for _, projCtx := range projCtxs {
+		if projectGroup(projCtx.Group) != group {
+			ctx.Log.Debug("ignoring project at dir '%s', workspace: '%s' because it is not in group '%s'", projCtx.RepoRelDir, projCtx.Workspace, group)
+			continue
+		}
+		filtered = append(filtered, projCtx)
+	}
+	return filtered
+}
+
+// projectGroup returns the group of a project, defaulting to
+// valid.DefaultGroup when it's unset.
+func projectGroup(group string) string {
+	if group == "" {
+		return valid.DefaultGroup
+	}
+	return group
 }
 
 func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {

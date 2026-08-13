@@ -218,6 +218,7 @@ projects:
 					{
 						Dir:              ".",
 						Workspace:        "default",
+						Group:            "default",
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
@@ -246,6 +247,7 @@ projects:
 					{
 						Dir:       "2026-06-26",
 						Workspace: "default",
+						Group:     "default",
 						Name:      String("2026-06-27"),
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"2026-06-28"},
@@ -269,6 +271,7 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -293,6 +296,7 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: []string{"**/*.tf*"},
 							Enabled:      true,
@@ -315,6 +319,7 @@ projects:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -338,6 +343,7 @@ workflows: ~
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -366,6 +372,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -395,6 +402,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -429,6 +437,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -463,6 +472,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -497,6 +507,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -531,6 +542,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -565,6 +577,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -599,6 +612,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -633,6 +647,7 @@ workflows:
 					{
 						Dir:              ".",
 						Workspace:        "myworkspace",
+						Group:            "default",
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
@@ -662,6 +677,7 @@ projects:
 					{
 						Dir:                   ".",
 						Workspace:             "myworkspace",
+						Group:                 "default",
 						TerraformDistribution: String("opentofu"),
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
@@ -770,6 +786,7 @@ projects:
 						Name:      String("myname"),
 						Dir:       ".",
 						Workspace: "workspace",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -779,6 +796,7 @@ projects:
 						Name:      String("myname2"),
 						Dir:       ".",
 						Workspace: "workspace",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -821,6 +839,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -920,6 +939,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -1011,6 +1031,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
@@ -1104,6 +1125,7 @@ workflows:
 					{
 						Dir:       ".",
 						Workspace: "default",
+						Group:     "default",
 						Autoplan: valid.Autoplan{
 							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,

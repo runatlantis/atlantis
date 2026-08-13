@@ -141,6 +141,9 @@ type MergedProjectCfg struct {
 	PolicyCheck               bool
 	CustomPolicyCheck         bool
 	SilencePRComments         []string
+	// Group is the group this project belongs to, ex. the group targeted by
+	// `atlantis plan -g mygroup`.
+	Group string
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -438,6 +441,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		Workspace:                 proj.Workspace,
 		DependsOn:                 proj.DependsOn,
 		Name:                      proj.GetName(),
+		Group:                     proj.GetGroup(),
 		AutoplanEnabled:           proj.Autoplan.Enabled,
 		AutoplanWhenModified:      proj.Autoplan.WhenModified,
 		TerraformDistribution:     proj.TerraformDistribution,
@@ -466,6 +470,7 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		RepoRelDir:                repoRelDir,
 		Workspace:                 workspace,
 		Name:                      "",
+		Group:                     DefaultGroup,
 		AutoplanEnabled:           DefaultAutoPlanEnabled,
 		AutoplanWhenModified:      []string{},
 		TerraformDistribution:     nil,
