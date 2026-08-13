@@ -28,6 +28,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"github.com/uber-go/tally/v4"
 )
 
 var defaultUserConfig = struct {
@@ -5961,4 +5962,179 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t
 	stagingPlan, err := os.ReadFile(filepath.Join(pullDir, "staging", "project1", "staging.tfplan"))
 	Ok(t, err)
 	Equals(t, "plan-data", string(stagingPlan))
+}
+
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_AfterPreHookRecreatedDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+	pullDir := t.TempDir()
+	defaultDir := filepath.Join(pullDir, events.DefaultWorkspace)
+	Ok(t, os.MkdirAll(filepath.Join(defaultDir, "project1"), 0o700))
+	runCmd(t, defaultDir, "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(pullDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(defaultDir, nil)
+	restored := false
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{events.DefaultWorkspace},
+		restoreFn: func(gotPullDir, _, _ string, _ int) error {
+			restored = true
+			return os.WriteFile(filepath.Join(gotPullDir, events.DefaultWorkspace, "project1", "default.tfplan"), []byte("plan"), 0o600)
+		},
+	}
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := newExternalPlanRecoveryBuilder(t, workingDir, planStore, scope)
+
+	ctxs, err := builder.BuildApplyCommands(&command.Context{
+		Log:                  logger,
+		Scope:                scope,
+		RecoverExternalPlans: true,
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{RepoRelDir: "project1", Workspace: events.DefaultWorkspace, Status: models.PlannedPlanStatus},
+		}},
+	}, &events.CommentCommand{Name: command.Apply})
+
+	Ok(t, err)
+	Assert(t, restored, "expected takeover recovery even though a pre-hook recreated the pull directory")
+	Equals(t, 1, len(ctxs))
+}
+
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MissingRemotePlanRequiresReplan(t *testing.T) {
+	RegisterMockTestingT(t)
+	pullDir := t.TempDir()
+	defaultDir := filepath.Join(pullDir, events.DefaultWorkspace)
+	Ok(t, os.MkdirAll(defaultDir, 0o700))
+	runCmd(t, defaultDir, "git", "init")
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(pullDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(defaultDir, nil)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := newExternalPlanRecoveryBuilder(t, workingDir, &mockExternalPlanStore{}, scope)
+
+	_, err := builder.BuildApplyCommands(&command.Context{
+		Log:                  logger,
+		Scope:                scope,
+		RecoverExternalPlans: true,
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{RepoRelDir: "project1", Workspace: events.DefaultWorkspace, Status: models.PlannedPlanStatus},
+		}},
+	}, &events.CommentCommand{Name: command.Apply})
+
+	Assert(t, err != nil, "expected missing external plan to require a new plan")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %v", err)
+}
+
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_EnsuresDefaultWorkspaceFirst(t *testing.T) {
+	RegisterMockTestingT(t)
+	pullDir := filepath.Join(t.TempDir(), "pull")
+	workingDir := &fakeWorkingDir{MockWorkingDir: *mocks.NewMockWorkingDir(), pullDir: pullDir}
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"prod"},
+		restoreFn: func(gotPullDir, _, _ string, _ int) error {
+			projectDir := filepath.Join(gotPullDir, "prod", "project1")
+			if err := os.MkdirAll(projectDir, 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(projectDir, "prod.tfplan"), []byte("plan"), 0o600)
+		},
+	}
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := newExternalPlanRecoveryBuilder(t, workingDir, planStore, scope)
+
+	ctxs, err := builder.BuildApplyCommands(&command.Context{
+		Log:   logger,
+		Scope: scope,
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{RepoRelDir: "project1", Workspace: "prod", Status: models.PlannedPlanStatus},
+		}},
+	}, &events.CommentCommand{Name: command.Apply})
+
+	Ok(t, err)
+	Equals(t, []string{events.DefaultWorkspace, "prod"}, workingDir.cloneCalls)
+	Equals(t, 1, len(ctxs))
+}
+
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_TargetedWorkspace(t *testing.T) {
+	testTargetedExternalPlanWorkspaceRecovery(t, events.CommentCommand{Name: command.Apply, Workspace: "prod"})
+}
+
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_TargetedProjectWorkspace(t *testing.T) {
+	testTargetedExternalPlanWorkspaceRecovery(t, events.CommentCommand{Name: command.Apply, ProjectName: "app"})
+}
+
+func testTargetedExternalPlanWorkspaceRecovery(t *testing.T, cmd events.CommentCommand) {
+	t.Helper()
+	RegisterMockTestingT(t)
+	defaultDir := DirStructure(t, map[string]any{
+		"main.tf": nil,
+		"app":     map[string]any{"main.tf": nil},
+	})
+	if cmd.ProjectName != "" {
+		Ok(t, os.WriteFile(filepath.Join(defaultDir, valid.DefaultAtlantisFile), []byte(`version: 3
+projects:
+- name: app
+  dir: app
+  workspace: prod
+`), 0o600))
+	}
+	prodDir := DirStructure(t, map[string]any{
+		"main.tf": nil,
+		"app":     map[string]any{"main.tf": nil},
+	})
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(defaultDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq("prod"))).
+		ThenReturn("", os.ErrNotExist).
+		ThenReturn(prodDir, nil)
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("prod"))).ThenReturn(prodDir, nil)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	builder := newExternalPlanRecoveryBuilder(t, workingDir, &mockExternalPlanStore{}, scope)
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+
+	ctxs, err := builder.BuildApplyCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: repo,
+		Pull:     models.PullRequest{Num: 12, BaseBranch: "main", BaseRepo: repo},
+	}, &cmd)
+
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "prod", ctxs[0].Workspace)
+	workingDir.VerifyWasCalledOnce().Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("prod"))
+}
+
+func newExternalPlanRecoveryBuilder(t *testing.T, workingDir events.WorkingDir, planStore runtime.PlanStore, scope tally.Scope) *events.DefaultProjectCommandBuilder {
+	t.Helper()
+	userConfig := defaultUserConfig
+	return events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		planStore,
+	)
 }
