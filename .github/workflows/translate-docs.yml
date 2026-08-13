@@ -77,8 +77,28 @@ jobs:
         # Version is pinned deliberately: this is the only step the API key is
         # exposed to, and `@latest` would run whatever was published upstream
         # since the last review. Bump it like any other dependency.
+        #
+        # Individual files can fail when the model returns a malformed JSON
+        # envelope, which gets likelier the longer the response. Retries are
+        # cheap because the lockfile means a rerun only reprocesses what is
+        # still missing. Files that never succeed are simply left untranslated:
+        # localize-links.mjs keeps the locale buildable, so a partial run still
+        # produces a reviewable PR instead of nothing.
         run: |
-          npx --yes lingo.dev@0.138.4 run ${{ inputs.force && '--force' || '' }}
+          for attempt in 1 2 3; do
+            if npx --yes lingo.dev@0.138.4 run ${{ inputs.force && '--force' || '' }}; then
+              echo "Translation completed on attempt ${attempt}."
+              break
+            fi
+            echo "::warning::Translation attempt ${attempt} had failures; retrying."
+          done
+
+          # A total failure (bad key, provider outage) must not pass silently as
+          # "no changes to translate".
+          if [ -z "$(find .lingo-src -mindepth 2 -name '*.md' -not -path '.lingo-src/en/*' -print -quit)" ]; then
+            echo "::error::No translated files were produced."
+            exit 1
+          fi
 
       - name: Copy translations into the site
         run: |
