@@ -23,6 +23,10 @@ const SITE_DIR = 'runatlantis.io';
 // Matches the target of a markdown link or image: ](target) or ](target "title")
 const LINK_RE = /(\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g;
 
+// These docs embed raw HTML for anything markdown can't express (sized images,
+// nested lists with inline images), so src=/href= need the same treatment.
+const HTML_ATTR_RE = /(<[^>]*?\b(?:src|href)=)(["'])([^"']+)(\2)/g;
+
 const isExternal = (target) =>
   /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(target);
 
@@ -70,10 +74,15 @@ for (const locale of locales) {
     const original = await readFile(file, 'utf8');
     const fileDir = path.dirname(path.resolve(file));
 
-    const updated = original.replace(LINK_RE, (match, open, target, close) => {
-      const next = rewriteTarget(target, fileDir, localeRoot, englishRoot);
-      return next === target ? match : `${open}${next}${close}`;
-    });
+    const updated = original
+      .replace(LINK_RE, (match, open, target, close) => {
+        const next = rewriteTarget(target, fileDir, localeRoot, englishRoot);
+        return next === target ? match : `${open}${next}${close}`;
+      })
+      .replace(HTML_ATTR_RE, (match, open, quote, target, close) => {
+        const next = rewriteTarget(target, fileDir, localeRoot, englishRoot);
+        return next === target ? match : `${open}${quote}${next}${close}`;
+      });
 
     if (updated !== original) {
       await writeFile(file, updated);

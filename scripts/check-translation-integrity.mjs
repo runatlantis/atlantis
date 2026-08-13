@@ -72,6 +72,9 @@ function splitFences(text) {
   return { fences, prose: proseLines.join('\n') };
 }
 const LINK_RE = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+// Raw HTML is used throughout these docs for sized images and nested lists, so
+// a dropped <img src> is as much a defect as a dropped markdown image.
+const HTML_ATTR_RE = /<[^>]*?\b(?:src|href)=["']([^"']+)["']/g;
 const CONTAINER_RE = /^:::+\s*([a-z-]+)/gm;
 const BADGE_RE = /<Badge\b[^>]*>/g;
 const HEADING_RE = /^#{1,6}\s+\S/gm;
@@ -150,8 +153,8 @@ function compare(sourceFull, targetFull, sourceDir, targetDir, locale) {
     );
   }
 
-  const srcLinks = collect(sourceText, LINK_RE);
-  const dstLinks = collect(targetText, LINK_RE);
+  const srcLinks = [...collect(sourceText, LINK_RE), ...collect(sourceText, HTML_ATTR_RE)];
+  const dstLinks = [...collect(targetText, LINK_RE), ...collect(targetText, HTML_ATTR_RE)];
   if (srcLinks.length !== dstLinks.length) {
     problems.push(`link count differs: source ${srcLinks.length}, translation ${dstLinks.length}`);
   } else {

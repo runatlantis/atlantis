@@ -23,6 +23,8 @@ on:
       - 'runatlantis.io/guide/**/*.md'
       - 'runatlantis.io/*.md'
       - 'i18n.json'
+      - 'scripts/localize-links.mjs'
+      - 'scripts/check-translation-integrity.mjs'
       - '.github/workflows/translate-docs.yml'
   workflow_dispatch:
     inputs:
