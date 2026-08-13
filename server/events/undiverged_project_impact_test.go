@@ -158,7 +158,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFailsForImpactedConf
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
-	Equals(t, "Default branch must be rebased onto pull request before running apply.", failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running apply.", failure)
 }
 
 func TestDefaultCommandRequirementHandler_TargetedUndivergedPassesForUnrelatedConfiguredChange(t *testing.T) {
@@ -227,7 +227,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackWhenGenerat
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
-	Equals(t, "Default branch must be rebased onto pull request before running apply.", failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running apply.", failure)
 }
 
 func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackForEmptyConfiguredWhenModified(t *testing.T) {
@@ -250,7 +250,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackForEmptyCon
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
-	Equals(t, "Default branch must be rebased onto pull request before running apply.", failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running apply.", failure)
 }
 
 func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackToFullCheckOnResolverError(t *testing.T) {
