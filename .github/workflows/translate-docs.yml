@@ -119,6 +119,18 @@ jobs:
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
           node scripts/localize-links.mjs $locales
 
+      - name: Upload translated output
+        # Kept even when the integrity check fails: when a page trips a check,
+        # the generated file is the only way to see what actually happened, and
+        # the run is otherwise the only place it ever existed.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: translated-docs
+          # Locale dirs only. Extend this list when a locale is added.
+          path: runatlantis.io/es/
+          retention-days: 7
+
       - name: Check translation integrity
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
