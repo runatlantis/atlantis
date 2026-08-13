@@ -111,6 +111,14 @@ jobs:
           done
           rm -rf .lingo-src
 
+      - name: Localize links
+        # Translated pages inherit their source's relative links, which would
+        # resolve inside the locale and break the build for any page that is
+        # not translated yet. Point those back at the English tree.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/localize-links.mjs $locales
+
       - name: Check translation integrity
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"

@@ -75,8 +75,13 @@ function resolveTarget(target, fromDir) {
   return { file: path.resolve(fromDir, filePart), anchor };
 }
 
-function compare(sourceText, targetText, sourceDir, targetDir, locale) {
+/** Frontmatter is compared separately; strip it so YAML comments aren't mistaken for headings. */
+const body = (text) => text.replace(FRONTMATTER_RE, '');
+
+function compare(sourceFull, targetFull, sourceDir, targetDir, locale) {
   const problems = [];
+  const sourceText = body(sourceFull);
+  const targetText = body(targetFull);
 
   const srcBlocks = codeBlocks(sourceText);
   const dstBlocks = codeBlocks(targetText);
@@ -151,8 +156,8 @@ function compare(sourceText, targetText, sourceDir, targetDir, locale) {
     problems.push(`heading count differs: source ${srcHeadings}, translation ${dstHeadings}`);
   }
 
-  const srcFm = frontmatter(sourceText);
-  const dstFm = frontmatter(targetText);
+  const srcFm = frontmatter(sourceFull);
+  const dstFm = frontmatter(targetFull);
   if (srcFm.keys.join(',') !== dstFm.keys.join(',')) {
     problems.push(`frontmatter keys differ: [${srcFm.keys}] vs [${dstFm.keys}]`);
   }
