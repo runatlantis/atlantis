@@ -673,7 +673,7 @@ var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
 // server/events cannot import cmd (cmd imports server, so the reverse would
 // be an import cycle). If the default executable name ever changes, update
 // both constants.
-const DefaultExecutableName = "atlantis"
+const defaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.
