@@ -21,7 +21,7 @@ func NewApplyCommandRunner(
 	applyCommandLocker locking.ApplyLockChecker,
 	commitStatusUpdater CommitStatusUpdater,
 	prjCommandBuilder ProjectApplyCommandBuilder,
-	prjCmdRunner ProjectApplyCommandRunner,
+	prjCmdRunner ProjectApplyWithReplanRunner,
 	cancellationTracker CancellationTracker,
 	autoMerger *AutoMerger,
 	pullUpdater *PullUpdater,
@@ -57,6 +57,15 @@ func NewApplyCommandRunner(
 	}
 }
 
+// ProjectApplyWithReplanRunner can apply projects and optionally replan (and
+// policy-check) dependents mid-apply when replan_between_execution_order_groups
+// is enabled.
+type ProjectApplyWithReplanRunner interface {
+	ProjectApplyCommandRunner
+	ProjectPlanCommandRunner
+	ProjectPolicyCheckCommandRunner
+}
+
 type ApplyCommandRunner struct {
 	DisableApplyAll       bool
 	Database              db.Database
@@ -64,7 +73,7 @@ type ApplyCommandRunner struct {
 	vcsClient             vcs.Client
 	commitStatusUpdater   CommitStatusUpdater
 	prjCmdBuilder         ProjectApplyCommandBuilder
-	prjCmdRunner          ProjectApplyCommandRunner
+	prjCmdRunner          ProjectApplyWithReplanRunner
 	cancellationTracker   CancellationTracker
 	autoMerger            *AutoMerger
 	pullUpdater           *PullUpdater
@@ -228,7 +237,11 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	preApplyPullStatus := ctx.PullStatus
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
+	result := runApplyCmdsWithOptionalReplan(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), projectCmdRunners{
+		apply:       a.prjCmdRunner.Apply,
+		plan:        a.prjCmdRunner.Plan,
+		policyCheck: a.prjCmdRunner.PolicyCheck,
+	})
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
 		ctx.Log.Err("fetching live pull request after apply: %s", err)

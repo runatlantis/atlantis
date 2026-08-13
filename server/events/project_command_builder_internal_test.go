@@ -742,6 +742,13 @@ projects:
 					// workflow uses the built-in plan or apply step.
 					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
 						slices.Contains(c.expApplySteps, "apply")
+					// PlanSteps are always attached so apply can optionally
+					// replan dependents mid-apply.
+					var expPlanSteps []valid.Step
+					for _, stepName := range c.expPlanSteps {
+						expPlanSteps = append(expPlanSteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PlanSteps = expPlanSteps
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -968,6 +975,13 @@ projects:
 					// workflow uses the built-in plan or apply step.
 					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
 						slices.Contains(c.expApplySteps, "apply")
+					// PlanSteps are always attached so apply can optionally
+					// replan dependents mid-apply.
+					var expPlanSteps []valid.Step
+					for _, stepName := range c.expPlanSteps {
+						expPlanSteps = append(expPlanSteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PlanSteps = expPlanSteps
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -1219,6 +1233,15 @@ workflows:
 				// fall back to the built-in default steps and Atlantis owns
 				// the convention plan artifact.
 				c.expCtx.RequiresAtlantisManagedPlanFile = true
+				// Default plan workflow steps are attached on every project context.
+				c.expCtx.PlanSteps = []valid.Step{{StepName: "init"}, {StepName: "plan"}}
+				if len(c.expPolicyCheckSteps) > 0 {
+					var expPolicySteps []valid.Step
+					for _, stepName := range c.expPolicyCheckSteps {
+						expPolicySteps = append(expPolicySteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PolicyCheckSteps = expPolicySteps
+				}
 				ctx.PolicySets = emptyPolicySets
 
 				// Job ID cannot be compared since its generated at random

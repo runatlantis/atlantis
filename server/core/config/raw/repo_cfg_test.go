@@ -329,6 +329,19 @@ func TestConfig_ToValid(t *testing.T) {
 			},
 		},
 		{
+			description: "replan_between_execution_order_groups true",
+			input: raw.RepoCfg{
+				Version:                           Int(3),
+				ReplanBetweenExecutionOrderGroups: Bool(true),
+			},
+			exp: valid.RepoCfg{
+				Version:                           3,
+				ReplanBetweenExecutionOrderGroups: true,
+				AbortOnExecutionOrderFail:         false,
+				Workflows:                         map[string]valid.Workflow{},
+			},
+		},
+		{
 			description: "autodiscover omitted",
 			input: raw.RepoCfg{
 				Version: Int(2),

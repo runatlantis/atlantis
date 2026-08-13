@@ -816,20 +816,37 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	defer unlockFn()
 
 	// Clone is idempotent so okay to run even if the repo was already cloned.
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+	// Mid-apply replans must NOT clone or merge-again: the apply already holds a
+	// pull working tree and sibling planfiles must stay intact.
+	var repoDir string
+	var mergedAgain bool
+	if ctx.MidApplyReplan {
+		repoDir, err = p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
+		if err != nil {
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after mid-apply replan error: %v", unlockErr)
+			}
+			if os.IsNotExist(err) {
+				return nil, "", errors.New("project has not been cloned–did you run plan?")
+			}
+			return nil, "", err
 		}
-		return nil, "", err
-	}
+	} else {
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+		if err != nil {
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			}
+			return nil, "", err
+		}
 
-	mergedAgain, err := p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		mergedAgain, err = p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+		if err != nil {
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			}
+			return nil, "", err
 		}
-		return nil, "", err
 	}
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
@@ -846,18 +863,21 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
-	// Validate requirements after refreshing the merge checkout so project path
-	// checks and plan execution use the same tree.
-	failure, err := p.CommandRequirementHandler.ValidatePlanProject(repoDir, ctx)
-	if failure != "" || err != nil {
-		if deleteErr := p.WorkingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); deleteErr != nil {
-			ctx.Log.Err("error deleting stale plan after plan validation failure: %v", deleteErr)
-			return nil, failure, fmt.Errorf("deleting stale plan after plan validation failure: %w", deleteErr)
+	// Skip plan-stage PR requirements on mid-apply refresh. Apply already
+	// enforced apply requirements, and re-checking undiverged/etc. after we
+	// intentionally skip MergeAgain would be incorrect.
+	if !ctx.MidApplyReplan {
+		failure, err := p.CommandRequirementHandler.ValidatePlanProject(repoDir, ctx)
+		if failure != "" || err != nil {
+			if deleteErr := p.WorkingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); deleteErr != nil {
+				ctx.Log.Err("error deleting stale plan after plan validation failure: %v", deleteErr)
+				return nil, failure, fmt.Errorf("deleting stale plan after plan validation failure: %w", deleteErr)
+			}
+			if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+				ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+			}
+			return nil, failure, err
 		}
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
-		return nil, failure, err
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
