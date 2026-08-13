@@ -81,6 +81,7 @@ var testFlags = map[string]any{
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
+	FailOnMissingDependenciesFlag:    true,
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
 	GHHostnameFlag:                   "ghhostname",
