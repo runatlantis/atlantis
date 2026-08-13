@@ -26,8 +26,51 @@ const TRANSLATED_DIRS = [
   { dir: '.', recursive: false },
 ];
 
-const FENCE_RE = /^([ \t]*)(`{3,}|~{3,})([^\n]*)\n([\s\S]*?)^[ \t]*\2[ \t]*$/gm;
 const INLINE_CODE_RE = /(?<!`)`([^`\n]+)`(?!`)/g;
+
+const FENCE_OPEN_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+/**
+ * Splits a document into fenced code blocks and the prose between them.
+ *
+ * Deliberately not a regex over the whole document: prose in these docs quotes
+ * literal ``` sequences, and once a line happens to start with one, a
+ * whole-document regex locks onto it as a fence opener and desyncs everything
+ * after. Per CommonMark, a backtick fence's info string may not contain a
+ * backtick, which is exactly the rule that distinguishes the two cases.
+ */
+function splitFences(text) {
+  const fences = [];
+  const proseLines = [];
+  let open = null;
+  let bodyLines = [];
+
+  for (const line of text.split('\n')) {
+    if (open) {
+      const close = line.match(/^ {0,3}(`{3,}|~{3,})\s*$/);
+      if (close && close[1][0] === open.char && close[1].length >= open.length) {
+        fences.push({ info: open.info.trim(), body: bodyLines.join('\n') });
+        open = null;
+        bodyLines = [];
+      } else {
+        bodyLines.push(line);
+      }
+      continue;
+    }
+
+    const match = line.match(FENCE_OPEN_RE);
+    if (match && !(match[1][0] === '`' && match[2].includes('`'))) {
+      open = { char: match[1][0], length: match[1].length, info: match[2] };
+      continue;
+    }
+    proseLines.push(line);
+  }
+
+  // An unterminated fence still holds real content; keep it rather than drop it.
+  if (open) fences.push({ info: open.info.trim(), body: bodyLines.join('\n') });
+
+  return { fences, prose: proseLines.join('\n') };
+}
 const LINK_RE = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const CONTAINER_RE = /^:::+\s*([a-z-]+)/gm;
 const BADGE_RE = /<Badge\b[^>]*>/g;
@@ -39,7 +82,7 @@ const collect = (text, re, pick = (m) => m[1]) =>
 
 /** Code blocks must survive byte for byte, including the info string. */
 const codeBlocks = (text) =>
-  collect(text, FENCE_RE, (m) => `${m[3].trim()}\n${m[4]}`);
+  splitFences(text).fences.map((fence) => `${fence.info}\n${fence.body}`);
 
 /** Frontmatter keys, plus the values that VitePress interprets rather than renders. */
 const frontmatter = (text) => {
@@ -80,11 +123,14 @@ const body = (text) => text.replace(FRONTMATTER_RE, '');
 
 function compare(sourceFull, targetFull, sourceDir, targetDir, locale) {
   const problems = [];
-  const sourceText = body(sourceFull);
-  const targetText = body(targetFull);
+  // Prose only for the inline checks: a `#` or a [link](…) inside a code sample
+  // is content, not markup, and comparing it here produces noise rather than
+  // signal. Code blocks get their own byte-for-byte comparison below.
+  const sourceText = splitFences(body(sourceFull)).prose;
+  const targetText = splitFences(body(targetFull)).prose;
 
-  const srcBlocks = codeBlocks(sourceText);
-  const dstBlocks = codeBlocks(targetText);
+  const srcBlocks = codeBlocks(body(sourceFull));
+  const dstBlocks = codeBlocks(body(targetFull));
   if (srcBlocks.length !== dstBlocks.length) {
     problems.push(`fenced code blocks: source has ${srcBlocks.length}, translation has ${dstBlocks.length}`);
   } else {
