@@ -151,7 +151,7 @@ func (c *NoOpLocker) TryLock(p models.Project, workspace string, _ models.PullRe
 // pointer will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *NoOpLocker) Unlock(_ string) (*models.ProjectLock, error) {
-	return &models.ProjectLock{}, nil
+	return nil, nil
 }
 
 // List returns a map of all locks with their lock key as the map key.
