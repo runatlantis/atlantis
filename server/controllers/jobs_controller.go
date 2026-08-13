@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -8,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
@@ -31,7 +34,7 @@ type JobsController struct {
 	Logger                   logging.SimpleLogging        `validate:"required"`
 	ProjectJobsTemplate      web_templates.TemplateWriter `validate:"required"`
 	ProjectJobsErrorTemplate web_templates.TemplateWriter `validate:"required"`
-	Backend                  locking.Backend              `validate:"required"`
+	Database                 db.Database                  `validate:"required"`
 	WsMux                    *websocket.Multiplexor       `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
 	StatsScope               tally.Scope `validate:"required"`
@@ -58,7 +61,7 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 	errorCounter := j.StatsScope.SubScope("getprojectjobs").Counter(metrics.ExecutionErrorMetric)
 	err := j.getProjectJobs(w, r)
 	if err != nil {
-		j.Logger.Err(err.Error())
+		j.Logger.Err("%s", err.Error())
 		errorCounter.Inc(1)
 	}
 }
@@ -87,9 +90,10 @@ func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...interface{}) {
+func (j *JobsController) respond(w http.ResponseWriter, lvl logging.LogLevel, responseCode int, format string, args ...any) {
 	response := fmt.Sprintf(format, args...)
 	j.Logger.Log(lvl, response)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(responseCode)
-	fmt.Fprintln(w, response)
+	fmt.Fprintln(w, response) // #nosec G705 -- response body is served as text/plain, not interpreted as HTML
 }

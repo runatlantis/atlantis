@@ -1,24 +1,16 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"testing"
 
-	"github.com/pkg/errors"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +26,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	loggermocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
@@ -42,7 +35,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -50,7 +43,7 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Backend:            db,
+		Database:           db,
 	}
 	err = errors.New("err")
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
@@ -58,14 +51,39 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	Equals(t, "cleaning workspace: err", actualErr.Error())
 }
 
+func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
+	t.Log("when workspace.Delete fails, external plans are still cleaned up")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	store := &countingPlanStore{}
+	pce := events.PullClosedExecutor{
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+		PlanStore:          store,
+	}
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning workspace: disk full", actualErr.Error())
+	Equals(t, 1, store.deleteForPullCalls)
+}
+
 func TestCleanUpPullUnlockErr(t *testing.T) {
 	t.Log("when locker.UnlockByPull returns an error, we return it")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
-	l := lockmocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -73,11 +91,11 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Backend:            db,
+		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 	}
 	err = errors.New("err")
-	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, err)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
 }
@@ -87,10 +105,11 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	t.Log("when there are no locks to clean up, we don't comment")
 	RegisterMockTestingT(t)
 	w := mocks.NewMockWorkingDir()
-	l := lockmocks.NewMockLocker()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	cp := vcsmocks.NewMockClient()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -99,9 +118,9 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 		Locker:     l,
 		VCSClient:  cp,
 		WorkingDir: w,
-		Backend:    db,
+		Database:   db,
 	}
-	When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Ok(t, err)
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
@@ -188,9 +207,10 @@ func TestCleanUpPullComments(t *testing.T) {
 		func() {
 			w := mocks.NewMockWorkingDir()
 			cp := vcsmocks.NewMockClient()
-			l := lockmocks.NewMockLocker()
+			ctrl := gomock.NewController(t)
+			l := lockmocks.NewMockLocker(ctrl)
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -199,10 +219,10 @@ func TestCleanUpPullComments(t *testing.T) {
 				Locker:     l,
 				VCSClient:  cp,
 				WorkingDir: w,
-				Backend:    db,
+				Database:   db,
 			}
 			t.Log("testing: " + c.Description)
-			When(l.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(c.Locks, nil)
+			l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(c.Locks, nil)
 			err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 			Ok(t, err)
 			_, _, _, comment, _ := cp.VerifyWasCalledOnce().CreateComment(
@@ -240,7 +260,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 
 		f, err := os.CreateTemp("", "")
 		if err != nil {
-			panic(errors.Wrap(err, "failed to create temp file"))
+			panic(fmt.Errorf("failed to create temp file: %w", err))
 		}
 		path := f.Name()
 		f.Close() // nolint: errcheck
@@ -248,17 +268,17 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		// Open the database.
 		boltDB, err := bolt.Open(path, 0600, nil)
 		if err != nil {
-			panic(errors.Wrap(err, "could not start bolt DB"))
+			panic(fmt.Errorf("could not start bolt DB: %w", err))
 		}
 		if err := boltDB.Update(func(tx *bolt.Tx) error {
 			if _, err := tx.CreateBucketIfNotExists([]byte(pullsBucketName)); err != nil {
-				return errors.Wrap(err, "failed to create bucket")
+				return fmt.Errorf("failed to create bucket: %w", err)
 			}
 			return nil
 		}); err != nil {
-			panic(errors.Wrap(err, "could not create bucket"))
+			panic(fmt.Errorf("could not create bucket: %w", err))
 		}
-		db, _ := db.NewWithDB(boltDB, lockBucket, configBucket)
+		database, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
 		result := []command.ProjectResult{
 			{
 				RepoRelDir:  testdata.GithubRepo.FullName,
@@ -268,18 +288,19 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		// Create a new record for pull
-		_, err = db.UpdatePullWithResults(testdata.Pull, result)
+		_, err = database.UpdatePullWithResults(testdata.Pull, result)
 		Ok(t, err)
 
 		workingDir := mocks.NewMockWorkingDir()
-		locker := lockmocks.NewMockLocker()
+		gmockCtrl := gomock.NewController(t)
+		locker := lockmocks.NewMockLocker(gmockCtrl)
 		client := vcsmocks.NewMockClient()
 		logger := loggermocks.NewMockSimpleLogging()
 
 		pullClosedExecutor := events.PullClosedExecutor{
 			Locker:                   locker,
 			WorkingDir:               workingDir,
-			Backend:                  db,
+			Database:                 database,
 			VCSClient:                client,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: prjCmdOutHandler,
@@ -291,7 +312,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 				Workspace: "default",
 			},
 		}
-		When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(locks, nil)
+		locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(locks, nil)
 
 		// Clean up.
 		err = pullClosedExecutor.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -317,13 +338,14 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 
 	// Create mocks
 	workingDir := mocks.NewMockWorkingDir()
-	locker := lockmocks.NewMockLocker()
+	gmockCtrl := gomock.NewController(t)
+	locker := lockmocks.NewMockLocker(gmockCtrl)
 	client := vcsmocks.NewMockClient()
 	resourceCleaner := mocks.NewMockResourceCleaner()
 
 	// Create temporary database
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
@@ -352,13 +374,13 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Locker:                   locker,
 		VCSClient:                client,
 		WorkingDir:               workingDir,
-		Backend:                  db,
+		Database:                 db,
 		PullClosedTemplate:       &events.PullClosedEventTemplate{},
 		LogStreamResourceCleaner: resourceCleaner,
 	}
 
 	// Setup mock expectations
-	When(locker.UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num)).ThenReturn(nil, nil)
+	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 
 	// Execute CleanUpPull
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
@@ -391,4 +413,23 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 		Workspace:    "staging",
 	}
 	Equals(t, expectedPullInfo2, capturedArgs[1])
+}
+
+type countingPlanStore struct {
+	deleteForPullCalls int
+}
+
+func (s *countingPlanStore) Save(command.ProjectContext, string) error   { return nil }
+func (s *countingPlanStore) Load(command.ProjectContext, string) error   { return nil }
+func (s *countingPlanStore) Remove(command.ProjectContext, string) error { return nil }
+func (s *countingPlanStore) ListWorkspaces(string, string, int) ([]string, error) {
+	return nil, nil
+}
+func (s *countingPlanStore) RestorePlans(string, string, string, int) error { return nil }
+func (s *countingPlanStore) DeleteForPull(string, string, int) error {
+	s.deleteForPullCalls++
+	return nil
+}
+func (s *countingPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
+	return nil
 }

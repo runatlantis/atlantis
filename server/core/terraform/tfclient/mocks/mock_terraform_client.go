@@ -28,11 +28,11 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *go_version.Version {
+func (mock *MockClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *go_version.Version {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
 	}
-	_params := []pegomock.Param{log, projectDirectory}
+	_params := []pegomock.Param{log, d, projectDirectory}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DetectVersion", _params, []reflect.Type{reflect.TypeOf((**go_version.Version)(nil)).Elem()})
 	var _ret0 *go_version.Version
 	if len(_result) != 0 {
@@ -114,8 +114,8 @@ type VerifierMockClient struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *MockClient_DetectVersion_OngoingVerification {
-	_params := []pegomock.Param{log, projectDirectory}
+func (verifier *VerifierMockClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *MockClient_DetectVersion_OngoingVerification {
+	_params := []pegomock.Param{log, d, projectDirectory}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DetectVersion", _params, verifier.timeout)
 	return &MockClient_DetectVersion_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -125,12 +125,12 @@ type MockClient_DetectVersion_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockClient_DetectVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
-	log, projectDirectory := c.GetAllCapturedArguments()
-	return log[len(log)-1], projectDirectory[len(projectDirectory)-1]
+func (c *MockClient_DetectVersion_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, terraform.Distribution, string) {
+	log, d, projectDirectory := c.GetAllCapturedArguments()
+	return log[len(log)-1], d[len(d)-1], projectDirectory[len(projectDirectory)-1]
 }
 
-func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
+func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []terraform.Distribution, _param2 []string) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -140,9 +140,15 @@ func (c *MockClient_DetectVersion_OngoingVerification) GetAllCapturedArguments()
 			}
 		}
 		if len(_params) > 1 {
-			_param1 = make([]string, len(c.methodInvocations))
+			_param1 = make([]terraform.Distribution, len(c.methodInvocations))
 			for u, param := range _params[1] {
-				_param1[u] = param.(string)
+				_param1[u] = param.(terraform.Distribution)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
 			}
 		}
 	}

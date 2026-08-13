@@ -1,0 +1,44 @@
+[
+  {
+    "id": 22,
+    "user": {
+      "id": 301,
+      "login": "reviewer-22",
+      "login_name": "reviewer-22",
+      "full_name": "Reviewer Twenty Two",
+      "email": "reviewer-22@example.com",
+      "active": true
+    },
+    "state": "COMMENT",
+    "body": "needs docs",
+    "commit_id": "1111111111111111111111111111111111111111",
+    "stale": false,
+    "official": true,
+    "dismissed": false,
+    "comments_count": 0,
+    "submitted_at": "2026-01-11T00:00:00Z",
+    "html_url": "https://gitea.example.com/owner/repo/pulls/1#review-22",
+    "pull_request_url": "https://gitea.example.com/api/v1/repos/owner/repo/pulls/1"
+  },
+  {
+    "id": 23,
+    "user": {
+      "id": 302,
+      "login": "reviewer-23",
+      "login_name": "reviewer-23",
+      "full_name": "Reviewer Twenty Three",
+      "email": "reviewer-23@example.com",
+      "active": true
+    },
+    "state": "COMMENT",
+    "body": "ok",
+    "commit_id": "2222222222222222222222222222222222222222",
+    "stale": false,
+    "official": true,
+    "dismissed": false,
+    "comments_count": 0,
+    "submitted_at": "2026-01-11T01:00:00Z",
+    "html_url": "https://gitea.example.com/owner/repo/pulls/1#review-23",
+    "pull_request_url": "https://gitea.example.com/api/v1/repos/owner/repo/pulls/1"
+  }
+]

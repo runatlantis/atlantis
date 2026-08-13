@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -16,31 +20,41 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 	}{
 		"plan success": {
 			command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{},
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
 			},
 			true,
 		},
 		"policy_check success": {
 			command.ProjectResult{
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			true,
 		},
 		"apply success": {
 			command.ProjectResult{
-				ApplySuccess: "success",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success",
+				},
 			},
 			true,
 		},
 		"failure": {
 			command.ProjectResult{
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			false,
 		},
 		"error": {
 			command.ProjectResult{
-				Error: errors.New("error"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("error"),
+				},
 			},
 			false,
 		},
@@ -61,29 +75,37 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				Error:   errors.New("err"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("err"),
+				},
 			},
 			expStatus: models.ErroredPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:     command.Plan,
-				PlanSuccess: &models.PlanSuccess{},
+				Command: command.Plan,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
 			},
 			expStatus: models.PlannedPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Plan,
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: "No changes. Infrastructure is up-to-date.",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
 				},
 			},
 			expStatus: models.PlannedNoChangesPlanStatus,
@@ -91,51 +113,84 @@ func TestProjectResult_PlanStatus(t *testing.T) {
 		{
 			p: command.ProjectResult{
 				Command: command.Apply,
-				Error:   errors.New("err"),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New("err"),
+				},
 			},
 			expStatus: models.ErroredApplyStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.Apply,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredApplyStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:      command.Apply,
-				ApplySuccess: "success",
+				Command: command.Apply,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "success",
+				},
 			},
 			expStatus: models.AppliedPlanStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:            command.PolicyCheck,
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				Command: command.PolicyCheck,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.PolicyCheck,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
-				Command:            command.ApprovePolicies,
-				PolicyCheckResults: &models.PolicyCheckResults{},
+				Command: command.ApprovePolicies,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
 			},
 			expStatus: models.PassedPolicyCheckStatus,
 		},
 		{
 			p: command.ProjectResult{
 				Command: command.ApprovePolicies,
-				Failure: "failure",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Failure: "failure",
+				},
 			},
 			expStatus: models.ErroredPolicyCheckStatus,
+		},
+		{
+			p: command.ProjectResult{
+				Command: command.Import,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ImportSuccess: &models.ImportSuccess{},
+				},
+			},
+			expStatus: models.DiscardedPlanStatus,
+		},
+		{
+			p: command.ProjectResult{
+				Command:    command.State,
+				SubCommand: "rm",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					StateRmSuccess: &models.StateRmSuccess{},
+				},
+			},
+			expStatus: models.DiscardedPlanStatus,
 		},
 	}
 
@@ -153,8 +208,9 @@ func TestPlanSuccess_Summary(t *testing.T) {
 	}{
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					An execution plan has been generated and is shown below.
 					Resource actions are indicated with the following symbols:
 					  - destroy
@@ -165,40 +221,46 @@ func TestPlanSuccess_Summary(t *testing.T) {
 
 
 					Plan: 0 to add, 0 to change, 1 to destroy.`,
+					},
 				},
 			},
 			expResult: "Plan: 0 to add, 0 to change, 1 to destroy.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					An execution plan has been generated and is shown below.
 					Resource actions are indicated with the following symbols:
 
 					No changes. Infrastructure is up-to-date.`,
+					},
 				},
 			},
 			expResult: "No changes. Infrastructure is up-to-date.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					Note: Objects have changed outside of Terraform
 
 					Terraform detected the following changes made outside of Terraform since the
 					last "terraform apply":
 
 					No changes. Your infrastructure matches the configuration.`,
+					},
 				},
 			},
 			expResult: "\n**Note: Objects have changed outside of Terraform**\nNo changes. Your infrastructure matches the configuration.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `
 					Note: Objects have changed outside of Terraform
 
 					Terraform detected the following changes made outside of Terraform since the
@@ -214,14 +276,17 @@ func TestPlanSuccess_Summary(t *testing.T) {
 
 
 					Plan: 0 to add, 0 to change, 1 to destroy.`,
+					},
 				},
 			},
 			expResult: "\n**Note: Objects have changed outside of Terraform**\nPlan: 0 to add, 0 to change, 1 to destroy.",
 		},
 		{
 			p: command.ProjectResult{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: `No match, expect empty`,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: `No match, expect empty`,
+					},
 				},
 			},
 			expResult: "",
@@ -233,6 +298,149 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			Equals(t, c.expResult, c.p.PlanSuccess.Summary())
 		})
 	}
+}
+
+// TestProjectResult_MarshalJSON verifies that ProjectResult serializes errors properly
+// and maintains backwards-compatible flat JSON structure (no ProjectCommandOutput wrapper).
+func TestProjectResult_MarshalJSON(t *testing.T) {
+	cases := map[string]struct {
+		pr          command.ProjectResult
+		checkFields map[string]any // Fields to verify in JSON output
+	}{
+		"nil error serializes as null": {
+			pr: command.ProjectResult{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add",
+					},
+				},
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "default",
+			},
+			checkFields: map[string]any{
+				"Error":      nil,
+				"Failure":    "",
+				"RepoRelDir": ".",
+				"Workspace":  "default",
+			},
+		},
+		"error preserves legacy empty object shape": {
+			pr: command.ProjectResult{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error:   errors.New("terraform plan failed: resource not found"),
+					Failure: "plan execution error",
+				},
+				Command:    command.Plan,
+				RepoRelDir: "modules/vpc",
+				Workspace:  "production",
+			},
+			checkFields: map[string]any{
+				"Error":      map[string]any{},
+				"Failure":    "plan execution error",
+				"RepoRelDir": "modules/vpc",
+				"Workspace":  "production",
+			},
+		},
+		"all fields present in flat structure": {
+			pr: command.ProjectResult{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "Apply complete!",
+				},
+				Command:           command.Apply,
+				SubCommand:        "",
+				RepoRelDir:        ".",
+				Workspace:         "default",
+				ProjectName:       "my-project",
+				SilencePRComments: []string{"comment1"},
+			},
+			checkFields: map[string]any{
+				"ApplySuccess": "Apply complete!",
+				"Command":      float64(command.Apply), // JSON numbers are float64
+				"RepoRelDir":   ".",
+				"Workspace":    "default",
+				"ProjectName":  "my-project",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			jsonBytes, err := json.Marshal(tc.pr)
+			Ok(t, err)
+
+			// Parse into generic map to check structure
+			var parsed map[string]any
+			err = json.Unmarshal(jsonBytes, &parsed)
+			Ok(t, err)
+
+			// Verify expected fields
+			for field, expected := range tc.checkFields {
+				actual, exists := parsed[field]
+				Assert(t, exists, "expected field %q to exist in JSON output", field)
+				Equals(t, expected, actual)
+			}
+
+			// CRITICAL: Verify NO ProjectCommandOutput wrapper exists
+			// This is the key backwards-compatibility check - embedded structs
+			// should produce flat fields, not nested objects
+			_, hasWrapper := parsed["ProjectCommandOutput"]
+			Assert(t, !hasWrapper, "JSON should NOT have ProjectCommandOutput wrapper - must maintain flat structure")
+		})
+	}
+}
+
+// TestProjectResult_MarshalJSON_FlatStructure is a specific test ensuring that
+// the JSON output maintains backwards compatibility by having a flat structure
+// rather than nesting fields under ProjectCommandOutput.
+func TestProjectResult_MarshalJSON_FlatStructure(t *testing.T) {
+	pr := command.ProjectResult{
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			Error:   errors.New("test error"),
+			Failure: "test failure",
+			PlanSuccess: &models.PlanSuccess{
+				TerraformOutput: "output",
+				LockURL:         "http://lock",
+				RePlanCmd:       "atlantis plan",
+				ApplyCmd:        "atlantis apply",
+			},
+		},
+		Command:     command.Plan,
+		RepoRelDir:  ".",
+		Workspace:   "default",
+		ProjectName: "test-project",
+	}
+
+	jsonBytes, err := json.Marshal(pr)
+	Ok(t, err)
+
+	var parsed map[string]any
+	err = json.Unmarshal(jsonBytes, &parsed)
+	Ok(t, err)
+
+	// All these fields should be at the top level, not nested
+	topLevelFields := []string{
+		"Error", "Failure", "PlanSuccess", "PolicyCheckResults",
+		"ApplySuccess", "VersionSuccess", "ImportSuccess", "StateRmSuccess",
+		"Command", "SubCommand", "RepoRelDir", "Workspace", "ProjectName", "SilencePRComments",
+	}
+
+	for _, field := range topLevelFields {
+		_, exists := parsed[field]
+		Assert(t, exists, "field %q should exist at top level of JSON", field)
+	}
+
+	// Verify error preserves the legacy encoding of a non-nil error interface.
+	errorVal := parsed["Error"]
+	Assert(t, errorVal != nil, "Error should not be nil")
+	errorObj, ok := errorVal.(map[string]any)
+	Assert(t, ok, "Error should be an object, got %T: %v", errorVal, errorVal)
+	Equals(t, 0, len(errorObj))
+
+	// Verify PlanSuccess is an object with expected fields
+	planSuccess, ok := parsed["PlanSuccess"].(map[string]any)
+	Assert(t, ok, "PlanSuccess should be an object")
+	Equals(t, "output", planSuccess["TerraformOutput"])
 }
 
 var Summary string

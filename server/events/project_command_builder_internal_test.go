@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -9,19 +12,20 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -61,17 +65,18 @@ workflows:
       - apply`,
 			repoCfg: "",
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -118,17 +123,18 @@ projects:
   terraform_version: v10.0
   `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -179,17 +185,18 @@ projects:
   terraform_version: v10.0
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -248,17 +255,18 @@ projects:
   terraform_version: v10.0
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -404,17 +412,18 @@ workflows:
       - apply
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -467,17 +476,18 @@ projects:
   workflow: custom
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -533,17 +543,18 @@ workflows:
       steps: []
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -585,17 +596,18 @@ projects:
   workspace: myworkspace
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
@@ -618,12 +630,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -668,11 +680,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command.
@@ -685,9 +699,9 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -733,7 +747,7 @@ projects:
 }
 
 func TestBuildProjectCmdCtx_WithRegExpCmdEnabled(t *testing.T) {
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -799,17 +813,18 @@ projects:
   terraform_version: v10.0
   `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -p myproject_1",
-				ApprovePoliciesCmd: "atlantis approve_policies -p myproject_1",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logging.NewNoopLogger(t),
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -p myproject_1",
+				ApprovePoliciesCmd:   "atlantis approve_policies -p myproject_1",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logging.NewNoopLogger(t),
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "myproject_1",
@@ -833,12 +848,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -863,7 +878,7 @@ projects:
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
 
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -885,11 +900,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -902,9 +919,9 @@ projects:
 						Log:   logging.NewNoopLogger(t),
 						Scope: statsScope,
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -952,7 +969,7 @@ projects:
 
 func TestBuildProjectCmdCtx_WithPolicCheckEnabled(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
-	statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 	emptyPolicySets := valid.PolicySets{
 		Version:    nil,
 		PolicySets: []valid.PolicySet{},
@@ -982,23 +999,24 @@ repos:
 `,
 			repoCfg: "",
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   false,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     false,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
 				User:               models.User{},
@@ -1044,23 +1062,24 @@ workflows:
       - policy_check
 `,
 			expCtx: command.ProjectContext{
-				ApplyCmd:           "atlantis apply -d project1 -w myworkspace",
-				ApprovePoliciesCmd: "atlantis approve_policies -d project1 -w myworkspace",
-				BaseRepo:           baseRepo,
-				EscapedCommentArgs: []string{`\f\l\a\g`},
-				AutomergeEnabled:   true,
-				AutoplanEnabled:    true,
-				HeadRepo:           models.Repo{},
-				Log:                logger,
-				Scope:              statsScope,
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutomergeEnabled:     true,
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"../modules/**/*.tf"},
+				HeadRepo:             models.Repo{},
+				Log:                  logger,
+				Scope:                statsScope,
 				PullReqStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Pull:               pull,
 				ProjectName:        "",
-				PlanRequirements:   []string{"policies_passed"},
+				PlanRequirements:   []string{},
 				ApplyRequirements:  []string{"policies_passed"},
-				ImportRequirements: []string{"policies_passed"},
+				ImportRequirements: []string{},
 				RepoConfigVersion:  3,
 				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
 				RepoRelDir:         "project1",
@@ -1078,12 +1097,12 @@ workflows:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1110,7 +1129,7 @@ workflows:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1132,11 +1151,13 @@ workflows:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			cmd := command.PolicyCheck
@@ -1148,9 +1169,9 @@ workflows:
 						BaseRepo: baseRepo,
 					},
 					PullRequestStatus: models.PullReqStatus{
-						Mergeable: true,
+						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
-				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)
@@ -1232,12 +1253,12 @@ projects:
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"modules": map[string]interface{}{
-					"module": map[string]interface{}{
+				"modules": map[string]any{
+					"module": map[string]any{
 						"main.tf": nil,
 					},
 				},
@@ -1262,7 +1283,7 @@ projects:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1284,11 +1305,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			for _, cmd := range []command.Name{command.Plan, command.Apply} {
@@ -1300,9 +1323,9 @@ projects:
 							BaseRepo: baseRepo,
 						},
 						PullRequestStatus: models.PullReqStatus{
-							Mergeable: true,
+							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", false, false, true)
 					Equals(t, c.expLen, len(ctxs))
 					Ok(t, err)
 				})
@@ -1367,18 +1390,119 @@ projects:
 			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
 			expLen:        3,
 		},
+		"autodiscover enabled, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
+		},
+		"autodiscover inherited from broad global config, disabled at repo level": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+- id: /.*/
+  allowed_overrides: [workflow]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: disabled
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        3,
+		},
+		"autodiscover respects ignore_paths in repo config": {
+			globalCfg: `
+repos:
+- id: /.*/
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover respects ignore_paths in global config": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project3
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        2,
+		},
+		"autodiscover skips ignore_paths in repo when configured in global": {
+			globalCfg: `
+repos:
+- id: /.*/
+  autodiscover:
+    mode: enabled
+    ignore_paths:
+    - project[0-9]
+`,
+			repoCfg: `
+version: 3
+automerge: true
+projects:
+- dir: project1
+  workspace: myworkspace
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project3
+`,
+			modifiedFiles: []string{"project1/main.tf", "project2/main.tf", "project3/main.tf"},
+			expLen:        1,
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			tmp := DirStructure(t, map[string]interface{}{
-				"project1": map[string]interface{}{
+			tmp := DirStructure(t, map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			})
@@ -1404,7 +1528,7 @@ projects:
 			if c.repoCfg != "" {
 				Ok(t, os.WriteFile(filepath.Join(tmp, "atlantis.yaml"), []byte(c.repoCfg), 0600))
 			}
-			statsScope, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+			statsScope := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 			terraformClient := tfclientmocks.NewMockClient()
 
@@ -1426,11 +1550,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -1450,6 +1576,27 @@ projects:
 
 		})
 	}
+}
+
+func TestDefaultProjectCommandBuilder_AutoDiscoverModeEnabledDefaultsEmptyToAuto(t *testing.T) {
+	builder := &DefaultProjectCommandBuilder{
+		GlobalCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+	}
+	ctx := &command.Context{
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				VCSHost: models.VCSHost{
+					Hostname: "github.com",
+				},
+			},
+		},
+	}
+
+	Equals(t, true, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{}))
+	Equals(t, false, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{
+		Projects: []valid.Project{{Dir: "project1"}},
+	}))
 }
 
 func mustVersion(v string) *version.Version {

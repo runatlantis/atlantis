@@ -4,7 +4,7 @@ Atlantis triggers commands via pull request comments.
 ![Help Command](./images/pr-comment-help.png)
 
 ::: tip
-You can use following executable names.
+You can use the following executable names.
 
 * `atlantis help`
   * `atlantis` is executable name. You can configure by [Executable Name](server-configuration.md#executable-name).
@@ -80,7 +80,7 @@ atlantis plan -w staging
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
-A `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
+An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
 :::
 
 ### Additional Terraform flags
@@ -136,7 +136,7 @@ atlantis plan -d dir -- -destroy
 ```
 
 ::: warning NOTE
-The `-destroy` flag generates a destroy plan, If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
+The `-destroy` flag generates a destroy plan. If this plan is applied it can result in data loss or service disruptions. Ensure that you have thoroughly reviewed your Terraform configuration and intend to remove the specified resources before using this flag.
 :::
 
 ---
@@ -199,6 +199,32 @@ The automatic `env/{workspace}.tfvars` file inclusion happens during the `atlant
 
 ---
 
+## Atlantis cancel
+
+```bash
+atlantis cancel
+```
+
+### Explanation
+
+Cancels all **queued commands** for the current pull request.
+
+::: warning NOTE
+This command **does not** attempt to stop or interrupt commands that are already running. It only removes subsequent commands that are waiting in the queue. There is currently no mechanism in Atlantis to interrupt the currently running process.
+:::
+
+This is useful if you have multiple commands queued (e.g., atlantis apply for several projects) and you realize you made a mistake in your PR. Using cancel prevents the queued plans from executing. Especially with long-running operations, this can save time and resources.
+
+### Examples
+
+```bash
+# An apply is currently running, and another is queued.
+# This command will cancel the queued apply but not the running one.
+atlantis cancel
+```
+
+---
+
 ## atlantis import
 
 ```bash
@@ -230,7 +256,7 @@ atlantis import -w staging ADDRESS ID
 
 ::: tip
 
-* If import for_each resources, it requires a single quoted address.
+* When importing `for_each` resources, a single quoted address is required.
   * ex. `atlantis import 'aws_instance.example["foo"]' i-1234567890abcdef0`
 :::
 
@@ -262,7 +288,7 @@ atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 ### Explanation
 
 Runs `terraform state rm` that matches the directory/project/workspace.
-This command discards the terraform plan result. After run state rm and before an apply, another `atlantis plan` must be run again.
+This command discards the terraform plan result. After running `state rm` and before an apply, another `atlantis plan` must be run again.
 
 To allow the `state` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 
@@ -284,7 +310,7 @@ atlantis state -w staging rm ADDRESS
 
 ::: tip
 
-* If run state rm to for_each resources, it requires a single quoted address.
+* When running `state rm` on `for_each` resources, a single quoted address is required.
   * ex. `atlantis state rm 'aws_instance.example["foo"]'`
 :::
 
@@ -335,3 +361,18 @@ See also [policy checking](policy-checking.md).
 ### Options
 
 * `--verbose` Append Atlantis log to comment.
+
+---
+
+## API-Based Workflows
+
+In addition to pull request comments, Atlantis supports API-based workflows for plan, apply, and drift detection. These endpoints allow external tools and automation to interact with Atlantis programmatically.
+
+Key capabilities:
+
+* **Plan and Apply** without a pull request (`POST /api/plan`, `POST /api/apply`)
+* **Drift Detection** to identify infrastructure changes outside of Terraform (`POST /api/drift/detect`)
+* **Drift Status** to view cached drift results (`GET /api/drift/status`)
+* **Drift Remediation** to fix detected drift (`POST /api/drift/remediate`)
+
+See [API Endpoints](api-endpoints.md) for full documentation and [Server Configuration](server-configuration.md) for the `--enable-drift-detection` flag.

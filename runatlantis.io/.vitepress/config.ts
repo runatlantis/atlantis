@@ -57,7 +57,7 @@ const config = defineConfig({
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
         footer: {
-            message: 'The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see <a href="https://www.linuxfoundation.org/legal/trademark-usage">Trademark Usage</a>.',
+            message: 'Copyright Atlantis a Series of LF Projects, LLC. For website terms of use, trademark policy and other project policies please see <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
         },
     },
     // SEO Improvement - sitemap.xml & robots.txt

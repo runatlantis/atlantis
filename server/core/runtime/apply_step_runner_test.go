@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,7 +14,6 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
@@ -27,6 +30,7 @@ import (
 func TestRun_NoDir(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
+		PlanStore:         &runtime.LocalPlanStore{},
 	}
 	_, err := o.Run(command.ProjectContext{
 		RepoRelDir: ".",
@@ -39,12 +43,47 @@ func TestRun_NoPlanFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
+		PlanStore:         &runtime.LocalPlanStore{},
 	}
 	_, err := o.Run(command.ProjectContext{
 		RepoRelDir: ".",
 		Workspace:  "workspace",
 	}, nil, tmpDir, map[string]string(nil))
 	ErrEquals(t, "no plan found at path \".\" and workspace \"workspace\"–did you run plan?", err)
+}
+
+func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	err := os.WriteFile(planPath, []byte("Atlantis: this plan was created by remote ops"), 0600)
+	Ok(t, err)
+
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		Log:        logger,
+		Workspace:  "workspace",
+		RepoRelDir: ".",
+	}
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	applyErr := errors.New("terraform rejected truncated plan")
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		PlanStore:             &runtime.LocalPlanStore{},
+	}
+
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("", applyErr)
+	_, err = o.Run(ctx, nil, tmpDir, nil)
+
+	Assert(t, errors.Is(err, applyErr), "expected the local apply error, got %v", err)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", fmt.Sprintf("%q", planPath)}, nil, tfDistribution, nil, "workspace")
+	_, statErr := os.Stat(planPath)
+	Ok(t, statErr)
 }
 
 func TestRun_Success(t *testing.T) {
@@ -67,6 +106,7 @@ func TestRun_Success(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
+		PlanStore:             &runtime.LocalPlanStore{},
 	}
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
@@ -102,6 +142,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
+		PlanStore:             &runtime.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -136,6 +177,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
+		PlanStore:             &runtime.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -172,6 +214,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
+		PlanStore:             &runtime.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), NotEq[tf.Distribution](tfDistribution), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -245,6 +288,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient()
 			step := runtime.ApplyStepRunner{
 				TerraformExecutor: terraform,
+				PlanStore:         &runtime.LocalPlanStore{},
 			}
 
 			output, err := step.Run(command.ProjectContext{
@@ -288,14 +332,17 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: updater,
+		PlanStore:           &runtime.LocalPlanStore{},
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
+	var remoteApplyRunURL string
 	ctx := command.ProjectContext{
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
+		RemoteApplyRunURL:  &remoteApplyRunURL,
 	}
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	<-tfExec.DoneCh
@@ -316,8 +363,9 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 	// Check that the status was updated with the run url.
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
+	Equals(t, runURL, remoteApplyRunURL)
 	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.PendingCommitStatus, runURL, nil)
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, runURL, nil)
+	updater.VerifyWasCalled(Never()).UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, runURL, nil)
 }
 
 // Test that if the plan is different, we error out.
@@ -348,6 +396,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: runtimemocks.NewMockStatusUpdater(),
+		PlanStore:           &runtime.LocalPlanStore{},
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 
@@ -432,7 +481,7 @@ func (r *remoteApplyMock) RunCommandAsync(_ command.ProjectContext, _ string, ar
 
 	// Asynchronously send the lines we're supposed to.
 	go func() {
-		for _, line := range strings.Split(r.LinesToSend, "\n") {
+		for line := range strings.SplitSeq(r.LinesToSend, "\n") {
 			out <- runtimemodels.Line{Line: line}
 		}
 		if r.Err != nil {

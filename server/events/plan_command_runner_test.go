@@ -1,18 +1,21 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +29,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		Matched           bool
 		Targeted          bool
 		VCSStatusSilence  bool
-		PrevPlanStored    bool // stores a 1/1 passing plan in the backend
+		PrevPlanStored    bool // stores a 1/1 passing plan in the database
 		ExpVCSStatusSet   bool
 		ExpVCSStatusTotal int
 		ExpVCSStatusSucc  int
@@ -78,7 +81,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
@@ -87,10 +90,10 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.SilenceNoProjects = true
 				tc.silenceVCSStatusNoProjects = c.VCSStatusSilence
-				tc.backend = db
+				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
@@ -109,10 +112,12 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 			if c.PrevPlanStored {
 				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{
 					{
-						Command:     command.Plan,
-						RepoRelDir:  "prevdir",
-						Workspace:   "default",
-						PlanSuccess: &models.PlanSuccess{},
+						Command:    command.Plan,
+						RepoRelDir: "prevdir",
+						Workspace:  "default",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{},
+						},
 					},
 				})
 				Ok(t, err)
@@ -124,6 +129,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 				}
 				return ReturnValues{[]command.ProjectContext{}, nil}
 			})
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 			planCommandRunner.Run(ctx, cmd)
 
@@ -141,8 +147,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](models.SuccessCommitStatus),
 					Eq[command.Name](command.Plan),
-					Eq(c.ExpVCSStatusSucc),
-					Eq(c.ExpVCSStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSStatusSucc, Total: c.ExpVCSStatusTotal}),
 				)
 			} else {
 				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
@@ -151,12 +156,42 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Plan),
-					Any[int](),
-					Any[int](),
+					Any[models.ProjectCounts](),
 				)
 			}
 		})
 	}
+}
+
+func TestPlanCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
+	RegisterMockTestingT(t)
+	vcsClient := setup(t)
+	planCommandRunner.DiscardApprovalOnPlan = true
+	scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    scopeNull,
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{}, events.ErrIgnoredTargetedDir)
+
+	planCommandRunner.Run(ctx, cmd)
+	Assert(t, ctx.CommandSkipped, "expected ignored targeted dir to mark the command skipped")
+
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+	vcsClient.VerifyWasCalled(Never()).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
 }
 
 func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
@@ -164,12 +199,12 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	cases := []struct {
-		Description       string
-		ProjectContexts   []command.ProjectContext
-		ProjectResults    []command.ProjectResult
-		RunnerInvokeMatch []*EqMatcher
-		PrevPlanStored    bool
-		PlanFailed        bool
+		Description           string
+		ProjectContexts       []command.ProjectContext
+		ProjectCommandOutputs []command.ProjectCommandOutput
+		RunnerInvokeMatch     []*EqMatcher
+		PrevPlanStored        bool
+		PlanFailed            bool
 	}{
 		{
 			Description: "When first plan fails, the second don't run",
@@ -191,16 +226,14 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 			},
 			RunnerInvokeMatch: []*EqMatcher{
@@ -227,13 +260,12 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
+
 				{
-					Command:     command.Plan,
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
@@ -263,13 +295,12 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
+
 				{
-					Command:     command.Plan,
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
@@ -308,25 +339,21 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
@@ -369,25 +396,24 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:               "Fourth",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
+
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
+
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
+
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
@@ -417,13 +443,11 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					AbortOnExecutionOrderFail: true,
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
@@ -449,15 +473,13 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
 				},
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
@@ -483,13 +505,11 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 					ProjectName:         "Second",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutputs: []command.ProjectCommandOutput{
 				{
-					Command: command.Plan,
-					Error:   errors.New("shabang"),
+					Error: errors.New("shabang"),
 				},
 				{
-					Command: command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "true",
 					},
@@ -508,17 +528,17 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// vcsClient := setup(t)
 
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.backend = db
+				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
 				State: github.Ptr("open"),
@@ -544,7 +564,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
 			// })
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -569,11 +589,12 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 	cases := []struct {
 		Description            string
 		ProjectContexts        []command.ProjectContext
-		ProjectResults         []command.ProjectResult
-		PrevPlanStored         bool // stores a previous "No changes" plan in the backend
-		DoNotUpdateApply       bool // certain circumtances we want to skip the call to update apply
+		ProjectCommandOutput   []command.ProjectCommandOutput
+		PrevPlanStored         bool // stores a previous "No changes" plan in the database
+		DoNotUpdateApply       bool // certain circumstances we want to skip the call to update apply
 		ExpVCSApplyStatusTotal int
 		ExpVCSApplyStatusSucc  int
+		ExpVCSApplyNoChanges   int
 	}{
 		{
 			Description: "When planning with changes, do not change the apply status",
@@ -583,10 +604,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
 					},
@@ -602,10 +621,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
@@ -613,6 +630,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			},
 			ExpVCSApplyStatusTotal: 1,
 			ExpVCSApplyStatusSucc:  1,
+			ExpVCSApplyNoChanges:   1,
 		},
 		{
 			Description: "When planning with no changes and previous plan with no changes do not set the apply status",
@@ -622,10 +640,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
 					},
@@ -642,10 +658,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
@@ -654,6 +668,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			PrevPlanStored:         true,
 			ExpVCSApplyStatusTotal: 2,
 			ExpVCSApplyStatusSucc:  2,
+			ExpVCSApplyNoChanges:   2,
 		},
 		{
 			Description: "When planning again with changes following a previous 'No changes' plan do not set the apply status",
@@ -664,11 +679,8 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					Workspace:   "default",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "prevdir",
-					Workspace:  "default",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
 					},
@@ -690,18 +702,13 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "prevdir",
-					Workspace:  "default",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "Plan: 0 to add, 0 to change, 1 to destroy.",
 					},
 				},
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
@@ -723,18 +730,13 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					RepoRelDir:  "mydir",
 				},
 			},
-			ProjectResults: []command.ProjectResult{
+			ProjectCommandOutput: []command.ProjectCommandOutput{
 				{
-					RepoRelDir: "prevdir",
-					Workspace:  "default",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
 				},
 				{
-					RepoRelDir: "mydir",
-					Command:    command.Plan,
 					PlanSuccess: &models.PlanSuccess{
 						TerraformOutput: "No changes. Infrastructure is up-to-date.",
 					},
@@ -743,6 +745,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			PrevPlanStored:         true,
 			ExpVCSApplyStatusTotal: 2,
 			ExpVCSApplyStatusSucc:  2,
+			ExpVCSApplyNoChanges:   2,
 		},
 	}
 
@@ -750,17 +753,17 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 		t.Run(c.Description, func(t *testing.T) {
 			// create an empty DB
 			tmp := t.TempDir()
-			db, err := db.New(tmp)
+			db, err := boltdb.New(tmp)
 			t.Cleanup(func() {
 				db.Close()
 			})
 			Ok(t, err)
 
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.backend = db
+				tc.database = db
 			})
 
-			scopeNull, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
 			cmd := &events.CommentCommand{Name: command.Plan}
@@ -780,8 +783,10 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 						Command:    command.Plan,
 						RepoRelDir: "prevdir",
 						Workspace:  "default",
-						PlanSuccess: &models.PlanSuccess{
-							TerraformOutput: "No changes. Your infrastructure matches the configuration.",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{
+								TerraformOutput: "No changes. Your infrastructure matches the configuration.",
+							},
 						},
 					},
 				})
@@ -791,7 +796,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectResults[i])
+				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutput[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -809,8 +814,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Any[models.CommitStatus](),
 					Eq[command.Name](command.Apply),
-					AnyInt(),
-					AnyInt(),
+					Any[models.ProjectCounts](),
 				)
 			} else {
 				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
@@ -819,8 +823,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 					Any[models.PullRequest](),
 					Eq[models.CommitStatus](ExpCommitStatus),
 					Eq[command.Name](command.Apply),
-					Eq(c.ExpVCSApplyStatusSucc),
-					Eq(c.ExpVCSApplyStatusTotal),
+					Eq(models.ProjectCounts{Success: c.ExpVCSApplyStatusSucc, Total: c.ExpVCSApplyStatusTotal, NoChanges: c.ExpVCSApplyNoChanges}),
 				)
 			}
 		})
@@ -849,7 +852,7 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 		})
 
 		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
-		scopeNull, _, _ := metrics.NewLoggingScope(logging.NewNoopLogger(t), "atlantis")
+		scopeNull := metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")
 
 		ctx := &command.Context{
 			User:     testdata.User,
@@ -885,8 +888,262 @@ func TestPlanCommandRunner_SilenceFlagsClearsPendingStatus(t *testing.T) {
 			Any[models.PullRequest](),
 			Any[models.CommitStatus](),
 			Any[command.Name](),
-			Any[int](),
-			Any[int](),
+			Any[models.ProjectCounts](),
 		)
 	})
+}
+func TestPlanCommandRunner_AutoplanFetchesPullStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	t.Run("autoplan fetches pull request status", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() {
+			db.Close()
+		})
+		Ok(t, err)
+
+		_ = setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+
+		expectedStatus := models.PullReqStatus{
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
+			ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+		}
+
+		When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(expectedStatus, nil)
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{}, nil)
+
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
+
+		// Verify FetchPullStatus was called
+		pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))
+
+		// Verify the status was set on the context
+		require.True(t, ctx.PullRequestStatus.MergeableStatus.IsMergeable, "PullRequestStatus.MergeableStatus.IsMergeable must be true")
+		require.True(t, ctx.PullRequestStatus.ApprovalStatus.IsApproved, "PullRequestStatus.ApprovalStatus.IsApproved must be true")
+	})
+
+	t.Run("autoplan continues when FetchPullStatus returns error", func(t *testing.T) {
+		tmp := t.TempDir()
+		db, err := boltdb.New(tmp)
+		t.Cleanup(func() {
+			db.Close()
+		})
+		Ok(t, err)
+
+		_ = setup(t, func(tc *TestConfig) {
+			tc.database = db
+		})
+
+		scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+		modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+		ctx := &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    scopeNull,
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.AutoTrigger,
+		}
+
+		When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(models.PullReqStatus{}, errors.New("api error"))
+		When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{
+			{CommandName: command.Plan},
+		}, nil)
+		When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+		cmd := &events.CommentCommand{Name: command.Plan}
+		planCommandRunner.Run(ctx, cmd)
+
+		// Verify FetchPullStatus was called despite returning an error
+		pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))
+
+		// Verify autoplan continued (Plan was still executed)
+		projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+
+		// Verify status defaults to false when FetchPullStatus errors
+		require.False(t, ctx.PullRequestStatus.MergeableStatus.IsMergeable, "IsMergeable must default to false on error")
+	})
+}
+
+func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		Description            string
+		VCSType                models.VCSHostType
+		PendingApplyFlag       bool
+		ProjectResults         []command.ProjectCommandOutput
+		ExpApplyStatus         models.CommitStatus
+		ExpVCSApplyStatusTotal int
+		ExpVCSApplyStatusSucc  int
+		ExpVCSApplyNoChanges   int
+		ExpShouldUpdateStatus  bool
+	}{
+		{
+			Description:      "GitLab with flag enabled and unapplied plans should set pending status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectCommandOutput{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpApplyStatus:         models.PendingCommitStatus,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  0,
+			ExpShouldUpdateStatus:  true,
+		},
+		{
+			Description:      "GitLab with flag disabled and unapplied plans should NOT update apply status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: false,
+			ProjectResults: []command.ProjectCommandOutput{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+		{
+			Description:      "GitHub with flag enabled should NOT update apply status (default behavior)",
+			VCSType:          models.Github,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectCommandOutput{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+		{
+			Description:      "GitLab with all plans applied should set success status",
+			VCSType:          models.Gitlab,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectCommandOutput{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "No changes. Infrastructure is up-to-date.",
+					},
+				},
+			},
+			ExpApplyStatus:         models.SuccessCommitStatus,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  1,
+			ExpVCSApplyNoChanges:   1,
+			ExpShouldUpdateStatus:  true,
+		},
+		{
+			Description:      "Bitbucket with flag enabled should NOT update apply status",
+			VCSType:          models.BitbucketCloud,
+			PendingApplyFlag: true,
+			ProjectResults: []command.ProjectCommandOutput{
+				{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					},
+				},
+			},
+			ExpShouldUpdateStatus: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			tmp := t.TempDir()
+			db, err := boltdb.New(tmp)
+			t.Cleanup(func() {
+				db.Close()
+			})
+			Ok(t, err)
+
+			_ = setup(t, func(tc *TestConfig) {
+				tc.database = db
+				tc.PendingApplyStatus = c.PendingApplyFlag
+			})
+
+			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+			// Create repo with the appropriate VCS type
+			repo := testdata.GithubRepo
+			repo.VCSHost = models.VCSHost{
+				Type: c.VCSType,
+			}
+
+			modelPull := models.PullRequest{
+				BaseRepo: repo,
+				State:    models.OpenPullState,
+				Num:      testdata.Pull.Num,
+			}
+
+			cmd := &events.CommentCommand{Name: command.Plan}
+
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    scopeNull,
+				Pull:     modelPull,
+				HeadRepo: repo,
+				Trigger:  command.CommentTrigger,
+			}
+
+			projectContexts := []command.ProjectContext{
+				{
+					CommandName: command.Plan,
+					RepoRelDir:  "mydir",
+				},
+			}
+
+			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
+			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
+
+			planCommandRunner.Run(ctx, cmd)
+
+			// Verify based on whether we expect a status update
+			if c.ExpShouldUpdateStatus {
+				commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Eq[models.CommitStatus](c.ExpApplyStatus),
+					Eq[command.Name](command.Apply),
+					Eq(models.ProjectCounts{Success: c.ExpVCSApplyStatusSucc, Total: c.ExpVCSApplyStatusTotal, NoChanges: c.ExpVCSApplyNoChanges}),
+				)
+			} else {
+				// Verify that UpdateCombinedCount was NOT called for Apply command
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](),
+					Any[models.Repo](),
+					Any[models.PullRequest](),
+					Any[models.CommitStatus](),
+					Eq[command.Name](command.Apply),
+					Any[models.ProjectCounts](),
+				)
+			}
+		})
+	}
 }

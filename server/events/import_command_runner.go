@@ -1,12 +1,18 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 func NewImportCommandRunner(
 	pullUpdater *PullUpdater,
+	dbUpdater *DBUpdater,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	prjCmdBuilder ProjectImportCommandBuilder,
 	prjCmdRunner ProjectImportCommandRunner,
@@ -14,6 +20,7 @@ func NewImportCommandRunner(
 ) *ImportCommandRunner {
 	return &ImportCommandRunner{
 		pullUpdater:          pullUpdater,
+		dbUpdater:            dbUpdater,
 		pullReqStatusFetcher: pullReqStatusFetcher,
 		prjCmdBuilder:        prjCmdBuilder,
 		prjCmdRunner:         prjCmdRunner,
@@ -23,6 +30,7 @@ func NewImportCommandRunner(
 
 type ImportCommandRunner struct {
 	pullUpdater          *PullUpdater
+	dbUpdater            *DBUpdater
 	pullReqStatusFetcher vcs.PullReqStatusFetcher
 	prjCmdBuilder        ProjectImportCommandBuilder
 	prjCmdRunner         ProjectImportCommandRunner
@@ -47,6 +55,9 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var projectCmds []command.ProjectContext
 	projectCmds, err = v.prjCmdBuilder.BuildImportCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return
+	}
 	if err != nil {
 		ctx.Log.Warn("Error %s", err)
 	}
@@ -65,5 +76,13 @@ func (v *ImportCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	} else {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Import)
 	}
+	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
+		result.Error = fmt.Errorf("writing discarded plan status: %w", err)
+		ctx.CommandHasErrors = true
+	}
 	v.pullUpdater.updatePull(ctx, cmd, result)
+}
+
+func (v *ImportCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
+	return MarkCommandSkippedIfIgnoredTarget(ctx, cmd.CommandName(), cmd, v.prjCmdBuilder)
 }

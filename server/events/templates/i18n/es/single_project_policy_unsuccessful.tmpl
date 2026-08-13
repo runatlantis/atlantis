@@ -1,0 +1,22 @@
+{{ define "singleProjectPolicyUnsuccessful" -}}
+{{ $result := index .Results 0 -}}
+Se ejecutó {{ .Command }} para {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{ if ne .DisableApplyAll true -}}
+---
+* :heavy_check_mark: Para **aprobar** todos los planes pendientes de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} approve_policies
+  ```
+* :put_litter_in_its_place: Para **eliminar** todos los planes y bloqueos de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
+* :repeat: Para volver a ejecutar las políticas, **planifica** este proyecto de nuevo comentando:
+  ```shell
+  {{ .ExecutableName }} plan
+  ```
+{{ end -}}
+{{- template "log" . -}}
+{{ end -}}

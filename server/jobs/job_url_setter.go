@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package jobs
 
 import (
@@ -5,19 +8,19 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_project_job_url_generator.go ProjectJobURLGenerator
 
 // ProjectJobURLGenerator generates urls to view project's progress.
 type ProjectJobURLGenerator interface {
 	GenerateProjectJobURL(p command.ProjectContext) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_project_status_updater.go ProjectStatusUpdater
 
 type ProjectStatusUpdater interface {
 	// UpdateProject sets the commit status for the project represented by
 	// ctx.
-	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectResult) error
+	UpdateProject(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, url string, res *command.ProjectCommandOutput) error
 }
 
 type JobURLSetter struct {
@@ -32,11 +35,18 @@ func NewJobURLSetter(projectJobURLGenerator ProjectJobURLGenerator, projectStatu
 	}
 }
 
-func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectResult) error {
+func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectCommandOutput) error {
+	if ctx.SuppressVCSStatus {
+		return nil
+	}
+
 	url, err := j.projectJobURLGenerator.GenerateProjectJobURL(ctx)
 
 	if err != nil {
 		return err
+	}
+	if cmdName == command.Apply && result != nil && result.ApplySuccessURL != "" {
+		url = result.ApplySuccessURL
 	}
 	return j.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url, result)
 }

@@ -1,19 +1,21 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // ApplyStepRunner runs `terraform apply`.
@@ -23,6 +25,7 @@ type ApplyStepRunner struct {
 	DefaultTFVersion      *version.Version       `validate:"required"`
 	CommitStatusUpdater   StatusUpdater          `validate:"required"`
 	AsyncTFExec           AsyncTFExec            `validate:"required"`
+	PlanStore             PlanStore              `validate:"required"`
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -31,12 +34,15 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	}
 
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	if loadErr := a.PlanStore.Load(ctx, planPath); loadErr != nil {
+		return "", fmt.Errorf("loading plan: %w", loadErr)
+	}
 	contents, err := os.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
 	if err != nil {
-		return "", errors.Wrap(err, "unable to read planfile")
+		return "", fmt.Errorf("unable to read planfile: %w", err)
 	}
 
 	ctx.Log.Info("starting apply")
@@ -67,7 +73,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// If the apply was successful, delete the plan.
 	if err == nil {
 		ctx.Log.Info("apply successful, deleting planfile")
-		if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
+		if removeErr := a.PlanStore.Remove(ctx, planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
 		}
 	}
@@ -83,17 +89,10 @@ func (a *ApplyStepRunner) hasTargetFlag(ctx command.ProjectContext, extraArgs []
 		return split[0] == "-target"
 	}
 
-	for _, arg := range ctx.EscapedCommentArgs {
-		if isTargetFlag(arg) {
-			return true
-		}
+	if slices.ContainsFunc(ctx.EscapedCommentArgs, isTargetFlag) {
+		return true
 	}
-	for _, arg := range extraArgs {
-		if isTargetFlag(arg) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(extraArgs, isTargetFlag)
 }
 
 // cleanRemoteApplyOutput removes unneeded output like the refresh and plan
@@ -104,11 +103,11 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 
   Enter a value: 
 `
-	applyStartIdx := strings.Index(out, applyStartText)
-	if applyStartIdx < 0 {
+	_, after, found := strings.Cut(out, applyStartText)
+	if !found {
 		return out
 	}
-	return out[applyStartIdx+len(applyStartText):]
+	return after
 }
 
 // runRemoteApply handles running the apply and performing actions in real-time
@@ -132,7 +131,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	// between plan and apply phases.
 	planfileBytes, err := os.ReadFile(absPlanPath)
 	if err != nil {
-		return "", errors.Wrap(err, "reading planfile")
+		return "", fmt.Errorf("reading planfile: %w", err)
 	}
 
 	// updateStatusF will update the commit status and log any error.
@@ -163,6 +162,9 @@ func (a *ApplyStepRunner) runRemoteApply(
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
+			if ctx.RemoteApplyRunURL != nil {
+				*ctx.RemoteApplyRunURL = runURL
+			}
 			ctx.Log.Debug("remote run url found, updating commit status")
 			updateStatusF(models.PendingCommitStatus, runURL)
 			nextLineIsRunURL = false
@@ -201,7 +203,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	if err != nil {
 		updateStatusF(models.FailedCommitStatus, runURL)
 	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
+		ctx.Log.Debug("remote apply succeeded; deferring success status until final apply freshness validation")
 	}
 	return output, err
 }
@@ -214,11 +216,11 @@ func (a *ApplyStepRunner) remotePlanChanged(planfileContents string, applyOut st
 	output := StripRefreshingFromPlanOutput(applyOut, tfVersion)
 
 	// Strip plan output after the prompt to execute the plan.
-	planEndIdx := strings.Index(output, "Do you want to perform these actions in workspace \"")
-	if planEndIdx < 0 {
-		return fmt.Errorf("Couldn't find plan end when parsing apply output:\n%q", applyOut)
+	before, _, found := strings.Cut(output, "Do you want to perform these actions in workspace \"")
+	if !found {
+		return fmt.Errorf("couldn't find plan end when parsing apply output:\n%q", applyOut)
 	}
-	currPlan := strings.TrimSpace(output[:planEndIdx])
+	currPlan := strings.TrimSpace(before)
 
 	// Ensure we strip the remoteOpsHeader from the plan contents so the
 	// comparison is fair. We add this header in the plan phase so we can

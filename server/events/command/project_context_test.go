@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command_test
 
 import (
@@ -31,7 +34,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: false,
@@ -50,7 +53,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: true,
@@ -69,7 +72,7 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 			},
 			policyClearedExp: true,
@@ -96,17 +99,17 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 				{
 					PolicySetName: "policy2",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 				{
 					PolicySetName: "policy3",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: false,
@@ -133,17 +136,17 @@ func TestPolicyCheckResults_PolicyFuncs(t *testing.T) {
 				{
 					PolicySetName: "policy1",
 					Passed:        false,
-					Approvals:     2,
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}, {Approver: "approver2"}},
 				},
 				{
 					PolicySetName: "policy2",
 					Passed:        false,
-					Approvals:     1,
+					Approvals:     []models.PolicySetApproval{{Approver: "approver1"}},
 				},
 				{
 					PolicySetName: "policy3",
 					Passed:        true,
-					Approvals:     0,
+					Approvals:     nil,
 				},
 			},
 			policyClearedExp: true,

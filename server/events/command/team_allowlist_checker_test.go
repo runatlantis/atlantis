@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command_test
 
 import (
@@ -42,4 +45,16 @@ func TestIsCommandAllowedForAnyTeam(t *testing.T) {
 	Equals(t, true, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{}, teams, `release`))
 	Equals(t, true, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{}, teams, `unlock`))
 	Equals(t, false, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{}, teams, `noop`))
+}
+
+func TestIsCommandAllowedForAnyTeamAPIContext(t *testing.T) {
+	checker, err := command.NewTeamAllowlistChecker("platform:plan")
+	Ok(t, err)
+
+	Equals(t, false, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{API: true}, nil, "plan"))
+	Equals(t, false, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{}, nil, "plan"))
+
+	wildcardChecker, err := command.NewTeamAllowlistChecker("*:plan")
+	Ok(t, err)
+	Equals(t, true, wildcardChecker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{API: true}, nil, "plan"))
 }

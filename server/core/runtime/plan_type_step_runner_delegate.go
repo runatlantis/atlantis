@@ -1,10 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -25,7 +28,7 @@ func (p *planTypeStepRunnerDelegate) isRemotePlan(planFile string) (bool, error)
 	data, err := os.ReadFile(planFile)
 
 	if err != nil {
-		return false, errors.Wrapf(err, "unable to read %s", planFile)
+		return false, fmt.Errorf("unable to read %s: %w", planFile, err)
 	}
 
 	return IsRemotePlan(data), nil

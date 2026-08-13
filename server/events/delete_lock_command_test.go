@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -5,20 +8,21 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, we return the error")
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, errors.New("err"))
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	l.EXPECT().Unlock("id").Return(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{Locker: l}
 	_, err := dlc.DeleteLock(logger, "id")
 	ErrEquals(t, "err", err)
@@ -27,9 +31,9 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we return nil")
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(nil, nil)
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	l.EXPECT().Unlock("id").Return(nil, nil)
 	dlc := events.DefaultDeleteLockCommand{Locker: l}
 	lock, err := dlc.DeleteLock(logger, "id")
 	Ok(t, err)
@@ -39,18 +43,16 @@ func TestDeleteLock_None(t *testing.T) {
 func TestDeleteLock_Success(t *testing.T) {
 	t.Log("Delete lock deletes successfully the plan file")
 	logger := logging.NewNoopLogger(t)
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{}, nil)
-	workingDir := events.NewMockWorkingDir()
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
 	workspace := "workspace"
 	path := "path"
 	projectName := ""
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
-	When(l.Unlock("id")).ThenReturn(&models.ProjectLock{
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	l.EXPECT().Unlock("id").Return(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: workspace,
 		Project: models.Project{
@@ -58,15 +60,17 @@ func TestDeleteLock_Success(t *testing.T) {
 			RepoFullName: pull.BaseRepo.FullName,
 		},
 	}, nil)
+	workingDir := events.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
 	tmp := t.TempDir()
-	db, err := db.New(tmp)
+	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
 		db.Close()
 	})
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
-		Backend:          db,
+		Database:         db,
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}
@@ -82,10 +86,11 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	repoName := "reponame"
 	pullNum := 2
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	workingDir := events.NewMockWorkingDir()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn(nil, errors.New("err"))
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
 		WorkingDir: workingDir,
@@ -101,10 +106,11 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	repoName := "reponame"
 	pullNum := 2
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	workingDir := events.NewMockWorkingDir()
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{}, nil)
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{}, nil)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:     l,
 		WorkingDir: workingDir,
@@ -124,14 +130,15 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 	workspace := "default"
 	projectName := "projectname"
 
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	workingDir := events.NewMockWorkingDir()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 		Num:      pullNum,
 	}
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{
 		{
 			Pull:      pull,
 			Workspace: workspace,
@@ -163,14 +170,15 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 	workspace := "default"
 	projectName := ""
 
-	RegisterMockTestingT(t)
-	l := lockmocks.NewMockLocker()
+	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	workingDir := events.NewMockWorkingDir()
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: repoName},
 		Num:      pullNum,
 	}
-	When(l.UnlockByPull(repoName, pullNum)).ThenReturn([]models.ProjectLock{
+	l.EXPECT().UnlockByPull(repoName, pullNum).Return([]models.ProjectLock{
 		{
 			Pull:      pull,
 			Workspace: workspace,

@@ -1,6 +1,10 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,7 +13,6 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	tf "github.com/runatlantis/atlantis/server/core/terraform"

@@ -1,0 +1,18 @@
+{{ define "singleProjectPlanSuccess" -}}
+{{ $result := index .Results 0 -}}
+Se ejecutó {{ .Command }} para {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{ if ne .DisableApplyAll true }}
+---
+* :fast_forward: Para **aplicar** todos los planes pendientes de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} apply
+  ```
+* :put_litter_in_its_place: Para **eliminar** todos los planes y bloqueos de esta {{ .VcsRequestType }}, comenta:
+  ```shell
+  {{ .ExecutableName }} unlock
+  ```
+{{ end -}}
+{{ template "log" . -}}
+{{ end -}}

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
@@ -33,7 +36,7 @@ func (a AutoDiscover) ToValid() *valid.AutoDiscover {
 
 func (a AutoDiscover) Validate() error {
 
-	ignoreValid := func(value interface{}) error {
+	ignoreValid := func(value any) error {
 		strSlice := value.([]string)
 		if strSlice == nil {
 			return nil

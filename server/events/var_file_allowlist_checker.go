@@ -1,11 +1,12 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // VarFileAllowlistChecker implements checking if paths are allowlisted to be used with
@@ -23,7 +24,7 @@ func NewVarFileAllowlistChecker(allowlist string) (*VarFileAllowlistChecker, err
 		for _, path := range paths {
 			absPath, err := filepath.Abs(path)
 			if err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("converting allowlist %q to absolute path", path))
+				return nil, fmt.Errorf("converting allowlist %q to absolute path: %w", path, err)
 			}
 			rules = append(rules, absPath)
 		}

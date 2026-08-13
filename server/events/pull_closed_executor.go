@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -17,26 +8,28 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
 
 	"github.com/runatlantis/atlantis/server/logging"
 
-	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_resource_cleaner.go ResourceCleaner
 
 type ResourceCleaner interface {
 	CleanUp(pullInfo jobs.PullInfo)
 }
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
 // PullCleaner cleans up pull requests after they're closed/merged.
 type PullCleaner interface {
@@ -51,9 +44,11 @@ type PullClosedExecutor struct {
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
-	Backend                  locking.Backend
+	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
+	CancellationTracker      CancellationTracker
+	PlanStore                runtime.PlanStore
 }
 
 type templatedProject struct {
@@ -67,18 +62,18 @@ var pullClosedTemplate = template.Must(template.New("").Parse(
 		"- dir: `{{ .RepoRelDir }}` {{ .Workspaces }}{{ end }}"))
 
 type PullCleanupTemplate interface {
-	Execute(wr io.Writer, data interface{}) error
+	Execute(wr io.Writer, data any) error
 }
 
 type PullClosedEventTemplate struct{}
 
-func (t *PullClosedEventTemplate) Execute(wr io.Writer, data interface{}) error {
+func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 	return pullClosedTemplate.Execute(wr, data)
 }
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
-	pullStatus, err := p.Backend.GetPullStatus(pull)
+	pullStatus, err := p.Database.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
 		logger.Err("retrieving pull status: %s", err)
@@ -98,8 +93,21 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	var workspaceErr error
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
-		return errors.Wrap(err, "cleaning workspace")
+		workspaceErr = fmt.Errorf("cleaning workspace: %w", err)
+	}
+
+	// Always attempt external plan cleanup even if workspace deletion failed,
+	// so S3 objects are not orphaned when local delete errors.
+	if p.PlanStore != nil {
+		if err := p.PlanStore.DeleteForPull(repo.Owner, repo.Name, pull.Num); err != nil {
+			logger.Warn("failed to delete plans from external store: %s", err)
+		}
+	}
+
+	if workspaceErr != nil {
+		return workspaceErr
 	}
 
 	// Finally, delete locks. We do this last because when someone
@@ -107,12 +115,17 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// so we might have plans laying around but no locks.
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
-		return errors.Wrap(err, "cleaning up locks")
+		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
 	// Delete pull from DB.
-	if err := p.Backend.DeletePullStatus(pull); err != nil {
+	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
+	}
+
+	// Clear any operations to avoid unbounded growth.
+	if p.CancellationTracker != nil {
+		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
@@ -123,7 +136,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	templateData := p.buildTemplateData(locks)
 	var buf bytes.Buffer
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
-		return errors.Wrap(err, "rendering template for comment")
+		return fmt.Errorf("rendering template for comment: %w", err)
 	}
 	return p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), "")
 }
@@ -136,7 +149,10 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	workspacesByPath := make(map[string][]string)
 	for _, l := range locks {
 		path := l.Project.Path
-		workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		// Check if workspace already exists to avoid duplicates
+		if !slices.Contains(workspacesByPath[path], l.Workspace) {
+			workspacesByPath[path] = append(workspacesByPath[path], l.Workspace)
+		}
 	}
 
 	// sort keys so we can write deterministic tests
@@ -149,6 +165,7 @@ func (p *PullClosedExecutor) buildTemplateData(locks []models.ProjectLock) []tem
 	var projects []templatedProject
 	for _, p := range sortedPaths {
 		workspace := workspacesByPath[p]
+		sort.Strings(workspace)
 		workspacesStr := fmt.Sprintf("`%s`", strings.Join(workspace, "`, `"))
 		if len(workspace) == 1 {
 			projects = append(projects, templatedProject{

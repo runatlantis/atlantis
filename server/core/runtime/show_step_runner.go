@@ -1,11 +1,14 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
@@ -54,11 +57,11 @@ func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string
 	)
 
 	if err != nil {
-		return "", errors.Wrap(err, "running terraform show")
+		return "", fmt.Errorf("running terraform show: %w", err)
 	}
 
 	if err := os.WriteFile(showResultFile, []byte(output), 0600); err != nil {
-		return "", errors.Wrap(err, "writing terraform show result")
+		return "", fmt.Errorf("writing terraform show result: %w", err)
 	}
 
 	return output, nil

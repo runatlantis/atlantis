@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package valid_test
 
 import (
@@ -10,7 +13,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/core/config"
-	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -83,7 +85,6 @@ func TestNewGlobalCfg(t *testing.T) {
 				RepoLocks:                 &valid.DefaultRepoLocks,
 				PolicyCheck:               Bool(false),
 				CustomPolicyCheck:         Bool(false),
-				AutoDiscover:              raw.DefaultAutoDiscover(),
 			},
 		},
 		Workflows: map[string]valid.Workflow{
@@ -135,9 +136,7 @@ func TestNewGlobalCfg(t *testing.T) {
 				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "repo_locks", "policy_check", "silence_pr_comments"}
 			}
 			if c.policyCheckEnabled {
-				exp.Repos[0].PlanRequirements = append(exp.Repos[0].PlanRequirements, "policies_passed")
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "policies_passed")
-				exp.Repos[0].ImportRequirements = append(exp.Repos[0].ImportRequirements, "policies_passed")
 				exp.Repos[0].PolicyCheck = Bool(true)
 			}
 
@@ -557,14 +556,16 @@ policies:
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      nil,
-					ApproveCount: 1,
+					Version:         nil,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/source",
-							Source:       "local",
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/source",
+							Source:          "local",
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},
@@ -606,14 +607,16 @@ policies:
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      version,
-					ApproveCount: 1,
+					Version:         version,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/source",
-							Source:       "local",
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/source",
+							Source:          "local",
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},
@@ -806,6 +809,38 @@ repos:
 				PolicyCheck:        true,
 			},
 		},
+		"repo-side plan reqs should not include non-overridable 'policies_passed', since it's not a default plan requirement": {
+			gCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [plan_requirements]
+  apply_requirements: [approved]
+  policy_check: true
+`,
+			repoID: "github.com/owner/repo",
+			proj: valid.Project{
+				Dir:                ".",
+				Workspace:          "default",
+				PlanRequirements:   []string{"mergeable"},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+			},
+			repoWorkflows: nil,
+			exp: valid.MergedProjectCfg{
+				PlanRequirements:   []string{"mergeable"},
+				ApplyRequirements:  []string{"approved"},
+				ImportRequirements: []string{},
+				Workflow:           defaultWorkflow,
+				RepoRelDir:         ".",
+				Workspace:          "default",
+				Name:               "",
+				AutoplanEnabled:    false,
+				PolicySets:         emptyPolicySets,
+				RepoLocks:          valid.DefaultRepoLocks,
+				CustomPolicyCheck:  false,
+				PolicyCheck:        true,
+			},
+		},
 		"repo-side apply reqs should not include non-overridable 'policies_passed' req when overridden and policies disabled": {
 			gCfg: `
 repos:
@@ -980,17 +1015,18 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				PlanRequirements:   []string{},
-				ApplyRequirements:  []string{},
-				ImportRequirements: []string{},
-				Workflow:           defaultWorkflow,
-				RepoRelDir:         "mydir",
-				Workspace:          "myworkspace",
-				Name:               "myname",
-				AutoplanEnabled:    true,
-				PolicySets:         emptyPolicySets,
-				RepoLocks:          valid.DefaultRepoLocks,
-				CustomPolicyCheck:  false,
+				PlanRequirements:     []string{},
+				ApplyRequirements:    []string{},
+				ImportRequirements:   []string{},
+				Workflow:             defaultWorkflow,
+				RepoRelDir:           "mydir",
+				Workspace:            "myworkspace",
+				Name:                 "myname",
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{".tf"},
+				PolicySets:           emptyPolicySets,
+				RepoLocks:            valid.DefaultRepoLocks,
+				CustomPolicyCheck:    false,
 			},
 		},
 		"execution order group is set": {
@@ -1008,18 +1044,19 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				PlanRequirements:    []string{},
-				ApplyRequirements:   []string{},
-				ImportRequirements:  []string{},
-				Workflow:            defaultWorkflow,
-				RepoRelDir:          "mydir",
-				Workspace:           "myworkspace",
-				Name:                "myname",
-				AutoplanEnabled:     true,
-				PolicySets:          emptyPolicySets,
-				ExecutionOrderGroup: 10,
-				RepoLocks:           valid.DefaultRepoLocks,
-				CustomPolicyCheck:   false,
+				PlanRequirements:     []string{},
+				ApplyRequirements:    []string{},
+				ImportRequirements:   []string{},
+				Workflow:             defaultWorkflow,
+				RepoRelDir:           "mydir",
+				Workspace:            "myworkspace",
+				Name:                 "myname",
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{".tf"},
+				PolicySets:           emptyPolicySets,
+				ExecutionOrderGroup:  10,
+				RepoLocks:            valid.DefaultRepoLocks,
+				CustomPolicyCheck:    false,
 			},
 		},
 	}
@@ -1152,6 +1189,58 @@ func TestGlobalCfg_MatchingRepo(t *testing.T) {
 	}
 }
 
+func TestGlobalCfg_RepoAutoDiscoverCfg(t *testing.T) {
+	inheritedAutoDiscover := &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"ignored/**"},
+	}
+	overrideAutoDiscover := &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverDisabledMode,
+	}
+
+	cases := map[string]struct {
+		gCfg   valid.GlobalCfg
+		repoID string
+		exp    *valid.AutoDiscover
+	}{
+		"returns nil when no matching repo defines autodiscover": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*")},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+		},
+		"inherits autodiscover from earlier matching repo": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo"},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    inheritedAutoDiscover,
+		},
+		"uses later matching autodiscover override": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					{IDRegex: regexp.MustCompile(".*"), AutoDiscover: inheritedAutoDiscover},
+					{ID: "github.com/owner/repo", AutoDiscover: overrideAutoDiscover},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			exp:    overrideAutoDiscover,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			Equals(t, c.exp, c.gCfg.RepoAutoDiscoverCfg(c.repoID))
+		})
+	}
+}
+
 func TestGlobalCfg_PolicyCheckOverride(t *testing.T) {
 	var emptyPolicySets valid.PolicySets
 
@@ -1237,9 +1326,9 @@ repos:
 			},
 			repoWorkflows: nil,
 			exp: valid.MergedProjectCfg{
-				PlanRequirements:   []string{"approved", "mergeable", "policies_passed"},
+				PlanRequirements:   []string{"approved", "mergeable"},
 				ApplyRequirements:  []string{"approved", "mergeable", "policies_passed"},
-				ImportRequirements: []string{"approved", "mergeable", "policies_passed"},
+				ImportRequirements: []string{"approved", "mergeable"},
 				Workflow:           defaultWorkflow,
 				RepoRelDir:         "mydir",
 				Workspace:          "myworkspace",

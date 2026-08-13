@@ -1,17 +1,20 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_pending_plan_finder.go PendingPlanFinder
 
 type PendingPlanFinder interface {
 	Find(pullDir string) ([]PendingPlan, error)
@@ -47,11 +50,34 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 	if err != nil {
 		return nil, nil, err
 	}
+	absPullDir, err := filepath.Abs(pullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute pull directory: %w", err)
+	}
+
 	var plans []PendingPlan
 	var absPaths []string
 	for _, workspaceDir := range workspaceDirs {
+		// Skip non-directory entries (files, symlinks); workspace clones are always directories.
+		if !workspaceDir.IsDir() {
+			continue
+		}
+
 		workspace := workspaceDir.Name()
-		repoDir := filepath.Join(pullDir, workspace)
+		repoDir, err := workspaceRepoDir(absPullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Skip directories that are not workspace clone roots (e.g. stray
+		// directories left by external processes).
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			continue
+		}
 
 		// Any generated plans should be untracked by git since Atlantis created
 		// them.
@@ -59,9 +85,9 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		lsCmd.Dir = repoDir
 		lsOut, err := lsCmd.CombinedOutput()
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "running 'git ls-files . --others' in '%s' directory: %s", repoDir, string(lsOut))
+			return nil, nil, fmt.Errorf("running 'git ls-files . --others' in '%s' directory: %s: %w", repoDir, string(lsOut), err)
 		}
-		for _, file := range strings.Split(string(lsOut), "\n") {
+		for file := range strings.SplitSeq(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
 				// Ignore .terragrunt-cache dirs (#487)
 				if strings.Contains(file, ".terragrunt-cache/") {
@@ -85,6 +111,33 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 	return plans, absPaths, nil
 }
 
+func workspaceRepoDir(absPullDir, workspace string) (string, error) {
+	repoDir := filepath.Clean(filepath.Join(absPullDir, workspace))
+	rel, err := filepath.Rel(absPullDir, repoDir)
+	if err != nil {
+		return "", fmt.Errorf("checking workspace directory %q: %w", workspace, err)
+	}
+	if rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("workspace directory %q escapes pull directory %q", workspace, absPullDir)
+	}
+	return repoDir, nil
+}
+
+func isGitWorkTreeRoot(repoDir string) (bool, error) {
+	showPrefixCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree", "--show-prefix") // nolint: gosec
+	showPrefixCmd.Dir = repoDir
+	showPrefixOut, err := showPrefixCmd.CombinedOutput()
+	if err != nil {
+		output := string(showPrefixOut)
+		if strings.Contains(output, "not a git repository") || strings.Contains(output, "must be run in a work tree") {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking git repository in '%s' directory: %s: %w", repoDir, output, err)
+	}
+	lines := strings.Split(string(showPrefixOut), "\n")
+	return len(lines) >= 2 && lines[0] == "true" && lines[1] == "", nil
+}
+
 // deletePlans deletes all plans in pullDir.
 func (p *DefaultPendingPlanFinder) DeletePlans(pullDir string) error {
 	_, absPaths, err := p.findWithAbsPaths(pullDir)
@@ -93,7 +146,7 @@ func (p *DefaultPendingPlanFinder) DeletePlans(pullDir string) error {
 	}
 	for _, path := range absPaths {
 		if err := utils.RemoveIgnoreNonExistent(path); err != nil {
-			return errors.Wrapf(err, "delete plan at %s", path)
+			return fmt.Errorf("delete plan at %s: %w", path, err)
 		}
 	}
 	return nil

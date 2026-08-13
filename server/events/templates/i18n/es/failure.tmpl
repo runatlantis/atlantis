@@ -1,0 +1,6 @@
+{{ define "failure" -}}
+**{{ .Command }} falló**: {{ .Failure }}
+{{- if ne .RenderedContext ""}}
+{{ .RenderedContext }}
+{{- end }}
+{{ end -}}

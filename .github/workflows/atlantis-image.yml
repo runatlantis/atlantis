@@ -22,29 +22,42 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-build: ${{ steps.changes.outputs.src == 'true' || startsWith(github.ref, 'refs/tags/') }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
         id: changes
         with:
           filters: |
             src:
               - 'Dockerfile'
+              - '.dockerignore'
               - 'docker-entrypoint.sh'
+              - 'goss.yaml'
+              - 'scripts/download-release.sh'
               - '.github/workflows/atlantis-image.yml'
-              - '**.go'
-              - 'go.*'
+              - 'cmd/**'
+              - 'server/**'
+              - 'testdrive/**'
+              - 'main.go'
+              - 'go.mod'
+              - 'go.sum'
 
   build:
     needs: [changes]
@@ -67,34 +80,34 @@ jobs:
 
     steps:
     - name: Harden Runner
-      uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+      uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
       with:
         egress-policy: audit
 
-    - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+      uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
       with:
         dockerfile: "Dockerfile"
 
     - name: Set up Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         go-version-file: "go.mod"
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
+      uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
       with:
-        image: tonistiigi/binfmt:latest
+        image: tonistiigi/binfmt:qemu-v10.2.1@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+      uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
     - name: "Install cosign"
-      uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
+      uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
       if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
     # release version is the name of the tag i.e. v0.10.0
@@ -105,7 +118,7 @@ jobs:
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -137,7 +150,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -151,7 +164,7 @@ jobs:
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
       id: build
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -183,19 +196,24 @@ jobs:
         # Sign dev tags, version tags, and latest tags
         echo "${TAGS}" | xargs -I {} cosign sign \
           --yes \
-          -a actor=${{ github.actor}} \
-          -a ref_name=${{ github.ref_name}} \
-          -a ref=${{ github.sha }} \
+          -a "actor=${ACTOR}" \
+          -a "ref_name=${REF_NAME}" \
+          -a "ref=${SHA}" \
           {}@${DIGEST}
       env:
         TAGS: ${{ steps.meta.outputs.tags }}
         DIGEST: ${{ steps.build.outputs.digest }}
+        ACTOR: ${{ github.actor }}
+        REF_NAME: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
 
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Test Image With Goss
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       matrix:
         image_type: [alpine, debian]
@@ -206,17 +224,17 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
       - name: "Build and load into Docker"
         if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -229,7 +247,7 @@ jobs:
           target: ${{ matrix.image_type }}
 
       - name: "Setup Goss"
-        uses: e1himself/goss-installation-action@fbb6fb55d3e59c96045b2500eeb8ce0995d99ac1 # v1.2.1
+        uses: e1himself/goss-installation-action@3b8340a7c772f8064444f48b0df4c2a80d2e50fc # v1.3.0
         with:
           version: "v0.4.7"
 
@@ -241,13 +259,15 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Image
+    permissions:
+      contents: read
     strategy:
       matrix:
         image_type: [alpine, debian]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 

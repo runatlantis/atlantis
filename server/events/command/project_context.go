@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
 import (
@@ -20,6 +23,7 @@ const (
 // be executed for a project.
 type ProjectContext struct {
 	CommandName Name
+	SubCommand  string
 	// ApplyCmd is the command that users should run to apply this plan. If
 	// this is an apply then this will be empty.
 	ApplyCmd string
@@ -46,6 +50,8 @@ type ProjectContext struct {
 	ParallelPolicyCheckEnabled bool
 	// AutoplanEnabled is true if autoplanning is enabled for this project.
 	AutoplanEnabled bool
+	// AutoplanWhenModified is the list of file patterns that trigger autoplanning for this project.
+	AutoplanWhenModified []string
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo models.Repo
 	// EscapedCommentArgs are the extra arguments that were added to the atlantis
@@ -72,10 +78,16 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
+	// ExpectedPlanHash is the SHA-256 hash of the plan file selected when the
+	// apply command was built.
+	ExpectedPlanHash string
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
 	ProjectPolicyStatus []models.PolicySetStatus
+	// RunPolicyChecks is true for API workflows that explicitly execute policy
+	// checks and should fail closed if policy status is missing.
+	RunPolicyChecks bool
 
 	// Pull is the pull request we're responding to.
 	Pull models.PullRequest
@@ -133,6 +145,34 @@ type ProjectContext struct {
 
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
+
+	// API indicates this command was triggered via the API endpoint rather than
+	// a PR comment.
+	API bool
+
+	// SkipPRRequirements allows explicitly opted-in non-PR API workflows to skip
+	// PR-only requirements like approved and mergeable.
+	SkipPRRequirements bool
+
+	// SuppressVCSStatus prevents API workflows such as drift detection from
+	// publishing normal PR lifecycle commit statuses.
+	SuppressVCSStatus bool
+
+	// SuppressJobOutput prevents API workflows such as drift detection from
+	// publishing raw command output to the public job stream.
+	SuppressJobOutput bool
+
+	// SuppressApplyWebhooks prevents synthetic API workflows such as drift
+	// remediation from sending legacy event: apply webhooks.
+	SuppressApplyWebhooks bool
+
+	// RemoteApplyRunURL receives the Terraform Cloud/Enterprise run URL found by
+	// remote apply execution so deferred final status publication can use it.
+	RemoteApplyRunURL *string
+
+	// FailOnMissingDependencies makes apply dependency validation fail when a
+	// configured dependency is not present in PullStatus.
+	FailOnMissingDependencies bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.
@@ -154,12 +194,23 @@ func (p ProjectContext) SetProjectScopeTags(scope tally.Scope) tally.Scope {
 	return scope.Tagged(tags.Loadtags())
 }
 
+// ProjectID returns the identifier used for this project in per-project commit
+// status names (e.g. "<vcs-status-name>/plan: <ProjectID>"). It must stay in
+// sync with DefaultCommitStatusUpdater.UpdateProject, which builds the status
+// name, so that consumers can match a commit status back to its project.
+func (p ProjectContext) ProjectID() string {
+	if p.ProjectName != "" {
+		return p.ProjectName
+	}
+	return fmt.Sprintf("%s/%s", p.RepoRelDir, p.Workspace)
+}
+
 // GetShowResultFileName returns the filename (not the path) to store the tf show result
 func (p ProjectContext) GetShowResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s.json", projName, p.Workspace)
 }
 
@@ -168,7 +219,7 @@ func (p ProjectContext) GetPolicyCheckResultFileName() string {
 	if p.ProjectName == "" {
 		return fmt.Sprintf("%s-policyout.json", p.Workspace)
 	}
-	projName := strings.Replace(p.ProjectName, "/", planfileSlashReplace, -1)
+	projName := strings.ReplaceAll(p.ProjectName, "/", planfileSlashReplace)
 	return fmt.Sprintf("%s-%s-policyout.json", projName, p.Workspace)
 }
 
@@ -204,7 +255,7 @@ func (p ProjectContext) PolicyCleared() bool {
 		}
 		for _, psCfg := range p.PolicySets.PolicySets {
 			if psStatus.PolicySetName == psCfg.Name {
-				if psStatus.Approvals != psCfg.ApproveCount {
+				if psStatus.GetCurApprovals() < psCfg.ApproveCount {
 					passing = false
 				}
 			}

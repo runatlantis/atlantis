@@ -1,9 +1,14 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -31,7 +36,8 @@ func (r *RunStepRunner) Run(
 	path string,
 	envs map[string]string,
 	streamOutput bool,
-	postProcessOutput valid.PostProcessRunOutputOption,
+	postProcessOutput []valid.PostProcessRunOutputOption,
+	postProcessFilterRegexes []*regexp.Regexp,
 ) (string, error) {
 	tfDistribution := r.DefaultTFDistribution
 	tfVersion := r.DefaultTFVersion
@@ -74,6 +80,11 @@ func (r *RunStepRunner) Run(
 		"USER_NAME":                       ctx.User.Username,
 		"WORKSPACE":                       ctx.Workspace,
 	}
+	// Add PR metadata environment variables for plan and apply steps
+	if ctx.CommandName.String() == "plan" || ctx.CommandName.String() == "apply" {
+		customEnvVars["ATLANTIS_PR_APPROVED"] = strconv.FormatBool(ctx.PullReqStatus.ApprovalStatus.IsApproved)
+		customEnvVars["ATLANTIS_PR_MERGEABLE"] = strconv.FormatBool(ctx.PullReqStatus.MergeableStatus.IsMergeable)
+	}
 
 	finalEnvVars := baseEnvVars
 	for key, val := range customEnvVars {
@@ -86,13 +97,26 @@ func (r *RunStepRunner) Run(
 	runner := models.NewShellCommandRunner(shell, command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
-	if postProcessOutput == valid.PostProcessRunOutputStripRefreshing {
-		output = StripRefreshingFromPlanOutput(output, tfVersion)
-
+	// These need to run before the error check to filter output
+	for _, processOutput := range postProcessOutput {
+		switch processOutput {
+		case valid.PostProcessRunOutputStripRefreshing:
+			output = StripRefreshingFromPlanOutput(output, tfVersion)
+		case valid.PostProcessRunOutputFilterRegexKey:
+			for _, filterRegexes := range postProcessFilterRegexes {
+				output = FilterRegexFromPlanOutput(output, filterRegexes)
+			}
+		}
 	}
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
+		err = runStepError{
+			err:          err,
+			command:      command,
+			path:         path,
+			output:       output,
+			streamOutput: streamOutput,
+		}
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 		} else {
@@ -101,14 +125,32 @@ func (r *RunStepRunner) Run(
 		return "", err
 	}
 
-	switch postProcessOutput {
-	case valid.PostProcessRunOutputHide:
-		return "", nil
-	case valid.PostProcessRunOutputStripRefreshing:
-		return output, nil
-	case valid.PostProcessRunOutputShow:
-		return output, nil
-	default:
-		return output, nil
+	for _, processOutput := range postProcessOutput {
+		switch processOutput {
+		case valid.PostProcessRunOutputHide:
+			output = ""
+		default:
+		}
 	}
+
+	return output, nil
+}
+
+type runStepError struct {
+	err          error
+	command      string
+	path         string
+	output       string
+	streamOutput bool
+}
+
+func (e runStepError) Error() string {
+	return fmt.Sprintf("%s: running %q in %q: \n%s", e.err, e.command, e.path, e.output)
+}
+
+func (e runStepError) JobMessage() string {
+	if !e.streamOutput && e.output != "" {
+		return e.Error()
+	}
+	return e.err.Error()
 }

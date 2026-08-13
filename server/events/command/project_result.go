@@ -1,25 +1,32 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
-import (
-	"github.com/runatlantis/atlantis/server/events/models"
-)
+import "github.com/runatlantis/atlantis/server/events/models"
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
-	Command            Name
-	SubCommand         string
-	RepoRelDir         string
-	Workspace          string
+	ProjectCommandOutput
+	Command           Name
+	SubCommand        string
+	RepoRelDir        string
+	Workspace         string
+	ProjectName       string
+	SilencePRComments []string
+}
+
+// ProjectCommandOutput is the output of a plan/policy_check/apply for a specific project.
+type ProjectCommandOutput struct {
 	Error              error
 	Failure            string
 	PlanSuccess        *models.PlanSuccess
 	PolicyCheckResults *models.PolicyCheckResults
 	ApplySuccess       string
+	ApplySuccessURL    string `json:"-"`
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
 	StateRmSuccess     *models.StateRmSuccess
-	ProjectName        string
-	SilencePRComments  []string
 }
 
 // CommitStatus returns the vcs commit status of this project result.
@@ -39,9 +46,11 @@ func (p ProjectResult) PolicyStatus() []models.PolicySetStatus {
 	if p.PolicyCheckResults != nil {
 		for _, policySet := range p.PolicyCheckResults.PolicySetResults {
 			policyStatus := models.PolicySetStatus{
-				PolicySetName: policySet.PolicySetName,
-				Passed:        policySet.Passed,
-				Approvals:     policySet.CurApprovals,
+				PolicySetName:   policySet.PolicySetName,
+				Passed:          policySet.Passed,
+				Approvals:       policySet.Approvals,
+				Hashes:          policySet.Hashes,
+				PolicyItemRegex: policySet.PolicyItemRegex,
 			}
 			policyStatuses = append(policyStatuses, policyStatus)
 		}
@@ -76,6 +85,13 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 			return models.ErroredApplyStatus
 		}
 		return models.AppliedPlanStatus
+	case Import, State:
+		if p.Error != nil {
+			return models.ErroredPlanStatus
+		} else if p.Failure != "" {
+			return models.ErroredPlanStatus
+		}
+		return models.DiscardedPlanStatus
 	}
 
 	panic("PlanStatus() missing a combination")

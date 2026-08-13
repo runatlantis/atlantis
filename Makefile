@@ -6,9 +6,6 @@ IMAGE_NAME := runatlantis/atlantis
 
 .DEFAULT_GOAL := help
 
-# renovate: datasource=github-releases depName=golangci/golangci-lint
-GOLANGCI_LINT_VERSION := v1.64.4
-
 .PHONY: help
 help: ## List targets & descriptions
 	@cat Makefile* | grep -E '^[a-zA-Z\/_-]+:.*?## .*$$' | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -50,8 +47,20 @@ regen-mocks: ## Delete and regenerate all mocks
 	@# been made empty, causing go generate to fail.
 	./scripts/go-generate.sh
 
+.PHONY: test-e2e-module
+test-e2e-module: ## Run tests for the e2e Go module
+	@cd e2e && go test $(NESTED_TEST_FLAGS) ./...
+
+.PHONY: test-ranking-module
+test-ranking-module: ## Run tests for the top-issues ranking Go module
+	@cd .github/scripts/update_top_issues_ranking && go test $(NESTED_TEST_FLAGS) ./...
+
+.PHONY: test-nested-modules
+test-nested-modules: test-e2e-module test-ranking-module ## Run tests for nested Go modules
+
 .PHONY: test
-test: ## Run tests
+test: NESTED_TEST_FLAGS = -short
+test: test-nested-modules ## Run tests
 	@go test -short $(PKG)
 
 .PHONY: docker/test
@@ -59,8 +68,8 @@ docker/test: ## Run tests in docker
 	docker run -it -v $(PWD):/atlantis ghcr.io/runatlantis/testing-env:latest sh -c "cd /atlantis && make test"
 
 .PHONY: test-all
-test-all: ## Run tests including integration
-	@go test  $(PKG)
+test-all: test-nested-modules ## Run tests including integration
+	@go test -timeout=300s $(PKG)
 
 .PHONY: docker/test-all
 docker/test-all: ## Run all tests in docker
@@ -93,11 +102,6 @@ fmt: ## Run goimports (which also formats)
 .PHONY: lint
 lint: ## Run linter locally
 	golangci-lint run
-
-.PHONY: check-lint
-check-lint: ## Run linter in CI/CD. If running locally use 'lint'
-	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin $(GOLANGCI_LINT_VERSION)
-	./bin/golangci-lint run -j 4 --timeout 5m
 
 .PHONY: check-fmt
 check-fmt: ## Fail if not formatted

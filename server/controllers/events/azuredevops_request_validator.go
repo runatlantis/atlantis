@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -8,7 +11,7 @@ import (
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_azuredevops_request_validator.go AzureDevopsRequestValidator
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_azuredevops_request_validator.go AzureDevopsRequestValidator
 
 // AzureDevopsRequestValidator handles checking if Azure DevOps requests
 // contain a valid Basic authentication username and password.

@@ -2,7 +2,11 @@
 
 If you want to run custom policy tools or scripts instead of the built-in Conftest integration, you can do so by setting the `custom_policy_check` option and running it in a custom workflow.  Note: custom policy tool output is simply parsed for "fail" substrings to determine if the policy set passed.
 
-This option can be configured either at the server-level in a [repos.yaml config file](server-configuration.md) or at the repo-level in an [atlantis.yaml file.](repo-level-atlantis-yaml.md).
+This option can be configured either at the server-level in a [repos.yaml config file](server-configuration.md) or at the repo-level in an [atlantis.yaml file](repo-level-atlantis-yaml.md).
+
+::: tip
+Custom policy checks support [sticky policy approvals](policy-checking.md#sticky-policy-approvals). Use `policy_item_regex` to target the meaningful failure lines in your tool's output.
+:::
 
 ## Server-side config example
 

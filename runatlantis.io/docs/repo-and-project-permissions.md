@@ -39,6 +39,16 @@ The `--gh-team-allowlist` option allows administrators to configure a global
 set of permissions that apply to all repositories.  For most use cases, this
 should be sufficient.
 
+::: warning
+If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command:
+
+```bash
+--gh-team-allowlist="*:plan,*:policy_check,myteam:apply"
+```
+
+`policy_check` is an internal command that runs automatically after `plan`. Without allowlisting it, manual `atlantis plan` commands will skip policy checks (though autoplans will still work). See [Policy Checking](policy-checking.md#step-1-enable-the-workflow) for details.
+:::
+
 ### External command
 
 For administrators that require more granular and specific permission

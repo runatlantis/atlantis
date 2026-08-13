@@ -1,16 +1,16 @@
-# syntax=docker/dockerfile:1@sha256:38387523653efa0039f8e1c89bb74a30504e76ee9f565e25c9a09841f9427b05
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 # what distro is the image being built for
-ARG ALPINE_TAG=3.21.3@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
-ARG DEBIAN_TAG=12.10-slim@sha256:4b50eb66f977b4062683ff434ef18ac191da862dbe966961bc11990cf5791a8d
+ARG ALPINE_TAG=3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+ARG DEBIAN_TAG=13.5-slim@sha256:28de0877c2189802884ccd20f15ee41c203573bd87bb6b883f5f46362d24c5c2
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.24.4-alpine@sha256:68932fa6d4d4059845c8f40ad7e654e626f3ebd3706eef7846f319293ab5cb7a
+ARG GOLANG_TAG=1.26.5-alpine3.24@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.11.4
+ARG DEFAULT_TERRAFORM_VERSION=1.14.9
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.10.5
+ARG DEFAULT_OPENTOFU_VERSION=1.12.5
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.59.0
+ARG DEFAULT_CONFTEST_VERSION=0.66.0
 
 # Stage 1: build artifact and download deps
 
@@ -37,10 +37,12 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.2.37-r0"
+# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
+
 RUN apk add --no-cache \
-        bash=${BUILDER_BASH_VERSION}
+    bash=${BUILDER_BASH_VERSION}
+
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -54,35 +56,42 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
-# renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
-# renovate: datasource=repology depName=debian_12/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u12"
-# renovate: datasource=repology depName=debian_12/git versioning=loose
-ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u2"
-# renovate: datasource=repology depName=debian_12/unzip versioning=loose
-ENV DEBIAN_UNZIP_VERSION="6.0-28"
-# renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u7"
-# renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
-ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
-# renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1"
-# renovate: datasource=repology depName=debian_12/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.0.17-1~deb12u2"
+# renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+# renovate: datasource=repology depName=debian_13/curl versioning=loose
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u4"
+# renovate: datasource=repology depName=debian_13/git versioning=loose
+ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
+# renovate: datasource=repology depName=debian_13/unzip versioning=loose
+ENV DEBIAN_UNZIP_VERSION="6.0-29"
+# renovate: datasource=repology depName=debian_13/openssh-server versioning=loose
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
+# renovate: datasource=repology depName=debian_13/dumb-init versioning=loose
+ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
+# renovate: datasource=repology depName=debian_13/gnupg versioning=loose
+ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
+# renovate: datasource=repology depName=debian_13/openssl versioning=loose
+ENV DEBIAN_OPENSSL_VERSION="3.5.6-1~deb13u2"
+
+# Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
+RUN groupadd --gid 1000 atlantis && \
+    useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
+    useradd --uid 1000 --system --home=/home/atlantis --gid 1000 --shell /bin/bash atlantis2 && \
+    chown atlantis:atlantis /home/atlantis/ && \
+    chmod ug+rwx /home/atlantis/
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
-        curl=${DEBIAN_CURL_VERSION} \
-        git=${DEBIAN_GIT_VERSION} \
-        unzip=${DEBIAN_UNZIP_VERSION} \
-        openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
-        dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
-        gnupg=${DEBIAN_GNUPG_VERSION} \
-        openssl=${DEBIAN_OPENSSL_VERSION} && \
+    ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
+    curl=${DEBIAN_CURL_VERSION} \
+    git=${DEBIAN_GIT_VERSION} \
+    unzip=${DEBIAN_UNZIP_VERSION} \
+    openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
+    dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
+    gnupg=${DEBIAN_GNUPG_VERSION} \
+    openssl=${DEBIAN_OPENSSL_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -116,14 +125,18 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.6.1
+ENV GIT_LFS_VERSION=3.7.1
 
+# Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
+# SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=1c0b6ee5200ca708c5cebebb18fdeb0e1c98f1af5c1a9cba205a4c0ab5a5ec08 ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=73a9c90eeb4312133a63c3eaee0c38c019ea7bfa0953d174809d25b18588dd8d ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=567002d2735ceb0e876e326736f1b72895931d5ac156002cc8561b072a4ce9a3 ;; \
+        *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    echo "${GIT_LFS_SHA256}  git-lfs.tar.gz" | sha256sum -c - && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
@@ -155,14 +168,16 @@ RUN ./download-release.sh \
 # Creating the individual distro builds using targets
 FROM alpine:${ALPINE_TAG} AS alpine
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup atlantis && \
-    adduser -S -G atlantis atlantis && \
+RUN addgroup --gid 1000 atlantis && \
+    adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
@@ -176,37 +191,65 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_21/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20250619-r0"
-# renovate: datasource=repology depName=alpine_3_21/curl versioning=loose
-ENV CURL_VERSION="8.12.1-r1"
-# renovate: datasource=repology depName=alpine_3_21/git versioning=loose
-ENV GIT_VERSION="2.47.3-r0"
-# renovate: datasource=repology depName=alpine_3_21/unzip versioning=loose
-ENV UNZIP_VERSION="6.0-r15"
-# renovate: datasource=repology depName=alpine_3_21/bash versioning=loose
-ENV BASH_VERSION="5.2.37-r0"
-# renovate: datasource=repology depName=alpine_3_21/openssh versioning=loose
-ENV OPENSSH_VERSION="9.9_p2-r0"
-# renovate: datasource=repology depName=alpine_3_21/dumb-init versioning=loose
+# renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
+ENV CA_CERTIFICATES_VERSION="20260611-r0"
+# renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
+ENV CURL_VERSION="8.20.0-r0"
+# renovate: datasource=repology depName=alpine_3_23/git versioning=loose
+ENV GIT_VERSION="2.52.0-r0"
+# renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
+ENV UNZIP_VERSION="6.0-r16"
+# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
+ENV BASH_VERSION="5.3.3-r1"
+# renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
+ENV OPENSSH_VERSION="10.2_p1-r0"
+# renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
 ENV DUMB_INIT_VERSION="1.2.5-r3"
-# renovate: datasource=repology depName=alpine_3_21/gcompat versioning=loose
+# renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_21/coreutils versioning=loose
-ENV COREUTILS_ENV_VERSION="9.5-r2"
+# renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
+ENV COREUTILS_ENV_VERSION="9.8-r1"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates=${CA_CERTIFICATES_VERSION} \
-        curl=${CURL_VERSION} \
-        git=${GIT_VERSION} \
-        unzip=${UNZIP_VERSION} \
-        bash=${BASH_VERSION} \
-        openssh=${OPENSSH_VERSION} \
-        dumb-init=${DUMB_INIT_VERSION} \
-        gcompat=${GCOMPAT_VERSION} \
-        coreutils-env=${COREUTILS_ENV_VERSION}
+    ca-certificates=${CA_CERTIFICATES_VERSION} \
+    curl=${CURL_VERSION} \
+    git=${GIT_VERSION} \
+    unzip=${UNZIP_VERSION} \
+    bash=${BASH_VERSION} \
+    openssh=${OPENSSH_VERSION} \
+    dumb-init=${DUMB_INIT_VERSION} \
+    gcompat=${GCOMPAT_VERSION} \
+    coreutils-env=${COREUTILS_ENV_VERSION}
+
+# Strip file capabilities only under fcap_scan_dirs (common rootfs locations for
+# binaries and libs: /bin, /sbin, /usr, /opt, /lib, /lib64). This is a scoped
+# scan, not a full getcap -r /: walking from / would traverse /proc, /sys, /dev,
+# etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
+# and verify share the same list; post-pass getcap|grep fails the build if
+# capabilities remain under that scope.
+# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+ENV LIBCAP_VERSION="2.78-r0"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apk del libcap
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
@@ -216,15 +259,12 @@ CMD ["server"]
 # Stage 2 - Debian
 FROM debian-base AS debian
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
-
-# Set up the 'atlantis' user and adjust permissions
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod u+rwx /home/atlantis/
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
@@ -236,6 +276,36 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
+# Same as Alpine: strip and verify only under fcap_scan_dirs (scoped rootfs
+# trees, not the entire image). Post-pass: if getcap still reports any
+# "path = cap_set" line under that scope, the build fails. Strip may use
+# 2>/dev/null and setcap || true; verification is the hard guarantee.
+# renovate: datasource=repology depName=debian_13/libcap2-bin versioning=loose
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b1"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apt-get purge -y libcap2-bin && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis

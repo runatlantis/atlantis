@@ -1,14 +1,18 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package models
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/terraform/ansi"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -114,8 +118,8 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 		ctx.Log.Debug("starting '%s %q' in '%s'", s.shell.String(), s.command, s.workingDir)
 		err := s.cmd.Start()
 		if err != nil {
-			err = errors.Wrapf(err, "running '%s %q' in '%s'", s.shell.String(), s.command, s.workingDir)
-			ctx.Log.Err(err.Error())
+			err = fmt.Errorf("running '%s %q' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
+			ctx.Log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 			return
 		}
@@ -127,17 +131,23 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 				ctx.Log.Debug("writing %q to remote command's stdin", line)
 				_, err := io.WriteString(stdin, line)
 				if err != nil {
-					err = errors.Wrapf(err, "writing %q to process", line)
-					ctx.Log.Err(err.Error())
+					err = fmt.Errorf("writing %q to process: %w", line, err)
+					ctx.Log.Err("%s", err.Error())
 				}
 			}
 		}()
 
 		wg := new(sync.WaitGroup)
 		wg.Add(2)
-		// Asynchronously copy from stdout/err to outCh.
-		go func() {
-			scanner := bufio.NewScanner(stdout)
+		// Asynchronously copy from stdout/err to outCh. Both scanners need
+		// the enlarged buffer: with the default 64KiB token size limit,
+		// bufio.Scanner stops scanning at the first longer line, silently
+		// dropping it and all subsequent output. Terraform writes its
+		// diagnostics to stderr, and some of them (e.g. dependency cycle
+		// errors) can easily exceed 64KiB on a single line.
+		readOutput := func(r io.Reader, name string) {
+			defer wg.Done()
+			scanner := bufio.NewScanner(r)
 			buf := []byte{}
 			scanner.Buffer(buf, BufioScannerBufferSize)
 
@@ -148,19 +158,28 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 					s.outputHandler.Send(ctx, message, false)
 				}
 			}
-			wg.Done()
-		}()
-		go func() {
-			scanner := bufio.NewScanner(stderr)
-			for scanner.Scan() {
-				message := scanner.Text()
+			if err := scanner.Err(); err != nil {
+				// Don't fail the command over unreadable output, but
+				// surface what happened instead of dropping it silently.
+				ctx.Log.Err("reading %s of '%s': %v", name, s.command, err)
+				message := fmt.Sprintf("[atlantis] error reading %s: %v", name, err)
+				if errors.Is(err, bufio.ErrTooLong) {
+					message = fmt.Sprintf("[atlantis] %s truncated: %v", name, err)
+				}
 				outCh <- Line{Line: message}
 				if s.streamOutput {
 					s.outputHandler.Send(ctx, message, false)
 				}
+				if errors.Is(err, bufio.ErrTooLong) {
+					// The reader is still usable after an oversized token;
+					// drain it so the child process can't block writing to
+					// a full pipe.
+					io.Copy(io.Discard, r) //nolint:errcheck
+				}
 			}
-			wg.Done()
-		}()
+		}
+		go readOutput(stdout, "stdout")
+		go readOutput(stderr, "stderr")
 
 		// Wait for our copying to complete. This *must* be done before
 		// calling cmd.Wait(). (see https://github.com/golang/go/issues/19685)
@@ -174,8 +193,8 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 
 		// We're done now. Send an error if there was one.
 		if err != nil {
-			err = errors.Wrapf(err, "running '%s' '%s' in '%s'", s.shell.String(), s.command, s.workingDir)
-			log.Err(err.Error())
+			err = fmt.Errorf("running '%s' '%s' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
+			log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 		} else {
 			log.Info("successfully ran '%s' '%s' in '%s'",

@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -10,18 +13,19 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v71/github"
+	"github.com/google/go-github/v88/github"
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 
 	"github.com/runatlantis/atlantis/server"
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
@@ -39,7 +43,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -815,6 +819,8 @@ func TestSimpleWorkflow_terraformLockFile(t *testing.T) {
 				runCmd(t, "", "cp", oldLockFilePath, fmt.Sprintf("%s/.terraform.lock.hcl", repoDir))
 				runCmd(t, repoDir, "git", "add", ".terraform.lock.hcl")
 				runCmd(t, repoDir, "git", "commit", "-am", "stage .terraform.lock.hcl")
+				// Update target sha since there's now an extra commit
+				headSHA = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 			}
 
 			atlantisWorkspace.TestingOverrideHeadCloneURL = fmt.Sprintf("file://%s", repoDir)
@@ -1191,6 +1197,45 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 				{"exp-output-merge.txt"},
 			},
 		},
+		{
+			Description:     "custom policy check with multiple policy sets - no duplicate output",
+			RepoDir:         "policy-checks-custom-policy-check",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
+		{
+			Description:     "sticky approval survives re-plan",
+			RepoDir:         "policy-checks-sticky-approvals",
+			ModifiedFiles:   []string{"main.tf"},
+			PolicyCheck:     true,
+			ExpAutoplan:     true,
+			ExpPolicyChecks: true,
+			Comments: []string{
+				"atlantis approve_policies",
+				"atlantis plan",
+				"atlantis apply",
+			},
+			ExpReplies: [][]string{
+				{"exp-output-autoplan.txt"},
+				{"exp-output-auto-policy-check.txt"},
+				{"exp-output-approve-policies.txt"},
+				{"exp-output-plan.txt"},
+				{"exp-output-policy-check-approved.txt"},
+				{"exp-output-apply.txt"},
+				{"exp-output-merge.txt"},
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -1211,7 +1256,9 @@ func TestGitHubWorkflowWithPolicyCheck(t *testing.T) {
 			// Setup test dependencies.
 			w := httptest.NewRecorder()
 			When(vcsClient.PullIsMergeable(
-				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(true, nil)
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(models.MergeableStatus{
+				IsMergeable: true,
+			}, nil)
 			When(vcsClient.PullIsApproved(
 				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(models.ApprovalStatus{
 				IsApproved: true,
@@ -1323,11 +1370,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	}
 	disableApply := true
 	disableGlobalApplyLock := false
-	for _, allowCommand := range allowCommands {
-		if allowCommand == command.Apply {
-			disableApply = false
-			break
-		}
+	if slices.Contains(allowCommands, command.Apply) {
+		disableApply = false
 	}
 	commentParser := &events.CommentParser{
 		GithubUser:     "github-user",
@@ -1341,16 +1385,17 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	terraformClient, err := tfclient.NewClient(logger, distribution, binDir, cacheDir, "", "", "", "default-tf-version", "https://releases.hashicorp.com", true, false, projectCmdOutputHandler)
 	Ok(t, err)
-	boltdb, err := db.New(dataDir)
+	b, err := boltdb.New(dataDir)
 	Ok(t, err)
-	backend := boltdb
-	lockingClient := locking.NewClient(boltdb)
+	database := b
+	lockingClient := locking.NewClient(b)
 	noOpLocker := locking.NewNoOpLocker()
-	applyLocker = locking.NewApplyClient(boltdb, disableApply, disableGlobalApplyLock)
+	applyLocker = locking.NewApplyClient(b, disableApply, disableGlobalApplyLock)
 	projectLocker := &events.DefaultProjectLocker{
-		Locker:     lockingClient,
-		NoOpLocker: noOpLocker,
-		VCSClient:  e2eVCSClient,
+		Locker:         lockingClient,
+		NoOpLocker:     noOpLocker,
+		VCSClient:      e2eVCSClient,
+		ExecutableName: "atlantis",
 	}
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
@@ -1394,6 +1439,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	disableAutomergeLabel := "no-auto-merge"
 	disableUnlockLabel := "do-not-unlock"
 
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
@@ -1423,7 +1469,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommitStatusUpdater:    commitStatusUpdater,
 		Router:                 postWorkflowHookURLGenerator,
 	}
-	statsScope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	statsScope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 	projectCommandBuilder := events.NewProjectCommandBuilder(
 		userConfig.EnablePolicyChecksFlag,
@@ -1443,11 +1489,13 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		false,
+		"",
 		false,
 		false,
 		"auto",
 		statsScope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
@@ -1468,6 +1516,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	Ok(t, err)
 
+	cancellationTracker := events.NewCancellationTracker()
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        e2eVCSClient,
 		Locker:           projectLocker,
@@ -1483,14 +1533,16 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			defaultTFVersion,
 			statusUpdater,
 			asyncTfExec,
+			&runtime.LocalPlanStore{},
 		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
+			PlanStore:         &runtime.LocalPlanStore{},
 		},
-		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
-		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFDistribution:   defaultTFDistribution,
@@ -1503,10 +1555,15 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
 			WorkingDir: workingDir,
 		},
+		CancellationTracker: cancellationTracker,
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher: database,
+		},
+		PlanStore: &runtime.LocalPlanStore{},
 	}
 
 	dbUpdater := &events.DBUpdater{
-		Backend: backend,
+		Database: database,
 	}
 
 	pullUpdater := &events.PullUpdater{
@@ -1549,19 +1606,22 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
 		workingDir,
+		locker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
 		autoMerger,
 		parallelPoolSize,
 		silenceNoProjects,
-		boltdb,
+		database,
 		lockingClient,
 		discardApprovalOnPlan,
 		e2ePullReqStatusFetcher,
+		false,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -1571,14 +1631,18 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
+		cancellationTracker,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
-		boltdb,
+		database,
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		locker,
 		e2ePullReqStatusFetcher,
+		nil,
+		disableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -1609,6 +1673,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -1617,6 +1682,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
@@ -1645,7 +1711,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		Drainer:                        drainer,
 		PreWorkflowHooksCommandRunner:  preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner: postWorkflowHooksCommandRunner,
-		PullStatusFetcher:              backend,
+		PullStatusFetcher:              database,
 		DisableAutoplan:                opt.disableAutoplan,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
@@ -1660,7 +1726,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			Locker:                   lockingClient,
 			VCSClient:                e2eVCSClient,
 			WorkingDir:               workingDir,
-			Backend:                  backend,
+			Database:                 database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 		},
@@ -1708,7 +1774,7 @@ func GitHubPullRequestOpenedEvent(t *testing.T, headSHA string) *http.Request {
 	requestJSON, err := os.ReadFile(filepath.Join("testdata", "githubPullRequestOpenedEvent.json"))
 	Ok(t, err)
 	// Replace sha with expected sha.
-	requestJSONStr := strings.Replace(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA, -1)
+	requestJSONStr := strings.ReplaceAll(string(requestJSON), "c31fd9ea6f557ad2ea659944c3844a059b83bc5d", headSHA)
 	req, err := http.NewRequest("POST", "/events", bytes.NewBuffer([]byte(requestJSONStr)))
 	Ok(t, err)
 	req.Header.Set("Content-Type", "application/json")

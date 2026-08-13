@@ -1,13 +1,18 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	validation "github.com/go-ozzo/ozzo-validation"
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -19,6 +24,28 @@ const (
 	MergeableRequirement  = "mergeable"
 	UnDivergedRequirement = "undiverged"
 )
+
+// terraformProjectIndicators are configuration files that suggest a directory
+// should be treated as a Terraform/Terragrunt/OpenTofu project.
+var terraformProjectIndicators = []string{
+	"*.tf",
+	"*.tf.json",
+	"*.tofu",
+	"*.tofu.json",
+	"terragrunt.hcl",
+}
+
+// IsProjectIndicatorFile returns true if the given filename matches any of the
+// project indicator patterns. This is the canonical check shared by full project
+// discovery and module-parent autodiscovery.
+func IsProjectIndicatorFile(name string) bool {
+	for _, indicator := range terraformProjectIndicators {
+		if doublestar.MatchUnvalidated(indicator, name) {
+			return true
+		}
+	}
+	return false
+}
 
 type Project struct {
 	Name                      *string    `yaml:"name,omitempty"`
@@ -42,15 +69,39 @@ type Project struct {
 	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
 }
 
+// IsTerraformProjectDir returns true if the directory contains files that make it look like a Terraform project
+func IsTerraformProjectDir(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if IsProjectIndicatorFile(entry.Name()) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (p Project) Validate() error {
-	hasDotDot := func(value interface{}) error {
-		if strings.Contains(*value.(*string), "..") {
+	validDir := func(value any) error {
+		dir := *value.(*string)
+		if strings.Contains(dir, "..") {
 			return errors.New("cannot contain '..'")
+		}
+		// If the dir contains glob pattern characters, validate the pattern
+		if ContainsGlobPattern(dir) {
+			if err := ValidateGlobPattern(dir); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
 
-	validName := func(value interface{}) error {
+	validName := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -64,7 +115,7 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	branchValid := func(value interface{}) error {
+	branchValid := func(value any) error {
 		strPtr := value.(*string)
 		if strPtr == nil {
 			return nil
@@ -81,12 +132,36 @@ func (p Project) Validate() error {
 		return nil
 	}
 
-	DependsOn := func(value interface{}) error {
+	DependsOn := func(value any) error {
 		return nil
 	}
 
+	validWorkspace := func(value any) error {
+		strPtr := value.(*string)
+		if strPtr == nil || *strPtr == "" {
+			return nil
+		}
+		ws := *strPtr
+		if strings.Contains(ws, "..") || strings.ContainsAny(ws, "/\\") {
+			return errors.New("cannot contain '..', '/', or '\\'")
+		}
+		return nil
+	}
+
+	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
+	if p.Name != nil && ContainsGlobPattern(*p.Name) {
+		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
+	}
+
+	// Cross-field validation: name cannot be used with glob patterns in dir
+	// because glob patterns expand to multiple projects which can't share the same name
+	if p.Name != nil && p.Dir != nil && ContainsGlobPattern(*p.Dir) {
+		return errors.New("name: cannot be used with glob patterns in 'dir'; glob patterns expand to multiple projects which cannot share the same name")
+	}
+
 	return validation.ValidateStruct(&p,
-		validation.Field(&p.Dir, validation.Required, validation.By(hasDotDot)),
+		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
+		validation.Field(&p.Workspace, validation.By(validWorkspace)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
@@ -177,11 +252,11 @@ func (p Project) ToValid() valid.Project {
 // support any characters that must be url escaped *except* for '/' because
 // users like to name their projects to match the directory it's in.
 func validProjectName(name string) bool {
-	nameWithoutSlashes := strings.Replace(name, "/", "-", -1)
+	nameWithoutSlashes := strings.ReplaceAll(name, "/", "-")
 	return nameWithoutSlashes == url.QueryEscape(nameWithoutSlashes)
 }
 
-func validPlanReq(value interface{}) error {
+func validPlanReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -191,7 +266,7 @@ func validPlanReq(value interface{}) error {
 	return nil
 }
 
-func validApplyReq(value interface{}) error {
+func validApplyReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -201,7 +276,7 @@ func validApplyReq(value interface{}) error {
 	return nil
 }
 
-func validImportReq(value interface{}) error {
+func validImportReq(value any) error {
 	reqs := value.([]string)
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
@@ -211,10 +286,26 @@ func validImportReq(value interface{}) error {
 	return nil
 }
 
-func validDistribution(value interface{}) error {
+func validDistribution(value any) error {
 	distribution := value.(*string)
 	if distribution != nil && *distribution != "terraform" && *distribution != "opentofu" {
 		return fmt.Errorf("'%s' is not a valid terraform_distribution, only '%s' and '%s' are supported", *distribution, "terraform", "opentofu")
+	}
+	return nil
+}
+
+// ContainsGlobPattern returns true if the string contains glob pattern characters.
+// This is used to detect if a dir field should be treated as a glob pattern
+// for expansion into multiple projects.
+func ContainsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
+}
+
+// ValidateGlobPattern validates that a glob pattern is syntactically correct
+// using the doublestar library.
+func ValidateGlobPattern(pattern string) error {
+	if !doublestar.ValidatePattern(pattern) {
+		return fmt.Errorf("invalid glob pattern %q", pattern)
 	}
 	return nil
 }

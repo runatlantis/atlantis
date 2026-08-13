@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketcloud
 
 const (
@@ -43,7 +46,7 @@ type Actor struct {
 }
 type Repository struct {
 	FullName *string `json:"full_name,omitempty" validate:"required"`
-	Links    Links   `json:"links,omitempty" validate:"required"`
+	Links    Links   `json:"links" validate:"required"`
 }
 
 type User struct {
@@ -75,6 +78,8 @@ type PullRequestComments struct {
 
 type PullRequest struct {
 	ID           *int          `json:"id,omitempty" validate:"required"`
+	Description  *string       `json:"description,omitempty"`
+	Summary      *Summary      `json:"summary,omitempty"`
 	Source       *BranchMeta   `json:"source,omitempty" validate:"required"`
 	Destination  *BranchMeta   `json:"destination,omitempty" validate:"required"`
 	Participants []Participant `json:"participants,omitempty" validate:"required"`
@@ -82,6 +87,11 @@ type PullRequest struct {
 	State        *string       `json:"state,omitempty" validate:"required"`
 	Author       *Author       `jsonN:"author,omitempty" validate:"required"`
 }
+
+type Summary struct {
+	Raw *string `json:"raw,omitempty"`
+}
+
 type Links struct {
 	HTML *Link `json:"html,omitempty" validate:"required"`
 }

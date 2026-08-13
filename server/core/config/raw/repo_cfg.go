@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
@@ -32,7 +35,7 @@ type RepoCfg struct {
 }
 
 func (r RepoCfg) Validate() error {
-	equals2 := func(value interface{}) error {
+	equals2 := func(value any) error {
 		asIntPtr := value.(*int)
 		if asIntPtr == nil {
 			return errors.New("is required. If you've just upgraded Atlantis you need to rewrite your atlantis.yaml for version 3. See www.runatlantis.io/docs/upgrading-atlantis-yaml.html")

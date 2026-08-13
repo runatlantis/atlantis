@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers_test
 
 import (
@@ -13,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/controllers"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 
@@ -27,6 +31,7 @@ import (
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCreateApplyLock(t *testing.T) {
@@ -39,8 +44,9 @@ func TestCreateApplyLock(t *testing.T) {
 		expLockTime := "2020-09-01 00:45:26"
 		lockTime, _ := time.Parse(layout, strLockTime)
 
-		l := mocks.NewMockApplyLocker()
-		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
 			Locked: true,
 			Time:   lockTime,
 		}, nil)
@@ -58,8 +64,9 @@ func TestCreateApplyLock(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.LockApply()).ThenReturn(locking.ApplyCommandLock{
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().LockApply().Return(locking.ApplyCommandLock{
 			Locked: false,
 		}, errors.New("failed to acquire lock"))
 
@@ -78,8 +85,9 @@ func TestUnlockApply(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.UnlockApply()).ThenReturn(nil)
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().UnlockApply().Return(nil)
 
 		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
@@ -94,8 +102,9 @@ func TestUnlockApply(t *testing.T) {
 		req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 		w := httptest.NewRecorder()
 
-		l := mocks.NewMockApplyLocker()
-		When(l.UnlockApply()).ThenReturn(errors.New("failed to delete lock"))
+		ctrl := gomock.NewController(t)
+		l := mocks.NewMockApplyLocker(ctrl)
+		l.EXPECT().UnlockApply().Return(errors.New("failed to delete lock"))
 
 		lc := controllers.LocksController{
 			Logger:      logging.NewNoopLogger(t),
@@ -132,9 +141,9 @@ func TestGetLock_InvalidLockID(t *testing.T) {
 
 func TestGetLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, errors.New("err"))
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(nil, errors.New("err"))
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
@@ -148,9 +157,9 @@ func TestGetLock_LockerErr(t *testing.T) {
 
 func TestGetLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(nil, nil)
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(nil, nil)
 	lc := controllers.LocksController{
 		Logger: logging.NewNoopLogger(t),
 		Locker: l,
@@ -164,9 +173,10 @@ func TestGetLock_None(t *testing.T) {
 
 func TestGetLock_Success(t *testing.T) {
 	t.Log("Should be able to render a lock successfully")
-	RegisterMockTestingT(t)
-	l := mocks.NewMockLocker()
-	When(l.GetLock("id")).ThenReturn(&models.ProjectLock{
+	RegisterMockTestingT(t) // needed for pegomock TemplateWriter mock
+	ctrl := gomock.NewController(t)
+	l := mocks.NewMockLocker(ctrl)
+	l.EXPECT().GetLock("id").Return(&models.ProjectLock{
 		Project:   models.Project{RepoFullName: "owner/repo", Path: "path"},
 		Pull:      models.PullRequest{URL: "url", Author: "lkysow"},
 		Workspace: "workspace",
@@ -292,19 +302,22 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 			RepoFullName: repoName,
 		},
 	}, nil)
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
 	// Seed the DB with a successful plan for that project (that is later discarded).
-	_, err = backend.UpdatePullWithResults(pull, []command.ProjectResult{
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: projectPath,
 			Workspace:  workspaceName,
-			PlanSuccess: &models.PlanSuccess{
-				TerraformOutput: "tf-output",
-				LockURL:         "lock-url",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "tf-output",
+					LockURL:         "lock-url",
+				},
 			},
 		},
 	})
@@ -315,14 +328,14 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDirLocker:  workingDirLocker,
 		WorkingDir:        workingDir,
-		Backend:           backend,
+		Database:          database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
 	w := httptest.NewRecorder()
 	lc.DeleteLock(w, req)
 	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
-	status, err := backend.GetPullStatus(pull)
+	status, err := database.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status.Projects != nil, "status projects was nil")
 	Equals(t, []models.ProjectStatus{
@@ -346,10 +359,11 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	cp := vcsmocks.NewMockClient()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
 	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
@@ -357,7 +371,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 		VCSClient:         cp,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
-		Backend:           backend,
+		Database:          database,
 	}
 	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
 	req = mux.SetURLVars(req, map[string]string{"id": "id"})
@@ -373,10 +387,12 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	dlc := mocks2.NewMockDeleteLockCommand()
 	workingDir := mocks2.NewMockWorkingDir()
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
-	var backend locking.Backend
+	var database db.Database
 	tmp := t.TempDir()
-	backend, err := db.New(tmp)
+	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
+
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -392,7 +408,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
 		VCSClient:         cp,
-		Backend:           backend,
+		Database:          database,
 		WorkingDir:        workingDir,
 		WorkingDirLocker:  workingDirLocker,
 	}
@@ -404,4 +420,9 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp.VerifyWasCalled(Once()).CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num),
 		Eq("**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again."), Eq(""))
+}
+
+func closeTestDatabase(t *testing.T, database db.Database) {
+	t.Helper()
+	Ok(t, database.Close())
 }

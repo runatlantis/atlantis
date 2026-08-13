@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 // Package raw contains the golang representations of the YAML elements
 // supported in atlantis.yaml. The structs here represent the exact data that
 // comes from the file before it is parsed/validated further.
@@ -5,13 +8,14 @@ package raw
 
 import (
 	"fmt"
+	"regexp"
 
 	version "github.com/hashicorp/go-version"
 )
 
 // VersionValidator helper function to validate binary version.
 // Function implements ozzo-validation::Rule.Validate interface.
-func VersionValidator(value interface{}) error {
+func VersionValidator(value any) error {
 	strPtr := value.(*string)
 	if strPtr == nil {
 		return nil
@@ -19,6 +23,20 @@ func VersionValidator(value interface{}) error {
 	_, err := version.NewVersion(*strPtr)
 	if err != nil {
 		return fmt.Errorf("version %q could not be parsed: %w", *strPtr, err)
+	}
+	return nil
+}
+
+// RegexValidator validates that a *string field is a valid regular expression.
+// Implements ozzo-validation::Rule.Validate interface.
+func RegexValidator(value any) error {
+	strPtr := value.(*string)
+	if strPtr == nil {
+		return nil
+	}
+	_, err := regexp.Compile(*strPtr)
+	if err != nil {
+		return fmt.Errorf("policy_item_regex %q is not a valid regular expression: %w", *strPtr, err)
 	}
 	return nil
 }

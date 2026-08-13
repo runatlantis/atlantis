@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
@@ -53,6 +56,50 @@ func TestGetPlanFilename(t *testing.T) {
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
 			Equals(t, c.exp, runtime.GetPlanFilename(c.workspace, c.projectName))
+		})
+	}
+}
+
+func TestIsRemotePlan(t *testing.T) {
+	const remotePlanHeader = "Atlantis: this plan was created by remote ops\n"
+
+	cases := []struct {
+		name     string
+		contents []byte
+		exp      bool
+	}{
+		{
+			name: "nil plan",
+		},
+		{
+			name:     "empty plan",
+			contents: []byte{},
+		},
+		{
+			name:     "same length without header",
+			contents: []byte("Atlantis: this plan was created by local ops\n"),
+		},
+		{
+			name:     "exact header",
+			contents: []byte(remotePlanHeader),
+			exp:      true,
+		},
+		{
+			name:     "header with plan contents",
+			contents: []byte(remotePlanHeader + "plan contents"),
+			exp:      true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, runtime.IsRemotePlan(c.contents))
+		})
+	}
+
+	for prefixLen := range len(remotePlanHeader) {
+		t.Run(fmt.Sprintf("truncated header length %d", prefixLen), func(t *testing.T) {
+			Equals(t, false, runtime.IsRemotePlan([]byte(remotePlanHeader[:prefixLen])))
 		})
 	}
 }

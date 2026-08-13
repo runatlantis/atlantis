@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -42,7 +45,7 @@ func (e *InstrumentedPullClosedExecutor) CleanUpPull(logger logging.SimpleLoggin
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("error during cleanup of pull data", err)
+		logger.Err("error during cleanup of pull data: %s", err)
 		return err
 	}
 

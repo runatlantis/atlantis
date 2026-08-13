@@ -1,10 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/models"
-	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -15,7 +18,7 @@ const redactedReplacement = "://:<redacted>@"
 // before every clone, given Github App tokens expire quickly
 type GithubAppWorkingDir struct {
 	WorkingDir
-	Credentials    vcs.GithubCredentials
+	Credentials    github.Credentials
 	GithubHostname string
 }
 
@@ -28,6 +31,13 @@ func (g *GithubAppWorkingDir) Clone(logger logging.SimpleLogging, headRepo model
 func (g *GithubAppWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error) {
 	g.fixReposURL(&p, &headRepo)
 	return g.WorkingDir.MergeAgain(logger, headRepo, p, workspace)
+}
+
+func (g *GithubAppWorkingDir) CheckoutMergeEnabled() bool {
+	checkoutMerge, ok := g.WorkingDir.(interface {
+		CheckoutMergeEnabled() bool
+	})
+	return ok && checkoutMerge.CheckoutMergeEnabled()
 }
 
 func (g *GithubAppWorkingDir) fixReposURL(p *models.PullRequest, headRepo *models.Repo) {
