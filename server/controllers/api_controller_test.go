@@ -3976,6 +3976,73 @@ func TestAPIController_DetectDrift_OmitsPlanOutputByDefault(t *testing.T) {
 	Equals(t, "", result.Projects[0].PlanOutput)
 }
 
+func TestAPIController_DetectDrift_ErrorProjectOmitsPlanOutputWhenIncluded(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "ok",
+				RepoRelDir:  "ok",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.Plan,
+				ProjectName: "bad",
+				RepoRelDir:  "bad",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	planOutput := "Plan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.ProjectName == "bad" {
+				return ReturnValues{command.ProjectCommandOutput{Error: errors.New("terraform plan failed")}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput},
+			}}
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, err := json.Marshal(models.DriftDetectionRequest{
+		Repository:        "Repo",
+		Ref:               "main",
+		Type:              "Gitlab",
+		IncludePlanOutput: true,
+	})
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusMultiStatus, w.Code)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, w.Body.Bytes(), &result)
+	Equals(t, 2, len(result.Projects))
+
+	var okProject, badProject *controllers.DriftProjectAPI
+	for i := range result.Projects {
+		switch result.Projects[i].ProjectName {
+		case "ok":
+			okProject = &result.Projects[i]
+		case "bad":
+			badProject = &result.Projects[i]
+		}
+	}
+	Assert(t, okProject != nil, "expected 'ok' project in response")
+	Assert(t, badProject != nil, "expected 'bad' project in response")
+	Equals(t, planOutput, okProject.PlanOutput)
+	Equals(t, "", badProject.PlanOutput)
+}
+
 func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).

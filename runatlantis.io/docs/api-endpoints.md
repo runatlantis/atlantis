@@ -313,7 +313,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 :::
 
 ::: tip Workflow Order
-`POST /api/drift/remediate` with `action: "plan"` (the default) runs a fresh plan even without cached drift data — it does not require a prior `POST /api/drift/detect` call. Only `action: "apply"` (or `drift_only: true`) requires a cached drift record for each targeted project/path/workspace. See the "Cached Drift Required" tip below.
+`POST /api/drift/remediate` with `action: "plan"` (the default) runs a fresh plan even without cached drift data — it does not require a prior `POST /api/drift/detect` call — when `projects` or `paths` are specified; an unscoped remediate (neither set) still draws its targets from cached drift. Only `action: "apply"` (or `drift_only: true`) requires a cached drift record for each targeted project/path/workspace. See the "Cached Drift Required" tip below.
 :::
 
 #### Parameters
@@ -673,7 +673,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
     "paths": [
         {"directory": "modules/vpc", "workspace": "production"},
         {"directory": "modules/ec2", "workspace": "production"}
-    ]
+    ],
+    "include_plan_output": true
 }'
 ```
 
