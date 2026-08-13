@@ -610,15 +610,15 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 
 #### Parameters
 
-| Name        | Type                 | Required    | Description                                                         |
-|-------------|----------------------|-------------|---------------------------------------------------------------------|
-| repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                           |
-| ref         | string               | Yes         | Git reference (branch/tag/commit) to check for drift                |
-| base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks |
-| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                |
-| projects    | []string             | No          | List of project names to check. If empty, all are checked           |
-| paths       | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used            |
-| include_plan_output | boolean     | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
+| Name                 | Type                 | Required    | Description                                                                          |
+|----------------------|----------------------|-------------|--------------------------------------------------------------------------------------|
+| repository           | string               | Yes         | Full repository name (e.g., `owner/repo`)                                            |
+| ref                  | string               | Yes         | Git reference (branch/tag/commit) to check for drift                                 |
+| base_branch          | string               | Conditional | Branch context for repo-config branch filters and undiverged checks                  |
+| type                 | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                                 |
+| projects             | []string             | No          | List of project names to check. If empty, all are checked                            |
+| paths                | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used                             |
+| include_plan_output  | boolean              | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
 
 #### DriftDetectionPath
 
