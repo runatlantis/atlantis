@@ -88,10 +88,17 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 | Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Projects   | []string | No       | List of project names to run the plan    |
 | Paths      | []Path   | No       | Paths to the projects to run the plan    |
+| group      | string   | No       | Run the plan for every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group) |
 | PR         | int      | No       | Pull Request number                      |
 
 ::: tip NOTE
-At least one of `Projects` or `Paths` must be specified.
+At least one of `Projects`, `Paths` or `group` must be specified.
+:::
+
+::: tip Group Selection
+`group` selects every project whose `group` key matches in the repo config, so it can't be combined with `Projects` or `Paths`. Projects that don't set a `group` belong to the `default` group.
+
+Unlike the `atlantis plan -g` pull request comment, which is limited to the projects modified in the pull request, the API selects all projects in the group — the same way `Projects` selects named projects regardless of modified files. A group that no project in the repo config uses is rejected with `400`.
 :::
 
 ::: tip No-PR API Requests
@@ -153,6 +160,20 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "Directory": ".",
       "Workspace": "default"
     }]
+}'
+```
+
+#### Sample Request (Group)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "group": "infra"
 }'
 ```
 
@@ -232,10 +253,15 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 | Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Projects   | []string | No       | List of project names to run the apply   |
 | Paths      | []Path   | No       | Paths to the projects to run the apply   |
+| group      | string   | No       | Run the apply for every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group) |
 | PR         | int      | No       | Pull Request number                      |
 
 ::: tip NOTE
-At least one of `Projects` or `Paths` must be specified.
+At least one of `Projects`, `Paths` or `group` must be specified.
+:::
+
+::: tip Group Selection
+`group` behaves as it does for [`POST /api/plan`](#post-apiplan): it selects every project in the group and can't be combined with `Projects` or `Paths`. Since this endpoint plans before applying, both phases are limited to the group.
 :::
 
 #### Path

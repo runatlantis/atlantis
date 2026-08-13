@@ -166,6 +166,23 @@ func (r RepoCfg) AllowedGroups() []string {
 	return groups
 }
 
+// GroupNotAllowedError is returned when a command targets a group that none of
+// the repo config's projects belong to. It's a distinct type so callers such as
+// the API can report it as a client error rather than a server error.
+type GroupNotAllowedError struct {
+	Group         string
+	AllowedGroups []string
+}
+
+func (e GroupNotAllowedError) Error() string {
+	return fmt.Sprintf(
+		"running commands for group %q is not allowed because this repo is"+
+			" only configured for the following groups: %s",
+		e.Group,
+		strings.Join(e.AllowedGroups, ", "),
+	)
+}
+
 // ValidateGroupAllowed returns an error if group isn't one of the groups that
 // this config's projects belong to. We want this to be an error because if a
 // user runs a command for a group that isn't defined then they've probably just
@@ -178,12 +195,7 @@ func (r RepoCfg) ValidateGroupAllowed(group string) error {
 	if slices.Contains(allowed, group) {
 		return nil
 	}
-	return fmt.Errorf(
-		"running commands for group %q is not allowed because this repo is"+
-			" only configured for the following groups: %s",
-		group,
-		strings.Join(allowed, ", "),
-	)
+	return GroupNotAllowedError{Group: group, AllowedGroups: allowed}
 }
 
 func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {

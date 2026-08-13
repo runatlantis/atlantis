@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
@@ -152,6 +153,132 @@ func TestAPIController_Plan(t *testing.T) {
 
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
+}
+
+// A group selects every project in the group. Since API requests aren't driven
+// by a pull request's modified files, the builder is asked to enumerate all
+// projects and filter by group.
+func TestAPIController_PlanByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedCmd.Group)
+	Equals(t, true, capturedCmd.DiscoverAllProjects)
+	Equals(t, "", capturedCmd.ProjectName)
+	Equals(t, "", capturedCmd.RepoRelDir)
+	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedApplyCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedApplyCmd.Group)
+	// The apply endpoint plans first, so the group has to reach both phases.
+	_, capturedPlanCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedPlanCmd.Group)
+	projectCommandRunner.VerifyWasCalled(Times(1)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_GroupRequestValidation(t *testing.T) {
+	cases := map[string]struct {
+		request controllers.APIRequest
+		expErr  string
+	}{
+		"group with projects": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group:    "infra",
+				Projects: []string{"project1"},
+			},
+			expErr: "cannot use 'group' at the same time as 'projects' or 'paths'",
+		},
+		"group with paths": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "infra",
+				Paths: []controllers.APIRequestPath{{Directory: "."}},
+			},
+			expErr: "cannot use 'group' at the same time as 'projects' or 'paths'",
+		},
+		"group with unsafe characters": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "my group",
+			},
+			expErr: "invalid group",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			body, _ := json.Marshal(c.request)
+
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+			ResponseContains(t, w, http.StatusBadRequest, c.expErr)
+
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+// An unknown group is a caller mistake, so it must not be reported as a 500.
+func TestAPIController_PlanUnknownGroupIsClientError(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, valid.GroupNotAllowedError{
+			Group:         "nope",
+			AllowedGroups: []string{"default", "infra"},
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "nope",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "only configured for the following groups: default, infra")
 }
 
 func TestAPIController_PlanSortsByExecutionOrder(t *testing.T) {

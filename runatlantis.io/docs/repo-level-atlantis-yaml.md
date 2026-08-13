@@ -345,6 +345,12 @@ atlantis apply -g infra
 atlantis plan -g default
 ```
 
+Groups are also selectable through the API with the `group` field of
+[`POST /api/plan`](api-endpoints.md#post-apiplan) and
+[`POST /api/apply`](api-endpoints.md#post-apiapply). Because API requests aren't
+driven by a pull request's modified files, an API group request runs every
+project in the group.
+
 A group command only touches the projects in that group: unlike a bare
 `atlantis plan`, `atlantis plan -g infra` doesn't discard plans that were created
 for projects in other groups. `-g`/`--group` can't be combined with `-p`, `-d` or

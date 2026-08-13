@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,6 +138,9 @@ type APIRequest struct {
 	PR         int
 	Projects   []string
 	Paths      []APIRequestPath
+	// Group selects every project belonging to that group in the repo config.
+	// Cannot be combined with Projects or Paths.
+	Group string `json:"group,omitempty"`
 	// DiscoverProjects enables all-project discovery when no projects or paths
 	// are specified. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
@@ -163,6 +167,18 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			ProjectName: path.ProjectName,
 			RepoRelDir:  strings.TrimRight(path.Directory, "/"),
 			Workspace:   path.Workspace,
+		})
+	}
+
+	// A group selects every project in that group, just like Projects selects
+	// every named project. API requests aren't driven by a pull request's
+	// modified files, so enumerate all projects and let the builder keep the
+	// ones in the group.
+	if len(cc) == 0 && a.Group != "" {
+		cc = append(cc, &events.CommentCommand{
+			Name:                cmdName,
+			Group:               a.Group,
+			DiscoverAllProjects: true,
 		})
 	}
 
@@ -244,9 +260,31 @@ func normalizeAPIBranchRef(ref string) string {
 	return models.NormalizeAPIRef(ref)
 }
 
+// validateAPIRequestGroup checks the group selector. A group selects a set of
+// projects so it can't be combined with the selectors that name projects, and
+// it has to match the group configured in the repo config so we apply the same
+// character restrictions the comment parser applies to project names.
+func validateAPIRequestGroup(request *APIRequest) error {
+	if request.Group == "" {
+		return nil
+	}
+	if len(request.Projects) > 0 || len(request.Paths) > 0 {
+		return fmt.Errorf("cannot use 'group' at the same time as 'projects' or 'paths'")
+	}
+	if request.Group != url.QueryEscape(request.Group) {
+		return fmt.Errorf("invalid group %q: must contain only URL safe characters", request.Group)
+	}
+	return nil
+}
+
 func apiErrorStatusCode(err error) int {
 	if errors.Is(err, events.ErrTeamAllowlistDenied) {
 		return http.StatusForbidden
+	}
+	var groupErr valid.GroupNotAllowedError
+	if errors.As(err, &groupErr) {
+		// The caller asked for a group that this repo's config doesn't define.
+		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
 }
@@ -1028,6 +1066,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+	if err = validateAPIRequestGroup(&request); err != nil {
+		return nil, nil, http.StatusBadRequest, err
 	}
 
 	// A workspace becomes a Terraform command argument, which Atlantis runs
