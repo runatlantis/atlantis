@@ -139,6 +139,18 @@ type ProjectContext struct {
 	ExecutionOrderGroup int
 	// If plans/applies should be aborted if any prior plan/apply fails
 	AbortOnExecutionOrderFail bool
+	// ReplanBetweenExecutionOrderGroups refreshes planfiles for later groups during apply.
+	ReplanBetweenExecutionOrderGroups bool
+	// MidApplyReplan marks a plan that runs inside an apply to refresh a
+	// dependent project's planfile. It must reuse the existing working tree and
+	// must not re-clone or merge-again (that would invalidate sibling planfiles).
+	MidApplyReplan bool
+	// PlanSteps are the workflow plan steps for this project. Populated on apply
+	// contexts so an opt-in mid-apply replan can reuse the plan workflow.
+	PlanSteps []valid.Step
+	// PolicyCheckSteps are the workflow policy_check steps for this project.
+	// Empty when policy checks are disabled for the project.
+	PolicyCheckSteps []valid.Step
 	// Allows custom policy check tools outside of Conftest to run in checks
 	CustomPolicyCheck bool
 	SilencePRComments []string

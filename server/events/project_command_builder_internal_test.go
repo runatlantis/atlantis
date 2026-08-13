@@ -729,6 +729,13 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// PlanSteps are always attached so apply can optionally
+					// replan dependents mid-apply.
+					var expPlanSteps []valid.Step
+					for _, stepName := range c.expPlanSteps {
+						expPlanSteps = append(expPlanSteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PlanSteps = expPlanSteps
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -950,6 +957,13 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// PlanSteps are always attached so apply can optionally
+					// replan dependents mid-apply.
+					var expPlanSteps []valid.Step
+					for _, stepName := range c.expPlanSteps {
+						expPlanSteps = append(expPlanSteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PlanSteps = expPlanSteps
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -1195,6 +1209,15 @@ workflows:
 				c.expCtx.CommandName = cmd
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
+				// Default plan workflow steps are attached on every project context.
+				c.expCtx.PlanSteps = []valid.Step{{StepName: "init"}, {StepName: "plan"}}
+				if len(c.expPolicyCheckSteps) > 0 {
+					var expPolicySteps []valid.Step
+					for _, stepName := range c.expPolicyCheckSteps {
+						expPolicySteps = append(expPolicySteps, valid.Step{StepName: stepName})
+					}
+					c.expCtx.PolicyCheckSteps = expPolicySteps
+				}
 				ctx.PolicySets = emptyPolicySets
 
 				// Job ID cannot be compared since its generated at random

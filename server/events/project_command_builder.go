@@ -808,6 +808,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	replanBetweenExecutionOrderGroups := false
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -819,6 +820,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 			parallelPlan = *repoCfg.ParallelPlan
 		}
 		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
+		replanBetweenExecutionOrderGroups = repoCfg.ReplanBetweenExecutionOrderGroups
 	}
 
 	projCtxs := make([]command.ProjectContext, 0)
@@ -840,11 +842,26 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 			)...)
 	}
 
+	setReplanBetweenExecutionOrderGroups(projCtxs, replanBetweenExecutionOrderGroups)
+
 	sort.Slice(projCtxs, func(i, j int) bool {
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
 	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+}
+
+// setReplanBetweenExecutionOrderGroups applies the repo-level
+// replan_between_execution_order_groups setting to every built context. It is
+// repo scoped rather than project scoped, so it is set here instead of being
+// threaded through the project context builders.
+func setReplanBetweenExecutionOrderGroups(projCtxs []command.ProjectContext, enabled bool) {
+	if !enabled {
+		return
+	}
+	for i := range projCtxs {
+		projCtxs[i].ReplanBetweenExecutionOrderGroups = true
+	}
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -910,6 +927,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	replanBetweenExecutionOrderGroups := false
 	if hasRepoCfg {
 		if repoCfg.Automerge != nil {
 			automerge = *repoCfg.Automerge
@@ -921,6 +939,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			parallelPlan = *repoCfg.ParallelPlan
 		}
 		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
+		replanBetweenExecutionOrderGroups = repoCfg.ReplanBetweenExecutionOrderGroups
 	}
 
 	for _, mergedProjectCfg := range mergedProjectCfgs {
@@ -940,6 +959,8 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 				p.TerraformExecutor,
 			)...)
 	}
+
+	setReplanBetweenExecutionOrderGroups(projCtxs, replanBetweenExecutionOrderGroups)
 
 	sort.Slice(projCtxs, func(i, j int) bool {
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
@@ -1663,6 +1684,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 	parallelApply := p.EnableParallelApply
 	parallelPlan := p.EnableParallelPlan
 	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	replanBetweenExecutionOrderGroups := false
 	if repoCfgPtr != nil {
 		if repoCfgPtr.Automerge != nil {
 			automerge = *repoCfgPtr.Automerge
@@ -1674,6 +1696,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 			parallelPlan = *repoCfgPtr.ParallelPlan
 		}
 		abortOnExecutionOrderFail = repoCfgPtr.AbortOnExecutionOrderFail
+		replanBetweenExecutionOrderGroups = repoCfgPtr.ReplanBetweenExecutionOrderGroups
 	}
 
 	if len(matchingProjects) > 0 {
@@ -1726,6 +1749,8 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 				p.TerraformExecutor,
 			)...)
 	}
+
+	setReplanBetweenExecutionOrderGroups(projCtxs, replanBetweenExecutionOrderGroups)
 
 	if err := p.validateWorkspaceAllowed(repoCfgPtr, repoRelDir, workspace); err != nil {
 		return []command.ProjectContext{}, err

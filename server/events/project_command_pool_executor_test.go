@@ -4,10 +4,12 @@
 package events
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -446,4 +448,233 @@ func TestRunProjectCmdsWithCancellationTracker_UpdatesPullStatusBetweenGroups(t 
 
 	// Verify both projects ran
 	Assert(t, len(result.ProjectResults) == 2, "expected 2 project results, got %d", len(result.ProjectResults))
+}
+
+func TestShouldReplanBeforeApply(t *testing.T) {
+	Equals(t, false, shouldReplanBeforeApply(command.ProjectContext{}, true))
+	Equals(t, true, shouldReplanBeforeApply(command.ProjectContext{
+		ReplanBetweenExecutionOrderGroups: true,
+	}, true))
+	Equals(t, false, shouldReplanBeforeApply(command.ProjectContext{
+		ReplanBetweenExecutionOrderGroups: true,
+	}, false))
+	Equals(t, true, shouldReplanBeforeApply(command.ProjectContext{
+		ReplanBetweenExecutionOrderGroups: true,
+		DependsOn:                         []string{"network"},
+	}, false))
+}
+
+func TestRunApplyCmdsWithOptionalReplan_ReplansLaterEOGroup(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	ctx := &command.Context{
+		Log: logger,
+		PullStatus: &models.PullStatus{
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: "a", ProjectName: "a", Status: models.PlannedPlanStatus},
+				{Workspace: "default", RepoRelDir: "b", ProjectName: "b", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+
+	var planCalls []string
+	var applyCalls []string
+
+	runners := projectCmdRunners{
+		plan: func(projCtx command.ProjectContext) command.ProjectCommandOutput {
+			planCalls = append(planCalls, projCtx.ProjectName)
+			Equals(t, command.Plan, projCtx.CommandName)
+			Equals(t, 1, len(projCtx.Steps))
+			Equals(t, "plan", projCtx.Steps[0].StepName)
+			Assert(t, projCtx.SuppressVCSStatus, "mid-apply replan must suppress plan commit statuses")
+			Assert(t, projCtx.SuppressJobOutput, "mid-apply replan must suppress job stream noise")
+			Assert(t, projCtx.MidApplyReplan, "mid-apply replan must reuse working tree without re-clone")
+			return command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "refreshed"},
+			}
+		},
+		apply: func(projCtx command.ProjectContext) command.ProjectCommandOutput {
+			applyCalls = append(applyCalls, projCtx.ProjectName)
+			if projCtx.ProjectName == "b" {
+				Equals(t, "", projCtx.ExpectedPlanHash)
+			}
+			if projCtx.ProjectName == "a" {
+				Equals(t, "old-a", projCtx.ExpectedPlanHash)
+			}
+			return command.ProjectCommandOutput{ApplySuccess: "ok"}
+		},
+	}
+
+	cmds := []command.ProjectContext{
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "a",
+			ProjectName:                       "a",
+			ExecutionOrderGroup:               0,
+			ReplanBetweenExecutionOrderGroups: true,
+			ExpectedPlanHash:                  "old-a",
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+		},
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "b",
+			ProjectName:                       "b",
+			ExecutionOrderGroup:               1,
+			DependsOn:                         []string{"a"},
+			ReplanBetweenExecutionOrderGroups: true,
+			ExpectedPlanHash:                  "old-b-mock",
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+		},
+	}
+
+	result := runApplyCmdsWithOptionalReplan(ctx, cmds, nil, 1, true, runners)
+	Assert(t, !result.HasErrors(), "expected no errors")
+	Equals(t, []string{"b"}, planCalls)
+	Equals(t, []string{"a", "b"}, applyCalls)
+
+	// Mid-apply replans must not appear as plan ProjectResults in the apply result.
+	for _, pr := range result.ProjectResults {
+		Equals(t, command.Apply, pr.Command)
+	}
+
+	// apply of a happened before plan of b
+	Equals(t, models.AppliedPlanStatus, ctx.PullStatus.Projects[0].Status)
+}
+
+func TestRunApplyCmdsWithOptionalReplan_DisabledKeepsStaleHash(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	ctx := &command.Context{Log: logger}
+
+	var planCalls int
+	runners := projectCmdRunners{
+		plan: func(command.ProjectContext) command.ProjectCommandOutput {
+			planCalls++
+			return command.ProjectCommandOutput{}
+		},
+		apply: func(projCtx command.ProjectContext) command.ProjectCommandOutput {
+			Equals(t, "stale", projCtx.ExpectedPlanHash)
+			return command.ProjectCommandOutput{ApplySuccess: "ok"}
+		},
+	}
+
+	cmds := []command.ProjectContext{
+		{
+			CommandName:         command.Apply,
+			Workspace:           "default",
+			RepoRelDir:          "a",
+			ProjectName:         "a",
+			ExecutionOrderGroup: 0,
+			ExpectedPlanHash:    "stale",
+			PlanSteps:           []valid.Step{{StepName: "plan"}},
+		},
+		{
+			CommandName:         command.Apply,
+			Workspace:           "default",
+			RepoRelDir:          "b",
+			ProjectName:         "b",
+			ExecutionOrderGroup: 1,
+			ExpectedPlanHash:    "stale",
+			PlanSteps:           []valid.Step{{StepName: "plan"}},
+		},
+	}
+
+	result := runApplyCmdsWithOptionalReplan(ctx, cmds, nil, 1, true, runners)
+	Assert(t, !result.HasErrors(), "expected no errors")
+	Equals(t, 0, planCalls)
+}
+
+func TestRunApplyCmdsWithOptionalReplan_PlanFailureSkipsApply(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	ctx := &command.Context{Log: logger}
+
+	var applyCalls []string
+	runners := projectCmdRunners{
+		plan: func(command.ProjectContext) command.ProjectCommandOutput {
+			return command.ProjectCommandOutput{Error: fmt.Errorf("mock outputs unresolved")}
+		},
+		apply: func(projCtx command.ProjectContext) command.ProjectCommandOutput {
+			applyCalls = append(applyCalls, projCtx.ProjectName)
+			return command.ProjectCommandOutput{ApplySuccess: "ok"}
+		},
+	}
+
+	cmds := []command.ProjectContext{
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "a",
+			ProjectName:                       "a",
+			ExecutionOrderGroup:               0,
+			ReplanBetweenExecutionOrderGroups: true,
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+		},
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "b",
+			ProjectName:                       "b",
+			ExecutionOrderGroup:               1,
+			ReplanBetweenExecutionOrderGroups: true,
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+			AbortOnExecutionOrderFail:         true,
+		},
+	}
+
+	result := runApplyCmdsWithOptionalReplan(ctx, cmds, nil, 1, true, runners)
+	Assert(t, result.HasErrors(), "expected errors from failed replan")
+	Equals(t, []string{"a"}, applyCalls)
+	Assert(t, len(result.ProjectResults) >= 2, "expected apply results for a and skipped b")
+	for _, pr := range result.ProjectResults {
+		Equals(t, command.Apply, pr.Command)
+	}
+}
+
+func TestRunApplyCmdsWithOptionalReplan_StopsLaterGroupsAfterEarlierApplyFailure(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	ctx := &command.Context{Log: logger}
+
+	var planCalls int
+	var applyCalls []string
+	runners := projectCmdRunners{
+		plan: func(command.ProjectContext) command.ProjectCommandOutput {
+			planCalls++
+			return command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "should-not-run"},
+			}
+		},
+		apply: func(projCtx command.ProjectContext) command.ProjectCommandOutput {
+			applyCalls = append(applyCalls, projCtx.ProjectName)
+			if projCtx.ProjectName == "a" {
+				return command.ProjectCommandOutput{Error: fmt.Errorf("apply boom")}
+			}
+			return command.ProjectCommandOutput{ApplySuccess: "ok"}
+		},
+	}
+
+	cmds := []command.ProjectContext{
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "a",
+			ProjectName:                       "a",
+			ExecutionOrderGroup:               0,
+			ReplanBetweenExecutionOrderGroups: true,
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+		},
+		{
+			CommandName:                       command.Apply,
+			Workspace:                         "default",
+			RepoRelDir:                        "b",
+			ProjectName:                       "b",
+			ExecutionOrderGroup:               1,
+			ReplanBetweenExecutionOrderGroups: true,
+			PlanSteps:                         []valid.Step{{StepName: "plan"}},
+		},
+	}
+
+	result := runApplyCmdsWithOptionalReplan(ctx, cmds, nil, 1, true, runners)
+	Assert(t, result.HasErrors(), "expected errors")
+	Equals(t, 0, planCalls)
+	Equals(t, []string{"a"}, applyCalls)
 }

@@ -128,6 +128,11 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 
 	detectProjectTerraformVersion(ctx, &prjCfg, repoDir, terraformClient)
 
+	var policyCheckSteps []valid.Step
+	if prjCfg.PolicyCheck {
+		policyCheckSteps = prjCfg.Workflow.PolicyCheck.Steps
+	}
+
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
@@ -144,6 +149,8 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		parallelPlan,
 		verbose,
 		abortOnExecutionOrderFail,
+		prjCfg.Workflow.Plan.Steps,
+		policyCheckSteps,
 		ctx.Scope,
 		ctx.PullRequestStatus,
 		ctx.PullStatus,
@@ -214,6 +221,8 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 			parallelPlan,
 			verbose,
 			abortOnExecutionOrderFail,
+			prjCfg.Workflow.Plan.Steps,
+			steps,
 			ctx.Scope,
 			ctx.PullRequestStatus,
 			ctx.PullStatus,
@@ -255,6 +264,8 @@ func newProjectCommandContext(ctx *command.Context,
 	parallelPlanEnabled bool,
 	verbose bool,
 	abortOnExecutionOrderFail bool,
+	planSteps []valid.Step,
+	policyCheckSteps []valid.Step,
 	scope tally.Scope,
 	pullReqStatus models.PullReqStatus,
 	pullStatus *models.PullStatus,
@@ -300,6 +311,8 @@ func newProjectCommandContext(ctx *command.Context,
 		AutoplanEnabled:            projCfg.AutoplanEnabled,
 		AutoplanWhenModified:       projCfg.AutoplanWhenModified,
 		Steps:                      steps,
+		PlanSteps:                  planSteps,
+		PolicyCheckSteps:           policyCheckSteps,
 		HeadRepo:                   ctx.HeadRepo,
 		Log:                        ctx.Log,
 		Scope:                      scope,
