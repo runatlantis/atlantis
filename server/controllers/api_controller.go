@@ -2007,6 +2007,7 @@ func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolv
 		projectDrift.Drift = models.DriftSummary{HasDrift: false}
 	} else if pr.PlanSuccess != nil {
 		projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		projectDrift.PlanOutput = pr.PlanSuccess.TerraformOutput
 	}
 
 	return projectDrift
@@ -2218,6 +2219,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
+		// PlanOutput is only ever returned in the immediate detect response;
+		// Store strips it before persisting, so it is never persisted.
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			storeFailed = true
 			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
@@ -2242,7 +2245,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to API DTO and return
-	apiResult := NewDriftDetectionResultAPI(detectionResult)
+	apiResult := NewDriftDetectionResultAPI(detectionResult, request.IncludePlanOutput)
 
 	code := http.StatusOK
 	if driftDetectionHasErrors(detectionResult) {

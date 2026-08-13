@@ -312,6 +312,10 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 
 :::
 
+::: tip Workflow Order
+`POST /api/drift/remediate` with `action: "plan"` (the default) runs a fresh plan even without cached drift data — it does not require a prior `POST /api/drift/detect` call — when `projects` or `paths` are specified; an unscoped remediate (neither set) still draws its targets from cached drift. Only `action: "apply"` (or `drift_only: true`) requires a cached drift record for each targeted project/path/workspace. See the "Cached Drift Required" tip below.
+:::
+
 #### Parameters
 
 | Name        | Type                 | Required    | Description                                                             |
@@ -606,14 +610,15 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 
 #### Parameters
 
-| Name        | Type                 | Required    | Description                                                         |
-|-------------|----------------------|-------------|---------------------------------------------------------------------|
-| repository  | string               | Yes         | Full repository name (e.g., `owner/repo`)                           |
-| ref         | string               | Yes         | Git reference (branch/tag/commit) to check for drift                |
-| base_branch | string               | Conditional | Branch context for repo-config branch filters and undiverged checks |
-| type        | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                |
-| projects    | []string             | No          | List of project names to check. If empty, all are checked           |
-| paths       | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used            |
+| Name                 | Type                 | Required    | Description                                                                          |
+|----------------------|----------------------|-------------|--------------------------------------------------------------------------------------|
+| repository           | string               | Yes         | Full repository name (e.g., `owner/repo`)                                            |
+| ref                  | string               | Yes         | Git reference (branch/tag/commit) to check for drift                                 |
+| base_branch          | string               | Conditional | Branch context for repo-config branch filters and undiverged checks                  |
+| type                 | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                                 |
+| projects             | []string             | No          | List of project names to check. If empty, all are checked                            |
+| paths                | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used                             |
+| include_plan_output  | boolean              | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
 
 #### DriftDetectionPath
 
@@ -650,7 +655,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
     "repository": "owner/repo",
     "ref": "main",
     "type": "Github",
-    "projects": ["vpc", "ec2"]
+    "projects": ["vpc", "ec2"],
+    "include_plan_output": true
 }'
 ```
 
@@ -667,9 +673,18 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
     "paths": [
         {"directory": "modules/vpc", "workspace": "production"},
         {"directory": "modules/ec2", "workspace": "production"}
-    ]
+    ],
+    "include_plan_output": true
 }'
 ```
+
+::: tip Plan Output
+Set `include_plan_output: true` on the request to have the response include `plan_output` for each project — the Terraform plan text for that project. For the built-in plan step this is typically normalized for diff rendering; the exact content depends on the configured workflow, since a custom `run` step can produce arbitrary, unnormalized output instead. It defaults to `false`, since plan text can be large; when omitted or `false`, `plan_output` is not included even for projects with a successful plan. It is also omitted when there is no plan output (for example, if the project errored before a plan ran). `plan_output` is only ever returned by this detect response; it is never included in `GET /api/drift/status`, since it is never persisted to drift storage.
+:::
+
+::: warning Plan Output May Contain Sensitive Data
+Before this field existed, `POST /api/drift/detect` only returned numeric drift counts. With `include_plan_output: true`, responses can include resource attribute values and, for custom `run`-step workflows, arbitrary command output. The endpoint's auth boundary is unchanged (the same API token as other drift/remediation endpoints), so this is not a new authorization gap, but the data sensitivity of the response changes materially when this field is enabled. Only `run`-step filter-regex redaction (if configured) applies to plan output; it is not otherwise scrubbed.
+:::
 
 #### Sample Response (Success)
 
@@ -697,6 +712,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
           "summary": "Plan: 1 to add, 2 to change, 0 to destroy.",
           "changes_outside": false
         },
+        "plan_output": "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place\n\nPlan: 1 to add, 2 to change, 0 to destroy.",
         "last_checked": "2025-01-21T10:30:00Z"
       },
       {
@@ -850,6 +866,10 @@ Drift detection must be enabled on the Atlantis server. Destructive remediation 
 | Name | Type   | Required | Description                                |
 |------|--------|----------|--------------------------------------------|
 | id   | string | Yes      | The unique identifier of the remediation   |
+
+::: tip Which ID?
+The `id` here is the `id` field returned by a prior `POST /api/drift/remediate` call — not the `detection_id`/`id` returned by `POST /api/drift/detect`. Detection and remediation runs are tracked separately, each with their own ID space. To inspect the plan output for a remediation, call `POST /api/drift/remediate` first and use the `id` from its response.
+:::
 
 #### Query Parameters
 
