@@ -19,6 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/events/webhooks"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/utils"
 )
@@ -339,9 +340,23 @@ type DefaultProjectCommandRunner struct {
 	WorkingDir                WorkingDir
 	Webhooks                  WebhooksSender
 	WorkingDirLocker          WorkingDirLocker
+	ProjectJobURLGenerator    jobs.ProjectJobURLGenerator
 	CommandRequirementHandler CommandRequirementHandler
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
+	PlanStore                 runtime.PlanStore
+}
+
+func (p *DefaultProjectCommandRunner) workingDirLockMetadata(ctx command.ProjectContext) WorkingDirLockMetadata {
+	if p.ProjectJobURLGenerator == nil {
+		return WorkingDirLockMetadataForProject(ctx, "")
+	}
+	jobURL, err := p.ProjectJobURLGenerator.GenerateProjectJobURL(ctx)
+	if err != nil {
+		ctx.Log.Warn("generating project job URL: %v", err)
+		jobURL = ""
+	}
+	return WorkingDirLockMetadataForProject(ctx, jobURL)
 }
 
 // Plan runs terraform plan for the project described by ctx.
@@ -425,7 +440,7 @@ func (p *DefaultProjectCommandRunner) doApprovePolicies(ctx command.ProjectConte
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.ApprovePolicies)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.ApprovePolicies, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
@@ -542,7 +557,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
@@ -791,7 +806,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
@@ -907,11 +922,18 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Apply, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return "", "", "", err
 	}
 	defer unlockFn()
+
+	// External plan stores put .tfplan on disk only via Load/RestorePlans.
+	// Targeted apply re-clones without RestorePlans; Load must run before
+	// ValidateProjectPlan (which stats the local file) and before hashing.
+	if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
+		return "", "", "", err
+	}
 
 	if p.ApplyPlanValidator != nil {
 		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
@@ -984,7 +1006,7 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Version)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Version, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return "", "", err
 	}
@@ -1028,7 +1050,7 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Import)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Import, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
@@ -1072,7 +1094,7 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	ctx.Log.Debug("acquired lock for project")
 
 	// Acquire internal lock for the directory we're going to operate in.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.State)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.State, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
@@ -1089,6 +1111,26 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		Output:    strings.Join(outputs, "\n"),
 		RePlanCmd: rePlanCmd,
 	}, "", nil
+}
+
+// ensurePlanLoaded downloads the plan from the external store (if any) so it
+// exists at the expected local path before validation and terraform apply.
+// LocalPlanStore.Load is a no-op. Not called again before the second
+// ValidateProjectPlan in runSteps so pre-apply run steps that mutate the plan
+// still fail the re-check.
+func (p *DefaultProjectCommandRunner) ensurePlanLoaded(ctx command.ProjectContext, absPath string) error {
+	store := p.PlanStore
+	if store == nil {
+		store = &runtime.LocalPlanStore{}
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	if err := store.Load(ctx, planPath); err != nil {
+		return fmt.Errorf("loading plan: %w", err)
+	}
+	return nil
 }
 
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {

@@ -18,6 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -93,6 +94,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -125,6 +127,7 @@ func NewInstrumentedProjectCommandBuilder(
 			AutoDiscoverMode,
 			scope,
 			terraformClient,
+			planStore,
 		),
 		Logger: logger,
 		scope:  scope,
@@ -155,6 +158,7 @@ func NewProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
+	planStore runtime.PlanStore,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -164,6 +168,7 @@ func NewProjectCommandBuilder(
 		WorkingDirLocker:         workingDirLocker,
 		GlobalCfg:                globalCfg,
 		PendingPlanFinder:        pendingPlanFinder,
+		PlanStore:                planStore,
 		SkipCloneNoChanges:       skipCloneNoChanges,
 		EnableRegExpCmd:          EnableRegExpCmd,
 		EnableAutoMerge:          EnableAutoMerge,
@@ -268,6 +273,8 @@ type DefaultProjectCommandBuilder struct {
 	GlobalCfg valid.GlobalCfg
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
+	// Persists plan files to external storage (S3) so they survive container restarts.
+	PlanStore runtime.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
@@ -774,7 +781,7 @@ func (p *DefaultProjectCommandBuilder) discoverAllProjectDirs(ctx *command.Conte
 func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Context, cmdName command.Name, subCmdName string, commentFlags []string, verbose bool) ([]command.ProjectContext, error) {
 	workspace := DefaultWorkspace
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -865,7 +872,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	// Need to lock the workspace we're about to clone to.
 	workspace := DefaultWorkspace
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", cmdName, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		ctx.Log.Warn("workspace was locked")
 		return nil, err
@@ -953,7 +960,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 	var pcc []command.ProjectContext
 
 	ctx.Log.Debug("building plan command")
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		return pcc, err
 	}
@@ -1196,7 +1203,41 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
-		return nil, err
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+		// Working dir is gone (e.g. container restart with emptyDir). Try to
+		// recover via the plan store. We must clone each workspace that has
+		// stored plans BEFORE restoring, otherwise Clone falls through to
+		// forceClone (os.RemoveAll) and wipes the just-restored plans.
+		ctx.Log.Info("pull directory missing, attempting to restore plans")
+		// Probe capability first to avoid pointless I/O on stores that don't
+		// support restore (e.g. LocalPlanStore).
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return nil, os.ErrNotExist
+		}
+		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
+		if listErr != nil {
+			return nil, fmt.Errorf("listing workspaces from external store: %w", listErr)
+		}
+		// No workspaces in the store means there's nothing to restore.
+		if len(workspaces) == 0 {
+			return nil, os.ErrNotExist
+		}
+		// Clone every workspace before restoring; this ensures each workspace
+		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
+		for _, workspace := range workspaces {
+			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
+				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
+			}
+		}
+		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
+		}
 	}
 
 	plans, err := p.PendingPlanFinder.Find(pullDir)
@@ -1256,7 +1297,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	var cmds []command.ProjectContext
 	for _, plan := range plans {
 		// Lock all the directories we need to run the command in
-		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, commentCmd.Name)
+		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, plan.Workspace, plan.RepoRelDir, plan.ProjectName, commentCmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			return nil, err
 		}
@@ -1511,7 +1552,18 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	if errors.Is(err, os.ErrNotExist) {
-		return projCtx, errors.New("no working directory found–did you run plan?")
+		// Re-clone only if the plan store can recover plans externally.
+		// LocalPlanStore signals this via ErrRestoreNotSupported; external
+		// stores (S3) return nil and Load restores the plan in doApply before
+		// plan validation (this path does not call RestorePlans).
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+			return projCtx, errors.New("no working directory found–did you run plan?")
+		}
+		ctx.Log.Info("working directory missing, re-cloning repo for apply")
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		if err != nil {
+			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
+		}
 	} else if err != nil {
 		return projCtx, err
 	}
@@ -1521,7 +1573,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, ErrIgnoredTargetedDir
 	}
 
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name)
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, cmd.ProjectName, cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		return projCtx, err
 	}

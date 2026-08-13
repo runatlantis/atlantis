@@ -3,7 +3,11 @@
 ```
 {{ .Error }}
 ```
+{{- template "lockMetadata" . }}
 {{ if ne .RenderedContext "" -}}
+{{ if or .CommitURL .JobURL .MultipleJobs }}
+
+{{ end -}}
 {{ .RenderedContext }}
 {{ end -}}
 {{ end -}}

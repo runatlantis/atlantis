@@ -18,6 +18,8 @@ Atlantis, by default, stores all locking and Terraform plans locally on disk und
 
 However, if you were to lose the data, all you would need to do is run `atlantis plan` again on the pull requests that are open. If someone tries to run `atlantis apply` after the data has been lost then they will get an error back, so they will have to re-plan anyway.
 
+For fully stateless HA (no shared filesystem or persistent volume), Atlantis supports external plan storage via `--enable-external-stores` with an S3-compatible backend. Plans are uploaded to S3 after `terraform plan` and restored automatically when a different replica handles the `apply`. Combined with Redis for locking (`--locking-db-type=redis`), this allows running multiple Atlantis replicas with `emptyDir` volumes. See [server configuration](server-configuration.md) for details.
+
 **Q: How to add SSL to Atlantis server?**
 
 A: First, you'll need to get a public/private key pair to serve over SSL.
