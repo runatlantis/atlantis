@@ -39,6 +39,10 @@ jobs:
     if: github.repository == 'runatlantis/atlantis'
     name: Translate docs
     runs-on: ubuntu-24.04
+    # Holds the translation provider key. Scoped to this job so no other
+    # workflow in the repo can read it, and restricted to main in the
+    # environment's deployment branch rules.
+    environment: docs-translation
     permissions:
       contents: write
       pull-requests: write
