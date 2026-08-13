@@ -51,8 +51,8 @@ It runs in `website.yml` too, so hand-edits to a locale are checked the same way
 
 ```bash
 # Translate (needs a provider API key — see the provider block in i18n.json)
-export ANTHROPIC_API_KEY=...
-npx lingo.dev@latest run
+export OPENAI_API_KEY=...
+npx lingo.dev@0.138.4 run
 
 # Fix up links in a partially translated locale, then verify
 node scripts/localize-links.mjs es
@@ -83,7 +83,17 @@ Focus on what machine translation gets wrong in reference docs:
 
 ## Changing the model or provider
 
-The `provider` block in `i18n.json` accepts `anthropic`, `openai`, `google`,
+The `provider` block in `i18n.json` accepts `openai`, `anthropic`, `google`,
 `mistral`, `openrouter` and `ollama`, each reading its usual `*_API_KEY` environment
 variable. Remove the block entirely to use Lingo.dev's hosted engine instead, which
 requires an account.
+
+The key lives in the `docs-translation` GitHub environment, not as a repository
+secret, so only the translate job can read it. It belongs to a dedicated service
+account and project on the provider side with a spend cap, so it can be rotated
+without touching anything else.
+
+The current model is a mini tier deliberately. Translating a 200-word section with
+code already stripped out does not benefit from a frontier model, and the integrity
+checks below are what actually guarantee correctness. `{source}` and `{target}` in
+the prompt are substituted with locale codes by the CLI.
