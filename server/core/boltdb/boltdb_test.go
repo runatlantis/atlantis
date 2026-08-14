@@ -1344,11 +1344,12 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Ok(t, err)
 	Ok(t, b.Close())
 
-	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
-	// that the current Go types cannot unmarshal.
+	// Inject a corrupt pull-status blob whose Status is a string where the
+	// current Go shape has an int. A legacy int Approvals is no longer corrupt;
+	// see TestPullStatus_PreservesLegacyPolicyApprovals.
 	key := fmt.Appendf(nil, "%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false}],"Status":"planned"}],"Pull":{"Num":1}}`)
 	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
 	Ok(t, err)
 	err = raw.Update(func(tx *bolt.Tx) error {
@@ -1385,6 +1386,63 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Assert(t, got != nil, "expected non-nil pull status")
 	Equals(t, 1, len(got.Projects))
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+}
+
+// TestPullStatus_PreservesLegacyPolicyApprovals verifies that a pull status
+// written before approvals recorded an approver still loads, instead of being
+// treated as corrupt and overwritten.
+func TestPullStatus_PreservesLegacyPolicyApprovals(t *testing.T) {
+	tmp := t.TempDir()
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	b, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, b.Close())
+
+	key := fmt.Appendf(nil, "%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	legacy := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":true,"Approvals":2}],"Status":2}],"Pull":{"Num":1}}`)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	Ok(t, raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, legacy)
+	}))
+	Ok(t, raw.Close())
+
+	b, err = boltdb.New(tmp)
+	Ok(t, err)
+	defer b.Close()
+
+	got, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, "mydir", got.Projects[0].RepoRelDir)
+	// The policy set survives; the count yields no approvals, so it must be
+	// approved again rather than crediting an approver nobody recorded.
+	Equals(t, 1, len(got.Projects[0].PolicyStatus))
+	Equals(t, "policy1", got.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 0, got.Projects[0].PolicyStatus[0].GetCurApprovals())
 }
 
 // newTestDB returns a TestDB using a temporary path.
