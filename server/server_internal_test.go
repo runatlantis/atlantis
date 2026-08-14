@@ -42,19 +42,22 @@ func TestServer_ShutdownOrdersOwnershipAndDatabase(t *testing.T) {
 	assert.Equal(t, []string{"begin-drain", "http-shutdown", "command-wait", "owner-close", "database-close"}, calls)
 }
 
-func TestServer_ShutdownDoesNotReleaseClaimsAfterHTTPTimeout(t *testing.T) {
+func TestServer_ShutdownCompletesCleanupAfterHTTPTimeout(t *testing.T) {
 	var calls []string
 	owners := &shutdownOwnerStore{calls: &calls}
 	s := &Server{
-		OwnerStore: owners,
-		Drainer:    &events.Drainer{},
-		Logger:     logging.NewNoopLogger(t),
+		OwnerStore:            owners,
+		commandExecutorWaiter: &recordingCommandWaiter{calls: &calls},
+		Drainer:               &events.Drainer{},
+		Logger:                logging.NewNoopLogger(t),
 	}
 	httpServer := &recordingHTTPShutdowner{calls: &calls, err: context.DeadlineExceeded}
 
-	err := s.shutdown(httpServer, time.Second)
-	assert.ErrorContains(t, err, "while shutting down HTTP server")
-	assert.Equal(t, []string{"begin-drain", "http-shutdown"}, calls)
+	// A missed HTTP-shutdown deadline (e.g. an open jobs/SSE stream) must not
+	// skip draining, ownership release, or database close, matching the
+	// unconditional cleanup behavior from before replica routing.
+	assert.NoError(t, s.shutdown(httpServer, time.Second))
+	assert.Equal(t, []string{"begin-drain", "http-shutdown", "command-wait", "owner-close"}, calls)
 }
 
 type recordingHTTPShutdowner struct {

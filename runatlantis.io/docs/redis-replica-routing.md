@@ -13,7 +13,7 @@ For each `{VCS host, repository, pull request}` key:
 3. Otherwise, the ingress replica forwards a credential-free command envelope to the owner's advertised URL.
 4. The owner authenticates the request and checks Redis plus its process-local claim before accepting it.
 5. Before resetting local state or scheduling work, the owner atomically verifies and renews the exact serialized claim in Redis.
-6. Project work that waited for local locks verifies the claim again after acquiring its Git read lock and before starting workflow steps.
+6. Project work that waited for local locks verifies the claim again before cloning or merging the working directory, and once more after acquiring its Git read lock and before starting workflow steps.
 7. The owner also renews all held leases every one-third of the configured TTL.
 
 The ownership key covers the whole pull request, not an individual project or workspace. Different pull requests can be assigned to different replicas. Assignment follows first ingress and is not actively rebalanced.
@@ -71,7 +71,7 @@ Atlantis fails closed when it cannot resolve or reach the owner:
 - With external plan storage, a new owner may restore and apply a plan only when its stored head commit matches the pull request.
 - Shared project locks are retained. A lock held by the same PR does not prevent the new owner from re-planning.
 
-Graceful shutdown marks the owner store as draining, stops HTTP traffic, waits for active commands, releases exact claims, and then closes Redis. If HTTP shutdown times out, Atlantis does not release claims early; they expire by TTL instead.
+Graceful shutdown marks the owner store as draining, stops HTTP traffic, waits for active commands, releases exact claims, and then closes Redis. If HTTP shutdown times out, Atlantis logs the error and still drains active commands, releases claims, and closes Redis; in-progress work is tracked independently of open HTTP connections, so a lingering jobs or SSE stream does not abort the rest of the shutdown sequence.
 
 Internal forwarding is at-least-once. A timeout can leave the ingress replica unsure whether the owner accepted a command, so a provider or manual redelivery can execute it again. Atlantis does not claim exactly-once execution. Ownership or forwarding failures return HTTP 503; monitor failed VCS deliveries and redeliver them when the provider does not retry automatically.
 
@@ -85,7 +85,7 @@ Use a dedicated production Redis deployment or managed service:
 - Monitor latency, rejected connections, replication health, failovers, and memory pressure.
 - Do not use the Kubernetes control-plane etcd. It is not an application datastore and Atlantis does not integrate with it.
 
-Redis replication and failover are generally asynchronous. A successful ownership or lock write can be lost during failover, and a network partition can briefly expose inconsistent primaries. The implementation uses atomic Redis operations, renewable leases, exact process claim IDs, and fail-closed client behavior, but Redis HA is not a linearizable consensus system. Lease checks fence top-level scheduling and queued project admission; they cannot stop Terraform or another workflow step that was already running when its owner lost Redis connectivity. Environments requiring strict partition and execution safety need a consensus-backed ownership design plus end-to-end fencing, such as fencing tokens enforced by the execution target; that design is not implemented by this mode.
+Redis replication and failover are generally asynchronous. A successful ownership or lock write can be lost during failover, and a network partition can briefly expose inconsistent primaries. The implementation uses atomic Redis operations, renewable leases, exact process claim IDs, and fail-closed client behavior, but Redis HA is not a linearizable consensus system. Lease checks fence top-level scheduling and queued project admission. Admission is re-checked at each stage a replica could act on stale ownership: before a mutating command (plan, import, state rm) clones or merges the working directory, and again after the in-process working-directory lock is acquired but immediately before workflow steps run. A replica that loses its lease while queued therefore aborts before touching the working directory, and read-only commands abort before any step executes. What the lease checks cannot stop is Terraform or another workflow step that was already running when its owner lost Redis connectivity. Environments requiring strict partition and execution safety need a consensus-backed ownership design plus end-to-end fencing, such as fencing tokens enforced by the execution target; that design is not implemented by this mode.
 
 ## Kubernetes
 
