@@ -35,7 +35,11 @@
 **Core logic:** `server/core/config/` (parsing), `server/core/runtime/` (Terraform execution), `server/core/terraform/tfclient/` (TF client)
 **Localization:** `server/i18n/` (embedded YAML catalogs and runtime overrides), `server/events/templates/i18n/<lang>/` (localized markdown template overrides)
 
+**HA / Replica routing:** `server/core/ownership/` (interface + key), `server/core/redis/ownership.go` (Redis lease store), `server/events/command_dispatch.go` (ownership-aware routing), `server/events/command_dispatch_transport.go` (credential-free envelopes), `server/events/http_command_forwarder.go` (inter-replica HTTP transport), `server/events/local_claim_guard.go` (per-claim local state reset), `server/controllers/internal_command_controller.go` (forwarded command receiver). Config: `--replica-advertise-url`, `--replica-id`, `--internal-command-token`, `--ownership-ttl-seconds`. Docs: `runatlantis.io/docs/redis-replica-routing.md`
+
 **VCS providers:** `server/events/vcs/{github,gitlab,bitbucketcloud,bitbucketserver,azuredevops,gitea}/`
+
+**HA mode interfaces:** `CommandDispatcher` (routes work), `CommandExecutor` (runs on owner), `CommandForwarder` (sends to remote owner), `RepoHydrator` (restores VCS credentials on owner), `ownership.Store` (lease coordination). The `RoutedCommandDispatcher` wraps the existing `CommandRunner` and `PullCleaner` without replacing them; when routing is disabled, the events controller calls them directly as before.
 
 **Config files:** `.golangci.yml` (lint), `go.mod`, `Makefile`, `Dockerfile`, `docker-compose.yml`, `.pre-commit-config.yaml`
 
@@ -54,6 +58,8 @@
 - **E2E test code:** `e2e/` has its own `go.mod` (separate module from root). Build: `cd e2e && make build`. Run: `make run`.
 - **Atlantis server in E2E:** Started by `scripts/e2e.sh` — reads GitHub auth from env vars automatically (viper). No explicit flags needed.
 
+**HA mode activation:** Configuring any of `--replica-advertise-url`, `--internal-command-token`, or `--replica-id` activates replica routing. All three require `--locking-db-type=redis` and a Redis endpoint. Partial configuration fails startup validation (`UserConfig.ValidateReplicaRouting`).
+
 ## Development Workflows
 
 **Before commit:** `make test` → `make check-fmt` → `make go-generate` (if interfaces changed) → `make build-service` (verify)
@@ -63,9 +69,14 @@
 **VCS pagination:** When following provider-returned pagination links, validate the next URL against the configured provider API origin before issuing the request. Bitbucket Cloud diffstat pagination uses this guard in both modified-file and mergeability checks.
 
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
+**HA mode changes:** Ownership logic in `server/core/redis/ownership.go` • Dispatch in `server/events/command_dispatch.go` • Transport in `server/events/http_command_forwarder.go` • Wiring in `server/server.go` (`NewServer` conditional block and `SetupRoutes`) • Validation in `server/user_config.go` (`ValidateReplicaRouting`) • Flags in `cmd/server.go`
 **i18n changes:** Keep command routing/template selection keyed on stable command identifiers (`command.Name`), and use localized titles only for display text.
 
 **Terraform execution:** Modify `server/core/terraform/tfclient/terraform_client.go` or `server/core/runtime/*_step_runner.go` (uses `hashicorp/hc-install`)
+
+**HA mode testing:** Run `go test ./server/events/... ./server/core/redis/... ./server/controllers/... -run "Replica|Ownership|InternalCommand|LocalClaim|AtomicLock|HTTPCommandForwarder"`. The integration test in `server/events/replica_routing_integration_test.go` uses `miniredis` for an in-process Redis and `FastForward` for TTL expiry simulation. Internal HTTP forwarding tests live in `server/events/http_command_forwarder_internal_test.go`.
+
+**HA internal endpoints:** `/internal/commands/{comment,autoplan,pull-closed}` are served on the same HTTP port as `/events` but must not be published through public ingress. They are authenticated via `X-Atlantis-Internal-Token` and ownership-claim validated before execution.
 
 **Combined VCS statuses:** `server/events/commit_status_updater.go` uses `models.ProjectCounts`. For failed apply/policy status text, count actual errored projects with `Errored`, not `Total - Success`, because planned or untouched projects may still be pending. For apply status text, `NoChanges` is a subset of `Success` and should be reported as up to date, not applied.
 
