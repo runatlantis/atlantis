@@ -12,7 +12,9 @@ For each `{VCS host, repository, pull request}` key:
 2. If that replica owns the exact process claim, it executes the command locally.
 3. Otherwise, the ingress replica forwards a credential-free command envelope to the owner's advertised URL.
 4. The owner authenticates the request and checks Redis plus its process-local claim before accepting it.
-5. The owner renews the lease every one-third of its configured TTL.
+5. Before resetting local state or scheduling work, the owner atomically verifies and renews the exact serialized claim in Redis.
+6. Project work that waited for local locks verifies the claim again after acquiring its Git read lock and before starting workflow steps.
+7. The owner also renews all held leases every one-third of the configured TTL.
 
 The ownership key covers the whole pull request, not an individual project or workspace. Different pull requests can be assigned to different replicas. Assignment follows first ingress and is not actively rebalanced.
 
@@ -54,7 +56,7 @@ Without `--enable-external-stores`, plan files stay beneath the owner's local `-
 
 ### External Plans
 
-With `--enable-external-stores` and a valid server-side `external_stores.plan_store` configuration, Atlantis saves plans through the external PlanStore. After takeover, the new owner clears its local state, reclones the workspace, and can restore a plan whose stored head commit matches the pull request. Missing, stale, or unavailable external plans fail the command and require a new plan.
+With `--enable-external-stores` and a valid server-side `external_stores.plan_store` configuration, Atlantis saves plans through the external PlanStore. After takeover, the new owner clears its local state, ensures the default checkout and every plan-bearing project workspace exist, and restores plans before discovery. Targeted applies also ensure the selected project's resolved workspace exists before loading its plan. Recovery runs for a new local ownership generation even when a pre-workflow hook already recreated the pull directory. Missing, stale, or unavailable external plans fail the command and require a new plan.
 
 ## Failure Behavior
 
@@ -62,15 +64,16 @@ Atlantis fails closed when it cannot resolve or reach the owner:
 
 - If Redis is unavailable, ingress returns HTTP 503 and does not execute locally.
 - If forwarding reaches a stale claim, ingress resolves ownership once more and retries once.
+- Pull-close forwarding is acknowledged after exact claim admission and scheduling. Cleanup continues on the owner; if it fails, Atlantis logs the error and retains ownership so a redelivered event can retry cleanup.
 - If the owner disappears or its process restarts, another process can claim the PR after the lease expires.
-- On every new process claim, the new owner deletes any local working directory for that PR before executing a command.
+- On every new process claim, the new owner waits for commands from an older local claim to finish, then deletes the local working directory for that PR once before executing new work.
 - With local plan storage, `apply` on a new owner fails with the existing missing-plan response until a user runs `plan` again.
 - With external plan storage, a new owner may restore and apply a plan only when its stored head commit matches the pull request.
 - Shared project locks are retained. A lock held by the same PR does not prevent the new owner from re-planning.
 
 Graceful shutdown marks the owner store as draining, stops HTTP traffic, waits for active commands, releases exact claims, and then closes Redis. If HTTP shutdown times out, Atlantis does not release claims early; they expire by TTL instead.
 
-Internal forwarding is at-least-once. A timeout can lead to a retried delivery after the owner already accepted a command. Atlantis does not claim exactly-once execution.
+Internal forwarding is at-least-once. A timeout can leave the ingress replica unsure whether the owner accepted a command, so a provider or manual redelivery can execute it again. Atlantis does not claim exactly-once execution. Ownership or forwarding failures return HTTP 503; monitor failed VCS deliveries and redeliver them when the provider does not retry automatically.
 
 ## Redis Requirements
 
@@ -82,7 +85,7 @@ Use a dedicated production Redis deployment or managed service:
 - Monitor latency, rejected connections, replication health, failovers, and memory pressure.
 - Do not use the Kubernetes control-plane etcd. It is not an application datastore and Atlantis does not integrate with it.
 
-Redis replication and failover are generally asynchronous. A successful ownership or lock write can be lost during failover, and a network partition can briefly expose inconsistent primaries. The implementation uses atomic Redis operations, renewable leases, exact process claim IDs, and fail-closed client behavior, but Redis HA is not a linearizable consensus system. Lease checks fence command admission; they cannot stop a Terraform process that was already running when its owner lost Redis connectivity. Environments requiring strict partition and execution safety need a consensus-backed ownership design plus end-to-end fencing, such as fencing tokens enforced by the execution target; that design is not implemented by this mode.
+Redis replication and failover are generally asynchronous. A successful ownership or lock write can be lost during failover, and a network partition can briefly expose inconsistent primaries. The implementation uses atomic Redis operations, renewable leases, exact process claim IDs, and fail-closed client behavior, but Redis HA is not a linearizable consensus system. Lease checks fence top-level scheduling and queued project admission; they cannot stop Terraform or another workflow step that was already running when its owner lost Redis connectivity. Environments requiring strict partition and execution safety need a consensus-backed ownership design plus end-to-end fencing, such as fencing tokens enforced by the execution target; that design is not implemented by this mode.
 
 ## Kubernetes
 
