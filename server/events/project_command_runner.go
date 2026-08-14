@@ -816,6 +816,17 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 	defer unlockFn()
 
+	// Re-check ownership now that we hold the working-directory lock: a replica
+	// can block on that lock and lose its lease while waiting. Fencing here, before
+	// Clone/MergeAgain, avoids mutating the working directory for a claim we no
+	// longer own. runSteps re-admits again immediately before workflow steps run.
+	if err := p.admitExecution(ctx); err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after ownership loss: %v", unlockErr)
+		}
+		return nil, "", err
+	}
+
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
@@ -1022,6 +1033,12 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 }
 
 func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out *models.ImportSuccess, failure string, err error) {
+	// Fence against ownership loss before mutating the working directory: a
+	// replica that lost its lease must not clone for a claim it no longer owns.
+	if err = p.admitExecution(ctx); err != nil {
+		return nil, "", err
+	}
+
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
@@ -1071,6 +1088,12 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 }
 
 func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out *models.StateRmSuccess, failure string, err error) {
+	// Fence against ownership loss before mutating the working directory: a
+	// replica that lost its lease must not clone for a claim it no longer owns.
+	if err = p.admitExecution(ctx); err != nil {
+		return nil, "", err
+	}
+
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if cloneErr != nil {
@@ -1134,16 +1157,29 @@ func (p *DefaultProjectCommandRunner) ensurePlanLoaded(ctx command.ProjectContex
 	return nil
 }
 
+// admitExecution re-verifies the pull request ownership lease before this
+// replica mutates or executes against the working directory. It is safe to call
+// repeatedly: Admit is an idempotent lease renewal that returns an error only
+// when this replica no longer owns the claim. When no lease is attached (routing
+// disabled) it is a no-op.
+func (p *DefaultProjectCommandRunner) admitExecution(ctx command.ProjectContext) error {
+	if ctx.ExecutionLease == nil {
+		return nil
+	}
+	if err := ctx.ExecutionLease.Admit(context.Background()); err != nil {
+		return fmt.Errorf("admitting project execution: %w", err)
+	}
+	return nil
+}
+
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
 	// Hold a read lock for the whole step run so clone/reset/merge cannot run in this dir until we're done.
 	unlock := p.WorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	defer unlock()
-	if ctx.ExecutionLease != nil {
-		if err := ctx.ExecutionLease.Admit(context.Background()); err != nil {
-			return outputs, fmt.Errorf("admitting project execution: %w", err)
-		}
+	if err := p.admitExecution(ctx); err != nil {
+		return outputs, err
 	}
 
 	envs := make(map[string]string)

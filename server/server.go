@@ -1349,8 +1349,11 @@ func (s *Server) shutdown(server httpShutdowner, timeout time.Duration) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	// Don't return early on a Shutdown error: a missed deadline (e.g. an open
+	// jobs/SSE stream) must not skip draining in-progress operations, flushing
+	// stats, releasing ownership claims, and closing the database below.
 	if err := server.Shutdown(ctx); err != nil {
-		return fmt.Errorf("while shutting down HTTP server: %w", err)
+		s.Logger.Err("while shutting down HTTP server: %v", err)
 	}
 
 	if s.commandExecutorWaiter != nil {
