@@ -17,7 +17,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/drmaxgit/go-azuredevops v0.13.2
 	github.com/go-ozzo/ozzo-validation v3.6.0+incompatible
-	github.com/go-playground/validator/v10 v10.30.2
+	github.com/go-playground/validator/v10 v10.30.3
 	github.com/go-test/deep v1.1.1
 	github.com/gofri/go-github-ratelimit/v2 v2.0.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
