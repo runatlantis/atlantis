@@ -159,6 +159,10 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
   * Member Entitlement Management (Read)
 * Record the access token
 
+::: tip Rotating the token
+Azure DevOps personal access tokens expire. To rotate the token without restarting Atlantis, write it to a file and start the server with [`--azuredevops-token-file`](server-configuration.md#azuredevops-token-file) instead of `--azuredevops-token`. The token is re-read from the file on every request, so an external process can replace it in place. Use it together with `--write-git-creds` so git operations also pick up the rotated token.
+:::
+
 ## Next Steps
 
 Once you've got your user and access token, you're ready to create a webhook secret. See [Creating a Webhook Secret](webhook-secrets.md).
