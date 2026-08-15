@@ -2268,7 +2268,7 @@ autodiscover:
 	terraformClient := tfclientmocks.NewMockClient()
 	userConfig := defaultUserConfig
 	locker := events.NewDefaultWorkingDirLocker()
-	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan)
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockPlan()
 
@@ -2352,7 +2352,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTar
 	terraformClient := tfclientmocks.NewMockClient()
 	userConfig := defaultUserConfig
 	locker := events.NewDefaultWorkingDirLocker()
-	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan)
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockPlan()
 

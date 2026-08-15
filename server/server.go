@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
@@ -633,8 +634,23 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		allowCommands,
 		userConfig.ToBlockedExtraArgs(),
 	)
-	defaultTfDistribution := terraformClient.DefaultDistribution()
-	defaultTfVersion := terraformClient.DefaultVersion()
+	defaultTfDistribution := distribution
+	terraformBinDir := binDir
+
+	var defaultTfVersion *version.Version
+	if userConfig.DefaultTFVersion != "" {
+		defaultTfVersion, err = version.NewVersion(userConfig.DefaultTFVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if terraformClient != nil {
+		defaultTfDistribution = terraformClient.DefaultDistribution()
+		defaultTfVersion = terraformClient.DefaultVersion()
+		terraformBinDir = terraformClient.TerraformBinDir()
+	}
+
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{
 		Log:               logger,
 		DataDir:           userConfig.DataDir,
@@ -644,7 +660,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
-		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		TerraformBinDir:         terraformBinDir,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}
@@ -824,6 +840,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
 		WorkingDirLocker:          workingDirLocker,
+		ProjectJobURLGenerator:    router,
 		CommandRequirementHandler: applyRequirementHandler,
 		CancellationTracker:       cancellationTracker,
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
