@@ -163,6 +163,12 @@ func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]Pendin
 }
 
 func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPullDir string) ([]PendingPlan, []string, error) {
+	// Defense-in-depth: planPullDir is derived from PR-controlled values (repo,
+	// pull number, workspace), so confirm it stays within the configured plan
+	// store root before touching the filesystem.
+	if err := utils.EnsureSubPath(p.LocalPlanStoreDir, planPullDir); err != nil {
+		return nil, nil, fmt.Errorf("plan store pull directory %q: %w", planPullDir, err)
+	}
 	workspaceDirs, err := os.ReadDir(planPullDir)
 	if os.IsNotExist(err) {
 		p.debug("plan store pull directory %q does not exist", planPullDir)
@@ -194,6 +200,11 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		if err != nil {
 			return nil, nil, err
 		}
+		// Defense-in-depth: ensure the workspace-derived clone directory stays
+		// within the pull clone root before stat-ing it.
+		if err := utils.EnsureSubPath(absClonePullDir, cloneRepoDir); err != nil {
+			return nil, nil, fmt.Errorf("clone directory for workspace %q: %w", workspace, err)
+		}
 		cloneRepoInfo, err := os.Stat(cloneRepoDir)
 		if os.IsNotExist(err) {
 			p.debug("skipping plan store workspace %q because clone directory %q does not exist", workspace, cloneRepoDir)
@@ -217,6 +228,11 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)
 		if err != nil {
 			return nil, nil, err
+		}
+		// Defense-in-depth: ensure the workspace-derived plan directory stays
+		// within the plan store pull root before walking it.
+		if err := utils.EnsureSubPath(absPlanPullDir, planRepoDir); err != nil {
+			return nil, nil, fmt.Errorf("plan directory for workspace %q: %w", workspace, err)
 		}
 
 		if err := filepath.WalkDir(planRepoDir, func(path string, entry os.DirEntry, walkErr error) error {
