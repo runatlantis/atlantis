@@ -5658,7 +5658,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 
 func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run with failing policy check then apply is not performed")
-	setup(t)
+	vcsClient := setup(t)
 	tmp := t.TempDir()
 	boltDB, err := boltdb.New(tmp)
 	t.Cleanup(func() {
@@ -5712,9 +5712,23 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 			nil,
 		}
 	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("policy checks have not been approved; run `atlantis approve_policies`"),
+	})
 
 	When(workingDir.GetPullDir(testdata.GithubRepo, modelPull)).ThenReturn(tmp, nil)
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, &modelPull, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Eq(command.Apply.String()),
+	).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "atlantis approve_policies"), "expected policy remediation comment, got %q", comment)
+	status, err := boltDB.GetPullStatus(modelPull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected policy status to remain durable")
+	Equals(t, models.ErroredPolicyCheckStatus, status.Projects[0].Status)
+	Ok(t, boltDB.AcquirePlanPublicationClaim(modelPull, "after-policy-block"))
+	Ok(t, boltDB.ReleasePlanPublicationClaim(modelPull, "after-policy-block"))
 }
 
 func TestApplyWithAutoMerge_VSCMerge(t *testing.T) {

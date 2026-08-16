@@ -235,7 +235,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	preApplyPullStatus := ctx.PullStatus
+	preApplyPullStatus := copyPullStatus(ctx.PullStatus)
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
@@ -270,7 +270,8 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if len(result.ProjectResults) == 0 {
 		pullStatus, err = a.dbUpdater.updateDB(ctx, pull, nil)
 	} else {
-		pullStatus, err = a.dbUpdater.updateApplyResultsForPlanGeneration(ctx, pull, result.ProjectResults, publicationToken)
+		persistedResults := applyResultsForDurableUpdate(result.ProjectResults, preApplyPullStatus)
+		pullStatus, err = a.dbUpdater.updateApplyResultsForPlanGeneration(ctx, pull, persistedResults, publicationToken)
 	}
 	if err != nil {
 		if db.IsPlanGenerationObsolete(err) {
@@ -435,10 +436,54 @@ func applyResultStatusUpdateError(result command.Result, pullStatus models.PullS
 	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		return err
 	}
-	if result.HasErrors() && pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {
-		return errors.New("apply result has errors but no errored apply status was recorded")
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Error == nil && projectResult.Failure == "" {
+			continue
+		}
+		if isPolicyBlockedApplyResult(projectResult, preApplyPullStatus) {
+			continue
+		}
+		projectStatus := findProjectInPullStatus(&pullStatus, projectResult.Workspace, projectResult.RepoRelDir, projectResult.ProjectName)
+		if projectStatus == nil || projectStatus.Status != models.ErroredApplyStatus ||
+			projectStatus.PlanGeneration != "" || projectStatus.AcceptedPlanGeneration != projectResult.AcceptedPlanGeneration {
+			return fmt.Errorf(
+				"apply result for dir %q workspace %q project %q has errors but no matching errored apply status was recorded",
+				projectResult.RepoRelDir, projectResult.Workspace, projectResult.ProjectName,
+			)
+		}
 	}
 	return nil
+}
+
+func copyPullStatus(status *models.PullStatus) *models.PullStatus {
+	if status == nil {
+		return nil
+	}
+	copy := *status
+	copy.Projects = append([]models.ProjectStatus(nil), status.Projects...)
+	return &copy
+}
+
+func applyResultsForDurableUpdate(results []command.ProjectResult, preApplyPullStatus *models.PullStatus) []command.ProjectResult {
+	filtered := make([]command.ProjectResult, 0, len(results))
+	for _, result := range results {
+		if isPolicyBlockedApplyResult(result, preApplyPullStatus) {
+			continue
+		}
+		filtered = append(filtered, result)
+	}
+	return filtered
+}
+
+func isPolicyBlockedApplyResult(result command.ProjectResult, preApplyPullStatus *models.PullStatus) bool {
+	if preApplyPullStatus == nil || result.Command != command.Apply || (result.Error == nil && result.Failure == "") {
+		return false
+	}
+	projectStatus := findProjectInPullStatus(preApplyPullStatus, result.Workspace, result.RepoRelDir, result.ProjectName)
+	return projectStatus != nil &&
+		projectStatus.Status == models.ErroredPolicyCheckStatus &&
+		projectStatus.PlanGeneration == "" &&
+		projectStatus.AcceptedPlanGeneration == result.AcceptedPlanGeneration
 }
 
 func applyResultHasStaleCommandHead(results []command.ProjectResult) bool {

@@ -248,6 +248,106 @@ func internalPlannedProjectResult(repoRelDir, workspace, projectName string) com
 	}
 }
 
+func TestApplyResultsForDurableUpdate_PreservesExactPolicyBlocker(t *testing.T) {
+	preApply := &models.PullStatus{Projects: []models.ProjectStatus{
+		{
+			Workspace:              "default",
+			RepoRelDir:             "shared",
+			ProjectName:            "policy-blocked",
+			Status:                 models.ErroredPolicyCheckStatus,
+			ManagedPlanHash:        "hash-policy",
+			AcceptedPlanGeneration: "generation-policy",
+		},
+		{
+			Workspace:              "default",
+			RepoRelDir:             "shared",
+			ProjectName:            "applyable",
+			Status:                 models.PlannedPlanStatus,
+			ManagedPlanHash:        "hash-applyable",
+			AcceptedPlanGeneration: "generation-applyable",
+		},
+	}}
+	results := []command.ProjectResult{
+		{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "shared", ProjectName: "policy-blocked",
+			AcceptedPlanGeneration: "generation-policy",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("policy checks have not been approved; run `atlantis approve_policies`"),
+			},
+		},
+		{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "shared", ProjectName: "applyable",
+			AcceptedPlanGeneration: "generation-applyable",
+			ProjectCommandOutput:   command.ProjectCommandOutput{ApplySuccess: "applied"},
+		},
+	}
+
+	filtered := applyResultsForDurableUpdate(results, preApply)
+
+	if len(filtered) != 1 || filtered[0].ProjectName != "applyable" {
+		t.Fatalf("durable apply results = %#v, want only the applyable project", filtered)
+	}
+	if preApply.Projects[0].Status != models.ErroredPolicyCheckStatus ||
+		preApply.Projects[0].ManagedPlanHash != "hash-policy" ||
+		preApply.Projects[0].AcceptedPlanGeneration != "generation-policy" {
+		t.Fatalf("policy blocker snapshot was mutated: %#v", preApply.Projects[0])
+	}
+}
+
+func TestApplyResultStatusUpdateError_AcceptsPolicyBlockerAndPersistedApplyFailureByExactProject(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "head", BaseBranch: "main"}
+	preApply := &models.PullStatus{Pull: pull, Projects: []models.ProjectStatus{
+		{
+			Workspace:              "default",
+			RepoRelDir:             "shared",
+			ProjectName:            "policy-blocked",
+			Status:                 models.ErroredPolicyCheckStatus,
+			ManagedPlanHash:        "hash-policy",
+			AcceptedPlanGeneration: "generation-policy",
+		},
+		{
+			Workspace:              "default",
+			RepoRelDir:             "shared",
+			ProjectName:            "apply-failed",
+			Status:                 models.PlannedPlanStatus,
+			ManagedPlanHash:        "hash-apply",
+			AcceptedPlanGeneration: "generation-apply",
+		},
+	}}
+	result := command.Result{ProjectResults: []command.ProjectResult{
+		{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "shared", ProjectName: "policy-blocked",
+			AcceptedPlanGeneration: "generation-policy",
+			ProjectCommandOutput:   command.ProjectCommandOutput{Error: fmt.Errorf("policy blocked")},
+		},
+		{
+			Command: command.Apply, Workspace: "default", RepoRelDir: "shared", ProjectName: "apply-failed",
+			AcceptedPlanGeneration: "generation-apply",
+			ProjectCommandOutput:   command.ProjectCommandOutput{Error: fmt.Errorf("apply failed")},
+		},
+	}}
+	persisted := models.PullStatus{Pull: pull, Projects: []models.ProjectStatus{
+		preApply.Projects[0],
+		{
+			Workspace:              "default",
+			RepoRelDir:             "shared",
+			ProjectName:            "apply-failed",
+			Status:                 models.ErroredApplyStatus,
+			ManagedPlanHash:        "hash-apply",
+			AcceptedPlanGeneration: "generation-apply",
+		},
+	}}
+
+	if err := applyResultStatusUpdateError(result, persisted, pull, pull, preApply); err != nil {
+		t.Fatalf("expected exact policy/apply error accounting to succeed: %v", err)
+	}
+
+	persisted.Projects[1].ProjectName = "different-project"
+	if err := applyResultStatusUpdateError(result, persisted, pull, pull, preApply); err == nil {
+		t.Fatal("expected missing exact errored apply status to fail closed")
+	}
+}
+
 func TestApplyCommandRunner_StaleCommandResultWithEmptyPullStatusDoesNotPublishZeroZeroSuccess(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
