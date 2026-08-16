@@ -98,8 +98,24 @@ clear a claim held by a publisher. If a claim remains after an ambiguous publica
 confirm the owning command and replica can no longer publish. If ownership cannot be established, stop **all** Atlantis
 replicas before recovery. Do not clear a live publisher's claim.
 
+The publication lifecycle is:
+
+1. `UNCLAIMED`: no command may publish a plan transition yet.
+2. `CLAIMED`: one command owns the pull's durable transition and publication boundary.
+3. `DURABLE_STATE_COMMITTED`: PullStatus contains the authoritative result.
+4. `VCS_PUBLICATION_STARTED`: replaceable commit statuses and any result comment are being sent.
+5. `VCS_PUBLICATION_COMPLETED`: every required publication returned successfully.
+6. `RELEASED`: the owner compare-and-deletes its claim. Offline recovery may perform the same exact-token delete.
+
+A crash while only `CLAIMED` leaves prior PullStatus unchanged and blocks later mutation until recovery. A crash after
+`DURABLE_STATE_COMMITTED` leaves durable state authoritative even if VCS is stale. Commit statuses can be replaced by a
+later command, but result comments are not replayed automatically because a timed-out request may already have created
+one. A timeout after publication starts is therefore ambiguous and retains the claim. Recovery only releases that exact
+claim; it never rolls back PullStatus or repeats a comment. A crash after publication completes but before release is
+safe to recover with the same exact-token procedure.
+
 For BoltDB, keep every Atlantis replica stopped and back up `<data-dir>/atlantis.db`. From a checkout of the same
-Atlantis version, run the offline recovery utility for exactly one pull request:
+Atlantis version, inspect the claim for exactly one pull request:
 
 ```bash
 go run ./cmd/plan-claim-recovery \
@@ -107,33 +123,64 @@ go run ./cmd/plan-claim-recovery \
   --vcs-hostname github.com \
   --repo owner/repository \
   --pull 123 \
-  --confirm-all-replicas-stopped
+  --confirm-all-replicas-stopped \
+  --inspect
 ```
 
-The utility refuses to open a BoltDB file that an Atlantis process still holds. Restart Atlantis only after it exits
-successfully.
+The stored claim must be a non-zero lowercase UUID in canonical form. Copy the inspected token exactly, confirm it
+still belongs to the stopped publisher, and use it for the compare-and-delete recovery:
+
+```bash
+go run ./cmd/plan-claim-recovery \
+  --data-dir /var/lib/atlantis \
+  --vcs-hostname github.com \
+  --repo owner/repository \
+  --pull 123 \
+  --confirm-all-replicas-stopped \
+  --claim-token 00000000-0000-4000-8000-000000000000
+```
+
+The utility refuses to open a BoltDB file that an Atlantis process still holds. It also refuses an absent or malformed
+claim and will not delete a claim that changed after inspection. Restart Atlantis only after it exits successfully.
 
 For Redis, stop every Atlantis replica, back up Redis according to the deployment's normal procedure, and inspect the
 exact claim key before deleting it. Replace the example VCS host, repository, and pull request number; retain the braces
 because they are part of the Redis key:
 
 ```bash
+set -eu
 claim_key='plan-publication/{github.com::owner/repository::123}'
-redis-cli --raw GET "$claim_key"
-redis-cli DEL "$claim_key"
-redis-cli EXISTS "$claim_key"
+inspected_claim_token=$(redis-cli --raw GET "$claim_key")
+printf '%s\n' "$inspected_claim_token"
+expected_claim_token='00000000-0000-4000-8000-000000000000' # copy the inspected token exactly
+printf '%s\n' "$expected_claim_token" | grep -Eq \
+  '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+test "$expected_claim_token" != '00000000-0000-0000-0000-000000000000'
+test "$expected_claim_token" = "$inspected_claim_token"
+deleted=$(redis-cli --raw EVAL \
+  'local current=redis.call("GET",KEYS[1]); if not current or current~=ARGV[1] then return 0 end; return redis.call("DEL",KEYS[1])' \
+  1 "$claim_key" "$expected_claim_token")
+test "$deleted" = 1
+remaining=$(redis-cli --raw EXISTS "$claim_key")
+test "$remaining" = 0
 ```
 
 Use the deployment's normal `redis-cli` connection, authentication, TLS, database, and cluster (`-c`) options. The
-final `EXISTS` result must be `0`. Restart Atlantis, then retry the close, unlock, or replan operation. These procedures
-clear only the publication claim; they do not infer or repair plan status.
+inspected token must be a non-zero lowercase UUID in canonical form; stop if the validation command fails. Never use
+an unconditional `DEL`: an `EVAL` result of `0` means the claim is absent or
+was replaced, so stop and establish ownership again. After an `EVAL` result of `1`, the final `EXISTS` result must be
+`0`. Restart Atlantis, then retry the close, unlock, or replan operation. These procedures clear only the publication
+claim; they do not infer, repair, or otherwise change accepted plan status or hashes.
 
 During a rolling upgrade, the strict cross-replica publication boundary is effective only after every Atlantis replica
 is running a version that participates in publication claims. Complete the replica rollout before relying on this
 ordering guarantee.
 
 For convention-managed plans, a successful generation stores the plan's SHA-256 digest in the same durable update as
-the successful project status. Apply verifies a local or restored plan against that accepted digest before executing.
+the successful project status. S3 stores an immutable object selected by the accepted generation and digest, alongside
+the historical deterministic object used only for legacy and generic discovery. A superseded generation may replace
+the discovery object, but it cannot replace the accepted immutable object. Apply loads the exact accepted object and
+verifies a local or restored plan against that accepted digest before executing.
 Pull status written by an older Atlantis version may not contain this digest. During a rolling upgrade, those legacy
 plans retain the previous command-start hash validation; running `atlantis plan` again creates the durable digest.
 PR-backed API plan/apply requests use this same durable generation and digest boundary; synthetic non-PR API requests
