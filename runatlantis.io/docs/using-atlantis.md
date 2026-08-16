@@ -149,13 +149,13 @@ claim with the offline procedure above before relying on close/reopen. If an app
 infrastructure state before retrying because one or more apply steps may already have executed.
 
 If a newer targeted plan supersedes one project in an older multi-project generation, Atlantis cancels the remaining
-projects from the older generation. Those projects are non-applyable and require a fresh plan. Results from the
+projects from the older generation. Those projects cannot be applied and require a fresh plan. Results from the
 superseded command do not replace the newer generation's pull request statuses or comments. Follow-on policy results
 are accepted and published only while the completed plan generation that produced them remains current.
 
 Generic plans and autoplans atomically mark prior project plans as discarded before starting their new generation.
-Likewise, when automerge requires every project plan to succeed and one project fails, Atlantis makes every project in
-that generation non-applyable. Physical plan-store objects may remain until later explicit cleanup; durable pull status,
+Likewise, when automerge requires every project plan to succeed and one project fails, Atlantis prevents every project
+in that generation from being applied. Physical plan-store objects may remain until later explicit cleanup; durable pull status,
 not the presence of an object, determines whether apply is authorized. Generic apply ignores retained convention-plan
 objects whose matching durable project status is already applied, discarded, or a no-change plan.
 
