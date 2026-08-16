@@ -1,0 +1,45 @@
+server/core/db/db.go
+  s_0054a5ac358e80::t_9d5ba64a45840a 31
+cmd/plan-claim-recovery/main.go
+  s_0054a5ac358e80::t_ae015229b42297 18,29-30,49-50,69-75,78-79,108-111,113-120
+  s_0054a5ac358e80::t_ab1f8b6702a50d 76-77,112,126-134
+  s_0054a5ac358e80::t_c68053a3d19c52 135-136
+server/core/redis/redis.go
+  s_0054a5ac358e80::t_9d5ba64a45840a 656-675
+server/core/boltdb/boltdb_test.go
+  s_0054a5ac358e80::t_d9fadd7af7f8f7 1479-1482
+  s_0054a5ac358e80::t_d600432ed5ebe5 1448-1450,1476-1477,1522-1523
+  s_0054a5ac358e80::t_179053cca3f432 1524
+server/core/boltdb/boltdb.go
+  s_0054a5ac358e80::t_998588abc876d1 607-611
+  s_0054a5ac358e80::t_9d5ba64a45840a 598-606,612-622
+cmd/plan-claim-recovery/main_test.go
+  s_0054a5ac358e80::t_9651b82d2c5215 22,33,54-64,117,120,126,134,150,193,206-249
+  s_0054a5ac358e80::t_c60ae7c480f569 16,157-192,194-205
+  s_0054a5ac358e80::t_fcde1d5fd7f3ee 91-97,100-116
+  s_0054a5ac358e80::t_469de725671b3e 34-44,71-75
+  s_0054a5ac358e80::t_ab1f8b6702a50d 98-99
+  s_0054a5ac358e80::t_974648ce751f3d 118
+server/core/redis/redis_test.go
+  s_0054a5ac358e80::t_d9fadd7af7f8f7 1505-1508
+  s_0054a5ac358e80::t_d600432ed5ebe5 1474-1477,1502-1503,1686-1687
+  s_0054a5ac358e80::t_7ee7f4114f23ea 1688
+server/core/db/mocks/mock_database.go
+  s_0054a5ac358e80::t_dd36408c7e38fc 192-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "be5b443b728d29adcd8e647dbd085f8305d09980",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
