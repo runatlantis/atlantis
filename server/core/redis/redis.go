@@ -587,7 +587,7 @@ func (r *RedisDB) BeginPlanGeneration(pull models.PullRequest, projects []models
 		return models.PullStatus{}, err
 	}
 
-	return r.updatePullAtomically(key, false, func(currStatus *models.PullStatus) (models.PullStatus, error) {
+	return r.updatePullAtomically(key, true, func(currStatus *models.PullStatus) (models.PullStatus, error) {
 		var newStatus models.PullStatus
 		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 			newStatus = models.PullStatus{Pull: pull}

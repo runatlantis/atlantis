@@ -1388,6 +1388,52 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
+func TestBeginPlanGenerationOverwritesCorruptData(t *testing.T) {
+	tmp := t.TempDir()
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+
+	database, err := boltdb.New(tmp)
+	Ok(t, err)
+	Ok(t, database.Close())
+
+	key := fmt.Appendf(nil, "%s::%s::%d", pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
+	Ok(t, err)
+	err = raw.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("pulls")).Put(key, []byte(`{"Projects":[{"PolicyStatus":[{"Approvals":2}]}]}`))
+	})
+	Ok(t, err)
+	Ok(t, raw.Close())
+
+	database, err = boltdb.New(tmp)
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	selected := []models.ProjectStatus{{Workspace: "default", RepoRelDir: "project-a", ProjectName: "a"}}
+	status, err := database.BeginPlanGeneration(pull, selected, "generation-1")
+	Ok(t, err)
+	Equals(t, pull, status.Pull)
+	project := findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, project.Status)
+	Equals(t, "generation-1", project.PlanGeneration)
+
+	status, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{{
+		Command: command.Plan, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+		ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}},
+	}})
+	Ok(t, err)
+	project = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.PlannedPlanStatus, project.Status)
+	Equals(t, "", project.PlanGeneration)
+}
+
 func TestPlanGenerationInvalidationPreservesUnrelatedProjectsAndRejectsStaleCompletion(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	Ok(t, err)

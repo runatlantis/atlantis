@@ -564,7 +564,11 @@ func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, projects []models.
 		bucket := tx.Bucket(b.pullsBucketName)
 		currStatus, err := b.getPullFromBucket(bucket, key)
 		if err != nil {
-			return err
+			// A new plan generation replaces authorization state rather than
+			// relying on an unreadable prior record. Keep the new generation
+			// non-applyable until its matching completion is persisted.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
 		}
 		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 			newStatus = models.PullStatus{Pull: pull}

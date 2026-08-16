@@ -18,10 +18,12 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	miniredisserver "github.com/alicebob/miniredis/v2/server"
 	"github.com/pkg/errors"
 	redisLib "github.com/redis/go-redis/v9"
 	"github.com/runatlantis/atlantis/server/core/redis"
@@ -1422,6 +1424,111 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Assert(t, got != nil, "expected non-nil pull status")
 	Equals(t, 1, len(got.Projects))
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+}
+
+func TestBeginPlanGenerationOverwritesCorruptData(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	key := fmt.Sprintf("%s::%s::%d", pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	Ok(t, mr.Set(key, `{"Projects":[{"PolicyStatus":[{"Approvals":2}]}]}`))
+
+	selected := []models.ProjectStatus{{Workspace: "default", RepoRelDir: "project-a", ProjectName: "a"}}
+	status, err := database.BeginPlanGeneration(pull, selected, "generation-1")
+	Ok(t, err)
+	Equals(t, pull, status.Pull)
+	project := findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, project.Status)
+	Equals(t, "generation-1", project.PlanGeneration)
+
+	status, err = database.CompletePlanGeneration(pull, "generation-1", []command.ProjectResult{{
+		Command: command.Plan, Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+		ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}},
+	}})
+	Ok(t, err)
+	project = findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.PlannedPlanStatus, project.Status)
+	Equals(t, "", project.PlanGeneration)
+}
+
+func TestBeginPlanGenerationRetriesWhenCorruptRawValueChangesBeforeCAS(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		BaseBranch: "main",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	key := fmt.Sprintf("%s::%s::%d", pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	Ok(t, mr.Set(key, `{"Projects":[{"PolicyStatus":[{"Approvals":2}]}]}`))
+	concurrentStatus := models.PullStatus{
+		Pull: pull,
+		Projects: []models.ProjectStatus{{
+			Workspace:   "default",
+			RepoRelDir:  "project-b",
+			ProjectName: "b",
+			Status:      models.PlannedPlanStatus,
+		}},
+	}
+	serializedConcurrent, err := json.Marshal(concurrentStatus)
+	Ok(t, err)
+	var changed atomic.Bool
+	mr.Server().SetPreHook(func(peer *miniredisserver.Peer, cmd string, _ ...string) bool {
+		if cmd != "EVAL" || !changed.CompareAndSwap(false, true) {
+			return false
+		}
+		if err := mr.Set(key, string(serializedConcurrent)); err != nil {
+			peer.WriteError(err.Error())
+			return true
+		}
+		return false
+	})
+
+	status, err := database.BeginPlanGeneration(pull, []models.ProjectStatus{{
+		Workspace:   "default",
+		RepoRelDir:  "project-a",
+		ProjectName: "a",
+	}}, "generation-1")
+
+	Ok(t, err)
+	Assert(t, changed.Load(), "expected the first CAS attempt to race with a raw-value change")
+	projectA := findPlanGenerationProject(t, status, "project-a", "a")
+	Equals(t, models.ErroredPlanStatus, projectA.Status)
+	Equals(t, "generation-1", projectA.PlanGeneration)
+	projectB := findPlanGenerationProject(t, status, "project-b", "b")
+	Equals(t, models.PlannedPlanStatus, projectB.Status)
+	Equals(t, "", projectB.PlanGeneration)
+}
+
+func TestBeginPlanGenerationReturnsRedisErrors(t *testing.T) {
+	mr := miniredis.RunT(t)
+	database := newTestRedis(mr)
+	t.Cleanup(func() { database.Close() })
+	mr.SetError("LOADING backend unavailable")
+
+	_, err := database.BeginPlanGeneration(models.PullRequest{
+		Num: 1,
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}, []models.ProjectStatus{{Workspace: "default", RepoRelDir: "project-a"}}, "generation-1")
+	Assert(t, err != nil, "expected Redis backend error")
+	Assert(t, strings.Contains(err.Error(), "backend unavailable"), "expected backend error to be retained, got %v", err)
 }
 
 func TestPlanGenerationInvalidationPreservesUnrelatedProjectsAndRejectsStaleCompletion(t *testing.T) {
