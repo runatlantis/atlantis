@@ -1,0 +1,19 @@
+runatlantis.io/contributing/events-controller.md
+  s_0054a5ac358e80::t_06522c185c3c33 89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "dbc6c3ad3832f83291f97b179eaa3177f3f403dc",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
