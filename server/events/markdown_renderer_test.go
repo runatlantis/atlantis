@@ -3601,7 +3601,7 @@ $$$diff
 tf out
 $$$
 
-This plan was not saved because one or more projects failed and automerge requires all plans pass.
+This plan was made non-applyable because one or more projects failed and automerge requires all plans pass.
 
 ---
 ### Plan Summary

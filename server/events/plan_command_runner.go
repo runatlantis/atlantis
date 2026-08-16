@@ -11,6 +11,7 @@ import (
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -112,13 +113,17 @@ type PlanCommandRunner struct {
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
-	if !ok {
+	publicationToken, err := p.acquirePlanPublicationClaim(ctx)
+	if err != nil {
+		return
+	}
+	unlockPullPlan, lockErr := p.lockPullForPlan(ctx)
+	if lockErr != nil {
+		p.finishPlanPublicationClaim(ctx, publicationToken, p.handleNoProjectPlanStateError(ctx, AutoplanCommand{}, lockErr))
 		return
 	}
 	defer unlockPullPlan()
 
-	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
 		// On error we continue the request with mergeable assumed false.
@@ -130,10 +135,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
 	if err != nil {
-		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err})
+		p.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+			p.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, command.Plan),
+			p.pullUpdater.updatePull(ctx, AutoplanCommand{}, command.Result{Error: err}),
+		))
 		return
 	}
 
@@ -141,78 +146,82 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	if len(projectCmds) == 0 {
 		ctx.Log.Info("determined there was no project to run plan in")
-		if _, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull); err != nil {
-			p.handleNoProjectPlanStateError(ctx, AutoplanCommand{}, err)
+		beginResult, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull, publicationToken)
+		if err != nil {
+			p.finishPlanPublicationClaim(ctx, publicationToken, p.handleNoProjectPlanStateError(ctx, AutoplanCommand{}, err))
 			return
 		}
+		ctx.PullStatus = &beginResult.PullStatus
+		var publicationErrors []error
 		if !p.silenceVCSStatusNoPlans && !p.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects planned/policy_checked/applied successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
-			if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
+			publicationErrors = append(publicationErrors,
+				p.publishCancelledPlanStatuses(cancelledPlanProjectContexts(ctx, beginResult.Canceled)),
+				p.updateNoProjectCommitStatuses(ctx, beginResult.PullStatus),
+			)
 		} else {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
+		p.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(publicationErrors...))
 		return
 	}
-	preexistingPlanLocks := p.snapshotExistingPlanLocks(ctx, projectCmds)
-	planGeneration, _, err := p.dbUpdater.beginPlanGeneration(pull, projectCmds)
+	planGeneration, beginResult, err := p.dbUpdater.beginPlanGeneration(pull, projectCmds, true, publicationToken)
 	if err != nil {
-		p.handlePlanGenerationStartError(ctx, AutoplanCommand{}, err)
-		return
-	}
-	p.updatePendingCommitStatus(ctx, command.Plan)
-
-	// discard previous plans that might not be relevant anymore
-	ctx.Log.Debug("deleting previous plans and locks")
-	if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-		p.handlePlanGenerationCompletionError(
-			ctx,
-			AutoplanCommand{},
-			fmt.Errorf("deleting previous plans and locks after starting plan generation: %w", err),
-			planGeneration,
-			projectCmds,
-			preexistingPlanLocks,
+		publicationErr := errors.Join(
+			p.publishPlanGenerationStartFailureStatuses(projectCmds, err),
+			p.handlePlanGenerationStartError(ctx, AutoplanCommand{}, err),
 		)
+		p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr)
 		return
 	}
-	// Any on-plan lock that existed before this generic/autoplan command was
-	// removed above. A lock present after the plan steps is therefore owned by
-	// this generation and is safe to clean on a failed final write.
-	preexistingPlanLocks = make(map[string]bool)
+	publicationErr := errors.Join(
+		p.publishPendingPlanStatuses(projectCmds),
+		p.publishCancelledPlanStatuses(cancelledPlanProjectContexts(ctx, beginResult.Canceled)),
+		p.updatePendingCommitStatus(ctx, command.Plan),
+	)
+	if !p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr) {
+		return
+	}
+	prepareProjectCommandsForPlanGeneration(projectCmds, planGeneration)
+	prepareProjectCommandsForPlanGeneration(policyCheckCmds, planGeneration)
 
+	// Do not delete deterministic plan-store artifacts or same-pull plan locks
+	// after BeginPlanGeneration. A newer generation on another replica may
+	// already own them; durable status and the accepted artifact hash invalidate
+	// the previous generation without destructive cleanup.
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	result = completePlanGenerationResults(projectCmds, result)
+	result = invalidateAutomergePlanResults(result, p.autoMerger.automergeEnabled(projectCmds))
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
-	}
-
-	pullStatus, err := p.dbUpdater.completePlanGeneration(ctx.Pull, planGeneration, result.ProjectResults)
+	publicationToken, err = p.waitForPlanPublicationClaim(ctx)
 	if err != nil {
-		p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus)
-		p.handlePlanGenerationCompletionError(ctx, AutoplanCommand{}, err, planGeneration, projectCmds, preexistingPlanLocks)
+		p.completeUnpublishedPlanJobs(projectCmds, result, "Atlantis could not claim the durable publication boundary for this completed plan. Run `atlantis plan` again.")
 		return
 	}
-	p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
-
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
-	p.updateCommitStatus(ctx, pullStatus, command.Plan)
-	p.updateCommitStatus(ctx, pullStatus, command.Apply)
+	pullStatus, err := p.dbUpdater.completePlanGeneration(ctx.Pull, planGeneration, result.ProjectResults, publicationToken)
+	if err != nil {
+		if db.IsPlanGenerationObsolete(err) {
+			p.finishPlanPublicationClaim(ctx, publicationToken, nil)
+			p.handleSupersededPlanGeneration(ctx, planGeneration, projectCmds, result, err)
+			return
+		}
+		publicationErr = errors.Join(
+			p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus),
+			p.handlePlanGenerationCompletionError(ctx, AutoplanCommand{}, err),
+		)
+		p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr)
+		return
+	}
+	ctx.PullStatus = &pullStatus
+	publicationErr = errors.Join(
+		p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus),
+		p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result),
+		p.updateCommitStatus(ctx, pullStatus, command.Plan),
+		p.updateCommitStatus(ctx, pullStatus, command.Apply),
+	)
+	if !p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr) {
+		return
+	}
 
 	// Check if there are any planned projects and if there are any errors or if plans are being deleted
 	if len(policyCheckCmds) > 0 &&
@@ -234,8 +243,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, cmd)
-	if !ok {
+	publicationToken, err := p.acquirePlanPublicationClaim(ctx)
+	if err != nil {
+		return
+	}
+	unlockPullPlan, lockErr := p.lockPullForPlan(ctx)
+	if lockErr != nil {
+		p.finishPlanPublicationClaim(ctx, publicationToken, p.handleNoProjectPlanStateError(ctx, cmd, lockErr))
 		return
 	}
 	defer unlockPullPlan()
@@ -251,34 +265,40 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
 	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, command.Plan, err) {
+		p.finishPlanPublicationClaim(ctx, publicationToken, nil)
 		return
 	}
 
 	if p.DiscardApprovalOnPlan {
 		if discardErr := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); discardErr != nil {
 			ctx.Log.Err("failed to remove approvals: %s", discardErr)
+			ctx.CommandHasErrors = true
+			p.finishPlanPublicationClaim(ctx, publicationToken, fmt.Errorf("discarding pull request approvals: %w", discardErr))
+			return
 		}
 	}
 
 	if err != nil {
-		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		p.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+			p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan),
+			p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err}),
+		))
 		return
 	}
 
-	var noProjectPullStatus *models.PullStatus
+	var noProjectBeginResult *db.PlanGenerationBeginResult
 	if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		ctx.Log.Info("determined there was no project to run plan in")
-		pullStatus, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull)
+		beginResult, err := p.clearPlansAndPullStatusForNoProjects(ctx, pull, publicationToken)
 		if err != nil {
-			p.handleNoProjectPlanStateError(ctx, cmd, err)
+			p.finishPlanPublicationClaim(ctx, publicationToken, p.handleNoProjectPlanStateError(ctx, cmd, err))
 			return
 		}
-		noProjectPullStatus = &pullStatus
+		ctx.PullStatus = &beginResult.PullStatus
+		noProjectBeginResult = &beginResult
 	}
 	if len(projectCmds) == 0 && p.SilenceNoProjects {
+		var publicationErrors []error
 		if cmd.IsForSpecificProject() {
 			ctx.Log.Info("determined there was no project to run plan in")
 		}
@@ -288,6 +308,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 				pullStatus, err := p.pullStatusFetcher.GetPullStatus(pull)
 				if err != nil {
 					ctx.Log.Warn("unable to fetch pull status: %s", err)
+					p.finishPlanPublicationClaim(ctx, publicationToken, err)
 					return
 				}
 				if pullStatus == nil {
@@ -295,111 +316,118 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 					ctx.Log.Debug("setting VCS status to 0/0 success as no previous state was found")
 					if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
 						ctx.Log.Warn("unable to update commit status: %s", err)
+						publicationErrors = append(publicationErrors, err)
 					}
+					p.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(publicationErrors...))
 					return
 				}
 				ctx.Log.Debug("resetting VCS status")
-				p.updateCommitStatus(ctx, *pullStatus, command.Plan)
+				publicationErrors = append(publicationErrors, p.updateCommitStatus(ctx, *pullStatus, command.Plan))
 			} else {
-				// With a generic plan, we set successful commit statuses
-				// with 0/0 projects planned successfully because some users require
-				// the Atlantis status to be passing for all pull requests.
-				// Does not apply to skipped runs for specific projects
-				ctx.Log.Debug("setting VCS status to success with no projects found")
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
-				if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
+				publicationErrors = append(publicationErrors,
+					p.publishCancelledPlanStatuses(cancelledPlanProjectContexts(ctx, noProjectBeginResult.Canceled)),
+					p.updateNoProjectCommitStatuses(ctx, noProjectBeginResult.PullStatus),
+				)
 			}
 		} else {
 			// When silence is enabled and no projects are found, don't set any status
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
+		p.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(publicationErrors...))
 		return
 	}
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
 	var planGeneration string
-	var preexistingPlanLocks map[string]bool
 	if len(projectCmds) > 0 {
-		preexistingPlanLocks = p.snapshotExistingPlanLocks(ctx, projectCmds)
-		planGeneration, _, err = p.dbUpdater.beginPlanGeneration(pull, projectCmds)
+		var beginResult db.PlanGenerationBeginResult
+		planGeneration, beginResult, err = p.dbUpdater.beginPlanGeneration(pull, projectCmds, !cmd.IsForSpecificProject(), publicationToken)
 		if err != nil {
-			p.handlePlanGenerationStartError(ctx, cmd, err)
-			return
-		}
-		p.updatePendingCommitStatus(ctx, command.Plan)
-	}
-
-	// if the plan is generic, new plans will be generated based on changes
-	// discard previous plans that might not be relevant anymore
-	if !cmd.IsForSpecificProject() && len(projectCmds) > 0 {
-		ctx.Log.Debug("deleting previous plans and locks")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			p.handlePlanGenerationCompletionError(
-				ctx,
-				cmd,
-				fmt.Errorf("deleting previous plans and locks after starting plan generation: %w", err),
-				planGeneration,
-				projectCmds,
-				preexistingPlanLocks,
+			publicationErr := errors.Join(
+				p.publishPlanGenerationStartFailureStatuses(projectCmds, err),
+				p.handlePlanGenerationStartError(ctx, cmd, err),
 			)
+			p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr)
 			return
 		}
-		preexistingPlanLocks = make(map[string]bool)
+		publicationErr := errors.Join(
+			p.publishPendingPlanStatuses(projectCmds),
+			p.publishCancelledPlanStatuses(cancelledPlanProjectContexts(ctx, beginResult.Canceled)),
+			p.updatePendingCommitStatus(ctx, command.Plan),
+		)
+		if !p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr) {
+			return
+		}
+		publicationToken = ""
+		prepareProjectCommandsForPlanGeneration(projectCmds, planGeneration)
+		prepareProjectCommandsForPlanGeneration(policyCheckCmds, planGeneration)
 	}
 
+	// Cleanup after generation begin is intentionally non-destructive. Another
+	// replica can supersede this command while sharing its plan-store key and
+	// same-pull project lock.
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	result = completePlanGenerationResults(projectCmds, result)
+	result = invalidateAutomergePlanResults(result, p.autoMerger.automergeEnabled(projectCmds))
 	ctx.CommandHasErrors = result.HasErrors()
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
-		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
-		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
-			ctx.Log.Err("deleting pending plans: %s", err)
-		}
-		result.PlansDeleted = true
-	}
-
 	var pullStatus models.PullStatus
-	if noProjectPullStatus != nil {
-		pullStatus = *noProjectPullStatus
+	if noProjectBeginResult != nil {
+		pullStatus = noProjectBeginResult.PullStatus
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
 	} else if len(projectCmds) == 0 {
 		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	} else {
-		pullStatus, err = p.dbUpdater.completePlanGeneration(pull, planGeneration, result.ProjectResults)
+		publicationToken, err = p.waitForPlanPublicationClaim(ctx)
+		if err != nil {
+			p.completeUnpublishedPlanJobs(projectCmds, result, "Atlantis could not claim the durable publication boundary for this completed plan. Run `atlantis plan` again.")
+			return
+		}
+		pullStatus, err = p.dbUpdater.completePlanGeneration(pull, planGeneration, result.ProjectResults, publicationToken)
 	}
 	if err != nil {
-		p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus)
-		p.handlePlanGenerationCompletionError(ctx, cmd, err, planGeneration, projectCmds, preexistingPlanLocks)
+		if db.IsPlanGenerationObsolete(err) {
+			if publicationToken != "" {
+				p.finishPlanPublicationClaim(ctx, publicationToken, nil)
+			}
+			p.handleSupersededPlanGeneration(ctx, planGeneration, projectCmds, result, err)
+			return
+		}
+		publicationErr := errors.Join(
+			p.publishDeferredPlanStatuses(projectCmds, result, models.FailedCommitStatus),
+			p.handlePlanGenerationCompletionError(ctx, cmd, err),
+		)
+		if publicationToken != "" {
+			p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr)
+		}
 		return
 	}
-	p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
-
-	p.pullUpdater.updatePull(ctx, cmd, result)
-	p.updateCommitStatus(ctx, pullStatus, command.Plan)
-	p.updateCommitStatus(ctx, pullStatus, command.Apply)
+	ctx.PullStatus = &pullStatus
+	commitStatusErr := errors.Join(
+		p.updateCommitStatus(ctx, pullStatus, command.Plan),
+		p.updateCommitStatus(ctx, pullStatus, command.Apply),
+	)
+	if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
+		commitStatusErr = errors.Join(
+			p.publishCancelledPlanStatuses(cancelledPlanProjectContexts(ctx, noProjectBeginResult.Canceled)),
+			p.updateNoProjectCommitStatuses(ctx, pullStatus),
+		)
+	}
+	publicationErr := errors.Join(
+		p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus),
+		p.pullUpdater.updatePull(ctx, cmd, result),
+		commitStatusErr,
+	)
+	if publicationToken != "" && !p.finishPlanPublicationClaim(ctx, publicationToken, publicationErr) {
+		return
+	}
 
 	// Runs policy checks step after all plans are successful.
 	// This step does not approve any policies that require approval.
 	if len(result.ProjectResults) > 0 &&
-		(!result.HasErrors() && !result.PlansDeleted) {
+		len(policyCheckCmds) > 0 && (!result.HasErrors() && !result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
-	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
-		// If there were no projects modified, we set successful commit statuses
-		// with 0/0 projects planned/policy_checked/applied successfully because some users require
-		// the Atlantis status to be passing for all pull requests.
-		ctx.Log.Debug("setting VCS status to success with no projects found")
-		if err := p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
-			ctx.Log.Warn("unable to update commit status: %s", err)
-		}
 	}
 }
 
@@ -411,147 +439,130 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) (models.PullStatus, error) {
-	pullStatus, err := p.dbUpdater.replaceDB(ctx, pull, nil)
+func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest, claimToken string) (db.PlanGenerationBeginResult, error) {
+	_, beginResult, err := p.dbUpdater.beginPlanGeneration(pull, nil, true, claimToken)
 	if err != nil {
-		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
+		return db.PlanGenerationBeginResult{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
-	// Keep any filesystem artifacts. Another replica can begin a generation
-	// immediately after the durable replacement, and this process has no atomic
-	// way to prove a discovered plan still belongs to the replaced state.
-	return pullStatus, nil
+	// Retain discarded project tombstones along with any filesystem artifacts.
+	// Another replica can begin a generation immediately after this durable
+	// replacement, and this process has no atomic way to prove a discovered plan
+	// still belongs to the replaced state. Generic apply deliberately ignores
+	// artifacts whose matching durable project status is already non-applyable.
+	return beginResult, nil
 }
 
-func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullCommand) (func(), bool) {
+func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context) (func(), error) {
 	if p.workingDirLocker == nil {
-		return func() {}, true
+		return func() {}, nil
 	}
 	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
-		p.handleNoProjectPlanStateError(ctx, cmd, err)
-		return nil, false
+		return nil, err
 	}
-	return unlockFn, true
+	return unlockFn, nil
 }
 
-func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {
+func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) error {
 	ctx.CommandHasErrors = true
+	var publicationErrors []error
 	if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 		ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		publicationErrors = append(publicationErrors, statusErr)
 	}
-	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+	publicationErrors = append(publicationErrors, p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err}))
+	return errors.Join(publicationErrors...)
 }
 
-func (p *PlanCommandRunner) handlePlanResultPersistenceError(ctx *command.Context, cmd PullCommand, err error) {
+func (p *PlanCommandRunner) handlePlanResultPersistenceError(ctx *command.Context, cmd PullCommand, err error) error {
 	persistenceErr := fmt.Errorf("persisting plan results: %w", err)
 	ctx.CommandHasErrors = true
+	var publicationErrors []error
 	if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
 		ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		publicationErrors = append(publicationErrors, statusErr)
 	}
 	if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
 		ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		publicationErrors = append(publicationErrors, statusErr)
 	}
-	p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: persistenceErr})
+	publicationErrors = append(publicationErrors, p.pullUpdater.updatePull(ctx, cmd, command.Result{Error: persistenceErr}))
+	return errors.Join(publicationErrors...)
 }
 
-func (p *PlanCommandRunner) handlePlanGenerationStartError(ctx *command.Context, cmd PullCommand, err error) {
-	p.handlePlanResultPersistenceError(ctx, cmd, fmt.Errorf("invalidating previous plan state before planning: %w", err))
+func (p *PlanCommandRunner) handlePlanGenerationStartError(ctx *command.Context, cmd PullCommand, err error) error {
+	return p.handlePlanResultPersistenceError(ctx, cmd, fmt.Errorf("invalidating previous plan state before planning: %w", err))
 }
 
 func (p *PlanCommandRunner) handlePlanGenerationCompletionError(
 	ctx *command.Context,
 	cmd PullCommand,
 	err error,
-	generation string,
-	projectCmds []command.ProjectContext,
-	preexistingPlanLocks map[string]bool,
-) {
-	if cleanupErr := p.cleanupFailedPlanGeneration(ctx, generation, projectCmds, preexistingPlanLocks); cleanupErr != nil {
-		err = errors.Join(err, fmt.Errorf("cleaning failed plan generation: %w", cleanupErr))
-	}
-	p.handlePlanResultPersistenceError(ctx, cmd, err)
+) error {
+	return p.handlePlanResultPersistenceError(ctx, cmd, err)
 }
 
-func (p *PlanCommandRunner) snapshotExistingPlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) map[string]bool {
-	preexisting := make(map[string]bool)
-	for _, projectCtx := range projectCmds {
-		if projectCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
-			continue
-		}
-		lockKey := GenerateLockID(projectCtx)
-		if _, seen := preexisting[lockKey]; seen {
-			continue
-		}
-		lock, err := p.lockingLocker.GetLock(lockKey)
-		if err != nil {
-			ctx.Log.Warn("unable to inspect plan lock %q before planning; it will not be cleaned automatically, %v", lockKey, err)
-			preexisting[lockKey] = true
-			continue
-		}
-		preexisting[lockKey] = lock != nil
+func (p *PlanCommandRunner) acquirePlanPublicationClaim(ctx *command.Context) (string, error) {
+	token, err := p.dbUpdater.acquirePlanPublicationClaim(ctx.Pull)
+	if err == nil {
+		return token, nil
 	}
-	return preexisting
+	ctx.CommandHasErrors = true
+	ctx.Log.Err("acquiring plan publication claim: %s", err)
+	return "", err
 }
 
-func (p *PlanCommandRunner) cleanupFailedPlanGeneration(
+func (p *PlanCommandRunner) waitForPlanPublicationClaim(ctx *command.Context) (string, error) {
+	token, err := p.dbUpdater.waitForPlanPublicationClaim(ctx.Pull)
+	if err == nil {
+		return token, nil
+	}
+	ctx.CommandHasErrors = true
+	ctx.Log.Err("waiting for plan publication claim: %s", err)
+	return "", err
+}
+
+// finishPlanPublicationClaim releases only after every synchronous VCS write
+// returned success. An error may be ambiguous at the provider boundary, so
+// retaining the non-expiring claim is the fail-closed choice until pull close
+// recovery confirms the old publisher has stopped.
+func (p *PlanCommandRunner) finishPlanPublicationClaim(ctx *command.Context, token string, publicationErr error) bool {
+	if publicationErr != nil {
+		ctx.CommandHasErrors = true
+		ctx.Log.Err("publishing plan state; publication claim retained for offline recovery: %s", publicationErr)
+		return false
+	}
+	if err := p.dbUpdater.releasePlanPublicationClaim(ctx.Pull, token); err != nil {
+		ctx.CommandHasErrors = true
+		ctx.Log.Err("releasing plan publication claim: %s", err)
+		return false
+	}
+	return true
+}
+
+func (p *PlanCommandRunner) handleSupersededPlanGeneration(
 	ctx *command.Context,
 	generation string,
 	projectCmds []command.ProjectContext,
-	preexistingPlanLocks map[string]bool,
-) error {
-	pullStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
-	if err != nil {
-		return fmt.Errorf("checking current plan generation before cleanup: %w", err)
-	}
-	if pullStatus == nil {
-		return errors.New("checking current plan generation before cleanup: pull status is missing")
-	}
-
-	var cleanupErrors []error
-	cleanedPlans := make(map[applyPlanKey]bool)
-	cleanedLocks := make(map[string]bool)
-	for _, projectCtx := range projectCmds {
-		projectStatus := findProjectInPullStatus(pullStatus, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
-		if projectStatus == nil || projectStatus.Status != models.ErroredPlanStatus || projectStatus.PlanGeneration != generation {
-			continue
-		}
-
-		projectKey := newApplyPlanKey(projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName)
-		if hasAtlantisManagedPlanStep(projectCtx.Steps) && !cleanedPlans[projectKey] {
-			cleanedPlans[projectKey] = true
-			if err := p.workingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, projectCtx.Workspace, projectCtx.RepoRelDir, projectCtx.ProjectName); err != nil {
-				cleanupErrors = append(cleanupErrors, fmt.Errorf("deleting managed plan for dir %q workspace %q project %q: %w", projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName, err))
-			}
-		}
-
-		if projectCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
-			continue
-		}
-		lockKey := GenerateLockID(projectCtx)
-		if cleanedLocks[lockKey] || preexistingPlanLocks[lockKey] {
-			continue
-		}
-		cleanedLocks[lockKey] = true
-		project := models.NewProject(projectCtx.BaseRepo.FullName, projectCtx.RepoRelDir, projectCtx.ProjectName)
-		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projectCtx.Workspace, lockKey); err != nil {
-			cleanupErrors = append(cleanupErrors, err)
-		}
-	}
-	return errors.Join(cleanupErrors...)
-}
-
-func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
-	for _, step := range steps {
-		if step.StepName == "plan" {
-			return true
-		}
-	}
-	return false
+	result command.Result,
+	err error,
+) {
+	ctx.Log.Info("plan generation %q was superseded by a newer generation; ignoring obsolete results", generation)
+	ctx.CommandHasErrors = false
+	// Never mutate project VCS contexts from the obsolete command. Any
+	// read-before-publish classification has another race with a still newer
+	// generation. Durable cancellation is reflected by the current runner's
+	// aggregate status; this stale runner only closes its job stream.
+	p.completeSupersededPlanJobs(projectCmds, result)
 }
 
 func completePlanGenerationResults(projectCmds []command.ProjectContext, result command.Result) command.Result {
 	completed := make(map[applyPlanKey]struct{}, len(result.ProjectResults))
-	for _, projectResult := range result.ProjectResults {
+	for i := range result.ProjectResults {
+		projectResult := &result.ProjectResults[i]
+		if projectResult.Command == command.Plan && projectResult.Error == nil && projectResult.Failure == "" && projectResult.PlanSuccess == nil {
+			projectResult.Error = errors.New("plan command completed without a plan result")
+		}
 		completed[newApplyPlanKey(projectResult.Workspace, projectResult.RepoRelDir, projectResult.ProjectName)] = struct{}{}
 	}
 
@@ -576,32 +587,143 @@ func completePlanGenerationResults(projectCmds []command.ProjectContext, result 
 	return result
 }
 
-func (p *PlanCommandRunner) publishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func prepareProjectCommandsForPlanGeneration(projectCmds []command.ProjectContext, generation string) {
+	for i := range projectCmds {
+		projectCmds[i].PlanGeneration = generation
+		projectCmds[i].AcceptedPlanGeneration = generation
+		if !projectCmds[i].RequiresAtlantisManagedPlanFile {
+			continue
+		}
+		managedPlanHash := ""
+		projectCmds[i].GeneratedPlanHash = &managedPlanHash
+	}
+}
+
+func invalidateAutomergePlanResults(result command.Result, automergeEnabled bool) command.Result {
+	if !automergeEnabled || !result.HasErrors() {
+		return result
+	}
+	for i := range result.ProjectResults {
+		projectResult := &result.ProjectResults[i]
+		if projectResult.Command != command.Plan || projectResult.Error != nil || projectResult.Failure != "" {
+			continue
+		}
+		projectResult.Failure = "plan invalidated because one or more projects failed and automerge requires all plans to succeed"
+	}
+	result.PlansDeleted = true
+	return result
+}
+
+func (p *PlanCommandRunner) publishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+}
+
+func (p *PlanCommandRunner) publishPendingPlanStatuses(projectCmds []command.ProjectContext) error {
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishPendingPlanStatuses(projectCmds)
+}
+
+func (p *PlanCommandRunner) publishCancelledPlanStatuses(projectCmds []command.ProjectContext) error {
+	if len(projectCmds) == 0 {
+		return nil
+	}
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishCancelledPlanStatuses(projectCmds)
+}
+
+func (p *PlanCommandRunner) publishPlanGenerationStartFailureStatuses(projectCmds []command.ProjectContext, err error) error {
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishPlanGenerationStartFailureStatuses(projectCmds, err)
+}
+
+func (p *PlanCommandRunner) completeSupersededPlanJobs(projectCmds []command.ProjectContext, result command.Result) {
 	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
 	if !ok {
 		return
 	}
-	publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+	publisher.CompleteSupersededPlanJobs(projectCmds, result)
+}
+
+func (p *PlanCommandRunner) completeUnpublishedPlanJobs(projectCmds []command.ProjectContext, result command.Result, message string) {
+	publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.CompleteUnpublishedPlanJobs(projectCmds, result, message)
+}
+
+func cancelledPlanProjectContexts(ctx *command.Context, projects []db.PlanGenerationProject) []command.ProjectContext {
+	contexts := make([]command.ProjectContext, 0, len(projects))
+	for _, project := range projects {
+		contexts = append(contexts, command.ProjectContext{
+			Log:         ctx.Log,
+			CommandName: command.Plan,
+			BaseRepo:    ctx.Pull.BaseRepo,
+			Pull:        ctx.Pull,
+			Workspace:   project.Workspace,
+			RepoRelDir:  project.RepoRelDir,
+			ProjectName: project.ProjectName,
+		})
+	}
+	return contexts
 }
 
 func (p *PlanCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
 	return MarkCommandSkippedIfIgnoredTarget(ctx, command.Plan, cmd, p.prjCmdBuilder)
 }
 
-func (p *PlanCommandRunner) updatePendingCommitStatus(ctx *command.Context, commandName command.Name) {
+func (p *PlanCommandRunner) updatePendingCommitStatus(ctx *command.Context, commandName command.Name) error {
 	if p.silenceVCSStatusNoProjects {
 		ctx.Log.Debug("silence enabled - not setting pending VCS status")
-		return
+		return nil
 	}
 	if err := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, commandName); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
+		return err
 	}
+	return nil
 }
 
-func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, commandName command.Name) {
+func (p *PlanCommandRunner) updateNoProjectCommitStatuses(ctx *command.Context, pullStatus models.PullStatus) error {
+	activeProjects := countActivePullStatusProjects(pullStatus)
+	if activeProjects == 0 {
+		ctx.Log.Debug("setting VCS status to success with no active projects found")
+		return errors.Join(
+			p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Plan, models.ProjectCounts{}),
+			p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}),
+			p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}),
+		)
+	}
+
+	// Replacing with no projects can cancel a plan that is still running on
+	// another replica. Those canceled projects are terminal plan errors, not a
+	// successful 0/0 plan.
+	counts := models.ProjectCounts{Total: activeProjects, Errored: activeProjects}
+	return errors.Join(
+		p.updateCommitStatus(ctx, pullStatus, command.Plan),
+		p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck, counts),
+		p.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply, counts),
+	)
+}
+
+func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus, commandName command.Name) error {
 	var numSuccess int
 	var numErrored int
 	var numNoChanges int
+	numProjects := countActivePullStatusProjects(pullStatus)
 	status := models.SuccessCommitStatus
 
 	switch commandName {
@@ -618,7 +740,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		// generation as a plan success.
 		// For example, if there is an apply error, that means that at least a
 		// plan was generated successfully.
-		numSuccess = len(pullStatus.Projects) - numErrored - numPending
+		numSuccess = numProjects - numErrored - numPending
 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
@@ -632,7 +754,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
-		} else if numSuccess < len(pullStatus.Projects) {
+		} else if numSuccess < numProjects {
 			// When there are planned changes that haven't been applied yet:
 			// - GitLab: Set status to pending if PendingApplyStatus is enabled
 			//           This prevents MR merging until all applies complete
@@ -646,7 +768,7 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 					ctx.Log.Warn("Flag --pending-apply-status is not yet supported by your VCS. Pipeline status will not be marked as pending")
 				}
 				// Otherwise, status remains SuccessCommitStatus (no update needed)
-				return
+				return nil
 			}
 		}
 	}
@@ -657,10 +779,16 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		ctx.Pull,
 		status,
 		commandName,
-		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
+		models.ProjectCounts{Success: numSuccess, Total: numProjects, Errored: numErrored, NoChanges: numNoChanges},
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
+		return err
 	}
+	return nil
+}
+
+func countActivePullStatusProjects(pullStatus models.PullStatus) int {
+	return len(pullStatus.Projects) - pullStatus.StatusCount(models.DiscardedPlanStatus)
 }
 
 // deletePlans deletes all plans generated in this ctx.

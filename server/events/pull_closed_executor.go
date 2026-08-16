@@ -6,13 +6,16 @@ package events
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -72,25 +75,49 @@ func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 }
 
 // CleanUpPull cleans up after a closed pull request.
-func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
-	pullStatus, err := p.Database.GetPullStatus(pull)
+func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (cleanupErr error) {
+	publicationToken := uuid.NewString()
+	for {
+		err := p.Database.AcquirePlanPublicationClaim(pull, publicationToken)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, db.ErrPlanPublicationBusy) {
+			return fmt.Errorf("claiming pull cleanup publication boundary: %w", err)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	claimActive := true
+	retainClaim := false
+	defer func() {
+		if !claimActive {
+			return
+		}
+		if retainClaim {
+			logger.Warn("retaining pull cleanup publication claim after ambiguous final comment publication")
+			return
+		}
+		if err := p.Database.ReleasePlanPublicationClaim(pull, publicationToken); err != nil {
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("releasing pull cleanup publication boundary: %w", err))
+		}
+	}()
+
+	closeGeneration := uuid.NewString()
+	closedStatus, err := p.Database.BeginPlanGenerationReplacing(pull, nil, closeGeneration, publicationToken)
 	if err != nil {
-		// Log and continue to clean up other resources.
-		logger.Err("retrieving pull status: %s", err)
+		return fmt.Errorf("invalidating durable plans before pull cleanup: %w", err)
 	}
 
-	if pullStatus != nil {
-		for _, project := range pullStatus.Projects {
-			jobContext := jobs.PullInfo{
-				PullNum:      pull.Num,
-				Repo:         pull.BaseRepo.Name,
-				RepoFullName: pull.BaseRepo.FullName,
-				ProjectName:  project.ProjectName,
-				Path:         project.RepoRelDir,
-				Workspace:    project.Workspace,
-			}
-			p.LogStreamResourceCleaner.CleanUp(jobContext)
+	for _, project := range closedStatus.Projects {
+		jobContext := jobs.PullInfo{
+			PullNum:      pull.Num,
+			Repo:         pull.BaseRepo.Name,
+			RepoFullName: pull.BaseRepo.FullName,
+			ProjectName:  project.ProjectName,
+			Path:         project.RepoRelDir,
+			Workspace:    project.Workspace,
 		}
+		p.LogStreamResourceCleaner.CleanUp(jobContext)
 	}
 
 	var workspaceErr error
@@ -118,11 +145,6 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
-	// Delete pull from DB.
-	if err := p.Database.DeletePullStatus(pull); err != nil {
-		logger.Err("deleting pull from db: %s", err)
-	}
-
 	// Clear any operations to avoid unbounded growth.
 	if p.CancellationTracker != nil {
 		p.CancellationTracker.Clear(pull)
@@ -138,7 +160,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
 		return fmt.Errorf("rendering template for comment: %w", err)
 	}
-	return p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), "")
+	if err := p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), ""); err != nil {
+		retainClaim = true
+		return err
+	}
+	return nil
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be

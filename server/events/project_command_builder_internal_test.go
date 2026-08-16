@@ -767,12 +767,10 @@ projects:
 
 					c.expCtx.CommandName = cmd
 					c.expCtx.RequiresAtlantisManagedPlanFile = false
-					if cmd == command.Apply {
-						for _, stepName := range append(append([]string{}, c.expPlanSteps...), c.expApplySteps...) {
-							if stepName == "plan" || stepName == "apply" {
-								c.expCtx.RequiresAtlantisManagedPlanFile = true
-								break
-							}
+					for _, stepName := range append(append([]string{}, c.expPlanSteps...), c.expApplySteps...) {
+						if stepName == "plan" || stepName == "apply" {
+							c.expCtx.RequiresAtlantisManagedPlanFile = true
+							break
 						}
 					}
 					// Init fields we couldn't in our cases map.
@@ -996,7 +994,7 @@ projects:
 					}
 
 					c.expCtx.CommandName = cmd
-					c.expCtx.RequiresAtlantisManagedPlanFile = cmd == command.Apply
+					c.expCtx.RequiresAtlantisManagedPlanFile = true
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
@@ -1242,6 +1240,7 @@ workflows:
 				}
 
 				c.expCtx.CommandName = cmd
+				c.expCtx.RequiresAtlantisManagedPlanFile = true
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
 				ctx.PolicySets = emptyPolicySets
@@ -1787,6 +1786,60 @@ func TestFilterNonConventionRunOnlyPlanArtifacts(t *testing.T) {
 	Equals(t, conventionLookingPath, filtered[1].PlanFilePath)
 	Equals(t, siblingCustomPath, filtered[2].PlanFilePath)
 	Equals(t, otherWorkspaceCustomPath, filtered[3].PlanFilePath)
+}
+
+func TestFilterDurablyInactiveManagedPlanArtifacts(t *testing.T) {
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{Workspace: "default", RepoRelDir: "applied", ProjectName: "applied", Status: models.AppliedPlanStatus},
+			{Workspace: "default", RepoRelDir: "discarded", ProjectName: "discarded", Status: models.DiscardedPlanStatus},
+			{Workspace: "default", RepoRelDir: "no-changes", ProjectName: "no-changes", Status: models.PlannedNoChangesPlanStatus},
+			{Workspace: "default", RepoRelDir: "planned", ProjectName: "planned", Status: models.PlannedPlanStatus},
+			{Workspace: "default", RepoRelDir: "active", ProjectName: "active", Status: models.ErroredPlanStatus, PlanGeneration: "generation-b"},
+		}},
+	}
+	plans := []PendingPlan{
+		{Workspace: "default", RepoRelDir: "applied", ProjectName: "applied"},
+		{Workspace: "default", RepoRelDir: "discarded", ProjectName: "discarded"},
+		{Workspace: "default", RepoRelDir: "no-changes", ProjectName: "no-changes"},
+		{Workspace: "default", RepoRelDir: "planned", ProjectName: "planned"},
+		{Workspace: "default", RepoRelDir: "active", ProjectName: "active"},
+		{Workspace: "default", RepoRelDir: "missing", ProjectName: "missing"},
+	}
+
+	filtered := filterDurablyInactiveManagedPlanArtifacts(ctx, plans)
+
+	Equals(t, 3, len(filtered))
+	Equals(t, "planned", filtered[0].ProjectName)
+	Equals(t, "active", filtered[1].ProjectName)
+	Equals(t, "missing", filtered[2].ProjectName)
+}
+
+func TestRetainedDiscardedArtifactDoesNotPoisonLaterGenericApply(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: pull,
+		PullStatus: &models.PullStatus{
+			Pull: pull,
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: "old", ProjectName: "old", Status: models.DiscardedPlanStatus},
+				{Workspace: "default", RepoRelDir: "current", ProjectName: "current", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{Workspace: "default", RepoRelDir: "old", ProjectName: "old"},
+		{Workspace: "default", RepoRelDir: "current", ProjectName: "current"},
+	}
+
+	filtered := filterDurablyInactiveManagedPlanArtifacts(ctx, plans)
+	err := validatePlansForApplyWithPlanlessProjects(ctx, filtered, false, nil)
+
+	Ok(t, err)
+	Equals(t, 1, len(filtered))
+	Equals(t, "current", filtered[0].ProjectName)
 }
 
 func mustVersion(v string) *version.Version {

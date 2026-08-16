@@ -6,6 +6,7 @@ package runtime_test
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -23,6 +24,51 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+func TestRunStepRunner_ValidatedPlanfileOverrideIsManagedApplyOnly(t *testing.T) {
+	tests := []struct {
+		name        string
+		managedPlan bool
+		expected    string
+	}{
+		{name: "managed run-only apply", managedPlan: true, expected: "accepted-plan\n"},
+		{name: "fully custom workflow", managedPlan: false, expected: "custom-plan\n"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := t.TempDir()
+			conventionPlanPath := filepath.Join(tmpDir, "default.tfplan")
+			validatedPlanPath := filepath.Join(tmpDir, "validated.tfplan")
+			Ok(t, os.WriteFile(conventionPlanPath, []byte("custom-plan"), 0o600))
+			Ok(t, os.WriteFile(validatedPlanPath, []byte("accepted-plan"), 0o400))
+
+			terraformClient := tfclientmocks.NewMockClient()
+			tfVersion, err := version.NewVersion("1.0.0")
+			Ok(t, err)
+			tfDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
+			When(terraformClient.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).ThenReturn(nil)
+			runner := runtime.RunStepRunner{
+				TerraformExecutor:     terraformClient,
+				DefaultTFDistribution: tfDistribution,
+				DefaultTFVersion:      tfVersion,
+			}
+			ctx := command.ProjectContext{
+				Log:                             logging.NewNoopLogger(t),
+				CommandName:                     command.Apply,
+				RequiresAtlantisManagedPlanFile: test.managedPlan,
+				ValidatedPlanFilePath:           validatedPlanPath,
+				Workspace:                       "default",
+			}
+
+			output, err := runner.Run(ctx, nil, `cat "$PLANFILE"`, tmpDir, nil, false, nil, nil)
+
+			Ok(t, err)
+			Equals(t, test.expected, output)
+		})
+	}
+}
 
 func TestRunStepRunner_Run(t *testing.T) {
 	testRegexSecret := regexp.MustCompile(`((?i)Secret:\s")[^"]*`)

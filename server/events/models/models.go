@@ -836,6 +836,12 @@ type ProjectStatus struct {
 	// another Atlantis replica cannot authorize the previous plan while new plan
 	// artifacts are being generated.
 	PlanGeneration string `json:",omitempty"`
+	// ManagedPlanHash is the SHA-256 hash of the convention-managed plan artifact
+	// that completed successfully for this project.
+	ManagedPlanHash string `json:",omitempty"`
+	// AcceptedPlanGeneration identifies the plan generation whose completed
+	// result is currently authoritative for follow-on project commands.
+	AcceptedPlanGeneration string `json:",omitempty"`
 	// PolicyStatus tracks the policy check status for each policy set.
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.

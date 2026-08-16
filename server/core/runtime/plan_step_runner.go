@@ -4,7 +4,10 @@
 package runtime
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,7 +16,6 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 const (
@@ -69,7 +71,7 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	if err != nil {
 		return output, err
 	}
-	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+	if saveErr := p.recordAndSavePlan(ctx, planFile); saveErr != nil {
 		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 	return p.fmtPlanOutput(output, tfVersion), nil
@@ -114,11 +116,40 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	if err != nil {
 		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
 	}
-	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+	if saveErr := p.recordAndSavePlan(ctx, planFile); saveErr != nil {
 		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil
+}
+
+func (p *planStepRunner) recordAndSavePlan(ctx command.ProjectContext, planFile string) error {
+	if ctx.RequiresAtlantisManagedPlanFile {
+		planHash, err := hashPlanFile(planFile)
+		if err != nil {
+			return fmt.Errorf("hashing managed plan: %w", err)
+		}
+		if ctx.GeneratedPlanHash == nil {
+			return fmt.Errorf("recording managed plan hash: hash recorder is not configured")
+		}
+		*ctx.GeneratedPlanHash = planHash
+	}
+
+	return p.PlanStore.Save(ctx, planFile)
+}
+
+func hashPlanFile(planFile string) (string, error) {
+	f, err := os.Open(planFile)
+	if err != nil {
+		return "", fmt.Errorf("opening plan file: %w", err)
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", fmt.Errorf("reading plan file: %w", err)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) []string {
@@ -201,7 +232,7 @@ func (p *planStepRunner) fmtPlanOutput(output string, tfVersion *version.Version
 
 // runRemotePlan runs a terraform command that utilizes the remote operations
 // backend. It watches the command output for the run url to be printed, and
-// then updates the commit status with a link to the run url.
+// then records the run URL for deferred commit status publication.
 // The run url is a link to the Terraform Enterprise UI where the output
 // from the in-progress command can be viewed.
 // cmdArgs is the args to terraform to execute.
@@ -213,13 +244,6 @@ func (p *planStepRunner) runRemotePlan(
 	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
-
-	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := p.CommitStatusUpdater.UpdateProject(ctx, command.Plan, status, url, nil); err != nil {
-			ctx.Log.Err("unable to update status: %s", err)
-		}
-	}
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
@@ -236,25 +260,22 @@ func (p *planStepRunner) runRemotePlan(
 		}
 		lines = append(lines, line.Line)
 
-		// Here we're checking for the run url and updating the status
-		// if found.
+		// Here we're checking for the run URL and recording it for publication
+		// after durable plan-generation completion.
 		if line.Line == lineBeforeRunURL {
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
 			runURL = strings.TrimSpace(line.Line)
-			ctx.Log.Debug("remote run url found, updating commit status")
-			updateStatusF(models.PendingCommitStatus, runURL)
+			if ctx.RemotePlanRunURL != nil {
+				*ctx.RemotePlanRunURL = runURL
+			}
+			ctx.Log.Debug("remote run url found")
 			nextLineIsRunURL = false
 		}
 	}
 
 	ctx.Log.Debug("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
-	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
-	} else {
-		updateStatusF(models.SuccessCommitStatus, runURL)
-	}
 	return output, err
 }
 

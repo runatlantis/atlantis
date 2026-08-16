@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -116,7 +117,104 @@ func TestRun_Success(t *testing.T) {
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
+}
+
+func TestRun_RejectsCommandLocalPlanHashMismatchImmediately(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	Ok(t, os.WriteFile(planPath, []byte("changed-plan"), 0o600))
+	terraform := tfclientmocks.NewMockClient()
+	store := &overwriteOnLoadPlanStore{}
+	o := runtime.ApplyStepRunner{TerraformExecutor: terraform, PlanStore: store}
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
+		ExpectedPlanHash: fmt.Sprintf("%x", sha256.Sum256([]byte("validated-plan"))),
+	}
+
+	_, err := o.Run(ctx, nil, tmpDir, nil)
+
+	Assert(t, err != nil && strings.Contains(err.Error(), "plan file changed"), "got: %v", err)
+	Equals(t, 0, store.loadCalls)
+	terraform.VerifyWasCalled(Never()).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
+}
+
+func TestSnapshotValidatedPlanRejectsChangedSource(t *testing.T) {
+	planPath := filepath.Join(t.TempDir(), "default.tfplan")
+	Ok(t, os.WriteFile(planPath, []byte("newer-plan"), 0o600))
+
+	snapshotPath, err := runtime.SnapshotValidatedPlan(planPath, fmt.Sprintf("%x", sha256.Sum256([]byte("accepted-plan"))))
+
+	Assert(t, err != nil && strings.Contains(err.Error(), "changed before snapshot"), "got: %v", err)
+	Equals(t, "", snapshotPath)
+}
+
+func TestRun_ExternalOverwriteAfterValidationCannotReplaceExecutedPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := t.TempDir()
+	planPath := filepath.Join(tmpDir, "workspace.tfplan")
+	validatedPlan := []byte("validated-local-plan")
+	externalOverwrite := []byte("newer-external-plan")
+	Ok(t, os.WriteFile(planPath, validatedPlan, 0o600))
+	store := &overwriteOnLoadPlanStore{}
+	executionReady := make(chan struct{})
+	overwriteComplete := make(chan struct{})
+	overwriteErr := make(chan error, 1)
+	go func() {
+		<-executionReady
+		overwriteErr <- os.WriteFile(planPath, externalOverwrite, 0o600)
+		close(overwriteComplete)
+	}()
+
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
+		ExpectedPlanHash: fmt.Sprintf("%x", sha256.Sum256(validatedPlan)),
+	}
+	var executedPlan []byte
+	var executionPlanPath string
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = strings.Trim(args[len(args)-1], `"`)
+			close(executionReady)
+			<-overwriteComplete
+			if err := <-overwriteErr; err != nil {
+				return []ReturnValue{"", err}
+			}
+			contents, err := os.ReadFile(executionPlanPath)
+			if err != nil {
+				return []ReturnValue{"", err}
+			}
+			executedPlan = contents
+			return []ReturnValue{"applied", nil}
+		})
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		PlanStore:             store,
+	}
+
+	output, err := o.Run(ctx, nil, tmpDir, nil)
+
+	Ok(t, err)
+	Equals(t, "applied", output)
+	Equals(t, string(validatedPlan), string(executedPlan))
+	Assert(t, executionPlanPath != planPath, "expected apply to execute an isolated plan snapshot")
+	actualConventionPlan, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, string(externalOverwrite), string(actualConventionPlan))
+	_, snapshotErr := os.Stat(executionPlanPath)
+	Assert(t, os.IsNotExist(snapshotErr), "validated plan snapshot should be removed after apply")
+	Equals(t, 0, store.loadCalls)
+	Equals(t, 0, store.removeCalls)
 }
 
 func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
@@ -151,7 +249,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "default")
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
@@ -186,7 +284,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
@@ -223,7 +321,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	Equals(t, "output", output)
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 // Apply ignores the -target flag when used with a planfile so we should give
@@ -359,13 +457,19 @@ Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
 
 	Equals(t, []string{"apply", "-input=false", "-no-color", "extra", "args", "comment", "args"}, tfExec.CalledArgs)
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 
-	// Check that the status was updated with the run url.
+	// The runtime records the remote URL but leaves all status publication to
+	// the generation-fenced outer apply lifecycle.
 	runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test-dir2/runs/run-PiDsRYKGcerTttV2"
 	Equals(t, runURL, remoteApplyRunURL)
-	updater.VerifyWasCalledOnce().UpdateProject(ctx, command.Apply, models.PendingCommitStatus, runURL, nil)
-	updater.VerifyWasCalled(Never()).UpdateProject(ctx, command.Apply, models.SuccessCommitStatus, runURL, nil)
+	updater.VerifyWasCalled(Never()).UpdateProject(
+		Any[command.ProjectContext](),
+		Any[command.Name](),
+		Any[models.CommitStatus](),
+		Any[string](),
+		Any[*command.ProjectCommandOutput](),
+	)
 }
 
 // Test that if the plan is different, we error out.
@@ -452,6 +556,32 @@ type remoteApplyMock struct {
 	PassedInput string
 	// DoneCh callers should wait on the done channel to ensure we're done.
 	DoneCh chan bool
+}
+
+type overwriteOnLoadPlanStore struct {
+	externalContents []byte
+	loadCalls        int
+	removeCalls      int
+}
+
+func (s *overwriteOnLoadPlanStore) Save(command.ProjectContext, string) error { return nil }
+
+func (s *overwriteOnLoadPlanStore) Load(_ command.ProjectContext, planPath string) error {
+	s.loadCalls++
+	return os.WriteFile(planPath, s.externalContents, 0o600)
+}
+
+func (s *overwriteOnLoadPlanStore) Remove(command.ProjectContext, string) error {
+	s.removeCalls++
+	return nil
+}
+func (*overwriteOnLoadPlanStore) ListWorkspaces(string, string, int) ([]string, error) {
+	return nil, nil
+}
+func (*overwriteOnLoadPlanStore) RestorePlans(string, string, string, int) error { return nil }
+func (*overwriteOnLoadPlanStore) DeleteForPull(string, string, int) error        { return nil }
+func (*overwriteOnLoadPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
+	return nil
 }
 
 // RunCommandAsync fakes out running terraform async.

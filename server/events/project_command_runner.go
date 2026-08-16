@@ -163,11 +163,16 @@ type JobURLSetter interface {
 }
 
 type DeferredApplyStatusPublisher interface {
-	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error
 }
 
 type DeferredPlanStatusPublisher interface {
-	PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+	PublishPendingPlanStatuses(projectCmds []command.ProjectContext) error
+	PublishCancelledPlanStatuses(projectCmds []command.ProjectContext) error
+	PublishPlanGenerationStartFailureStatuses(projectCmds []command.ProjectContext, err error) error
+	PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error
+	CompleteSupersededPlanJobs(projectCmds []command.ProjectContext, result command.Result)
+	CompleteUnpublishedPlanJobs(projectCmds []command.ProjectContext, result command.Result, message string)
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
@@ -186,8 +191,10 @@ type ProjectOutputWrapper struct {
 
 func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Plan, ctx, p.ProjectCommandRunner.Plan)
-	if !ctx.SuppressJobOutput {
+	if !ctx.SuppressJobOutput && (result.Error != nil || result.Failure != "") {
+		p.streamFailureToJob(ctx, result)
 		p.JobMessageSender.Send(ctx, "", OperationComplete)
+		result.JobOutputComplete = true
 	}
 	return result
 }
@@ -195,7 +202,11 @@ func (p *ProjectOutputWrapper) Plan(ctx command.ProjectContext) command.ProjectC
 func (p *ProjectOutputWrapper) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	result := p.updateProjectPRStatus(command.Apply, ctx, p.ProjectCommandRunner.Apply)
 	if !ctx.SuppressJobOutput {
+		if result.Error != nil || result.Failure != "" {
+			p.streamFailureToJob(ctx, result)
+		}
 		p.JobMessageSender.Send(ctx, "", OperationComplete)
+		result.JobOutputComplete = true
 	}
 	return result
 }
@@ -208,24 +219,29 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
-		ctx.Log.Err("updating project PR status: %s", err)
+	if commandName != command.PolicyCheck && commandName != command.ApprovePolicies &&
+		(commandName != command.Plan || ctx.PlanGeneration == "") {
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+		}
 	}
 
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
-
 	if result.Error != nil || result.Failure != "" {
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
-			ctx.Log.Err("updating project PR status: %s", err)
+		deferTerminalFailure := commandName == command.Apply ||
+			(commandName == command.Plan && ctx.PlanGeneration != "")
+		if !deferTerminalFailure && commandName != command.PolicyCheck && commandName != command.ApprovePolicies {
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+			}
 		}
-
-		p.streamFailureToJob(ctx, result)
-
+		if commandName != command.Plan && commandName != command.Apply {
+			p.streamFailureToJob(ctx, result)
+		}
 		return result
 	}
-
-	if commandName == command.Plan || commandName == command.Apply {
+	if commandName == command.Plan || commandName == command.Apply || commandName == command.PolicyCheck || commandName == command.ApprovePolicies {
 		return result
 	}
 
@@ -236,36 +252,136 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	return result
 }
 
-func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *ProjectOutputWrapper) PublishPendingPlanStatuses(projectCmds []command.ProjectContext) error {
+	var publicationErrors []error
+	for _, ctx := range projectCmds {
+		if ctx.SuppressVCSStatus {
+			continue
+		}
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+			publicationErrors = append(publicationErrors, err)
+		}
+	}
+	return errors.Join(publicationErrors...)
+}
+
+func (p *ProjectOutputWrapper) PublishCancelledPlanStatuses(projectCmds []command.ProjectContext) error {
+	var publicationErrors []error
+	for _, ctx := range projectCmds {
+		output := command.ProjectCommandOutput{Failure: "plan generation was cancelled by a newer plan"}
+		if !ctx.SuppressVCSStatus {
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &output); err != nil {
+				ctx.Log.Err("updating cancelled project PR status %s", err)
+				publicationErrors = append(publicationErrors, err)
+			}
+		}
+		if !ctx.SuppressJobOutput {
+			p.JobMessageSender.Send(ctx, "\nA newer targeted plan cancelled this plan generation. Run `atlantis plan` again for this project.\n", false)
+			p.JobMessageSender.Send(ctx, "", OperationComplete)
+		}
+	}
+	return errors.Join(publicationErrors...)
+}
+
+func (p *ProjectOutputWrapper) PublishPlanGenerationStartFailureStatuses(projectCmds []command.ProjectContext, startErr error) error {
+	var publicationErrors []error
+	for _, ctx := range projectCmds {
+		output := command.ProjectCommandOutput{Error: startErr}
+		if !ctx.SuppressVCSStatus {
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &output); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+				publicationErrors = append(publicationErrors, err)
+			}
+		}
+		if !ctx.SuppressJobOutput {
+			p.streamFailureToJob(ctx, output)
+			p.JobMessageSender.Send(ctx, "", OperationComplete)
+		}
+	}
+	return errors.Join(publicationErrors...)
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
+	var publicationErrors []error
 	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command != command.Plan || projectResult.PlanSuccess == nil || projectResult.Error != nil || projectResult.Failure != "" {
+		if projectResult.Command != command.Plan {
 			continue
 		}
 		ctx, ok := deferredProjectContext(projectCmds, projectResult, command.Plan)
-		if !ok || ctx.SuppressVCSStatus {
+		if !ok {
 			continue
 		}
 		projectOutput := projectResult.ProjectCommandOutput
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &projectOutput); err != nil {
-			ctx.Log.Err("updating project PR status %s", err)
+		if (projectResult.Error != nil || projectResult.Failure != "") && ctx.PlanGeneration == "" {
+			continue
+		}
+		projectStatus := status
+		if projectResult.Error != nil || projectResult.Failure != "" {
+			projectStatus = models.FailedCommitStatus
+		}
+		if !ctx.SuppressVCSStatus {
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, projectStatus, &projectOutput); err != nil {
+				ctx.Log.Err("updating project PR status %s", err)
+				publicationErrors = append(publicationErrors, err)
+			}
+		}
+		if !ctx.SuppressJobOutput && !projectOutput.JobOutputComplete {
+			if projectResult.Error != nil || projectResult.Failure != "" {
+				p.streamFailureToJob(ctx, projectOutput)
+			} else if status == models.FailedCommitStatus {
+				p.JobMessageSender.Send(ctx, "\nAtlantis could not persist the completed plan. Run `atlantis plan` again.\n", false)
+			}
+			p.JobMessageSender.Send(ctx, "", OperationComplete)
+		}
+	}
+	return errors.Join(publicationErrors...)
+}
+
+func (p *ProjectOutputWrapper) CompleteSupersededPlanJobs(projectCmds []command.ProjectContext, result command.Result) {
+	p.CompleteUnpublishedPlanJobs(projectCmds, result, "This plan was superseded by a newer plan generation.")
+}
+
+func (p *ProjectOutputWrapper) CompleteUnpublishedPlanJobs(projectCmds []command.ProjectContext, result command.Result, message string) {
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Command != command.Plan {
+			continue
+		}
+		ctx, ok := deferredProjectContext(projectCmds, projectResult, command.Plan)
+		if !ok {
+			continue
+		}
+		projectOutput := projectResult.ProjectCommandOutput
+		if !ctx.SuppressJobOutput && !projectOutput.JobOutputComplete {
+			p.JobMessageSender.Send(ctx, "\n"+message+"\n", false)
+			p.JobMessageSender.Send(ctx, "", OperationComplete)
 		}
 	}
 }
 
-func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
+	var publicationErrors []error
 	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command != command.Apply || projectResult.ApplySuccess == "" || projectResult.Error != nil || projectResult.Failure != "" {
+		if projectResult.Command != command.Apply {
 			continue
 		}
 		ctx, ok := deferredProjectContext(projectCmds, projectResult, command.Apply)
-		if !ok || ctx.SuppressVCSStatus {
+		if !ok {
 			continue
 		}
 		projectOutput := projectResult.ProjectCommandOutput
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, status, &projectOutput); err != nil {
-			ctx.Log.Err("updating project PR status: %s", err)
+		projectStatus := status
+		if projectResult.Error != nil || projectResult.Failure != "" {
+			projectStatus = models.FailedCommitStatus
+		}
+		if !ctx.SuppressVCSStatus {
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, projectStatus, &projectOutput); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+				publicationErrors = append(publicationErrors, err)
+			}
 		}
 	}
+	return errors.Join(publicationErrors...)
 }
 
 func deferredProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult, commandName command.Name) (command.ProjectContext, bool) {
@@ -381,11 +497,24 @@ func (p *DefaultProjectCommandRunner) workingDirLockMetadata(ctx command.Project
 
 // Plan runs terraform plan for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Plan(ctx command.ProjectContext) command.ProjectCommandOutput {
+	if ctx.RequiresAtlantisManagedPlanFile && ctx.GeneratedPlanHash == nil {
+		managedPlanHash := ""
+		ctx.GeneratedPlanHash = &managedPlanHash
+	}
+	remotePlanRunURL := ""
+	ctx.RemotePlanRunURL = &remotePlanRunURL
 	planSuccess, failure, err := p.doPlan(ctx)
+	managedPlanHash := ""
+	if ctx.GeneratedPlanHash != nil {
+		managedPlanHash = *ctx.GeneratedPlanHash
+	}
 	return command.ProjectCommandOutput{
-		PlanSuccess: planSuccess,
-		Error:       err,
-		Failure:     failure,
+		PlanSuccess:         planSuccess,
+		Error:               err,
+		Failure:             failure,
+		ManagedPlanHash:     managedPlanHash,
+		AtlantisManagedPlan: ctx.RequiresAtlantisManagedPlanFile,
+		PlanSuccessURL:      remotePlanRunURL,
 	}
 }
 
@@ -587,11 +716,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// that shouldn't affect this particular operation.
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 
 		if os.IsNotExist(err) {
 			return nil, "", errors.New("project has not been cloned–did you run plan?")
@@ -600,20 +725,12 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 
 		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
@@ -828,9 +945,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Acquire internal lock for the directory we're going to operate in.
 	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Plan, p.workingDirLockMetadata(ctx))
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", err
 	}
 	defer unlockFn()
@@ -838,31 +953,23 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// Clone is idempotent so okay to run even if the repo was already cloned.
 	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", err
 	}
 
 	mergedAgain, err := p.WorkingDir.MergeAgain(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", err
 	}
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if err := utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
 	}
 	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
 	}
 
@@ -870,23 +977,39 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	// checks and plan execution use the same tree.
 	failure, err := p.CommandRequirementHandler.ValidatePlanProject(repoDir, ctx)
 	if failure != "" || err != nil {
-		if deleteErr := p.WorkingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); deleteErr != nil {
-			ctx.Log.Err("error deleting stale plan after plan validation failure: %v", deleteErr)
-			return nil, failure, fmt.Errorf("deleting stale plan after plan validation failure: %w", deleteErr)
+		if ctx.PlanGeneration == "" {
+			if deleteErr := p.WorkingDir.DeletePlan(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); deleteErr != nil {
+				ctx.Log.Err("error deleting stale plan after plan validation failure: %v", deleteErr)
+				return nil, failure, fmt.Errorf("deleting stale plan after plan validation failure: %w", deleteErr)
+			}
 		}
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, failure, err
 	}
 
 	outputs, err := p.runSteps(ctx.Steps, ctx, projAbsPath)
 
 	if err != nil {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
+		p.unlockFailedPlanAttempt(ctx, lockAttempt)
 		return nil, "", errorWithStepOutput(err, outputs)
+	}
+	if ctx.RequiresAtlantisManagedPlanFile && ctx.GeneratedPlanHash != nil && *ctx.GeneratedPlanHash == "" {
+		planPath, pathErr := safePlanFilePath(ctx, projAbsPath)
+		if pathErr != nil {
+			return nil, "", pathErr
+		}
+		managedPlanHash, hashErr := hashFile(projAbsPath, planPath)
+		if hashErr != nil {
+			return nil, "", fmt.Errorf("hashing managed plan for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, hashErr)
+		}
+		*ctx.GeneratedPlanHash = managedPlanHash
+		store := p.PlanStore
+		if store == nil {
+			store = &runtime.LocalPlanStore{}
+		}
+		if saveErr := store.Save(ctx, planPath); saveErr != nil {
+			return nil, "", fmt.Errorf("saving managed plan for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, saveErr)
+		}
 	}
 
 	return &models.PlanSuccess{
@@ -896,6 +1019,20 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,
 	}, "", nil
+}
+
+// unlockFailedPlanAttempt preserves locks once a durable plan generation has
+// begun. Another replica may already have superseded that generation and
+// reused the same-pull lock, which cannot be distinguished by the legacy lock
+// record. The replacement generation, apply, explicit unlock, or pull close
+// remains responsible for releasing it.
+func (p *DefaultProjectCommandRunner) unlockFailedPlanAttempt(ctx command.ProjectContext, lockAttempt *TryLockResponse) {
+	if ctx.PlanGeneration != "" || lockAttempt == nil || lockAttempt.UnlockFn == nil {
+		return
+	}
+	if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+		ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+	}
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
@@ -977,6 +1114,26 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
 		ctx.ExpectedPlanHash = planHash
+	}
+	if requiresManagedPlan && ctx.CommandName == command.Apply && !hasAtlantisManagedApplyStep(ctx.Steps) {
+		expectedPlanHash := ctx.ExpectedPlanHash
+		if expectedPlanHash == "" {
+			expectedPlanHash = ctx.RecordedManagedPlanHash
+		}
+		planPath, err := safePlanFilePath(ctx, absPath)
+		if err != nil {
+			return "", "", "", err
+		}
+		validatedPlanPath, err := runtime.SnapshotValidatedPlan(planPath, expectedPlanHash)
+		if err != nil {
+			return "", "", "", fmt.Errorf("binding validated plan for custom apply in dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+		}
+		ctx.ValidatedPlanFilePath = validatedPlanPath
+		defer func() {
+			if removeErr := os.Remove(validatedPlanPath); removeErr != nil && !os.IsNotExist(removeErr) {
+				ctx.Log.Warn("failed to remove validated plan snapshot: %s", removeErr)
+			}
+		}()
 	}
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {

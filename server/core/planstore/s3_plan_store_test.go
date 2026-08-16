@@ -6,7 +6,9 @@ package planstore_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -147,6 +149,10 @@ func TestSave_Success(t *testing.T) {
 	store := planstore.NewS3PlanStoreWithClient(mock, "my-bucket", "pfx", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
 	ctx.Pull.HeadCommit = "abc123def456"
+	ctx.PlanGeneration = "generation-42"
+	ctx.AcceptedPlanGeneration = "generation-previously-accepted"
+	managedPlanHash := "72852ea4d29c1a0726d30d75af3e47b77f650257f37777e698305bccce48f9b8"
+	ctx.GeneratedPlanHash = &managedPlanHash
 
 	planDir := t.TempDir()
 	planPath := filepath.Join(planDir, "test.tfplan")
@@ -159,6 +165,8 @@ func TestSave_Success(t *testing.T) {
 	assert.Equal(t, "pfx/acme/infra/42/default/modules/vpc/test.tfplan", *mock.putInput.Key)
 	assert.Equal(t, []byte("plan-content"), mock.putBody)
 	assert.Equal(t, "abc123def456", mock.putInput.Metadata["head-commit"])
+	assert.Equal(t, managedPlanHash, mock.putInput.Metadata["managed-plan-sha256"])
+	assert.Equal(t, "generation-42", mock.putInput.Metadata["plan-generation"])
 }
 
 func TestSave_S3Error(t *testing.T) {
@@ -182,7 +190,7 @@ func TestSave_FileOpenError(t *testing.T) {
 	assert.ErrorContains(t, err, "opening plan file")
 }
 
-func TestLoad_Success(t *testing.T) {
+func TestLoad_SuccessWithoutManagedPlanMetadata(t *testing.T) {
 	planContent := []byte("downloaded-plan-data")
 	mock := &mockS3Client{
 		getBody:     planContent,
@@ -238,7 +246,7 @@ func TestLoad_S3Error(t *testing.T) {
 	assert.ErrorContains(t, err, "no such key")
 }
 
-func TestRemove_Success(t *testing.T) {
+func TestRemove_DeletesLegacyArtifact(t *testing.T) {
 	mock := &mockS3Client{}
 	store := planstore.NewS3PlanStoreWithClient(mock, "my-bucket", "pfx", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
@@ -252,6 +260,7 @@ func TestRemove_Success(t *testing.T) {
 
 	assert.Equal(t, "my-bucket", *mock.deleteInput.Bucket)
 	assert.Equal(t, "pfx/acme/infra/42/default/modules/vpc/test.tfplan", *mock.deleteInput.Key)
+	assert.Nil(t, mock.deleteInput.IfMatch)
 
 	_, statErr := os.Stat(planPath)
 	assert.True(t, os.IsNotExist(statErr))
@@ -262,7 +271,6 @@ func TestRemove_S3Error(t *testing.T) {
 	store := planstore.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
 	ctx := testProjectContext()
 
-	// S3 delete errors are logged but not returned (soft-fail).
 	err := store.Remove(ctx, "/tmp/whatever.tfplan")
 	assert.NoError(t, err)
 }
@@ -273,6 +281,62 @@ func TestRemove_LocalFileAlreadyGone(t *testing.T) {
 	ctx := testProjectContext()
 
 	err := store.Remove(ctx, "/tmp/nonexistent-plan-file.tfplan")
+	require.NoError(t, err)
+}
+
+func TestRemove_DigestBoundMatchingArtifactIsRetained(t *testing.T) {
+	planContents := []byte("accepted-plan")
+	planHash := fmt.Sprintf("%x", sha256.Sum256(planContents))
+	mock := &mockS3Client{}
+	store := planstore.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
+	ctx := testProjectContext()
+	ctx.RecordedManagedPlanHash = planHash
+	ctx.AcceptedPlanGeneration = "generation-accepted"
+	ctx.PlanGeneration = "generation-active-unrelated"
+	planPath := filepath.Join(t.TempDir(), "plan.tfplan")
+	require.NoError(t, os.WriteFile(planPath, planContents, 0o600))
+
+	require.NoError(t, store.Remove(ctx, planPath))
+
+	assert.Nil(t, mock.deleteInput)
+	_, err := os.Stat(planPath)
+	require.NoError(t, err)
+}
+
+func TestRemove_DigestBoundNewerArtifactIsPreserved(t *testing.T) {
+	acceptedPlan := []byte("accepted-plan")
+	newerPlan := []byte("accepted-plan")
+	mock := &mockS3Client{}
+	store := planstore.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
+	ctx := testProjectContext()
+	ctx.RecordedManagedPlanHash = fmt.Sprintf("%x", sha256.Sum256(acceptedPlan))
+	ctx.AcceptedPlanGeneration = "generation-old"
+	ctx.PlanGeneration = "generation-newer"
+	planPath := filepath.Join(t.TempDir(), "plan.tfplan")
+	require.NoError(t, os.WriteFile(planPath, newerPlan, 0o600))
+
+	require.NoError(t, store.Remove(ctx, planPath))
+
+	assert.Nil(t, mock.deleteInput)
+	got, err := os.ReadFile(planPath)
+	require.NoError(t, err)
+	assert.Equal(t, newerPlan, got)
+}
+
+func TestRemove_DigestBoundWithoutAcceptedGenerationDoesNotAttemptAutomaticDelete(t *testing.T) {
+	planContents := []byte("accepted-plan")
+	planHash := fmt.Sprintf("%x", sha256.Sum256(planContents))
+	mock := &mockS3Client{}
+	store := planstore.NewS3PlanStoreWithClient(mock, "bucket", "", logging.NewNoopLogger(t))
+	ctx := testProjectContext()
+	ctx.RecordedManagedPlanHash = planHash
+	planPath := filepath.Join(t.TempDir(), "plan.tfplan")
+	require.NoError(t, os.WriteFile(planPath, planContents, 0o600))
+
+	require.NoError(t, store.Remove(ctx, planPath))
+
+	assert.Nil(t, mock.deleteInput)
+	_, err := os.Stat(planPath)
 	require.NoError(t, err)
 }
 

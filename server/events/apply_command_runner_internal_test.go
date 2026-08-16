@@ -82,8 +82,9 @@ func (r *recordingDeferredApplyRunner) Apply(command.ProjectContext) command.Pro
 	return r.output
 }
 
-func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) {
+func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) error {
 	r.statuses = append(r.statuses, status)
+	return nil
 }
 
 type sequenceApplyIdentityFetcher struct {
@@ -130,6 +131,7 @@ func TestApplyCommandRunner_DeferredApplySuccessPublishesAfterFinalFreshness(t *
 		Workspace:         DefaultWorkspace,
 		ProjectName:       "projA",
 		ProjectPlanStatus: models.PlannedPlanStatus,
+		SilencePRComments: []string{command.Apply.String()},
 		Pull:              pull,
 	}}}, deferredRunner, &sequenceApplyIdentityFetcher{identities: []models.PullRequest{pull, pull}})
 	ctx := newInternalApplyContext(t, pull)

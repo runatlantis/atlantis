@@ -4,8 +4,6 @@
 package events
 
 import (
-	"strings"
-
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/planstore"
@@ -40,25 +38,6 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 		return nil, nil
 	}
 
-	removeErr := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
-	if removeErr != nil {
-		logger.Warn("Failed to delete plan: %s", removeErr)
-		return nil, removeErr
-	}
-
-	if l.PlanStore != nil {
-		if err := l.PlanStore.DeletePlanForProject(
-			lock.Pull.BaseRepo.Owner,
-			lock.Pull.BaseRepo.Name,
-			lock.Pull.Num,
-			lock.Workspace,
-			lock.Project.Path,
-			lock.Project.ProjectName,
-		); err != nil {
-			logger.Warn("Failed to delete plan from external store: %s", err)
-		}
-	}
-
 	return lock, nil
 }
 
@@ -68,28 +47,6 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 	numLocks := len(locks)
 	if err != nil {
 		return numLocks, err
-	}
-
-	for i := range numLocks {
-		lock := locks[i]
-
-		err := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
-		if err != nil {
-			logger.Warn("Failed to delete plan: %s", err)
-			return numLocks, err
-		}
-	}
-
-	// Always clean up the external plan store for this pull, even when no
-	// locks were found locally. Locks can be cleaned via other paths (manual
-	// unlock, partial failure) which would otherwise leave orphaned S3 plans.
-	if l.PlanStore != nil {
-		owner, repo, ok := strings.Cut(repoFullName, "/")
-		if !ok {
-			logger.Warn("cannot parse owner/repo from %q; skipping external plan store cleanup", repoFullName)
-		} else if err := l.PlanStore.DeleteForPull(owner, repo, pullNum); err != nil {
-			logger.Warn("Failed to delete plans from external store: %s", err)
-		}
 	}
 
 	if numLocks == 0 {

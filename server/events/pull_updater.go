@@ -4,6 +4,8 @@
 package events
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -16,7 +18,8 @@ type PullUpdater struct {
 	MarkdownRenderer     *MarkdownRenderer
 }
 
-func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
+func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) error {
+	var publicationErrors []error
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err("%s", res.Error.Error())
@@ -31,6 +34,7 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		ctx.Log.Debug("hiding previous plan comments for command: '%v', directory: '%v'", cmd.CommandName().TitleString(), cmd.Dir())
 		if err := c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir()); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
+			publicationErrors = append(publicationErrors, fmt.Errorf("hiding previous command comments: %w", err))
 		}
 	}
 
@@ -45,7 +49,7 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		}
 
 		if len(commentOnProjects) == 0 {
-			return
+			return errors.Join(publicationErrors...)
 		}
 
 		res.ProjectResults = commentOnProjects
@@ -54,5 +58,7 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	comment := c.MarkdownRenderer.Render(ctx, res, cmd)
 	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
 		ctx.Log.Err("unable to comment: %s", err)
+		publicationErrors = append(publicationErrors, fmt.Errorf("creating pull request comment: %w", err))
 	}
+	return errors.Join(publicationErrors...)
 }

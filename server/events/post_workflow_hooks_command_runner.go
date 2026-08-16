@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -140,6 +141,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		if !suppressVCSStatus {
 			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+				return workflowHookStatusPublicationError(err)
 			}
 		}
 
@@ -147,8 +149,9 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 
 		if err != nil {
 			if !suppressVCSStatus {
-				if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-					ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+				if statusErr := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); statusErr != nil {
+					ctx.Log.Warn("unable to update post workflow hook status: %s", statusErr)
+					return errors.Join(err, workflowHookStatusPublicationError(statusErr))
 				}
 			}
 			return err
@@ -157,6 +160,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 		if !suppressVCSStatus {
 			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+				return workflowHookStatusPublicationError(err)
 			}
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -22,7 +23,9 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -62,6 +65,11 @@ type APIController struct {
 	WorkingDir                      events.WorkingDir                     `validate:"required"`
 	WorkingDirLocker                events.WorkingDirLocker               `validate:"required"`
 	CommitStatusUpdater             events.CommitStatusUpdater            `validate:"required"`
+	// Database is required for PR-backed API plan/apply requests so their
+	// managed artifacts and follow-on policy results use the same durable
+	// generation boundary as comment-driven workflows. Synthetic non-PR API
+	// requests intentionally retain their in-memory lifecycle.
+	Database db.Database
 	// PullReqStatusFetcher is optional. When set and the API request supplies a
 	// PR number, it is used to populate command.Context.PullRequestStatus so
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
@@ -247,6 +255,9 @@ func apiErrorStatusCode(err error) int {
 	if errors.Is(err, events.ErrTeamAllowlistDenied) {
 		return http.StatusForbidden
 	}
+	if db.IsPlanGenerationObsolete(err) {
+		return http.StatusConflict
+	}
 	return http.StatusInternalServerError
 }
 
@@ -295,12 +306,12 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	}
 	defer a.cleanupNonPRWorkingDir(ctx)
 
-	result, err := a.apiPlan(request, ctx)
+	result, err := a.apiPlan(request, ctx, true)
 	if err != nil {
 		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
 	}
-	if !ctx.CommandSkipped {
+	if !ctx.CommandSkipped && ctx.Pull.Num <= 0 {
 		defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 	}
 
@@ -329,7 +340,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	defer a.cleanupNonPRWorkingDir(ctx)
 
 	// We must first make the plan for all projects
-	result, err := a.apiPlan(request, ctx)
+	result, err := a.apiPlan(request, ctx, false)
 	if err != nil {
 		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
 		return
@@ -338,12 +349,23 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		responder.writeJSON(w, http.StatusOK, result)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	if ctx.Pull.Num > 0 && len(result.ProjectResults) == 0 {
+		// A PR-backed apply with no selected plan projects is a no-op. It must not
+		// discard an existing accepted plan or replace newer shared statuses with
+		// synthetic 0/0 success.
+		responder.writeJSON(w, http.StatusOK, result)
+		return
+	}
+	if ctx.Pull.Num <= 0 {
+		defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+	}
 
 	// The API apply endpoint runs plan first. Refresh PR status afterward so
 	// apply requirements evaluate the VCS state the plan phase just produced.
 	a.populatePullRequestStatus(ctx)
-	seedPullStatusFromPlanResult(ctx, result)
+	if ctx.Pull.Num <= 0 {
+		seedPullStatusFromPlanResult(ctx, result)
+	}
 
 	// We can now prepare and run the apply step
 	result, err = a.apiApply(request, ctx)
@@ -697,7 +719,7 @@ func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, rem
 	return string(output), err
 }
 
-func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context, replacePRStatusWhenEmpty bool) (*command.Result, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
 	if events.IsIgnoredTargetedDir(err) {
 		ctx.CommandSkipped = true
@@ -708,10 +730,53 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	if len(cmds) == 0 {
+		ctx.Log.Info("determined there was no project to run plan in")
+		if ctx.Pull.Num > 0 {
+			if !replacePRStatusWhenEmpty {
+				return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+			}
+			if a.Database == nil {
+				return nil, errors.New("database is required for PR-backed API plan")
+			}
+			publicationToken, claimErr := a.acquirePlanPublicationClaim(ctx, "replacing PR-backed API plan with no projects")
+			if claimErr != nil {
+				return nil, claimErr
+			}
+			beginResult, beginErr := a.Database.BeginPlanGenerationReplacing(ctx.Pull, nil, uuid.NewString(), publicationToken)
+			if beginErr != nil {
+				var statusErr error
+				if !ctx.SuppressVCSStatus {
+					statusErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan)
+				}
+				claimErr = a.finishPlanPublicationClaim(ctx, publicationToken, statusErr)
+				return nil, errors.Join(fmt.Errorf("replacing PR-backed API plan with no projects: %w", beginErr), claimErr)
+			}
+			ctx.PullStatus = &beginResult.PullStatus
+			var publicationErr error
+			if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
+				status := models.SuccessCommitStatus
+				counts := models.ProjectCounts{}
+				if len(beginResult.Canceled) > 0 {
+					status = models.FailedCommitStatus
+					counts = models.ProjectCounts{Total: len(beginResult.Canceled), Errored: len(beginResult.Canceled)}
+				}
+				publicationErr = errors.Join(
+					a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.Plan, counts),
+					a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, counts),
+					a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.Apply, counts),
+				)
+			}
+			if claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+				a.publishCancelledPlanStatuses(apiCancelledPlanProjectContexts(ctx, beginResult.Canceled)),
+				publicationErr,
+			)); claimErr != nil {
+				return nil, claimErr
+			}
+			return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+		}
 		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("determined there was no project to run plan in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
@@ -729,14 +794,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		}
 		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
 	}
-
-	// Update the combined plan commit status to pending
-	if !ctx.SuppressVCSStatus {
-		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
-		}
-	}
-
 	var planCmds []command.ProjectContext
 	var planCC []*events.CommentCommand
 	var policyCmds []command.ProjectContext
@@ -752,13 +809,95 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		}
 	}
 
+	planGeneration := ""
+	publicationToken := ""
+	if ctx.Pull.Num > 0 {
+		if a.Database == nil {
+			return nil, errors.New("database is required for PR-backed API plan")
+		}
+		publicationToken, err = a.acquirePlanPublicationClaim(ctx, "beginning PR-backed API plan")
+		if err != nil {
+			return nil, err
+		}
+		planGeneration = uuid.NewString()
+		startedStatus, beginErr := a.Database.BeginPlanGeneration(ctx.Pull, apiPlanGenerationProjects(ctx, planCmds), planGeneration, publicationToken)
+		if beginErr != nil {
+			var statusErr error
+			if !ctx.SuppressVCSStatus {
+				statusErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan)
+			}
+			claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(a.publishPlanGenerationStartFailureStatuses(planCmds, beginErr), statusErr))
+			return nil, errors.Join(fmt.Errorf("beginning PR-backed API plan generation: %w", beginErr), claimErr)
+		}
+		var aggregatePendingErr error
+		if !ctx.SuppressVCSStatus {
+			aggregatePendingErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan)
+		}
+		if claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+			a.publishPendingPlanStatuses(planCmds),
+			a.publishCancelledPlanStatuses(apiCancelledPlanProjectContexts(ctx, startedStatus.Canceled)),
+			aggregatePendingErr,
+		)); claimErr != nil {
+			return nil, claimErr
+		}
+		prepareAPIProjectCommandsForPlanGeneration(planCmds, planGeneration)
+		prepareAPIProjectCommandsForPlanGeneration(policyCmds, planGeneration)
+		ctx.PullStatus = &startedStatus.PullStatus
+	} else if !ctx.SuppressVCSStatus {
+		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
+		}
+	}
+
 	var projectResults []command.ProjectResult
 	for i, cmd := range planCmds {
 		if !ctx.PreWorkflowHooksAlreadyRun {
-			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
+			err = a.runAPIPlanWorkflowHook(ctx, planGeneration, cmd, "pre-workflow hook", func() error {
+				return a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
+			})
 			if err != nil {
+				if db.IsPlanGenerationObsolete(err) {
+					result := &command.Result{ProjectResults: projectResults}
+					a.completeUnpublishedPlanJobs(planCmds, result, "This plan was superseded before its workflow hook completed.")
+					return result, err
+				}
 				if a.FailOnPreWorkflowHookError {
-					return nil, err
+					failureResults := append(projectResults, apiPlanFailureResults(planCmds[i:], err)...)
+					failureResult := &command.Result{ProjectResults: failureResults, Error: err}
+					if planGeneration != "" {
+						publicationToken, claimErr := a.waitForPlanPublicationClaim(ctx, "completing failed PR-backed API plan")
+						if claimErr != nil {
+							return failureResult, claimErr
+						}
+						completedStatus, completeErr := a.Database.CompletePlanGeneration(ctx.Pull, planGeneration, uniqueAPIProjectResults(failureResults), publicationToken)
+						if completeErr != nil {
+							claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, nil)
+							return failureResult, errors.Join(fmt.Errorf("completing failed PR-backed API plan generation: %w", completeErr), claimErr)
+						}
+						ctx.PullStatus = &completedStatus
+						var aggregateErr error
+						if !ctx.SuppressVCSStatus {
+							aggregateErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan)
+						}
+						if claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+							a.publishDeferredPlanStatuses(planCmds, failureResult, models.FailedCommitStatus),
+							aggregateErr,
+						)); claimErr != nil {
+							return failureResult, claimErr
+						}
+					} else {
+						publicationErr := a.publishDeferredPlanStatuses(planCmds, failureResult, models.FailedCommitStatus)
+						if !ctx.SuppressVCSStatus {
+							if statusErr := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+								ctx.Log.Warn("unable to update plan commit status: %s", statusErr)
+								publicationErr = errors.Join(publicationErr, statusErr)
+							}
+						}
+						if publicationErr != nil {
+							return failureResult, errors.Join(err, publicationErr)
+						}
+					}
+					return failureResult, err
 				}
 			}
 		}
@@ -766,10 +905,55 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
 		projectResults = append(projectResults, res)
 
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
+		if hookErr := a.runAPIPlanWorkflowHook(ctx, planGeneration, cmd, "post-workflow hook", func() error {
+			return a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i])
+		}); hookErr != nil {
+			if db.IsPlanGenerationObsolete(hookErr) || events.IsWorkflowHookStatusPublicationError(hookErr) {
+				result := &command.Result{ProjectResults: projectResults}
+				a.completeUnpublishedPlanJobs(planCmds, result, "This plan was superseded before its workflow hook completed.")
+				return result, hookErr
+			}
+			ctx.Log.Warn("post-workflow hook failed, %v", hookErr)
+		}
 	}
 
 	result := &command.Result{ProjectResults: projectResults}
+	if planGeneration != "" {
+		publicationToken, claimErr := a.waitForPlanPublicationClaim(ctx, "completing PR-backed API plan")
+		if claimErr != nil {
+			a.completeUnpublishedPlanJobs(planCmds, result, "Atlantis could not claim the durable publication boundary for this completed plan. Run the API plan again.")
+			return result, claimErr
+		}
+		completedStatus, completeErr := a.Database.CompletePlanGeneration(ctx.Pull, planGeneration, uniqueAPIProjectResults(projectResults), publicationToken)
+		if completeErr != nil {
+			if !db.IsPlanGenerationObsolete(completeErr) {
+				claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, a.publishDeferredPlanStatuses(planCmds, result, models.FailedCommitStatus))
+				return result, errors.Join(fmt.Errorf("completing PR-backed API plan generation: %w", completeErr), claimErr)
+			}
+			ctx.Log.Info("PR-backed API plan generation was superseded; ignoring obsolete results")
+			claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, nil)
+			return result, errors.Join(fmt.Errorf("PR-backed API plan was superseded by a newer plan generation: %w", completeErr), claimErr)
+		}
+		ctx.PullStatus = &completedStatus
+		planStatus := models.SuccessCommitStatus
+		if result.HasErrors() {
+			planStatus = models.FailedCommitStatus
+		}
+		var aggregateErr error
+		if !ctx.SuppressVCSStatus {
+			aggregateErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, planStatus, command.Plan)
+		}
+		if claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, errors.Join(
+			a.publishDeferredPlanStatuses(planCmds, result, models.SuccessCommitStatus),
+			aggregateErr,
+		)); claimErr != nil {
+			return result, claimErr
+		}
+	} else {
+		if publicationErr := a.publishDeferredPlanStatuses(planCmds, result, models.SuccessCommitStatus); publicationErr != nil {
+			return result, publicationErr
+		}
+	}
 	if !ctx.RunPolicyChecks || result.HasErrors() || len(planCmds) == 0 {
 		return result, nil
 	}
@@ -781,24 +965,92 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
 	}
+	if planGeneration != "" && len(projectResults) > len(result.ProjectResults) {
+		policyResults := uniqueAPIProjectResults(projectResults[len(result.ProjectResults):])
+		publicationToken, claimErr := a.waitForPlanPublicationClaim(ctx, "persisting PR-backed API policy results")
+		if claimErr != nil {
+			return &command.Result{ProjectResults: projectResults}, claimErr
+		}
+		policyStatus, policyErr := a.Database.UpdatePolicyResultsForPlanGeneration(ctx.Pull, policyResults, publicationToken)
+		if policyErr != nil {
+			if db.IsPlanGenerationObsolete(policyErr) {
+				ctx.Log.Info("PR-backed API policy results were superseded; ignoring obsolete results")
+				claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, nil)
+				return &command.Result{ProjectResults: projectResults}, errors.Join(fmt.Errorf("PR-backed API policy results were superseded by a newer plan generation: %w", policyErr), claimErr)
+			}
+			claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, policyErr)
+			return &command.Result{ProjectResults: projectResults}, errors.Join(fmt.Errorf("persisting PR-backed API policy results: %w", policyErr), claimErr)
+		}
+		ctx.PullStatus = &policyStatus
+		if claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, nil); claimErr != nil {
+			return &command.Result{ProjectResults: projectResults}, claimErr
+		}
+	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	publicationToken := ""
+	claimActive := false
+	finishClaim := func(publicationErr error) error {
+		if !claimActive {
+			return publicationErr
+		}
+		claimActive = false
+		return a.finishPlanPublicationClaim(ctx, publicationToken, publicationErr)
+	}
+	defer func() {
+		if claimActive {
+			if claimErr := finishClaim(nil); claimErr != nil {
+				ctx.Log.Err("releasing PR-backed API apply publication claim: %s", claimErr)
+			}
+		}
+	}()
+
+	if ctx.Pull.Num > 0 {
+		if a.Database == nil {
+			return nil, errors.New("database is required for PR-backed API apply")
+		}
+		expectedPullStatus := ctx.PullStatus
+		var err error
+		publicationToken, err = a.acquirePlanPublicationClaim(ctx, "executing PR-backed API apply")
+		if err != nil {
+			return nil, err
+		}
+		claimActive = true
+		pullStatus, statusErr := a.Database.GetPullStatus(ctx.Pull)
+		if statusErr != nil {
+			return nil, errors.Join(fmt.Errorf("fetching current PR-backed API plan status: %w", statusErr), finishClaim(nil))
+		}
+		if pullStatus == nil {
+			return nil, errors.Join(errors.New("current PR-backed API plan status is missing"), finishClaim(nil))
+		}
+		if expectedPullStatus != nil && !reflect.DeepEqual(expectedPullStatus, pullStatus) {
+			return nil, errors.Join(errors.New("PR-backed API plan generation changed before apply; rerun the API apply request"), finishClaim(nil))
+		}
+		ctx.PullStatus = pullStatus
+	}
+
 	cmds, cc, err := request.getCommands(ctx, command.Apply, a.ProjectCommandBuilder.BuildApplyCommands)
 	if events.IsIgnoredTargetedDir(err) {
 		ctx.CommandSkipped = true
-		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, finishClaim(nil)
 	}
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, finishClaim(nil))
 	}
 
 	if len(cmds) == 0 {
+		ctx.Log.Info("determined there was no project to run apply in")
+		if ctx.Pull.Num > 0 {
+			// A PR-backed no-project apply has no durable result to publish. Leaving
+			// current statuses untouched avoids an obsolete API request replacing a
+			// newer generation's user-visible state with synthetic 0/0 success.
+			return &command.Result{ProjectResults: []command.ProjectResult{}}, finishClaim(nil)
+		}
 		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
 			return nil, err
 		}
-		ctx.Log.Info("determined there was no project to run apply in")
 		// When silence is enabled and no projects are found, don't set any VCS status
 		if !a.SilenceVCSStatusNoProjects && !ctx.SuppressVCSStatus {
 			ctx.Log.Debug("setting VCS status to success with no projects found")
@@ -817,9 +1069,16 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
 	}
 
+	if err := prepareAPIApplyCommandsForAcceptedGeneration(ctx, cmds); err != nil {
+		return nil, errors.Join(err, finishClaim(nil))
+	}
+
 	// Update the combined apply commit status to pending
 	if !ctx.SuppressVCSStatus {
 		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+			if ctx.Pull.Num > 0 {
+				return nil, finishClaim(err)
+			}
 			ctx.Log.Warn("unable to update apply commit status: %s", err)
 		}
 	}
@@ -843,8 +1102,15 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		if !ctx.PreWorkflowHooksAlreadyRun {
 			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc[i])
 			if err != nil {
+				if events.IsWorkflowHookStatusPublicationError(err) {
+					return nil, finishClaim(err)
+				}
 				if a.FailOnPreWorkflowHookError {
-					return nil, err
+					var publicationErr error
+					if ctx.Pull.Num > 0 && !ctx.SuppressVCSStatus {
+						publicationErr = a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply)
+					}
+					return nil, errors.Join(err, finishClaim(publicationErr))
 				}
 			}
 		}
@@ -854,17 +1120,44 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		if res.Error != nil || res.Failure != "" {
 			currentGroupHasErrors = true
 		}
-		updatePullStatusFromProjectResult(ctx, res)
+		if ctx.Pull.Num <= 0 {
+			updatePullStatusFromProjectResult(ctx, res)
+		}
 
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]) // nolint: errcheck
+		if hookErr := a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc[i]); hookErr != nil {
+			if events.IsWorkflowHookStatusPublicationError(hookErr) {
+				return &command.Result{ProjectResults: projectResults}, finishClaim(hookErr)
+			}
+			ctx.Log.Warn("post-workflow hook failed, %v", hookErr)
+		}
 	}
 	result := &command.Result{ProjectResults: projectResults}
-	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
-		a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus)
-		return result, err
+	if ctx.Pull.Num > 0 {
+		pullStatus, updateErr := a.Database.UpdateApplyResultsForPlanGeneration(ctx.Pull, projectResults, publicationToken)
+		if updateErr != nil {
+			if db.IsPlanGenerationObsolete(updateErr) {
+				ctx.Log.Warn("PR-backed API apply result was superseded after execution; durable plan state was not changed")
+				claimErr := finishClaim(nil)
+				return result, errors.Join(fmt.Errorf("PR-backed API apply result was superseded by a newer plan generation after execution; verify infrastructure state: %w", updateErr), claimErr)
+			}
+			publicationErr := a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus)
+			claimErr := finishClaim(errors.Join(publicationErr, updateErr))
+			return result, errors.Join(fmt.Errorf("persisting PR-backed API apply results: %w", updateErr), claimErr)
+		}
+		ctx.PullStatus = &pullStatus
+		status := models.SuccessCommitStatus
+		if result.HasErrors() {
+			status = models.FailedCommitStatus
+		}
+		if claimErr := finishClaim(a.publishDeferredApplyStatuses(cmds, result, status)); claimErr != nil {
+			return result, claimErr
+		}
+		return result, nil
 	}
-	a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
-	return result, nil
+	if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
+		return result, errors.Join(err, a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus))
+	}
+	return result, a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
 }
 
 func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error {
@@ -882,15 +1175,274 @@ func (a *APIController) validateNonPRAPIRefUnchanged(ctx *command.Context) error
 	}, repoDir))
 }
 
-func (a *APIController) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result *command.Result, status models.CommitStatus) {
+func (a *APIController) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result *command.Result, status models.CommitStatus) error {
 	if result == nil {
-		return
+		return nil
 	}
 	publisher, ok := a.ProjectApplyCommandRunner.(events.DeferredApplyStatusPublisher)
 	if !ok {
+		return nil
+	}
+	return publisher.PublishDeferredApplyStatuses(projectCmds, *result, status)
+}
+
+func (a *APIController) publishDeferredPlanStatuses(projectCmds []command.ProjectContext, result *command.Result, status models.CommitStatus) error {
+	if result == nil {
+		return nil
+	}
+	publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishDeferredPlanStatuses(projectCmds, *result, status)
+}
+
+func (a *APIController) completeUnpublishedPlanJobs(projectCmds []command.ProjectContext, result *command.Result, message string) {
+	if result == nil {
 		return
 	}
-	publisher.PublishDeferredApplyStatuses(projectCmds, *result, status)
+	publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.CompleteUnpublishedPlanJobs(projectCmds, *result, message)
+}
+
+func (a *APIController) publishPendingPlanStatuses(projectCmds []command.ProjectContext) error {
+	publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishPendingPlanStatuses(projectCmds)
+}
+
+func (a *APIController) publishCancelledPlanStatuses(projectCmds []command.ProjectContext) error {
+	if len(projectCmds) == 0 {
+		return nil
+	}
+	publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishCancelledPlanStatuses(projectCmds)
+}
+
+func (a *APIController) publishPlanGenerationStartFailureStatuses(projectCmds []command.ProjectContext, err error) error {
+	publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher)
+	if !ok {
+		return nil
+	}
+	return publisher.PublishPlanGenerationStartFailureStatuses(projectCmds, err)
+}
+
+func (a *APIController) acquirePlanPublicationClaim(ctx *command.Context, operation string) (string, error) {
+	token := uuid.NewString()
+	if err := a.Database.AcquirePlanPublicationClaim(ctx.Pull, token); err != nil {
+		return "", fmt.Errorf("%s: %w", operation, err)
+	}
+	return token, nil
+}
+
+func (a *APIController) waitForPlanPublicationClaim(ctx *command.Context, operation string) (string, error) {
+	token := uuid.NewString()
+	for {
+		err := a.Database.AcquirePlanPublicationClaim(ctx.Pull, token)
+		if err == nil {
+			return token, nil
+		}
+		if !errors.Is(err, db.ErrPlanPublicationBusy) {
+			return "", fmt.Errorf("%s: %w", operation, err)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+func (a *APIController) finishPlanPublicationClaim(ctx *command.Context, token string, publicationErr error) error {
+	if publicationErr != nil {
+		return fmt.Errorf("publishing PR-backed API plan state; publication claim retained for offline recovery: %w", publicationErr)
+	}
+	if err := a.Database.ReleasePlanPublicationClaim(ctx.Pull, token); err != nil {
+		return fmt.Errorf("releasing PR-backed API plan publication claim: %w", err)
+	}
+	return nil
+}
+
+func (a *APIController) runAPIPlanWorkflowHook(
+	ctx *command.Context,
+	planGeneration string,
+	project command.ProjectContext,
+	phase string,
+	run func() error,
+) error {
+	if ctx.Pull.Num <= 0 || planGeneration == "" {
+		return run()
+	}
+	publicationToken, err := a.waitForPlanPublicationClaim(ctx, "running PR-backed API "+phase)
+	if err != nil {
+		return err
+	}
+	pullStatus, err := a.Database.GetPullStatus(ctx.Pull)
+	if err != nil {
+		return errors.Join(
+			fmt.Errorf("reading plan status before %s: %w", phase, err),
+			a.finishPlanPublicationClaim(ctx, publicationToken, nil),
+		)
+	}
+	current := false
+	if pullStatus != nil {
+		for _, status := range pullStatus.Projects {
+			if apiProjectIdentityMatches(status, project) && status.PlanGeneration == planGeneration {
+				current = true
+				break
+			}
+		}
+	}
+	if !current {
+		claimErr := a.finishPlanPublicationClaim(ctx, publicationToken, nil)
+		return errors.Join(fmt.Errorf("%w: PR-backed API %s belongs to generation %q", db.ErrPlanGenerationSuperseded, phase, planGeneration), claimErr)
+	}
+
+	hookErr := run()
+	if events.IsWorkflowHookStatusPublicationError(hookErr) {
+		return a.finishPlanPublicationClaim(ctx, publicationToken, hookErr)
+	}
+	return errors.Join(hookErr, a.finishPlanPublicationClaim(ctx, publicationToken, nil))
+}
+
+func apiPlanGenerationProjects(ctx *command.Context, cmds []command.ProjectContext) []models.ProjectStatus {
+	projects := make([]models.ProjectStatus, 0, len(cmds))
+	seen := make(map[string]struct{}, len(cmds))
+	for _, cmd := range cmds {
+		key := fmt.Sprintf("%s\x00%s\x00%s", cmd.Workspace, filepath.Clean(cmd.RepoRelDir), cmd.ProjectName)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		project := models.ProjectStatus{
+			Workspace:   cmd.Workspace,
+			RepoRelDir:  cmd.RepoRelDir,
+			ProjectName: cmd.ProjectName,
+		}
+		if ctx.PullStatus != nil {
+			for _, existing := range ctx.PullStatus.Projects {
+				if existing.Workspace == cmd.Workspace && filepath.Clean(existing.RepoRelDir) == filepath.Clean(cmd.RepoRelDir) && existing.ProjectName == cmd.ProjectName {
+					project.PolicyStatus = existing.PolicyStatus
+					break
+				}
+			}
+		}
+		projects = append(projects, project)
+	}
+	return projects
+}
+
+func apiCancelledPlanProjectContexts(ctx *command.Context, projects []db.PlanGenerationProject) []command.ProjectContext {
+	contexts := make([]command.ProjectContext, 0, len(projects))
+	for _, project := range projects {
+		contexts = append(contexts, command.ProjectContext{
+			Log:         ctx.Log,
+			CommandName: command.Plan,
+			BaseRepo:    ctx.Pull.BaseRepo,
+			Pull:        ctx.Pull,
+			Workspace:   project.Workspace,
+			RepoRelDir:  project.RepoRelDir,
+			ProjectName: project.ProjectName,
+		})
+	}
+	return contexts
+}
+
+func apiPlanFailureResults(cmds []command.ProjectContext, err error) []command.ProjectResult {
+	results := make([]command.ProjectResult, 0, len(cmds))
+	for _, cmd := range cmds {
+		results = append(results, command.ProjectResult{
+			ProjectCommandOutput: command.ProjectCommandOutput{Error: err},
+			Command:              command.Plan,
+			SubCommand:           cmd.SubCommand,
+			RepoRelDir:           cmd.RepoRelDir,
+			Workspace:            cmd.Workspace,
+			ProjectName:          cmd.ProjectName,
+			SilencePRComments:    cmd.SilencePRComments,
+		})
+	}
+	return results
+}
+
+func uniqueAPIProjectResults(results []command.ProjectResult) []command.ProjectResult {
+	unique := make([]command.ProjectResult, 0, len(results))
+	indexes := make(map[string]int, len(results))
+	for _, result := range results {
+		key := fmt.Sprintf("%s\x00%s\x00%s", result.Workspace, filepath.Clean(result.RepoRelDir), result.ProjectName)
+		if idx, ok := indexes[key]; ok {
+			unique[idx] = result
+			continue
+		}
+		indexes[key] = len(unique)
+		unique = append(unique, result)
+	}
+	return unique
+}
+
+func prepareAPIProjectCommandsForPlanGeneration(cmds []command.ProjectContext, generation string) {
+	for i := range cmds {
+		cmds[i].PlanGeneration = generation
+		cmds[i].AcceptedPlanGeneration = generation
+		if !cmds[i].RequiresAtlantisManagedPlanFile {
+			continue
+		}
+		managedPlanHash := ""
+		cmds[i].GeneratedPlanHash = &managedPlanHash
+	}
+}
+
+func prepareAPIApplyCommandsForAcceptedGeneration(ctx *command.Context, cmds []command.ProjectContext) error {
+	if ctx.PullStatus == nil {
+		if ctx.Pull.Num > 0 {
+			return errors.New("current PR-backed API plan status is missing")
+		}
+		return nil
+	}
+	for i := range cmds {
+		found := false
+		for _, project := range ctx.PullStatus.Projects {
+			if apiProjectIdentityMatches(project, cmds[i]) {
+				if cmds[i].AcceptedPlanGeneration == "" {
+					// Legacy/custom builders may omit this correlation field. The
+					// publication claim and command-start PullStatus equality check
+					// above make copying from this exact snapshot safe.
+					cmds[i].AcceptedPlanGeneration = project.AcceptedPlanGeneration
+				} else if cmds[i].AcceptedPlanGeneration != project.AcceptedPlanGeneration {
+					return fmt.Errorf(
+						"plan generation changed before PR-backed API apply for dir %q workspace %q project %q; rerun the API apply request",
+						cmds[i].RepoRelDir, cmds[i].Workspace, cmds[i].ProjectName,
+					)
+				}
+				found = true
+				break
+			}
+		}
+		if !found && ctx.Pull.Num > 0 {
+			return fmt.Errorf(
+				"no current plan status exists for PR-backed API apply dir %q workspace %q project %q; run `atlantis plan`",
+				cmds[i].RepoRelDir, cmds[i].Workspace, cmds[i].ProjectName,
+			)
+		}
+	}
+	return nil
+}
+
+func apiProjectIdentityMatches(project models.ProjectStatus, ctx command.ProjectContext) bool {
+	projectWorkspace := project.Workspace
+	if projectWorkspace == "" {
+		projectWorkspace = events.DefaultWorkspace
+	}
+	ctxWorkspace := ctx.Workspace
+	if ctxWorkspace == "" {
+		ctxWorkspace = events.DefaultWorkspace
+	}
+	return projectWorkspace == ctxWorkspace &&
+		filepath.Clean(project.RepoRelDir) == filepath.Clean(ctx.RepoRelDir) &&
+		project.ProjectName == ctx.ProjectName
 }
 
 func updatePullStatusFromProjectResult(ctx *command.Context, result command.ProjectResult) {
@@ -1292,7 +1844,7 @@ func (e *apiRemediationExecutor) ExecutePlan(repository, ref, vcsType, projectNa
 	ctx.PreWorkflowHooksAlreadyRun = true
 
 	// Execute plan
-	result, err := e.controller.apiPlan(request, ctx)
+	result, err := e.controller.apiPlan(request, ctx, true)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1372,7 +1924,7 @@ func (e *apiRemediationExecutor) ExecuteApplyProjects(repository, ref, vcsType s
 	}
 	ctx.PreWorkflowHooksAlreadyRun = true
 
-	planResult, err := e.controller.apiPlan(request, ctx)
+	planResult, err := e.controller.apiPlan(request, ctx, true)
 	if err != nil {
 		return nil, fmt.Errorf("plan failed: %w", err)
 	}
@@ -1467,7 +2019,7 @@ func (e *apiRemediationExecutor) ExecuteApply(repository, ref, vcsType, projectN
 	ctx.PreWorkflowHooksAlreadyRun = true
 
 	// First run plan (required before apply)
-	planResult, err := e.controller.apiPlan(request, ctx)
+	planResult, err := e.controller.apiPlan(request, ctx, true)
 	if err != nil {
 		return "", fmt.Errorf("plan failed: %w", err)
 	}
@@ -2201,7 +2753,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx.PreWorkflowHooksAlreadyRun = true
 
-	result, err := a.apiPlan(apiRequest, ctx)
+	result, err := a.apiPlan(apiRequest, ctx, true)
 	if err != nil {
 		if errors.Is(err, events.ErrTeamAllowlistDenied) {
 			responder.Forbidden(w, r, err.Error())

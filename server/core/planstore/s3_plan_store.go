@@ -21,7 +21,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // S3Client is the subset of the S3 API used by S3PlanStore, extracted for testability.
@@ -128,6 +127,12 @@ func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
 	if ctx.User.Username != "" {
 		metadata["planned-by"] = ctx.User.Username
 	}
+	if ctx.GeneratedPlanHash != nil && *ctx.GeneratedPlanHash != "" {
+		metadata["managed-plan-sha256"] = *ctx.GeneratedPlanHash
+	}
+	if ctx.PlanGeneration != "" {
+		metadata["plan-generation"] = ctx.PlanGeneration
+	}
 
 	opCtx, opCancel := s3Ctx()
 	defer opCancel()
@@ -198,22 +203,24 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	return nil
 }
 
-// Remove deletes the plan file from S3 and locally.
+// Remove deletes legacy/hashless artifacts for non-apply callers. Digest-bound
+// managed plans are retained until explicit pull/project cleanup. Apply never
+// calls this method because even legacy state cannot prove artifact ownership.
 func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error {
 	key := s.s3Key(ctx, planPath)
-
-	opCtx, opCancel := s3Ctx()
-	defer opCancel()
-	if _, err := s.client.DeleteObject(opCtx, &s3.DeleteObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(key),
-	}); err != nil {
-		s.logger.Warn("failed to delete plan from S3 (key=%s): %v", key, err)
+	if ctx.RecordedManagedPlanHash == "" {
+		opCtx, opCancel := s3Ctx()
+		defer opCancel()
+		if _, err := s.client.DeleteObject(opCtx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}); err != nil {
+			s.logger.Warn("failed to delete plan from S3 (key=%s): %v", key, err)
+		} else {
+			s.logger.Debug("deleted plan from s3://%s/%s", s.bucket, key)
+		}
 	} else {
-		s.logger.Debug("deleted plan from s3://%s/%s", s.bucket, key)
+		s.logger.Debug("retaining digest-bound managed plan in s3://%s/%s until explicit cleanup", s.bucket, key)
 	}
 
-	return utils.RemoveIgnoreNonExistent(planPath)
+	return (&LocalPlanStore{}).Remove(ctx, planPath)
 }
 
 // RestorePlans lists all plan files for a pull request in S3 (via prefix scan)
@@ -221,11 +228,9 @@ func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error 
 // Only called from the "apply all" path where we don't know which projects
 // were planned. The single-project path skips this and uses Load directly.
 //
-// Note: plans downloaded here will be re-downloaded by Load() in
-// ApplyStepRunner, which also validates head-commit metadata. This means
-// each plan is fetched from S3 twice in the "apply all" path. Acceptable
-// since plan files are small; eliminating it would require shared state
-// between RestorePlans and Load.
+// Restored plans are validated by the apply path before execution. The runtime
+// apply step consumes the already validated local bytes and does not load the
+// deterministic S3 key again.
 // ListWorkspaces scans the pull request's prefix in S3 and returns the unique
 // workspace names (first path segment after owner/repo/pullNum/) that have at
 // least one .tfplan stored. Callers use this to clone each workspace before

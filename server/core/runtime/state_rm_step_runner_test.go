@@ -48,7 +48,7 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 	commands := []string{"state", "rm", "-lock=false", "addr1", "addr2", "addr3"}
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, "default")
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
@@ -87,7 +87,7 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace)
 
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
@@ -129,5 +129,5 @@ func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq(commands), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq(workspace))
 
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }

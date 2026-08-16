@@ -4,6 +4,8 @@
 package runtime
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -15,7 +17,6 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 // ApplyStepRunner runs `terraform apply`.
@@ -34,15 +35,18 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	}
 
 	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
-	if loadErr := a.PlanStore.Load(ctx, planPath); loadErr != nil {
-		return "", fmt.Errorf("loading plan: %w", loadErr)
-	}
 	contents, err := os.ReadFile(planPath)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no plan found at path %q and workspace %q–did you run plan?", ctx.RepoRelDir, ctx.Workspace)
 	}
 	if err != nil {
 		return "", fmt.Errorf("unable to read planfile: %w", err)
+	}
+	if ctx.ExpectedPlanHash != "" {
+		actualHash := sha256.Sum256(contents)
+		if hex.EncodeToString(actualHash[:]) != ctx.ExpectedPlanHash {
+			return "", fmt.Errorf("plan file changed for dir %q workspace %q project %q; run `atlantis plan` before apply", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+		}
 	}
 
 	ctx.Log.Info("starting apply")
@@ -59,24 +63,32 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.EscapedCommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, tfDistribution, tfVersion, envs)
+		out, err = a.runRemoteApply(ctx, args, path, contents, tfDistribution, tfVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
 	} else {
+		executionPlanPath := planPath
+		if ctx.ExpectedPlanHash != "" {
+			executionPlanPath, err = writeValidatedPlanSnapshot(path, contents)
+			if err != nil {
+				return "", err
+			}
+			defer func() {
+				if removeErr := os.Remove(executionPlanPath); removeErr != nil && !os.IsNotExist(removeErr) {
+					ctx.Log.Warn("failed to remove validated plan snapshot: %s", removeErr)
+				}
+			}()
+		}
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
-		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", planPath))
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.EscapedCommentArgs...), fmt.Sprintf("%q", executionPlanPath))
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
-	// If the apply was successful, delete the plan.
-	if err == nil {
-		ctx.Log.Info("apply successful, deleting planfile")
-		if removeErr := a.PlanStore.Remove(ctx, planPath); removeErr != nil {
-			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)
-		}
-	}
+	// Retain the plan until explicit pull/project cleanup. A completed apply
+	// cannot prove that a deterministic local/S3 artifact was not replaced by a
+	// newer accepted generation while Terraform was running.
 	return out, err
 }
 
@@ -112,8 +124,8 @@ func (a *ApplyStepRunner) cleanRemoteApplyOutput(out string) string {
 
 // runRemoteApply handles running the apply and performing actions in real-time
 // as we get the output from the command.
-// Specifically, we set commit statuses with links to Terraform Enterprise's
-// UI to view real-time output.
+// Specifically, we record the Terraform Enterprise run URL so the outer apply
+// lifecycle can publish it after durable result persistence.
 // We also check if the plan that's about to be applied matches the one we
 // printed to the pull request.
 // We need to do this because remote plan doesn't support -out, so we do a
@@ -123,24 +135,10 @@ func (a *ApplyStepRunner) runRemoteApply(
 	ctx command.ProjectContext,
 	applyArgs []string,
 	path string,
-	absPlanPath string,
+	planfileBytes []byte,
 	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
-	// The planfile contents are needed to ensure that the plan didn't change
-	// between plan and apply phases.
-	planfileBytes, err := os.ReadFile(absPlanPath)
-	if err != nil {
-		return "", fmt.Errorf("reading planfile: %w", err)
-	}
-
-	// updateStatusF will update the commit status and log any error.
-	updateStatusF := func(status models.CommitStatus, url string) {
-		if err := a.CommitStatusUpdater.UpdateProject(ctx, command.Apply, status, url, nil); err != nil {
-			ctx.Log.Err("unable to update status: %s", err)
-		}
-	}
-
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
 	inCh, outCh := a.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), applyArgs, envs, tfDistribution, tfVersion, ctx.Workspace)
@@ -148,6 +146,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 	nextLineIsRunURL := false
 	var runURL string
 	var planChangedErr error
+	var err error
 
 	for line := range outCh {
 		if line.Err != nil {
@@ -156,8 +155,8 @@ func (a *ApplyStepRunner) runRemoteApply(
 		}
 		lines = append(lines, line.Line)
 
-		// Here we're checking for the run url and updating the status
-		// if found.
+		// Here we're checking for the run URL and recording it for deferred
+		// publication after durable apply result persistence.
 		if line.Line == lineBeforeRunURL {
 			nextLineIsRunURL = true
 		} else if nextLineIsRunURL {
@@ -165,8 +164,7 @@ func (a *ApplyStepRunner) runRemoteApply(
 			if ctx.RemoteApplyRunURL != nil {
 				*ctx.RemoteApplyRunURL = runURL
 			}
-			ctx.Log.Debug("remote run url found, updating commit status")
-			updateStatusF(models.PendingCommitStatus, runURL)
+			ctx.Log.Debug("remote run url found")
 			nextLineIsRunURL = false
 		}
 
@@ -194,15 +192,12 @@ func (a *ApplyStepRunner) runRemoteApply(
 	ctx.Log.Debug("async tf remote operation complete")
 	output := strings.Join(lines, "\n")
 	if planChangedErr != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
 		// The output isn't important if the plans don't match so we just
 		// discard it.
 		return "", planChangedErr
 	}
 
-	if err != nil {
-		updateStatusF(models.FailedCommitStatus, runURL)
-	} else {
+	if err == nil {
 		ctx.Log.Debug("remote apply succeeded; deferring success status until final apply freshness validation")
 	}
 	return output, err

@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	coredb "github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +30,180 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 	"go.uber.org/mock/gomock"
 )
+
+func TestCleanUpPullPublicationClaimRecovery(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	workingDir := mocks.NewMockWorkingDir()
+	resourceCleaner := mocks.NewMockResourceCleaner()
+	store := &countingPlanStore{}
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	_, err = database.UpdatePullWithResults(testdata.Pull, []command.ProjectResult{{
+		Workspace: "default", RepoRelDir: "project-a", ProjectName: "a",
+	}})
+	Ok(t, err)
+	Ok(t, database.AcquirePlanPublicationClaim(testdata.Pull, "publisher"))
+	notifyingDatabase := &notifyBusyClaimDatabase{Database: database, busy: make(chan struct{})}
+	lockerController := gomock.NewController(t)
+	locker := lockmocks.NewMockLocker(lockerController)
+	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+	pce := events.PullClosedExecutor{
+		Locker:                   locker,
+		WorkingDir:               workingDir,
+		Database:                 notifyingDatabase,
+		PlanStore:                store,
+		LogStreamResourceCleaner: resourceCleaner,
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull) }()
+	<-notifyingDatabase.busy
+	select {
+	case err := <-done:
+		t.Fatalf("cleanup returned while publisher still held claim: %v", err)
+	default:
+	}
+	workingDir.VerifyWasCalled(Never()).Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+	resourceCleaner.VerifyWasCalled(Never()).CleanUp(Any[jobs.PullInfo]())
+	Equals(t, 0, store.deleteForPullCalls)
+	status, statusErr := database.GetPullStatus(testdata.Pull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "busy cleanup must not delete pull status")
+	secondOwnerErr := database.AcquirePlanPublicationClaim(testdata.Pull, "second-owner")
+	Assert(t, errors.Is(secondOwnerErr, coredb.ErrPlanPublicationBusy), "cleanup must not clear the publisher claim, got %v", secondOwnerErr)
+
+	Ok(t, database.ReleasePlanPublicationClaim(testdata.Pull, "publisher"))
+	err = <-done
+
+	Ok(t, err)
+	workingDir.VerifyWasCalledOnce().Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+	resourceCleaner.VerifyWasCalledOnce().CleanUp(Any[jobs.PullInfo]())
+	Equals(t, 1, store.deleteForPullCalls)
+	status, statusErr = database.GetPullStatus(testdata.Pull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "successful cleanup must retain a durable close tombstone")
+	Equals(t, models.DiscardedPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].PlanGeneration)
+	Ok(t, database.AcquirePlanPublicationClaim(testdata.Pull, "after-cleanup"))
+	Ok(t, database.ReleasePlanPublicationClaim(testdata.Pull, "after-cleanup"))
+}
+
+func TestCleanUpPullEarlyErrorReleasesPublicationClaim(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	workingDir := mocks.NewMockWorkingDir()
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	pce := events.PullClosedExecutor{
+		WorkingDir: workingDir,
+		Database:   database,
+	}
+	workspaceErr := errors.New("disk unavailable")
+	When(workingDir.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(workspaceErr)
+
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+
+	Equals(t, "cleaning workspace: disk unavailable", err.Error())
+	workingDir.VerifyWasCalledOnce().Delete(logger, testdata.GithubRepo, testdata.Pull)
+	Ok(t, database.AcquirePlanPublicationClaim(testdata.Pull, "retry-owner"))
+	Ok(t, database.ReleasePlanPublicationClaim(testdata.Pull, "retry-owner"))
+}
+
+func TestCleanUpPullCancelsActivePlanGenerationBeforeDestructiveWork(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	workingDir := mocks.NewMockWorkingDir()
+	resourceCleaner := mocks.NewMockResourceCleaner()
+	store := &countingPlanStore{}
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	project := models.ProjectStatus{
+		Workspace:   "default",
+		RepoRelDir:  "project-a",
+		ProjectName: "a",
+	}
+	_, err = database.BeginPlanGeneration(testdata.Pull, []models.ProjectStatus{project}, "generation-a")
+	Ok(t, err)
+	lockerController := gomock.NewController(t)
+	locker := lockmocks.NewMockLocker(lockerController)
+	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+	pce := events.PullClosedExecutor{
+		Locker:                   locker,
+		WorkingDir:               workingDir,
+		Database:                 database,
+		PlanStore:                store,
+		LogStreamResourceCleaner: resourceCleaner,
+	}
+
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+
+	Ok(t, err)
+	workingDir.VerifyWasCalledOnce().Delete(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+	resourceCleaner.VerifyWasCalledOnce().CleanUp(Any[jobs.PullInfo]())
+	Equals(t, 1, store.deleteForPullCalls)
+	status, statusErr := database.GetPullStatus(testdata.Pull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "active generation cleanup must retain a close tombstone")
+	Equals(t, models.ErroredPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].PlanGeneration)
+	_, staleErr := database.CompletePlanGeneration(testdata.Pull, "generation-a", []command.ProjectResult{{
+		Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, ProjectName: project.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}},
+	}})
+	Assert(t, coredb.IsPlanGenerationObsolete(staleErr), "stale generation must remain obsolete after close, got %v", staleErr)
+	Ok(t, database.AcquirePlanPublicationClaim(testdata.Pull, "retry-owner"))
+	Ok(t, database.ReleasePlanPublicationClaim(testdata.Pull, "retry-owner"))
+}
+
+func TestCleanUpPullRetainsClaimWhenFinalCommentPublicationIsAmbiguous(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	workingDir := mocks.NewMockWorkingDir()
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+	_, err = database.UpdatePullWithResults(testdata.Pull, []command.ProjectResult{{
+		Command:     command.Plan,
+		Workspace:   "default",
+		RepoRelDir:  "project-a",
+		ProjectName: "a",
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess: &models.PlanSuccess{},
+		},
+	}})
+	Ok(t, err)
+	lockerController := gomock.NewController(t)
+	locker := lockmocks.NewMockLocker(lockerController)
+	locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return([]models.ProjectLock{{
+		Pull:      testdata.Pull,
+		Workspace: "default",
+		Project:   models.NewProject(testdata.GithubRepo.FullName, "project-a", "a"),
+	}}, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	commentErr := errors.New("ambiguous VCS timeout")
+	When(vcsClient.CreateComment(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Any[string](), Eq(""))).ThenReturn(commentErr)
+	pce := events.PullClosedExecutor{
+		Locker:                   locker,
+		VCSClient:                vcsClient,
+		WorkingDir:               workingDir,
+		Database:                 database,
+		LogStreamResourceCleaner: mocks.NewMockResourceCleaner(),
+	}
+
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+
+	Equals(t, commentErr, err)
+	status, statusErr := database.GetPullStatus(testdata.Pull)
+	Ok(t, statusErr)
+	Assert(t, status != nil, "claim-aware cleanup must retain a close tombstone before final publication")
+	Equals(t, models.DiscardedPlanStatus, status.Projects[0].Status)
+	competingErr := database.AcquirePlanPublicationClaim(testdata.Pull, "reopened-pull")
+	Assert(t, errors.Is(competingErr, coredb.ErrPlanPublicationBusy), "ambiguous final close comment must retain claim, got %v", competingErr)
+}
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	t.Log("when workspace.Delete returns an error, we return it")
@@ -417,6 +593,20 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 
 type countingPlanStore struct {
 	deleteForPullCalls int
+}
+
+type notifyBusyClaimDatabase struct {
+	coredb.Database
+	busy chan struct{}
+	once sync.Once
+}
+
+func (d *notifyBusyClaimDatabase) AcquirePlanPublicationClaim(pull models.PullRequest, token string) error {
+	err := d.Database.AcquirePlanPublicationClaim(pull, token)
+	if errors.Is(err, coredb.ErrPlanPublicationBusy) {
+		d.once.Do(func() { close(d.busy) })
+	}
+	return err
 }
 
 func (s *countingPlanStore) Save(command.ProjectContext, string) error   { return nil }

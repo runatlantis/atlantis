@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,8 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/boltdb"
+	coredb "github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
@@ -64,6 +67,76 @@ func (f fakeControllerLivePullHeadFetcher) GetLivePullIdentity(command.ProjectCo
 type recordingPullStatusFetcher struct {
 	statuses []*models.PullStatus
 	calls    []models.PullRequest
+}
+
+type claimRecordingPlanPublisher struct {
+	events.ProjectPlanCommandRunner
+	database                coredb.Database
+	pull                    models.PullRequest
+	cancelled               []command.ProjectContext
+	claimErr                error
+	statusDuringPublication *models.PullStatus
+}
+
+func (*claimRecordingPlanPublisher) PublishPendingPlanStatuses([]command.ProjectContext) error {
+	return nil
+}
+
+func (p *claimRecordingPlanPublisher) PublishCancelledPlanStatuses(projects []command.ProjectContext) error {
+	p.cancelled = append(p.cancelled, projects...)
+	p.statusDuringPublication, _ = p.database.GetPullStatus(p.pull)
+	p.claimErr = p.database.AcquirePlanPublicationClaim(p.pull, "competing-cancellation-publisher")
+	return nil
+}
+
+func (*claimRecordingPlanPublisher) PublishPlanGenerationStartFailureStatuses([]command.ProjectContext, error) error {
+	return nil
+}
+
+func (*claimRecordingPlanPublisher) PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus) error {
+	return nil
+}
+
+func (*claimRecordingPlanPublisher) CompleteSupersededPlanJobs([]command.ProjectContext, command.Result) {
+}
+
+func (*claimRecordingPlanPublisher) CompleteUnpublishedPlanJobs([]command.ProjectContext, command.Result, string) {
+}
+
+func seedPRBackedAPIManagedPlan(t *testing.T, ac *controllers.APIController) (models.PullRequest, models.ProjectStatus) {
+	t.Helper()
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "main",
+		BaseRepo: models.Repo{
+			FullName: "Repo",
+			VCSHost:  models.VCSHost{Hostname: "gitlab.com", Type: models.Gitlab},
+		},
+	}
+	project := models.ProjectStatus{
+		Workspace:   events.DefaultWorkspace,
+		RepoRelDir:  events.DefaultRepoRelDir,
+		ProjectName: "managed-project",
+	}
+	const claimToken = "seed-managed-plan"
+	const generation = "accepted-generation"
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(pull, claimToken))
+	_, err := ac.Database.BeginPlanGeneration(pull, []models.ProjectStatus{project}, generation, claimToken)
+	Ok(t, err)
+	_, err = ac.Database.CompletePlanGeneration(pull, generation, []command.ProjectResult{{
+		Command:     command.Plan,
+		Workspace:   project.Workspace,
+		RepoRelDir:  project.RepoRelDir,
+		ProjectName: project.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess:         &models.PlanSuccess{},
+			AtlantisManagedPlan: true,
+			ManagedPlanHash:     strings.Repeat("b", 64),
+		},
+	}}, claimToken)
+	Ok(t, err)
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(pull, claimToken))
+	return pull, project
 }
 
 func (f *recordingPullStatusFetcher) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
@@ -152,6 +225,173 @@ func TestAPIController_Plan(t *testing.T) {
 
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_PRBackedPlanPersistsManagedArtifactIdentity(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	project := command.ProjectContext{
+		CommandName:                     command.Plan,
+		RepoRelDir:                      "infra",
+		Workspace:                       events.DefaultWorkspace,
+		ProjectName:                     "api-managed",
+		RequiresAtlantisManagedPlanFile: true,
+	}
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{project}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess:         &models.PlanSuccess{},
+		AtlantisManagedPlan: true,
+		ManagedPlanHash:     strings.Repeat("a", 64),
+	})
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{"api-managed"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "main",
+		BaseRepo: models.Repo{
+			FullName: "Repo",
+			VCSHost:  models.VCSHost{Hostname: "gitlab.com", Type: models.Gitlab},
+		},
+	}
+	status, err := ac.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected durable PR-backed API plan status")
+	Equals(t, 1, len(status.Projects))
+	Equals(t, strings.Repeat("a", 64), status.Projects[0].ManagedPlanHash)
+	Assert(t, status.Projects[0].AcceptedPlanGeneration != "", "expected accepted plan generation")
+}
+
+func TestAPIController_PRBackedPlanWithZeroProjectsTombstonesPriorManagedPlanUnderPublicationClaim(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	pull, project := seedPRBackedAPIManagedPlan(t, ac)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+
+	publisher := &claimRecordingPlanPublisher{
+		ProjectPlanCommandRunner: projectCommandRunner,
+		database:                 ac.Database,
+		pull:                     pull,
+	}
+	ac.ProjectPlanCommandRunner = publisher
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+	var statusClaimErrors []error
+	var statusesDuringCountPublication []*models.PullStatus
+	var publishedCountCommands []command.Name
+	When(commitStatusUpdater.UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts](),
+	)).Then(func(params []Param) ReturnValues {
+		status, err := ac.Database.GetPullStatus(pull)
+		if err != nil {
+			return ReturnValues{err}
+		}
+		statusesDuringCountPublication = append(statusesDuringCountPublication, status)
+		publishedCountCommands = append(publishedCountCommands, params[4].(command.Name))
+		statusClaimErrors = append(statusClaimErrors, ac.Database.AcquirePlanPublicationClaim(pull, "competing-count-publisher"))
+		return ReturnValues{error(nil)}
+	})
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{"removed-project"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	status, err := ac.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected tombstoned pull status")
+	Equals(t, 1, len(status.Projects))
+	Equals(t, project.Workspace, status.Projects[0].Workspace)
+	Equals(t, project.RepoRelDir, status.Projects[0].RepoRelDir)
+	Equals(t, project.ProjectName, status.Projects[0].ProjectName)
+	Equals(t, models.DiscardedPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].ManagedPlanHash)
+	Equals(t, "", status.Projects[0].PlanGeneration)
+	Equals(t, "", status.Projects[0].AcceptedPlanGeneration)
+	Equals(t, 0, len(publisher.cancelled))
+	Equals(t, 3, len(statusClaimErrors))
+	Equals(t, 3, len(statusesDuringCountPublication))
+	Equals(t, []command.Name{command.Plan, command.PolicyCheck, command.Apply}, publishedCountCommands)
+	for i, claimErr := range statusClaimErrors {
+		Assert(t, errors.Is(claimErr, coredb.ErrPlanPublicationBusy), "count publication %d did not hold claim: %v", i, claimErr)
+		Assert(t, statusesDuringCountPublication[i] != nil && statusesDuringCountPublication[i].Projects[0].Status == models.DiscardedPlanStatus, "count publication %d did not observe committed tombstone", i)
+	}
+	commitStatusUpdater.VerifyWasCalled(Times(3)).UpdateCombinedCount(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Any[command.Name](), Eq(models.ProjectCounts{}))
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(pull, "after-publication"))
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(pull, "after-publication"))
+}
+
+func TestAPIController_PRBackedPlanWithZeroProjectsCancelsPriorActiveGenerationUnderPublicationClaim(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	pull, project := seedPRBackedAPIManagedPlan(t, ac)
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(pull, "activate-generation"))
+	_, err := ac.Database.BeginPlanGeneration(pull, []models.ProjectStatus{project}, "active-generation", "activate-generation")
+	Ok(t, err)
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(pull, "activate-generation"))
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+	publisher := &claimRecordingPlanPublisher{
+		ProjectPlanCommandRunner: projectCommandRunner,
+		database:                 ac.Database,
+		pull:                     pull,
+	}
+	ac.ProjectPlanCommandRunner = publisher
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{"removed-project"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Plan(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	status, err := ac.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected terminal pull status")
+	Equals(t, 1, len(status.Projects))
+	Equals(t, models.ErroredPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].PlanGeneration)
+	Equals(t, "", status.Projects[0].AcceptedPlanGeneration)
+	Equals(t, "", status.Projects[0].ManagedPlanHash)
+	Equals(t, 1, len(publisher.cancelled))
+	Equals(t, project.Workspace, publisher.cancelled[0].Workspace)
+	Equals(t, project.RepoRelDir, publisher.cancelled[0].RepoRelDir)
+	Equals(t, project.ProjectName, publisher.cancelled[0].ProjectName)
+	Assert(t, errors.Is(publisher.claimErr, coredb.ErrPlanPublicationBusy), "expected cancellation publication to hold claim, got %v", publisher.claimErr)
+	Assert(t, publisher.statusDuringPublication != nil && publisher.statusDuringPublication.Projects[0].Status == models.ErroredPlanStatus, "expected cancellation publication to observe committed terminal state")
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+	commitStatusUpdater.VerifyWasCalled(Times(3)).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Any[models.PullRequest](), Eq(models.FailedCommitStatus), Any[command.Name](), Eq(models.ProjectCounts{Total: 1, Errored: 1}))
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(pull, "after-cancellation"))
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(pull, "after-cancellation"))
 }
 
 func TestAPIController_PlanSortsByExecutionOrder(t *testing.T) {
@@ -845,6 +1085,234 @@ func TestAPIController_Apply(t *testing.T) {
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Apply(Any[command.ProjectContext]())
 }
 
+func TestAPIController_PRBackedApplyDoesNotUnlockNewerSamePullLocks(t *testing.T) {
+	ac, _, _ := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         42,
+		Projects:   []string{"default"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+}
+
+func TestAPIController_PRBackedApplyHoldsPublicationClaimDuringProjectExecution(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	seededPull, seededProject := seedPRBackedAPIManagedPlan(t, ac)
+	const competingToken = "competing-apply-publisher"
+	var competingAcquireErr error
+	var unclaimedBeginErr error
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func([]Param) ReturnValues {
+		competingAcquireErr = ac.Database.AcquirePlanPublicationClaim(seededPull, competingToken)
+		_, unclaimedBeginErr = ac.Database.BeginPlanGeneration(seededPull, []models.ProjectStatus{seededProject}, "unclaimed-during-apply")
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+	})
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{seededProject.ProjectName},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+	Assert(t, errors.Is(competingAcquireErr, coredb.ErrPlanPublicationBusy), "expected competing acquire to be busy during apply, got %v", competingAcquireErr)
+	Assert(t, errors.Is(unclaimedBeginErr, coredb.ErrPlanPublicationNotOwned), "expected unclaimed begin to be rejected during apply, got %v", unclaimedBeginErr)
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(seededPull, competingToken))
+	_, err = ac.Database.BeginPlanGeneration(seededPull, []models.ProjectStatus{seededProject}, "generation-after-apply", competingToken)
+	Ok(t, err)
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(seededPull, competingToken))
+}
+
+func TestAPIController_PRBackedApplyHoldsPublicationClaimWhileBuildingCommands(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	seededPull, seededProject := seedPRBackedAPIManagedPlan(t, ac)
+	builderEntered := make(chan struct{})
+	releaseBuilder := make(chan struct{})
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
+		commentCommand := params[1].(*events.CommentCommand)
+		close(builderEntered)
+		<-releaseBuilder
+		return ReturnValues{[]command.ProjectContext{apiTestProjectContext(commentCommand)}, nil}
+	})
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{seededProject.ProjectName},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	requestDone := make(chan struct{})
+	go func() {
+		ac.Apply(w, req)
+		close(requestDone)
+	}()
+
+	select {
+	case <-builderEntered:
+	case <-requestDone:
+		t.Fatal("API apply returned before BuildApplyCommands barrier")
+	}
+	const competingToken = "competing-builder-publisher"
+	competingAcquireErr := ac.Database.AcquirePlanPublicationClaim(seededPull, competingToken)
+	_, unclaimedBeginErr := ac.Database.BeginPlanGeneration(seededPull, []models.ProjectStatus{seededProject}, "unclaimed-during-builder")
+	close(releaseBuilder)
+	<-requestDone
+
+	ResponseContains(t, w, http.StatusOK, "")
+	Assert(t, errors.Is(competingAcquireErr, coredb.ErrPlanPublicationBusy), "expected competing acquire to be busy during apply command building, got %v", competingAcquireErr)
+	Assert(t, errors.Is(unclaimedBeginErr, coredb.ErrPlanPublicationNotOwned), "expected unclaimed begin to be rejected during apply command building, got %v", unclaimedBeginErr)
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+	Ok(t, ac.Database.AcquirePlanPublicationClaim(seededPull, competingToken))
+	_, err = ac.Database.BeginPlanGeneration(seededPull, []models.ProjectStatus{seededProject}, "generation-after-builder", competingToken)
+	Ok(t, err)
+	Ok(t, ac.Database.ReleasePlanPublicationClaim(seededPull, competingToken))
+}
+
+func TestAPIController_PRBackedApplyRejectsGenerationChangedAfterPlanBeforeApply(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	_, seededProject := seedPRBackedAPIManagedPlan(t, ac)
+	pullReqStatusFetcher := NewMockPullReqStatusFetcher()
+	ac.PullReqStatusFetcher = pullReqStatusFetcher
+	var fetchCalls int
+	var generationBErr error
+	When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Any[models.PullRequest]())).Then(func(params []Param) ReturnValues {
+		fetchCalls++
+		if fetchCalls == 2 {
+			pull := params[1].(models.PullRequest)
+			const claimToken = "generation-b-publisher"
+			generationBErr = ac.Database.AcquirePlanPublicationClaim(pull, claimToken)
+			if generationBErr == nil {
+				_, generationBErr = ac.Database.BeginPlanGeneration(pull, []models.ProjectStatus{seededProject}, "generation-b", claimToken)
+			}
+			if generationBErr == nil {
+				_, generationBErr = ac.Database.CompletePlanGeneration(pull, "generation-b", []command.ProjectResult{{
+					Command:     command.Plan,
+					Workspace:   seededProject.Workspace,
+					RepoRelDir:  seededProject.RepoRelDir,
+					ProjectName: seededProject.ProjectName,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{},
+					},
+				}}, claimToken)
+			}
+			if releaseErr := ac.Database.ReleasePlanPublicationClaim(pull, claimToken); generationBErr == nil {
+				generationBErr = releaseErr
+			}
+		}
+		return ReturnValues{models.PullReqStatus{}, generationBErr}
+	})
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{seededProject.ProjectName},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	ResponseContains(t, w, http.StatusInternalServerError, "plan generation changed before apply")
+	Ok(t, generationBErr)
+	Equals(t, 2, fetchCalls)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_PRBackedApplyWithZeroProjectsPreservesDurableStateAndSharedStatuses(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	pull, _ := seedPRBackedAPIManagedPlan(t, ac)
+	before, err := ac.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, before != nil, "expected seeded durable state")
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+	commitStatusUpdater := ac.CommitStatusUpdater.(*MockCommitStatusUpdater)
+
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		PR:         1,
+		Projects:   []string{"missing-project"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+	after, err := ac.Database.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, reflect.DeepEqual(before, after), "zero-project PR apply changed durable state\nbefore: %#v\nafter: %#v", before, after)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](),
+	)
+	commitStatusUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts](),
+	)
+}
+
+func TestAPIController_NonPRApplyRetainsLegacyPullWideUnlock(t *testing.T) {
+	ac, _, _ := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
+	ac.Locker.(*MockLocker).EXPECT().UnlockByPull("Repo", gomock.Any()).Return(nil, nil).Times(1)
+	body, err := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+
+	ac.Apply(w, req)
+
+	ResponseContains(t, w, http.StatusOK, "")
+}
+
 func TestAPIController_ApplySortsByExecutionOrder(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	buildCommands := func(args []Param) ReturnValues {
@@ -983,7 +1451,12 @@ func TestAPIController_NoPRRequestsUseSyntheticHardenedAPIContext(t *testing.T) 
 			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 				Then(func(args []Param) ReturnValues {
 					capturedCtx = args[0].(*command.Context)
-					return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+					return ReturnValues{[]command.ProjectContext{{
+						CommandName: command.Plan,
+						Workspace:   events.DefaultWorkspace,
+						RepoRelDir:  events.DefaultRepoRelDir,
+						ProjectName: "default",
+					}}, nil}
 				})
 
 			body, _ := json.Marshal(controllers.APIRequest{
@@ -1025,7 +1498,12 @@ func TestAPIController_PRRequestsDoNotSkipPRRequirements(t *testing.T) {
 			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 				Then(func(args []Param) ReturnValues {
 					capturedCtx = args[0].(*command.Context)
-					return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
+					return ReturnValues{[]command.ProjectContext{{
+						CommandName: command.Plan,
+						Workspace:   events.DefaultWorkspace,
+						RepoRelDir:  events.DefaultRepoRelDir,
+						ProjectName: "default",
+					}}, nil}
 				})
 
 			body, _ := json.Marshal(controllers.APIRequest{
@@ -1579,7 +2057,12 @@ func TestAPIApply_PRRefDoesNotUseHeadRefAsBaseBranch(t *testing.T) {
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		Then(func(args []Param) ReturnValues {
 			applyCtx = args[0].(*command.Context)
-			return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply}}, nil}
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Apply,
+				Workspace:   events.DefaultWorkspace,
+				RepoRelDir:  events.DefaultRepoRelDir,
+				ProjectName: "default",
+			}}, nil}
 		})
 
 	body, _ := json.Marshal(controllers.APIRequest{
@@ -1612,7 +2095,12 @@ func TestAPIApply_PRWithoutBaseBranchCurrentLiveBaseSucceeds(t *testing.T) {
 		pull: models.PullRequest{HeadCommit: headCommit, BaseBranch: "main"},
 	}
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn([]command.ProjectContext{{CommandName: command.Apply}}, nil)
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Apply,
+			Workspace:   events.DefaultWorkspace,
+			RepoRelDir:  events.DefaultRepoRelDir,
+			ProjectName: "default",
+		}}, nil)
 
 	body, _ := json.Marshal(controllers.APIRequest{
 		Repository: "Repo",
@@ -2251,13 +2739,15 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn([]command.ProjectContext{{
-			CommandName: command.Plan,
-		}}, nil)
+		Then(func(args []Param) ReturnValues {
+			commentCommand := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{apiTestProjectContext(commentCommand)}, nil}
+		})
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		ThenReturn([]command.ProjectContext{{
-			CommandName: command.Apply,
-		}}, nil)
+		Then(func(args []Param) ReturnValues {
+			commentCommand := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{apiTestProjectContext(commentCommand)}, nil}
+		})
 
 	projectCommandRunner := NewMockProjectCommandRunner()
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
@@ -2278,6 +2768,9 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 	commitStatusUpdater := NewMockCommitStatusUpdater()
 
 	When(commitStatusUpdater.UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())).ThenReturn(nil)
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { Ok(t, database.Close()) })
 
 	ac := &controllers.APIController{
 		APISecret:                       []byte(atlantisToken),
@@ -2296,8 +2789,29 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 		WorkingDir:                      workingDir,
 		WorkingDirLocker:                workingDirLocker,
 		CommitStatusUpdater:             commitStatusUpdater,
+		Database:                        database,
 	}
 	return ac, projectCommandBuilder, projectCommandRunner
+}
+
+func apiTestProjectContext(commentCommand *events.CommentCommand) command.ProjectContext {
+	if commentCommand == nil {
+		return command.ProjectContext{}
+	}
+	workspace := commentCommand.Workspace
+	if workspace == "" {
+		workspace = events.DefaultWorkspace
+	}
+	repoRelDir := commentCommand.RepoRelDir
+	if repoRelDir == "" {
+		repoRelDir = events.DefaultRepoRelDir
+	}
+	return command.ProjectContext{
+		CommandName: commentCommand.Name,
+		Workspace:   workspace,
+		RepoRelDir:  repoRelDir,
+		ProjectName: commentCommand.ProjectName,
+	}
 }
 
 func testVCSHostname(vcsType models.VCSHostType) string {

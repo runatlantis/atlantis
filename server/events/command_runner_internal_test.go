@@ -315,6 +315,16 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			expNumSuccess: 2,
 			expNumTotal:   2,
 		},
+		"apply, discarded tombstone is excluded": {
+			cmd: command.Apply,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.AppliedPlanStatus},
+				{Status: models.DiscardedPlanStatus},
+			}},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   1,
+		},
 		"apply, one errored, one pending": {
 			cmd: command.Apply,
 			pullStatus: models.PullStatus{
@@ -377,7 +387,7 @@ func TestApplyUpdateCommitStatus(t *testing.T) {
 			cr := &ApplyCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus)
+			Ok(t, cr.updateCommitStatus(&command.Context{}, c.pullStatus))
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -479,7 +489,7 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Plan)
+			Ok(t, cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Plan))
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -516,6 +526,16 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 			expNumSuccess:   2,
 			expNumTotal:     2,
 			expNumNoChanges: 2,
+		},
+		"discarded tombstone does not keep apply pending": {
+			cmd: command.Apply,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.AppliedPlanStatus},
+				{Status: models.DiscardedPlanStatus},
+			}},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   1,
 		},
 		"one plan, one plan success with no changes": {
 			cmd: command.Apply,
@@ -597,7 +617,7 @@ func TestPlanUpdateApplyCommitStatus(t *testing.T) {
 			cr := &PlanCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Apply)
+			Ok(t, cr.updateCommitStatus(&command.Context{}, c.pullStatus, command.Apply))
 			if c.doNotCallUpdateApply {
 				Equals(t, csu.Called, false)
 			} else {
@@ -639,7 +659,7 @@ func TestPlanUpdateApplyCommitStatus_GitLabPendingWithNoChanges(t *testing.T) {
 		},
 	}
 
-	runner.updateCommitStatus(ctx, pullStatus, command.Apply)
+	Ok(t, runner.updateCommitStatus(ctx, pullStatus, command.Apply))
 
 	Equals(t, true, csu.Called)
 	Equals(t, models.PendingCommitStatus, csu.CalledStatus)
@@ -670,6 +690,15 @@ func TestPolicyCheckUpdateCommitStatus(t *testing.T) {
 			expNumSuccess: 2,
 			expNumTotal:   2,
 		},
+		"discarded tombstone is excluded from policy total": {
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.PassedPolicyCheckStatus},
+				{Status: models.DiscardedPlanStatus},
+			}},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   1,
+		},
 		"one policy check failed, one untouched project": {
 			pullStatus: models.PullStatus{
 				Projects: []models.ProjectStatus{
@@ -693,7 +722,7 @@ func TestPolicyCheckUpdateCommitStatus(t *testing.T) {
 			runner := &PolicyCheckCommandRunner{
 				commitStatusUpdater: csu,
 			}
-			runner.updateCommitStatus(&command.Context{}, c.pullStatus)
+			Ok(t, runner.updateCommitStatus(&command.Context{}, c.pullStatus))
 			Equals(t, models.Repo{}, csu.CalledRepo)
 			Equals(t, models.PullRequest{}, csu.CalledPull)
 			Equals(t, c.expStatus, csu.CalledStatus)
@@ -712,6 +741,9 @@ func TestApprovePoliciesUpdateCommitStatus(t *testing.T) {
 			{
 				Status: models.PlannedPlanStatus,
 			},
+			{
+				Status: models.DiscardedPlanStatus,
+			},
 		},
 	}
 	csu := &MockCSU{}
@@ -719,7 +751,7 @@ func TestApprovePoliciesUpdateCommitStatus(t *testing.T) {
 		commitStatusUpdater: csu,
 	}
 
-	runner.updateCommitStatus(&command.Context{}, pullStatus)
+	Ok(t, runner.updateCommitStatus(&command.Context{}, pullStatus))
 
 	Equals(t, models.FailedCommitStatus, csu.CalledStatus)
 	Equals(t, command.PolicyCheck, csu.CalledCommand)

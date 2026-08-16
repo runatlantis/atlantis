@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -17,19 +18,20 @@ type AutoMerger struct {
 	GlobalAutomergeMethod string
 }
 
-func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
+func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) error {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
 			ctx.Log.Info("not automerging because project at dir %q, workspace %q has status %q", p.RepoRelDir, p.Workspace, p.Status.String())
-			return
+			return nil
 		}
 	}
 
 	// Comment that we're automerging the pull request.
+	var publicationErr error
 	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, command.Apply.String()); err != nil {
 		ctx.Log.Err("failed to comment about automerge: %s", err)
-		// Commenting isn't required so continue.
+		publicationErr = errors.Join(publicationErr, fmt.Errorf("commenting about automerge: %w", err))
 	}
 
 	// Fall back to the server-side default merge method when the comment
@@ -50,9 +52,12 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 
 		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
 		if commentErr := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, command.Apply.String()); commentErr != nil {
-			ctx.Log.Err("failed to comment about automerge failing: %s", err)
+			ctx.Log.Err("failed to comment about automerge failing: %s", commentErr)
+			publicationErr = errors.Join(publicationErr, fmt.Errorf("commenting about automerge failure: %w", commentErr))
 		}
+		publicationErr = errors.Join(publicationErr, fmt.Errorf("automerging pull request: %w", err))
 	}
+	return publicationErr
 }
 
 // automergeEnabled returns true if automerging is enabled in this context.

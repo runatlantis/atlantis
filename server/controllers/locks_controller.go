@@ -4,16 +4,21 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"reflect"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -80,7 +85,6 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
 		return
 	}
-
 	owner, repo := models.SplitRepoFullName(lock.Project.RepoFullName)
 	viewData := web_templates.LockDetailData{
 		LockKeyEncoded:  id,
@@ -115,12 +119,114 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lock, err := l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
+	lock, err := l.Locker.GetLock(idUnencoded)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "getting lock before deletion failed with: '%s'", err)
+		return
+	}
+	if lock == nil {
+		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
+		return
+	}
+	if lock.Pull.BaseRepo == (models.Repo{}) {
+		lock, err = l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
+		if err != nil {
+			l.respond(w, logging.Error, http.StatusInternalServerError, "deleting legacy lock failed with: '%s'", err)
+			return
+		}
+		if lock == nil {
+			l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
+			return
+		}
+		l.Logger.Debug("skipping durable plan update and pull request comment because legacy lock BaseRepo is empty")
+		l.respond(w, logging.Info, http.StatusOK, "Deleted lock id '%s'", id)
+		return
+	}
+
+	publicationToken := uuid.NewString()
+	if err := l.Database.AcquirePlanPublicationClaim(lock.Pull, publicationToken); err != nil {
+		l.respond(w, logging.Warn, http.StatusConflict, "Lock cannot be deleted while plan state is being published: '%s'", err)
+		return
+	}
+	claimActive := true
+	retainClaim := false
+	claimPull := lock.Pull
+	defer func() {
+		if !claimActive || retainClaim {
+			return
+		}
+		if err := l.Database.ReleasePlanPublicationClaim(claimPull, publicationToken); err != nil {
+			l.Logger.Err("releasing lock deletion publication claim: %s", err)
+		}
+	}()
+
+	currentLock, err := l.Locker.GetLock(idUnencoded)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "rechecking lock before deletion failed with: '%s'", err)
+		return
+	}
+	if currentLock == nil || !reflect.DeepEqual(lock, currentLock) {
+		l.respond(w, logging.Warn, http.StatusConflict, "Lock changed before deletion; refresh and retry")
+		return
+	}
+
+	pullStatus, err := l.Database.GetPullStatus(lock.Pull)
+	if err != nil {
+		l.respond(w, logging.Error, http.StatusInternalServerError, "reading durable plan status before lock deletion failed with: '%s'", err)
+		return
+	}
+	if pullStatus != nil {
+		var matchingProjects []models.ProjectStatus
+		for _, project := range pullStatus.Projects {
+			projectWorkspace := project.Workspace
+			if projectWorkspace == "" {
+				projectWorkspace = events.DefaultWorkspace
+			}
+			lockWorkspace := lock.Workspace
+			if lockWorkspace == "" {
+				lockWorkspace = events.DefaultWorkspace
+			}
+			if projectWorkspace != lockWorkspace || filepath.Clean(project.RepoRelDir) != filepath.Clean(lock.Project.Path) {
+				continue
+			}
+			if lock.Project.ProjectName != "" && project.ProjectName != lock.Project.ProjectName {
+				continue
+			}
+			matchingProjects = append(matchingProjects, project)
+		}
+		if lock.Project.ProjectName == "" && len(matchingProjects) > 1 {
+			l.respond(w, logging.Warn, http.StatusConflict, "Lock matches multiple named projects; replan or unlock the pull request instead")
+			return
+		}
+		if len(matchingProjects) == 1 {
+			project := matchingProjects[0]
+			if project.PlanGeneration != "" {
+				l.respond(w, logging.Warn, http.StatusConflict, "Lock cannot be deleted while plan generation '%s' is active", project.PlanGeneration)
+				return
+			}
+			_, err = l.Database.UpdateDiscardResultsForPlanGeneration(lock.Pull, []command.ProjectResult{{
+				Command:                command.Unlock,
+				Workspace:              project.Workspace,
+				RepoRelDir:             project.RepoRelDir,
+				ProjectName:            project.ProjectName,
+				AcceptedPlanGeneration: project.AcceptedPlanGeneration,
+			}}, publicationToken)
+			if err != nil {
+				statusCode := http.StatusInternalServerError
+				if db.IsPlanGenerationObsolete(err) || errors.Is(err, db.ErrPlanGenerationStateInvalid) {
+					statusCode = http.StatusConflict
+				}
+				l.respond(w, logging.Warn, statusCode, "discarding durable plan before lock deletion failed with: '%s'", err)
+				return
+			}
+		}
+	}
+
+	lock, err = l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
 	if err != nil {
 		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: '%s'", err)
 		return
 	}
-
 	if lock == nil {
 		l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
 		return
@@ -130,22 +236,12 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
 	if lock.Pull.BaseRepo != (models.Repo{}) {
-		statusUpdateErr := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus)
-		if statusUpdateErr != nil {
-			l.Logger.Err("unable to update project status: %s", statusUpdateErr)
-		}
-
 		// Once the lock has been deleted, comment back on the pull request.
-		var comment string
-		if statusUpdateErr != nil {
-			comment = fmt.Sprintf("**Warning**: The lock for dir: `%s` workspace: `%s` was deleted via the Atlantis UI, but Atlantis could not update its durable plan status.\n\n"+
-				"Do not apply the existing plan. Run `plan` again after any in-progress plan finishes.", lock.Project.Path, lock.Workspace)
-		} else {
-			comment = fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
-				"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
-		}
+		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
+			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
 		if err = l.VCSClient.CreateComment(l.Logger, lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {
 			l.Logger.Warn("failed commenting on pull request: %s", err)
+			retainClaim = true
 		}
 	} else {
 		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")

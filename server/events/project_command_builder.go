@@ -1290,6 +1290,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		var runOnlyApplyRoots []runOnlyApplyRoot
 		runOnlyApplyProjects, runOnlyApplyKeys, runOnlyApplyRoots = p.findRunOnlyApplyProjectsWithoutManagedPlans(ctx, repoCfg, plans)
 		plans = filterNonConventionRunOnlyPlanArtifacts(plans, runOnlyApplyRoots)
+		plans = filterDurablyInactiveManagedPlanArtifacts(ctx, plans)
 		hasActivePlan := false
 		if p.WorkingDirLocker != nil {
 			hasActivePlan = p.WorkingDirLocker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan)
@@ -1365,6 +1366,28 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 	})
 
 	return cmds, nil
+}
+
+// filterDurablyInactiveManagedPlanArtifacts removes convention plan files that
+// have already been made non-applyable in PullStatus. Physical local or
+// external-store artifacts can outlive their accepted generation because an
+// old replica cannot safely delete a deterministic shared-store key. Durable
+// status remains authoritative, so those files must not poison later generic
+// apply discovery or be rebuilt into apply commands.
+func filterDurablyInactiveManagedPlanArtifacts(ctx *command.Context, plans []PendingPlan) []PendingPlan {
+	if ctx.PullStatus == nil {
+		return plans
+	}
+	filtered := make([]PendingPlan, 0, len(plans))
+	for _, plan := range plans {
+		project := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		if project != nil && project.PlanGeneration == "" && statusIsSafeWithoutPlanFile(project.Status) {
+			ctx.Log.Debug("ignoring inactive managed plan artifact for dir %q workspace %q project %q with status %q", plan.RepoRelDir, plan.Workspace, plan.ProjectName, project.Status.String())
+			continue
+		}
+		filtered = append(filtered, plan)
+	}
+	return filtered
 }
 
 type runOnlyApplyProject struct {
