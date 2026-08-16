@@ -91,7 +91,7 @@ after the write, the stored state can be newer than the latest pull request comm
 An interrupted plan generation intentionally blocks apply and policy-result updates for its projects. Run
 `atlantis plan` again after the in-progress command has stopped to replace the incomplete generation. Starting a new
 plan also replaces a stored pull request status that Atlantis can read from the database but cannot deserialize after
-a schema change. The replacement generation remains non-applyable until the new plan completes successfully. For a
+a schema change. The replacement generation cannot be applied until the new plan completes successfully. For a
 genuinely stuck generation that cannot be replaced by replanning, close and reopen the pull request after Atlantis
 processes the close event, then run a fresh plan. If an apply runs but its result cannot be stored, verify the
 infrastructure state before retrying because one or more apply steps may already have executed.
