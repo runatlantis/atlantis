@@ -653,6 +653,26 @@ func (r *RedisDB) AcquirePlanPublicationClaim(pull models.PullRequest, token str
 	return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationBusy, Detail: "another owner holds the claim"}
 }
 
+// GetPlanPublicationClaim returns the current claim token for recovery
+// inspection. A missing claim is a typed ownership error, not an empty token.
+func (r *RedisDB) GetPlanPublicationClaim(pull models.PullRequest) (string, error) {
+	key, err := r.pullKey(pull)
+	if err != nil {
+		return "", err
+	}
+	token, err := r.client.Get(ctx, r.planPublicationClaimKey(key)).Result()
+	if err == redis.Nil {
+		return "", &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "no claim exists"}
+	}
+	if err != nil {
+		return "", fmt.Errorf("db transaction failed: %w", err)
+	}
+	if token == "" {
+		return "", &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim token is empty"}
+	}
+	return token, nil
+}
+
 func (r *RedisDB) ReleasePlanPublicationClaim(pull models.PullRequest, token string) error {
 	key, err := r.pullKey(pull)
 	if err != nil {

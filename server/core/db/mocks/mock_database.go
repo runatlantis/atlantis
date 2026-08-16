@@ -189,6 +189,21 @@ func (mr *MockDatabaseMockRecorder) GetLock(project, workspace any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLock", reflect.TypeOf((*MockDatabase)(nil).GetLock), project, workspace)
 }
 
+// GetPlanPublicationClaim mocks base method.
+func (m *MockDatabase) GetPlanPublicationClaim(pull models.PullRequest) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPlanPublicationClaim", pull)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPlanPublicationClaim indicates an expected call of GetPlanPublicationClaim.
+func (mr *MockDatabaseMockRecorder) GetPlanPublicationClaim(pull any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPlanPublicationClaim", reflect.TypeOf((*MockDatabase)(nil).GetPlanPublicationClaim), pull)
+}
+
 // GetPullStatus mocks base method.
 func (m *MockDatabase) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
 	m.ctrl.T.Helper()

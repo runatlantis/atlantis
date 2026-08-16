@@ -595,6 +595,31 @@ func (b *BoltDB) AcquirePlanPublicationClaim(pull models.PullRequest, token stri
 	return nil
 }
 
+// GetPlanPublicationClaim returns the current claim token for offline recovery
+// inspection. A missing claim is a typed ownership error, not an empty token.
+func (b *BoltDB) GetPlanPublicationClaim(pull models.PullRequest) (string, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return "", err
+	}
+	var token string
+	err = b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+		if bucket == nil {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim bucket is missing"}
+		}
+		token = string(bucket.Get(b.planPublicationClaimKey(key)))
+		if token == "" {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "no claim exists"}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return token, nil
+}
+
 func (b *BoltDB) ReleasePlanPublicationClaim(pull models.PullRequest, token string) error {
 	key, err := b.pullKey(pull)
 	if err != nil {

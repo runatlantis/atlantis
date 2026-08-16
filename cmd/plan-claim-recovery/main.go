@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -25,6 +26,8 @@ type recoveryOptions struct {
 	repoFullName              string
 	pullNum                   int
 	confirmAllReplicasStopped bool
+	inspect                   bool
+	claimToken                string
 }
 
 func main() {
@@ -43,6 +46,8 @@ func run(args []string, stdout, stderr io.Writer) (retErr error) {
 	flags.StringVar(&opts.repoFullName, "repo", "", "repository full name, for example runatlantis/atlantis")
 	flags.IntVar(&opts.pullNum, "pull", 0, "pull request number")
 	flags.BoolVar(&opts.confirmAllReplicasStopped, "confirm-all-replicas-stopped", false, "confirm no Atlantis replica can still publish for this pull")
+	flags.BoolVar(&opts.inspect, "inspect", false, "print the current offline claim token without clearing it")
+	flags.StringVar(&opts.claimToken, "claim-token", "", "exact claim token previously obtained with --inspect")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -60,6 +65,17 @@ func run(args []string, stdout, stderr io.Writer) (retErr error) {
 	}
 	if opts.pullNum <= 0 {
 		return errors.New("--pull must be greater than zero")
+	}
+	if opts.inspect && opts.claimToken != "" {
+		return errors.New("--inspect and --claim-token are mutually exclusive")
+	}
+	if !opts.inspect && opts.claimToken == "" {
+		return errors.New("refusing recovery without --claim-token; run with --inspect first")
+	}
+	if opts.claimToken != "" {
+		if err := validateClaimToken(opts.claimToken); err != nil {
+			return fmt.Errorf("--claim-token is not a valid canonical UUID: %w", err)
+		}
 	}
 
 	dataDir, err := expandHome(opts.dataDir)
@@ -89,11 +105,33 @@ func run(args []string, stdout, stderr io.Writer) (retErr error) {
 			VCSHost:  models.VCSHost{Hostname: opts.vcsHostname},
 		},
 	}
-	if err := database.ForceClearPlanPublicationClaim(pull); err != nil {
-		return fmt.Errorf("clearing plan publication claim: %w", err)
+	currentToken, err := database.GetPlanPublicationClaim(pull)
+	if err != nil {
+		return fmt.Errorf("inspecting plan publication claim: %w", err)
+	}
+	if err := validateClaimToken(currentToken); err != nil {
+		return fmt.Errorf("stored plan publication claim is malformed; refusing recovery: %w", err)
+	}
+	if opts.inspect {
+		_, err = fmt.Fprintf(stdout, "offline plan publication claim for %s/%s#%d: %s\n", opts.vcsHostname, opts.repoFullName, opts.pullNum, currentToken)
+		return err
+	}
+	if err := database.ReleasePlanPublicationClaim(pull, opts.claimToken); err != nil {
+		return fmt.Errorf("clearing exact plan publication claim: %w", err)
 	}
 	_, err = fmt.Fprintf(stdout, "cleared offline plan publication claim for %s/%s#%d\n", opts.vcsHostname, opts.repoFullName, opts.pullNum)
 	return err
+}
+
+func validateClaimToken(token string) error {
+	parsed, err := uuid.Parse(token)
+	if err != nil {
+		return err
+	}
+	if parsed == uuid.Nil || parsed.String() != token {
+		return errors.New("claim token must be a non-zero lowercase UUID in canonical form")
+	}
+	return nil
 }
 
 func expandHome(path string) (string, error) {
