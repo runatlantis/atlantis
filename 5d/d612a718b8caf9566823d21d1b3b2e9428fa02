@@ -1,0 +1,26 @@
+e2e/main_test.go
+  s_0054a5ac358e80::t_645a7ff993384f 42
+  s_0054a5ac358e80::t_a3aacaa2a4567b 56-64
+  s_0054a5ac358e80::t_51238d42fae577 10
+  s_0054a5ac358e80::t_b899c6c3590f23 6,14-41,43-55,65
+  s_0054a5ac358e80::t_21f7b4ea35a78a 66
+e2e/e2e.go
+  s_0054a5ac358e80::t_b899c6c3590f23 270-274
+  s_0054a5ac358e80::t_0bba953b980132 134-136,225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5dd612a718b8caf9566823d21d1b3b2e9428fa02",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}

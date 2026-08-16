@@ -1,0 +1,26 @@
+server/core/boltdb/boltdb_test.go
+  s_0054a5ac358e80::t_bdfc104216dff9 1391-1436
+server/core/redis/redis_test.go
+  s_0054a5ac358e80::t_bdfc104216dff9 1429-1460,1515-1533
+  s_0054a5ac358e80::t_425b0b6d5d55ad 21,26,1461-1514
+server/core/boltdb/boltdb.go
+  s_0054a5ac358e80::t_0bba953b980132 567-571
+server/core/redis/redis.go
+  s_0054a5ac358e80::t_0bba953b980132 590
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1aca8373a0526b5627c2eba552f635a74f380c53",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
