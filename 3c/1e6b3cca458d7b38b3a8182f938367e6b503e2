@@ -1,0 +1,26 @@
+runatlantis.io/docs/using-atlantis.md
+  s_0054a5ac358e80::t_5d796e4d21b39a 158-159
+  s_0054a5ac358e80::t_c662bab9f2016a 151
+  s_0054a5ac358e80::t_6cef773eb47205 130-131
+  s_0054a5ac358e80::t_ab1f8b6702a50d 153-154,156-157,169-170
+  s_0054a5ac358e80::t_8652d71ad0fad0 164-165
+  s_0054a5ac358e80::t_c8dfd33b144e26 101-116,180-183
+  s_0054a5ac358e80::t_3f5cedb0ad611e 118-127,139-140,143-144,155,160-163,171-173
+  s_0054a5ac358e80::t_7dd683bb01d9f5 128-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3c1e6b3cca458d7b38b3a8182f938367e6b503e2",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
