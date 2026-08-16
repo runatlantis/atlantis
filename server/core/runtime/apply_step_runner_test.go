@@ -14,6 +14,7 @@ import (
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
@@ -30,7 +31,7 @@ import (
 func TestRun_NoDir(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
-		PlanStore:         &runtime.LocalPlanStore{},
+		PlanStore:         &planstore.LocalPlanStore{},
 	}
 	_, err := o.Run(command.ProjectContext{
 		RepoRelDir: ".",
@@ -43,7 +44,7 @@ func TestRun_NoPlanFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor: nil,
-		PlanStore:         &runtime.LocalPlanStore{},
+		PlanStore:         &planstore.LocalPlanStore{},
 	}
 	_, err := o.Run(command.ProjectContext{
 		RepoRelDir: ".",
@@ -73,7 +74,7 @@ func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
-		PlanStore:             &runtime.LocalPlanStore{},
+		PlanStore:             &planstore.LocalPlanStore{},
 	}
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
@@ -106,7 +107,7 @@ func TestRun_Success(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
-		PlanStore:             &runtime.LocalPlanStore{},
+		PlanStore:             &planstore.LocalPlanStore{},
 	}
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
@@ -142,7 +143,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
-		PlanStore:             &runtime.LocalPlanStore{},
+		PlanStore:             &planstore.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -177,7 +178,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	o := runtime.ApplyStepRunner{
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
-		PlanStore:             &runtime.LocalPlanStore{},
+		PlanStore:             &planstore.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -214,7 +215,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 		TerraformExecutor:     terraform,
 		DefaultTFDistribution: tfDistribution,
 		DefaultTFVersion:      tfVersion,
-		PlanStore:             &runtime.LocalPlanStore{},
+		PlanStore:             &planstore.LocalPlanStore{},
 	}
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), NotEq[tf.Distribution](tfDistribution), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -288,7 +289,7 @@ func TestRun_UsingTarget(t *testing.T) {
 			terraform := tfclientmocks.NewMockClient()
 			step := runtime.ApplyStepRunner{
 				TerraformExecutor: terraform,
-				PlanStore:         &runtime.LocalPlanStore{},
+				PlanStore:         &planstore.LocalPlanStore{},
 			}
 
 			output, err := step.Run(command.ProjectContext{
@@ -332,7 +333,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: updater,
-		PlanStore:           &runtime.LocalPlanStore{},
+		PlanStore:           &planstore.LocalPlanStore{},
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 	var remoteApplyRunURL string
@@ -396,7 +397,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	o := runtime.ApplyStepRunner{
 		AsyncTFExec:         tfExec,
 		CommitStatusUpdater: runtimemocks.NewMockStatusUpdater(),
-		PlanStore:           &runtime.LocalPlanStore{},
+		PlanStore:           &planstore.LocalPlanStore{},
 	}
 	tfVersion, _ := version.NewVersion("0.11.0")
 

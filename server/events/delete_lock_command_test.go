@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/boltdb"
-	lockmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
+	lockmocks "github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -69,10 +69,10 @@ func TestDeleteLock_Success(t *testing.T) {
 	})
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
-		Locker:           l,
-		Database:         db,
-		WorkingDirLocker: workingDirLocker,
-		WorkingDir:       workingDir,
+		Locker:            l,
+		CoordinationStore: db,
+		WorkingDirLocker:  workingDirLocker,
+		WorkingDir:        workingDir,
 	}
 	lock, err := dlc.DeleteLock(logger, "id")
 	Ok(t, err)

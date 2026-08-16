@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
@@ -20,8 +20,8 @@ import (
 
 type unlockedApplyLockChecker struct{}
 
-func (unlockedApplyLockChecker) CheckApplyLock() (locking.ApplyCommandLock, error) {
-	return locking.ApplyCommandLock{}, nil
+func (unlockedApplyLockChecker) CheckApplyLock() (coordination.ApplyCommandLock, error) {
+	return coordination.ApplyCommandLock{}, nil
 }
 
 type noopPullReqStatusFetcher struct{}
@@ -193,7 +193,7 @@ func TestApplyCommandRunner_DeferredApplySuccessFailsWhenFinalFreshnessFails(t *
 	}
 }
 
-func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
+func newInternalApplyCommandRunner(t *testing.T, database *boltdb.Store, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
 	t.Helper()
 	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
 	pullUpdater := &PullUpdater{
@@ -210,7 +210,7 @@ func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builde
 		NewCancellationTracker(),
 		&AutoMerger{VCSClient: vcsClient},
 		pullUpdater,
-		&DBUpdater{Database: database},
+		&coordination.PullStatusUpdater{Store: database},
 		database,
 		1,
 		false,
@@ -277,12 +277,12 @@ func TestApplyCommandRunner_StaleCommandResultWithEmptyPullStatusDoesNotPublishZ
 			},
 		}}},
 		staticProjectApplyRunner{output: command.ProjectCommandOutput{
-			Error: fmt.Errorf("%w: pull request base branch changed", errStaleCommandHead),
+			Error: fmt.Errorf("%w: pull request base branch changed", command.ErrStaleCommandHead),
 		}},
 		NewCancellationTracker(),
 		&AutoMerger{VCSClient: vcsClient},
 		pullUpdater,
-		&DBUpdater{Database: database},
+		&coordination.PullStatusUpdater{Store: database},
 		database,
 		1,
 		false,
@@ -355,7 +355,7 @@ func TestApplyCommandRunner_NoPlanLegacyEmptyIdentityDoesNotPublishZeroZeroSucce
 		NewCancellationTracker(),
 		&AutoMerger{VCSClient: vcsClient},
 		pullUpdater,
-		&DBUpdater{Database: database},
+		&coordination.PullStatusUpdater{Store: database},
 		database,
 		1,
 		false,
@@ -427,7 +427,7 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 		NewCancellationTracker(),
 		&AutoMerger{VCSClient: vcsClient},
 		pullUpdater,
-		&DBUpdater{Database: database},
+		&coordination.PullStatusUpdater{Store: database},
 		database,
 		1,
 		true,

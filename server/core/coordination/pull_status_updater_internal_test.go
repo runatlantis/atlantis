@@ -1,43 +1,45 @@
 // Copyright 2026 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package events
+package coordination
 
 import (
 	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-func TestDBUpdater_StaleApplyResultDoesNotOverwriteNewerPullStatus(t *testing.T) {
-	assertDBUpdaterStaleApplyPreservesNewerPullStatus(t, command.ProjectCommandOutput{
+const defaultWorkspace = "default"
+
+func TestPullStatusUpdater_StaleApplyResultDoesNotOverwriteNewerPullStatus(t *testing.T) {
+	assertPullStatusUpdaterStaleApplyPreservesNewerPullStatus(t, command.ProjectCommandOutput{
 		Error: errors.New("mergeable requirement failed"),
 	})
 }
 
-func TestDBUpdater_StaleApplyFailurePreservesNewerPullStatus(t *testing.T) {
-	assertDBUpdaterStaleApplyPreservesNewerPullStatus(t, command.ProjectCommandOutput{
+func TestPullStatusUpdater_StaleApplyFailurePreservesNewerPullStatus(t *testing.T) {
+	assertPullStatusUpdaterStaleApplyPreservesNewerPullStatus(t, command.ProjectCommandOutput{
 		Failure: "mergeable requirement failed",
 	})
 }
 
-func TestDBUpdater_StaleApplyFailurePreservesNewerPullStatusWhenBaseDiffers(t *testing.T) {
-	assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t)
+func TestPullStatusUpdater_StaleApplyFailurePreservesNewerPullStatusWhenBaseDiffers(t *testing.T) {
+	assertPullStatusUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t)
 }
 
-func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *testing.T) {
+func assertPullStatusUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *testing.T) {
 	t.Helper()
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	stalePull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -49,7 +51,7 @@ func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *tes
 	_, err = database.UpdatePullWithResults(currentPull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -61,10 +63,10 @@ func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *tes
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -77,9 +79,9 @@ func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *tes
 	}
 
 	if pullStatus.Pull.BaseBranch != currentPull.BaseBranch {
-		t.Fatalf("expected DBUpdater to preserve current base %q, got %q", currentPull.BaseBranch, pullStatus.Pull.BaseBranch)
+		t.Fatalf("expected PullStatusUpdater to preserve current base %q, got %q", currentPull.BaseBranch, pullStatus.Pull.BaseBranch)
 	}
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -88,14 +90,14 @@ func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *tes
 	}
 }
 
-func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output command.ProjectCommandOutput) {
+func assertPullStatusUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output command.ProjectCommandOutput) {
 	t.Helper()
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	stalePull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -106,7 +108,7 @@ func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output comm
 	_, err = database.UpdatePullWithResults(currentPull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -118,10 +120,10 @@ func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output comm
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
 		{
 			Command:              command.Apply,
-			Workspace:            DefaultWorkspace,
+			Workspace:            defaultWorkspace,
 			RepoRelDir:           "dirA",
 			ProjectName:          "projA",
 			ProjectCommandOutput: output,
@@ -132,9 +134,9 @@ func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output comm
 	}
 
 	if pullStatus.Pull.HeadCommit != currentPull.HeadCommit {
-		t.Fatalf("expected DBUpdater to preserve current head %q, got %q", currentPull.HeadCommit, pullStatus.Pull.HeadCommit)
+		t.Fatalf("expected PullStatusUpdater to preserve current head %q, got %q", currentPull.HeadCommit, pullStatus.Pull.HeadCommit)
 	}
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -143,13 +145,13 @@ func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output comm
 	}
 }
 
-func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
+func TestPullStatusUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	pull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -158,7 +160,7 @@ func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -170,10 +172,10 @@ func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -185,7 +187,7 @@ func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -194,13 +196,13 @@ func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 	}
 }
 
-func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testing.T) {
+func TestPullStatusUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	pull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -210,7 +212,7 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -222,10 +224,10 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -237,7 +239,7 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 		t.Fatal(err)
 	}
 
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -246,17 +248,17 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 	}
 }
 
-func TestDBUpdater_SameHeadDifferentBaseApplyFailureDoesNotOverwriteCurrentBaseStatus(t *testing.T) {
-	assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t)
+func TestPullStatusUpdater_SameHeadDifferentBaseApplyFailureDoesNotOverwriteCurrentBaseStatus(t *testing.T) {
+	assertPullStatusUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t)
 }
 
-func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) {
+func TestPullStatusUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	stalePull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -268,7 +270,7 @@ func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) 
 	_, err = database.UpdatePullWithResults(currentPull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -280,14 +282,14 @@ func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
-				Error: fmt.Errorf("%w: pull request base branch changed", errStaleCommandHead),
+				Error: fmt.Errorf("%w: pull request base branch changed", command.ErrStaleCommandHead),
 			},
 		},
 	})
@@ -296,9 +298,9 @@ func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) 
 	}
 
 	if pullStatus.Pull.BaseBranch != currentPull.BaseBranch {
-		t.Fatalf("expected DBUpdater to preserve current base %q, got %q", currentPull.BaseBranch, pullStatus.Pull.BaseBranch)
+		t.Fatalf("expected PullStatusUpdater to preserve current base %q, got %q", currentPull.BaseBranch, pullStatus.Pull.BaseBranch)
 	}
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -307,13 +309,13 @@ func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) 
 	}
 }
 
-func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T) {
+func TestPullStatusUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	pull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -322,7 +324,7 @@ func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T
 	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -334,10 +336,10 @@ func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, pull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -349,7 +351,7 @@ func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T
 		t.Fatal(err)
 	}
 
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}
@@ -358,13 +360,13 @@ func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T
 	}
 }
 
-func TestDBUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testing.T) {
+func TestPullStatusUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	updater := &DBUpdater{Database: database}
+	updater := &PullStatusUpdater{Store: database}
 	stalePull := models.PullRequest{
 		Num:        1,
 		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -375,7 +377,7 @@ func TestDBUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testin
 	_, err = database.UpdatePullWithResults(currentPull, []command.ProjectResult{
 		{
 			Command:     command.Plan,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
@@ -387,14 +389,14 @@ func TestDBUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testin
 		t.Fatal(err)
 	}
 
-	pullStatus, err := updater.updateDB(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
+	pullStatus, err := updater.Update(&command.Context{Log: logging.NewNoopLogger(t)}, stalePull, []command.ProjectResult{
 		{
 			Command:     command.Apply,
-			Workspace:   DefaultWorkspace,
+			Workspace:   defaultWorkspace,
 			RepoRelDir:  "dirA",
 			ProjectName: "projA",
 			ProjectCommandOutput: command.ProjectCommandOutput{
-				Error: DirNotExistErr{RepoRelDir: "dirA"},
+				Error: command.DirNotExistErr{RepoRelDir: "dirA"},
 			},
 		},
 	})
@@ -403,9 +405,9 @@ func TestDBUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testin
 	}
 
 	if pullStatus.Pull.HeadCommit != currentPull.HeadCommit {
-		t.Fatalf("expected DBUpdater to preserve current head %q, got %q", currentPull.HeadCommit, pullStatus.Pull.HeadCommit)
+		t.Fatalf("expected PullStatusUpdater to preserve current head %q, got %q", currentPull.HeadCommit, pullStatus.Pull.HeadCommit)
 	}
-	project := findProjectInPullStatus(&pullStatus, DefaultWorkspace, "dirA", "projA")
+	project := pullStatus.FindProject(defaultWorkspace, "dirA", "projA")
 	if project == nil {
 		t.Fatal("expected current project status to remain")
 	}

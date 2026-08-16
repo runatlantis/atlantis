@@ -18,7 +18,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
@@ -94,7 +94,7 @@ func NewInstrumentedProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
-	planStore runtime.PlanStore,
+	planStore planstore.PlanStore,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -158,7 +158,7 @@ func NewProjectCommandBuilder(
 	AutoDiscoverMode string,
 	scope tally.Scope,
 	terraformClient tfclient.Client,
-	planStore runtime.PlanStore,
+	planStore planstore.PlanStore,
 ) *DefaultProjectCommandBuilder {
 	return &DefaultProjectCommandBuilder{
 		ParserValidator:          parserValidator,
@@ -274,7 +274,7 @@ type DefaultProjectCommandBuilder struct {
 	// Finds unapplied plans.
 	PendingPlanFinder *DefaultPendingPlanFinder
 	// Persists plan files to external storage (S3) so they survive container restarts.
-	PlanStore runtime.PlanStore
+	PlanStore planstore.PlanStore
 	// Builds project command contexts for Atlantis commands.
 	ProjectCommandContextBuilder ProjectCommandContextBuilder
 	// User config option: Skip cloning the repo during autoplan if there are no changes to Terraform projects.
@@ -1213,7 +1213,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		ctx.Log.Info("pull directory missing, attempting to restore plans")
 		// Probe capability first to avoid pointless I/O on stores that don't
 		// support restore (e.g. LocalPlanStore).
-		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), planstore.ErrRestoreNotSupported) {
 			return nil, os.ErrNotExist
 		}
 		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
@@ -1380,21 +1380,21 @@ func validateFoundPlans(ctx *command.Context, plans []PendingPlan) error {
 		return fmt.Errorf("no recorded plan status found; run `atlantis plan` before apply")
 	}
 
-	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
+	if err := models.PullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "plans"); err != nil {
 		return err
 	}
 
 	planKeys := make(map[applyPlanKey]struct{}, len(plans))
 	for _, plan := range plans {
 		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
-		proj := findProjectInPullStatus(ctx.PullStatus, plan.Workspace, plan.RepoRelDir, plan.ProjectName)
+		proj := ctx.PullStatus.FindProject(plan.Workspace, plan.RepoRelDir, plan.ProjectName)
 		if proj == nil {
 			return fmt.Errorf(
 				"plan file found for dir %q workspace %q project %q but no matching plan status exists; run `atlantis plan`",
 				plan.RepoRelDir, plan.Workspace, plan.ProjectName,
 			)
 		}
-		if !statusAllowedForDiscoveredPlan(proj.Status) {
+		if !models.StatusAllowsDiscoveredPlan(proj.Status) {
 			return fmt.Errorf(
 				"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
 				plan.RepoRelDir, plan.Workspace, plan.ProjectName, proj.Status.String(),
@@ -1410,33 +1410,11 @@ func validateNoPlansFound(ctx *command.Context, hasActivePlan bool) error {
 		return fmt.Errorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
-	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
+	if err := models.PullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "recorded plan status"); err != nil {
 		return err
 	}
 
 	return validatePullStatusHasPlanFiles(ctx.PullStatus, nil)
-}
-
-func shortSHA(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
-}
-
-// statusAllowedForDiscoveredPlan returns true if a discovered .tfplan file
-// with this status is valid to build an apply command for. Includes
-// PlannedNoChangesPlanStatus (no-op plan can leave a .tfplan on disk) and
-// ErroredPolicyCheckStatus (let apply build the command and fail through
-// existing per-project apply-requirement handling).
-func statusAllowedForDiscoveredPlan(status models.ProjectPlanStatus) bool {
-	switch status {
-	case models.PlannedPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus,
-		models.PlannedNoChangesPlanStatus, models.ErroredPolicyCheckStatus:
-		return true
-	default:
-		return false
-	}
 }
 
 func statusRequiresPlanFileForGenericApply(status models.ProjectPlanStatus) bool {
@@ -1509,26 +1487,6 @@ func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[
 	return nil
 }
 
-func findProjectInPullStatus(pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
-	cleanDir := filepath.Clean(repoRelDir)
-	for i := range pullStatus.Projects {
-		proj := &pullStatus.Projects[i]
-		if proj.Workspace != workspace || filepath.Clean(proj.RepoRelDir) != cleanDir {
-			continue
-		}
-		if projectName != "" {
-			if proj.ProjectName == projectName {
-				return proj
-			}
-			continue
-		}
-		if proj.ProjectName == "" {
-			return proj
-		}
-	}
-	return nil
-}
-
 // buildProjectCommand builds an command for the single project
 // identified by cmd except plan.
 func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
@@ -1556,7 +1514,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		// LocalPlanStore signals this via ErrRestoreNotSupported; external
 		// stores (S3) return nil and Load restores the plan in doApply before
 		// plan validation (this path does not call RestorePlans).
-		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), planstore.ErrRestoreNotSupported) {
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}
 		ctx.Log.Info("working directory missing, re-cloning repo for apply")

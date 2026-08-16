@@ -12,9 +12,8 @@ import (
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
-	"github.com/runatlantis/atlantis/server/core/boltdb"
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	"github.com/runatlantis/atlantis/server/core/coordination/boltdb"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -64,7 +63,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
-				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: c.ApplyLocked}
+				tc.applyLockCheckerReturn = coordination.ApplyCommandLock{Locked: c.ApplyLocked}
 				tc.applyLockCheckerErr = c.ApplyLockError
 			})
 
@@ -76,7 +75,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+			_, err := pullStatusUpdater.Store.UpdatePullWithResults(modelPull, nil)
 			Ok(t, err)
 
 			ctx := &command.Context{
@@ -905,7 +904,7 @@ func TestApplyCommandRunner_DoesNotAutomergeAfterStaleApplyError(t *testing.T) {
 	})
 }
 
-func TestApplyCommandRunner_DoesNotAutomergeWhenDBUpdaterSkippedStaleApplyResult(t *testing.T) {
+func TestApplyCommandRunner_DoesNotAutomergeWhenPullStatusUpdaterSkippedStaleApplyResult(t *testing.T) {
 	assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApply(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", command.ProjectCommandOutput{
 		ApplySuccess: "stale apply result",
 	})
@@ -1199,7 +1198,7 @@ func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t 
 	vcsClient.VerifyWasCalled(Never()).MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
 }
 
-func runApplyCommandRunnerWithBaseChangeDuringApply(t *testing.T) (db.Database, *vcsmocks.MockClient, *command.Context, models.PullRequest) {
+func runApplyCommandRunnerWithBaseChangeDuringApply(t *testing.T) (coordination.Store, *vcsmocks.MockClient, *command.Context, models.PullRequest) {
 	t.Helper()
 	database := newTestBoltDB(t)
 	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -1263,7 +1262,7 @@ func TestApplyCommandRunner_GenericApplyHoldsApplyLockDuringPullStatusRefresh(t 
 	locker := events.NewDefaultWorkingDirLocker()
 	refreshObserved := false
 	database := assertApplyLockDB{
-		Database:     realDB,
+		Store:        realDB,
 		t:            t,
 		locker:       locker,
 		repoFullName: testdata.GithubRepo.FullName,
@@ -1422,7 +1421,7 @@ func TestBuildApplyCommands_UsesFreshPullStatusAfterPlanFinishes(t *testing.T) {
 
 func TestApplyCommandRunner_PullStatusRefreshFailureFailsClosed(t *testing.T) {
 	realDB := newTestBoltDB(t)
-	database := failingGetPullStatusDB{Database: realDB, err: errors.New("db unavailable")}
+	database := failingGetPullStatusDB{Store: realDB, err: errors.New("db unavailable")}
 	vcsClient := setup(t, func(tc *TestConfig) {
 		tc.database = database
 	})
@@ -1820,7 +1819,7 @@ func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
 }
 
 type failingGetPullStatusDB struct {
-	db.Database
+	coordination.Store
 	err error
 }
 
@@ -1829,7 +1828,7 @@ func (f failingGetPullStatusDB) GetPullStatus(models.PullRequest) (*models.PullS
 }
 
 type assertApplyLockDB struct {
-	db.Database
+	coordination.Store
 	t            *testing.T
 	locker       events.WorkingDirLocker
 	repoFullName string
@@ -1840,5 +1839,5 @@ type assertApplyLockDB struct {
 func (a assertApplyLockDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
 	*a.called = true
 	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Apply), "expected apply lock during pull status refresh")
-	return a.Database.GetPullStatus(pull)
+	return a.Store.GetPullStatus(pull)
 }

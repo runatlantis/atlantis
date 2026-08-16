@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
@@ -16,10 +17,10 @@ type stateRmStepRunner struct {
 	terraformExecutor     TerraformExec
 	defaultTFDistribution terraform.Distribution
 	defaultTFVersion      *version.Version
-	planStore             PlanStore
+	planStore             planstore.PlanStore
 }
 
-func NewStateRmStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, planStore PlanStore) Runner {
+func NewStateRmStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, planStore planstore.PlanStore) Runner {
 	runner := &stateRmStepRunner{
 		terraformExecutor:     terraformExecutor,
 		defaultTFDistribution: defaultTfDistribution,

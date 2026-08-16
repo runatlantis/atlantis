@@ -12,7 +12,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -686,7 +686,7 @@ projects:
 				"auto",
 				statsScope,
 				terraformClient,
-				&runtime.LocalPlanStore{},
+				&planstore.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command.
@@ -906,7 +906,7 @@ projects:
 				"auto",
 				statsScope,
 				terraformClient,
-				&runtime.LocalPlanStore{},
+				&planstore.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -1157,7 +1157,7 @@ workflows:
 				"auto",
 				statsScope,
 				terraformClient,
-				&runtime.LocalPlanStore{},
+				&planstore.LocalPlanStore{},
 			)
 
 			cmd := command.PolicyCheck
@@ -1311,7 +1311,7 @@ projects:
 				"auto",
 				statsScope,
 				terraformClient,
-				&runtime.LocalPlanStore{},
+				&planstore.LocalPlanStore{},
 			)
 
 			for _, cmd := range []command.Name{command.Plan, command.Apply} {
@@ -1556,7 +1556,7 @@ autodiscover:
 				"auto",
 				statsScope,
 				terraformClient,
-				&runtime.LocalPlanStore{},
+				&planstore.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(

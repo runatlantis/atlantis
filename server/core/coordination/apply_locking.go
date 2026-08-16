@@ -1,13 +1,12 @@
 // Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package locking
+package coordination
 
 import (
 	"errors"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -44,14 +43,14 @@ type ApplyCommandLock struct {
 }
 
 type ApplyClient struct {
-	database               db.Database
+	store                  Store
 	disableApply           bool
 	disableGlobalApplyLock bool
 }
 
-func NewApplyClient(database db.Database, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
+func NewApplyClient(store Store, disableApply bool, disableGlobalApplyLock bool) ApplyLocker {
 	return &ApplyClient{
-		database:               database,
+		store:                  store,
 		disableApply:           disableApply,
 		disableGlobalApplyLock: disableGlobalApplyLock,
 	}
@@ -67,7 +66,7 @@ func (c *ApplyClient) LockApply() (ApplyCommandLock, error) {
 		return response, errors.New("apply is omitted from AllowCommands; Apply commands are locked globally until flag is updated")
 	}
 
-	applyCmdLock, err := c.database.LockCommand(command.Apply, time.Now())
+	applyCmdLock, err := c.store.LockCommand(command.Apply, time.Now())
 	if err != nil {
 		return response, err
 	}
@@ -87,7 +86,7 @@ func (c *ApplyClient) UnlockApply() error {
 		return errors.New("apply commands are disabled until AllowCommands flag is updated")
 	}
 
-	err := c.database.UnlockCommand(command.Apply)
+	err := c.store.UnlockCommand(command.Apply)
 	if err != nil {
 		return err
 	}
@@ -108,7 +107,7 @@ func (c *ApplyClient) CheckApplyLock() (ApplyCommandLock, error) {
 		}, nil
 	}
 
-	applyCmdLock, err := c.database.CheckCommandLock(command.Apply)
+	applyCmdLock, err := c.store.CheckCommandLock(command.Apply)
 	if err != nil {
 		return response, err
 	}

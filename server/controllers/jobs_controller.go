@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	"github.com/runatlantis/atlantis/server/controllers/websocket"
-	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
@@ -34,7 +34,7 @@ type JobsController struct {
 	Logger                   logging.SimpleLogging        `validate:"required"`
 	ProjectJobsTemplate      web_templates.TemplateWriter `validate:"required"`
 	ProjectJobsErrorTemplate web_templates.TemplateWriter `validate:"required"`
-	Database                 db.Database                  `validate:"required"`
+	CoordinationStore        coordination.Store           `validate:"required"`
 	WsMux                    *websocket.Multiplexor       `validate:"required"`
 	KeyGenerator             JobIDKeyGenerator
 	StatsScope               tally.Scope `validate:"required"`

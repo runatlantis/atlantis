@@ -6,8 +6,7 @@ package events
 import (
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/core/db"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -23,11 +22,11 @@ type DeleteLockCommand interface {
 
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
 type DefaultDeleteLockCommand struct {
-	Locker           locking.Locker
-	WorkingDir       WorkingDir
-	WorkingDirLocker WorkingDirLocker
-	Database         db.Database
-	PlanStore        planstore.PlanStore
+	Locker            coordination.Locker
+	WorkingDir        WorkingDir
+	WorkingDirLocker  WorkingDirLocker
+	CoordinationStore coordination.Store
+	PlanStore         planstore.PlanStore
 }
 
 // DeleteLock handles deleting the lock at id

@@ -23,8 +23,8 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/core/drift"
-	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -42,10 +42,10 @@ var apiErrorURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\
 
 type APIController struct {
 	APISecret                       []byte
-	Locker                          locking.Locker `validate:"required"`
+	Locker                          coordination.Locker `validate:"required"`
 	DriftStorage                    drift.Storage
 	RemediationService              drift.RemediationService
-	ApplyLockChecker                locking.ApplyLockChecker
+	ApplyLockChecker                coordination.ApplyLockChecker
 	EnableDriftRemediation          bool
 	Logger                          logging.SimpleLogging           `validate:"required"`
 	Parser                          events.EventParsing             `validate:"required"`

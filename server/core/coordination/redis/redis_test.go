@@ -1,28 +1,35 @@
-// Copyright 2017 HootSuite Media Inc.
+// Copyright 2025 The Atlantis Authors
 // SPDX-License-Identifier: Apache-2.0
-// Modified hereafter by contributors to runatlantis/atlantis.
 
-package boltdb_test
+package redis_test
 
 import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
-	"errors"
+	"encoding/pem"
 	"fmt"
+	"math/big"
+	"net"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/runatlantis/atlantis/server/core/boltdb"
-
+	"github.com/alicebob/miniredis/v2"
+	"github.com/pkg/errors"
+	redisLib "github.com/redis/go-redis/v9"
+	"github.com/runatlantis/atlantis/server/core/coordination/redis"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+
 	. "github.com/runatlantis/atlantis/testing"
-	bolt "go.etcd.io/bbolt"
 )
 
-var lockBucket = "bucket"
-var configBucket = "configBucket"
 var project = models.NewProject("owner/repo", "parent/child", "")
 var workspace = "default"
 var pullNum = 1
@@ -38,88 +45,128 @@ var lock = models.ProjectLock{
 	Time:      time.Now(),
 }
 
+var (
+	cert   tls.Certificate
+	caPath string
+)
+
+// newStoreWithClient wraps a directly-constructed go-redis client, the
+// same composition the coordination factory uses with a dialed client.
+func newStoreWithClient(opts *redisLib.Options) (*redis.Store, error) {
+	return redis.NewStore(redisLib.NewClient(opts))
+}
+
+func TestRedisWithTLS(t *testing.T) {
+	t.Log("connecting to redis over TLS")
+
+	// Setup the Miniredis Server for TLS
+	certBytes, keyBytes, err := generateLocalhostCert()
+	Ok(t, err)
+	certOut := new(bytes.Buffer)
+	err = pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	Ok(t, err)
+	certData := certOut.Bytes()
+	keyOut := new(bytes.Buffer)
+	err = pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	Ok(t, err)
+	cert, err = tls.X509KeyPair(certData, keyOut.Bytes())
+	Ok(t, err)
+	certFile, err := os.CreateTemp("", "cert.*.pem")
+	Ok(t, err)
+	caPath = certFile.Name()
+	_, err = certFile.Write(certData)
+	Ok(t, err)
+	defer certFile.Close()
+	tlsConfig := &tls.Config{
+		Certificates:       []tls.Certificate{cert},
+		InsecureSkipVerify: true, //nolint:gosec // This is purely for testing
+	}
+
+	// Start Server and Connect
+	s := miniredis.NewMiniRedis()
+	if err := s.StartTLS(tlsConfig); err != nil {
+		t.Fatalf("could not start miniredis: %s", err)
+		// not reached
+	}
+	t.Cleanup(s.Close)
+	_ = newTestRedisTLS(s)
+}
+
 func TestLockCommandNotSet(t *testing.T) {
 	t.Log("retrieving apply lock when there are none should return empty LockCommand")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	exists, err := b.CheckCommandLock(command.Apply)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+	exists, err := r.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, exists == nil, "exp nil")
 }
 
 func TestLockCommandEnabled(t *testing.T) {
 	t.Log("setting the apply lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
 	timeNow := time.Now()
-	_, err := b.LockCommand(command.Apply, timeNow)
+	_, err := r.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(command.Apply)
+	config, err := r.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 }
 
 func TestLockCommandFail(t *testing.T) {
 	t.Log("setting the apply lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
 	timeNow := time.Now()
-	_, err := b.LockCommand(command.Apply, timeNow)
+	_, err := r.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	_, err = b.LockCommand(command.Apply, timeNow)
+	_, err = r.LockCommand(command.Apply, timeNow)
 	ErrEquals(t, "db transaction failed: lock already exists", err)
 }
 
 func TestUnlockCommandDisabled(t *testing.T) {
 	t.Log("unsetting the apply lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
 	timeNow := time.Now()
-	_, err := b.LockCommand(command.Apply, timeNow)
+	_, err := r.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	config, err := b.CheckCommandLock(command.Apply)
+	config, err := r.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Equals(t, true, config.IsLocked())
 
-	err = b.UnlockCommand(command.Apply)
+	err = r.UnlockCommand(command.Apply)
 	Ok(t, err)
 
-	config, err = b.CheckCommandLock(command.Apply)
+	config, err = r.CheckCommandLock(command.Apply)
 	Ok(t, err)
 	Assert(t, config == nil, "exp nil object")
+}
+
+func TestUnlockCommandFail(t *testing.T) {
+	t.Log("setting the apply lock")
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+	err := r.UnlockCommand(command.Apply)
+	ErrEquals(t, "db transaction failed: no lock exists", err)
 }
 
 func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
 	t.Log("migration should convert old format keys to new format with project name")
 
-	// Create a temporary directory
-	tmpDir := t.TempDir()
+	s := miniredis.RunT(t)
 
-	// Create a database file manually with an old format key
-	dbPath := tmpDir + "/atlantis.db"
-	boltDB, err := bolt.Open(dbPath, 0600, nil)
-	Ok(t, err)
-
-	// Create buckets
-	err = boltDB.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte("runLocks")); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists([]byte("pulls")); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists([]byte("globalLocks")); err != nil {
-			return err
-		}
-		return nil
+	// Create a direct redis client to set up old format locks
+	client := redisLib.NewClient(&redisLib.Options{
+		Addr: s.Addr(),
 	})
-	Ok(t, err)
+	defer client.Close()
 
 	// Create a lock in old format: {repoFullName}/{path}/{workspace}
-	oldKey := "owner/repo/path/default"
+	oldKey := "pr/owner/repo/path/default"
 	oldProject := models.NewProject("owner/repo", "path", "myproject")
 	oldLock := models.ProjectLock{
 		Pull:      models.PullRequest{Num: 1},
@@ -132,39 +179,25 @@ func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
 	oldLockSerialized, err := json.Marshal(oldLock)
 	Ok(t, err)
 
-	// Insert old format lock
-	err = boltDB.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("runLocks"))
-		return bucket.Put([]byte(oldKey), oldLockSerialized)
-	})
+	// Insert old format lock directly
+	err = client.Set(context.Background(), oldKey, oldLockSerialized, 0).Err()
 	Ok(t, err)
 
-	// Verify old key exists
-	err = boltDB.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket([]byte("runLocks"))
-		val := bucket.Get([]byte(oldKey))
-		Assert(t, val != nil, "old key should exist before migration")
-		return nil
-	})
+	// Verify old key exists before migration
+	val, err := client.Get(context.Background(), oldKey).Result()
+	Ok(t, err)
+	Assert(t, val != "", "old key should exist before migration")
+
+	// Now create a new Redis instance which should trigger the migration
+	r, err := newStoreWithClient(&redisLib.Options{Addr: s.Addr()})
 	Ok(t, err)
 
-	// Close the database
-	boltDB.Close()
+	// Verify the old key no longer exists
+	_, err = client.Get(context.Background(), oldKey).Result()
+	Assert(t, err != nil, "old key should be deleted after migration")
 
-	// Now open with boltdb.New which should trigger the migration
-	b, err := boltdb.New(tmpDir)
-	Ok(t, err)
-	defer b.Close()
-
-	// List all locks
-	allLocks, err := b.List()
-	Ok(t, err)
-	Assert(t, len(allLocks) == 1, "should have 1 lock after migration")
-
-	// Verify the lock can be retrieved using the GetLock method
-	// which uses the new key format internally
-	projectWithName := models.NewProject("owner/repo", "path", "myproject")
-	retrievedLock, err := b.GetLock(projectWithName, "default")
+	// Verify the new key exists with correct format
+	retrievedLock, err := r.GetLock(oldProject, "default")
 	Ok(t, err)
 	Assert(t, retrievedLock != nil, "lock should exist with new key format")
 	Equals(t, "owner/repo", retrievedLock.Project.RepoFullName)
@@ -177,10 +210,8 @@ func TestMigrationOldLockKeysToNewFormat(t *testing.T) {
 func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
 	t.Log("migration should not affect keys already in new format")
 
-	// Create a temporary directory for the test database
-	tmp := t.TempDir()
-	db, err := boltdb.New(tmp)
-	Ok(t, err)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
 
 	// Create a lock with the new format (includes project name)
 	projectWithName := models.NewProject("owner/repo", "path", "projectName")
@@ -192,78 +223,71 @@ func TestNoMigrationNeededForNewFormatKeys(t *testing.T) {
 		Time:      time.Now(),
 	}
 
-	// Acquire lock using the new format
-	acquired, _, err := db.TryLock(newLock)
+	// Try to lock using the new format
+	acquired, _, err := r.TryLock(newLock)
 	Ok(t, err)
 	Assert(t, acquired, "should acquire lock")
 
-	// Verify the lock can be retrieved immediately after creation
-	retrievedLock, err := db.GetLock(projectWithName, "default")
+	// Verify the lock was created and can be retrieved with the correct key format
+	retrievedLock, err := r.GetLock(projectWithName, "default")
 	Ok(t, err)
 	Assert(t, retrievedLock != nil, "lock should exist")
 	Equals(t, "projectName", retrievedLock.Project.ProjectName)
 	Equals(t, "testuser", retrievedLock.User.Username)
 
-	// Close and reopen the database to trigger any migration logic
-	db.Close()
-	db, err = boltdb.New(tmp)
+	// Close the current Redis connection and create a new one
+	// This simulates a restart which would trigger the migration logic
+	r.Close()
+	r = newTestRedis(s)
+	defer r.Close()
+	// Verify lock still exists after "migration"
+	retrievedLock, err = r.GetLock(projectWithName, "default")
 	Ok(t, err)
-	defer db.Close()
-
-	// Verify lock still exists after reopening (no migration should have changed it)
-	retrievedLock, err = db.GetLock(projectWithName, "default")
-	Ok(t, err)
-	Assert(t, retrievedLock != nil, "lock should exist after migration")
+	Assert(t, retrievedLock != nil, "lock should exist")
 	Equals(t, "projectName", retrievedLock.Project.ProjectName)
 	Equals(t, "testuser", retrievedLock.User.Username)
-}
 
-func TestUnlockCommandFail(t *testing.T) {
-	t.Log("setting the apply lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	err := b.UnlockCommand(command.Apply)
-	ErrEquals(t, "db transaction failed: no lock exists", err)
 }
 
 func TestMixedLocksPresent(t *testing.T) {
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
 	timeNow := time.Now()
-	_, err := b.LockCommand(command.Apply, timeNow)
+	_, err := r.LockCommand(command.Apply, timeNow)
 	Ok(t, err)
 
-	_, _, err = b.TryLock(lock)
+	_, _, err = r.TryLock(lock)
 	Ok(t, err)
-	ls, err := b.List()
+
+	ls, err := r.List()
 	Ok(t, err)
 	Equals(t, 1, len(ls))
 }
 
 func TestListNoLocks(t *testing.T) {
 	t.Log("listing locks when there are none should return an empty list")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	ls, err := b.List()
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+	ls, err := r.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 }
 
 func TestListOneLock(t *testing.T) {
 	t.Log("listing locks when there is one should return it")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	r := newTestRedis(s)
+	_, _, err := r.TryLock(lock)
 	Ok(t, err)
-	ls, err := b.List()
+	ls, err := r.List()
 	Ok(t, err)
 	Equals(t, 1, len(ls))
 }
 
 func TestListMultipleLocks(t *testing.T) {
 	t.Log("listing locks when there are multiple should return them")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	// add multiple locks
 	repos := []string{
@@ -276,10 +300,10 @@ func TestListMultipleLocks(t *testing.T) {
 	for _, r := range repos {
 		newLock := lock
 		newLock.Project = models.NewProject(r, "path", "")
-		_, _, err := b.TryLock(newLock)
+		_, _, err := rdb.TryLock(newLock)
 		Ok(t, err)
 	}
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 4, len(ls))
 	for _, r := range repos {
@@ -295,23 +319,23 @@ func TestListMultipleLocks(t *testing.T) {
 
 func TestListAddRemove(t *testing.T) {
 	t.Log("listing after adding and removing should return none")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 }
 
 func TestLockingNoLocks(t *testing.T) {
 	t.Log("with no locks yet, lock should succeed")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	acquired, currLock, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	acquired, currLock, err := rdb.TryLock(lock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, lock, currLock)
@@ -319,16 +343,16 @@ func TestLockingNoLocks(t *testing.T) {
 
 func TestLockingExistingLock(t *testing.T) {
 	t.Log("if there is an existing lock, lock should...")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...succeed if the new project has a different path")
 	{
 		newLock := lock
 		newLock.Project = models.NewProject(project.RepoFullName, "different/path", "")
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, pullNum, currLock.Pull.Num)
@@ -338,7 +362,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Workspace = "different-workspace"
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
@@ -348,18 +372,19 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Project = models.NewProject("different/repo", project.Path, "")
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, true, acquired)
 		Equals(t, newLock, currLock)
 	}
+
 	// TODO: How should we handle different name?
 	/*
 		t.Log("...succeed if the new project has a different name")
 		{
 			newLock := lock
 			newLock.Project = models.NewProject(project.RepoFullName, project.Path, "different-name")
-			acquired, currLock, err := b.TryLock(newLock)
+			acquired, currLock, err := rdb.TryLock(newLock)
 			Ok(t, err)
 			Equals(t, true, acquired)
 			Equals(t, newLock, currLock)
@@ -370,7 +395,7 @@ func TestLockingExistingLock(t *testing.T) {
 	{
 		newLock := lock
 		newLock.Pull.Num = lock.Pull.Num + 1
-		acquired, currLock, err := b.TryLock(newLock)
+		acquired, currLock, err := rdb.TryLock(newLock)
 		Ok(t, err)
 		Equals(t, false, acquired)
 		Equals(t, currLock.Pull.Num, pullNum)
@@ -379,32 +404,32 @@ func TestLockingExistingLock(t *testing.T) {
 
 func TestUnlockingNoLocks(t *testing.T) {
 	t.Log("unlocking with no locks should succeed")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, err := b.Unlock(project, workspace)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, err := rdb.Unlock(project, workspace)
 
 	Ok(t, err)
 }
 
 func TestUnlocking(t *testing.T) {
 	t.Log("unlocking with an existing lock should succeed")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	_, _, err := b.TryLock(lock)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be no locks listed
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 
 	// should be able to re-lock that repo with a new pull num
 	newLock := lock
 	newLock.Pull.Num = lock.Pull.Num + 1
-	acquired, currLock, err := b.TryLock(newLock)
+	acquired, currLock, err := rdb.TryLock(newLock)
 	Ok(t, err)
 	Equals(t, true, acquired)
 	Equals(t, newLock, currLock)
@@ -412,66 +437,66 @@ func TestUnlocking(t *testing.T) {
 
 func TestUnlockingMultiple(t *testing.T) {
 	t.Log("unlocking and locking multiple locks should succeed")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	_, _, err := b.TryLock(lock)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	new1 := lock
 	new1.Project.RepoFullName = "new/repo"
-	_, _, err = b.TryLock(new1)
+	_, _, err = rdb.TryLock(new1)
 	Ok(t, err)
 
 	new2 := lock
 	new2.Project.Path = "new/path"
-	_, _, err = b.TryLock(new2)
+	_, _, err = rdb.TryLock(new2)
 	Ok(t, err)
 
 	new3 := lock
 	new3.Workspace = "new-workspace"
-	_, _, err = b.TryLock(new3)
+	_, _, err = rdb.TryLock(new3)
 	Ok(t, err)
 
 	// now try and unlock them
-	_, err = b.Unlock(new3.Project, new3.Workspace)
+	_, err = rdb.Unlock(new3.Project, new3.Workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new2.Project, workspace)
+	_, err = rdb.Unlock(new2.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(new1.Project, workspace)
+	_, err = rdb.Unlock(new1.Project, workspace)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
 	// should be none left
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 }
 
 func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
 	t.Log("UnlockIfOwnedByPull should ignore missing locks")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), deleted)
 }
 
 func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
 	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	_, _, err := b.TryLock(lock)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
-	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum+1)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), deleted)
 
-	existing, err := b.GetLock(project, workspace)
+	existing, err := rdb.GetLock(project, workspace)
 	Ok(t, err)
 	Assert(t, existing != nil, "expected lock to remain")
 	Equals(t, pullNum, existing.Pull.Num)
@@ -479,13 +504,13 @@ func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
 
 func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
 	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	_, _, err := b.TryLock(lock)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
-	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
 	Ok(t, err)
 	Assert(t, deleted != nil, "expected deleted lock")
 	Equals(t, lock.Project, deleted.Project)
@@ -493,48 +518,48 @@ func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
 	Equals(t, lock.Pull, deleted.Pull)
 	Equals(t, lock.User, deleted.User)
 
-	existing, err := b.GetLock(project, workspace)
+	existing, err := rdb.GetLock(project, workspace)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), existing)
 }
 
 func TestUnlockByPullNone(t *testing.T) {
 	t.Log("UnlockByPull should be successful when there are no locks")
-	db, b := newTestDB()
-	defer cleanupDB(db)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
-	_, err := b.UnlockByPull("any/repo", 1)
+	_, err := rdb.UnlockByPull("any/repo", 1)
 	Ok(t, err)
 }
 
 func TestUnlockByPullOne(t *testing.T) {
 	t.Log("with one lock, UnlockByPull should...")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	t.Log("...delete nothing when its the same repo but a different pull")
 	{
-		_, err := b.UnlockByPull(project.RepoFullName, pullNum+1)
+		_, err := rdb.UnlockByPull(project.RepoFullName, pullNum+1)
 		Ok(t, err)
-		ls, err := b.List()
+		ls, err := rdb.List()
 		Ok(t, err)
 		Equals(t, 1, len(ls))
 	}
 	t.Log("...delete nothing when its the same pull but a different repo")
 	{
-		_, err := b.UnlockByPull("different/repo", pullNum)
+		_, err := rdb.UnlockByPull("different/repo", pullNum)
 		Ok(t, err)
-		ls, err := b.List()
+		ls, err := rdb.List()
 		Ok(t, err)
 		Equals(t, 1, len(ls))
 	}
 	t.Log("...delete the lock when its the same repo and pull")
 	{
-		_, err := b.UnlockByPull(project.RepoFullName, pullNum)
+		_, err := rdb.UnlockByPull(project.RepoFullName, pullNum)
 		Ok(t, err)
-		ls, err := b.List()
+		ls, err := rdb.List()
 		Ok(t, err)
 		Equals(t, 0, len(ls))
 	}
@@ -542,67 +567,67 @@ func TestUnlockByPullOne(t *testing.T) {
 
 func TestUnlockByPullAfterUnlock(t *testing.T) {
 	t.Log("after locking and unlocking, UnlockByPull should be successful")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
-	_, err = b.Unlock(project, workspace)
+	_, err = rdb.Unlock(project, workspace)
 	Ok(t, err)
 
-	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 }
 
 func TestUnlockByPullMatching(t *testing.T) {
 	t.Log("UnlockByPull should delete all locks in that repo and pull num")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
 	// add additional locks with the same repo and pull num but different paths/workspaces
 	new1 := lock
 	new1.Project.Path = "dif/path"
-	_, _, err = b.TryLock(new1)
+	_, _, err = rdb.TryLock(new1)
 	Ok(t, err)
 	new2 := lock
 	new2.Workspace = "new-workspace"
-	_, _, err = b.TryLock(new2)
+	_, _, err = rdb.TryLock(new2)
 	Ok(t, err)
 
 	// there should now be 3
-	ls, err := b.List()
+	ls, err := rdb.List()
 	Ok(t, err)
 	Equals(t, 3, len(ls))
 
 	// should all be unlocked
-	_, err = b.UnlockByPull(project.RepoFullName, pullNum)
+	_, err = rdb.UnlockByPull(project.RepoFullName, pullNum)
 	Ok(t, err)
-	ls, err = b.List()
+	ls, err = rdb.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
 }
 
 func TestGetLockNotThere(t *testing.T) {
 	t.Log("getting a lock that doesn't exist should return a nil pointer")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	l, err := b.GetLock(project, workspace)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	l, err := rdb.GetLock(project, workspace)
 	Ok(t, err)
 	Equals(t, (*models.ProjectLock)(nil), l)
 }
 
 func TestGetLock(t *testing.T) {
 	t.Log("getting a lock should return the lock")
-	db, b := newTestDB()
-	defer cleanupDB(db)
-	_, _, err := b.TryLock(lock)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	_, _, err := rdb.TryLock(lock)
 	Ok(t, err)
 
-	l, err := b.GetLock(project, workspace)
+	l, err := rdb.GetLock(project, workspace)
 	Ok(t, err)
 	// can't compare against time so doing each field
 	Equals(t, lock.Project, l.Project)
@@ -613,7 +638,8 @@ func TestGetLock(t *testing.T) {
 
 // Test we can create a status and then getCommandLock it.
 func TestPullStatus_UpdateGet(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -635,7 +661,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 			},
 		},
 	}
-	status, err := b.UpdatePullWithResults(
+	status, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -649,7 +675,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 		})
 	Ok(t, err)
 
-	maybeStatus, err := b.GetPullStatus(pull)
+	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, pull, maybeStatus.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
@@ -660,13 +686,13 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 			Status:      models.ErroredPlanStatus,
 		},
 	}, status.Projects)
-	b.Close()
 }
 
 // Test we can create a status, delete it, and then we shouldn't be able to getCommandLock
 // it.
 func TestPullStatus_UpdateDeleteGet(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -688,7 +714,7 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -701,20 +727,20 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 		})
 	Ok(t, err)
 
-	err = b.DeletePullStatus(pull)
+	err = rdb.DeletePullStatus(pull)
 	Ok(t, err)
 
-	maybeStatus, err := b.GetPullStatus(pull)
+	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, maybeStatus == nil, "exp nil")
-	b.Close()
 }
 
 // Test we can create a status, update a specific project's status within that
 // pull status, and when we getCommandLock all the project statuses, that specific project
 // should be updated.
 func TestPullStatus_UpdateProject(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -736,7 +762,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -756,10 +782,10 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 		})
 	Ok(t, err)
 
-	err = b.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
+	err = rdb.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
 	Ok(t, err)
 
-	status, err := b.GetPullStatus(pull)
+	status, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, pull, status.Pull) // nolint: staticcheck
 	Equals(t, []models.ProjectStatus{
@@ -776,13 +802,13 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, status.Projects) // nolint: staticcheck
-	b.Close()
 }
 
 // Test that if we update an existing pull status and our new status is for a
 // different HeadSHA, that we just overwrite the old status.
 func TestPullStatus_UpdateNewCommit(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -804,7 +830,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -818,7 +844,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	Ok(t, err)
 
 	pull.HeadCommit = "newsha"
-	status, err := b.UpdatePullWithResults(pull,
+	status, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
 				RepoRelDir: ".",
@@ -832,7 +858,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
 
-	maybeStatus, err := b.GetPullStatus(pull)
+	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, pull, maybeStatus.Pull)
 	Equals(t, []models.ProjectStatus{
@@ -843,11 +869,11 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, maybeStatus.Projects)
-	b.Close()
 }
 
 func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -869,7 +895,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -884,7 +910,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 	Ok(t, err)
 
 	pull.BaseBranch = "release"
-	status, err := b.UpdatePullWithResults(pull,
+	status, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
 				Command:    command.Plan,
@@ -899,7 +925,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
 
-	maybeStatus, err := b.GetPullStatus(pull)
+	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, pull, maybeStatus.Pull)
 	Equals(t, []models.ProjectStatus{
@@ -910,11 +936,11 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 			Status:      models.PlannedPlanStatus,
 		},
 	}, maybeStatus.Projects)
-	b.Close()
 }
 
-func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
-	b := newTestDB2(t)
+func TestRedis_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -935,7 +961,7 @@ func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *tes
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -950,7 +976,7 @@ func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *tes
 	Ok(t, err)
 
 	pull.BaseBranch = "main"
-	status, err := b.UpdatePullWithResults(pull,
+	status, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
 				Command:    command.Plan,
@@ -973,17 +999,17 @@ func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *tes
 		},
 	}, status.Projects)
 
-	maybeStatus, err := b.GetPullStatus(pull)
+	maybeStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, "main", maybeStatus.Pull.BaseBranch)
 	Equals(t, status.Projects, maybeStatus.Projects)
-	b.Close()
 }
 
 // Test that if we update an existing pull status via Apply and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -1005,7 +1031,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -1041,7 +1067,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 		})
 	Ok(t, err)
 
-	updateStatus, err := b.UpdatePullWithResults(pull,
+	updateStatus, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
 				Command:    command.Apply,
@@ -1071,7 +1097,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 		})
 	Ok(t, err)
 
-	getStatus, err := b.GetPullStatus(pull)
+	getStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 
 	// Test both the pull state returned from the update call *and* the getCommandLock
@@ -1102,13 +1128,13 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 			},
 		}, updateStatus.Projects)
 	}
-	b.Close()
 }
 
 // Test that if we update one existing policy status via approve_policies and our new status is for a
 // the same commit, that we merge the statuses.
 func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -1130,7 +1156,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 			},
 		},
 	}
-	_, err := b.UpdatePullWithResults(
+	_, err := rdb.UpdatePullWithResults(
 		pull,
 		[]command.ProjectResult{
 			{
@@ -1169,7 +1195,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 		})
 	Ok(t, err)
 
-	updateStatus, err := b.UpdatePullWithResults(pull,
+	updateStatus, err := rdb.UpdatePullWithResults(pull,
 		[]command.ProjectResult{
 			{
 				Command:    command.ApprovePolicies,
@@ -1190,7 +1216,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 		})
 	Ok(t, err)
 
-	getStatus, err := b.GetPullStatus(pull)
+	getStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 
 	// Test both the pull state returned from the update call *and* the getCommandLock
@@ -1223,13 +1249,13 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 			},
 		}, updateStatus.Projects)
 	}
-	b.Close()
 }
 
 // Test that policy approvals are preserved when HeadCommit changes,
 // so sticky approvals can survive across code pushes.
 func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
-	b := newTestDB2(t)
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -1253,7 +1279,7 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 	}
 
 	// Write initial policy check results with an approval at commit A.
-	_, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+	_, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.PolicyCheck,
 			RepoRelDir: "mydir",
@@ -1278,10 +1304,8 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 	Ok(t, err)
 
 	// Push new commit B with a plan result (no PolicyCheckResults).
-	// This simulates what happens when autoplan writes the plan to DB
-	// before the policy check runs.
 	pull.HeadCommit = "sha-B"
-	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "mydir",
@@ -1304,10 +1328,9 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 	Equals(t, "boss", status.Projects[0].PolicyStatus[0].Approvals[0].Approver)
 
 	// Verify via GetPullStatus too.
-	getStatus, err := b.GetPullStatus(pull)
+	getStatus, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Equals(t, 1, len(getStatus.Projects[0].PolicyStatus[0].Approvals))
-	b.Close()
 }
 
 // TestPullStatus_UpdateOverwritesCorruptData verifies that
@@ -1316,7 +1339,8 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 // PullStatus schema change). The corrupt entry should be logged and
 // overwritten rather than causing every subsequent plan to fail.
 func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
-	tmp := t.TempDir()
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
 
 	pull := models.PullRequest{
 		Num:        1,
@@ -1339,31 +1363,15 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 		},
 	}
 
-	// First, let boltdb.New create the file and buckets.
-	b, err := boltdb.New(tmp)
-	Ok(t, err)
-	Ok(t, b.Close())
-
 	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
-	// that the current Go types cannot unmarshal.
-	key := fmt.Appendf(nil, "%s::%s::%d",
+	// that the current Go types cannot unmarshal (Approvals used to be int).
+	key := fmt.Sprintf("%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
-	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
-	Ok(t, err)
-	err = raw.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket([]byte("pulls")).Put(key, corrupt)
-	})
-	Ok(t, err)
-	Ok(t, raw.Close())
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	Ok(t, s.Set(key, corrupt))
 
-	// Reopen and write fresh results. This must succeed despite the
-	// unreadable prior entry.
-	b, err = boltdb.New(tmp)
-	Ok(t, err)
-	defer b.Close()
-
-	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+	// Write fresh results. This must succeed despite the unreadable prior entry.
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
 			Command:    command.Plan,
 			RepoRelDir: "mydir",
@@ -1380,51 +1388,64 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Equals(t, 0, len(status.Projects[0].PolicyStatus))
 
 	// The corrupt entry is gone: reading it back returns clean data.
-	got, err := b.GetPullStatus(pull)
+	got, err := rdb.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, got != nil, "expected non-nil pull status")
 	Equals(t, 1, len(got.Projects))
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
 }
 
-// newTestDB returns a TestDB using a temporary path.
-func newTestDB() (*bolt.DB, *boltdb.BoltDB) {
-	// Retrieve a temporary path.
-	f, err := os.CreateTemp("", "")
+func newTestRedis(mr *miniredis.Miniredis) *redis.Store {
+	r, err := newStoreWithClient(&redisLib.Options{Addr: mr.Addr()})
 	if err != nil {
-		panic(fmt.Errorf("failed to create temp file: %w", err))
+		panic(fmt.Errorf("failed to create test redis client: %w", err))
 	}
-	path := f.Name()
-	f.Close() // nolint: errcheck
-
-	// Open the database.
-	boltDB, err := bolt.Open(path, 0600, nil)
-	if err != nil {
-		panic(fmt.Errorf("could not start bolt DB: %w", err))
-	}
-	if err := boltDB.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists([]byte(lockBucket)); err != nil {
-			return fmt.Errorf("failed to create bucket: %w", err)
-		}
-		if _, err := tx.CreateBucketIfNotExists([]byte(configBucket)); err != nil {
-			return fmt.Errorf("failed to create bucket: %w", err)
-		}
-		return nil
-	}); err != nil {
-		panic(fmt.Errorf("could not create bucket: %w", err))
-	}
-	b, _ := boltdb.NewWithDB(boltDB, lockBucket, configBucket)
-	return boltDB, b
+	return r
 }
 
-func newTestDB2(t *testing.T) *boltdb.BoltDB {
-	tmp := t.TempDir()
-	boltDB, err := boltdb.New(tmp)
-	Ok(t, err)
-	return boltDB
+func newTestRedisTLS(mr *miniredis.Miniredis) *redis.Store {
+	r, err := newStoreWithClient(&redisLib.Options{
+		Addr:      mr.Addr(),
+		TLSConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // test-only
+	})
+	if err != nil {
+		panic(fmt.Errorf("failed to create test redis client: %w", err))
+	}
+	return r
 }
 
-func cleanupDB(db *bolt.DB) {
-	db.Close()           // nolint: errcheck
-	os.Remove(db.Path()) // nolint: errcheck
+func generateLocalhostCert() ([]byte, []byte, error) {
+	var err error
+
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		return nil, keyBytes, err
+	}
+
+	serialNumber, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+	if err != nil {
+		return nil, keyBytes, err
+	}
+
+	notBefore := time.Now()
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Atlantis Test Suite"},
+		},
+		NotBefore: notBefore,
+		NotAfter:  notBefore.Add(time.Hour),
+		KeyUsage:  x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	return certBytes, keyBytes, err
 }

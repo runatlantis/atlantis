@@ -11,7 +11,7 @@ import (
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/core/locking"
+	"github.com/runatlantis/atlantis/server/core/coordination"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -38,14 +38,14 @@ func NewPlanCommandRunner(
 	projectCommandBuilder ProjectPlanCommandBuilder,
 	projectCommandRunner ProjectPlanCommandRunner,
 	cancellationTracker CancellationTracker,
-	dbUpdater *DBUpdater,
+	pullStatusUpdater *coordination.PullStatusUpdater,
 	pullUpdater *PullUpdater,
 	policyCheckCommandRunner *PolicyCheckCommandRunner,
 	autoMerger *AutoMerger,
 	parallelPoolSize int,
 	SilenceNoProjects bool,
 	pullStatusFetcher PullStatusFetcher,
-	lockingLocker locking.Locker,
+	locker coordination.Locker,
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
@@ -62,14 +62,14 @@ func NewPlanCommandRunner(
 		prjCmdBuilder:              projectCommandBuilder,
 		prjCmdRunner:               projectCommandRunner,
 		cancellationTracker:        cancellationTracker,
-		dbUpdater:                  dbUpdater,
+		pullStatusUpdater:          pullStatusUpdater,
 		pullUpdater:                pullUpdater,
 		policyCheckCommandRunner:   policyCheckCommandRunner,
 		autoMerger:                 autoMerger,
 		parallelPoolSize:           parallelPoolSize,
 		SilenceNoProjects:          SilenceNoProjects,
 		pullStatusFetcher:          pullStatusFetcher,
-		lockingLocker:              lockingLocker,
+		locker:                     locker,
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
@@ -94,13 +94,13 @@ type PlanCommandRunner struct {
 	prjCmdBuilder              ProjectPlanCommandBuilder
 	prjCmdRunner               ProjectPlanCommandRunner
 	cancellationTracker        CancellationTracker
-	dbUpdater                  *DBUpdater
+	pullStatusUpdater          *coordination.PullStatusUpdater
 	pullUpdater                *PullUpdater
 	policyCheckCommandRunner   *PolicyCheckCommandRunner
 	autoMerger                 *AutoMerger
 	parallelPoolSize           int
 	pullStatusFetcher          PullStatusFetcher
-	lockingLocker              locking.Locker
+	locker                     coordination.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
 	DiscardApprovalOnPlan bool
@@ -189,7 +189,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 
-	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	pullStatus, err := p.pullStatusUpdater.Update(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
 	}
@@ -343,9 +343,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if noProjectPullStatus != nil {
 		pullStatus = *noProjectPullStatus
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
-		pullStatus, err = p.dbUpdater.replaceDB(ctx, pull, result.ProjectResults)
+		pullStatus, err = p.pullStatusUpdater.Replace(ctx, pull, result.ProjectResults)
 	} else {
-		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+		pullStatus, err = p.pullStatusUpdater.Update(ctx, pull, result.ProjectResults)
 	}
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
@@ -384,7 +384,7 @@ func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Co
 	if _, err := p.deletePlansAndPendingPlanLocks(ctx); err != nil {
 		return models.PullStatus{}, err
 	}
-	pullStatus, err := p.dbUpdater.replaceDB(ctx, pull, nil)
+	pullStatus, err := p.pullStatusUpdater.Replace(ctx, pull, nil)
 	if err != nil {
 		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
@@ -575,7 +575,7 @@ func (p *PlanCommandRunner) deletePlanLocksForPendingPlans(ctx *command.Context,
 }
 
 func (p *PlanCommandRunner) unlockPlanLockIfOwnedByPull(ctx *command.Context, project models.Project, workspace string, lockKey string) error {
-	if _, err := p.lockingLocker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
+	if _, err := p.locker.UnlockIfOwnedByPull(project, workspace, ctx.Pull.Num); err != nil {
 		return fmt.Errorf("deleting lock %q for pull %d: %w", lockKey, ctx.Pull.Num, err)
 	}
 	return nil

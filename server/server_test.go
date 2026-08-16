@@ -23,8 +23,8 @@ import (
 	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
-	"github.com/runatlantis/atlantis/server/core/locking"
-	lockMocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/coordination"
+	lockMocks "github.com/runatlantis/atlantis/server/core/coordination/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -168,7 +168,7 @@ func TestIndex_Success(t *testing.T) {
 		},
 	}
 	l.EXPECT().List().Return(locks, nil)
-	al.EXPECT().CheckApplyLock().Return(locking.ApplyCommandLock{}, nil)
+	al.EXPECT().CheckApplyLock().Return(coordination.ApplyCommandLock{}, nil)
 	it := tMocks.NewMockTemplateWriter()
 	r := mux.NewRouter()
 	atlantisVersion := "0.3.1"

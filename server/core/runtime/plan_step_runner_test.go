@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	runtimemocks "github.com/runatlantis/atlantis/server/core/runtime/mocks"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
@@ -47,7 +48,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 	// Using version >= 0.10 here so we don't expect any env commands.
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
@@ -108,7 +109,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
 	logger := logging.NewNoopLogger(t)
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 	ctx := command.ProjectContext{
 		Log:                logger,
 		Workspace:          "default",
@@ -189,7 +190,7 @@ Terraform will perform the following actions:
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 	When(terraform.RunCommandWithVersion(
 		Any[command.ProjectContext](),
 		Any[string](),
@@ -242,7 +243,7 @@ func TestRun_OutputOnErr(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.10.0")
-	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 	expOutput := "expected output"
 	expErrMsg := "error!"
 	When(terraform.RunCommandWithVersion(
@@ -318,7 +319,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 			ctx := command.ProjectContext{
 				Workspace:          "default",
 				RepoRelDir:         ".",
@@ -410,7 +411,7 @@ locally at this time.
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
 			asyncTf := &remotePlanMock{}
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTf, &runtime.LocalPlanStore{})
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTf, &planstore.LocalPlanStore{})
 			absProjectPath := t.TempDir()
 
 			// First, terraform workspace gets run.
@@ -607,7 +608,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion(c.tfVersion)
-			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &planstore.LocalPlanStore{})
 			ctx := command.ProjectContext{
 				Workspace:          "default",
 				RepoRelDir:         ".",

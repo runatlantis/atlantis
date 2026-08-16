@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -25,7 +26,7 @@ type ApplyStepRunner struct {
 	DefaultTFVersion      *version.Version       `validate:"required"`
 	CommitStatusUpdater   StatusUpdater          `validate:"required"`
 	AsyncTFExec           AsyncTFExec            `validate:"required"`
-	PlanStore             PlanStore              `validate:"required"`
+	PlanStore             planstore.PlanStore    `validate:"required"`
 }
 
 func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
