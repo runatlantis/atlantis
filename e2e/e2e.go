@@ -129,11 +129,11 @@ func (t *E2ETester) runPlanThenApplyExpectFailure(ctx context.Context) (result *
 
 func (t *E2ETester) runPlanApplyLifecycle(ctx context.Context, replan, expectApplyFailure bool) (result *E2EResult, err error) {
 	tc := t.testCase
-	if tc.ApplyCommand == "" {
-		return nil, fmt.Errorf("[%s] plan/apply lifecycle requires ApplyCommand", tc.Name)
-	}
 	branchName := fmt.Sprintf("e2e-%s-%s", tc.Name, e2eRunNonce())
 	result = &E2EResult{testCase: tc.Name, branchName: branchName}
+	if tc.ApplyCommand == "" {
+		return result, fmt.Errorf("[%s] plan/apply lifecycle requires ApplyCommand", tc.Name)
+	}
 	pull, err := t.createFixturePull(ctx, "", branchName, tc.MutateFile, nil)
 	if err != nil {
 		return result, err
@@ -222,7 +222,7 @@ func (t *E2ETester) runPlanApplyLifecycle(ctx context.Context, replan, expectApp
 			return result, t.withLifecycleDiagnostics(ctx, pull, "apply", fmt.Errorf("[%s] apply expected success but got %q", tc.Name, state))
 		}
 		if len(tc.ExpectedApplyStatusContexts) > 0 {
-			if err := assertProjectStatuses(ctx, t.vcsClient, branchName, "apply", tc.Name, tc.ExpectedApplyStatusContexts, false); err != nil {
+			if err := assertProjectStatuses(ctx, t.vcsClient, branchName, "apply", tc.Name, tc.ExpectedApplyStatusContexts, tc.ForbidExtraProjectStatuses); err != nil {
 				return result, t.withLifecycleDiagnostics(ctx, pull, "apply", err)
 			}
 		}
@@ -267,7 +267,11 @@ func (t *E2ETester) assertPlanResult(ctx context.Context, pull *fixturePull, sta
 
 // assertProjectStatuses verifies that the expected per-project status contexts
 // are present and (optionally) that no unexpected project statuses exist.
-func assertProjectStatuses(ctx context.Context, client VCSClient, branchName, command, caseName string, expectedContexts []string, forbidExtra bool) error {
+type projectStatusGetter interface {
+	GetProjectStatuses(ctx context.Context, branchName, command string) (map[string]string, error)
+}
+
+func assertProjectStatuses(ctx context.Context, client projectStatusGetter, branchName, command, caseName string, expectedContexts []string, forbidExtra bool) error {
 	projectStatuses, err := client.GetProjectStatuses(ctx, branchName, command)
 	if err != nil {
 		return fmt.Errorf("[%s] failed to get %s project statuses: %v", caseName, command, err)

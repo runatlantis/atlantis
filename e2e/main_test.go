@@ -3,11 +3,66 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+type staticProjectStatusClient map[string]string
+
+func (s staticProjectStatusClient) GetProjectStatuses(context.Context, string, string) (map[string]string, error) {
+	return s, nil
+}
+
+func TestPlanApplyLifecycleMissingApplyCommandReturnsResult(t *testing.T) {
+	tester := E2ETester{testCase: TestCase{Name: "missing-apply-command", Scenario: ScenarioPlanThenApply}}
+
+	result, err := tester.Start(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "plan/apply lifecycle requires ApplyCommand") {
+		t.Fatalf("Start() error = %v, want missing ApplyCommand error", err)
+	}
+	if result == nil {
+		t.Fatal("Start() result = nil, want lifecycle result for ordinary case failure")
+	}
+	if result.testCase != "missing-apply-command" {
+		t.Fatalf("Start() result testCase = %q, want %q", result.testCase, "missing-apply-command")
+	}
+
+	// A second ordinary case can still be evaluated after the first failure.
+	next := E2ETester{testCase: TestCase{Name: "next-missing-apply-command", Scenario: ScenarioPlanThenApply}}
+	nextResult, nextErr := next.Start(context.Background())
+	if nextErr == nil || nextResult == nil {
+		t.Fatalf("second Start() = (%v, %v), want non-nil result and error", nextResult, nextErr)
+	}
+}
+
+func TestAssertProjectStatusesForbidsUnexpectedContexts(t *testing.T) {
+	expected := []string{"atlantis/apply: project-a"}
+	statuses := staticProjectStatusClient{
+		"atlantis/apply: project-a":         "success",
+		"atlantis/apply: unrelated-project": "success",
+	}
+
+	err := assertProjectStatuses(context.Background(), statuses, "branch", "apply", "case", expected, true)
+	if err == nil || !strings.Contains(err.Error(), "atlantis/apply: unrelated-project") {
+		t.Fatalf("assertProjectStatuses() error = %v, want unexpected apply context", err)
+	}
+	if err := assertProjectStatuses(context.Background(), statuses, "branch", "apply", "case", expected, false); err != nil {
+		t.Fatalf("assertProjectStatuses() with extras permitted error = %v", err)
+	}
+
+	planExpected := []string{"atlantis/plan: project-a"}
+	planStatuses := staticProjectStatusClient{
+		"atlantis/plan: project-a":         "success",
+		"atlantis/plan: unrelated-project": "success",
+	}
+	if err := assertProjectStatuses(context.Background(), planStatuses, "branch", "plan", "case", planExpected, true); err == nil {
+		t.Fatal("strict plan status assertion accepted an unexpected context")
+	}
+}
 
 func TestValidateCleanPath(t *testing.T) {
 	cwd, _ := os.Getwd()
