@@ -225,7 +225,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
-	if commandName == command.Apply {
+	if commandName == command.Plan || commandName == command.Apply {
 		return result
 	}
 
@@ -247,7 +247,7 @@ func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command
 		}
 		projectOutput := projectResult.ProjectCommandOutput
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &projectOutput); err != nil {
-			ctx.Log.Err("updating project PR status: %s", err)
+			ctx.Log.Err("updating project PR status %s", err)
 		}
 	}
 }
@@ -900,7 +900,7 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
 	var remoteApplyRunURL string
-	hasManagedApply := hasAtlantisManagedApplyStep(ctx.Steps)
+	requiresManagedPlan := ctx.RequiresAtlantisManagedPlanFile
 	if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
 		if err := validator.ValidateCommandStartHead(ctx); err != nil {
 			return "", "", "", err
@@ -949,7 +949,7 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
-	if hasManagedApply {
+	if requiresManagedPlan {
 		// External plan stores put .tfplan on disk only via Load/RestorePlans.
 		// Targeted apply re-clones without RestorePlans; Load must run before
 		// ValidateProjectPlan (which stats the local file) and before hashing.
@@ -961,13 +961,13 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 				return "", "", "", err
 			}
 		}
-	} else if validator, ok := p.ApplyPlanValidator.(ApplyPlanStatusValidator); ok {
-		if err := validator.ValidateProjectPlanStatus(ctx); err != nil {
+	} else if p.ApplyPlanValidator != nil {
+		if err := p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx); err != nil {
 			return "", "", "", err
 		}
 	}
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if hasManagedApply && ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
+	if requiresManagedPlan && ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
 		planPath, err := safePlanFilePath(ctx, absPath)
 		if err != nil {
 			return "", "", "", err

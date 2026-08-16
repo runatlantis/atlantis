@@ -22,6 +22,45 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+func TestRequiresAtlantisManagedPlanFile(t *testing.T) {
+	cases := map[string]struct {
+		planSteps  []valid.Step
+		applySteps []valid.Step
+		expected   bool
+	}{
+		"built-in plan and built-in apply": {
+			planSteps:  []valid.Step{{StepName: "plan"}},
+			applySteps: []valid.Step{{StepName: "apply"}},
+			expected:   true,
+		},
+		"built-in plan and run-only apply": {
+			planSteps:  []valid.Step{{StepName: "plan"}},
+			applySteps: []valid.Step{{StepName: "run"}},
+			expected:   true,
+		},
+		"run-only plan and built-in apply": {
+			planSteps:  []valid.Step{{StepName: "run"}},
+			applySteps: []valid.Step{{StepName: "apply"}},
+			expected:   true,
+		},
+		"run-only plan and run-only apply": {
+			planSteps:  []valid.Step{{StepName: "run"}},
+			applySteps: []valid.Step{{StepName: "run"}},
+			expected:   false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			workflow := valid.Workflow{
+				Plan:  valid.Stage{Steps: tc.planSteps},
+				Apply: valid.Stage{Steps: tc.applySteps},
+			}
+			Equals(t, tc.expected, requiresAtlantisManagedPlanFile(workflow))
+		})
+	}
+}
+
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -727,6 +766,15 @@ projects:
 					}
 
 					c.expCtx.CommandName = cmd
+					c.expCtx.RequiresAtlantisManagedPlanFile = false
+					if cmd == command.Apply {
+						for _, stepName := range append(append([]string{}, c.expPlanSteps...), c.expApplySteps...) {
+							if stepName == "plan" || stepName == "apply" {
+								c.expCtx.RequiresAtlantisManagedPlanFile = true
+								break
+							}
+						}
+					}
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
@@ -948,6 +996,7 @@ projects:
 					}
 
 					c.expCtx.CommandName = cmd
+					c.expCtx.RequiresAtlantisManagedPlanFile = cmd == command.Apply
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets

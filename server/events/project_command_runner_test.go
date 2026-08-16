@@ -356,7 +356,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
-			if c.CommandName == command.Apply && c.Success {
+			if c.Success {
 				mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, c.CommandName, models.SuccessCommitStatus, &prjResult)
 			} else {
 				mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
@@ -421,7 +421,7 @@ func TestProjectOutputWrapper_DowngradesPlanSuccessAfterPersistenceFailure(t *te
 
 	Equals(t, projectOutput, result)
 	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
-	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.SuccessCommitStatus, &projectOutput)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, command.Plan, models.SuccessCommitStatus, &projectOutput)
 
 	commandResult := command.Result{ProjectResults: []command.ProjectResult{{
 		ProjectCommandOutput: projectOutput,
@@ -433,6 +433,43 @@ func TestProjectOutputWrapper_DowngradesPlanSuccessAfterPersistenceFailure(t *te
 	runner.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, commandResult, models.FailedCommitStatus)
 
 	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &projectOutput)
+}
+
+func TestProjectOutputWrapper_PublishesPlanSuccessOnlyWhenDeferred(t *testing.T) {
+	RegisterMockTestingT(t)
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Plan,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "deferred-plan-success",
+	}
+	projectOutput := command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	mockJobURLSetter := mocks.NewMockJobURLSetter()
+	mockJobMessageSender := mocks.NewMockJobMessageSender()
+	mockProjectCommandRunner := mocks.NewMockProjectCommandRunner()
+	runner := &events.ProjectOutputWrapper{
+		JobURLSetter:         mockJobURLSetter,
+		JobMessageSender:     mockJobMessageSender,
+		ProjectCommandRunner: mockProjectCommandRunner,
+	}
+	When(mockProjectCommandRunner.Plan(ctx)).ThenReturn(projectOutput)
+
+	runner.Plan(ctx)
+
+	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
+	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, command.Plan, models.SuccessCommitStatus, &projectOutput)
+
+	commandResult := command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectCommandOutput: projectOutput,
+		Command:              command.Plan,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+		ProjectName:          ctx.ProjectName,
+	}}}
+	runner.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, commandResult, models.SuccessCommitStatus)
+
+	mockJobURLSetter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.SuccessCommitStatus, &projectOutput)
 }
 
 func TestProjectOutputWrapper_DefersRemoteApplyURLSuccessStatus(t *testing.T) {
@@ -491,6 +528,13 @@ func TestProjectOutputWrapperSuppressesJobOutput(t *testing.T) {
 		JobMessageSender:     mockJobMessageSender,
 	}
 	result := runner.Plan(ctx)
+	runner.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{
+		ProjectCommandOutput: result,
+		Command:              command.Plan,
+		RepoRelDir:           ctx.RepoRelDir,
+		Workspace:            ctx.Workspace,
+		ProjectName:          ctx.ProjectName,
+	}}}, models.SuccessCommitStatus)
 
 	Equals(t, expected, result)
 	mockProjectCommandRunner.VerifyWasCalledOnce().Plan(ctx)
@@ -979,11 +1023,12 @@ func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
 		Pull: models.PullRequest{
 			Num:      1,
 			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
@@ -1049,6 +1094,67 @@ func TestProjectCommandRunner_RunOnlyApplyDoesNotRequireManagedPlanFile(t *testi
 	Ok(t, res.Error)
 	Equals(t, "run", res.ApplySuccess)
 	Equals(t, []string{"run"}, calls)
+}
+
+func TestProjectCommandRunner_RunOnlyApplyReportsPolicyApprovalRemediation(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRun := mocks.NewMockCustomStepRunner()
+	database := newTestBoltDB(t)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+	}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		RunStepRunner:             mockRun,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher:   database,
+			LivePullHeadFetcher: fakeLivePullHeadFetcher{head: pull.HeadCommit, base: pull.BaseBranch},
+		},
+	}
+	repoDir := t.TempDir()
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Apply,
+		Steps:       []valid.Step{{StepName: "run", RunCommand: "custom-apply"}},
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "run-only-policy",
+		Pull:        pull,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	_, err := database.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	_, err = database.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+	Ok(t, err)
+
+	result := runner.Apply(ctx)
+
+	Assert(t, result.Error != nil, "expected policy-check status to reject apply")
+	Assert(t, strings.Contains(result.Error.Error(), "policy checks have not been approved"), "got: %s", result.Error)
+	Assert(t, strings.Contains(result.Error.Error(), "atlantis approve_policies"), "got: %s", result.Error)
+	Assert(t, !strings.Contains(result.Error.Error(), "plan file is missing"), "got: %s", result.Error)
+	mockRun.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](),
+		Any[*valid.CommandShell](),
+		Any[string](),
+		Any[string](),
+		Any[map[string]string](),
+		AnyBool(),
+		Any[[]valid.PostProcessRunOutputOption](),
+		Any[[]*regexp.Regexp](),
+	)
 }
 
 func TestProjectCommandRunner_RunOnlyApplyRejectsMissingPullStatus(t *testing.T) {
@@ -1282,8 +1388,9 @@ func TestProjectCommandRunner_ApplyRevalidatesImmediatelyBeforeApplyStep(t *test
 			{StepName: "run"},
 			{StepName: "apply"},
 		},
-		Workspace:  "default",
-		RepoRelDir: ".",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
 		Pull: models.PullRequest{
 			Num:      1,
 			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
@@ -1325,9 +1432,10 @@ func TestProjectCommandRunner_MixedApplyRunsWhenManagedPlanIsUnchanged(t *testin
 			{StepName: "run", RunCommand: "some-pre-apply-command"},
 			{StepName: "apply"},
 		},
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -1372,8 +1480,9 @@ func TestProjectCommandRunner_MultipleManagedApplyStepsAreEachRevalidated(t *tes
 			{StepName: "apply"},
 			{StepName: "apply"},
 		},
-		Workspace:  "default",
-		RepoRelDir: ".",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
 		Pull: models.PullRequest{
 			Num:      1,
 			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
@@ -1417,8 +1526,9 @@ func TestProjectCommandRunner_ApplyDoesNotCallApplyStepWhenFinalValidationFails(
 			{StepName: "run"},
 			{StepName: "apply"},
 		},
-		Workspace:  "default",
-		RepoRelDir: ".",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
 		Pull: models.PullRequest{
 			Num:      1,
 			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
@@ -1515,14 +1625,15 @@ func TestProjectCommandRunner_ActivePlanGenerationRejectsApplyWithoutDeletingPla
 		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 	}
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "active-generation",
-		Pull:        pull,
-		BaseRepo:    pull.BaseRepo,
-		Steps:       valid.DefaultApplyStage.Steps,
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "active-generation",
+		Pull:                            pull,
+		BaseRepo:                        pull.BaseRepo,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
 	}
 	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
 		plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName),
@@ -1547,6 +1658,7 @@ func TestProjectCommandRunner_ActivePlanGenerationRejectsApplyWithoutDeletingPla
 		ctx.RepoRelDir,
 		ctx.ProjectName,
 		command.Plan,
+		events.WorkingDirLockMetadataForPull(pull),
 	)
 	Ok(t, err)
 	defer releaseReplicaA()
@@ -1928,12 +2040,13 @@ func TestProjectCommandRunner_TargetedBaseRetargetClassifiedBeforeRequirements(t
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: head, base: "release"}},
 	}
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: head,
@@ -1967,12 +2080,13 @@ func TestProjectCommandRunner_TargetedStaleCommandClassifiedBeforeDirNotExist(t 
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{LivePullHeadFetcher: fakeLivePullHeadFetcher{head: liveHead}},
 	}
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  "deleted-dir",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      "deleted-dir",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: oldHead,
@@ -2007,12 +2121,13 @@ func assertTargetedStaleCommandClassifiedBeforeApplyValidation(t *testing.T) {
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: oldHead,
@@ -2325,7 +2440,8 @@ func TestApplyPlanValidator_APIInMemoryErroredPolicyCheckStatusRejectsApply(t *t
 	err := validator.ValidateProjectPlan(ctx, repoDir)
 
 	Assert(t, err != nil, "expected policy-check errored status to reject API apply")
-	Assert(t, strings.Contains(err.Error(), "policy checks have errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "policy checks have not been approved"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis approve_policies"), "got: %s", err)
 }
 
 func TestApplyPlanValidator_APIApplyUsesDBWhenNoSeededPullStatusExists(t *testing.T) {
@@ -2558,12 +2674,13 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -2621,12 +2738,13 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 		PlanStore:                 store,
 	}
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -2664,6 +2782,70 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
+func TestProjectCommandRunner_ManagedPlanRunOnlyApplyLoadsPlanFromStoreBeforeExecution(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	planContents := []byte("external-managed-plan")
+	store := &restoringPlanStore{contents: planContents}
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename("default", "mixed-workflow"))
+	runCalled := false
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:           mockLocker,
+		LockURLGenerator: mockURLGenerator{},
+		RunStepRunner: &mutatingCustomStepRunner{mutate: func() error {
+			runCalled = true
+			got, err := os.ReadFile(planPath)
+			if err != nil {
+				return err
+			}
+			if string(got) != string(planContents) {
+				return fmt.Errorf("unexpected restored plan contents %q", got)
+			}
+			return nil
+		}},
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher:   database,
+			LivePullHeadFetcher: fakeLivePullHeadFetcher{head: "abc123", base: "main"},
+		},
+		PlanStore: store,
+	}
+	ctx := command.ProjectContext{
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           []valid.Step{{StepName: "run", RunCommand: `terraform apply "$PLANFILE"`}},
+		RequiresAtlantisManagedPlanFile: true,
+		ExpectedPlanHash:                planHashForContent(planContents),
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "mixed-workflow",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	_, err := database.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	result := runner.Apply(ctx)
+
+	Ok(t, result.Error)
+	Equals(t, "run", result.ApplySuccess)
+	Assert(t, runCalled, "expected run-only apply command to execute")
+	Equals(t, 1, store.loadCalls)
+}
+
 func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCommandStart(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -2683,12 +2865,13 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: oldHead,
@@ -2735,9 +2918,10 @@ func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testin
 			{StepName: "run"},
 			{StepName: "apply"},
 		},
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -2811,9 +2995,10 @@ func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContent
 			{StepName: "run"},
 			{StepName: "apply"},
 		},
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -2863,13 +3048,14 @@ func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
 	repoDir := t.TempDir()
 	planContents := []byte("original plan")
 	ctx := command.ProjectContext{
-		Log:              logging.NewNoopLogger(t),
-		CommandName:      command.Apply,
-		Steps:            valid.DefaultApplyStage.Steps,
-		Workspace:        "default",
-		RepoRelDir:       ".",
-		ProjectName:      "projA",
-		ExpectedPlanHash: planHashForContent(planContents),
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		ExpectedPlanHash:                planHashForContent(planContents),
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -2938,14 +3124,15 @@ func TestProjectCommandRunner_UnchangedIdentityApplyStillSucceeds(t *testing.T) 
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:              logging.NewNoopLogger(t),
-		CommandName:      command.Apply,
-		Steps:            valid.DefaultApplyStage.Steps,
-		Workspace:        "default",
-		RepoRelDir:       ".",
-		ProjectName:      "projA",
-		ExpectedPlanHash: "already-captured",
-		Pull:             initialPull,
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		ExpectedPlanHash:                "already-captured",
+		Pull:                            initialPull,
 	}
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
@@ -2989,14 +3176,15 @@ func runProjectApplyWithBaseChangeAfterApplyStep(t *testing.T) (command.ProjectC
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:              logging.NewNoopLogger(t),
-		CommandName:      command.Apply,
-		Steps:            valid.DefaultApplyStage.Steps,
-		Workspace:        "default",
-		RepoRelDir:       ".",
-		ProjectName:      "projA",
-		ExpectedPlanHash: "already-captured",
-		Pull:             initialPull,
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		ExpectedPlanHash:                "already-captured",
+		Pull:                            initialPull,
 	}
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
@@ -3023,12 +3211,13 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -3049,7 +3238,8 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected policy-check status error")
-	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have not been approved"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "atlantis approve_policies"), "got: %s", res.Error)
 	contents, readErr := os.ReadFile(planPath)
 	Ok(t, readErr)
 	Equals(t, policyBlockedMarker, string(contents))
@@ -3079,9 +3269,10 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAft
 			{StepName: "run"},
 			{StepName: "apply"},
 		},
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "abc123",
@@ -3113,7 +3304,8 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAft
 	res := runner.Apply(ctx)
 
 	Assert(t, res.Error != nil, "expected policy-check status error")
-	Assert(t, strings.Contains(res.Error.Error(), "policy checks have errored"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "policy checks have not been approved"), "got: %s", res.Error)
+	Assert(t, strings.Contains(res.Error.Error(), "atlantis approve_policies"), "got: %s", res.Error)
 	Equals(t, []string{"run"}, calls)
 }
 
@@ -3134,12 +3326,13 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "new123",
@@ -3200,12 +3393,13 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 	}
 	repoDir := t.TempDir()
 	ctx := command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		Steps:       valid.DefaultApplyStage.Steps,
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        1,
 			HeadCommit: "new123",
@@ -3335,6 +3529,10 @@ func (v *assertLockedApplyPlanValidator) ValidateProjectPlan(command.ProjectCont
 	return nil
 }
 
+func (v *assertLockedApplyPlanValidator) ValidateProjectPlanStatus(command.ProjectContext) error {
+	return nil
+}
+
 type sequencedApplyPlanValidator struct {
 	t      *testing.T
 	locker *trackingWorkingDirLocker
@@ -3354,6 +3552,10 @@ func (v *sequencedApplyPlanValidator) ValidateProjectPlan(command.ProjectContext
 	if v.count < len(v.errs) {
 		return v.errs[v.count]
 	}
+	return nil
+}
+
+func (v *sequencedApplyPlanValidator) ValidateProjectPlanStatus(command.ProjectContext) error {
 	return nil
 }
 
@@ -3421,13 +3623,14 @@ func newTestBoltDB(t *testing.T) *boltdb.BoltDB {
 func nonPRAPIApplyContext(t *testing.T, headCommit string) command.ProjectContext {
 	t.Helper()
 	return command.ProjectContext{
-		Log:         logging.NewNoopLogger(t),
-		CommandName: command.Apply,
-		API:         true,
-		Steps:       []valid.Step{{StepName: "apply"}},
-		Workspace:   "default",
-		RepoRelDir:  ".",
-		ProjectName: "projA",
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		API:                             true,
+		Steps:                           []valid.Step{{StepName: "apply"}},
+		RequiresAtlantisManagedPlanFile: true,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
 		Pull: models.PullRequest{
 			Num:        -1,
 			HeadBranch: "main",

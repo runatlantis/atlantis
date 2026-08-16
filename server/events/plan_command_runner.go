@@ -208,6 +208,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		p.handlePlanGenerationCompletionError(ctx, AutoplanCommand{}, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
+	p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
 
 	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
@@ -379,6 +380,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		p.handlePlanGenerationCompletionError(ctx, cmd, err, planGeneration, projectCmds, preexistingPlanLocks)
 		return
 	}
+	p.publishDeferredPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
 
 	p.pullUpdater.updatePull(ctx, cmd, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
@@ -482,7 +484,7 @@ func (p *PlanCommandRunner) snapshotExistingPlanLocks(ctx *command.Context, proj
 		}
 		lock, err := p.lockingLocker.GetLock(lockKey)
 		if err != nil {
-			ctx.Log.Warn("unable to inspect plan lock %q before planning; it will not be cleaned automatically: %s", lockKey, err)
+			ctx.Log.Warn("unable to inspect plan lock %q before planning; it will not be cleaned automatically, %v", lockKey, err)
 			preexisting[lockKey] = true
 			continue
 		}
@@ -604,8 +606,11 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 
 	switch commandName {
 	case command.Plan:
+		var numPending int
 		for _, project := range pullStatus.Projects {
-			if project.Status == models.ErroredPlanStatus || project.PlanGeneration != "" {
+			if project.PlanGeneration != "" {
+				numPending++
+			} else if project.Status == models.ErroredPlanStatus {
 				numErrored++
 			}
 		}
@@ -613,10 +618,12 @@ func (p *PlanCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus 
 		// generation as a plan success.
 		// For example, if there is an apply error, that means that at least a
 		// plan was generated successfully.
-		numSuccess = len(pullStatus.Projects) - numErrored
+		numSuccess = len(pullStatus.Projects) - numErrored - numPending
 
 		if numErrored > 0 {
 			status = models.FailedCommitStatus
+		} else if numPending > 0 {
+			status = models.PendingCommitStatus
 		}
 	case command.Apply:
 		numNoChanges = pullStatus.StatusCount(models.PlannedNoChangesPlanStatus)

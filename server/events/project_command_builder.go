@@ -1335,6 +1335,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			project.status.RepoRelDir,
 			project.status.ProjectName,
 			commentCmd.Name,
+			WorkingDirLockMetadataForPull(ctx.Pull),
 		)
 		if err != nil {
 			return nil, err
@@ -1403,7 +1404,7 @@ func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPla
 			continue
 		}
 		mergedCfg := p.GlobalCfg.MergeProjectCfg(ctx.Log, ctx.Pull.BaseRepo.ID(), *projectCfg, repoCfg)
-		if !hasRunOnlyApplySteps(mergedCfg.Workflow.Apply.Steps) {
+		if !hasRunOnlyApplySteps(mergedCfg.Workflow.Apply.Steps) || requiresAtlantisManagedPlanFile(mergedCfg.Workflow) {
 			continue
 		}
 		rootKey := newApplyPlanKey(status.Workspace, status.RepoRelDir, "")
@@ -1421,7 +1422,7 @@ func (p *DefaultProjectCommandBuilder) findRunOnlyApplyProjectsWithoutManagedPla
 		if _, ok := projectKeys[key]; ok {
 			continue
 		}
-		if status.PlanGeneration != "" || !statusRequiresPlanFileForGenericApply(status.Status) || !statusAllowedForApplyExecution(status.Status) {
+		if status.PlanGeneration != "" || !statusRequiresPlanFileForGenericApply(status.Status) {
 			continue
 		}
 
@@ -1734,7 +1735,10 @@ func validatePullStatusHasPlanFiles(
 			continue
 		}
 		if _, ok := planlessProjects[key]; ok {
-			if statusAllowedForApplyExecution(proj.Status) {
+			// ErroredPolicyCheckStatus is intentionally buildable here so the
+			// project-level validator can return the approve_policies remedy.
+			// It remains ineligible for apply execution.
+			if statusAllowedForApplyExecution(proj.Status) || proj.Status == models.ErroredPolicyCheckStatus {
 				continue
 			}
 			return fmt.Errorf(
@@ -1861,7 +1865,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
 	for i := range projCtxs {
-		if !hasAtlantisManagedApplyStep(projCtxs[i].Steps) {
+		if !projCtxs[i].RequiresAtlantisManagedPlanFile {
 			continue
 		}
 		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)

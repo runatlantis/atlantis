@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -69,21 +70,22 @@ var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
-	parallelPoolSize           int
-	SilenceNoProjects          bool
-	silenceVCSStatusNoPlans    bool
-	silenceVCSStatusNoProjects bool
-	StatusName                 string
-	discardApprovalOnPlan      bool
-	database                   db.Database
-	DisableUnlockLabel         string
-	DisableAutomergeLabel      string
-	PendingApplyStatus         bool
-	applyLockCheckerReturn     locking.ApplyCommandLock
-	applyLockCheckerErr        error
-	workingDirLocker           events.WorkingDirLocker
-	planLocker                 locking.Locker
-	livePullHeadFetcher        events.LivePullHeadFetcher
+	parallelPoolSize                int
+	SilenceNoProjects               bool
+	silenceVCSStatusNoPlans         bool
+	silenceVCSStatusNoProjects      bool
+	StatusName                      string
+	discardApprovalOnPlan           bool
+	database                        db.Database
+	DisableUnlockLabel              string
+	DisableAutomergeLabel           string
+	PendingApplyStatus              bool
+	applyLockCheckerReturn          locking.ApplyCommandLock
+	applyLockCheckerErr             error
+	workingDirLocker                events.WorkingDirLocker
+	planLocker                      locking.Locker
+	livePullHeadFetcher             events.LivePullHeadFetcher
+	planProjectCommandRunnerFactory func(events.ProjectCommandRunner) events.ProjectPlanCommandRunner
 }
 
 type configuredPreWorkflowHooksCommandRunner struct {
@@ -193,7 +195,12 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		workingDirLocker,
 		commitUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		func() events.ProjectPlanCommandRunner {
+			if testConfig.planProjectCommandRunnerFactory != nil {
+				return testConfig.planProjectCommandRunnerFactory(projectCommandRunner)
+			}
+			return projectCommandRunner
+		}(),
 		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
@@ -1184,8 +1191,12 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 		started:  make(chan struct{}),
 		release:  make(chan struct{}),
 	}
+	projectStatuses := &recordingJobURLSetter{}
 	vcsClient := setup(t, func(tc *TestConfig) {
 		tc.database = database
+		tc.planProjectCommandRunnerFactory = func(runner events.ProjectCommandRunner) events.ProjectPlanCommandRunner {
+			return &events.ProjectOutputWrapper{ProjectCommandRunner: runner, JobURLSetter: projectStatuses}
+		}
 	})
 	pull := models.PullRequest{
 		BaseRepo:   testdata.GithubRepo,
@@ -1195,13 +1206,14 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 		BaseBranch: "main",
 	}
 	projectCtx := command.ProjectContext{
-		CommandName: command.Plan,
-		RepoRelDir:  "infrastructure",
-		Workspace:   events.DefaultWorkspace,
-		ProjectName: "immediate-autoplan-apply",
-		BaseRepo:    pull.BaseRepo,
-		Pull:        pull,
-		Steps:       valid.DefaultPlanStage.Steps,
+		CommandName:       command.Plan,
+		RepoRelDir:        "infrastructure",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "immediate-autoplan-apply",
+		BaseRepo:          pull.BaseRepo,
+		Pull:              pull,
+		Steps:             valid.DefaultPlanStage.Steps,
+		SuppressJobOutput: true,
 	}
 	ctx := &command.Context{
 		User:     testdata.User,
@@ -1240,6 +1252,7 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 
 	Assert(t, !successCommentVisible.Load(), "successful plan comment became visible before PullStatus completion")
 	Assert(t, !successStatusVisible.Load(), "successful plan status became visible before PullStatus completion")
+	Equals(t, []models.CommitStatus{models.PendingCommitStatus}, projectStatuses.snapshot())
 	inProgress, err := underlying.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, inProgress != nil, "expected durable in-progress PullStatus")
@@ -1250,6 +1263,7 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 	<-done
 	Assert(t, successCommentVisible.Load(), "expected successful plan comment after PullStatus completion")
 	Assert(t, successStatusVisible.Load(), "expected successful plan status after PullStatus completion")
+	Equals(t, []models.CommitStatus{models.PendingCommitStatus, models.SuccessCommitStatus}, projectStatuses.snapshot())
 	persisted, err := underlying.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, persisted != nil, "expected persisted PullStatus")
@@ -1262,6 +1276,7 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 	applyCtx := projectCtx
 	applyCtx.CommandName = command.Apply
 	applyCtx.Steps = valid.DefaultApplyStage.Steps
+	applyCtx.RequiresAtlantisManagedPlanFile = true
 	applyCtx.Log = logging.NewNoopLogger(t)
 	projectDir := filepath.Join(repoDir, applyCtx.RepoRelDir)
 	Ok(t, os.MkdirAll(projectDir, 0755))
@@ -1286,6 +1301,82 @@ func TestPlanCommandRunner_AutoplanCompletionPrecedesSuccessVisibilityAndImmedia
 
 	Ok(t, applyResult.Error)
 	Equals(t, "applied immediate autoplan", applyResult.ApplySuccess)
+}
+
+type recordingJobURLSetter struct {
+	mu       sync.Mutex
+	statuses []models.CommitStatus
+}
+
+func TestPlanCommandRunner_ManualPlanDefersProjectSuccessUntilCompletion(t *testing.T) {
+	underlying := newTestBoltDB(t)
+	database := &blockingPlanCompletionDB{
+		Database: underlying,
+		started:  make(chan struct{}),
+		release:  make(chan struct{}),
+	}
+	projectStatuses := &recordingJobURLSetter{}
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.planProjectCommandRunnerFactory = func(runner events.ProjectCommandRunner) events.ProjectPlanCommandRunner {
+			return &events.ProjectOutputWrapper{ProjectCommandRunner: runner, JobURLSetter: projectStatuses}
+		}
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "manual-plan-head",
+		BaseBranch: "main",
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Plan,
+		RepoRelDir:        "infrastructure",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "manual-plan",
+		BaseRepo:          pull.BaseRepo,
+		Pull:              pull,
+		SuppressJobOutput: true,
+	}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan}
+	tmp := t.TempDir()
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
+	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		planCommandRunner.Run(ctx, cmd)
+	}()
+	<-database.started
+
+	Equals(t, []models.CommitStatus{models.PendingCommitStatus}, projectStatuses.snapshot())
+	close(database.release)
+	<-done
+	Equals(t, []models.CommitStatus{models.PendingCommitStatus, models.SuccessCommitStatus}, projectStatuses.snapshot())
+}
+
+func (r *recordingJobURLSetter) SetJobURLWithStatus(_ command.ProjectContext, _ command.Name, status models.CommitStatus, _ *command.ProjectCommandOutput) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.statuses = append(r.statuses, status)
+	return nil
+}
+
+func (r *recordingJobURLSetter) snapshot() []models.CommitStatus {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]models.CommitStatus(nil), r.statuses...)
 }
 
 func TestApprovePoliciesCommandRunner_CannotReplaceActivePlanGeneration(t *testing.T) {
@@ -1808,20 +1899,25 @@ func TestPlanCommandRunner_AutoplanFinalPersistenceFailureLeavesGenerationNonApp
 		BaseBranch: "main",
 	}
 	projectCtx := command.ProjectContext{
-		CommandName: command.Plan,
-		RepoRelDir:  "infrastructure",
-		Workspace:   events.DefaultWorkspace,
-		ProjectName: "autoplan-replan",
-		BaseRepo:    pull.BaseRepo,
-		Pull:        pull,
-		Steps:       []valid.Step{{StepName: "run", RunCommand: "custom-plan-command"}},
+		CommandName:       command.Plan,
+		RepoRelDir:        "infrastructure",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "autoplan-replan",
+		BaseRepo:          pull.BaseRepo,
+		Pull:              pull,
+		Steps:             []valid.Step{{StepName: "run", RunCommand: "custom-plan-command"}},
+		SuppressJobOutput: true,
 	}
 	_, err := underlying.UpdatePullWithResults(pull, []command.ProjectResult{
 		plannedProjectResult(projectCtx.RepoRelDir, projectCtx.Workspace, projectCtx.ProjectName),
 	})
 	Ok(t, err)
+	projectStatuses := &recordingJobURLSetter{}
 	setup(t, func(tc *TestConfig) {
 		tc.database = database
+		tc.planProjectCommandRunnerFactory = func(runner events.ProjectCommandRunner) events.ProjectPlanCommandRunner {
+			return &events.ProjectOutputWrapper{ProjectCommandRunner: runner, JobURLSetter: projectStatuses}
+		}
 	})
 	ctx := &command.Context{
 		User:     testdata.User,
@@ -1841,7 +1937,7 @@ func TestPlanCommandRunner_AutoplanFinalPersistenceFailureLeavesGenerationNonApp
 	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
 
 	Assert(t, ctx.CommandHasErrors, "expected final autoplan persistence failure to fail the command")
-	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+	Equals(t, []models.CommitStatus{models.PendingCommitStatus, models.FailedCommitStatus}, projectStatuses.snapshot())
 	status, err := underlying.GetPullStatus(pull)
 	Ok(t, err)
 	Assert(t, status != nil, "expected durable PullStatus")

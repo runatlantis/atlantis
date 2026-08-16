@@ -409,6 +409,16 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			expNumSuccess: 1,
 			expNumTotal:   1,
 		},
+		"all generations completed successfully": {
+			cmd: command.Plan,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.PlannedPlanStatus},
+				{Status: models.PlannedNoChangesPlanStatus},
+			}},
+			expStatus:     models.SuccessCommitStatus,
+			expNumSuccess: 2,
+			expNumTotal:   2,
+		},
 		"one plan error, other errors": {
 			cmd: command.Plan,
 			pullStatus: models.PullStatus{
@@ -430,6 +440,35 @@ func TestPlanUpdatePlanCommitStatus(t *testing.T) {
 			expStatus:     models.FailedCommitStatus,
 			expNumSuccess: 3,
 			expNumTotal:   4,
+			expNumErrored: 1,
+		},
+		"one successful plan and one generation in flight": {
+			cmd: command.Plan,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.PlannedPlanStatus},
+				{Status: models.ErroredPlanStatus, PlanGeneration: "generation-1"},
+			}},
+			expStatus:     models.PendingCommitStatus,
+			expNumSuccess: 1,
+			expNumTotal:   2,
+		},
+		"all generations in flight": {
+			cmd: command.Plan,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.ErroredPlanStatus, PlanGeneration: "generation-1"},
+				{Status: models.ErroredPlanStatus, PlanGeneration: "generation-2"},
+			}},
+			expStatus:   models.PendingCommitStatus,
+			expNumTotal: 2,
+		},
+		"actual error takes priority over generation in flight": {
+			cmd: command.Plan,
+			pullStatus: models.PullStatus{Projects: []models.ProjectStatus{
+				{Status: models.ErroredPlanStatus},
+				{Status: models.ErroredPlanStatus, PlanGeneration: "generation-1"},
+			}},
+			expStatus:     models.FailedCommitStatus,
+			expNumTotal:   2,
 			expNumErrored: 1,
 		},
 	}

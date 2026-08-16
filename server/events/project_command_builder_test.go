@@ -5,9 +5,11 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -3516,6 +3518,9 @@ projects:
   workflow: custom-plan-path
 - name: managed-plan
   dir: managed-plan
+- name: managed-plan-run-only
+  dir: managed-plan-run-only
+  workflow: managed-plan-run-only
 workflows:
   custom-plan-path:
     plan:
@@ -3524,6 +3529,13 @@ workflows:
     apply:
       steps:
       - run: terraform apply custom-atlantis.tfplan
+  managed-plan-run-only:
+    plan:
+      steps:
+      - plan
+    apply:
+      steps:
+      - run: terraform apply "$PLANFILE"
 `
 	tmpDir := DirStructure(t, map[string]any{
 		"default": map[string]any{
@@ -3533,6 +3545,9 @@ workflows:
 				"custom-atlantis.tfplan": nil,
 			},
 			"managed-plan": map[string]any{
+				"main.tf": nil,
+			},
+			"managed-plan-run-only": map[string]any{
 				"main.tf": nil,
 			},
 		},
@@ -3608,6 +3623,7 @@ workflows:
 	Equals(t, "default", ctxs[0].Workspace)
 	Equals(t, "run", ctxs[0].Steps[0].StepName)
 	Equals(t, "", ctxs[0].ExpectedPlanHash)
+	Assert(t, !ctxs[0].RequiresAtlantisManagedPlanFile, "fully custom workflow must remain status-only")
 	_, err = os.Stat(customPlanPath)
 	Ok(t, err)
 
@@ -3628,6 +3644,78 @@ workflows:
 		_, err := buildApply(pull, pull, activeProject)
 		Assert(t, err != nil, "expected active plan generation to reject apply")
 		Assert(t, strings.Contains(err.Error(), "plan is incomplete"), "got: %s", err)
+	})
+
+	t.Run("reports run-only policy state without inventing a managed plan", func(t *testing.T) {
+		policyBlocked := customProject
+		policyBlocked.Status = models.ErroredPolicyCheckStatus
+		ctxs, err := buildApply(pull, pull, policyBlocked)
+		Ok(t, err)
+		Equals(t, 1, len(ctxs))
+		Equals(t, models.ErroredPolicyCheckStatus, ctxs[0].ProjectPlanStatus)
+		Assert(t, !ctxs[0].RequiresAtlantisManagedPlanFile, "policy state must not change plan ownership")
+
+		database := newTestBoltDB(t)
+		_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+			plannedProjectResult(policyBlocked.RepoRelDir, policyBlocked.Workspace, policyBlocked.ProjectName),
+		})
+		Ok(t, err)
+		policyCtx := ctxs[0]
+		_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{erroredPolicyProjectResult(policyCtx)})
+		Ok(t, err)
+		mockLocker := mocks.NewMockProjectLocker()
+		mockRun := mocks.NewMockCustomStepRunner()
+		runner := &events.DefaultProjectCommandRunner{
+			Locker:                    mockLocker,
+			LockURLGenerator:          mockURLGenerator{},
+			RunStepRunner:             mockRun,
+			WorkingDir:                workingDir,
+			WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+			CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: workingDir},
+			ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+				PullStatusFetcher:   database,
+				LivePullHeadFetcher: fakeLivePullHeadFetcher{head: pull.HeadCommit, base: pull.BaseBranch},
+			},
+		}
+		When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(pull), Any[models.User](), Eq(policyBlocked.Workspace), Any[models.Project](), AnyBool())).
+			ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+		result := runner.Apply(policyCtx)
+
+		Assert(t, result.Error != nil, "expected policy-blocked generic apply to fail")
+		Assert(t, strings.Contains(result.Error.Error(), "policy checks have not been approved"), "got: %s", result.Error)
+		Assert(t, strings.Contains(result.Error.Error(), "run `atlantis approve_policies`"), "got: %s", result.Error)
+		Assert(t, !strings.Contains(result.Error.Error(), "plan file is missing"), "got: %s", result.Error)
+		mockRun.VerifyWasCalled(Never()).Run(
+			Any[command.ProjectContext](),
+			Any[*valid.CommandShell](),
+			Any[string](),
+			Any[string](),
+			Any[map[string]string](),
+			AnyBool(),
+			Any[[]valid.PostProcessRunOutputOption](),
+			Any[[]*regexp.Regexp](),
+		)
+	})
+
+	t.Run("managed plan with run-only apply retains convention ownership", func(t *testing.T) {
+		Ok(t, os.Remove(customPlanPath))
+		defer func() { Ok(t, os.WriteFile(customPlanPath, nil, 0600)) }()
+		project := models.ProjectStatus{
+			RepoRelDir:  "managed-plan-run-only",
+			Workspace:   "default",
+			ProjectName: "managed-plan-run-only",
+			Status:      models.PlannedPlanStatus,
+		}
+		planPath := filepath.Join(tmpDir, "default", project.RepoRelDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
+		Ok(t, os.WriteFile(planPath, []byte("managed plan"), 0600))
+		defer func() { Ok(t, os.Remove(planPath)) }()
+		ctxs, err := buildApply(pull, pull, project)
+		Ok(t, err)
+		Equals(t, 1, len(ctxs))
+		Assert(t, ctxs[0].RequiresAtlantisManagedPlanFile, "built-in plan must retain convention ownership")
+		Assert(t, ctxs[0].ExpectedPlanHash != "", "expected convention plan hash")
+		Equals(t, "run", ctxs[0].Steps[0].StepName)
 	})
 
 	t.Run("does not ignore unmatched convention plan", func(t *testing.T) {
@@ -6311,6 +6399,148 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 	Ok(t, err)
 	Assert(t, restoreCalled, "expected RestorePlans to be called")
 	Equals(t, 1, len(ctxs))
+}
+
+func TestDefaultProjectCommandBuilder_TargetedManagedPlanRunOnlyApplyReclonesWithExternalStore(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	const atlantisYAML = `
+version: 3
+projects:
+- name: mixed
+  dir: project
+  workflow: mixed
+workflows:
+  mixed:
+    plan:
+      steps:
+      - plan
+    apply:
+      steps:
+      - run: terraform apply "$PLANFILE"
+`
+	repoDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"project": map[string]any{
+			"main.tf": nil,
+		},
+	})
+	planContents := []byte("stored convention plan")
+	planStore := &restoringPlanStore{contents: planContents}
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn("", os.ErrNotExist).
+		ThenReturn(repoDir, nil)
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Eq(events.DefaultWorkspace),
+	)).ThenReturn(repoDir, nil)
+	When(workingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).
+		ThenReturn(func() {})
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		planStore,
+	)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+		BaseRepo:   models.Repo{Owner: "runatlantis", Name: "atlantis", FullName: "runatlantis/atlantis"},
+	}
+	database := newTestBoltDB(t)
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult("project", events.DefaultWorkspace, "mixed"),
+	})
+	Ok(t, err)
+	ctxs, err := builder.BuildApplyCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     pull,
+		HeadRepo: pull.BaseRepo,
+		PullStatus: &models.PullStatus{
+			Pull: pull,
+			Projects: []models.ProjectStatus{{
+				RepoRelDir:  "project",
+				Workspace:   events.DefaultWorkspace,
+				ProjectName: "mixed",
+				Status:      models.PlannedPlanStatus,
+			}},
+		},
+	}, &events.CommentCommand{Name: command.Apply, ProjectName: "mixed"})
+
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Assert(t, ctxs[0].RequiresAtlantisManagedPlanFile, "built-in plan must retain convention ownership after re-clone")
+	Equals(t, "run", ctxs[0].Steps[0].StepName)
+	workingDir.VerifyWasCalledOnce().Clone(
+		Any[logging.SimpleLogging](),
+		Eq(pull.BaseRepo),
+		Eq(pull),
+		Eq(events.DefaultWorkspace),
+	)
+
+	mockLocker := mocks.NewMockProjectLocker()
+	runCalled := false
+	planPath := filepath.Join(repoDir, "project", runtime.GetPlanFilename(events.DefaultWorkspace, "mixed"))
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:           mockLocker,
+		LockURLGenerator: mockURLGenerator{},
+		RunStepRunner: &mutatingCustomStepRunner{mutate: func() error {
+			runCalled = true
+			contents, readErr := os.ReadFile(planPath)
+			if readErr != nil {
+				return readErr
+			}
+			if string(contents) != string(planContents) {
+				return fmt.Errorf("restored plan contents = %q, want %q", contents, planContents)
+			}
+			return nil
+		}},
+		WorkingDir:                workingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: workingDir},
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher:   database,
+			LivePullHeadFetcher: fakeLivePullHeadFetcher{head: pull.HeadCommit, base: pull.BaseBranch},
+		},
+		PlanStore: planStore,
+	}
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(pull), Any[models.User](), Eq(events.DefaultWorkspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	result := runner.Apply(ctxs[0])
+
+	Ok(t, result.Error)
+	Assert(t, runCalled, "expected run-only custom apply command to execute")
+	Equals(t, 1, planStore.loadCalls)
 }
 
 // mockExternalPlanStore satisfies the runtime.PlanStore interface for testing

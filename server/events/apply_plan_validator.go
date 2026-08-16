@@ -21,9 +21,6 @@ import (
 
 type ApplyPlanValidator interface {
 	ValidateProjectPlan(ctx command.ProjectContext, absPath string) error
-}
-
-type ApplyPlanStatusValidator interface {
 	ValidateProjectPlanStatus(ctx command.ProjectContext) error
 }
 
@@ -39,6 +36,8 @@ type DefaultApplyPlanValidator struct {
 	PullStatusFetcher   PullStatusFetcher
 	LivePullHeadFetcher LivePullHeadFetcher
 }
+
+var _ ApplyPlanValidator = (*DefaultApplyPlanValidator)(nil)
 
 var errStaleCommandHead = errors.New("stale command head")
 
@@ -146,7 +145,7 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 	if !statusAllowedForApplyExecution(proj.Status) {
 		if proj.Status == models.ErroredPolicyCheckStatus {
 			return fmt.Errorf(
-				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
+				"policy checks have not been approved for dir %q workspace %q project %q; run `atlantis approve_policies`",
 				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 			)
 		}
