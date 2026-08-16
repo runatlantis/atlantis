@@ -320,7 +320,7 @@ var testCases = []TestCase{
 		ForbidExtraProjectStatuses:        true,
 		ApplyCommand:                      "atlantis apply -p mixed-plan-mutation",
 		ExpectedFailedApplyStatusContexts: []string{"atlantis/apply: mixed-plan-mutation"},
-		ExpectedApplyCommentSubstring:     "plan file changed",
+		ExpectedApplyCommentSubstring:     "managed plan artifact does not match the accepted plan",
 		ForbiddenApplyCommentSubstring:    "ATLANTIS_E2E_MIXED_BUILTIN_APPLY_MUST_NOT_RUN",
 		Scenario:                          ScenarioPlanThenApplyExpectFailure,
 		VCS:                               VCSGitHub,

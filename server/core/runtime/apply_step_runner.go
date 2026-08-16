@@ -86,9 +86,10 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
-	// Retain the plan until explicit pull/project cleanup. A completed apply
-	// cannot prove that a deterministic local/S3 artifact was not replaced by a
-	// newer accepted generation while Terraform was running.
+	// Retain the plan until the project command reaches its durable lifecycle
+	// boundary. A completed apply step cannot prove that a deterministic
+	// local/S3 artifact was not replaced by a newer accepted generation while
+	// Terraform was running.
 	return out, err
 }
 

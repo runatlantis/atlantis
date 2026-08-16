@@ -68,11 +68,11 @@ func (s *LocalPlanStore) Load(_ command.ProjectContext, _ string) error {
 	return nil
 }
 
-// Remove deletes legacy/hashless local plans. Durable-bound plans are retained
-// because a local path has no generation/ETag ownership token that can prove a
-// caller still owns the current artifact.
+// Remove deletes legacy/hashless local plans and uniquely scoped synthetic
+// non-PR API plans. PR-backed durable plans are retained because a local path
+// has no generation/ETag ownership token that can prove artifact ownership.
 func (s *LocalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
-	if ctx.RecordedManagedPlanHash != "" {
+	if ctx.RecordedManagedPlanHash != "" && (!ctx.API || ctx.Pull.Num > 0) {
 		return nil
 	}
 	return utils.RemoveIgnoreNonExistent(planPath)

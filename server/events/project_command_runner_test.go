@@ -3040,6 +3040,166 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
+func TestProjectCommandRunner_LoadedAcceptedPlanRebindsHashForDelegatingValidator(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	database := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	acceptedPlan := []byte("PLAN_GENERATION_B")
+	acceptedHash := planHashForContent(acceptedPlan)
+	store := &restoringPlanStore{contents: acceptedPlan}
+	stepRunner := &capturingStepRunner{output: "apply ok"}
+	defaultValidator := &events.DefaultApplyPlanValidator{PullStatusFetcher: database}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           stepRunner,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &delegatingApplyPlanValidator{delegate: defaultValidator},
+		PlanStore:                 store,
+	}
+	ctx := command.ProjectContext{
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		AcceptedPlanGeneration:          "generation-b",
+		Steps:                           valid.DefaultApplyStage.Steps,
+		RequiresAtlantisManagedPlanFile: true,
+		ExpectedPlanHash:                planHashForContent([]byte("stale-canonical-generation-a")),
+		RecordedManagedPlanHash:         acceptedHash,
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"},
+		},
+	}
+	project := models.ProjectStatus{Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName}
+	_, err := database.BeginPlanGeneration(ctx.Pull, []models.ProjectStatus{project}, "generation-b")
+	Ok(t, err)
+	_, err = database.CompletePlanGeneration(ctx.Pull, "generation-b", []command.ProjectResult{{
+		Command:     command.Plan,
+		Workspace:   ctx.Workspace,
+		RepoRelDir:  ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess:         &models.PlanSuccess{},
+			AtlantisManagedPlan: true,
+			ManagedPlanHash:     acceptedHash,
+		},
+	}})
+	Ok(t, err)
+
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "apply ok", res.ApplySuccess)
+	Equals(t, acceptedHash, stepRunner.ctx.ExpectedPlanHash)
+	Equals(t, acceptedHash, stepRunner.ctx.RecordedManagedPlanHash)
+	Equals(t, 1, store.loadCalls)
+}
+
+func TestProjectCommandRunner_SyntheticNonPRManagedApplyRemovesPlanAfterAllSteps(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRequirements := mocks.NewMockCommandRequirementHandler()
+	mockApply := mocks.NewMockStepRunner()
+	repoDir := t.TempDir()
+	planContents := []byte("synthetic-api-plan")
+	store := &restoringPlanStore{contents: planContents}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirements,
+		ApplyPlanValidator:        &sequencedApplyPlanValidator{},
+		PlanStore:                 store,
+	}
+	ctx := command.ProjectContext{
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		API:                             true,
+		Pull:                            models.PullRequest{Num: -1, HeadCommit: "abc123", BaseRepo: models.Repo{FullName: "runatlantis/atlantis"}},
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		RecordedManagedPlanHash:         planHashForContent(planContents),
+		Steps:                           []valid.Step{{StepName: "apply"}, {StepName: "apply"}},
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockRequirements.ValidateApplyProject(Eq(repoDir), Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockRequirements.ValidateProjectDependencies(Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("applied", nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "applied\napplied", res.ApplySuccess)
+	Equals(t, 1, store.removeCalls)
+	mockApply.VerifyWasCalled(Times(2)).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_FailedSyntheticNonPRManagedApplyRetainsPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRequirements := mocks.NewMockCommandRequirementHandler()
+	mockApply := mocks.NewMockStepRunner()
+	repoDir := t.TempDir()
+	planContents := []byte("synthetic-api-plan")
+	store := &restoringPlanStore{contents: planContents}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirements,
+		ApplyPlanValidator:        &sequencedApplyPlanValidator{},
+		PlanStore:                 store,
+	}
+	ctx := command.ProjectContext{
+		Log:                             logging.NewNoopLogger(t),
+		CommandName:                     command.Apply,
+		API:                             true,
+		Pull:                            models.PullRequest{Num: -1, HeadCommit: "abc123", BaseRepo: models.Repo{FullName: "runatlantis/atlantis"}},
+		Workspace:                       "default",
+		RepoRelDir:                      ".",
+		ProjectName:                     "projA",
+		RequiresAtlantisManagedPlanFile: true,
+		RecordedManagedPlanHash:         planHashForContent(planContents),
+		Steps:                           valid.DefaultApplyStage.Steps,
+	}
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockRequirements.ValidateApplyProject(Eq(repoDir), Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockRequirements.ValidateProjectDependencies(Any[command.ProjectContext]())).ThenReturn("", nil)
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", errors.New("apply failed"))
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected apply failure")
+	Equals(t, 0, store.removeCalls)
+}
+
 func TestProjectCommandRunner_ApplyRejectsRestoredPlanFromSupersededGeneration(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
@@ -3150,7 +3310,7 @@ func TestApplyPlanValidator_RejectsChangedRecordedManagedPlanAuthorization(t *te
 	Assert(t, err != nil && strings.Contains(err.Error(), "managed plan authorization changed"), "got: %v", err)
 }
 
-func TestCrossReplicaSupersededPlanArtifactCannotBeApplied(t *testing.T) {
+func TestCrossReplicaAcceptedPlanArtifactSurvivesSupersededWriter(t *testing.T) {
 	RegisterMockTestingT(t)
 	database := newTestBoltDB(t)
 	pull := models.PullRequest{
@@ -3163,6 +3323,13 @@ func TestCrossReplicaSupersededPlanArtifactCannotBeApplied(t *testing.T) {
 	planA := []byte("PLAN_GENERATION_A")
 	planB := []byte("PLAN_GENERATION_B")
 	store := newBlockingMemoryPlanStore("generation-a")
+	defer func() {
+		select {
+		case <-store.releaseBlockedSave:
+		default:
+			close(store.releaseBlockedSave)
+		}
+	}()
 
 	// Independent process-local lockers model two Atlantis replicas. Both can
 	// plan the same project because they do not share lock state.
@@ -3214,6 +3381,7 @@ func TestCrossReplicaSupersededPlanArtifactCannotBeApplied(t *testing.T) {
 	close(store.releaseBlockedSave)
 	Ok(t, <-aSaveDone)
 	Equals(t, string(planA), string(store.contents()))
+	Equals(t, string(planB), string(store.acceptedContents("generation-b", hashB)))
 	_, err = database.CompletePlanGeneration(pull, "generation-a", []command.ProjectResult{{
 		Command:     command.Plan,
 		Workspace:   project.Workspace,
@@ -3227,8 +3395,8 @@ func TestCrossReplicaSupersededPlanArtifactCannotBeApplied(t *testing.T) {
 	}})
 	Assert(t, errors.Is(err, db.ErrPlanGenerationSuperseded), "expected superseded completion, got %v", err)
 
-	// A third freshly cloned replica restores A's overwritten object, but the
-	// durable digest accepted for B prevents the stale bytes from executing.
+	// A third freshly cloned replica selects B's immutable object from the
+	// durable generation and digest even though A overwrote canonical discovery.
 	mockApply := mocks.NewMockStepRunner()
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	mockLocker := mocks.NewMockProjectLocker()
@@ -3259,12 +3427,16 @@ func TestCrossReplicaSupersededPlanArtifactCannotBeApplied(t *testing.T) {
 	When(mockWorkingDir.GitReadLock(pull.BaseRepo, pull, project.Workspace)).ThenReturn(func() {})
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(pull), Any[models.User](), Eq(project.Workspace), Any[models.Project](), AnyBool())).
 		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("applied generation b", nil)
 
 	applyResult := applyRunner.Apply(applyCtx)
 
-	Assert(t, applyResult.Error != nil, "expected stale overwritten artifact to be rejected")
-	Assert(t, strings.Contains(applyResult.Error.Error(), "managed plan artifact does not match the accepted plan"), "got: %s", applyResult.Error)
-	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	Ok(t, applyResult.Error)
+	Equals(t, "applied generation b", applyResult.ApplySuccess)
+	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	appliedBytes, readErr := os.ReadFile(filepath.Join(repoDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName)))
+	Ok(t, readErr)
+	Equals(t, string(planB), string(appliedBytes))
 }
 
 func TestProjectCommandRunner_ManagedPlanRunOnlyApplyLoadsPlanFromStoreBeforeExecution(t *testing.T) {
@@ -3305,7 +3477,9 @@ func TestProjectCommandRunner_ManagedPlanRunOnlyApplyLoadsPlanFromStoreBeforeExe
 		CommandName:                     command.Apply,
 		Steps:                           []valid.Step{{StepName: "run", RunCommand: `terraform apply "$PLANFILE"`}},
 		RequiresAtlantisManagedPlanFile: true,
-		ExpectedPlanHash:                planHashForContent(planContents),
+		ExpectedPlanHash:                planHashForContent([]byte("superseded-canonical-discovery-plan")),
+		RecordedManagedPlanHash:         planHashForContent(planContents),
+		AcceptedPlanGeneration:          "generation-b",
 		Workspace:                       "default",
 		RepoRelDir:                      ".",
 		ProjectName:                     "mixed-workflow",
@@ -3316,7 +3490,20 @@ func TestProjectCommandRunner_ManagedPlanRunOnlyApplyLoadsPlanFromStoreBeforeExe
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := database.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	project := models.ProjectStatus{Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName}
+	_, err := database.BeginPlanGeneration(ctx.Pull, []models.ProjectStatus{project}, "generation-b")
+	Ok(t, err)
+	_, err = database.CompletePlanGeneration(ctx.Pull, "generation-b", []command.ProjectResult{{
+		Command:     command.Plan,
+		Workspace:   ctx.Workspace,
+		RepoRelDir:  ctx.RepoRelDir,
+		ProjectName: ctx.ProjectName,
+		ProjectCommandOutput: command.ProjectCommandOutput{
+			PlanSuccess:         &models.PlanSuccess{},
+			AtlantisManagedPlan: true,
+			ManagedPlanHash:     ctx.RecordedManagedPlanHash,
+		},
+	}})
 	Ok(t, err)
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
@@ -4015,8 +4202,9 @@ type trackingWorkingDirLocker struct {
 // restoringPlanStore writes contents to planPath on Load, simulating an
 // external store restoring a plan after a container restart / re-clone.
 type restoringPlanStore struct {
-	contents  []byte
-	loadCalls int
+	contents    []byte
+	loadCalls   int
+	removeCalls int
 }
 
 type capturingPlanStore struct {
@@ -4051,6 +4239,7 @@ func (*capturingPlanStore) DeletePlanForProject(string, string, int, string, str
 type blockingMemoryPlanStore struct {
 	mu                 sync.Mutex
 	object             []byte
+	immutable          map[string][]byte
 	blockGeneration    string
 	blockedSaveStarted chan struct{}
 	releaseBlockedSave chan struct{}
@@ -4058,6 +4247,7 @@ type blockingMemoryPlanStore struct {
 
 func newBlockingMemoryPlanStore(blockGeneration string) *blockingMemoryPlanStore {
 	return &blockingMemoryPlanStore{
+		immutable:          make(map[string][]byte),
 		blockGeneration:    blockGeneration,
 		blockedSaveStarted: make(chan struct{}),
 		releaseBlockedSave: make(chan struct{}),
@@ -4075,21 +4265,34 @@ func (s *blockingMemoryPlanStore) Save(ctx command.ProjectContext, planPath stri
 	}
 	s.mu.Lock()
 	s.object = append([]byte(nil), contents...)
+	if ctx.PlanGeneration != "" && ctx.GeneratedPlanHash != nil && *ctx.GeneratedPlanHash != "" {
+		s.immutable[ctx.PlanGeneration+":"+*ctx.GeneratedPlanHash] = append([]byte(nil), contents...)
+	}
 	s.mu.Unlock()
 	return nil
 }
 
-func (s *blockingMemoryPlanStore) Load(_ command.ProjectContext, planPath string) error {
+func (s *blockingMemoryPlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(planPath, s.contents(), 0o600)
+	contents := s.contents()
+	if ctx.AcceptedPlanGeneration != "" && ctx.RecordedManagedPlanHash != "" {
+		contents = s.acceptedContents(ctx.AcceptedPlanGeneration, ctx.RecordedManagedPlanHash)
+	}
+	return os.WriteFile(planPath, contents, 0o600)
 }
 
 func (s *blockingMemoryPlanStore) contents() []byte {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]byte(nil), s.object...)
+}
+
+func (s *blockingMemoryPlanStore) acceptedContents(generation, planHash string) []byte {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]byte(nil), s.immutable[generation+":"+planHash]...)
 }
 
 func (s *blockingMemoryPlanStore) Remove(command.ProjectContext, string) error { return nil }
@@ -4110,7 +4313,10 @@ func (s *restoringPlanStore) Load(_ command.ProjectContext, planPath string) err
 	}
 	return os.WriteFile(planPath, s.contents, 0o600)
 }
-func (s *restoringPlanStore) Remove(command.ProjectContext, string) error { return nil }
+func (s *restoringPlanStore) Remove(command.ProjectContext, string) error {
+	s.removeCalls++
+	return nil
+}
 func (s *restoringPlanStore) ListWorkspaces(string, string, int) ([]string, error) {
 	return nil, nil
 }
@@ -4217,6 +4423,29 @@ func (v *sequencedApplyPlanValidator) ValidateProjectPlan(command.ProjectContext
 
 func (v *sequencedApplyPlanValidator) ValidateProjectPlanStatus(command.ProjectContext) error {
 	return nil
+}
+
+type delegatingApplyPlanValidator struct {
+	delegate events.ApplyPlanValidator
+}
+
+func (v *delegatingApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
+	return v.delegate.ValidateProjectPlan(ctx, absPath)
+}
+
+func (v *delegatingApplyPlanValidator) ValidateProjectPlanStatus(ctx command.ProjectContext) error {
+	return v.delegate.ValidateProjectPlanStatus(ctx)
+}
+
+type capturingStepRunner struct {
+	ctx    command.ProjectContext
+	output string
+	err    error
+}
+
+func (r *capturingStepRunner) Run(ctx command.ProjectContext, _ []string, _ string, _ map[string]string) (string, error) {
+	r.ctx = ctx
+	return r.output, r.err
 }
 
 type recordingStepRunner struct {

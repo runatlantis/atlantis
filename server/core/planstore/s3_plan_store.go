@@ -5,8 +5,11 @@ package planstore
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -95,6 +98,12 @@ func NewS3PlanStore(cfg S3PlanStoreConfig, logger logging.SimpleLogging) (*S3Pla
 // s3OpTimeout is the per-operation timeout for S3 API calls.
 const s3OpTimeout = 30 * time.Second
 
+// managedPlanVersionMarker separates immutable managed artifacts from the
+// deterministic .tfplan object retained for legacy restore and discovery.
+// Version keys intentionally do not end in .tfplan so RestorePlans ignores
+// them until it has an accepted durable generation to select.
+const managedPlanVersionMarker = ".atlantis-managed/"
+
 // s3Ctx returns a context with the standard S3 operation timeout.
 func s3Ctx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), s3OpTimeout)
@@ -112,14 +121,6 @@ func NewS3PlanStoreWithClient(client S3Client, bucket, prefix string, logger log
 
 // Save uploads the plan file at planPath to S3.
 func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
-	key := s.s3Key(ctx, planPath)
-
-	f, err := os.Open(planPath)
-	if err != nil {
-		return fmt.Errorf("opening plan file for S3 upload: %w", err)
-	}
-	defer f.Close()
-
 	metadata := map[string]string{}
 	if ctx.Pull.HeadCommit != "" {
 		metadata["head-commit"] = ctx.Pull.HeadCommit
@@ -134,25 +135,112 @@ func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
 		metadata["plan-generation"] = ctx.PlanGeneration
 	}
 
-	opCtx, opCancel := s3Ctx()
-	defer opCancel()
-	_, err = s.client.PutObject(opCtx, &s3.PutObjectInput{
-		Bucket:   aws.String(s.bucket),
-		Key:      aws.String(key),
-		Body:     f,
-		Metadata: metadata,
-	})
-	if err != nil {
-		return fmt.Errorf("uploading plan to S3 (key=%s): %w", key, err)
+	canonicalKey := s.s3Key(ctx, planPath)
+	if !ctx.RequiresAtlantisManagedPlanFile {
+		f, err := os.Open(planPath)
+		if err != nil {
+			return fmt.Errorf("opening plan file for S3 upload: %w", err)
+		}
+		defer f.Close()
+		if err := s.uploadPlan(canonicalKey, f, metadata); err != nil {
+			return err
+		}
+		s.logger.Info("uploaded plan to s3://%s/%s", s.bucket, canonicalKey)
+		return nil
 	}
 
-	s.logger.Info("uploaded plan to s3://%s/%s", s.bucket, key)
+	if ctx.PlanGeneration == "" && !isSyntheticNonPRAPI(ctx) {
+		return fmt.Errorf("saving managed plan to S3: plan generation is empty")
+	}
+	if ctx.GeneratedPlanHash == nil || *ctx.GeneratedPlanHash == "" {
+		return fmt.Errorf("saving managed plan to S3: managed plan hash is empty")
+	}
+
+	snapshot, cleanup, err := snapshotManagedPlan(planPath, *ctx.GeneratedPlanHash)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	immutableKey := ""
+	if ctx.PlanGeneration != "" {
+		immutableKey = s.managedPlanKey(ctx, planPath, ctx.PlanGeneration, *ctx.GeneratedPlanHash)
+		if err := s.uploadPlan(immutableKey, snapshot, metadata); err != nil {
+			return err
+		}
+		if _, err := snapshot.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("rewinding managed plan snapshot for canonical S3 upload: %w", err)
+		}
+	}
+	if err := s.uploadPlan(canonicalKey, snapshot, metadata); err != nil {
+		return err
+	}
+
+	if immutableKey != "" {
+		s.logger.Info("uploaded immutable managed plan to s3://%s/%s and canonical discovery plan to s3://%s/%s", s.bucket, immutableKey, s.bucket, canonicalKey)
+	} else {
+		s.logger.Info("uploaded synthetic non-PR managed plan to s3://%s/%s", s.bucket, canonicalKey)
+	}
 	return nil
+}
+
+func (s *S3PlanStore) uploadPlan(key string, body io.Reader, metadata map[string]string) error {
+	opCtx, opCancel := s3Ctx()
+	defer opCancel()
+	if _, err := s.client.PutObject(opCtx, &s3.PutObjectInput{
+		Bucket:   aws.String(s.bucket),
+		Key:      aws.String(key),
+		Body:     body,
+		Metadata: metadata,
+	}); err != nil {
+		return fmt.Errorf("uploading plan to S3 (key=%s): %w", key, err)
+	}
+	return nil
+}
+
+func snapshotManagedPlan(planPath, expectedHash string) (*os.File, func(), error) {
+	source, err := os.Open(planPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("opening plan file for S3 upload: %w", err)
+	}
+	defer source.Close()
+
+	snapshot, err := os.CreateTemp("", "atlantis-managed-plan-upload-*")
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating managed plan snapshot for S3 upload: %w", err)
+	}
+	cleanup := func() {
+		_ = snapshot.Close()
+		_ = os.Remove(snapshot.Name())
+	}
+	hasher := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(snapshot, hasher), source); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("snapshotting managed plan for S3 upload: %w", err)
+	}
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+	if actualHash != expectedHash {
+		cleanup()
+		return nil, nil, fmt.Errorf("managed plan hash changed before S3 upload: expected %s, got %s", expectedHash, actualHash)
+	}
+	if _, err := snapshot.Seek(0, io.SeekStart); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("rewinding managed plan snapshot for S3 upload: %w", err)
+	}
+	return snapshot, cleanup, nil
 }
 
 // Load downloads the plan file from S3 and writes it to planPath.
 func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	key := s.s3Key(ctx, planPath)
+	partialManagedIdentity := (ctx.RecordedManagedPlanHash == "") != (ctx.AcceptedPlanGeneration == "")
+	if partialManagedIdentity && !isSyntheticNonPRAPI(ctx) {
+		return fmt.Errorf("loading managed plan from S3: durable plan hash and accepted generation must both be set")
+	}
+	immutableManagedPlan := !partialManagedIdentity && ctx.RecordedManagedPlanHash != "" && ctx.AcceptedPlanGeneration != ""
+	if immutableManagedPlan {
+		key = s.managedPlanKey(ctx, planPath, ctx.AcceptedPlanGeneration, ctx.RecordedManagedPlanHash)
+	}
 
 	opCtx, opCancel := s3Ctx()
 	defer opCancel()
@@ -184,6 +272,16 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	if ctx.Pull.HeadCommit != "" && planCommit != ctx.Pull.HeadCommit {
 		return fmt.Errorf("plan was created at commit %.8s but PR is now at %.8s — run plan again", planCommit, ctx.Pull.HeadCommit)
 	}
+	if immutableManagedPlan {
+		storedHash := metadataValue(resp.Metadata, "managed-plan-sha256")
+		if storedHash != ctx.RecordedManagedPlanHash {
+			return fmt.Errorf("managed plan in S3 has hash metadata %q, expected %q (key=%s) — run plan again", storedHash, ctx.RecordedManagedPlanHash, key)
+		}
+		storedGeneration := metadataValue(resp.Metadata, "plan-generation")
+		if storedGeneration != ctx.AcceptedPlanGeneration {
+			return fmt.Errorf("managed plan in S3 has generation metadata %q, expected %q (key=%s) — run plan again", storedGeneration, ctx.AcceptedPlanGeneration, key)
+		}
+	}
 
 	if err := os.MkdirAll(filepath.Dir(planPath), 0o700); err != nil {
 		return fmt.Errorf("creating parent directories for plan file: %w", err)
@@ -203,12 +301,25 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 	return nil
 }
 
-// Remove deletes legacy/hashless artifacts for non-apply callers. Digest-bound
-// managed plans are retained until explicit pull/project cleanup. Apply never
-// calls this method because even legacy state cannot prove artifact ownership.
+func isSyntheticNonPRAPI(ctx command.ProjectContext) bool {
+	return ctx.API && ctx.Pull.Num <= 0
+}
+
+func metadataValue(metadata map[string]string, name string) string {
+	for key, value := range metadata {
+		if strings.EqualFold(key, name) {
+			return value
+		}
+	}
+	return ""
+}
+
+// Remove deletes legacy/hashless artifacts and uniquely scoped synthetic
+// non-PR API artifacts. PR-backed digest-bound managed plans are retained until
+// explicit pull/project cleanup because an apply cannot prove artifact ownership.
 func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error {
 	key := s.s3Key(ctx, planPath)
-	if ctx.RecordedManagedPlanHash == "" {
+	if ctx.RecordedManagedPlanHash == "" || isSyntheticNonPRAPI(ctx) {
 		opCtx, opCancel := s3Ctx()
 		defer opCancel()
 		if _, err := s.client.DeleteObject(opCtx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}); err != nil {
@@ -441,6 +552,10 @@ func (s *S3PlanStore) s3Key(ctx command.ProjectContext, planPath string) string 
 	return strings.Join(parts, "/")
 }
 
+func (s *S3PlanStore) managedPlanKey(ctx command.ProjectContext, planPath, generation, planHash string) string {
+	return s.s3Key(ctx, planPath) + managedPlanVersionMarker + url.PathEscape(generation) + "/" + url.PathEscape(planHash)
+}
+
 // TestS3Key is exported for testing only.
 func (s *S3PlanStore) TestS3Key(ctx command.ProjectContext, planPath string) string {
 	return s.s3Key(ctx, planPath)
@@ -459,6 +574,38 @@ func (s *S3PlanStore) DeletePlanForProject(owner, repo string, pullNum int, work
 	}
 	parts = append(parts, owner, repo, strconv.Itoa(pullNum), workspace, repoRelDir, planFilename)
 	key := strings.Join(parts, "/")
+	versionPrefix := key + managedPlanVersionMarker
+
+	var continuationToken *string
+	for {
+		listCtx, listCancel := s3Ctx()
+		resp, err := s.client.ListObjectsV2(listCtx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucket),
+			Prefix:            aws.String(versionPrefix),
+			ContinuationToken: continuationToken,
+		})
+		listCancel()
+		if err != nil {
+			s.logger.Warn("failed to list immutable managed plans for project cleanup (prefix=%s): %v", versionPrefix, err)
+			break
+		}
+		for _, obj := range resp.Contents {
+			versionKey := aws.ToString(obj.Key)
+			deleteCtx, deleteCancel := s3Ctx()
+			_, deleteErr := s.client.DeleteObject(deleteCtx, &s3.DeleteObjectInput{
+				Bucket: aws.String(s.bucket),
+				Key:    aws.String(versionKey),
+			})
+			deleteCancel()
+			if deleteErr != nil {
+				s.logger.Warn("failed to delete immutable managed plan from S3 (key=%s): %v", versionKey, deleteErr)
+			}
+		}
+		if !aws.ToBool(resp.IsTruncated) {
+			break
+		}
+		continuationToken = resp.NextContinuationToken
+	}
 
 	opCtx, opCancel := s3Ctx()
 	defer opCancel()

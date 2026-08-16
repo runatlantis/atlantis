@@ -1086,12 +1086,20 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	defer unlockFn()
 
+	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
 	if requiresManagedPlan {
 		// External plan stores put .tfplan on disk only via Load/RestorePlans.
 		// Targeted apply re-clones without RestorePlans; Load must run before
 		// ValidateProjectPlan (which stats the local file) and before hashing.
 		if err := p.ensurePlanLoaded(ctx, absPath); err != nil {
 			return "", "", "", err
+		}
+		// Generic external-store discovery may have hashed the canonical
+		// discovery object, which can be overwritten by a superseded generation.
+		// Once Load selects the durable digest-addressed object, bind command-local
+		// mutation checks to that accepted digest before validating the bytes.
+		if ctx.RecordedManagedPlanHash != "" {
+			ctx.ExpectedPlanHash = ctx.RecordedManagedPlanHash
 		}
 		if p.ApplyPlanValidator != nil {
 			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
@@ -1103,7 +1111,6 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 			return "", "", "", err
 		}
 	}
-	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
 	if requiresManagedPlan && ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
 		planPath, err := safePlanFilePath(ctx, absPath)
 		if err != nil {
@@ -1167,6 +1174,20 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	if err != nil {
 		return "", remoteApplyRunURL, "", errorWithStepOutput(err, outputs)
+	}
+	if requiresManagedPlan && ctx.API && ctx.Pull.Num <= 0 {
+		store := p.PlanStore
+		if store == nil {
+			store = &runtime.LocalPlanStore{}
+		}
+		planPath, pathErr := safePlanFilePath(ctx, absPath)
+		if pathErr != nil {
+			return "", remoteApplyRunURL, "", pathErr
+		}
+		ctx.Log.Info("synthetic API apply successful, deleting planfile")
+		if removeErr := store.Remove(ctx, planPath); removeErr != nil {
+			ctx.Log.Warn("failed to delete synthetic API planfile after successful apply: %s", removeErr)
+		}
 	}
 
 	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
