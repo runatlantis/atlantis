@@ -1,0 +1,36 @@
+runatlantis.io/docs/using-atlantis.md
+  s_0054a5ac358e80::t_201134e8117414 93-94
+  s_0054a5ac358e80::t_e6fd307cc57d83 98-99,101-130,147-148
+  s_0054a5ac358e80::t_ce40c877549316 135-138,141,151-152
+  s_0054a5ac358e80::t_9131d857e2138a 91-92,95-97,100,131-134
+  s_0054a5ac358e80::t_e17727a915393b 139-140,153-154,159-160
+  s_0054a5ac358e80::t_e3f0e1f3f36427 156-158,161-165
+  s_0054a5ac358e80::t_9a125bb7def7f1 155
+  s_0054a5ac358e80::t_522058aac769ad 166
+cmd/plan-claim-recovery/main.go
+  s_0054a5ac358e80::t_9dfc128abd42e5 69-76
+  s_0054a5ac358e80::t_e6fd307cc57d83 37,81-83
+  s_0054a5ac358e80::t_c76d8747dfac2a 23-27
+  s_0054a5ac358e80::t_9a3f1395d60825 1-22,28-36,38-68,77-80,84-111
+cmd/plan-claim-recovery/main_test.go
+  s_0054a5ac358e80::t_9a3f1395d60825 1-8,11-57,59-66,69-80,96
+  s_0054a5ac358e80::t_e6fd307cc57d83 58
+  s_0054a5ac358e80::t_b1b5f194df1ead 9-10
+  s_0054a5ac358e80::t_9dfc128abd42e5 67-68,81-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4529e22f46f6b159cb52a7b15409c47eab038edd",
+  "prompts": {},
+  "sessions": {
+    "s_0054a5ac358e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0083d-3fe5-7f52-8e0d-ca72c6f8bf16",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
