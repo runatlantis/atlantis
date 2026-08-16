@@ -306,7 +306,7 @@ func TestRestorePlans_Success(t *testing.T) {
 	assert.Equal(t, []byte("plan-rds"), got2)
 }
 
-// With a separate --plan-store-dir the destination tree won't exist yet after a
+// With a separate --share-plan-dir the destination tree won't exist yet after a
 // restart, so restore has to create it rather than fail.
 func TestRestorePlans_DestinationDoesNotExist(t *testing.T) {
 	mock := &mockS3Client{

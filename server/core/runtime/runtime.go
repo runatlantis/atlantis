@@ -106,22 +106,22 @@ func GetPlanFilename(workspace string, projName string) string {
 }
 
 // GetPlanFileDir returns the directory where Atlantis stores the plan file for ctx.
-// When LocalPlanStoreDir is set to data-dir, this must mirror FileWorkspace.cloneDir
+// When LocalSharePlanDir is set to data-dir, this must mirror FileWorkspace.cloneDir
 // plus ctx.RepoRelDir so default installs keep the legacy on-disk layout.
 func GetPlanFileDir(ctx command.ProjectContext, projectPath string) string {
-	if ctx.LocalPlanStoreDir == "" {
+	if ctx.LocalSharePlanDir == "" {
 		return projectPath
 	}
-	return filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir, ctx.BaseRepo.FullName, strconv.Itoa(ctx.Pull.Num), ctx.Workspace, ctx.RepoRelDir)
+	return filepath.Join(ctx.LocalSharePlanDir, planStoreReposDir, ctx.BaseRepo.FullName, strconv.Itoa(ctx.Pull.Num), ctx.Workspace, ctx.RepoRelDir)
 }
 
 // EnsurePlanFileDir creates the directory for ctx's generated Terraform plan file.
 func EnsurePlanFileDir(ctx command.ProjectContext, projectPath string) error {
-	if ctx.LocalPlanStoreDir == "" {
+	if ctx.LocalSharePlanDir == "" {
 		return nil
 	}
 	planFileDir := GetPlanFileDir(ctx, projectPath)
-	if err := utils.EnsureSubPath(filepath.Join(ctx.LocalPlanStoreDir, planStoreReposDir), planFileDir); err != nil {
+	if err := utils.EnsureSubPath(filepath.Join(ctx.LocalSharePlanDir, planStoreReposDir), planFileDir); err != nil {
 		return fmt.Errorf("plan file path traversal detected: %w", err)
 	}
 	if err := os.MkdirAll(planFileDir, 0700); err != nil {
@@ -136,8 +136,8 @@ func GetPlanFilePath(ctx command.ProjectContext, projectPath string) string {
 }
 
 // GetPlanPullDir returns the root directory for all plan files for a pull request.
-func GetPlanPullDir(localPlanStoreDir string, r models.Repo, p models.PullRequest) string {
-	return planstore.PullDir(localPlanStoreDir, r.FullName, p.Num)
+func GetPlanPullDir(localSharePlanDir string, r models.Repo, p models.PullRequest) string {
+	return planstore.PullDir(localSharePlanDir, r.FullName, p.Num)
 }
 
 // isRemotePlan returns true if planContents are from a plan that was generated

@@ -547,7 +547,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:           userConfig.DataDir,
-		LocalPlanStoreDir: userConfig.PlanStoreDir,
+		LocalSharePlanDir: userConfig.SharePlanDir,
 		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:     userConfig.CheckoutDepth,
 		GithubAppEnabled:  githubAppEnabled,
@@ -654,7 +654,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	pendingPlanFinder := &events.DefaultPendingPlanFinder{
 		Log:               logger,
 		DataDir:           userConfig.DataDir,
-		LocalPlanStoreDir: userConfig.PlanStoreDir,
+		LocalSharePlanDir: userConfig.SharePlanDir,
 	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
@@ -719,8 +719,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		// A plan store dir outside the data dir survives the loss of a
 		// checkout, so plans there can be recovered after a restart even
 		// without an external store.
-		if userConfig.PlanStoreDir != "" && filepath.Clean(userConfig.PlanStoreDir) != filepath.Clean(userConfig.DataDir) {
-			local.SeparatePlanDir = userConfig.PlanStoreDir
+		if userConfig.SharePlanDir != "" && filepath.Clean(userConfig.SharePlanDir) != filepath.Clean(userConfig.DataDir) {
+			local.SeparatePlanDir = userConfig.SharePlanDir
 		}
 		planStore = local
 	}
@@ -768,7 +768,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		terraformClient,
 		planStore,
-		userConfig.PlanStoreDir,
+		userConfig.SharePlanDir,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)

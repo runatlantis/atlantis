@@ -1258,16 +1258,6 @@ Defaults to `false`.
 
 Only supported on GitLab
 
-### `--plan-store-dir`
-
-```bash
-atlantis server --plan-store-dir="path/to/local/plan/dir"
-# or
-ATLANTIS_PLAN_STORE_DIR="path/to/local/plan/dir"
-```
-
-Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--plan-store-dir`.
-
 ### `--port` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
@@ -1470,6 +1460,16 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
 When `--enable-regexp-cmd` is also enabled, regex project plans such as `atlantis plan -p .*` are scoped to matching projects with files modified in the pull request.
 Defaults to `false`.
+
+### `--share-plan-dir`
+
+```bash
+atlantis server --share-plan-dir="path/to/local/plan/dir"
+# or
+ATLANTIS_SHARE_PLAN_DIR="path/to/local/plan/dir"
+```
+
+Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--share-plan-dir`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>
 

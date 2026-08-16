@@ -87,9 +87,9 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
-	// LocalPlanStoreDir is the root directory for local Terraform plan files.
+	// LocalSharePlanDir is the root directory for local Terraform plan files.
 	// If empty, DataDir is used for backward compatibility.
-	LocalPlanStoreDir string
+	LocalSharePlanDir string
 	// CheckoutMerge is true if we should check out the branch that corresponds
 	// to what the base branch will look like *after* the pull request is merged.
 	// If this is false, then we will check out the head branch from the pull
@@ -616,7 +616,7 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 }
 
 func (w *FileWorkspace) cleanStalePlanFiles(logger logging.SimpleLogging, c wrappedGitContext) error {
-	if filepath.Clean(w.localPlanStoreDir()) != filepath.Clean(w.DataDir) {
+	if filepath.Clean(w.localSharePlanDir()) != filepath.Clean(w.DataDir) {
 		workspace, err := w.workspaceFromCloneDir(c.pr.BaseRepo, c.pr, c.dir)
 		if err != nil {
 			return err
@@ -936,7 +936,7 @@ func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p mo
 		return cloneErr
 	}
 	logger.Info("Deleting plan pull directory: %s", planPullDir)
-	planErr := removeAllSubPath(filepath.Join(w.localPlanStoreDir(), workingDirPrefix), planPullDir)
+	planErr := removeAllSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), planPullDir)
 	if cloneErr != nil {
 		return cloneErr
 	}
@@ -1007,16 +1007,16 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) (string
 	return dir, nil
 }
 
-func (w *FileWorkspace) localPlanStoreDir() string {
-	if w.LocalPlanStoreDir == "" {
+func (w *FileWorkspace) localSharePlanDir() string {
+	if w.LocalSharePlanDir == "" {
 		return w.DataDir
 	}
-	return w.LocalPlanStoreDir
+	return w.LocalSharePlanDir
 }
 
 func (w *FileWorkspace) planPullDir(r models.Repo, p models.PullRequest) (string, error) {
-	dir := runtime.GetPlanPullDir(w.localPlanStoreDir(), r, p)
-	if err := utils.EnsureSubPath(filepath.Join(w.localPlanStoreDir(), workingDirPrefix), dir); err != nil {
+	dir := runtime.GetPlanPullDir(w.localSharePlanDir(), r, p)
+	if err := utils.EnsureSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), dir); err != nil {
 		return "", fmt.Errorf("plan path traversal detected: %w", err)
 	}
 	return dir, nil
@@ -1062,7 +1062,7 @@ func (w *FileWorkspace) workspaceFromCloneDir(r models.Repo, p models.PullReques
 }
 
 func (w *FileWorkspace) deletePlanWorkspaceIfSeparate(r models.Repo, p models.PullRequest, cloneDir string) error {
-	if filepath.Clean(w.localPlanStoreDir()) == filepath.Clean(w.DataDir) {
+	if filepath.Clean(w.localSharePlanDir()) == filepath.Clean(w.DataDir) {
 		return nil
 	}
 	workspace, err := w.workspaceFromCloneDir(r, p, cloneDir)

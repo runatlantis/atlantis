@@ -25,7 +25,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestRunStepRunner_CreatesLocalPlanStoreDir(t *testing.T) {
+func TestRunStepRunner_CreatesLocalSharePlanDir(t *testing.T) {
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
 	defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
@@ -35,8 +35,8 @@ func TestRunStepRunner_CreatesLocalPlanStoreDir(t *testing.T) {
 		ThenReturn(nil)
 
 	projectPath := t.TempDir()
-	planStoreDir := t.TempDir()
-	planPath := filepath.Join(planStoreDir, "repos", "owner", "repo", "2", "default", "project", "default.tfplan")
+	sharePlanDir := t.TempDir()
+	planPath := filepath.Join(sharePlanDir, "repos", "owner", "repo", "2", "default", "project", "default.tfplan")
 	logger := logging.NewNoopLogger(t)
 	r := runtime.RunStepRunner{
 		TerraformExecutor:     terraform,
@@ -47,7 +47,7 @@ func TestRunStepRunner_CreatesLocalPlanStoreDir(t *testing.T) {
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 		},
-		LocalPlanStoreDir: planStoreDir,
+		LocalSharePlanDir: sharePlanDir,
 		Log:               logger,
 		Pull: models.PullRequest{
 			Num: 2,

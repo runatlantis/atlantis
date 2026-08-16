@@ -76,8 +76,8 @@ func TestLocalPlanStore_RestoreSupportedWithSeparateDir(t *testing.T) {
 }
 
 func TestLocalPlanStore_ListWorkspaces(t *testing.T) {
-	planStoreDir := t.TempDir()
-	pullDir := PullDir(planStoreDir, "owner/repo", 42)
+	sharePlanDir := t.TempDir()
+	pullDir := PullDir(sharePlanDir, "owner/repo", 42)
 
 	writePlan := func(parts ...string) {
 		path := filepath.Join(append([]string{pullDir}, parts...)...)
@@ -92,7 +92,7 @@ func TestLocalPlanStore_ListWorkspaces(t *testing.T) {
 	// Plans that PendingPlanFinder ignores must not be reported either.
 	writePlan("cached", ".terragrunt-cache", "project1", "cached.tfplan")
 
-	store := &LocalPlanStore{SeparatePlanDir: planStoreDir}
+	store := &LocalPlanStore{SeparatePlanDir: sharePlanDir}
 	workspaces, err := store.ListWorkspaces("owner", "repo", 42)
 	Ok(t, err)
 

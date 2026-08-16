@@ -26,7 +26,7 @@ type PendingPlanFinder interface {
 type DefaultPendingPlanFinder struct {
 	Log               logging.SimpleLogging
 	DataDir           string
-	LocalPlanStoreDir string
+	LocalSharePlanDir string
 }
 
 // PendingPlan is a plan that has not been applied.
@@ -78,7 +78,7 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 }
 
 func (p *DefaultPendingPlanFinder) planPullDir(pullDir string) (string, bool, error) {
-	if p.DataDir == "" || p.LocalPlanStoreDir == "" {
+	if p.DataDir == "" || p.LocalSharePlanDir == "" {
 		return pullDir, false, nil
 	}
 
@@ -92,7 +92,7 @@ func (p *DefaultPendingPlanFinder) planPullDir(pullDir string) (string, bool, er
 		return "", false, fmt.Errorf("pull directory %q escapes clone root %q", pullDir, cloneRoot)
 	}
 
-	planPullDir := filepath.Join(p.LocalPlanStoreDir, workingDirPrefix, relPullDir)
+	planPullDir := filepath.Join(p.LocalSharePlanDir, workingDirPrefix, relPullDir)
 	return planPullDir, filepath.Clean(planPullDir) != cleanPullDir, nil
 }
 
@@ -166,7 +166,7 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 	// Defense-in-depth: planPullDir is derived from PR-controlled values (repo,
 	// pull number, workspace), so confirm it stays within the configured plan
 	// store root before touching the filesystem.
-	if err := utils.EnsureSubPath(p.LocalPlanStoreDir, planPullDir); err != nil {
+	if err := utils.EnsureSubPath(p.LocalSharePlanDir, planPullDir); err != nil {
 		return nil, nil, fmt.Errorf("plan store pull directory %q: %w", planPullDir, err)
 	}
 	workspaceDirs, err := os.ReadDir(planPullDir)

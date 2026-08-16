@@ -119,10 +119,10 @@ func TestRun_Success(t *testing.T) {
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
 
-func TestRun_UsesLocalPlanStoreDir(t *testing.T) {
+func TestRun_UsesLocalSharePlanDir(t *testing.T) {
 	projectPath := t.TempDir()
-	planStoreDir := t.TempDir()
-	planPath := filepath.Join(planStoreDir, "repos", "owner", "repo", "2", "workspace", "env", "workspace.tfplan")
+	sharePlanDir := t.TempDir()
+	planPath := filepath.Join(sharePlanDir, "repos", "owner", "repo", "2", "workspace", "env", "workspace.tfplan")
 	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
 	Ok(t, os.WriteFile(planPath, nil, 0600))
 
@@ -132,7 +132,7 @@ func TestRun_UsesLocalPlanStoreDir(t *testing.T) {
 			FullName: "owner/repo",
 		},
 		EscapedCommentArgs: []string{"comment", "args"},
-		LocalPlanStoreDir:  planStoreDir,
+		LocalSharePlanDir:  sharePlanDir,
 		Log:                logger,
 		Pull: models.PullRequest{
 			Num: 2,

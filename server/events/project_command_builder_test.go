@@ -5973,18 +5973,18 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t
 	Equals(t, "plan-data", string(stagingPlan))
 }
 
-// When --plan-store-dir points somewhere other than --data-dir, an external
+// When --share-plan-dir points somewhere other than --data-dir, an external
 // plan store must restore into the plan store tree, because that is the only
 // place PendingPlanFinder looks. Restoring into the clone pull dir instead
 // leaves the plans undiscoverable and apply reports "no plans found".
-func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparatePlanStoreDir(t *testing.T) {
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparateSharePlanDir(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	repo := models.Repo{FullName: "owner/repo"}
 	pull := models.PullRequest{Num: 7, BaseRepo: repo}
 
 	dataDir := t.TempDir()
-	planStoreDir := t.TempDir()
+	sharePlanDir := t.TempDir()
 	pullDir := filepath.Join(dataDir, "repos", "owner", "repo", "7")
 	workingDir := &fakeWorkingDir{
 		MockWorkingDir: *mocks.NewMockWorkingDir(),
@@ -6024,7 +6024,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparatePlanStor
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(globalCfgArgs),
-		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalPlanStoreDir: planStoreDir},
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalSharePlanDir: sharePlanDir},
 		&events.CommentParser{ExecutableName: "atlantis"},
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
@@ -6042,7 +6042,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparatePlanStor
 		terraformClient,
 		planStore,
 	)
-	builder.LocalPlanStoreDir = planStoreDir
+	builder.LocalSharePlanDir = sharePlanDir
 
 	// Trigger the missing-pullDir path.
 	Ok(t, os.RemoveAll(pullDir))
@@ -6063,14 +6063,14 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparatePlanStor
 	Ok(t, err)
 
 	// Restore must target the plan store tree, not the clone pull dir.
-	Equals(t, filepath.Join(planStoreDir, "repos", "owner", "repo", "7"), restoreDir)
+	Equals(t, filepath.Join(sharePlanDir, "repos", "owner", "repo", "7"), restoreDir)
 
 	// Both restored plans must then be discoverable.
 	Equals(t, 2, len(ctxs))
 	gotWorkspaces := map[string]bool{}
 	for _, c := range ctxs {
 		gotWorkspaces[c.Workspace] = true
-		Equals(t, planStoreDir, c.LocalPlanStoreDir)
+		Equals(t, sharePlanDir, c.LocalSharePlanDir)
 	}
 	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be found")
 	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be found")
@@ -6151,16 +6151,16 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_OnlyNonDefaultWo
 	Equals(t, "staging", ctxs[0].Workspace)
 }
 
-// A separate --plan-store-dir already outlives the checkout, so losing the
+// A separate --share-plan-dir already outlives the checkout, so losing the
 // working dir is recoverable without any external store: the plans are still on
 // disk and the workspaces just need re-cloning. Exercised end to end with a real
 // FileWorkspace because recovery depends on the clone not wiping the plans.
-func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDir(t *testing.T) {
+func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparateSharePlanDir(t *testing.T) {
 	RegisterMockTestingT(t)
 
 	repoDir := initRepo(t)
 	dataDir := t.TempDir()
-	planStoreDir := t.TempDir()
+	sharePlanDir := t.TempDir()
 	logger := logging.NewNoopLogger(t)
 
 	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
@@ -6168,7 +6168,7 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 
 	workingDir := &events.FileWorkspace{
 		DataDir:                     dataDir,
-		LocalPlanStoreDir:           planStoreDir,
+		LocalSharePlanDir:           sharePlanDir,
 		CheckoutMerge:               false,
 		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
 		GpgNoSigningEnabled:         true,
@@ -6176,7 +6176,7 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 
 	// Plans survived the restart in the plan store; the checkout did not.
 	for _, ws := range []string{"default", "staging"} {
-		createPlanFile(t, filepath.Join(planStoreDir, "repos", "owner", "repo", "3", ws, "project1", ws+".tfplan"))
+		createPlanFile(t, filepath.Join(sharePlanDir, "repos", "owner", "repo", "3", ws, "project1", ws+".tfplan"))
 	}
 	assertPathMissing(t, filepath.Join(dataDir, "repos", "owner", "repo", "3"))
 
@@ -6191,7 +6191,7 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 		workingDir,
 		events.NewDefaultWorkingDirLocker(),
 		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
-		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalPlanStoreDir: planStoreDir},
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalSharePlanDir: sharePlanDir},
 		&events.CommentParser{ExecutableName: "atlantis"},
 		userConfig.SkipCloneNoChanges,
 		userConfig.EnableRegExpCmd,
@@ -6207,9 +6207,9 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 		userConfig.AutoDiscoverMode,
 		scope,
 		tfclientmocks.NewMockClient(),
-		&runtime.LocalPlanStore{SeparatePlanDir: planStoreDir},
+		&runtime.LocalPlanStore{SeparatePlanDir: sharePlanDir},
 	)
-	builder.LocalPlanStoreDir = planStoreDir
+	builder.LocalSharePlanDir = sharePlanDir
 
 	ctxs, err := builder.BuildApplyCommands(
 		&command.Context{
@@ -6234,7 +6234,7 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparatePlanStoreDi
 	gotWorkspaces := map[string]bool{}
 	for _, c := range ctxs {
 		gotWorkspaces[c.Workspace] = true
-		Equals(t, planStoreDir, c.LocalPlanStoreDir)
+		Equals(t, sharePlanDir, c.LocalSharePlanDir)
 	}
 	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be recovered")
 	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be recovered")

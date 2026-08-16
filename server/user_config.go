@@ -40,7 +40,7 @@ type UserConfig struct {
 	CheckoutDepth               int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
-	PlanStoreDir                string `mapstructure:"plan-store-dir"`
+	SharePlanDir                string `mapstructure:"share-plan-dir"`
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`

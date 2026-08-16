@@ -96,7 +96,7 @@ func NewInstrumentedProjectCommandBuilder(
 	scope tally.Scope,
 	terraformClient tfclient.Client,
 	planStore runtime.PlanStore,
-	localPlanStoreDir string,
+	localSharePlanDir string,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -130,7 +130,7 @@ func NewInstrumentedProjectCommandBuilder(
 		terraformClient,
 		planStore,
 	)
-	builder.LocalPlanStoreDir = localPlanStoreDir
+	builder.LocalSharePlanDir = localSharePlanDir
 
 	return &InstrumentedProjectCommandBuilder{
 		ProjectCommandBuilder: builder,
@@ -311,27 +311,27 @@ type DefaultProjectCommandBuilder struct {
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor tfclient.Client
 	// Root directory for local Terraform plan files.
-	LocalPlanStoreDir string
+	LocalSharePlanDir string
 }
 
-func (p *DefaultProjectCommandBuilder) withLocalPlanStoreDir(projCtxs []command.ProjectContext) []command.ProjectContext {
+func (p *DefaultProjectCommandBuilder) withLocalSharePlanDir(projCtxs []command.ProjectContext) []command.ProjectContext {
 	for i := range projCtxs {
-		projCtxs[i].LocalPlanStoreDir = p.LocalPlanStoreDir
+		projCtxs[i].LocalSharePlanDir = p.LocalSharePlanDir
 	}
 	return projCtxs
 }
 
 // restorePullDir returns the directory an external plan store must restore into.
 // Restored plans are read back by PendingPlanFinder, which looks under
-// LocalPlanStoreDir, so restoring into the clone pull dir would leave them
-// undiscoverable. When LocalPlanStoreDir resolves to the data dir this is the
+// LocalSharePlanDir, so restoring into the clone pull dir would leave them
+// undiscoverable. When LocalSharePlanDir resolves to the data dir this is the
 // clone pull dir, so the default on-disk layout is unchanged.
 func (p *DefaultProjectCommandBuilder) restorePullDir(pullDir string, r models.Repo, pull models.PullRequest) (string, error) {
-	if p.LocalPlanStoreDir == "" {
+	if p.LocalSharePlanDir == "" {
 		return pullDir, nil
 	}
-	planPullDir := runtime.GetPlanPullDir(p.LocalPlanStoreDir, r, pull)
-	if err := utils.EnsureSubPath(filepath.Join(p.LocalPlanStoreDir, workingDirPrefix), planPullDir); err != nil {
+	planPullDir := runtime.GetPlanPullDir(p.LocalSharePlanDir, r, pull)
+	if err := utils.EnsureSubPath(filepath.Join(p.LocalSharePlanDir, workingDirPrefix), planPullDir); err != nil {
 		return "", fmt.Errorf("plan path traversal detected: %w", err)
 	}
 	return planPullDir, nil
@@ -883,7 +883,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
-	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -985,7 +985,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
@@ -1805,7 +1805,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 	}
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(p.withLocalPlanStoreDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {

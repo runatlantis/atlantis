@@ -66,12 +66,12 @@ func TestGetPlanFilename(t *testing.T) {
 
 func TestEnsurePlanFileDir(t *testing.T) {
 	projectPath := t.TempDir()
-	planStoreDir := t.TempDir()
+	sharePlanDir := t.TempDir()
 	ctx := command.ProjectContext{
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 		},
-		LocalPlanStoreDir: planStoreDir,
+		LocalSharePlanDir: sharePlanDir,
 		Pull: models.PullRequest{
 			Num: 2,
 		},
@@ -93,7 +93,7 @@ func TestGetPlanFilePath(t *testing.T) {
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 		},
-		LocalPlanStoreDir: filepath.Join("plans"),
+		LocalSharePlanDir: filepath.Join("plans"),
 		ProjectName:       "project/name",
 		Pull: models.PullRequest{
 			Num: 2,
@@ -104,7 +104,7 @@ func TestGetPlanFilePath(t *testing.T) {
 
 	Equals(t, filepath.Join("plans", "repos", "owner", "repo", "2", "default", "modules", "app", "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
 
-	ctx.LocalPlanStoreDir = ""
+	ctx.LocalSharePlanDir = ""
 	Equals(t, filepath.Join(projectPath, "project::name-default.tfplan"), runtime.GetPlanFilePath(ctx, projectPath))
 }
 
