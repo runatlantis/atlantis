@@ -394,6 +394,20 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+::: warning SECURITY WARNING
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--bitbucket-webhook-secret-file` to mitigate that risk.
+:::
+
+### `--bitbucket-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --bitbucket-webhook-secret-file="path/to/webhook-secret"
+# or
+ATLANTIS_BITBUCKET_WEBHOOK_SECRET_FILE="path/to/webhook-secret"
+```
+
+Path to a file containing the secret used to validate Bitbucket webhooks.
+
 ### `--blocked-extra-args`
 
 ```bash
@@ -901,6 +915,20 @@ If not specified, Atlantis won't be able to validate that the incoming webhook c
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
 
+::: warning SECURITY WARNING
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gh-webhook-secret-file` to mitigate that risk.
+:::
+
+### `--gh-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --gh-webhook-secret-file="path/to/webhook-secret"
+# or
+ATLANTIS_GH_WEBHOOK_SECRET_FILE="path/to/webhook-secret"
+```
+
+Path to a file containing the secret used to validate GitHub webhooks.
+
 ### `--gitea-base-url` <Badge text="v0.28.0+" type="info"/>
 
 ```bash
@@ -960,6 +988,20 @@ Secret used to validate Gitea webhooks.
 If not specified, Atlantis won't be able to validate that the incoming webhook call came from Gitea.
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
+
+::: warning SECURITY WARNING
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitea-webhook-secret-file` to mitigate that risk.
+:::
+
+### `--gitea-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --gitea-webhook-secret-file="path/to/webhook-secret"
+# or
+ATLANTIS_GITEA_WEBHOOK_SECRET_FILE="path/to/webhook-secret"
+```
+
+Path to a file containing the secret used to validate Gitea webhooks.
 
 ### `--gitlab-group-allowlist` <Badge text="v0.13.0+" type="info"/>
 
@@ -1034,6 +1076,20 @@ Secret used to validate GitLab webhooks.
 If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab.
 This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions.
 :::
+
+::: warning SECURITY WARNING
+The webhook secret will be visible by anyone that can run `ps` or look at the shell history of the machine where Atlantis is running. Use `--gitlab-webhook-secret-file` to mitigate that risk.
+:::
+
+### `--gitlab-webhook-secret-file` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --gitlab-webhook-secret-file="path/to/webhook-secret"
+# or
+ATLANTIS_GITLAB_WEBHOOK_SECRET_FILE="path/to/webhook-secret"
+```
+
+Path to a file containing the secret used to validate GitLab webhooks.
 
 ### `--help` <Badge text="v0.1.3+" type="info"/>
 
