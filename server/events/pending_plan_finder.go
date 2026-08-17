@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -92,7 +93,14 @@ func (p *DefaultPendingPlanFinder) planPullDir(pullDir string) (string, bool, er
 		return "", false, fmt.Errorf("pull directory %q escapes clone root %q", pullDir, cloneRoot)
 	}
 
-	planPullDir := filepath.Join(p.LocalSharePlanDir, workingDirPrefix, relPullDir)
+	// SecureJoin resolves the PR-derived relative path against the plan store
+	// repos root and guarantees the result stays within it (rejecting "..",
+	// absolute paths, and symlink escapes).
+	planStoreRoot := filepath.Join(p.LocalSharePlanDir, workingDirPrefix)
+	planPullDir, err := securejoin.SecureJoin(planStoreRoot, relPullDir)
+	if err != nil {
+		return "", false, fmt.Errorf("resolving plan pull directory for %q: %w", pullDir, err)
+	}
 	return planPullDir, filepath.Clean(planPullDir) != cleanPullDir, nil
 }
 
@@ -163,11 +171,18 @@ func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]Pendin
 }
 
 func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPullDir string) ([]PendingPlan, []string, error) {
-	// Defense-in-depth: planPullDir is derived from PR-controlled values (repo,
-	// pull number, workspace), so confirm it stays within the configured plan
-	// store root before touching the filesystem.
-	if err := utils.EnsureSubPath(p.LocalSharePlanDir, planPullDir); err != nil {
-		return nil, nil, fmt.Errorf("plan store pull directory %q: %w", planPullDir, err)
+	// Defense-in-depth: re-anchor the caller-supplied planPullDir under the plan
+	// store root via SecureJoin at the point of use, so the path handed to
+	// os.ReadDir is provably contained within that root regardless of how the
+	// caller built it. This is idempotent for values produced by planPullDir().
+	planStoreRoot := filepath.Join(p.LocalSharePlanDir, workingDirPrefix)
+	relPlanPullDir, err := filepath.Rel(planStoreRoot, planPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("checking plan pull directory %q: %w", planPullDir, err)
+	}
+	planPullDir, err = securejoin.SecureJoin(planStoreRoot, relPlanPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving plan pull directory %q: %w", planPullDir, err)
 	}
 	workspaceDirs, err := os.ReadDir(planPullDir)
 	if os.IsNotExist(err) {
@@ -200,11 +215,6 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		if err != nil {
 			return nil, nil, err
 		}
-		// Defense-in-depth: ensure the workspace-derived clone directory stays
-		// within the pull clone root before stat-ing it.
-		if err := utils.EnsureSubPath(absClonePullDir, cloneRepoDir); err != nil {
-			return nil, nil, fmt.Errorf("clone directory for workspace %q: %w", workspace, err)
-		}
 		cloneRepoInfo, err := os.Stat(cloneRepoDir)
 		if os.IsNotExist(err) {
 			p.debug("skipping plan store workspace %q because clone directory %q does not exist", workspace, cloneRepoDir)
@@ -228,11 +238,6 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)
 		if err != nil {
 			return nil, nil, err
-		}
-		// Defense-in-depth: ensure the workspace-derived plan directory stays
-		// within the plan store pull root before walking it.
-		if err := utils.EnsureSubPath(absPlanPullDir, planRepoDir); err != nil {
-			return nil, nil, fmt.Errorf("plan directory for workspace %q: %w", workspace, err)
 		}
 
 		if err := filepath.WalkDir(planRepoDir, func(path string, entry os.DirEntry, walkErr error) error {
@@ -273,14 +278,13 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 	return plans, absPaths, nil
 }
 
+// workspaceRepoDir resolves a workspace name (derived from PR-controlled data)
+// against absPullDir. SecureJoin guarantees the result stays within absPullDir,
+// rejecting traversal via "..", absolute paths, or symlink escapes.
 func workspaceRepoDir(absPullDir, workspace string) (string, error) {
-	repoDir := filepath.Clean(filepath.Join(absPullDir, workspace))
-	rel, err := filepath.Rel(absPullDir, repoDir)
+	repoDir, err := securejoin.SecureJoin(absPullDir, workspace)
 	if err != nil {
 		return "", fmt.Errorf("checking workspace directory %q: %w", workspace, err)
-	}
-	if rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("workspace directory %q escapes pull directory %q", workspace, absPullDir)
 	}
 	return repoDir, nil
 }
