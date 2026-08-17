@@ -517,7 +517,7 @@ func (p *PlanCommandRunner) deletePlansWithPostDelete(ctx *command.Context, post
 	}
 
 	for _, plan := range plans {
-		planPath := filepath.Join(plan.RepoDir, plan.RepoRelDir, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
+		planPath := filepath.Join(plan.planRepoDir(), plan.RepoRelDir, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
 		if err := utils.RemoveIgnoreNonExistent(planPath); err != nil {
 			return nil, fmt.Errorf("deleting plan at %s: %w", planPath, err)
 		}
