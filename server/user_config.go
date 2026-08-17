@@ -5,7 +5,10 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
+	"os"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events"
@@ -85,6 +88,7 @@ type UserConfig struct {
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
 	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
+	InternalCommandToken            string `mapstructure:"internal-command-token"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
@@ -98,6 +102,7 @@ type UserConfig struct {
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
 	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
+	OwnershipTTLSeconds             int    `mapstructure:"ownership-ttl-seconds"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
 	EnableExternalStores            bool   `mapstructure:"enable-external-stores"`
@@ -111,6 +116,8 @@ type UserConfig struct {
 	RedisInsecureSkipVerify         bool   `mapstructure:"redis-insecure-skip-verify"`
 	RedisUsername                   string `mapstructure:"redis-username"`
 	RedisClusterAddresses           string `mapstructure:"redis-cluster-addresses"`
+	ReplicaAdvertiseURL             string `mapstructure:"replica-advertise-url"`
+	ReplicaID                       string `mapstructure:"replica-id"`
 	RepoConfig                      string `mapstructure:"repo-config"`
 	RepoConfigJSON                  string `mapstructure:"repo-config-json"`
 	RepoAllowlist                   string `mapstructure:"repo-allowlist"`
@@ -148,6 +155,54 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+}
+
+// replicaRoutingConfigured reports whether a routing-only setting was supplied.
+// OwnershipTTLSeconds is excluded because it has a non-zero default.
+func (u UserConfig) replicaRoutingConfigured() bool {
+	return u.ReplicaID != "" || u.ReplicaAdvertiseURL != "" || u.InternalCommandToken != ""
+}
+
+// ValidateReplicaRouting validates the multi-replica routing contract when any
+// routing-only setting is configured.
+func (u UserConfig) ValidateReplicaRouting() error {
+	if !u.replicaRoutingConfigured() {
+		return nil
+	}
+	if u.LockingDBType != "redis" {
+		return errors.New("replica routing requires --locking-db-type=redis")
+	}
+	if strings.TrimSpace(u.RedisHost) == "" && strings.Trim(u.RedisClusterAddresses, " ,") == "" {
+		return errors.New("replica routing requires --redis-host or --redis-cluster-addresses")
+	}
+	if strings.TrimSpace(u.ReplicaAdvertiseURL) == "" {
+		return errors.New("--replica-advertise-url must be set when replica routing is configured")
+	}
+	parsed, err := url.Parse(u.ReplicaAdvertiseURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || parsed.Opaque != "" {
+		return errors.New("--replica-advertise-url must be an absolute HTTP(S) URL without credentials, query, or fragment")
+	}
+	if strings.TrimSpace(u.InternalCommandToken) == "" {
+		return errors.New("--internal-command-token must be set when replica routing is configured")
+	}
+	if u.OwnershipTTLSeconds < 10 {
+		return errors.New("--ownership-ttl-seconds must be at least 10")
+	}
+	return nil
+}
+
+func (u UserConfig) resolveReplicaID() (string, error) {
+	if replicaID := strings.TrimSpace(u.ReplicaID); replicaID != "" {
+		return replicaID, nil
+	}
+	replicaID, err := os.Hostname()
+	if err != nil {
+		return "", fmt.Errorf("resolving replica ID from hostname: %w", err)
+	}
+	if replicaID = strings.TrimSpace(replicaID); replicaID == "" {
+		return "", errors.New("replica routing requires a non-empty hostname or --replica-id")
+	}
+	return replicaID, nil
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

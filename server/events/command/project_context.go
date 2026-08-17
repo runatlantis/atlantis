@@ -173,6 +173,12 @@ type ProjectContext struct {
 	// FailOnMissingDependencies makes apply dependency validation fail when a
 	// configured dependency is not present in PullStatus.
 	FailOnMissingDependencies bool
+
+	// ExecutionLease fences queued project work before workflow steps begin.
+	ExecutionLease ExecutionLease
+
+	// RecoverExternalPlans marks a newly prepared local ownership generation.
+	RecoverExternalPlans bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

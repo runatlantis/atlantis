@@ -1202,41 +1202,26 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 // pending plans in this ctx.
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	pullDirMissing := os.IsNotExist(err)
+	restoreSupported := p.planRestoreSupported()
+	if pullDirMissing && !restoreSupported {
+		return nil, os.ErrNotExist
+	}
+	if restoreSupported && (pullDirMissing || ctx.RecoverExternalPlans) {
+		if pullDirMissing {
+			ctx.Log.Info("pull directory missing, attempting to restore plans")
+		} else {
+			ctx.Log.Info("new local ownership generation, restoring plans from external store")
 		}
-		// Working dir is gone (e.g. container restart with emptyDir). Try to
-		// recover via the plan store. We must clone each workspace that has
-		// stored plans BEFORE restoring, otherwise Clone falls through to
-		// forceClone (os.RemoveAll) and wipes the just-restored plans.
-		ctx.Log.Info("pull directory missing, attempting to restore plans")
-		// Probe capability first to avoid pointless I/O on stores that don't
-		// support restore (e.g. LocalPlanStore).
-		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
-			return nil, os.ErrNotExist
+		restoredPullDir, restoreErr := p.restoreExternalPlans(ctx)
+		if restoreErr != nil && !(errors.Is(restoreErr, os.ErrNotExist) && !pullDirMissing) {
+			return nil, restoreErr
 		}
-		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
-		if listErr != nil {
-			return nil, fmt.Errorf("listing workspaces from external store: %w", listErr)
-		}
-		// No workspaces in the store means there's nothing to restore.
-		if len(workspaces) == 0 {
-			return nil, os.ErrNotExist
-		}
-		// Clone every workspace before restoring; this ensures each workspace
-		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
-		for _, workspace := range workspaces {
-			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
-				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
-			}
-		}
-		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
-		if err != nil {
-			return nil, err
-		}
-		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
-			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
+		if restoreErr == nil {
+			pullDir = restoredPullDir
 		}
 	}
 
@@ -1551,16 +1536,17 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	restoreSupported := p.planRestoreSupported()
 	if errors.Is(err, os.ErrNotExist) {
 		// Re-clone only if the plan store can recover plans externally.
 		// LocalPlanStore signals this via ErrRestoreNotSupported; external
 		// stores (S3) return nil and Load restores the plan in doApply before
 		// plan validation (this path does not call RestorePlans).
-		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+		if !restoreSupported {
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}
 		ctx.Log.Info("working directory missing, re-cloning repo for apply")
-		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 		if err != nil {
 			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
 		}
@@ -1596,11 +1582,78 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 		return projCtx, err
 	}
 	if cmd.Name == command.Apply {
+		if restoreSupported {
+			ensured := make(map[string]bool)
+			for _, projectCtx := range projCtx {
+				if ensured[projectCtx.Workspace] {
+					continue
+				}
+				if _, err := p.ensureWorkspace(ctx, projectCtx.Workspace); err != nil {
+					return nil, err
+				}
+				ensured[projectCtx.Workspace] = true
+			}
+		}
 		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
 			return nil, err
 		}
 	}
 	return projCtx, nil
+}
+
+func (p *DefaultProjectCommandBuilder) planRestoreSupported() bool {
+	if p.PlanStore == nil {
+		return false
+	}
+	return !errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported)
+}
+
+func (p *DefaultProjectCommandBuilder) restoreExternalPlans(ctx *command.Context) (string, error) {
+	workspaces, err := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
+	if err != nil {
+		return "", fmt.Errorf("listing workspaces from external store: %w", err)
+	}
+	if len(workspaces) == 0 {
+		return "", os.ErrNotExist
+	}
+
+	if _, err := p.ensureWorkspace(ctx, DefaultWorkspace); err != nil {
+		return "", err
+	}
+	ensured := map[string]bool{DefaultWorkspace: true}
+	for _, workspace := range workspaces {
+		if ensured[workspace] {
+			continue
+		}
+		if _, err := p.ensureWorkspace(ctx, workspace); err != nil {
+			return "", err
+		}
+		ensured[workspace] = true
+	}
+
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return "", err
+	}
+	if err := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); err != nil {
+		return "", fmt.Errorf("restoring plans from external store: %w", err)
+	}
+	return pullDir, nil
+}
+
+func (p *DefaultProjectCommandBuilder) ensureWorkspace(ctx *command.Context, workspace string) (string, error) {
+	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, workspace)
+	if err == nil {
+		return repoDir, nil
+	}
+	if !os.IsNotExist(err) {
+		return "", fmt.Errorf("getting working directory for workspace %q: %w", workspace, err)
+	}
+	repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return "", fmt.Errorf("cloning workspace %q for apply: %w", workspace, err)
+	}
+	return repoDir, nil
 }
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {

@@ -52,15 +52,16 @@ const azuredevopsTestURL = "https://fabrikam.visualstudio.com/DefaultCollection/
 // VCSEventsController handles all webhook requests which signify 'events' in the
 // VCS host, ex. GitHub.
 type VCSEventsController struct {
-	CommandRunner  events.CommandRunner  `validate:"required"`
-	PullCleaner    events.PullCleaner    `validate:"required"`
-	Logger         logging.SimpleLogging `validate:"required"`
-	Scope          tally.Scope           `validate:"required"`
-	Parser         events.EventParsing   `validate:"required"`
-	CommentParser  events.CommentParsing `validate:"required"`
-	ApplyDisabled  bool
-	EmojiReaction  string
-	ExecutableName string
+	CommandRunner     events.CommandRunner `validate:"required"`
+	CommandDispatcher events.CommandDispatcher
+	PullCleaner       events.PullCleaner    `validate:"required"`
+	Logger            logging.SimpleLogging `validate:"required"`
+	Scope             tally.Scope           `validate:"required"`
+	Parser            events.EventParsing   `validate:"required"`
+	CommentParser     events.CommentParsing `validate:"required"`
+	ApplyDisabled     bool
+	EmojiReaction     string
+	ExecutableName    string
 	// GithubWebhookSecret is the secret added to this webhook via the GitHub
 	// UI that identifies this call as coming from GitHub. If empty, no
 	// request validation is done.
@@ -584,15 +585,17 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 
 	switch eventType {
 	case models.OpenedPullEvent, models.UpdatedPullEvent:
-		// If the pull request was opened or updated, we will try to autoplan.
-
-		// Respond with success and then actually execute the command asynchronously.
-		// We use a goroutine so that this function returns and the connection is
-		// closed.
-		if !e.TestingMode {
+		if e.CommandDispatcher != nil {
+			dispatch, err := events.NewAutoplanDispatch(baseRepo, headRepo, pull, user)
+			if err == nil {
+				err = e.CommandDispatcher.DispatchAutoplan(dispatch)
+			}
+			if err != nil {
+				return commandDispatchError("autoplan", err)
+			}
+		} else if !e.TestingMode {
 			go e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
 		} else {
-			// When testing we want to wait for everything to complete.
 			e.CommandRunner.RunAutoplanCommand(baseRepo, headRepo, pull, user)
 		}
 		return HTTPResponse{
@@ -601,14 +604,18 @@ func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLoggin
 	case models.ClosedPullEvent:
 		// If the pull request was closed, we delete locks.
 		logger.Info("Pull request closed, cleaning up...")
-		if err := e.PullCleaner.CleanUpPull(logger, baseRepo, pull); err != nil {
+		if e.CommandDispatcher != nil {
+			dispatch, err := events.NewPullClosedDispatch(baseRepo, pull)
+			if err == nil {
+				err = e.CommandDispatcher.DispatchPullClosed(dispatch)
+			}
+			if err != nil {
+				return commandDispatchError("pull request cleanup", err)
+			}
+		} else if err := e.PullCleaner.CleanUpPull(logger, baseRepo, pull); err != nil {
 			return HTTPResponse{
 				body: err.Error(),
-				err: HTTPError{
-					code:       http.StatusForbidden,
-					err:        err,
-					isSilenced: false,
-				},
+				err:  HTTPError{code: http.StatusForbidden, err: err, isSilenced: false},
 			}
 		}
 		logger.Info("Locks and workspace successfully deleted")
@@ -735,18 +742,34 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	} else {
 		logger.Info("Running comment command '%v' for user '%v'.", parseResult.Command.Name, user.Username)
 	}
-	if !e.TestingMode {
-		// Respond with success and then actually execute the command asynchronously.
-		// We use a goroutine so that this function returns and the connection is
-		// closed.
+	if e.CommandDispatcher != nil {
+		dispatch, err := events.NewCommentDispatch(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
+		if err == nil {
+			err = e.CommandDispatcher.DispatchComment(dispatch)
+		}
+		if err != nil {
+			return commandDispatchError("comment command", err)
+		}
+	} else if !e.TestingMode {
 		go e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
 	} else {
-		// When testing we want to wait for everything to complete.
 		e.CommandRunner.RunCommentCommand(baseRepo, maybeHeadRepo, maybePull, user, pullNum, parseResult.Command)
 	}
 
 	return HTTPResponse{
 		body: "Processing...",
+	}
+}
+
+func commandDispatchError(kind string, err error) HTTPResponse {
+	wrapped := fmt.Errorf("dispatching %s: %w", kind, err)
+	return HTTPResponse{
+		body: wrapped.Error(),
+		err: HTTPError{
+			code:       http.StatusServiceUnavailable,
+			err:        wrapped,
+			isSilenced: false,
+		},
 	}
 }
 

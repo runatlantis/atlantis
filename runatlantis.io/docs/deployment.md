@@ -28,10 +28,14 @@ Bitbucket Server, then Atlantis needs to be routable from the private host and A
 
 ### Data
 
-Atlantis has no external database. Atlantis stores Terraform plan files on disk.
-If Atlantis loses that data in between a `plan` and `apply` cycle, then users will have
-to re-run `plan`. Because of this, you may want to provision a persistent disk
-for Atlantis.
+By default, Atlantis stores locks, metadata, and Terraform plan files on disk. If Atlantis loses plan data between a `plan` and `apply` cycle, users must re-run `plan`.
+
+For multiple replicas, use [Redis replica routing](redis-replica-routing.md) when every replica should accept webhooks while one owner handles each pull request. Redis stores locks, metadata, and ownership.
+
+Choose plan durability independently:
+
+* Local plans stay on the owner and require re-plan after ownership moves.
+* External plan storage can restore a current plan on the new owner and can also be used without replica routing.
 
 ## Deployment
 
@@ -39,6 +43,7 @@ Pick your deployment type:
 
 * [Kubernetes Helm Chart](#kubernetes-helm-chart)
 * [Kubernetes Manifests](#kubernetes-manifests)
+* [Redis Replica Routing](redis-replica-routing.md)
 * [Kubernetes Kustomize](#kubernetes-kustomize)
 * [OpenShift](#openshift)
 * [AWS Fargate](#aws-fargate)
@@ -108,6 +113,8 @@ or a [Statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/sta
 StatefulSet is recommended because Atlantis stores its data on disk and so if your Pod dies
 or you upgrade Atlantis, you won't lose plans that haven't been applied. If
 you do lose that data, you just need to run `atlantis plan` again so it's not the end of the world.
+
+For an active-active webhook deployment with multiple StatefulSet replicas and Redis-backed PR ownership, use the separate [Redis replica routing guide](redis-replica-routing.md). Do not increase the replica count in the single-server manifests below without choosing and configuring a distributed model.
 
 Regardless of whether you choose a Deployment or StatefulSet, first create a Secret with the webhook secret and access token:
 
@@ -283,7 +290,7 @@ spec:
         readinessProbe:
           periodSeconds: 60
           httpGet:
-            path: /healthz
+            path: /readyz
             port: 4141
             # If using https, change this to HTTPS
             scheme: HTTP
@@ -442,7 +449,7 @@ spec:
         readinessProbe:
           periodSeconds: 60
           httpGet:
-            path: /healthz
+            path: /readyz
             port: 4141
             # If using https, change this to HTTPS
             scheme: HTTP

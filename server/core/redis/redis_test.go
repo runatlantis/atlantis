@@ -639,6 +639,47 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
+func TestUnlockByPullExactRepository(t *testing.T) {
+	tests := []struct {
+		name         string
+		targetRepo   string
+		neighborRepo string
+	}{
+		{name: "prefix neighbor", targetRepo: "org/api", neighborRepo: "org/api-v2"},
+		{name: "glob metacharacters", targetRepo: "org/api[prod]", neighborRepo: "org/apip"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := miniredis.RunT(t)
+			rdb := newTestRedis(s)
+			target := models.ProjectLock{
+				Project:   models.NewProject(tt.targetRepo, "infra", "target"),
+				Workspace: "default",
+				Pull:      models.PullRequest{Num: 42},
+			}
+			neighbor := models.ProjectLock{
+				Project:   models.NewProject(tt.neighborRepo, "infra", "neighbor"),
+				Workspace: "default",
+				Pull:      models.PullRequest{Num: 42},
+			}
+			for _, candidate := range []models.ProjectLock{target, neighbor} {
+				acquired, _, err := rdb.TryLock(candidate)
+				Ok(t, err)
+				Assert(t, acquired, "expected test lock to be acquired")
+			}
+
+			removed, err := rdb.UnlockByPull(tt.targetRepo, 42)
+			Ok(t, err)
+			Equals(t, 1, len(removed))
+			Equals(t, tt.targetRepo, removed[0].Project.RepoFullName)
+
+			remaining, err := rdb.GetLock(neighbor.Project, neighbor.Workspace)
+			Ok(t, err)
+			Assert(t, remaining != nil, "neighbor repository lock must remain")
+		})
+	}
+}
+
 func TestGetLockNotThere(t *testing.T) {
 	t.Log("getting a lock that doesn't exist should return a nil pointer")
 	s := miniredis.RunT(t)

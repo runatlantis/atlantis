@@ -22,6 +22,7 @@ const en = [
           { text: "Git Host Access Credentials", link: "/docs/access-credentials" },
           { text: "Webhook Secrets", link: "/docs/webhook-secrets" },
           { text: "Deployment", link: "/docs/deployment" },
+          { text: "Redis Replica Routing", link: "/docs/redis-replica-routing" },
           { text: "Configuring Webhooks", link: "/docs/configuring-webhooks" },
           { text: "Provider Credentials", link: "/docs/provider-credentials" },
         ]

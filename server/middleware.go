@@ -40,6 +40,7 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		r.URL.Path == "/healthz" ||
 		r.URL.Path == "/readyz" ||
 		r.URL.Path == "/status" ||
+		strings.HasPrefix(r.URL.Path, "/internal/commands/") ||
 		strings.HasPrefix(r.URL.Path, "/api/") {
 		allowed = true
 	} else {

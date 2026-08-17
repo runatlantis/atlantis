@@ -335,6 +335,8 @@ func newProjectCommandContext(ctx *command.Context,
 		SuppressJobOutput:          ctx.SuppressJobOutput,
 		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
 		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
+		ExecutionLease:             ctx.ExecutionLease,
+		RecoverExternalPlans:       ctx.RecoverExternalPlans,
 	}
 }
 
