@@ -61,6 +61,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 				Status:      models.ErroredPolicyCheckStatus,
 				ProjectName: "project1",
 				RepoRelDir:  "dir1",
+				Workspace:   "default",
 			},
 		}
 
@@ -80,6 +81,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			{
 				Status:     models.ErroredPolicyCheckStatus,
 				RepoRelDir: "dir1",
+				Workspace:  "default",
 			},
 		}
 
@@ -172,4 +174,46 @@ func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
 	assert.False(t, normalResult[0].SuppressVCSStatus)
 	assert.False(t, normalResult[0].SuppressJobOutput)
 	assert.False(t, normalResult[0].SuppressApplyWebhooks)
+}
+
+func TestProjectCommandContextBuilder_RecordedManagedPlanHashUsesExactProjectIdentity(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockCommentBuilder := mocks.NewMockCommentBuilder()
+	subject := events.DefaultProjectCommandContextBuilder{CommentBuilder: mockCommentBuilder}
+	terraformClient := tfclientmocks.NewMockClient()
+	projCfg := valid.MergedProjectCfg{
+		RepoRelDir: "env",
+		Workspace:  "prod",
+		Name:       "app",
+		Workflow: valid.Workflow{
+			Name:  valid.DefaultWorkflowName,
+			Apply: valid.DefaultApplyStage,
+		},
+	}
+	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
+	When(mockCommentBuilder.BuildApplyComment("env", "prod", "app", false, "")).ThenReturn("apply comment")
+	commandCtx := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{
+				Workspace:              "staging",
+				RepoRelDir:             "env",
+				ProjectName:            "app",
+				ManagedPlanHash:        "wrong-workspace-hash",
+				AcceptedPlanGeneration: "generation-staging",
+			},
+			{
+				Workspace:              "prod",
+				RepoRelDir:             "env",
+				ProjectName:            "app",
+				ManagedPlanHash:        "prod-hash",
+				AcceptedPlanGeneration: "generation-prod",
+			},
+		}},
+	}
+
+	result := subject.BuildProjectContext(commandCtx, command.Apply, "", projCfg, nil, "repo", false, false, false, false, false, terraformClient)
+
+	assert.Equal(t, "prod-hash", result[0].RecordedManagedPlanHash)
+	assert.Equal(t, "generation-prod", result[0].AcceptedPlanGeneration)
 }

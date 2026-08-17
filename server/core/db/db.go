@@ -26,6 +26,17 @@ type Database interface {
 	GetPullStatus(pull models.PullRequest) (*models.PullStatus, error)
 	DeletePullStatus(pull models.PullRequest) error
 	UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error)
+	ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error)
+	AcquirePlanPublicationClaim(pull models.PullRequest, token string) error
+	GetPlanPublicationClaim(pull models.PullRequest) (string, error)
+	ReleasePlanPublicationClaim(pull models.PullRequest, token string) error
+	ForceClearPlanPublicationClaim(pull models.PullRequest) error
+	BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (PlanGenerationBeginResult, error)
+	BeginPlanGenerationReplacing(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (PlanGenerationBeginResult, error)
+	CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error)
+	UpdatePolicyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error)
+	UpdateApplyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error)
+	UpdateDiscardResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error)
 
 	LockCommand(cmdName command.Name, lockTime time.Time) (*command.Lock, error)
 	UnlockCommand(cmdName command.Name) error

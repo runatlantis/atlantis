@@ -1659,6 +1659,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		mocks.NewMockDeleteLockCommand(),
 		e2eVCSClient,
+		dbUpdater,
 		silenceNoProjects,
 		disableUnlockLabel,
 	)

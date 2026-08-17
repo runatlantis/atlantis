@@ -8,25 +8,32 @@ import "github.com/runatlantis/atlantis/server/events/models"
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
 	ProjectCommandOutput
-	Command           Name
-	SubCommand        string
-	RepoRelDir        string
-	Workspace         string
-	ProjectName       string
-	SilencePRComments []string
+	Command     Name
+	SubCommand  string
+	RepoRelDir  string
+	Workspace   string
+	ProjectName string
+	// AcceptedPlanGeneration identifies the completed plan generation whose
+	// authority this result consumed.
+	AcceptedPlanGeneration string `json:"-"`
+	SilencePRComments      []string
 }
 
 // ProjectCommandOutput is the output of a plan/policy_check/apply for a specific project.
 type ProjectCommandOutput struct {
-	Error              error
-	Failure            string
-	PlanSuccess        *models.PlanSuccess
-	PolicyCheckResults *models.PolicyCheckResults
-	ApplySuccess       string
-	ApplySuccessURL    string `json:"-"`
-	VersionSuccess     string
-	ImportSuccess      *models.ImportSuccess
-	StateRmSuccess     *models.StateRmSuccess
+	Error               error
+	Failure             string
+	PlanSuccess         *models.PlanSuccess
+	ManagedPlanHash     string
+	AtlantisManagedPlan bool
+	JobOutputComplete   bool `json:"-"`
+	PolicyCheckResults  *models.PolicyCheckResults
+	ApplySuccess        string
+	ApplySuccessURL     string `json:"-"`
+	PlanSuccessURL      string `json:"-"`
+	VersionSuccess      string
+	ImportSuccess       *models.ImportSuccess
+	StateRmSuccess      *models.StateRmSuccess
 }
 
 // CommitStatus returns the vcs commit status of this project result.

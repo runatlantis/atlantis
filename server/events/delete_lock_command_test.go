@@ -41,12 +41,11 @@ func TestDeleteLock_None(t *testing.T) {
 }
 
 func TestDeleteLock_Success(t *testing.T) {
-	t.Log("Delete lock deletes successfully the plan file")
+	t.Log("Delete lock retains the plan artifact until durable status is discarded")
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
 	workspace := "workspace"
 	path := "path"
-	projectName := ""
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -77,8 +76,8 @@ func TestDeleteLock_Success(t *testing.T) {
 	lock, err := dlc.DeleteLock(logger, "id")
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
-	workingDir.VerifyWasCalledOnce().DeletePlan(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace),
-		Eq(path), Eq(projectName))
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
 }
 
 func TestDeleteLocksByPull_LockerErr(t *testing.T) {
@@ -156,8 +155,8 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 	}
 	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
 	Ok(t, err)
-	workingDir.VerifyWasCalled(Once()).DeletePlan(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace),
-		Eq(path), Eq(projectName))
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
 }
 
 func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
@@ -168,7 +167,6 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 	path1 := "path1"
 	path2 := "path2"
 	workspace := "default"
-	projectName := ""
 
 	RegisterMockTestingT(t) // needed for pegomock WorkingDir mock
 	ctrl := gomock.NewController(t)
@@ -203,6 +201,6 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 	}
 	_, err := dlc.DeleteLocksByPull(logger, repoName, pullNum)
 	Ok(t, err)
-	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path1, projectName)
-	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path2, projectName)
+	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string](), Any[string](), Any[string]())
 }

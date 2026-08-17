@@ -20,15 +20,19 @@ func RunOneProjectCmd(
 	cmd command.ProjectContext,
 ) command.ProjectResult {
 	projectCommandOutput := runnerFunc(cmd)
+	if cmd.CommandName == command.Plan {
+		projectCommandOutput.AtlantisManagedPlan = cmd.RequiresAtlantisManagedPlanFile
+	}
 
 	return command.ProjectResult{
-		ProjectCommandOutput: projectCommandOutput,
-		Command:              cmd.CommandName,
-		SubCommand:           cmd.SubCommand,
-		RepoRelDir:           cmd.RepoRelDir,
-		Workspace:            cmd.Workspace,
-		ProjectName:          cmd.ProjectName,
-		SilencePRComments:    cmd.SilencePRComments,
+		ProjectCommandOutput:   projectCommandOutput,
+		Command:                cmd.CommandName,
+		SubCommand:             cmd.SubCommand,
+		RepoRelDir:             cmd.RepoRelDir,
+		Workspace:              cmd.Workspace,
+		ProjectName:            cmd.ProjectName,
+		AcceptedPlanGeneration: cmd.AcceptedPlanGeneration,
+		SilencePRComments:      cmd.SilencePRComments,
 	}
 }
 
@@ -83,9 +87,10 @@ func runProjectCmdsParallel(
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},
-				RepoRelDir:  pCmd.RepoRelDir,
-				Workspace:   pCmd.Workspace,
-				ProjectName: pCmd.ProjectName,
+				RepoRelDir:             pCmd.RepoRelDir,
+				Workspace:              pCmd.Workspace,
+				ProjectName:            pCmd.ProjectName,
+				AcceptedPlanGeneration: pCmd.AcceptedPlanGeneration,
 			})
 		}
 	}
@@ -229,9 +234,10 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},
-				RepoRelDir:  cmd.RepoRelDir,
-				Workspace:   cmd.Workspace,
-				ProjectName: cmd.ProjectName,
+				RepoRelDir:             cmd.RepoRelDir,
+				Workspace:              cmd.Workspace,
+				ProjectName:            cmd.ProjectName,
+				AcceptedPlanGeneration: cmd.AcceptedPlanGeneration,
 			})
 		}
 	}

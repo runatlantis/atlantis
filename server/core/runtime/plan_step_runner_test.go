@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -152,6 +153,102 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 	output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
+}
+
+func TestRun_RecordsManagedPlanHashBeforeSave(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion := version.Must(version.NewVersion("1.11.0"))
+	planStore := &recordingPlanStore{}
+	runner := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, planStore)
+	projectPath := t.TempDir()
+	planContents := []byte("exact managed plan bytes\x00\xff")
+	var generatedPlanHash string
+	ctx := command.ProjectContext{
+		Log:                             logging.NewNoopLogger(t),
+		Workspace:                       "default",
+		RequiresAtlantisManagedPlanFile: true,
+		PlanGeneration:                  "generation-42",
+		GeneratedPlanHash:               &generatedPlanHash,
+	}
+
+	When(terraform.RunCommandWithVersion(
+		ctx,
+		projectPath,
+		[]string{"workspace", "show"},
+		map[string]string(nil),
+		tfDistribution,
+		tfVersion,
+		"default")).ThenReturn("default\n", nil)
+	When(terraform.RunCommandWithVersion(
+		ctx,
+		projectPath,
+		[]string{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", filepath.Join(projectPath, "default.tfplan"))},
+		map[string]string(nil),
+		tfDistribution,
+		tfVersion,
+		"default")).Then(func(_ []Param) ReturnValues {
+		if err := os.WriteFile(filepath.Join(projectPath, "default.tfplan"), planContents, 0o600); err != nil {
+			return []ReturnValue{"", err}
+		}
+		return []ReturnValue{"plan output", nil}
+	})
+
+	output, err := runner.Run(ctx, nil, projectPath, nil)
+	Ok(t, err)
+	Equals(t, "plan output", output)
+	wantHash := fmt.Sprintf("%x", sha256.Sum256(planContents))
+	Equals(t, wantHash, generatedPlanHash)
+	Equals(t, 1, planStore.saveCalls)
+	Equals(t, planContents, planStore.savedPlan)
+	Equals(t, "generation-42", planStore.savedCtx.PlanGeneration)
+	Equals(t, wantHash, *planStore.savedCtx.GeneratedPlanHash)
+}
+
+func TestRun_ManagedPlanHashFailureDoesNotSave(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion := version.Must(version.NewVersion("1.11.0"))
+	planStore := &recordingPlanStore{}
+	runner := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, planStore)
+	projectPath := t.TempDir()
+	var generatedPlanHash string
+	ctx := command.ProjectContext{
+		Workspace:                       "default",
+		RequiresAtlantisManagedPlanFile: true,
+		GeneratedPlanHash:               &generatedPlanHash,
+	}
+
+	When(terraform.RunCommandWithVersion(
+		ctx,
+		projectPath,
+		[]string{"workspace", "show"},
+		map[string]string(nil),
+		tfDistribution,
+		tfVersion,
+		"default")).ThenReturn("default\n", nil)
+	When(terraform.RunCommandWithVersion(
+		ctx,
+		projectPath,
+		[]string{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", filepath.Join(projectPath, "default.tfplan"))},
+		map[string]string(nil),
+		tfDistribution,
+		tfVersion,
+		"default")).ThenReturn("plan output", nil)
+
+	output, err := runner.Run(ctx, nil, projectPath, nil)
+	Equals(t, "plan output", output)
+	ErrContains(t, "saving plan: hashing managed plan: opening plan file", err)
+	Equals(t, 0, planStore.saveCalls)
+	Equals(t, "", generatedPlanHash)
 }
 
 // Test that we format the plan output for better rendering.
@@ -412,6 +509,11 @@ locally at this time.
 			asyncTf := &remotePlanMock{}
 			s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTf, &runtime.LocalPlanStore{})
 			absProjectPath := t.TempDir()
+			var generatedPlanHash string
+			var remotePlanRunURL string
+			ctx.RequiresAtlantisManagedPlanFile = true
+			ctx.GeneratedPlanHash = &generatedPlanHash
+			ctx.RemotePlanRunURL = &remotePlanRunURL
 
 			// First, terraform workspace gets run.
 			When(terraform.RunCommandWithVersion(
@@ -484,13 +586,52 @@ Plan: 0 to add, 0 to change, 1 to destroy.`), "expect plan success")
 			bytes, err := os.ReadFile(filepath.Join(absProjectPath, "default.tfplan"))
 			Ok(t, err)
 			Assert(t, strings.HasPrefix(string(bytes), "Atlantis: this plan was created by remote ops"), "expect remote plan")
+			Equals(t, fmt.Sprintf("%x", sha256.Sum256(bytes)), generatedPlanHash)
 
-			// Ensure that the status was updated with the runURL.
+			// The remote run URL is carried to the deferred status publisher. The
+			// runtime step must not publish before durable generation completion.
 			runURL := "https://app.terraform.io/app/lkysow-enterprises/atlantis-tfe-test/runs/run-is4oVvJfrkud1KvE"
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.PendingCommitStatus, runURL, nil)
-			commitStatusUpdater.VerifyWasCalledOnce().UpdateProject(ctx, command.Plan, models.SuccessCommitStatus, runURL, nil)
+			Equals(t, runURL, remotePlanRunURL)
+			commitStatusUpdater.VerifyWasCalled(Never()).UpdateProject(
+				Any[command.ProjectContext](),
+				Any[command.Name](),
+				Any[models.CommitStatus](),
+				Any[string](),
+				Any[*command.ProjectCommandOutput](),
+			)
 		})
 	}
+}
+
+type recordingPlanStore struct {
+	saveCalls int
+	savedCtx  command.ProjectContext
+	savedPlan []byte
+}
+
+func (s *recordingPlanStore) Save(ctx command.ProjectContext, planPath string) error {
+	s.saveCalls++
+	s.savedCtx = ctx
+	plan, err := os.ReadFile(planPath)
+	if err != nil {
+		return err
+	}
+	s.savedPlan = plan
+	return nil
+}
+
+func (*recordingPlanStore) Load(command.ProjectContext, string) error { return nil }
+
+func (*recordingPlanStore) Remove(command.ProjectContext, string) error { return nil }
+
+func (*recordingPlanStore) ListWorkspaces(string, string, int) ([]string, error) { return nil, nil }
+
+func (*recordingPlanStore) RestorePlans(string, string, string, int) error { return nil }
+
+func (*recordingPlanStore) DeleteForPull(string, string, int) error { return nil }
+
+func (*recordingPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
+	return nil
 }
 
 // Test striping output method

@@ -83,6 +83,134 @@ atlantis plan -w staging
 An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
 :::
 
+### Interrupted plans and durable state recovery
+
+Atlantis records plan and apply results in durable state before posting the result comment. If Atlantis is interrupted
+after the write, the stored state can be newer than the latest pull request comment.
+
+Plan-generation transitions and their pull request status/comment publication use a durable, per-pull publication
+claim. This prevents an older replica from publishing after a newer replica has started or completed a generation.
+Apply holds the same claim from its final durable-plan selection through execution, result persistence, terminal
+publication, and automerge, so another replica cannot replace the accepted generation while apply is running.
+The claim is deliberately non-expiring: an ambiguous VCS response may still complete remotely after Atlantis loses
+the response, so automatically timing out the claim would allow stale publication. Pull-close cleanup also refuses to
+clear a claim held by a publisher. If a claim remains after an ambiguous publication error, first stop or otherwise
+confirm the owning command and replica can no longer publish. If ownership cannot be established, stop **all** Atlantis
+replicas before recovery. Do not clear a live publisher's claim.
+
+The publication lifecycle is:
+
+1. `UNCLAIMED`: no command may publish a plan transition yet.
+2. `CLAIMED`: one command owns the pull's durable transition and publication boundary.
+3. `DURABLE_STATE_COMMITTED`: PullStatus contains the authoritative result.
+4. `VCS_PUBLICATION_STARTED`: replaceable commit statuses and any result comment are being sent.
+5. `VCS_PUBLICATION_COMPLETED`: every required publication returned successfully.
+6. `RELEASED`: the owner compare-and-deletes its claim. Offline recovery may perform the same exact-token delete.
+
+A crash while only `CLAIMED` leaves prior PullStatus unchanged and blocks later mutation until recovery. A crash after
+`DURABLE_STATE_COMMITTED` leaves durable state authoritative even if VCS is stale. Commit statuses can be replaced by a
+later command, but result comments are not replayed automatically because a timed-out request may already have created
+one. A timeout after publication starts is therefore ambiguous and retains the claim. Recovery only releases that exact
+claim; it never rolls back PullStatus or repeats a comment. A crash after publication completes but before release is
+safe to recover with the same exact-token procedure.
+
+For BoltDB, keep every Atlantis replica stopped and back up `<data-dir>/atlantis.db`. From a checkout of the same
+Atlantis version, inspect the claim for exactly one pull request:
+
+```bash
+go run ./cmd/plan-claim-recovery \
+  --data-dir /var/lib/atlantis \
+  --vcs-hostname github.com \
+  --repo owner/repository \
+  --pull 123 \
+  --confirm-all-replicas-stopped \
+  --inspect
+```
+
+The stored claim must be a non-zero lowercase UUID in canonical form. Copy the inspected token exactly, confirm it
+still belongs to the stopped publisher, and use it for the compare-and-delete recovery:
+
+```bash
+go run ./cmd/plan-claim-recovery \
+  --data-dir /var/lib/atlantis \
+  --vcs-hostname github.com \
+  --repo owner/repository \
+  --pull 123 \
+  --confirm-all-replicas-stopped \
+  --claim-token 00000000-0000-4000-8000-000000000000
+```
+
+The utility refuses to open a BoltDB file that an Atlantis process still holds. It also refuses an absent or malformed
+claim and will not delete a claim that changed after inspection. Restart Atlantis only after it exits successfully.
+
+For Redis, stop every Atlantis replica, back up Redis according to the deployment's normal procedure, and inspect the
+exact claim key before deleting it. Replace the example VCS host, repository, and pull request number; retain the braces
+because they are part of the Redis key:
+
+```bash
+set -eu
+claim_key='plan-publication/{github.com::owner/repository::123}'
+inspected_claim_token=$(redis-cli --raw GET "$claim_key")
+printf '%s\n' "$inspected_claim_token"
+expected_claim_token='00000000-0000-4000-8000-000000000000' # copy the inspected token exactly
+printf '%s\n' "$expected_claim_token" | grep -Eq \
+  '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+test "$expected_claim_token" != '00000000-0000-0000-0000-000000000000'
+test "$expected_claim_token" = "$inspected_claim_token"
+deleted=$(redis-cli --raw EVAL \
+  'local current=redis.call("GET",KEYS[1]); if not current or current~=ARGV[1] then return 0 end; return redis.call("DEL",KEYS[1])' \
+  1 "$claim_key" "$expected_claim_token")
+test "$deleted" = 1
+remaining=$(redis-cli --raw EXISTS "$claim_key")
+test "$remaining" = 0
+```
+
+Use the deployment's normal `redis-cli` connection, authentication, TLS, database, and cluster (`-c`) options. The
+inspected token must be a non-zero lowercase UUID in canonical form; stop if the validation command fails. Never use
+an unconditional `DEL`: an `EVAL` result of `0` means the claim is absent or
+was replaced, so stop and establish ownership again. After an `EVAL` result of `1`, the final `EXISTS` result must be
+`0`. Restart Atlantis, then retry the close, unlock, or replan operation. These procedures clear only the publication
+claim; they do not infer, repair, or otherwise change accepted plan status or hashes.
+
+During a rolling upgrade, the strict cross-replica publication boundary is effective only after every Atlantis replica
+is running a version that participates in publication claims. Complete the replica rollout before relying on this
+ordering guarantee.
+
+For convention-managed plans, a successful generation stores the plan's SHA-256 digest in the same durable update as
+the successful project status. S3 stores an immutable object selected by the accepted generation and digest, alongside
+the historical deterministic object used only for legacy and generic discovery. A superseded generation may replace
+the discovery object, but it cannot replace the accepted immutable object. Apply loads the exact accepted object and
+verifies a local or restored plan against that accepted digest before executing.
+Pull status written by an older Atlantis version may not contain this digest. During a rolling upgrade, those legacy
+plans retain the previous command-start hash validation; running `atlantis plan` again creates the durable digest.
+PR-backed API plan/apply requests use this same durable generation and digest boundary; synthetic non-PR API requests
+continue to use their request-local plan state.
+
+An interrupted plan generation intentionally blocks apply and policy-result updates for its projects. Run
+`atlantis plan` again after the in-progress command has stopped to replace the incomplete generation. Starting a new
+plan also replaces a stored pull request status that Atlantis can read from the database but cannot deserialize after
+a schema change. The replacement generation cannot be applied until the new plan completes successfully. For a
+genuinely stuck generation that cannot be replaced by replanning, close and reopen the pull request after Atlantis
+processes the close event, then run a fresh plan. A close event waits for any publication claim; recover an orphaned
+claim with the offline procedure above before relying on close/reopen. If an apply runs but its result cannot be stored, verify the
+infrastructure state before retrying because one or more apply steps may already have executed.
+
+If a newer targeted plan supersedes one project in an older multi-project generation, Atlantis cancels the remaining
+projects from the older generation. Those projects cannot be applied and require a fresh plan. Results from the
+superseded command do not replace the newer generation's pull request statuses or comments. Follow-on policy results
+are accepted and published only while the completed plan generation that produced them remains current.
+
+Generic plans and autoplans atomically mark prior project plans as discarded before starting their new generation.
+Likewise, when automerge requires every project plan to succeed and one project fails, Atlantis prevents every project
+in that generation from being applied. Physical plan-store objects may remain until later explicit cleanup; durable pull status,
+not the presence of an object, determines whether apply is authorized. Generic apply ignores retained convention-plan
+objects whose matching durable project status is already applied, discarded, or a no-change plan.
+
+After a durable generation starts, Atlantis does not automatically remove its plan artifact or release its on-plan lock
+from a failing or superseded command because another replica may already have reused the same plan key and pull-owned
+lock. A replan from the same pull can reuse that lock. If the pull cannot replan, use `atlantis unlock` or close the pull
+request to release the lock and discard the plan after confirming no plan command is still running.
+
 ### Additional Terraform flags
 
 If `terraform plan` requires additional arguments, like `-target=resource` or `-var 'foo=bar'` or `-var-file myfile.tfvars`

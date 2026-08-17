@@ -22,6 +22,45 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+func TestRequiresAtlantisManagedPlanFile(t *testing.T) {
+	cases := map[string]struct {
+		planSteps  []valid.Step
+		applySteps []valid.Step
+		expected   bool
+	}{
+		"built-in plan and built-in apply": {
+			planSteps:  []valid.Step{{StepName: "plan"}},
+			applySteps: []valid.Step{{StepName: "apply"}},
+			expected:   true,
+		},
+		"built-in plan and run-only apply": {
+			planSteps:  []valid.Step{{StepName: "plan"}},
+			applySteps: []valid.Step{{StepName: "run"}},
+			expected:   true,
+		},
+		"run-only plan and built-in apply": {
+			planSteps:  []valid.Step{{StepName: "run"}},
+			applySteps: []valid.Step{{StepName: "apply"}},
+			expected:   true,
+		},
+		"run-only plan and run-only apply": {
+			planSteps:  []valid.Step{{StepName: "run"}},
+			applySteps: []valid.Step{{StepName: "run"}},
+			expected:   false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			workflow := valid.Workflow{
+				Plan:  valid.Stage{Steps: tc.planSteps},
+				Apply: valid.Stage{Steps: tc.applySteps},
+			}
+			Equals(t, tc.expected, requiresAtlantisManagedPlanFile(workflow))
+		})
+	}
+}
+
 // Test different permutations of global and repo config.
 func TestBuildProjectCmdCtx(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -727,6 +766,13 @@ projects:
 					}
 
 					c.expCtx.CommandName = cmd
+					c.expCtx.RequiresAtlantisManagedPlanFile = false
+					for _, stepName := range append(append([]string{}, c.expPlanSteps...), c.expApplySteps...) {
+						if stepName == "plan" || stepName == "apply" {
+							c.expCtx.RequiresAtlantisManagedPlanFile = true
+							break
+						}
+					}
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
@@ -948,6 +994,7 @@ projects:
 					}
 
 					c.expCtx.CommandName = cmd
+					c.expCtx.RequiresAtlantisManagedPlanFile = true
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
 					ctx.PolicySets = emptyPolicySets
@@ -1193,6 +1240,7 @@ workflows:
 				}
 
 				c.expCtx.CommandName = cmd
+				c.expCtx.RequiresAtlantisManagedPlanFile = true
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
 				ctx.PolicySets = emptyPolicySets
@@ -1597,6 +1645,201 @@ func TestDefaultProjectCommandBuilder_AutoDiscoverModeEnabledDefaultsEmptyToAuto
 	Equals(t, false, builder.autoDiscoverModeEnabled(ctx, valid.RepoCfg{
 		Projects: []valid.Project{{Dir: "project1"}},
 	}))
+}
+
+func TestRepoRelDirWithinRoot(t *testing.T) {
+	tests := []struct {
+		name      string
+		root      string
+		candidate string
+		expected  bool
+	}{
+		{
+			name:      "root equality",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform"),
+			expected:  true,
+		},
+		{
+			name:      "nested descendant",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  true,
+		},
+		{
+			name:      "repository root equality",
+			root:      ".",
+			candidate: ".",
+			expected:  true,
+		},
+		{
+			name:      "repository root descendant",
+			root:      ".",
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  true,
+		},
+		{
+			name:      "cleaned project root",
+			root:      filepath.FromSlash("stacks/./platform"),
+			candidate: filepath.Join("stacks", "platform", "staging"),
+			expected:  true,
+		},
+		{
+			name:      "cleaned descendant",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.FromSlash("stacks/platform/dev/../staging"),
+			expected:  true,
+		},
+		{
+			name:      "sibling with shared prefix",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform-other"),
+			expected:  false,
+		},
+		{
+			name:      "parent traversal",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "..", "platform-other"),
+			expected:  false,
+		},
+		{
+			name:      "multiple parent traversal",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "..", "..", "outside"),
+			expected:  false,
+		},
+		{
+			name:      "absolute root",
+			root:      filepath.Join(string(filepath.Separator), "stacks", "platform"),
+			candidate: filepath.Join("stacks", "platform", "dev"),
+			expected:  false,
+		},
+		{
+			name:      "absolute candidate",
+			root:      filepath.Join("stacks", "platform"),
+			candidate: filepath.Join(string(filepath.Separator), "stacks", "platform", "dev"),
+			expected:  false,
+		},
+		{
+			name:      "absolute root and candidate",
+			root:      filepath.Join(string(filepath.Separator), "stacks", "platform"),
+			candidate: filepath.Join(string(filepath.Separator), "stacks", "platform", "dev"),
+			expected:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			Equals(t, test.expected, repoRelDirWithinRoot(test.root, test.candidate))
+		})
+	}
+}
+
+func TestFilterNonConventionRunOnlyPlanArtifacts(t *testing.T) {
+	repoDir := filepath.Join(string(filepath.Separator), "repo")
+	customNestedPath := filepath.Join(repoDir, "stacks", "platform", "dev", "atlantis.tfplan")
+	managedNestedPath := filepath.Join(repoDir, "stacks", "platform", "managed-child", "managed-child-default.tfplan")
+	conventionLookingPath := filepath.Join(repoDir, "stacks", "platform", "generated", "default.tfplan")
+	siblingCustomPath := filepath.Join(repoDir, "stacks", "platform-other", "dev", "atlantis.tfplan")
+	otherWorkspaceCustomPath := filepath.Join(repoDir, "stacks", "platform", "staging", "atlantis.tfplan")
+	plans := []PendingPlan{
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "dev"),
+			Workspace:    "default",
+			PlanFilePath: customNestedPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "managed-child"),
+			Workspace:    "default",
+			ProjectName:  "managed-child",
+			PlanFilePath: managedNestedPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "generated"),
+			Workspace:    "default",
+			PlanFilePath: conventionLookingPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform-other", "dev"),
+			Workspace:    "default",
+			PlanFilePath: siblingCustomPath,
+		},
+		{
+			RepoDir:      repoDir,
+			RepoRelDir:   filepath.Join("stacks", "platform", "staging"),
+			Workspace:    "other",
+			PlanFilePath: otherWorkspaceCustomPath,
+		},
+	}
+
+	filtered := filterNonConventionRunOnlyPlanArtifacts(plans, []runOnlyApplyRoot{
+		{workspace: "default", repoRelDir: filepath.FromSlash("stacks/./platform")},
+		{workspace: "default", repoRelDir: filepath.Join("stacks", "platform")},
+	})
+
+	Equals(t, 4, len(filtered))
+	Equals(t, managedNestedPath, filtered[0].PlanFilePath)
+	Equals(t, conventionLookingPath, filtered[1].PlanFilePath)
+	Equals(t, siblingCustomPath, filtered[2].PlanFilePath)
+	Equals(t, otherWorkspaceCustomPath, filtered[3].PlanFilePath)
+}
+
+func TestFilterDurablyInactiveManagedPlanArtifacts(t *testing.T) {
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		PullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+			{Workspace: "default", RepoRelDir: "applied", ProjectName: "applied", Status: models.AppliedPlanStatus},
+			{Workspace: "default", RepoRelDir: "discarded", ProjectName: "discarded", Status: models.DiscardedPlanStatus},
+			{Workspace: "default", RepoRelDir: "no-changes", ProjectName: "no-changes", Status: models.PlannedNoChangesPlanStatus},
+			{Workspace: "default", RepoRelDir: "planned", ProjectName: "planned", Status: models.PlannedPlanStatus},
+			{Workspace: "default", RepoRelDir: "active", ProjectName: "active", Status: models.ErroredPlanStatus, PlanGeneration: "generation-b"},
+		}},
+	}
+	plans := []PendingPlan{
+		{Workspace: "default", RepoRelDir: "applied", ProjectName: "applied"},
+		{Workspace: "default", RepoRelDir: "discarded", ProjectName: "discarded"},
+		{Workspace: "default", RepoRelDir: "no-changes", ProjectName: "no-changes"},
+		{Workspace: "default", RepoRelDir: "planned", ProjectName: "planned"},
+		{Workspace: "default", RepoRelDir: "active", ProjectName: "active"},
+		{Workspace: "default", RepoRelDir: "missing", ProjectName: "missing"},
+	}
+
+	filtered := filterDurablyInactiveManagedPlanArtifacts(ctx, plans)
+
+	Equals(t, 3, len(filtered))
+	Equals(t, "planned", filtered[0].ProjectName)
+	Equals(t, "active", filtered[1].ProjectName)
+	Equals(t, "missing", filtered[2].ProjectName)
+}
+
+func TestRetainedDiscardedArtifactDoesNotPoisonLaterGenericApply(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: pull,
+		PullStatus: &models.PullStatus{
+			Pull: pull,
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: "old", ProjectName: "old", Status: models.DiscardedPlanStatus},
+				{Workspace: "default", RepoRelDir: "current", ProjectName: "current", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []PendingPlan{
+		{Workspace: "default", RepoRelDir: "old", ProjectName: "old"},
+		{Workspace: "default", RepoRelDir: "current", ProjectName: "current"},
+	}
+
+	filtered := filterDurablyInactiveManagedPlanArtifacts(ctx, plans)
+	err := validatePlansForApplyWithPlanlessProjects(ctx, filtered, false, nil)
+
+	Ok(t, err)
+	Equals(t, 1, len(filtered))
+	Equals(t, "current", filtered[0].ProjectName)
 }
 
 func mustVersion(v string) *version.Version {

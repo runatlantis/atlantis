@@ -48,7 +48,7 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 	commands := []string{"import", "-var", "foo=bar", "addr", "id"}
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace)
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestImportStepRunner_Run_Workspace(t *testing.T) {
@@ -87,7 +87,7 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(context, tmpDir, commands, map[string]string(nil), tfDistribution, tfVersion, workspace)
 
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }
 
 func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
@@ -128,5 +128,5 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(context), Eq(tmpDir), Eq(commands), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq(workspace))
 
 	_, err = os.Stat(planPath)
-	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+	Ok(t, err)
 }

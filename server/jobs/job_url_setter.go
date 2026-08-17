@@ -48,5 +48,8 @@ func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName c
 	if cmdName == command.Apply && result != nil && result.ApplySuccessURL != "" {
 		url = result.ApplySuccessURL
 	}
+	if cmdName == command.Plan && result != nil && result.PlanSuccessURL != "" {
+		url = result.PlanSuccessURL
+	}
 	return j.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url, result)
 }

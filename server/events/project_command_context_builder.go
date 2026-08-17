@@ -263,79 +263,89 @@ func newProjectCommandContext(ctx *command.Context,
 
 	var projectPlanStatus models.ProjectPlanStatus
 	var projectPolicyStatus []models.PolicySetStatus
+	var recordedManagedPlanHash string
+	var acceptedPlanGeneration string
 
 	if ctx.PullStatus != nil {
-		for _, project := range ctx.PullStatus.Projects {
-
-			// if name is not used, let's match the directory
-			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
-				projectPlanStatus = project.Status
-				projectPolicyStatus = project.PolicyStatus
-				break
-			}
-
-			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
-				projectPlanStatus = project.Status
-				projectPolicyStatus = project.PolicyStatus
-				break
-			}
+		project := findProjectInPullStatus(ctx.PullStatus, projCfg.Workspace, projCfg.RepoRelDir, projCfg.Name)
+		if project != nil {
+			projectPlanStatus = project.Status
+			projectPolicyStatus = project.PolicyStatus
+			recordedManagedPlanHash = project.ManagedPlanHash
+			acceptedPlanGeneration = project.AcceptedPlanGeneration
 		}
 	}
 
 	return command.ProjectContext{
-		CommandName:                cmd,
-		SubCommand:                 subCommand,
-		ApplyCmd:                   applyCmd,
-		ApprovePoliciesCmd:         approvePoliciesCmd,
-		BaseRepo:                   ctx.Pull.BaseRepo,
-		EscapedCommentArgs:         escapedCommentArgs,
-		AutomergeEnabled:           automergeEnabled,
-		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocksMode:              projCfg.RepoLocks.Mode,
-		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
-		ParallelApplyEnabled:       parallelApplyEnabled,
-		ParallelPlanEnabled:        parallelPlanEnabled,
-		ParallelPolicyCheckEnabled: parallelPlanEnabled,
-		DependsOn:                  projCfg.DependsOn,
-		AutoplanEnabled:            projCfg.AutoplanEnabled,
-		AutoplanWhenModified:       projCfg.AutoplanWhenModified,
-		Steps:                      steps,
-		HeadRepo:                   ctx.HeadRepo,
-		Log:                        ctx.Log,
-		Scope:                      scope,
-		ProjectPlanStatus:          projectPlanStatus,
-		ProjectPolicyStatus:        projectPolicyStatus,
-		Pull:                       ctx.Pull,
-		ProjectName:                projCfg.Name,
-		PlanRequirements:           projCfg.PlanRequirements,
-		ApplyRequirements:          projCfg.ApplyRequirements,
-		ImportRequirements:         projCfg.ImportRequirements,
-		RePlanCmd:                  planCmd,
-		RepoRelDir:                 projCfg.RepoRelDir,
-		RepoConfigVersion:          projCfg.RepoCfgVersion,
-		TerraformDistribution:      projCfg.TerraformDistribution,
-		TerraformVersion:           projCfg.TerraformVersion,
-		User:                       ctx.User,
-		Verbose:                    verbose,
-		Workspace:                  projCfg.Workspace,
-		PolicySets:                 policySets,
-		PolicySetTarget:            ctx.PolicySet,
-		ClearPolicyApproval:        ctx.ClearPolicyApproval,
-		PullReqStatus:              pullReqStatus,
-		PullStatus:                 pullStatus,
-		JobID:                      uuid.New().String(),
-		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
-		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
-		SilencePRComments:          projCfg.SilencePRComments,
-		TeamAllowlistChecker:       teamAllowlistChecker,
-		API:                        ctx.API,
-		SkipPRRequirements:         ctx.SkipPRRequirements,
-		RunPolicyChecks:            ctx.RunPolicyChecks,
-		SuppressVCSStatus:          ctx.SuppressVCSStatus,
-		SuppressJobOutput:          ctx.SuppressJobOutput,
-		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
-		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
+		CommandName:                     cmd,
+		SubCommand:                      subCommand,
+		ApplyCmd:                        applyCmd,
+		ApprovePoliciesCmd:              approvePoliciesCmd,
+		BaseRepo:                        ctx.Pull.BaseRepo,
+		EscapedCommentArgs:              escapedCommentArgs,
+		AutomergeEnabled:                automergeEnabled,
+		DeleteSourceBranchOnMerge:       projCfg.DeleteSourceBranchOnMerge,
+		RepoLocksMode:                   projCfg.RepoLocks.Mode,
+		CustomPolicyCheck:               projCfg.CustomPolicyCheck,
+		ParallelApplyEnabled:            parallelApplyEnabled,
+		ParallelPlanEnabled:             parallelPlanEnabled,
+		ParallelPolicyCheckEnabled:      parallelPlanEnabled,
+		DependsOn:                       projCfg.DependsOn,
+		AutoplanEnabled:                 projCfg.AutoplanEnabled,
+		AutoplanWhenModified:            projCfg.AutoplanWhenModified,
+		Steps:                           steps,
+		HeadRepo:                        ctx.HeadRepo,
+		Log:                             ctx.Log,
+		Scope:                           scope,
+		ProjectPlanStatus:               projectPlanStatus,
+		ProjectPolicyStatus:             projectPolicyStatus,
+		RequiresAtlantisManagedPlanFile: requiresAtlantisManagedPlanFile(projCfg.Workflow),
+		RecordedManagedPlanHash:         recordedManagedPlanHash,
+		AcceptedPlanGeneration:          acceptedPlanGeneration,
+		Pull:                            ctx.Pull,
+		ProjectName:                     projCfg.Name,
+		PlanRequirements:                projCfg.PlanRequirements,
+		ApplyRequirements:               projCfg.ApplyRequirements,
+		ImportRequirements:              projCfg.ImportRequirements,
+		RePlanCmd:                       planCmd,
+		RepoRelDir:                      projCfg.RepoRelDir,
+		RepoConfigVersion:               projCfg.RepoCfgVersion,
+		TerraformDistribution:           projCfg.TerraformDistribution,
+		TerraformVersion:                projCfg.TerraformVersion,
+		User:                            ctx.User,
+		Verbose:                         verbose,
+		Workspace:                       projCfg.Workspace,
+		PolicySets:                      policySets,
+		PolicySetTarget:                 ctx.PolicySet,
+		ClearPolicyApproval:             ctx.ClearPolicyApproval,
+		PullReqStatus:                   pullReqStatus,
+		PullStatus:                      pullStatus,
+		JobID:                           uuid.New().String(),
+		ExecutionOrderGroup:             projCfg.ExecutionOrderGroup,
+		AbortOnExecutionOrderFail:       abortOnExecutionOrderFail,
+		SilencePRComments:               projCfg.SilencePRComments,
+		TeamAllowlistChecker:            teamAllowlistChecker,
+		API:                             ctx.API,
+		SkipPRRequirements:              ctx.SkipPRRequirements,
+		RunPolicyChecks:                 ctx.RunPolicyChecks,
+		SuppressVCSStatus:               ctx.SuppressVCSStatus,
+		SuppressJobOutput:               ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:           ctx.SuppressApplyWebhooks,
+		FailOnMissingDependencies:       ctx.FailOnMissingDependencies,
 	}
+}
+
+func requiresAtlantisManagedPlanFile(workflow valid.Workflow) bool {
+	return hasAtlantisManagedPlanStep(workflow.Plan.Steps) || hasAtlantisManagedApplyStep(workflow.Apply.Steps)
+}
+
+func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
+	for _, step := range steps {
+		if step.StepName == "plan" {
+			return true
+		}
+	}
+	return false
 }
 
 func escapeArgs(args []string) []string {

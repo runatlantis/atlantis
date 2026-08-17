@@ -386,6 +386,46 @@ If you don't want to create/manage the repo's `atlantis.yaml` file yourself, you
 
 The `terragrunt-atlantis-config` tool is a community project and not maintained by the Atlantis team.
 
+#### Custom plan artifact names and locations
+
+When both the plan and apply stages use only `run` steps, the plan artifact is user-managed. Atlantis authorizes the
+custom apply using its durable project status, but it does not validate, restore, or hash the contents of arbitrary
+custom plan files.
+
+For plain `atlantis apply`, choose a filename that does not collide with Atlantis's convention-managed plan filename.
+Atlantis derives that name from the workspace and optional project name. Common examples are `<workspace>.tfplan` and
+`<project>-<workspace>.tfplan`. A custom artifact with a convention filename may be discovered as an Atlantis-managed
+plan and will then require the corresponding project status and plan validation. Atlantis intentionally fails closed
+for this ambiguous case.
+
+Plain `atlantis apply` ignores a non-convention `.tfplan` belonging to a run-only project only when the artifact:
+
+* uses the same Terraform workspace as the configured project; and
+* is at or below that project's configured root after path-safe normalization.
+
+Artifacts in a sibling directory, above the project root, or associated with another workspace are not automatically
+claimed by the project. Generic plan discovery can therefore find them independently and fail closed. A path such as
+`../../../../atlantis.tfplan` is safe for generic discovery only if its normalized destination still remains within
+the configured Atlantis project subtree. Targeted apply, such as `atlantis apply -p <project>`, does not use generic
+artifact discovery to select projects, but the custom command remains responsible for locating and validating its
+user-managed artifact.
+
+For example, a Terragrunt project rooted at `stacks/platform` can use distinct non-convention artifacts below its
+project root:
+
+```plain
+stacks/platform/
+└── generated/
+    ├── dev/
+    │   └── atlantis.tfplan
+    └── staging/
+        └── atlantis.tfplan
+```
+
+The workflow's custom plan and apply commands must create and consume these files themselves. Using Atlantis's
+built-in `plan` step, or a built-in `apply` step that consumes `$PLANFILE`, instead makes the convention plan an
+Atlantis-managed artifact with the normal restore, identity, and hash checks.
+
 ### Running custom commands
 
 Atlantis supports running completely custom commands. In this example, we want to run

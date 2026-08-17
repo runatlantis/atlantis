@@ -50,3 +50,27 @@ func TestLocalPlanStore_Remove_NonexistentFile(t *testing.T) {
 	err := store.Remove(ctx, "/nonexistent/path/plan.tfplan")
 	Ok(t, err)
 }
+
+func TestLocalPlanStore_Remove_DigestBoundFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		contents []byte
+	}{
+		{name: "matching durable artifact retained without ownership token", contents: []byte("accepted-plan")},
+		{name: "newer artifact preserved", contents: []byte("newer-plan")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &LocalPlanStore{}
+			planPath := filepath.Join(t.TempDir(), "test.tfplan")
+			Ok(t, os.WriteFile(planPath, tt.contents, 0o600))
+			ctx := command.ProjectContext{RecordedManagedPlanHash: "accepted-hash"}
+
+			Ok(t, store.Remove(ctx, planPath))
+
+			_, err := os.Stat(planPath)
+			Ok(t, err)
+		})
+	}
+}

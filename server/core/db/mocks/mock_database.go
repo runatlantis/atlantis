@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	db "github.com/runatlantis/atlantis/server/core/db"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	gomock "go.uber.org/mock/gomock"
@@ -40,6 +41,60 @@ func NewMockDatabase(ctrl *gomock.Controller) *MockDatabase {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
+}
+
+// AcquirePlanPublicationClaim mocks base method.
+func (m *MockDatabase) AcquirePlanPublicationClaim(pull models.PullRequest, token string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcquirePlanPublicationClaim", pull, token)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AcquirePlanPublicationClaim indicates an expected call of AcquirePlanPublicationClaim.
+func (mr *MockDatabaseMockRecorder) AcquirePlanPublicationClaim(pull, token any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquirePlanPublicationClaim", reflect.TypeOf((*MockDatabase)(nil).AcquirePlanPublicationClaim), pull, token)
+}
+
+// BeginPlanGeneration mocks base method.
+func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (db.PlanGenerationBeginResult, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, projects, generation}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BeginPlanGeneration", varargs...)
+	ret0, _ := ret[0].(db.PlanGenerationBeginResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BeginPlanGeneration indicates an expected call of BeginPlanGeneration.
+func (mr *MockDatabaseMockRecorder) BeginPlanGeneration(pull, projects, generation any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, projects, generation}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGeneration), varargs...)
+}
+
+// BeginPlanGenerationReplacing mocks base method.
+func (m *MockDatabase) BeginPlanGenerationReplacing(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (db.PlanGenerationBeginResult, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, projects, generation}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BeginPlanGenerationReplacing", varargs...)
+	ret0, _ := ret[0].(db.PlanGenerationBeginResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BeginPlanGenerationReplacing indicates an expected call of BeginPlanGenerationReplacing.
+func (mr *MockDatabaseMockRecorder) BeginPlanGenerationReplacing(pull, projects, generation any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, projects, generation}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGenerationReplacing", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGenerationReplacing), varargs...)
 }
 
 // CheckCommandLock mocks base method.
@@ -71,6 +126,26 @@ func (mr *MockDatabaseMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabase)(nil).Close))
 }
 
+// CompletePlanGeneration mocks base method.
+func (m *MockDatabase) CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, generation, newResults}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CompletePlanGeneration", varargs...)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CompletePlanGeneration indicates an expected call of CompletePlanGeneration.
+func (mr *MockDatabaseMockRecorder) CompletePlanGeneration(pull, generation, newResults any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, generation, newResults}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompletePlanGeneration", reflect.TypeOf((*MockDatabase)(nil).CompletePlanGeneration), varargs...)
+}
+
 // DeletePullStatus mocks base method.
 func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
 	m.ctrl.T.Helper()
@@ -83,6 +158,20 @@ func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
 func (mr *MockDatabaseMockRecorder) DeletePullStatus(pull any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePullStatus", reflect.TypeOf((*MockDatabase)(nil).DeletePullStatus), pull)
+}
+
+// ForceClearPlanPublicationClaim mocks base method.
+func (m *MockDatabase) ForceClearPlanPublicationClaim(pull models.PullRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ForceClearPlanPublicationClaim", pull)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ForceClearPlanPublicationClaim indicates an expected call of ForceClearPlanPublicationClaim.
+func (mr *MockDatabaseMockRecorder) ForceClearPlanPublicationClaim(pull any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceClearPlanPublicationClaim", reflect.TypeOf((*MockDatabase)(nil).ForceClearPlanPublicationClaim), pull)
 }
 
 // GetLock mocks base method.
@@ -98,6 +187,21 @@ func (m *MockDatabase) GetLock(project models.Project, workspace string) (*model
 func (mr *MockDatabaseMockRecorder) GetLock(project, workspace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLock", reflect.TypeOf((*MockDatabase)(nil).GetLock), project, workspace)
+}
+
+// GetPlanPublicationClaim mocks base method.
+func (m *MockDatabase) GetPlanPublicationClaim(pull models.PullRequest) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPlanPublicationClaim", pull)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPlanPublicationClaim indicates an expected call of GetPlanPublicationClaim.
+func (mr *MockDatabaseMockRecorder) GetPlanPublicationClaim(pull any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPlanPublicationClaim", reflect.TypeOf((*MockDatabase)(nil).GetPlanPublicationClaim), pull)
 }
 
 // GetPullStatus mocks base method.
@@ -157,6 +261,35 @@ func (m *MockDatabase) Ping() error {
 func (mr *MockDatabaseMockRecorder) Ping() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDatabase)(nil).Ping))
+}
+
+// ReleasePlanPublicationClaim mocks base method.
+func (m *MockDatabase) ReleasePlanPublicationClaim(pull models.PullRequest, token string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleasePlanPublicationClaim", pull, token)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleasePlanPublicationClaim indicates an expected call of ReleasePlanPublicationClaim.
+func (mr *MockDatabaseMockRecorder) ReleasePlanPublicationClaim(pull, token any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePlanPublicationClaim", reflect.TypeOf((*MockDatabase)(nil).ReleasePlanPublicationClaim), pull, token)
+}
+
+// ReplacePullWithResults mocks base method.
+func (m *MockDatabase) ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplacePullWithResults", pull, newResults)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplacePullWithResults indicates an expected call of ReplacePullWithResults.
+func (mr *MockDatabaseMockRecorder) ReplacePullWithResults(pull, newResults any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplacePullWithResults", reflect.TypeOf((*MockDatabase)(nil).ReplacePullWithResults), pull, newResults)
 }
 
 // TryLock mocks base method.
@@ -232,6 +365,66 @@ func (m *MockDatabase) UnlockIfOwnedByPull(project models.Project, workspace str
 func (mr *MockDatabaseMockRecorder) UnlockIfOwnedByPull(project, workspace, pullNum any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockIfOwnedByPull", reflect.TypeOf((*MockDatabase)(nil).UnlockIfOwnedByPull), project, workspace, pullNum)
+}
+
+// UpdateApplyResultsForPlanGeneration mocks base method.
+func (m *MockDatabase) UpdateApplyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, newResults}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateApplyResultsForPlanGeneration", varargs...)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateApplyResultsForPlanGeneration indicates an expected call of UpdateApplyResultsForPlanGeneration.
+func (mr *MockDatabaseMockRecorder) UpdateApplyResultsForPlanGeneration(pull, newResults any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, newResults}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateApplyResultsForPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).UpdateApplyResultsForPlanGeneration), varargs...)
+}
+
+// UpdateDiscardResultsForPlanGeneration mocks base method.
+func (m *MockDatabase) UpdateDiscardResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, newResults}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateDiscardResultsForPlanGeneration", varargs...)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateDiscardResultsForPlanGeneration indicates an expected call of UpdateDiscardResultsForPlanGeneration.
+func (mr *MockDatabaseMockRecorder) UpdateDiscardResultsForPlanGeneration(pull, newResults any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, newResults}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDiscardResultsForPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).UpdateDiscardResultsForPlanGeneration), varargs...)
+}
+
+// UpdatePolicyResultsForPlanGeneration mocks base method.
+func (m *MockDatabase) UpdatePolicyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{pull, newResults}
+	for _, a := range claimTokens {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdatePolicyResultsForPlanGeneration", varargs...)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdatePolicyResultsForPlanGeneration indicates an expected call of UpdatePolicyResultsForPlanGeneration.
+func (mr *MockDatabaseMockRecorder) UpdatePolicyResultsForPlanGeneration(pull, newResults any, claimTokens ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{pull, newResults}, claimTokens...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePolicyResultsForPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).UpdatePolicyResultsForPlanGeneration), varargs...)
 }
 
 // UpdateProjectStatus mocks base method.

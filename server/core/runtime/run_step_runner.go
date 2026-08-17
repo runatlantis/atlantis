@@ -32,7 +32,7 @@ type RunStepRunner struct {
 func (r *RunStepRunner) Run(
 	ctx command.ProjectContext,
 	shell *valid.CommandShell,
-	command string,
+	runCommand string,
 	path string,
 	envs map[string]string,
 	streamOutput bool,
@@ -56,6 +56,10 @@ func (r *RunStepRunner) Run(
 	}
 
 	baseEnvVars := os.Environ()
+	planFilePath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	if ctx.CommandName == command.Apply && ctx.RequiresAtlantisManagedPlanFile && ctx.ValidatedPlanFilePath != "" {
+		planFilePath = ctx.ValidatedPlanFilePath
+	}
 	customEnvVars := map[string]string{
 		"ATLANTIS_TERRAFORM_DISTRIBUTION": tfDistribution.BinName(),
 		"ATLANTIS_TERRAFORM_VERSION":      tfVersion.String(),
@@ -69,7 +73,7 @@ func (r *RunStepRunner) Run(
 		"HEAD_REPO_NAME":                  ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":                 ctx.HeadRepo.Owner,
 		"PATH":                            fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                        filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"PLANFILE":                        planFilePath,
 		"SHOWFILE":                        filepath.Join(path, ctx.GetShowResultFileName()),
 		"POLICYCHECKFILE":                 filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":                    ctx.ProjectName,
@@ -94,7 +98,7 @@ func (r *RunStepRunner) Run(
 		finalEnvVars = append(finalEnvVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(shell, command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(shell, runCommand, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
 	// These need to run before the error check to filter output
@@ -112,7 +116,7 @@ func (r *RunStepRunner) Run(
 	if err != nil {
 		err = runStepError{
 			err:          err,
-			command:      command,
+			command:      runCommand,
 			path:         path,
 			output:       output,
 			streamOutput: streamOutput,

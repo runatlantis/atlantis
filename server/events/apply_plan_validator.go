@@ -21,6 +21,7 @@ import (
 
 type ApplyPlanValidator interface {
 	ValidateProjectPlan(ctx command.ProjectContext, absPath string) error
+	ValidateProjectPlanStatus(ctx command.ProjectContext) error
 }
 
 type ApplyCommandStartValidator interface {
@@ -35,6 +36,8 @@ type DefaultApplyPlanValidator struct {
 	PullStatusFetcher   PullStatusFetcher
 	LivePullHeadFetcher LivePullHeadFetcher
 }
+
+var _ ApplyPlanValidator = (*DefaultApplyPlanValidator)(nil)
 
 var errStaleCommandHead = errors.New("stale command head")
 
@@ -57,53 +60,9 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	if err != nil {
 		return err
 	}
-
-	pullStatus, err := v.pullStatusForApply(ctx)
-	if err != nil {
-		return fmt.Errorf("fetching current plan status: %w", err)
-	}
-	if pullStatus == nil {
-		return rejectProjectPlan(planPath, "no current plan status found; run `atlantis plan` before apply")
-	}
-
-	livePull, err := v.getLivePullIdentity(ctx)
-	if err != nil {
-		return fmt.Errorf("fetching live pull request: %w", err)
-	}
-	if livePull.HeadCommit != "" || livePull.BaseBranch != "" {
-		currentPull := ctx.Pull
-		currentPull.HeadCommit = livePull.HeadCommit
-		if livePull.BaseBranch != "" {
-			currentPull.BaseBranch = livePull.BaseBranch
-		}
-		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
-			return err
-		}
-		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
-			return err
-		}
-	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
-		return rejectProjectPlan(planPath, "%s", err)
-	}
-
-	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
-	if proj == nil {
-		return rejectProjectPlan(planPath,
-			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
-			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
-		)
-	}
-	if !statusAllowedForApplyExecution(proj.Status) {
-		if proj.Status == models.ErroredPolicyCheckStatus {
-			return rejectProjectPlan(planPath,
-				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
-				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
-			)
-		}
-		return rejectProjectPlan(planPath,
-			"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
-			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, proj.Status.String(),
-		)
+	projectStatus, statusErr := v.validateProjectPlanStatus(ctx)
+	if statusErr != nil {
+		return statusErr
 	}
 
 	if _, err := os.Stat(planPath); err != nil {
@@ -114,6 +73,27 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 			)
 		}
 		return fmt.Errorf("checking plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+	}
+
+	if projectStatus.ManagedPlanHash == "" {
+		ctx.Log.Debug("durable managed plan hash is unavailable for this legacy plan; using command-start validation")
+	} else {
+		actualHash, err := hashFile(absPath, planPath)
+		if err != nil {
+			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+		}
+		if actualHash != projectStatus.ManagedPlanHash {
+			return fmt.Errorf(
+				"managed plan artifact does not match the accepted plan for dir %q workspace %q project %q; run `atlantis plan` before apply",
+				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+			)
+		}
+		if ctx.RecordedManagedPlanHash != "" && ctx.RecordedManagedPlanHash != projectStatus.ManagedPlanHash {
+			return fmt.Errorf(
+				"managed plan authorization changed for dir %q workspace %q project %q; run `atlantis apply` again",
+				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+			)
+		}
 	}
 
 	if ctx.ExpectedPlanHash != "" {
@@ -130,6 +110,81 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	return nil
+}
+
+func (v *DefaultApplyPlanValidator) ValidateProjectPlanStatus(ctx command.ProjectContext) error {
+	if v == nil || v.PullStatusFetcher == nil {
+		return nil
+	}
+	_, err := v.validateProjectPlanStatus(ctx)
+	return err
+}
+
+// validateProjectPlanStatus only validates durable state. Rejected validation
+// must not remove a convention-managed plan because another replica may have
+// replaced the file after this validator read PullStatus.
+func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) (*models.ProjectStatus, error) {
+	pullStatus, err := v.pullStatusForApply(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching current plan status: %w", err)
+	}
+	if pullStatus == nil {
+		return nil, errors.New("no current plan status found; run `atlantis plan` before apply")
+	}
+
+	livePull, err := v.getLivePullIdentity(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching live pull request: %w", err)
+	}
+	if livePull.HeadCommit != "" || livePull.BaseBranch != "" {
+		currentPull := ctx.Pull
+		currentPull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			currentPull.BaseBranch = livePull.BaseBranch
+		}
+		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
+			return nil, err
+		}
+		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
+			return nil, err
+		}
+	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
+		return nil, err
+	}
+
+	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
+	if proj == nil {
+		return nil, fmt.Errorf(
+			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+		)
+	}
+	if proj.PlanGeneration != "" {
+		return nil, fmt.Errorf(
+			"plan is incomplete for dir %q workspace %q project %q and cannot be applied; run `atlantis plan` again",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+		)
+	}
+	if proj.AcceptedPlanGeneration != ctx.AcceptedPlanGeneration {
+		return nil, fmt.Errorf(
+			"plan generation changed for dir %q workspace %q project %q; run `atlantis apply` again",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+		)
+	}
+	if !statusAllowedForApplyExecution(proj.Status) {
+		if proj.Status == models.ErroredPolicyCheckStatus {
+			return nil, fmt.Errorf(
+				"policy checks have not been approved for dir %q workspace %q project %q; run `atlantis approve_policies`",
+				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+			)
+		}
+		return nil, fmt.Errorf(
+			"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, proj.Status.String(),
+		)
+	}
+
+	return proj, nil
 }
 
 func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.PullRequest) error {
@@ -155,7 +210,7 @@ func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.Pu
 }
 
 func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContext) (*models.PullStatus, error) {
-	if ctx.API && ctx.PullStatus != nil {
+	if ctx.API && ctx.Pull.Num <= 0 && ctx.PullStatus != nil {
 		return ctx.PullStatus, nil
 	}
 	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
@@ -245,14 +300,6 @@ func containedPlanRelPath(baseDir, path string) (string, error) {
 		return "", fmt.Errorf("plan path traversal detected: %w", utils.ErrPathEscapesBase)
 	}
 	return relPath, nil
-}
-
-func rejectProjectPlan(planPath string, format string, args ...any) error {
-	err := fmt.Errorf(format, args...)
-	if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
-		return fmt.Errorf("%w; deleting rejected plan file %q: %v", err, planPath, removeErr)
-	}
-	return err
 }
 
 func looksLikeCommitSHA(s string) bool {

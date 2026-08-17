@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,18 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
+
+var errWorkflowHookStatusPublication = errors.New("workflow hook status publication is ambiguous")
+
+func workflowHookStatusPublicationError(err error) error {
+	return fmt.Errorf("%w: %w", errWorkflowHookStatusPublication, err)
+}
+
+// IsWorkflowHookStatusPublicationError reports whether a workflow hook status
+// update had an ambiguous VCS outcome and the publication claim must be retained.
+func IsWorkflowHookStatusPublicationError(err error) bool {
+	return errors.Is(err, errWorkflowHookStatusPublication)
+}
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_pre_workflow_hook_url_generator.go PreWorkflowHookURLGenerator
 
@@ -153,11 +166,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		if !suppressVCSStatus {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-				ctx.Log.Info("is api? %v", ctx.API)
-				if !ctx.API {
-					ctx.Log.Info("is api? %v", ctx.API)
-					return err
-				}
+				return workflowHookStatusPublicationError(err)
 			}
 		}
 
@@ -165,8 +174,9 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		if err != nil {
 			if !suppressVCSStatus {
-				if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-					ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
+				if statusErr := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); statusErr != nil {
+					ctx.Log.Warn("unable to update pre workflow hook status: %s", statusErr)
+					return errors.Join(err, workflowHookStatusPublicationError(statusErr))
 				}
 			}
 			return err
@@ -175,9 +185,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 		if !suppressVCSStatus {
 			if err := w.CommitStatusUpdater.UpdatePreWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
 				ctx.Log.Warn("unable to update pre workflow hook status: %s", err)
-				if !ctx.API {
-					return err
-				}
+				return workflowHookStatusPublicationError(err)
 			}
 		}
 	}

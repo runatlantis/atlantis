@@ -7,13 +7,16 @@ package events
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/google/go-github/v88/github"
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -218,25 +221,11 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 
-	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
-
+	preWorkflowHooksErr, continueCommand := c.runPreWorkflowHooks(ctx, cmd, command.Plan, true)
+	if !continueCommand {
+		return
+	}
 	if preWorkflowHooksErr != nil {
-		if c.FailOnPreWorkflowHookError {
-			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
-
-			// Create comment on pull request about the pre-workflow hook failure
-			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
-				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
-			}
-
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
-				ctx.Log.Warn("Unable to update plan commit status: %s", err)
-			}
-
-			return
-		}
-
 		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 	}
 
@@ -244,7 +233,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	c.runPostWorkflowHooks(ctx, cmd)
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -520,7 +509,10 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	preWorkflowHooksMayUpdateRepo := preWorkflowHooksConfigured(c.PreWorkflowHooksCommandRunner, ctx)
-	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	preWorkflowHooksErr, continueCommand := c.runPreWorkflowHooks(ctx, cmd, cmd.Name, !targetInitiallyIgnored || preWorkflowHooksMayUpdateRepo)
+	if !continueCommand {
+		return
+	}
 	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
 		if !preWorkflowHooksMayUpdateRepo {
@@ -532,30 +524,6 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		}
 	}
 	if preWorkflowHooksErr != nil {
-		if c.FailOnPreWorkflowHookError {
-			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", cmd.Name.String())
-
-			// Create comment on pull request about the pre-workflow hook failure
-			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
-				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
-			}
-
-			// Update the plan or apply commit status to failed
-			switch cmd.Name {
-			case command.Plan:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
-					ctx.Log.Warn("unable to update plan commit status: %s", err)
-				}
-			case command.Apply:
-				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
-					ctx.Log.Warn("unable to update apply commit status: %s", err)
-				}
-			}
-
-			return
-		}
-
 		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
 
@@ -564,7 +532,105 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	c.runPostWorkflowHooks(ctx, cmd)
+}
+
+func (c *DefaultCommandRunner) runPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand, statusCommand command.Name, publishFailure bool) (error, bool) {
+	database, claimToken, current, err := c.acquireWorkflowHookPublicationClaim(ctx, "pre-workflow hook")
+	if err != nil {
+		ctx.Log.Warn("claiming pre-workflow hook publication boundary, %v", err)
+		return nil, false
+	}
+	if !current {
+		return nil, false
+	}
+
+	hookErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+	var publicationErr error
+	if hookErr != nil && c.FailOnPreWorkflowHookError {
+		ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", statusCommand.String())
+		if publishFailure {
+			publicationErr = c.publishPreWorkflowHookFailure(ctx, statusCommand, hookErr)
+		}
+	}
+	if errors.Is(hookErr, errWorkflowHookStatusPublication) {
+		publicationErr = errors.Join(publicationErr, hookErr)
+	}
+	if publicationErr != nil {
+		ctx.Log.Warn("retaining plan publication claim after ambiguous pre-workflow hook publication, %v", publicationErr)
+		return hookErr, false
+	}
+	if err := database.ReleasePlanPublicationClaim(ctx.Pull, claimToken); err != nil {
+		ctx.Log.Warn("releasing pre-workflow hook publication claim, %v", err)
+		return hookErr, false
+	}
+	return hookErr, hookErr == nil || !c.FailOnPreWorkflowHookError
+}
+
+func (c *DefaultCommandRunner) runPostWorkflowHooks(ctx *command.Context, cmd *CommentCommand) {
+	database, claimToken, current, err := c.acquireWorkflowHookPublicationClaim(ctx, "post-workflow hook")
+	if err != nil {
+		ctx.Log.Warn("claiming post-workflow hook publication boundary, %v", err)
+		return
+	}
+	if !current {
+		return
+	}
+
+	hookErr := c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd)
+	if errors.Is(hookErr, errWorkflowHookStatusPublication) {
+		ctx.Log.Warn("retaining plan publication claim after ambiguous post-workflow hook publication, %v", hookErr)
+		return
+	}
+	if err := database.ReleasePlanPublicationClaim(ctx.Pull, claimToken); err != nil {
+		ctx.Log.Warn("releasing post-workflow hook publication claim, %v", err)
+		return
+	}
+	if hookErr != nil {
+		ctx.Log.Warn("post-workflow hook failed, %v", hookErr)
+	}
+}
+
+func (c *DefaultCommandRunner) acquireWorkflowHookPublicationClaim(ctx *command.Context, phase string) (db.Database, string, bool, error) {
+	database, ok := c.PullStatusFetcher.(db.Database)
+	if !ok {
+		return nil, "", false, errors.New("durable plan publication database is not configured")
+	}
+
+	claimToken := uuid.NewString()
+	if err := database.AcquirePlanPublicationClaim(ctx.Pull, claimToken); err != nil {
+		return nil, "", false, fmt.Errorf("claiming %s publication boundary: %w", phase, err)
+	}
+
+	currentStatus, err := database.GetPullStatus(ctx.Pull)
+	if err != nil {
+		releaseErr := database.ReleasePlanPublicationClaim(ctx.Pull, claimToken)
+		return nil, "", false, errors.Join(
+			fmt.Errorf("reading pull status before %s publication: %w", phase, err),
+			releaseErr,
+		)
+	}
+	if !reflect.DeepEqual(currentStatus, ctx.PullStatus) {
+		if err := database.ReleasePlanPublicationClaim(ctx.Pull, claimToken); err != nil {
+			return nil, "", false, fmt.Errorf("releasing obsolete %s publication claim: %w", phase, err)
+		}
+		ctx.Log.Info("%s belongs to an obsolete command, skipping publication", phase)
+		return database, "", false, nil
+	}
+	return database, claimToken, true, nil
+}
+
+func (c *DefaultCommandRunner) publishPreWorkflowHookFailure(ctx *command.Context, cmdName command.Name, hookErr error) error {
+	errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", hookErr.Error())
+	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+		return fmt.Errorf("commenting pre-workflow hook failure: %w", err)
+	}
+	if cmdName == command.Plan || cmdName == command.Apply {
+		if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmdName); err != nil {
+			return fmt.Errorf("updating %s status for pre-workflow hook failure: %w", cmdName, err)
+		}
+	}
+	return nil
 }
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

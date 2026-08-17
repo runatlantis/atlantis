@@ -5,6 +5,7 @@ package events_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-github/v88/github"
@@ -19,6 +20,28 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 	"github.com/stretchr/testify/require"
 )
+
+type projectContextGenerationMatcher struct {
+	expected command.ProjectContext
+}
+
+func (m projectContextGenerationMatcher) Matches(param Param) bool {
+	actual, ok := param.(command.ProjectContext)
+	if !ok || actual.PlanGeneration == "" {
+		return false
+	}
+	actual.PlanGeneration = ""
+	actual.AcceptedPlanGeneration = ""
+	actual.GeneratedPlanHash = nil
+	m.expected.PlanGeneration = ""
+	m.expected.AcceptedPlanGeneration = ""
+	m.expected.GeneratedPlanHash = nil
+	return reflect.DeepEqual(m.expected, actual)
+}
+
+func (m projectContextGenerationMatcher) String() string {
+	return "project context with a durable plan generation"
+}
 
 func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
@@ -564,13 +587,13 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
 			// })
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
+				When(projectCommandRunner.Plan(ArgThat[command.ProjectContext](projectContextGenerationMatcher{expected: c.ProjectContexts[i]}))).ThenReturn(c.ProjectCommandOutputs[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
 
 			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])
+				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(ArgThat[command.ProjectContext](projectContextGenerationMatcher{expected: c.ProjectContexts[i]}))
 			}
 
 			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
@@ -651,7 +674,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			PrevPlanStored:   true,
 		},
 		{
-			Description: "When planning with no changes and previous 'No changes' plan, set the 2/2 apply status",
+			Description: "When generic planning with no changes, discard an unrelated previous plan and report only active projects",
 			ProjectContexts: []command.ProjectContext{
 				{
 					CommandName: command.Plan,
@@ -666,9 +689,9 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 				},
 			},
 			PrevPlanStored:         true,
-			ExpVCSApplyStatusTotal: 2,
-			ExpVCSApplyStatusSucc:  2,
-			ExpVCSApplyNoChanges:   2,
+			ExpVCSApplyStatusTotal: 1,
+			ExpVCSApplyStatusSucc:  1,
+			ExpVCSApplyNoChanges:   1,
 		},
 		{
 			Description: "When planning again with changes following a previous 'No changes' plan do not set the apply status",
@@ -796,7 +819,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutput[i])
+				When(projectCommandRunner.Plan(ArgThat[command.ProjectContext](projectContextGenerationMatcher{expected: c.ProjectContexts[i]}))).ThenReturn(c.ProjectCommandOutput[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -1119,7 +1142,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			}
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
-			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
+			When(projectCommandRunner.Plan(ArgThat[command.ProjectContext](projectContextGenerationMatcher{expected: projectContexts[0]}))).ThenReturn(c.ProjectResults[0])
 
 			planCommandRunner.Run(ctx, cmd)
 

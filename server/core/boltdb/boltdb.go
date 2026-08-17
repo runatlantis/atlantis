@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	coredb "github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -421,13 +422,25 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
 			currStatus = nil
 		}
+		if currStatus != nil && pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			if err := rejectAnyActivePlanGeneration(currStatus); err != nil {
+				return err
+			}
+		}
+		if err := rejectResultsForActivePlanGeneration(currStatus, newResults); err != nil {
+			return err
+		}
 
 		// If there is no pull OR if the pull we have is out of date, we
 		// just write a new pull.
 		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
 			var statuses []models.ProjectStatus
 			for _, r := range newResults {
-				statuses = append(statuses, b.projectResultToProject(r))
+				status, err := b.projectResultToProject(r)
+				if err != nil {
+					return err
+				}
+				statuses = append(statuses, status)
 			}
 			// Preserve policy status from the previous commit so approvals
 			// survive between the plan DB write and the subsequent policy
@@ -467,8 +480,15 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 					if res.Workspace == proj.Workspace &&
 						res.RepoRelDir == proj.RepoRelDir &&
 						res.ProjectName == proj.ProjectName {
-
+						managedPlanHash, err := coredb.ManagedPlanHashAfterResult(proj.ManagedPlanHash, res)
+						if err != nil {
+							return err
+						}
+						acceptedPlanGeneration := coredb.AcceptedPlanGenerationAfterResult(proj.AcceptedPlanGeneration, res)
 						proj.Status = res.PlanStatus()
+						proj.PlanGeneration = ""
+						proj.ManagedPlanHash = managedPlanHash
+						proj.AcceptedPlanGeneration = acceptedPlanGeneration
 
 						// Updating only policy sets which are included in results; keeping the rest.
 						if len(proj.PolicyStatus) > 0 {
@@ -491,7 +511,11 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 				if !updatedExisting {
 					// If we didn't update an existing project, then we need to
 					// add this because it's a new one.
-					newStatus.Projects = append(newStatus.Projects, b.projectResultToProject(res))
+					status, err := b.projectResultToProject(res)
+					if err != nil {
+						return err
+					}
+					newStatus.Projects = append(newStatus.Projects, status)
 				}
 			}
 		}
@@ -503,6 +527,496 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
 	}
 	return newStatus, nil
+}
+
+// ReplacePullWithResults atomically replaces a pull status unless a plan
+// generation is active. Only CompletePlanGeneration may finalize that state.
+func (b *BoltDB) ReplacePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			// Preserve the historical replace behavior: an unreadable entry is
+			// discarded because replacement does not depend on its contents.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
+		}
+		if err := rejectAnyActivePlanGeneration(currStatus); err != nil {
+			return err
+		}
+
+		newStatus = models.PullStatus{Pull: pull}
+		for _, result := range newResults {
+			status, err := b.projectResultToProject(result)
+			if err != nil {
+				return err
+			}
+			newStatus.Projects = append(newStatus.Projects, status)
+		}
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+// AcquirePlanPublicationClaim durably claims terminal VCS publication for pull.
+// Re-acquiring with the same token is idempotent.
+func (b *BoltDB) AcquirePlanPublicationClaim(pull models.PullRequest, token string) error {
+	if token == "" {
+		return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim token is empty"}
+	}
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return err
+	}
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists(b.globalLocksBucketName)
+		if err != nil {
+			return err
+		}
+		claimKey := b.planPublicationClaimKey(key)
+		current := bucket.Get(claimKey)
+		if len(current) != 0 && string(current) != token {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationBusy, Detail: "another owner holds the claim"}
+		}
+		return bucket.Put(claimKey, []byte(token))
+	})
+	if err != nil {
+		return fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return nil
+}
+
+// GetPlanPublicationClaim returns the current claim token for offline recovery
+// inspection. A missing claim is a typed ownership error, not an empty token.
+func (b *BoltDB) GetPlanPublicationClaim(pull models.PullRequest) (string, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return "", err
+	}
+	var token string
+	err = b.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+		if bucket == nil {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim bucket is missing"}
+		}
+		token = string(bucket.Get(b.planPublicationClaimKey(key)))
+		if token == "" {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "no claim exists"}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return token, nil
+}
+
+func (b *BoltDB) ReleasePlanPublicationClaim(pull models.PullRequest, token string) error {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return err
+	}
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+		if bucket == nil {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim token does not match"}
+		}
+		claimKey := b.planPublicationClaimKey(key)
+		current := string(bucket.Get(claimKey))
+		if current == "" || token == "" {
+			return &coredb.PlanPublicationClaimError{Kind: coredb.ErrPlanPublicationNotOwned, Detail: "claim token does not match"}
+		}
+		if err := coredb.ValidatePlanPublicationClaim(current, token); err != nil {
+			return err
+		}
+		return bucket.Delete(claimKey)
+	})
+	if err != nil {
+		return fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return nil
+}
+
+func (b *BoltDB) ForceClearPlanPublicationClaim(pull models.PullRequest) error {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return err
+	}
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.globalLocksBucketName)
+		if bucket == nil {
+			return nil
+		}
+		return bucket.Delete(b.planPublicationClaimKey(key))
+	})
+	if err != nil {
+		return fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return nil
+}
+
+// BeginPlanGeneration atomically makes the selected projects non-applyable
+// before their plan steps can replace any plan artifacts.
+func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (coredb.PlanGenerationBeginResult, error) {
+	return b.beginPlanGeneration(pull, projects, generation, false, claimTokens...)
+}
+
+// BeginPlanGenerationReplacing atomically invalidates every previous project
+// plan before activating the selected projects.
+func (b *BoltDB) BeginPlanGenerationReplacing(pull models.PullRequest, projects []models.ProjectStatus, generation string, claimTokens ...string) (coredb.PlanGenerationBeginResult, error) {
+	return b.beginPlanGeneration(pull, projects, generation, true, claimTokens...)
+}
+
+func (b *BoltDB) beginPlanGeneration(pull models.PullRequest, projects []models.ProjectStatus, generation string, replace bool, claimTokens ...string) (coredb.PlanGenerationBeginResult, error) {
+	if generation == "" {
+		return coredb.PlanGenerationBeginResult{}, &coredb.PlanGenerationCompletionError{
+			Kind:   coredb.ErrPlanGenerationStateInvalid,
+			Detail: "generation is empty",
+		}
+	}
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return coredb.PlanGenerationBeginResult{}, err
+	}
+	claimToken, err := coredb.PlanPublicationClaimToken(claimTokens)
+	if err != nil {
+		return coredb.PlanGenerationBeginResult{}, err
+	}
+
+	var newStatus models.PullStatus
+	var canceled []coredb.PlanGenerationProject
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := b.validatePlanPublicationClaim(tx, key, claimToken); err != nil {
+			return err
+		}
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			// A new plan generation replaces authorization state rather than
+			// relying on an unreadable prior record. Keep the new generation
+			// non-applyable until its matching completion is persisted.
+			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
+			currStatus = nil
+		}
+		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
+			newStatus = models.PullStatus{Pull: pull}
+		} else {
+			newStatus = *currStatus
+		}
+		canceled = coredb.CanceledPlanGenerationProjects(&newStatus, projects, generation, replace)
+		if replace {
+			for i := range newStatus.Projects {
+				project := &newStatus.Projects[i]
+				if project.PlanGeneration != "" {
+					project.Status = models.ErroredPlanStatus
+				} else {
+					project.Status = models.DiscardedPlanStatus
+				}
+				project.PlanGeneration = ""
+				project.ManagedPlanHash = ""
+				project.AcceptedPlanGeneration = ""
+			}
+		}
+		coredb.SupersedePlanGenerations(&newStatus, projects, generation)
+
+		for _, project := range projects {
+			updated := false
+			for i := range newStatus.Projects {
+				current := &newStatus.Projects[i]
+				if sameProjectStatus(*current, project) {
+					current.Status = models.ErroredPlanStatus
+					current.PlanGeneration = generation
+					current.ManagedPlanHash = ""
+					current.AcceptedPlanGeneration = ""
+					updated = true
+					break
+				}
+			}
+			if !updated {
+				policyStatus := project.PolicyStatus
+				if currStatus != nil {
+					if previous := findProjectStatus(currStatus.Projects, project.Workspace, project.RepoRelDir, project.ProjectName); previous != nil {
+						policyStatus = previous.PolicyStatus
+					}
+				}
+				newStatus.Projects = append(newStatus.Projects, models.ProjectStatus{
+					Workspace:      project.Workspace,
+					RepoRelDir:     project.RepoRelDir,
+					ProjectName:    project.ProjectName,
+					PlanGeneration: generation,
+					PolicyStatus:   policyStatus,
+					Status:         models.ErroredPlanStatus,
+				})
+			}
+		}
+
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return coredb.PlanGenerationBeginResult{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return coredb.PlanGenerationBeginResult{PullStatus: newStatus, Canceled: canceled}, nil
+}
+
+// CompletePlanGeneration atomically persists final plan results only while the
+// selected projects still belong to the plan generation that produced them.
+func (b *BoltDB) CompletePlanGeneration(pull models.PullRequest, generation string, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	if generation == "" {
+		return models.PullStatus{}, &coredb.PlanGenerationCompletionError{
+			Kind:   coredb.ErrPlanGenerationStateInvalid,
+			Detail: "generation is empty",
+		}
+	}
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	claimToken, err := coredb.PlanPublicationClaimToken(claimTokens)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := b.validatePlanPublicationClaim(tx, key, claimToken); err != nil {
+			return err
+		}
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return &coredb.PlanGenerationCompletionError{
+				Kind:       coredb.ErrPlanGenerationStateInvalid,
+				Generation: generation,
+				Detail:     "pull status is unreadable",
+				Cause:      err,
+			}
+		}
+		if err := coredb.ValidatePlanGenerationCompletion(currStatus, pull, generation, newResults); err != nil {
+			return err
+		}
+
+		newStatus = *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			managedPlanHash, err := coredb.ManagedPlanHashAfterResult(project.ManagedPlanHash, result)
+			if err != nil {
+				return err
+			}
+			project.Status = result.PlanStatus()
+			project.PlanGeneration = ""
+			project.ManagedPlanHash = managedPlanHash
+			if project.Status == models.ErroredPlanStatus {
+				project.AcceptedPlanGeneration = ""
+			} else {
+				project.AcceptedPlanGeneration = generation
+			}
+		}
+
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+// UpdatePolicyResultsForPlanGeneration atomically persists follow-on policy
+// results only while their completed plan generation remains authoritative.
+func (b *BoltDB) UpdatePolicyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	claimToken, err := coredb.PlanPublicationClaimToken(claimTokens)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := b.validatePlanPublicationClaim(tx, key, claimToken); err != nil {
+			return err
+		}
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return &coredb.PlanGenerationCompletionError{
+				Kind:   coredb.ErrPlanGenerationStateInvalid,
+				Detail: "pull status is unreadable",
+				Cause:  err,
+			}
+		}
+		if err := coredb.ValidatePolicyResultsForPlanGeneration(currStatus, pull, newResults); err != nil {
+			return err
+		}
+
+		newStatus = *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			project.Status = result.PlanStatus()
+			newPolicyStatus := result.PolicyStatus()
+			if len(project.PolicyStatus) == 0 {
+				project.PolicyStatus = newPolicyStatus
+				continue
+			}
+			for i, oldPolicySet := range project.PolicyStatus {
+				for _, newPolicySet := range newPolicyStatus {
+					if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
+						project.PolicyStatus[i] = newPolicySet
+					}
+				}
+			}
+		}
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+// UpdateApplyResultsForPlanGeneration atomically persists apply results only
+// while their completed plan generation remains authoritative.
+func (b *BoltDB) UpdateApplyResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	claimToken, err := coredb.PlanPublicationClaimToken(claimTokens)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := b.validatePlanPublicationClaim(tx, key, claimToken); err != nil {
+			return err
+		}
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return &coredb.PlanGenerationCompletionError{
+				Kind:   coredb.ErrPlanGenerationStateInvalid,
+				Detail: "pull status is unreadable",
+				Cause:  err,
+			}
+		}
+		if err := coredb.ValidateApplyResultsForPlanGeneration(currStatus, pull, newResults); err != nil {
+			return err
+		}
+
+		newStatus = *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			managedPlanHash, err := coredb.ManagedPlanHashAfterResult(project.ManagedPlanHash, result)
+			if err != nil {
+				return err
+			}
+			project.Status = result.PlanStatus()
+			project.ManagedPlanHash = managedPlanHash
+			project.AcceptedPlanGeneration = coredb.AcceptedPlanGenerationAfterResult(project.AcceptedPlanGeneration, result)
+		}
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+// UpdateDiscardResultsForPlanGeneration atomically invalidates completed plan
+// authority consumed by successful import/state commands.
+func (b *BoltDB) UpdateDiscardResultsForPlanGeneration(pull models.PullRequest, newResults []command.ProjectResult, claimTokens ...string) (models.PullStatus, error) {
+	key, err := b.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	claimToken, err := coredb.PlanPublicationClaimToken(claimTokens)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+
+	var newStatus models.PullStatus
+	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := b.validatePlanPublicationClaim(tx, key, claimToken); err != nil {
+			return err
+		}
+		bucket := tx.Bucket(b.pullsBucketName)
+		currStatus, err := b.getPullFromBucket(bucket, key)
+		if err != nil {
+			return &coredb.PlanGenerationCompletionError{
+				Kind:   coredb.ErrPlanGenerationStateInvalid,
+				Detail: "pull status is unreadable",
+				Cause:  err,
+			}
+		}
+		if err := coredb.ValidateDiscardResultsForPlanGeneration(currStatus, pull, newResults); err != nil {
+			return err
+		}
+
+		newStatus = *currStatus
+		for _, result := range newResults {
+			project := findProjectStatus(newStatus.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+			project.Status = models.DiscardedPlanStatus
+			project.ManagedPlanHash = ""
+			project.AcceptedPlanGeneration = ""
+		}
+		return b.writePullToBucket(bucket, key, newStatus)
+	})
+	if err != nil {
+		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
+	}
+	return newStatus, nil
+}
+
+func sameProjectStatus(left, right models.ProjectStatus) bool {
+	return left.Workspace == right.Workspace &&
+		left.RepoRelDir == right.RepoRelDir &&
+		left.ProjectName == right.ProjectName
+}
+
+func findProjectStatus(projects []models.ProjectStatus, workspace, repoRelDir, projectName string) *models.ProjectStatus {
+	for i := range projects {
+		project := &projects[i]
+		if project.Workspace == workspace && project.RepoRelDir == repoRelDir && project.ProjectName == projectName {
+			return project
+		}
+	}
+	return nil
+}
+
+func rejectResultsForActivePlanGeneration(status *models.PullStatus, results []command.ProjectResult) error {
+	if status == nil {
+		return nil
+	}
+	for _, result := range results {
+		project := findProjectStatus(status.Projects, result.Workspace, result.RepoRelDir, result.ProjectName)
+		if project != nil && project.PlanGeneration != "" {
+			return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", result.RepoRelDir, result.Workspace, result.ProjectName)
+		}
+	}
+	return nil
+}
+
+func rejectAnyActivePlanGeneration(status *models.PullStatus) error {
+	if status == nil {
+		return nil
+	}
+	for _, project := range status.Projects {
+		if project.PlanGeneration != "" {
+			return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", project.RepoRelDir, project.Workspace, project.ProjectName)
+		}
+	}
+	return nil
 }
 
 func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
@@ -542,8 +1056,14 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 		return err
 	}
 	err = b.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(b.pullsBucketName)
-		return bucket.Delete(key)
+		if err := tx.Bucket(b.pullsBucketName).Delete(key); err != nil {
+			return err
+		}
+		claimBucket := tx.Bucket(b.globalLocksBucketName)
+		if claimBucket == nil {
+			return nil
+		}
+		return claimBucket.Delete(b.planPublicationClaimKey(key))
 	})
 	if err != nil {
 		return fmt.Errorf("DB transaction failed: %w", err)
@@ -574,7 +1094,15 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 			// in-place updating its Status field.
 			proj := &currStatus.Projects[i]
 			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+				if proj.PlanGeneration != "" {
+					return fmt.Errorf("project has an active plan generation for dir %q workspace %q project %q", proj.RepoRelDir, proj.Workspace, proj.ProjectName)
+				}
 				proj.Status = newStatus
+				proj.PlanGeneration = ""
+				if newStatus == models.DiscardedPlanStatus {
+					proj.ManagedPlanHash = ""
+					proj.AcceptedPlanGeneration = ""
+				}
 				break
 			}
 		}
@@ -604,6 +1132,15 @@ func (b *BoltDB) commandLockKey(cmdName command.Name) string {
 	return fmt.Sprintf("%s/lock", cmdName)
 }
 
+func (b *BoltDB) planPublicationClaimKey(pullKey []byte) []byte {
+	return fmt.Appendf(nil, "plan-publication/%s", pullKey)
+}
+
+func (b *BoltDB) validatePlanPublicationClaim(tx *bolt.Tx, pullKey []byte, token string) error {
+	current := tx.Bucket(b.globalLocksBucketName).Get(b.planPublicationClaimKey(pullKey))
+	return coredb.ValidatePlanPublicationClaim(string(current), token)
+}
+
 func (b *BoltDB) lockKey(p models.Project, workspace string) string {
 	return models.GenerateLockKey(p, workspace)
 }
@@ -629,14 +1166,20 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
-	return models.ProjectStatus{
-		Workspace:    p.Workspace,
-		RepoRelDir:   p.RepoRelDir,
-		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyStatus(),
-		Status:       p.PlanStatus(),
+func (b *BoltDB) projectResultToProject(p command.ProjectResult) (models.ProjectStatus, error) {
+	managedPlanHash, err := coredb.ManagedPlanHashAfterResult("", p)
+	if err != nil {
+		return models.ProjectStatus{}, err
 	}
+	return models.ProjectStatus{
+		Workspace:              p.Workspace,
+		RepoRelDir:             p.RepoRelDir,
+		ProjectName:            p.ProjectName,
+		ManagedPlanHash:        managedPlanHash,
+		AcceptedPlanGeneration: coredb.AcceptedPlanGenerationAfterResult("", p),
+		PolicyStatus:           p.PolicyStatus(),
+		Status:                 p.PlanStatus(),
+	}, nil
 }
 
 // Ping checks the database connection health.

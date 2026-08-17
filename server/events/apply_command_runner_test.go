@@ -212,7 +212,15 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 					},
 				})
 				Ok(t, err)
-			} else if c.ExpVCSStatusSet && !c.Matched {
+			} else if c.Matched {
+				_, err = db.UpdatePullWithResults(modelPull, []command.ProjectResult{{
+					Command: command.Plan,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{},
+					},
+				}})
+				Ok(t, err)
+			} else if c.ExpVCSStatusSet {
 				_, err = db.UpdatePullWithResults(modelPull, nil)
 				Ok(t, err)
 			}
@@ -957,6 +965,62 @@ func TestApplyCommandRunner_AutomergeSucceedsWhenReturnedPullStatusMatchesLiveHe
 	applyCommandRunner.Run(ctx, cmd)
 
 	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.PullRequestOptions]())
+}
+
+func TestApplyCommandRunner_HoldsPublicationClaimThroughAutomerge(t *testing.T) {
+	database := newTestBoltDB(t)
+	head := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "main"}
+	})
+	autoMerger.GlobalAutomerge = true
+	t.Cleanup(func() { autoMerger.GlobalAutomerge = false })
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dirA",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "projA",
+		AutomergeEnabled:  true,
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              pull,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	mergeStarted := make(chan struct{})
+	releaseMerge := make(chan struct{})
+	When(vcsClient.MergePull(Any[logging.SimpleLogging](), Eq(pull), Any[models.PullRequestOptions]())).Then(func([]Param) ReturnValues {
+		close(mergeStarted)
+		<-releaseMerge
+		return ReturnValues{nil}
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		applyCommandRunner.Run(ctx, cmd)
+	}()
+
+	<-mergeStarted
+	Assert(t, errors.Is(database.AcquirePlanPublicationClaim(pull, "replica-b"), db.ErrPlanPublicationBusy), "expected a newer plan generation to remain blocked until automerge completes")
+	close(releaseMerge)
+	<-done
+
+	Ok(t, database.AcquirePlanPublicationClaim(pull, "replica-b"))
+	_, err := database.BeginPlanGeneration(pull, []models.ProjectStatus{{RepoRelDir: "dirA", Workspace: events.DefaultWorkspace, ProjectName: "projA"}}, "generation-b", "replica-b")
+	Ok(t, err)
+	Ok(t, database.ReleasePlanPublicationClaim(pull, "replica-b"))
 }
 
 func TestApplyCommandRunner_RefetchesLiveIdentityBeforeAutomerge(t *testing.T) {

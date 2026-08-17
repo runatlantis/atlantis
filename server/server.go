@@ -930,6 +930,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
+		dbUpdater,
 		userConfig.SilenceNoProjects,
 		userConfig.DisableUnlockLabel,
 	)
@@ -1085,6 +1086,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WorkingDir:                      workingDir,
 		WorkingDirLocker:                workingDirLocker,
 		CommitStatusUpdater:             commitStatusUpdater,
+		Database:                        database,
 		PullReqStatusFetcher:            pullReqStatusFetcher,
 		PullStatusFetcher:               database,
 		LivePullHeadFetcher:             livePullHeadFetcher,

@@ -21,9 +21,12 @@ var ErrRestoreNotSupported = errors.New("plan store does not support restore")
 type PlanStore interface {
 	// Save persists a plan file after terraform writes it to planPath.
 	Save(ctx command.ProjectContext, planPath string) error
-	// Load ensures a plan file exists at planPath before terraform reads it.
+	// Load ensures a plan file exists at planPath before validation. Callers must
+	// not reload between validation and execution.
 	Load(ctx command.ProjectContext, planPath string) error
 	// Remove deletes a plan file (local + external) after apply/import/state-rm.
+	// Durable-bound contexts must retain the artifact unless the implementation
+	// can prove generation ownership; legacy contexts retain unconditional cleanup.
 	Remove(ctx command.ProjectContext, planPath string) error
 	// ListWorkspaces returns the distinct workspace names that have stored
 	// plans for the given pull request. Used by the "apply all" path so that
@@ -65,7 +68,13 @@ func (s *LocalPlanStore) Load(_ command.ProjectContext, _ string) error {
 	return nil
 }
 
-func (s *LocalPlanStore) Remove(_ command.ProjectContext, planPath string) error {
+// Remove deletes legacy/hashless local plans and uniquely scoped synthetic
+// non-PR API plans. PR-backed durable plans are retained because a local path
+// has no generation/ETag ownership token that can prove artifact ownership.
+func (s *LocalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
+	if ctx.RecordedManagedPlanHash != "" && (!ctx.API || ctx.Pull.Num > 0) {
+		return nil
+	}
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 
