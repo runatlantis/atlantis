@@ -181,7 +181,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	// customized ExecutableName (e.g. running multiple Atlantis servers against
 	// one repo) can otherwise get spurious "did you mean" replies to ordinary
 	// comments that happen to be Levenshtein-close to their custom name.
-	if e.ExecutableName == DefaultExecutableName && utils.IsSimilarWord(executableName, e.ExecutableName) {
+	if e.ExecutableName == defaultExecutableName && utils.IsSimilarWord(executableName, e.ExecutableName) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
