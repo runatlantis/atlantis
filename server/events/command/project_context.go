@@ -81,6 +81,11 @@ type ProjectContext struct {
 	// ExpectedPlanHash is the SHA-256 hash of the plan file selected when the
 	// apply command was built.
 	ExpectedPlanHash string
+	// RequiresAtlantisManagedPlanFile is true when this project's workflow uses
+	// the built-in plan or apply step, meaning Atlantis owns the convention plan
+	// artifact (<workspace>.tfplan). Workflows built only from custom run steps
+	// manage their own plan file, so Atlantis must not require or inspect one.
+	RequiresAtlantisManagedPlanFile bool
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
