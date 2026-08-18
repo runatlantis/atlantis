@@ -647,6 +647,11 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
   * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
       either be generated (by plan) or already exist (if running apply). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+      A workflow whose `plan` and `apply` are both made up entirely of custom `run` steps
+      may write its plan to a path of its own choosing instead of `$PLANFILE`. Atlantis
+      does not require, hash, or delete a plan artifact for such a workflow; it still
+      validates the project's recorded plan state before running `apply`. As soon as a
+      workflow uses the built-in `plan` or `apply` step, the plan must be at `$PLANFILE`.
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
