@@ -23,6 +23,7 @@ type UserConfig struct {
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
+	AutomergeMethod             string `mapstructure:"automerge-method"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
@@ -39,9 +40,11 @@ type UserConfig struct {
 	CheckoutDepth               int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
+	SharePlanDir                string `mapstructure:"share-plan-dir"`
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
+	DisableAutomergeLabel       string `mapstructure:"disable-automerge-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
 	DisableGlobalApplyLock      bool   `mapstructure:"disable-global-apply-lock"`
@@ -52,6 +55,8 @@ type UserConfig struct {
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
 	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
+	EnableDriftDetection        bool   `mapstructure:"enable-drift-detection"`
+	EnableDriftRemediation      bool   `mapstructure:"enable-drift-remediation"`
 	ExecutableName              string `mapstructure:"executable-name"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
 	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
@@ -88,12 +93,15 @@ type UserConfig struct {
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
 	IgnoreVCSStatusNames            string `mapstructure:"ignore-vcs-status-names"`
+	Language                        string `mapstructure:"language"`
+	LanguageConfigFile              string `mapstructure:"language-config-file"`
 	ParallelPoolSize                int    `mapstructure:"parallel-pool-size"`
 	ParallelPlan                    bool   `mapstructure:"parallel-plan"`
 	ParallelApply                   bool   `mapstructure:"parallel-apply"`
 	PendingApplyStatus              bool   `mapstructure:"pending-apply-status"`
 	StatsNamespace                  string `mapstructure:"stats-namespace"`
 	PlanDrafts                      bool   `mapstructure:"allow-draft-prs"`
+	EnableExternalStores            bool   `mapstructure:"enable-external-stores"`
 	Port                            int    `mapstructure:"port"`
 	QuietPolicyChecks               bool   `mapstructure:"quiet-policy-checks"`
 	RedisDB                         int    `mapstructure:"redis-db"`

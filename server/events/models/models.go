@@ -165,6 +165,9 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 	if strings.Contains(repo, "/") {
 		return Repo{}, fmt.Errorf("invalid repo format %q, repo %q should not contain any /'s", repoFullName, owner)
 	}
+	if strings.Contains(owner, "..") || strings.Contains(repo, "..") {
+		return Repo{}, fmt.Errorf("invalid repo format %q, owner or repo cannot contain '..'", repoFullName)
+	}
 
 	return Repo{
 		FullName:          repoFullName,
@@ -189,6 +192,13 @@ type MergeableStatus struct {
 	IsMergeable bool
 	// Short human readable explanation of why the PR is (or is not) mergeable
 	Reason string
+	// BlockingStatuses holds the names of the commit statuses that caused the
+	// pull request to be considered not mergeable because of the project's
+	// "Only allow merge if pipeline succeeds" setting. It lets per-project
+	// command requirement checks ignore statuses that belong to other projects
+	// in the same pull request (a failing plan in project B must not block an
+	// apply of project A). Currently only populated by the GitLab client.
+	BlockingStatuses []string
 }
 
 // PullRequest is a VCS pull request.
@@ -210,8 +220,15 @@ type PullRequest struct {
 	// BaseBranch is the name of the base branch (the branch that the pull
 	// request is getting merged into).
 	BaseBranch string
+	// HardenedNonPRRefCheckout makes synthetic non-PR API checkouts fetch the
+	// requested ref directly instead of treating it as a branch checkout. This is
+	// used by drift/remediation requests that accept branch, tag, and SHA refs.
+	HardenedNonPRRefCheckout bool
 	// Author is the username of the pull request author.
 	Author string
+	// Body is the description of the pull request. It may be empty when the VCS
+	// payload omits a description.
+	Body string
 	// State will be one of Open or Closed.
 	// Gitlab supports an additional "merged" state but Github doesn't so we map
 	// merged to Closed.
@@ -506,8 +523,10 @@ func (pss *PolicySetStatus) OwnerHasFullyApproved(owner string) bool {
 // Summary regexes
 var (
 	reChangesOutside = regexp.MustCompile(`Note: Objects have changed outside of Terraform`)
-	rePlanChanges    = regexp.MustCompile(`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy.`)
-	reNoChanges      = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
+	rePlanChanges    = regexp.MustCompile(
+		`Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy(?:, (\d+) to forget)?\.`,
+	)
+	reNoChanges = regexp.MustCompile(`No changes. (Infrastructure is up-to-date|Your infrastructure matches the configuration).`)
 )
 
 // Summary extracts summaries of plan changes from TerraformOutput.
@@ -520,38 +539,134 @@ func (p *PlanSuccess) Summary() string {
 }
 
 // DiffSummary extracts one line summary of plan changes from TerraformOutput.
+// When the output contains multiple "Plan:" lines (e.g. terragrunt stack run
+// plan, which prints one summary per unit), the counters are aggregated so the
+// rendered summary reflects the total across all units.
 func (p *PlanSuccess) DiffSummary() string {
-	if match := rePlanChanges.FindString(p.TerraformOutput); match != "" {
-		return match
+	stats := NewPlanSuccessStats(p.TerraformOutput)
+	if !stats.Changes {
+		return reNoChanges.FindString(p.TerraformOutput)
 	}
-	return reNoChanges.FindString(p.TerraformOutput)
+	switch {
+	case stats.Import > 0 && stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	case stats.Import > 0:
+		return fmt.Sprintf("Plan: %d to import, %d to add, %d to change, %d to destroy.",
+			stats.Import, stats.Add, stats.Change, stats.Destroy)
+	case stats.Forget > 0:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy, %d to forget.",
+			stats.Add, stats.Change, stats.Destroy, stats.Forget)
+	default:
+		return fmt.Sprintf("Plan: %d to add, %d to change, %d to destroy.",
+			stats.Add, stats.Change, stats.Destroy)
+	}
 }
 
 // NoChanges returns true if the plan has no changes.
 func (p *PlanSuccess) NoChanges() bool {
+	if p.Stats().Changes {
+		return false
+	}
 	return reNoChanges.MatchString(p.TerraformOutput)
 }
 
 // Diff Markdown regexes
 var (
-	diffKeywordRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
-	diffResourceRegex = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
-	diffHeredocRegex  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
-	diffColonRegex    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
-	diffListRegex     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
-	diffTildeRegex    = regexp.MustCompile(`(?m)^~`)
+	diffKeywordRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)([a-zA-Z_][\w]*\s*)(\s=\s|\s->\s|\(known after apply\)|\{)(.*)`)
+	diffResourceRegex                 = regexp.MustCompile(`(?m)^( +)([-+~]\s)((?:resource|data|module)\s+.+\{.*)`)
+	diffHeredocRegex                  = regexp.MustCompile(`(?m)^( +)([-+~]\s)(<<)(.*)`)
+	diffColonRegex                    = regexp.MustCompile(`(?m)^( +)([-+~]\s)( {4,}[a-zA-Z_][\w-]*:.*)`)
+	diffListRegex                     = regexp.MustCompile(`(?m)^( +)([-+~]\s)(".*",)`)
+	diffTildeRegex                    = regexp.MustCompile(`(?m)^~`)
+	diffHeredocAttributeStartRegex    = regexp.MustCompile(`^( *)([-+~]\s)?[a-zA-Z_][\w]*\s*=\s<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocCollectionElementRegex = regexp.MustCompile(`^( *)([-+~]\s)<<-?([a-zA-Z_][\w]*)\s*$`)
+	diffHeredocContentLineRegex       = regexp.MustCompile(`^( +)([-+~]\s)(.*)`)
 )
 
 // DiffMarkdownFormattedTerraformOutput formats the Terraform output to match diff markdown format
 func (p PlanSuccess) DiffMarkdownFormattedTerraformOutput() string {
-	formattedTerraformOutput := diffKeywordRegex.ReplaceAllString(p.TerraformOutput, "$2$1$3$4$5")
-	formattedTerraformOutput = diffResourceRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffHeredocRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3$4")
-	formattedTerraformOutput = diffColonRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffListRegex.ReplaceAllString(formattedTerraformOutput, "$2$1$3")
-	formattedTerraformOutput = diffTildeRegex.ReplaceAllString(formattedTerraformOutput, "!")
+	lines := strings.Split(p.TerraformOutput, "\n")
+	heredocDelimiter := ""
+	heredocTerminatorIndent := -1
+	heredocDiffMarkerIndent := -1
 
-	return strings.TrimSpace(formattedTerraformOutput)
+	for i, line := range lines {
+		if heredocDelimiter != "" {
+			if isDiffMarkdownHeredocEnd(line, heredocDelimiter, heredocTerminatorIndent) {
+				heredocDelimiter = ""
+				heredocTerminatorIndent = -1
+				heredocDiffMarkerIndent = -1
+				continue
+			}
+
+			if heredocDiffMarkerIndent >= 0 {
+				lines[i] = formatHeredocDiffMarkdownLine(line, heredocDiffMarkerIndent)
+			}
+			continue
+		}
+
+		if delimiter, terminatorIndent, diffMarkerIndent, ok := diffMarkdownHeredocStart(line); ok {
+			heredocDelimiter = delimiter
+			heredocTerminatorIndent = terminatorIndent
+			heredocDiffMarkerIndent = diffMarkerIndent
+		}
+
+		lines[i] = formatDiffMarkdownLine(line)
+	}
+
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func formatDiffMarkdownLine(line string) string {
+	formattedLine := diffKeywordRegex.ReplaceAllString(line, "$2$1$3$4$5")
+	formattedLine = diffResourceRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffHeredocRegex.ReplaceAllString(formattedLine, "$2$1$3$4")
+	formattedLine = diffColonRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffListRegex.ReplaceAllString(formattedLine, "$2$1$3")
+	formattedLine = diffTildeRegex.ReplaceAllString(formattedLine, "!")
+
+	return formattedLine
+}
+
+func diffMarkdownHeredocStart(line string) (string, int, int, bool) {
+	if heredocMatch := diffHeredocAttributeStartRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+4)
+	}
+
+	if heredocMatch := diffHeredocCollectionElementRegex.FindStringSubmatch(line); heredocMatch != nil {
+		return diffMarkdownHeredocState(heredocMatch[1], heredocMatch[2], heredocMatch[3], len(heredocMatch[1])+len(heredocMatch[2])+2)
+	}
+
+	return "", -1, -1, false
+}
+
+func diffMarkdownHeredocState(indent string, marker string, delimiter string, diffMarkerIndent int) (string, int, int, bool) {
+	terminatorIndent := len(indent) + len(marker)
+	if !strings.HasPrefix(marker, "~") {
+		return delimiter, terminatorIndent, -1, true
+	}
+
+	// Terraform renders changed heredoc content diff markers two spaces deeper
+	// than the heredoc terminator.
+	return delimiter, terminatorIndent, diffMarkerIndent, true
+}
+
+func isDiffMarkdownHeredocEnd(line string, delimiter string, indent int) bool {
+	terminator := strings.Repeat(" ", indent) + delimiter
+	return line == terminator ||
+		line == terminator+"," ||
+		strings.HasPrefix(line, terminator+" -> ") ||
+		strings.HasPrefix(line, terminator+", -> ")
+}
+
+func formatHeredocDiffMarkdownLine(line string, diffMarkerIndent int) string {
+	matches := diffHeredocContentLineRegex.FindStringSubmatch(line)
+	if matches == nil || len(matches[1]) != diffMarkerIndent {
+		return line
+	}
+
+	return diffTildeRegex.ReplaceAllString(matches[2]+matches[1]+matches[3], "!")
 }
 
 // Stats returns plan change stats and contextual information.
@@ -701,6 +816,17 @@ func (p PullStatus) StatusCount(status ProjectPlanStatus) int {
 	return c
 }
 
+// ProjectCounts holds the success/failure counts for a set of project operations.
+// For command.Apply: Errored counts projects with apply errors. NoChanges is a
+// subset of Success (projects that were already up to date count as successful).
+// NoChanges is ignored for all other commands.
+type ProjectCounts struct {
+	Success   int
+	Total     int
+	Errored   int
+	NoChanges int
+}
+
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
 	Workspace   string
@@ -848,6 +974,9 @@ type WorkflowHookCommandContext struct {
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
+	// SuppressJobOutput prevents hook output from being published to the public
+	// job stream for API workflows such as drift detection.
+	SuppressJobOutput bool
 	// RepoRelDir is the directory of this project relative to the repo root.
 	RepoRelDir string
 	// User is the user that triggered this command.
@@ -863,27 +992,48 @@ type WorkflowHookCommandContext struct {
 
 // PlanSuccessStats holds stats for a plan.
 type PlanSuccessStats struct {
-	Import, Add, Change, Destroy int
-	Changes, ChangesOutside      bool
+	Import, Add, Change, Destroy, Forget int
+	Changes, ChangesOutside              bool
 }
 
 func NewPlanSuccessStats(output string) PlanSuccessStats {
-	m := rePlanChanges.FindStringSubmatch(output)
+	matches := rePlanChanges.FindAllStringSubmatch(output, -1)
 
 	s := PlanSuccessStats{
 		ChangesOutside: reChangesOutside.MatchString(output),
-		Changes:        len(m) > 0,
+		Changes:        len(matches) > 0,
 	}
 
-	if s.Changes {
-		// We can skip checking the error here as we can assume
-		// Terraform output will always render an integer on these
-		// blocks.
-		s.Import, _ = strconv.Atoi(m[1])
-		s.Add, _ = strconv.Atoi(m[2])
-		s.Change, _ = strconv.Atoi(m[3])
-		s.Destroy, _ = strconv.Atoi(m[4])
+	// When the output contains multiple "Plan:" lines (e.g. terragrunt stack
+	// run plan produces one summary per unit), aggregate the counters so the
+	// stats reflect the total across all units.
+	//
+	// m[1] is the optional "X to import" group: it is an empty string for
+	// plans without import blocks. m[5] is the optional "X to forget" group:
+	// it is absent or empty for plans without forget blocks. All captures must
+	// be parsed leniently.
+	for _, m := range matches {
+		s.Import += parsePlanCount(m[1])
+		s.Add += parsePlanCount(m[2])
+		s.Change += parsePlanCount(m[3])
+		s.Destroy += parsePlanCount(m[4])
+		if len(m) > 5 && m[5] != "" {
+			s.Forget += parsePlanCount(m[5])
+		}
 	}
 
 	return s
+}
+
+// parsePlanCount converts a numeric capture group from rePlanChanges into an
+// int. The "to import" group is optional in the regexp, so an empty string is
+// a normal case (no import block) and must produce 0 rather than be treated
+// as a parse failure. A non-empty value that fails to parse is unreachable
+// given the (\d+) capture, but we return 0 defensively rather than panic.
+func parsePlanCount(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, _ := strconv.Atoi(s)
+	return n
 }

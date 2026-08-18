@@ -230,6 +230,37 @@ func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
 	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
 }
 
+func TestDefaultClient_RunCommandAsyncSuppressesProjectOutputHandler(t *testing.T) {
+	RegisterMockTestingT(t)
+	v, err := version.NewVersion("0.11.11")
+	Ok(t, err)
+	tmp := t.TempDir()
+	logger := logmocks.NewMockSimpleLogging()
+	When(logger.With(Any[string](), Any[any]())).ThenReturn(logger)
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	ctx := command.ProjectContext{
+		Log:               logger,
+		Workspace:         "default",
+		RepoRelDir:        ".",
+		SuppressJobOutput: true,
+	}
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: tmp,
+		overrideTF:              "echo",
+		projectCmdOutputHandler: projectCmdOutputHandler,
+	}
+	mockDownloader := terraform_mocks.NewMockDownloader()
+	distribution := terraform.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	_, outCh := client.RunCommandAsync(ctx, tmp, []string{"hello"}, map[string]string{}, distribution, nil, "default")
+	out, err := waitCh(outCh)
+	Ok(t, err)
+	Equals(t, "hello", out)
+	projectCmdOutputHandler.VerifyWasCalled(Never()).Send(Any[command.ProjectContext](), Any[string](), Any[bool]())
+	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
+}
+
 func TestDefaultClient_RunCommandAsync_BigOutput(t *testing.T) {
 	RegisterMockTestingT(t)
 	v, err := version.NewVersion("0.11.11")

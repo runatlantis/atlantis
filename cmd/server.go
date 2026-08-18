@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -51,6 +52,7 @@ const (
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
@@ -70,6 +72,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -116,9 +119,11 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	SharePlanDirFlag                 = "share-plan-dir"
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
+	EnableExternalStoresFlag         = "enable-external-stores"
 	PortFlag                         = "port"
 	RedisDB                          = "redis-db"
 	RedisHost                        = "redis-host"
@@ -148,6 +153,8 @@ const (
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	LanguageFlag                     = "language"
+	LanguageConfigFileFlag           = "language-config-file"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -156,6 +163,8 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag         = "enable-drift-detection"
+	EnableDriftRemediationFlag       = "enable-drift-remediation"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -163,7 +172,7 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
@@ -178,6 +187,7 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
+	DefaultLanguage                     = i18n.DefaultLanguage
 	DefaultLogLevel                     = "info"
 	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
@@ -240,6 +250,11 @@ var stringFlags = map[string]stringFlag{
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
 	},
+	AutomergeMethodFlag: {
+		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
+			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+		defaultValue: "",
+	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
 			" Indexed projects will automatically be planned if a module they depend on is modified." +
@@ -293,6 +308,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableAutomergeLabelFlag: {
+		description:  "Pull request label to disable atlantis automerge feature only if present.",
 		defaultValue: "",
 	},
 	DisableUnlockLabelFlag: {
@@ -415,6 +434,10 @@ var stringFlags = map[string]stringFlag{
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
 	},
+	SharePlanDirFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
+	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
 	},
@@ -483,6 +506,14 @@ var stringFlags = map[string]stringFlag{
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
 			" Currently only implemented for GitHub.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
+	},
+	LanguageFlag: {
+		description:  "Language used for Atlantis pull request comments. Supported values: " + i18n.SupportedLanguagesDescription() + ".",
+		defaultValue: DefaultLanguage,
+	},
+	LanguageConfigFileFlag: {
+		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
+			"Supports partial overrides and can be combined with --language.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -589,6 +620,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
 		defaultValue: false,
 	},
+	EnableExternalStoresFlag: {
+		description:  "Enable external storage backends configured in the server-side repo config (external_stores block).",
+		defaultValue: false,
+	},
 	QuietPolicyChecks: {
 		description:  "Exclude policy check comments from pull requests unless there's an actual error from conftest. This also excludes warnings.",
 		defaultValue: false,
@@ -654,6 +689,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
+		defaultValue: false,
+	},
+	EnableDriftRemediationFlag: {
+		description:  "Enable drift remediation apply API actions. Requires --enable-drift-detection.",
+		defaultValue: false,
+	},
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
@@ -712,6 +755,10 @@ var int64Flags = map[string]int64Flag{
 
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
+
+// ValidAutomergeMethods are the valid merge methods that can be set for the
+// automerge-method flag.
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
 
 type stringFlag struct {
 	description  string
@@ -895,6 +942,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setSharePlanDir(&userConfig); err != nil {
+		return err
+	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
@@ -968,6 +1018,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
 	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
@@ -1026,6 +1079,17 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
+	// Intentionally allow unsupported --language values when a custom language
+	// catalog is provided, so operators can define their own locale codes.
+	if strings.TrimSpace(userConfig.LanguageConfigFile) == "" {
+		if err := i18n.ValidateLanguage(userConfig.Language); err != nil {
+			return err
+		}
+	} else {
+		if err := i18n.ValidateCustomCatalog(userConfig.LanguageConfigFile); err != nil {
+			return err
+		}
+	}
 
 	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
 		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
@@ -1036,6 +1100,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
 		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
+	}
+
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
@@ -1182,6 +1250,31 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
+	return nil
+}
+
+// setSharePlanDir checks if ~ was used in share-plan-dir and converts it to the actual
+// home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
+func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
+	if userConfig.SharePlanDir == "" {
+		userConfig.SharePlanDir = userConfig.DataDir
+		return nil
+	}
+
+	finalPath := userConfig.SharePlanDir
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making share-plan-dir absolute: %w", err)
+	}
+	userConfig.SharePlanDir = finalPath
 	return nil
 }
 

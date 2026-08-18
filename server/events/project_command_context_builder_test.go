@@ -129,3 +129,47 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 		assert.True(t, result[0].AbortOnExecutionOrderFail)
 	})
 }
+
+func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockCommentBuilder := mocks.NewMockCommentBuilder()
+	subject := events.DefaultProjectCommandContextBuilder{
+		CommentBuilder: mockCommentBuilder,
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	projCfg := valid.MergedProjectCfg{
+		RepoRelDir: "env",
+		Workspace:  "prod",
+		Name:       "app",
+		Workflow: valid.Workflow{
+			Name: valid.DefaultWorkflowName,
+			Plan: valid.DefaultPlanStage,
+		},
+	}
+	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
+
+	apiCtx := &command.Context{
+		Log:                   logging.NewNoopLogger(t),
+		API:                   true,
+		SkipPRRequirements:    true,
+		SkipPRModifiedFiles:   true,
+		SuppressVCSStatus:     true,
+		SuppressJobOutput:     true,
+		SuppressApplyWebhooks: true,
+	}
+	apiResult := subject.BuildProjectContext(apiCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
+	assert.True(t, apiResult[0].API)
+	assert.True(t, apiResult[0].SkipPRRequirements)
+	assert.True(t, apiResult[0].SuppressVCSStatus)
+	assert.True(t, apiResult[0].SuppressJobOutput)
+	assert.True(t, apiResult[0].SuppressApplyWebhooks)
+
+	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
+	normalCtx := &command.Context{Log: logging.NewNoopLogger(t)}
+	normalResult := subject.BuildProjectContext(normalCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
+	assert.False(t, normalResult[0].API)
+	assert.False(t, normalResult[0].SkipPRRequirements)
+	assert.False(t, normalResult[0].SuppressVCSStatus)
+	assert.False(t, normalResult[0].SuppressJobOutput)
+	assert.False(t, normalResult[0].SuppressApplyWebhooks)
+}

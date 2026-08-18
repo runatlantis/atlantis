@@ -152,6 +152,19 @@ ATLANTIS_AUTOMERGE=true
 Automatically merge pull requests after all plans have been successfully applied.
 Defaults to `false`. See [Automerging](automerging.md) for more details.
 
+### `--automerge-method`
+
+```bash
+atlantis server --automerge-method="squash"
+# or
+ATLANTIS_AUTOMERGE_METHOD="squash"
+```
+
+Default merge method to use when automerging pull requests. Valid values are
+`merge`, `rebase`, and `squash`. When not set, the VCS provider's default merge
+method is used. This can be overridden per command with the `--auto-merge-method`
+comment flag. Currently only implemented for GitHub.
+
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
 ```bash
@@ -168,9 +181,10 @@ Notes:
 - Accepts a comma separated list, ex. `pattern1,pattern2`.
 - Patterns use the [`.dockerignore` syntax](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
 - List of file patterns will be used by both automatic and manually run plans.
-- When not set, defaults to all `.tf`, `.tfvars`, `.tfvars.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
-   (`--autoplan-file-list='**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
+- When not set, defaults to all `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` and `.terraform.lock.hcl` files
+   (`--autoplan-file-list='**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
 - Setting `--autoplan-file-list` will override the defaults. You **must** add `**/*.tf` and other defaults if you want to include them.
+- The default is global (not distribution-aware). Both Terraform and OpenTofu installs will match `.tofu` changes. If you do not use OpenTofu, you can override the default to exclude `.tofu` patterns.
 - A custom [Workflow](repo-level-atlantis-yaml.md#configuring-planning) that uses autoplan `when_modified` will ignore this value.
 
 Examples:
@@ -198,6 +212,10 @@ Defaults to `false`. When set to `true`, Atlantis will trace the local modules o
 Included project are projects with files included by `--autoplan-file-list`.
 After tracing, Atlantis will plan any project that includes a changed module. This is equivalent to setting
 `--autoplan-modules-from-projects` to the value of `--autoplan-file-list`. See below.
+
+::: tip NOTE
+Module dependency indexing uses Terraform config inspection and may not fully support `.tofu` / `.tofu.json` files. Module calls defined only in `.tofu` files or shared module directories containing only `.tofu` files may not be traced. Direct file-change autoplanning for `.tofu` projects works regardless. Use explicit `autoplan.when_modified` patterns as a workaround. See [OpenTofu .tofu file support](terraform-versions.md#opentofu-tofu-file-support) for details.
+:::
 
 ### `--autoplan-modules-from-projects` <Badge text="v0.26.0+" type="info"/>
 
@@ -317,7 +335,7 @@ Bitbucket username (usually an email) used for API authentication with Bitbucket
 
 **Note:**
 
-- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026(see [here](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- The backward compatibility is for supporting the existing Bitbucket APP Passwords that are still valid until June 2026 (see [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Config file key:**
 
@@ -434,7 +452,7 @@ ATLANTIS_DATA_DIR="path/to/data/dir"
 ```
 
 Directory where Atlantis will store its data. Will be created if it doesn't exist.
-Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans and downloaded
+Defaults to `~/.atlantis`. Atlantis will store its database, checked out repos, Terraform plans by default, and downloaded
 Terraform binaries here. If Atlantis loses this directory, [locks](locking.md)
 will be lost and unapplied plans will be lost.
 
@@ -472,6 +490,19 @@ ATLANTIS_DISABLE_APPLY_ALL=true
 
 Disable `atlantis apply` command so a specific project/workspace/directory has to
 be specified for applies.
+
+### `--disable-automerge-label` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --disable-automerge-label="no-auto-merge"
+# or
+ATLANTIS_DISABLE_AUTOMERGE_LABEL="no-auto-merge"
+```
+
+Disable atlantis automerge only on pull requests with the specified label.
+Defaults to an empty string, so no label disables automerge by default.
+This flag has no effect unless automerge is enabled with `--automerge` or
+repo-level `automerge: true`.
 
 ### `--disable-autoplan` <Badge text="v0.15.0+" type="info"/>
 
@@ -576,7 +607,51 @@ ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 
 Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.
 
-Useful to enable for use with GitHub.
+Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
+
+### `--enable-drift-detection`
+
+```bash
+atlantis server --enable-drift-detection
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+```
+
+Enable drift detection API endpoints. Drift detection does not run Terraform apply, but
+it does execute the normal plan lifecycle, including configured pre-workflow hooks,
+custom workflows, custom plan steps, and Terraform plan commands. When enabled, Atlantis
+will initialize in-memory storage for drift detection results and a remediation service,
+making drift detection, status, and plan-only remediation endpoints functional. If drift [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks)
+are configured (`event: drift`), successful detection runs send notifications to Slack or HTTP endpoints,
+including no-drift heartbeat results. Drift detection does not bypass team allowlists or PR-state
+`plan_requirements` such as `approved` or `mergeable`; those checks fail closed when
+they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
+`--enable-drift-remediation`. Defaults to `false`.
+
+### `--enable-drift-remediation`
+
+```bash
+atlantis server --enable-drift-detection --enable-drift-remediation
+# or
+ATLANTIS_ENABLE_DRIFT_DETECTION=true
+ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
+```
+
+Enable destructive drift remediation apply actions on the `/api/drift/remediate` endpoint.
+This flag requires `--enable-drift-detection`; without it, `action: "apply"` requests are
+rejected while read-only drift detection remains available. This flag does not bypass
+repository `apply_requirements`; requirements that need pull request state fail closed for
+non-PR remediation requests. Defaults to `false`.
+
+### `--enable-external-stores`
+
+```bash
+atlantis server --enable-external-stores
+# or
+ATLANTIS_ENABLE_EXTERNAL_STORES=true
+```
+
+Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -614,7 +689,7 @@ The flag will only allow the regexes listed in the [`allowed_regexp_prefixes`](r
 
 This will not work with `-d` yet and to use `-p` the repo projects must be defined in the repo `atlantis.yaml` file.
 
-This will bypass `--restrict-file-list` if regex is used, normal commands will still be blocked if necessary.
+When `--restrict-file-list` is enabled, regex project plans are limited to matching projects with files modified in the pull request. Without `--restrict-file-list`, regex project commands can still run against all matching projects.
 
 ::: warning SECURITY WARNING
 It's not supposed to be used with `--disable-apply-all`.
@@ -632,6 +707,8 @@ ATLANTIS_EXECUTABLE_NAME="atlantis"
 Comment command trigger executable name. Defaults to `atlantis`.
 
 This is useful when running multiple Atlantis servers against a single repository.
+
+Note: the "did you mean" misspelling warning only applies to the default executable name (`atlantis`). If you set a custom `--executable-name`, Atlantis won't warn about comments that are Levenshtein-close to it — this avoids spurious warnings when multiple servers with similar names (e.g. `atlantis-dev` and `atlantis-prod`) receive the same comment.
 
 ### `--fail-on-pre-workflow-hook-error` <Badge text="v0.27.0+" type="info"/>
 
@@ -739,6 +816,8 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://github.com),
 don't set. Defaults to `github.com`.
 
+For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
+
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
@@ -766,6 +845,8 @@ In versions v0.20.1 and below, the GitHub team name required the case sensitive 
 Comma-separated list of GitHub teams and permission pairs.
 
 By default, any team can plan and apply.
+
+GitHub team hierarchy is honored. If an allowlisted team has child teams, members of those child teams inherit the parent team's allowed commands.
 
 ::: tip
 If you are using [policy checking](policy-checking.md), you must also allowlist the `policy_check` command for it to work on manual `atlantis plan` commands:
@@ -1019,6 +1100,57 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
+### `--language` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="en"
+# or
+ATLANTIS_LANGUAGE="en"
+```
+
+Language used for Atlantis pull request comments. Defaults to `en`.
+
+Supported values:
+
+- `en` (English)
+- `es` (Spanish)
+
+Atlantis normalizes locale-style values (for example `es-MX` resolves to `es`).
+If an unsupported language is configured and `--language-config-file` is not set,
+Atlantis returns a validation error at startup.
+
+Built-in language strings are loaded from:
+
+- `server/i18n/locales/en.yaml`
+- `server/i18n/locales/es.yaml`
+
+### `--language-config-file` <Badge text="v0.45.0+" type="info"/>
+
+```bash
+atlantis server --language="de" --language-config-file="/etc/atlantis/language.yaml"
+# or
+ATLANTIS_LANGUAGE_CONFIG_FILE="/etc/atlantis/language.yaml"
+```
+
+Optional path to a custom YAML language catalog. Values in this file override
+the selected built-in language, and partial overrides are supported.
+
+When `--language-config-file` is set, unsupported `--language` values are allowed
+and Atlantis falls back to built-in English for unspecified strings.
+
+Expected YAML schema:
+
+```yaml
+pull_request_label: Pull Request (custom)
+merge_request_label: Merge Request (custom)
+command_titles:
+  plan: Plan (custom)
+  apply: Apply (custom)
+```
+
+For complete markdown wording customization, keep using
+`--markdown-template-overrides-dir`.
+
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
@@ -1120,6 +1252,9 @@ This prevents merge requests from being merged until all Terraform applies are c
 
 When enabled, after running `atlantis plan`, the MR status will show as pending if there are changes
 to apply. Once all projects are successfully applied (or show no changes), the status will update to success.
+Projects with no Terraform changes are counted as up to date rather than applied. If a pull request has both
+up-to-date projects and projects still waiting to apply, the Atlantis apply commit status remains pending
+until all changed projects are applied.
 
 Defaults to `false`.
 
@@ -1325,9 +1460,18 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 ```
 
 `--restrict-file-list` will block plan requests from projects outside the files modified in the pull request.
-This will not block plan requests with regex if using the `--enable-regexp-cmd` flag, in these cases commands
-like `atlantis plan -p .*` will still work if used. normal commands will still be blocked if necessary.
+When `--enable-regexp-cmd` is also enabled, regex project plans such as `atlantis plan -p .*` are scoped to matching projects with files modified in the pull request.
 Defaults to `false`.
+
+### `--share-plan-dir`
+
+```bash
+atlantis server --share-plan-dir="path/to/local/plan/dir"
+# or
+ATLANTIS_SHARE_PLAN_DIR="path/to/local/plan/dir"
+```
+
+Directory where Atlantis will store local Terraform plan files. If unset, this defaults to the resolved `--data-dir` value so existing installations keep the same on-disk layout. When set to a different directory, checked out repositories remain under `--data-dir` and generated `.tfplan` files use the same repo, pull request, workspace, and project path layout under `--share-plan-dir`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>
 

@@ -1,0 +1,7 @@
+{{ define "multiProjectApplyFooter" -}}
+{{ if (gt (len .Results) 1) -}}
+### Resumen de apply
+
+{{ len .Results }} proyectos, {{ .NumApplySuccesses }} exitosos, {{ .NumApplyFailures }} fallidos, {{ .NumApplyErrors }} con errores
+{{ end -}}
+{{ end -}}

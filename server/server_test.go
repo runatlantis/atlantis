@@ -19,6 +19,8 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/cmd"
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/controllers"
+	events_controllers "github.com/runatlantis/atlantis/server/controllers/events"
 	"github.com/runatlantis/atlantis/server/controllers/web_templates"
 	tMocks "github.com/runatlantis/atlantis/server/controllers/web_templates/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -53,6 +55,70 @@ func TestNewServer_GitHubUser(t *testing.T) {
 		},
 	)
 	Ok(t, err)
+}
+
+func TestNewServer_EnableDriftDetectionWiresServices(t *testing.T) {
+	tmpDir := t.TempDir()
+	s, err := server.NewServer(
+		server.UserConfig{
+			DataDir:              tmpDir,
+			AtlantisURL:          testAtlantisUrl,
+			LockingDBType:        testLockingDBType,
+			GithubHostname:       testGitHubHostName,
+			GithubUser:           testGitHubUser,
+			APISecret:            "token",
+			EnableDriftDetection: true,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
+	Ok(t, err)
+
+	Assert(t, s.APIController.DriftStorage != nil, "expected drift storage to be configured")
+	Assert(t, s.APIController.RemediationService != nil, "expected remediation service to be configured")
+	Assert(t, !s.APIController.EnableDriftRemediation, "expected drift remediation apply to require explicit opt-in")
+	Assert(t, s.APIController.DriftWebhookSender != nil, "expected drift webhook sender to be configured")
+}
+
+func TestNewServer_EnableDriftRemediationWiresApplyOptIn(t *testing.T) {
+	tmpDir := t.TempDir()
+	s, err := server.NewServer(
+		server.UserConfig{
+			DataDir:                tmpDir,
+			AtlantisURL:            testAtlantisUrl,
+			LockingDBType:          testLockingDBType,
+			GithubHostname:         testGitHubHostName,
+			GithubUser:             testGitHubUser,
+			APISecret:              "token",
+			EnableDriftDetection:   true,
+			EnableDriftRemediation: true,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
+	Ok(t, err)
+
+	Assert(t, s.APIController.DriftStorage != nil, "expected drift storage to be configured")
+	Assert(t, s.APIController.RemediationService != nil, "expected remediation service to be configured")
+	Assert(t, s.APIController.EnableDriftRemediation, "expected drift remediation apply opt-in to be configured")
+}
+
+func TestNewServer_EnableDriftRemediationRequiresDriftDetection(t *testing.T) {
+	tmpDir := t.TempDir()
+	_, err := server.NewServer(
+		server.UserConfig{
+			DataDir:                tmpDir,
+			AtlantisURL:            testAtlantisUrl,
+			LockingDBType:          testLockingDBType,
+			GithubHostname:         testGitHubHostName,
+			GithubUser:             testGitHubUser,
+			APISecret:              "token",
+			EnableDriftRemediation: true,
+		}, server.Config{
+			AtlantisVersion: testAtlantisVersion,
+		},
+	)
+	ErrContains(t, "--enable-drift-remediation requires --enable-drift-detection", err)
 }
 
 // todo: test what happens if we set different flags. The generated config should be different.
@@ -281,6 +347,51 @@ func TestParseAtlantisURL(t *testing.T) {
 				Ok(t, err)
 				Equals(t, c.ExpURL, act.String())
 			}
+		})
+	}
+}
+
+func TestSetupRoutes_APIRoutesRegistered(t *testing.T) {
+	t.Log("All API routes should be registered after SetupRoutes()")
+
+	s := server.Server{
+		Router:              mux.NewRouter(),
+		APIController:       &controllers.APIController{},
+		StatusController:    &controllers.StatusController{},
+		LocksController:     &controllers.LocksController{},
+		GithubAppController: &controllers.GithubAppController{},
+		JobsController:      &controllers.JobsController{},
+		VCSEventsController: &events_controllers.VCSEventsController{},
+		Logger:              logging.NewNoopLogger(t),
+	}
+
+	s.SetupRoutes()
+
+	cases := []struct {
+		method string
+		path   string
+	}{
+		// Core API endpoints
+		{"POST", "/api/plan"},
+		{"POST", "/api/apply"},
+		{"GET", "/api/locks"},
+		// Drift detection endpoints
+		{"GET", "/api/drift/status"},
+		{"POST", "/api/drift/detect"},
+		// Remediation endpoints
+		{"GET", "/api/drift/remediate/some-id"},
+		{"GET", "/api/drift/remediate"},
+		{"POST", "/api/drift/remediate"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.method+" "+c.path, func(t *testing.T) {
+			req, err := http.NewRequest(c.method, c.path, nil)
+			Ok(t, err)
+
+			var match mux.RouteMatch
+			Assert(t, s.Router.Match(req, &match),
+				"route %s %s should be registered but was not found", c.method, c.path)
 		})
 	}
 }

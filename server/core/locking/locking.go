@@ -34,6 +34,7 @@ type Client struct {
 type Locker interface {
 	TryLock(p models.Project, workspace string, pull models.PullRequest, user models.User) (TryLockResponse, error)
 	Unlock(key string) (*models.ProjectLock, error)
+	UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error)
 	List() (map[string]models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)
 	GetLock(key string) (*models.ProjectLock, error)
@@ -75,6 +76,11 @@ func (c *Client) Unlock(key string) (*models.ProjectLock, error) {
 		return nil, err
 	}
 	return c.database.Unlock(project, workspace)
+}
+
+// UnlockIfOwnedByPull unlocks project and workspace only when it is still owned by pullNum.
+func (c *Client) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	return c.database.UnlockIfOwnedByPull(project, workspace, pullNum)
 }
 
 // List returns a map of all locks with their lock key as the map key.
@@ -151,6 +157,11 @@ func (c *NoOpLocker) TryLock(p models.Project, workspace string, _ models.PullRe
 // pointer will be nil. An error will only be returned if there was
 // an error deleting the lock (i.e. not if there was no lock).
 func (c *NoOpLocker) Unlock(_ string) (*models.ProjectLock, error) {
+	return nil, nil
+}
+
+// UnlockIfOwnedByPull is a no-op for commands that do not use repository locks.
+func (c *NoOpLocker) UnlockIfOwnedByPull(_ models.Project, _ string, _ int) (*models.ProjectLock, error) {
 	return nil, nil
 }
 

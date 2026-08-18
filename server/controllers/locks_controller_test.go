@@ -306,6 +306,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
 	// Seed the DB with a successful plan for that project (that is later discarded).
 	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
@@ -362,6 +363,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
 	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
@@ -389,6 +391,8 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	tmp := t.TempDir()
 	database, err := boltdb.New(tmp)
 	Ok(t, err)
+	defer closeTestDatabase(t, database)
+
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
@@ -416,4 +420,9 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	cp.VerifyWasCalled(Once()).CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num),
 		Eq("**Warning**: The plan for dir: `path` workspace: `workspace` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again."), Eq(""))
+}
+
+func closeTestDatabase(t *testing.T, database db.Database) {
+	t.Helper()
+	Ok(t, database.Close())
 }

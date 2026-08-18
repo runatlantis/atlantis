@@ -217,6 +217,85 @@ func TestRunProjectCmdsWithCancellationTracker_NoCancellation(t *testing.T) {
 	assert.False(t, result.HasErrors())
 }
 
+func TestRunProjectCmdsWithCancellationTracker_ParallelPlanAndApplyRunConcurrently(t *testing.T) {
+	for _, cmdName := range []command.Name{command.Plan, command.Apply} {
+		t.Run(cmdName.String(), func(t *testing.T) {
+			tracker := NewCancellationTracker()
+			pull := models.PullRequest{Num: 4}
+			ctx := makeCtx(t, pull)
+			release := make(chan struct{})
+			var releaseOnce sync.Once
+			t.Cleanup(func() {
+				releaseOnce.Do(func() {
+					close(release)
+				})
+			})
+
+			entered := make(chan string, 2)
+			completed := make(chan string, 2)
+			resultCh := make(chan command.Result, 1)
+
+			cmds := []command.ProjectContext{
+				makeProjectContext("p1"),
+				makeProjectContext("p2"),
+			}
+			for i := range cmds {
+				cmds[i].CommandName = cmdName
+			}
+
+			blockingRunner := func(cmd command.ProjectContext) command.ProjectCommandOutput {
+				entered <- cmd.ProjectName
+				<-release
+				completed <- cmd.ProjectName
+
+				if cmd.CommandName == command.Apply {
+					return command.ProjectCommandOutput{ApplySuccess: "success"}
+				}
+				return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+			}
+
+			go func() {
+				resultCh <- runProjectCmdsWithCancellationTracker(ctx, cmds, tracker, 2, true, blockingRunner)
+			}()
+
+			enteredProjects := map[string]bool{}
+			for len(enteredProjects) < 2 {
+				select {
+				case projectName := <-entered:
+					enteredProjects[projectName] = true
+				case <-time.After(2 * time.Second):
+					t.Fatalf("timed out waiting for both %s projects to enter execution; entered=%v", cmdName.String(), enteredProjects)
+				}
+			}
+
+			select {
+			case projectName := <-completed:
+				t.Fatalf("%s project %q completed before release", cmdName.String(), projectName)
+			default:
+			}
+
+			releaseOnce.Do(func() {
+				close(release)
+			})
+
+			var result command.Result
+			select {
+			case result = <-resultCh:
+			case <-time.After(2 * time.Second):
+				t.Fatalf("timed out waiting for %s result after release", cmdName.String())
+			}
+
+			require.Len(t, result.ProjectResults, 2)
+			assert.False(t, result.HasErrors())
+			for _, projectName := range []string{"p1", "p2"} {
+				projectResult := findResult(result, projectName)
+				require.NotNil(t, projectResult)
+				require.NoError(t, projectResult.Error)
+			}
+		})
+	}
+}
+
 func TestRunProjectCmdsWithCancellationTracker_CancelBetweenGroups(t *testing.T) {
 	tracker := NewCancellationTracker()
 	pull := models.PullRequest{Num: 2}

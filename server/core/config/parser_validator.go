@@ -19,7 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	yaml "gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // ParserValidator parses and validates server-side repo config files and
@@ -60,8 +60,8 @@ func (p *ParserValidator) ParseRepoCfg(absRepoDir string, globalCfg valid.Global
 	var rawConfig raw.RepoCfg
 	decoder := yaml.NewDecoder(bytes.NewReader(configData))
 	decoder.KnownFields(true)
-	err = decoder.Decode(&rawConfig)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err = decodeYAML(decoder, &rawConfig)
+	if err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -84,8 +84,8 @@ func (p *ParserValidator) ParseRepoCfgData(repoCfgData []byte, globalCfg valid.G
 	decoder := yaml.NewDecoder(bytes.NewReader(repoCfgData))
 	decoder.KnownFields(true)
 
-	err := decoder.Decode(&rawConfig)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err := decodeYAML(decoder, &rawConfig)
+	if err != nil {
 		return valid.RepoCfg{}, err
 	}
 
@@ -152,12 +152,46 @@ func (p *ParserValidator) ParseGlobalCfg(configFile string, defaultCfg valid.Glo
 	decoder := yaml.NewDecoder(bytes.NewReader(configData))
 	decoder.KnownFields(true)
 
-	err = decoder.Decode(&rawCfg)
-	if err != nil && !errors.Is(err, io.EOF) {
+	err = decodeYAML(decoder, &rawCfg)
+	if err != nil {
 		return valid.GlobalCfg{}, err
 	}
 
 	return p.validateRawGlobalCfg(rawCfg, defaultCfg, "yaml")
+}
+
+func decodeYAML(decoder *yaml.Decoder, out any) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("parsing yaml: %v", recovered)
+		}
+	}()
+
+	var node yaml.Node
+	err = decoder.Decode(&node)
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	stringifyTimestampScalars(&node)
+	return node.Load(out, yaml.WithKnownFields())
+}
+
+func stringifyTimestampScalars(node *yaml.Node) {
+	if node == nil {
+		return
+	}
+	// v3 decoded unquoted timestamp-like scalars into string fields. Preserve that
+	// Atlantis config compatibility before v4 constructs Go values from the node.
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!timestamp" {
+		node.Tag = "!!str"
+	}
+	for _, child := range node.Content {
+		stringifyTimestampScalars(child)
+	}
 }
 
 // ParseGlobalCfgJSON parses a json string cfgJSON into global config.
@@ -257,8 +291,7 @@ func (p *ParserValidator) applyLegacyShellParsing(cfg *valid.RepoCfg) error {
 }
 
 // expandProjectGlobs expands projects with glob patterns in their dir field
-// into multiple projects, one for each matching directory that contains
-// Terraform files (.tf).
+// into multiple projects, one for each matching directory that appears to be a terraform directory
 func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.Project) ([]raw.Project, error) {
 	var expandedProjects []raw.Project
 
@@ -284,12 +317,11 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 				continue
 			}
 
-			// Check if the directory contains any .tf files
-			hasTerraformFiles, err := p.dirContainsTerraformFiles(match)
+			isTerraformProjectDir, err := raw.IsTerraformProjectDir(match)
 			if err != nil {
-				return nil, fmt.Errorf("error checking for Terraform files in %q: %w", match, err)
+				return nil, fmt.Errorf("error checking for Terraform project in %q: %w", match, err)
 			}
-			if !hasTerraformFiles {
+			if !isTerraformProjectDir {
 				continue
 			}
 
@@ -307,20 +339,6 @@ func (p *ParserValidator) expandProjectGlobs(absRepoDir string, projects []raw.P
 	}
 
 	return expandedProjects, nil
-}
-
-// dirContainsTerraformFiles returns true if the directory contains at least one .tf file.
-func (p *ParserValidator) dirContainsTerraformFiles(dir string) (bool, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".tf") {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // copyProjectWithDir creates a copy of a project with a new directory value.

@@ -270,6 +270,11 @@ commands. We can use this functionality to enable
 
 You can either use your repo's `atlantis.yaml` file or the Atlantis server's `repos.yaml` file.
 
+Atlantis selects each project's Terraform distribution and version. In the workflows below,
+`ATLANTIS_TERRAFORM_DISTRIBUTION` expands to the executable prefix (`terraform` or `tofu`), and combining it with
+`ATLANTIS_TERRAFORM_VERSION` points Terragrunt at the same versioned binary. This also supports repositories containing
+both Terraform and OpenTofu projects.
+
 Given a directory structure:
 
 ```plain
@@ -285,7 +290,6 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TG_TF_PATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
@@ -296,7 +300,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -311,7 +315,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -321,7 +325,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           name: TF_VAR_author
           command: 'git show -s --format="%ae" $HEAD_COMMIT'
@@ -331,7 +335,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
@@ -351,7 +355,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -363,7 +367,7 @@ workflows:
       steps:
       - env:
           name: TG_TF_PATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -580,9 +584,9 @@ A map from string to `extra_args` for a built-in command with extra arguments.
     extra_args: [arg1, arg2]
 ```
 
-| Key                             | Type                               | Default | Required | Description                                                                                                                                                               |
-|---------------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
 
@@ -625,7 +629,7 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
 ```
 
 | Key | Type | Default | Required | Description |
-|-----|-----|-----|-----|-----|
+| ----- | ----- | ----- | ----- | ----- |
 | run | map\[string -> string\] | none | no | Run a custom command |
 | run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
@@ -643,6 +647,11 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
   * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
       either be generated (by plan) or already exist (if running apply). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+      A workflow whose `plan` and `apply` are both made up entirely of custom `run` steps
+      may write its plan to a path of its own choosing instead of `$PLANFILE`. Atlantis
+      does not require, hash, or delete a plan artifact for such a workflow; it still
+      validates the project's recorded plan state before running `apply`. As soon as a
+      workflow uses the built-in `plan` or `apply` step, the plan must be at `$PLANFILE`.
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
@@ -700,11 +709,11 @@ as the environment variable value.
       - "-c"
 ```
 
-| Key             | Type                  | Default | Required | Description                                                                                                     |
-|-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
-| env | map\[string -> string\] | none    | no       | Set environment variables for subsequent steps                                                                  |
-| env.name | string | none | yes | Name of the environment variable                                                                                |
-| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
+| Key | Type | Default | Required | Description |
+| ----------------- | ----------------------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| env | map\[string -> string\] | none | no | Set environment variables for subsequent steps |
+| env.name | string | none | yes | Name of the environment variable |
+| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command` |
 | env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
 | env.shell | string | "sh" | no | Name of the shell to use for command execution. Cannot be set without `command` |
 | env.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
@@ -742,13 +751,13 @@ Full:
     output: show
 ```
 
-| Key                | Type                  | Default | Required | Description                                                                         |
-|--------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
-| multienv           | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
-| multienv.command   | string                | none    | yes      | Name of the custom script to run                                                    |
-| multienv.shell     | string                | "sh"    | no       | Name of the shell to use for command execution                                      |
-| multienv.shellArgs | string or []string    | "-c"    | no       | Command line arguments to be passed to the shell. Cannot be set without `shell`     |
-| multienv.output    | string                | "show"  | no       | Setting output to "hide" will suppress the message about added environment variables |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| multienv | map[string -> string] | none | no | Run a custom command and add printed environment variables |
+| multienv.command | string | none | yes | Name of the custom script to run |
+| multienv.shell | string | "sh" | no | Name of the shell to use for command execution |
+| multienv.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
+| multienv.output | string | "show" | no | Setting output to "hide" will suppress the message about added environment variables |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`

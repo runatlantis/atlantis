@@ -18,6 +18,7 @@ import (
 type Database interface {
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
+	UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error)
 	List() ([]models.ProjectLock, error)
 	GetLock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error)

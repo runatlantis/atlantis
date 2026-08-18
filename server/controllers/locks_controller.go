@@ -96,7 +96,7 @@ func (l *LocksController) GetLock(w http.ResponseWriter, r *http.Request) {
 
 	err = l.LockDetailTemplate.Execute(w, viewData)
 	if err != nil {
-		l.Logger.Err(err.Error())
+		l.Logger.Err("%s", err.Error())
 	}
 }
 

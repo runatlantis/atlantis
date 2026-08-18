@@ -48,17 +48,20 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 
-	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
-
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return
+	}
 	if err != nil {
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
 			ctx.Log.Warn("unable to update commit status: %s", statusErr)
 		}
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
 		return
+	}
+
+	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
@@ -68,7 +71,7 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 			// with 0/0 projects approve_policies successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
 			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, 0, 0); err != nil {
+			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
 				ctx.Log.Warn("unable to update commit status: %s", err)
 			}
 		}
@@ -92,6 +95,10 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	a.updateCommitStatus(ctx, pullStatus)
 }
 
+func (a *ApprovePoliciesCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
+	return MarkCommandSkippedIfIgnoredTarget(ctx, cmd.CommandName(), cmd, a.prjCmdBuilder)
+}
+
 func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
 	var numSuccess int
 	var numErrored int
@@ -104,7 +111,7 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, 
 		status = models.FailedCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, numSuccess, len(pullStatus.Projects)); err != nil {
+	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored}); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
 	}
 }

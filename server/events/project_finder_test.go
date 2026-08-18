@@ -5,9 +5,11 @@
 package events_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/config/raw"
@@ -16,6 +18,30 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
+
+// warnRecorder wraps a logger and records Warn messages for assertions.
+type warnRecorder struct {
+	logging.SimpleLogging
+	warnings []string
+}
+
+func newWarnRecorder(t *testing.T) *warnRecorder {
+	return &warnRecorder{SimpleLogging: logging.NewNoopLogger(t)}
+}
+
+func (w *warnRecorder) Warn(format string, a ...any) {
+	w.warnings = append(w.warnings, fmt.Sprintf(format, a...))
+	w.SimpleLogging.Warn(format, a...)
+}
+
+func (w *warnRecorder) hasWarnContaining(substr string) bool {
+	for _, msg := range w.warnings {
+		if strings.Contains(msg, substr) {
+			return true
+		}
+	}
+	return false
+}
 
 var modifiedRepo = "owner/repo"
 var m = events.DefaultProjectFinder{}
@@ -96,37 +122,192 @@ func TestDetermineWorkspaceFromHCL(t *testing.T) {
 	cases := []struct {
 		description       string
 		repoDir           string
+		distribution      string
 		expectedWorkspace string
 	}{
 		{
-			"Should use configured Terraform Cloud workspace",
+			"Should use configured Terraform Cloud workspace from .tf",
 			"workspace-configured",
+			"",
 			"test-workspace",
 		},
 		{
 			"If no 'cloud' block was configured, it should use 'default' workspace",
 			"no-cloud-block",
+			"",
 			"default",
 		},
 		{
 			"If 'cloud' was specify but without `name` attribute, it should use 'default' workspace",
 			"cloud-block-without-workspace-name",
+			"",
+			"default",
+		},
+		{
+			"OpenTofu: detect workspace from .tofu file",
+			"workspace-tofu-only",
+			"opentofu",
+			"tofu-workspace",
+		},
+		{
+			"OpenTofu: detect workspace from .tofu.json file",
+			"workspace-tofu-json-only",
+			"opentofu",
+			"tofu-json-workspace",
+		},
+		{
+			"OpenTofu: .tofu workspace overrides same-basename .tf",
+			"workspace-tofu-overrides-tf",
+			"opentofu",
+			"tofu-workspace",
+		},
+		{
+			"Terraform: ignores .tofu file, returns default",
+			"workspace-tofu-only",
+			"",
+			"default",
+		},
+		{
+			"Terraform: ignores .tofu.json file, returns default",
+			"workspace-tofu-json-only",
+			"",
+			"default",
+		},
+		{
+			"Terraform: with same-basename .tf and .tofu, reads .tf",
+			"workspace-tofu-overrides-tf",
+			"",
+			"tf-workspace",
+		},
+		{
+			"Terraform: .tf.json happy path",
+			"workspace-tf-json-only",
+			"",
+			"tf-json-workspace",
+		},
+		{
+			"OpenTofu: .tf.json happy path (compatibility)",
+			"workspace-tf-json-only",
+			"opentofu",
+			"tf-json-workspace",
+		},
+		{
+			"OpenTofu: reads .tf without .tofu present",
+			"workspace-configured",
+			"opentofu",
+			"test-workspace",
+		},
+		{
+			"OpenTofu: .tofu.json overrides same-basename .tf.json",
+			"workspace-json-precedence",
+			"opentofu",
+			"tofu-json-workspace",
+		},
+		{
+			"Terraform: .tf.json wins over .tofu.json",
+			"workspace-json-precedence",
+			"",
+			"tf-json-workspace",
+		},
+		{
+			"Terraform: ignores malformed .tofu, returns default",
+			"workspace-malformed-tofu",
+			"",
+			"default",
+		},
+		{
+			"OpenTofu: malformed .tofu returns default",
+			"workspace-malformed-tofu",
+			"opentofu",
 			"default",
 		},
 	}
 
 	for _, c := range cases {
-		fullPath := filepath.Join("testdata/test-repos", c.repoDir)
-		got, err := m.DetermineWorkspaceFromHCL(noopLogger, fullPath)
-		if err != nil {
-			t.Error("got error:", err)
-			break
-		}
-		if got != c.expectedWorkspace {
-			t.Fatalf("Expected %s but got %s", c.expectedWorkspace, got)
-		}
+		t.Run(c.description, func(t *testing.T) {
+			fullPath := filepath.Join("testdata/test-repos", c.repoDir)
+			got, err := m.DetermineWorkspaceFromHCL(noopLogger, fullPath, c.distribution)
+			if err != nil {
+				t.Fatal("got error:", err)
+			}
+			if got != c.expectedWorkspace {
+				t.Fatalf("Expected %q but got %q", c.expectedWorkspace, got)
+			}
+		})
+	}
+}
+
+func TestDetermineWorkspaceFromHCL_MalformedFiles(t *testing.T) {
+	cases := []struct {
+		description       string
+		repoDir           string
+		distribution      string
+		expectedWorkspace string
+		expectWarn        string // substring expected in warnings; "" means no warning expected
+	}{
+		{
+			"Terraform: valid .tf sibling + malformed .tofu → reads .tf, no .tofu warning",
+			"workspace-tf-plus-malformed-tofu",
+			"",
+			"tf-workspace",
+			"",
+		},
+		{
+			"OpenTofu: valid .tf sibling + malformed .tofu → precedence suppresses .tf, default workspace",
+			"workspace-tf-plus-malformed-tofu",
+			"opentofu",
+			"default",
+			"",
+		},
+		{
+			"Terraform: malformed .tf.json → parse fails silently, returns default",
+			"workspace-malformed-tf-json",
+			"",
+			"default",
+			"",
+		},
+		{
+			"OpenTofu: malformed .tf.json → parse fails silently, returns default",
+			"workspace-malformed-tf-json",
+			"opentofu",
+			"default",
+			"",
+		},
+		{
+			"Terraform: malformed .tofu.json only → ignored, no warning",
+			"workspace-malformed-tofu-json",
+			"",
+			"default",
+			"",
+		},
+		{
+			"OpenTofu: malformed .tofu.json → parse fails silently, returns default",
+			"workspace-malformed-tofu-json",
+			"opentofu",
+			"default",
+			"",
+		},
 	}
 
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			recorder := newWarnRecorder(t)
+			fullPath := filepath.Join("testdata/test-repos", c.repoDir)
+			got, err := m.DetermineWorkspaceFromHCL(recorder, fullPath, c.distribution)
+			if err != nil {
+				t.Fatal("got error:", err)
+			}
+			if got != c.expectedWorkspace {
+				t.Fatalf("Expected workspace %q but got %q", c.expectedWorkspace, got)
+			}
+			if c.expectWarn != "" && !recorder.hasWarnContaining(c.expectWarn) {
+				t.Fatalf("Expected warning containing %q, got: %v", c.expectWarn, recorder.warnings)
+			}
+			if c.expectWarn == "" && len(recorder.warnings) > 0 {
+				t.Fatalf("Expected no warnings, got: %v", recorder.warnings)
+			}
+		})
+	}
 }
 
 func TestDetermineProjects(t *testing.T) {
@@ -479,7 +660,7 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 						Dir: "project2",
 						Autoplan: valid.Autoplan{
 							Enabled:      true,
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 						},
 					},
 				},

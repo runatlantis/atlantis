@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/utils"
 )
 
@@ -22,19 +24,33 @@ type PendingPlanFinder interface {
 }
 
 // DefaultPendingPlanFinder finds unapplied plans.
-type DefaultPendingPlanFinder struct{}
+type DefaultPendingPlanFinder struct {
+	Log               logging.SimpleLogging
+	DataDir           string
+	LocalSharePlanDir string
+}
 
 // PendingPlan is a plan that has not been applied.
 type PendingPlan struct {
 	// RepoDir is the absolute path to the root of the repo that holds this
-	// plan.
+	// plan's workspace clone.
 	RepoDir string
+	// PlanDir is the absolute path to the root of the workspace plan store.
+	// If empty, RepoDir is used for backward compatibility.
+	PlanDir string
 	// RepoRelDir is the relative path from the repo to the project that
 	// the plan is for.
 	RepoRelDir string
 	// Workspace is the workspace this plan should execute in.
 	Workspace   string
 	ProjectName string
+}
+
+func (p PendingPlan) planRepoDir() string {
+	if p.PlanDir != "" {
+		return p.PlanDir
+	}
+	return p.RepoDir
 }
 
 // Find finds all pending plans in pullDir. pullDir should be the working
@@ -45,16 +61,82 @@ func (p *DefaultPendingPlanFinder) Find(pullDir string) ([]PendingPlan, error) {
 	return plans, err
 }
 
+func (p *DefaultPendingPlanFinder) debug(format string, args ...any) {
+	if p.Log != nil {
+		p.Log.Debug(format, args...)
+	}
+}
+
 func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPlan, []string, error) {
+	planPullDir, separatePlanDir, err := p.planPullDir(pullDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	if separatePlanDir {
+		return p.findInPlanStore(pullDir, planPullDir)
+	}
+	return p.findInGitWorkspaces(pullDir)
+}
+
+func (p *DefaultPendingPlanFinder) planPullDir(pullDir string) (string, bool, error) {
+	if p.DataDir == "" || p.LocalSharePlanDir == "" {
+		return pullDir, false, nil
+	}
+
+	cloneRoot := filepath.Clean(filepath.Join(p.DataDir, workingDirPrefix))
+	cleanPullDir := filepath.Clean(pullDir)
+	relPullDir, err := filepath.Rel(cloneRoot, cleanPullDir)
+	if err != nil {
+		return "", false, fmt.Errorf("checking pull directory %q: %w", pullDir, err)
+	}
+	if relPullDir == ".." || filepath.IsAbs(relPullDir) || strings.HasPrefix(relPullDir, ".."+string(filepath.Separator)) {
+		return "", false, fmt.Errorf("pull directory %q escapes clone root %q", pullDir, cloneRoot)
+	}
+
+	// SecureJoin resolves the PR-derived relative path against the plan store
+	// repos root and guarantees the result stays within it (rejecting "..",
+	// absolute paths, and symlink escapes).
+	planStoreRoot := filepath.Join(p.LocalSharePlanDir, workingDirPrefix)
+	planPullDir, err := securejoin.SecureJoin(planStoreRoot, relPullDir)
+	if err != nil {
+		return "", false, fmt.Errorf("resolving plan pull directory for %q: %w", pullDir, err)
+	}
+	return planPullDir, filepath.Clean(planPullDir) != cleanPullDir, nil
+}
+
+func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]PendingPlan, []string, error) {
 	workspaceDirs, err := os.ReadDir(pullDir)
 	if err != nil {
 		return nil, nil, err
 	}
+	absPullDir, err := filepath.Abs(pullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute pull directory: %w", err)
+	}
+
 	var plans []PendingPlan
 	var absPaths []string
 	for _, workspaceDir := range workspaceDirs {
+		// Skip non-directory entries (files, symlinks); workspace clones are always directories.
+		if !workspaceDir.IsDir() {
+			continue
+		}
+
 		workspace := workspaceDir.Name()
-		repoDir := filepath.Join(pullDir, workspace)
+		repoDir, err := workspaceRepoDir(absPullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Skip directories that are not workspace clone roots (e.g. stray
+		// directories left by external processes).
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(repoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			continue
+		}
 
 		// Any generated plans should be untracked by git since Atlantis created
 		// them.
@@ -86,6 +168,140 @@ func (p *DefaultPendingPlanFinder) findWithAbsPaths(pullDir string) ([]PendingPl
 		}
 	}
 	return plans, absPaths, nil
+}
+
+func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPullDir string) ([]PendingPlan, []string, error) {
+	// Defense-in-depth: re-anchor the caller-supplied planPullDir under the plan
+	// store root via SecureJoin at the point of use, so the path handed to
+	// os.ReadDir is provably contained within that root regardless of how the
+	// caller built it. This is idempotent for values produced by planPullDir().
+	planStoreRoot := filepath.Join(p.LocalSharePlanDir, workingDirPrefix)
+	relPlanPullDir, err := filepath.Rel(planStoreRoot, planPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("checking plan pull directory %q: %w", planPullDir, err)
+	}
+	planPullDir, err = securejoin.SecureJoin(planStoreRoot, relPlanPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving plan pull directory %q: %w", planPullDir, err)
+	}
+	workspaceDirs, err := os.ReadDir(planPullDir)
+	if os.IsNotExist(err) {
+		p.debug("plan store pull directory %q does not exist", planPullDir)
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	absClonePullDir, err := filepath.Abs(clonePullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute clone pull directory: %w", err)
+	}
+	absPlanPullDir, err := filepath.Abs(planPullDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting absolute plan pull directory: %w", err)
+	}
+
+	var plans []PendingPlan
+	var absPaths []string
+	for _, workspaceDir := range workspaceDirs {
+		if !workspaceDir.IsDir() {
+			p.debug("skipping plan store entry %q because it is not a directory", filepath.Join(absPlanPullDir, workspaceDir.Name()))
+			continue
+		}
+
+		workspace := workspaceDir.Name()
+		cloneRepoDir, err := workspaceRepoDir(absClonePullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+		cloneRepoInfo, err := os.Stat(cloneRepoDir)
+		if os.IsNotExist(err) {
+			p.debug("skipping plan store workspace %q because clone directory %q does not exist", workspace, cloneRepoDir)
+			continue
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if !cloneRepoInfo.IsDir() {
+			p.debug("skipping plan store workspace %q because clone path %q is not a directory", workspace, cloneRepoDir)
+			continue
+		}
+		workspaceIsGitRoot, err := isGitWorkTreeRoot(cloneRepoDir)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspaceIsGitRoot {
+			p.debug("skipping plan store workspace %q because clone directory %q is not a git worktree root", workspace, cloneRepoDir)
+			continue
+		}
+		planRepoDir, err := workspaceRepoDir(absPlanPullDir, workspace)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := filepath.WalkDir(planRepoDir, func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() {
+				if entry.Name() == ".terragrunt-cache" {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if filepath.Ext(path) != ".tfplan" {
+				return nil
+			}
+
+			relFile, err := filepath.Rel(planRepoDir, path)
+			if err != nil {
+				return fmt.Errorf("checking plan path %q: %w", path, err)
+			}
+			projectName, err := runtime.ProjectNameFromPlanfile(workspace, filepath.Base(relFile))
+			if err != nil {
+				return err
+			}
+			plans = append(plans, PendingPlan{
+				RepoDir:     cloneRepoDir,
+				PlanDir:     planRepoDir,
+				RepoRelDir:  filepath.Dir(relFile),
+				Workspace:   workspace,
+				ProjectName: projectName,
+			})
+			absPaths = append(absPaths, path)
+			return nil
+		}); err != nil {
+			return nil, nil, err
+		}
+	}
+	return plans, absPaths, nil
+}
+
+// workspaceRepoDir resolves a workspace name (derived from PR-controlled data)
+// against absPullDir. SecureJoin guarantees the result stays within absPullDir,
+// rejecting traversal via "..", absolute paths, or symlink escapes.
+func workspaceRepoDir(absPullDir, workspace string) (string, error) {
+	repoDir, err := securejoin.SecureJoin(absPullDir, workspace)
+	if err != nil {
+		return "", fmt.Errorf("checking workspace directory %q: %w", workspace, err)
+	}
+	return repoDir, nil
+}
+
+func isGitWorkTreeRoot(repoDir string) (bool, error) {
+	showPrefixCmd := exec.Command("git", "rev-parse", "--is-inside-work-tree", "--show-prefix") // nolint: gosec
+	showPrefixCmd.Dir = repoDir
+	showPrefixOut, err := showPrefixCmd.CombinedOutput()
+	if err != nil {
+		output := string(showPrefixOut)
+		if strings.Contains(output, "not a git repository") || strings.Contains(output, "must be run in a work tree") {
+			return false, nil
+		}
+		return false, fmt.Errorf("checking git repository in '%s' directory: %s: %w", repoDir, output, err)
+	}
+	lines := strings.Split(string(showPrefixOut), "\n")
+	return len(lines) >= 2 && lines[0] == "true" && lines[1] == "", nil
 }
 
 // deletePlans deletes all plans in pullDir.

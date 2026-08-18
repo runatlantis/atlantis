@@ -131,6 +131,9 @@ type CommentCommand struct {
 	// project specified in an atlantis.yaml file.
 	// If empty then the comment specified no project.
 	ProjectName string
+	// DiscoverAllProjects is true when API drift detection should enumerate all
+	// configured or auto-discovered projects without consulting PR modified files.
+	DiscoverAllProjects bool
 	// PolicySet is the name of a policy set to run an approval on.
 	PolicySet string
 	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.
@@ -461,6 +464,7 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 
 	pull = models.PullRequest{
 		Num:        *event.PullRequest.ID,
+		Body:       bitbucketCloudPullRequestBody(event.PullRequest),
 		HeadCommit: *event.PullRequest.Source.Commit.Hash,
 		URL:        *event.PullRequest.Links.HTML.HREF,
 		HeadBranch: *event.PullRequest.Source.Branch.Name,
@@ -473,6 +477,19 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 		Username: *event.Actor.AccountID,
 	}
 	return
+}
+
+func bitbucketCloudPullRequestBody(pull *bitbucketcloud.PullRequest) string {
+	if pull == nil {
+		return ""
+	}
+	if pull.Description != nil {
+		return *pull.Description
+	}
+	if pull.Summary != nil && pull.Summary.Raw != nil {
+		return *pull.Summary.Raw
+	}
+	return ""
 }
 
 // ParseBitbucketCloudPullEvent parses a pull request event from Bitbucket
@@ -615,6 +632,7 @@ func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github
 
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
+		Body:       pull.GetBody(),
 		HeadBranch: headBranch,
 		HeadCommit: commit,
 		URL:        url,
@@ -683,6 +701,7 @@ func (e *EventParser) ParseGitlabMergeRequestEvent(event gitlab.MergeEvent) (pul
 	pull = models.PullRequest{
 		URL:        event.ObjectAttributes.URL,
 		Author:     event.User.Username,
+		Body:       event.ObjectAttributes.Description,
 		Num:        event.ObjectAttributes.IID,
 		HeadCommit: event.ObjectAttributes.LastCommit.ID,
 		HeadBranch: event.ObjectAttributes.SourceBranch,
@@ -777,6 +796,7 @@ func (e *EventParser) ParseGitlabMergeRequest(mr *gitlab.MergeRequest, baseRepo 
 	return models.PullRequest{
 		URL:        mr.WebURL,
 		Author:     mr.Author.Username,
+		Body:       mr.Description,
 		Num:        mr.IID,
 		HeadCommit: mr.SHA,
 		HeadBranch: mr.SourceBranch,
@@ -862,6 +882,7 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 
 	pull = models.PullRequest{
 		Num:        *event.PullRequest.ID,
+		Body:       bitbucketServerPullRequestBody(event.PullRequest),
 		HeadCommit: *event.PullRequest.FromRef.LatestCommit,
 		URL:        fmt.Sprintf("%s/projects/%s/repos/%s/pull-requests/%d", e.BitbucketServerURL, *event.PullRequest.ToRef.Repository.Project.Key, *event.PullRequest.ToRef.Repository.Slug, *event.PullRequest.ID),
 		HeadBranch: *event.PullRequest.FromRef.DisplayID,
@@ -874,6 +895,13 @@ func (e *EventParser) parseCommonBitbucketServerEventData(event bitbucketserver.
 		Username: *event.Actor.Username,
 	}
 	return
+}
+
+func bitbucketServerPullRequestBody(pull *bitbucketserver.PullRequest) string {
+	if pull == nil || pull.Description == nil {
+		return ""
+	}
+	return *pull.Description
 }
 
 // ParseBitbucketServerPullEvent parses a pull request event from Bitbucket
@@ -978,13 +1006,14 @@ func (e *EventParser) ParseAzureDevopsPull(pull *azuredevops.GitPullRequest) (pu
 	if err != nil {
 		return
 	}
-	pullState := models.ClosedPullState
-	if *pull.Status == azuredevops.PullActive.String() {
-		pullState = models.OpenPullState
+	pullState := models.OpenPullState
+	if pull.Status != nil && *pull.Status != azuredevops.PullActive.String() {
+		pullState = models.ClosedPullState
 	}
 
 	pullModel = models.PullRequest{
 		Author: authorUsername,
+		Body:   pull.GetDescription(),
 		// Change webhook refs from "refs/heads/<branch>" to "<branch>"
 		HeadBranch: strings.Replace(headBranch, "refs/heads/", "", 1),
 		HeadCommit: commit,
@@ -1104,6 +1133,7 @@ func (e *EventParser) ParseGiteaPullRequestEvent(event giteasdk.PullRequest) (mo
 		HeadBranch: (*event.Head).Ref,
 		BaseBranch: event.Base.Ref,
 		Author:     event.Poster.UserName,
+		Body:       event.Body,
 		BaseRepo:   baseRepo,
 	}
 
@@ -1166,6 +1196,7 @@ func (e *EventParser) ParseGiteaPull(pull *giteasdk.PullRequest) (pullModel mode
 
 	pullModel = models.PullRequest{
 		Author:     authorUsername,
+		Body:       pull.Body,
 		HeadBranch: headBranch,
 		HeadCommit: commit,
 		URL:        url,

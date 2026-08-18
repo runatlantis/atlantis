@@ -10,20 +10,21 @@ import (
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 type importStepRunner struct {
 	terraformExecutor     TerraformExec
 	defaultTFDistribution terraform.Distribution
 	defaultTFVersion      *version.Version
+	planStore             PlanStore
 }
 
-func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version) Runner {
+func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, planStore PlanStore) Runner {
 	runner := &importStepRunner{
 		terraformExecutor:     terraformExecutor,
 		defaultTFDistribution: defaultTfDistribution,
 		defaultTFVersion:      defaultTfVersion,
+		planStore:             planStore,
 	}
 	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
@@ -44,11 +45,11 @@ func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the import was successful and a plan file exists, delete the plan.
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	if err == nil {
 		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("import successful, deleting planfile")
-			if removeErr := utils.RemoveIgnoreNonExistent(planPath); removeErr != nil {
+			if removeErr := p.planStore.Remove(ctx, planPath); removeErr != nil {
 				ctx.Log.Warn("failed to delete planfile after successful import: %s", removeErr)
 			}
 		}

@@ -1,0 +1,8 @@
+{{ define "approveAllProjects" -}}
+Políticas aprobadas para {{ len .Results }} proyectos:
+
+{{ range $result := .Results -}}
+1. {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+{{ end -}}
+{{- template "log" . -}}
+{{ end }}

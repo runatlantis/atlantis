@@ -95,6 +95,16 @@ func (r RepoCfg) FindProjectByName(name string) *Project {
 	return nil
 }
 
+func (r RepoCfg) FindProjectsByExactName(name string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if p.Name != nil && *p.Name == name {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
 // FindProjectsByName returns all projects that match with name.
 func (r RepoCfg) FindProjectsByName(name string) []Project {
 	var ps []Project

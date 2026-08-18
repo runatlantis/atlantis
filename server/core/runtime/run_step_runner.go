@@ -55,6 +55,11 @@ func (r *RunStepRunner) Run(
 		return "", err
 	}
 
+	planFile := GetPlanFilePath(ctx, path)
+	if err := EnsurePlanFileDir(ctx, path); err != nil {
+		return "", err
+	}
+
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
 		"ATLANTIS_TERRAFORM_DISTRIBUTION": tfDistribution.BinName(),
@@ -69,7 +74,7 @@ func (r *RunStepRunner) Run(
 		"HEAD_REPO_NAME":                  ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":                 ctx.HeadRepo.Owner,
 		"PATH":                            fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                        filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"PLANFILE":                        planFile,
 		"SHOWFILE":                        filepath.Join(path, ctx.GetShowResultFileName()),
 		"POLICYCHECKFILE":                 filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":                    ctx.ProjectName,
@@ -110,7 +115,13 @@ func (r *RunStepRunner) Run(
 	}
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
+		err = runStepError{
+			err:          err,
+			command:      command,
+			path:         path,
+			output:       output,
+			streamOutput: streamOutput,
+		}
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 		} else {
@@ -128,4 +139,23 @@ func (r *RunStepRunner) Run(
 	}
 
 	return output, nil
+}
+
+type runStepError struct {
+	err          error
+	command      string
+	path         string
+	output       string
+	streamOutput bool
+}
+
+func (e runStepError) Error() string {
+	return fmt.Sprintf("%s: running %q in %q: \n%s", e.err, e.command, e.path, e.output)
+}
+
+func (e runStepError) JobMessage() string {
+	if !e.streamOutput && e.output != "" {
+		return e.Error()
+	}
+	return e.err.Error()
 }

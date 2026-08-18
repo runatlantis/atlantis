@@ -19,9 +19,9 @@ type PullUpdater struct {
 func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
-		ctx.Log.Err(res.Error.Error())
+		ctx.Log.Err("%s", res.Error.Error())
 	} else if res.Failure != "" {
-		ctx.Log.Warn(res.Failure)
+		ctx.Log.Warn("%s", res.Failure)
 	}
 
 	// HidePrevCommandComments will hide old comments left from previous runs to reduce

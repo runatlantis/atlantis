@@ -6,12 +6,14 @@ package events
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -601,7 +603,7 @@ projects:
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
-				AutoplanWhenModified: []string{"**/*.tf*", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				AutoplanWhenModified: []string{"**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
 				HeadRepo:             models.Repo{},
 				Log:                  logger,
 				Scope:                statsScope,
@@ -679,11 +681,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command.
@@ -698,7 +702,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -726,6 +730,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -897,11 +905,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			// We run a test for each type of command, again specific projects
@@ -916,7 +926,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "myproject_[1-2]", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 					if c.expErr != "" {
 						ErrEquals(t, c.expErr, err)
@@ -945,6 +955,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -1146,11 +1160,13 @@ workflows:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				false,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			cmd := command.PolicyCheck
@@ -1164,7 +1180,7 @@ workflows:
 					PullRequestStatus: models.PullReqStatus{
 						MergeableStatus: models.MergeableStatus{IsMergeable: true},
 					},
-				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", true)
+				}, command.Plan, "", "", []string{"flag"}, tmp, "project1", "myworkspace", false, false, true)
 
 				if c.expErr != "" {
 					ErrEquals(t, c.expErr, err)
@@ -1188,6 +1204,10 @@ workflows:
 				c.expCtx.CommandName = cmd
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
+				// These cases only override policy_check, so plan and apply
+				// fall back to the built-in default steps and Atlantis owns
+				// the convention plan artifact.
+				c.expCtx.RequiresAtlantisManagedPlanFile = true
 				ctx.PolicySets = emptyPolicySets
 
 				// Job ID cannot be compared since its generated at random
@@ -1298,11 +1318,13 @@ projects:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			for _, cmd := range []command.Name{command.Plan, command.Apply} {
@@ -1316,7 +1338,7 @@ projects:
 						PullRequestStatus: models.PullReqStatus{
 							MergeableStatus: models.MergeableStatus{IsMergeable: true},
 						},
-					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", true)
+					}, cmd, "", "", []string{}, tmp, "project1", "myworkspace", false, false, true)
 					Equals(t, c.expLen, len(ctxs))
 					Ok(t, err)
 				})
@@ -1541,11 +1563,13 @@ autodiscover:
 				"",
 				"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
+				"",
 				true,
 				false,
 				"auto",
 				statsScope,
 				terraformClient,
+				&runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(

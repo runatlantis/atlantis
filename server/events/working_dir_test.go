@@ -108,6 +108,194 @@ func TestClone_MainBranchWithMergeStrategy(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestClone_SyntheticNonPRRefsCheckoutDirectly(t *testing.T) {
+	repoDir := initRepo(t)
+	mainCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "main"))
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	branchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "drift-tag")
+	runCmd(t, repoDir, "git", "tag", "branch", mainCommit)
+	runCmd(t, repoDir, "git", "tag", "main", branchCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "feature/foo", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "slash-branch-file")
+	runCmd(t, repoDir, "git", "add", "slash-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "slash branch file")
+	slashBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "feature/foo", mainCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "prod", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "prod-branch-file")
+	runCmd(t, repoDir, "git", "add", "prod-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "prod branch file")
+	prodBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "prod", mainCommit)
+	runCmd(t, repoDir, "git", "checkout", "-b", "v1.2.3", "refs/heads/main")
+	runCmd(t, repoDir, "touch", "semver-branch-file")
+	runCmd(t, repoDir, "git", "add", "semver-branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "semver branch file")
+	semverBranchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "tag", "v1.2.3", mainCommit)
+
+	for _, tt := range []struct {
+		name           string
+		ref            string
+		expectedCommit string
+	}{
+		{
+			name:           "main branch with same-named tag",
+			ref:            "main",
+			expectedCommit: mainCommit,
+		},
+		{
+			name:           "branch with same-named tag",
+			ref:            "branch",
+			expectedCommit: branchCommit,
+		},
+		{
+			name:           "slash branch with same-named tag",
+			ref:            "feature/foo",
+			expectedCommit: slashBranchCommit,
+		},
+		{
+			name:           "ambiguous branch with same-named tag",
+			ref:            "prod",
+			expectedCommit: prodBranchCommit,
+		},
+		{
+			name:           "semver-like branch with same-named tag",
+			ref:            "v1.2.3",
+			expectedCommit: semverBranchCommit,
+		},
+		{
+			name:           "explicit branch ref",
+			ref:            "refs/heads/feature/foo",
+			expectedCommit: slashBranchCommit,
+		},
+		{
+			name:           "raw commit",
+			ref:            branchCommit,
+			expectedCommit: branchCommit,
+		},
+		{
+			name:           "explicit tag ref",
+			ref:            "refs/tags/drift-tag",
+			expectedCommit: branchCommit,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logging.NewNoopLogger(t)
+			overrideURL := fmt.Sprintf("file://%s", repoDir)
+			wd := &events.FileWorkspace{
+				DataDir:                     t.TempDir(),
+				CheckoutMerge:               true,
+				TestingOverrideHeadCloneURL: overrideURL,
+				TestingOverrideBaseCloneURL: overrideURL,
+				GpgNoSigningEnabled:         true,
+			}
+			pull := models.PullRequest{
+				Num:                      -1,
+				BaseRepo:                 models.Repo{},
+				BaseBranch:               tt.ref,
+				HeadBranch:               tt.ref,
+				HeadCommit:               tt.ref,
+				HardenedNonPRRefCheckout: true,
+			}
+
+			cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+			Equals(t, tt.expectedCommit, actCommit)
+
+			merged, err := wd.MergeAgain(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			Equals(t, false, merged)
+		})
+	}
+}
+
+func TestClone_SyntheticNonPRRefsRejectPRNamespaces(t *testing.T) {
+	repoDir := initRepo(t)
+	logger := logging.NewNoopLogger(t)
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+
+	for _, ref := range []string{
+		"--upload-pack=/tmp/x",
+		"--depth=1",
+		"-c",
+		"+main",
+		"+pull/1/head",
+		"pull/1/head",
+		"pull/1/merge",
+		"+refs/pull/1/head",
+		"+refs/pull/1/merge",
+		"refs/pull/1/head",
+		"refs/pull/1/merge",
+		"merge-requests/1/head",
+		"merge-requests/1/merge",
+		"+refs/merge-requests/1/head",
+		"+refs/merge-requests/1/merge",
+		"refs/merge-requests/1/head",
+		"refs/merge-requests/1/merge",
+		"pull-requests/1/from",
+		"refs/pull-requests/1/merge",
+	} {
+		t.Run(ref, func(t *testing.T) {
+			wd := &events.FileWorkspace{
+				DataDir:                     t.TempDir(),
+				CheckoutMerge:               true,
+				TestingOverrideHeadCloneURL: overrideURL,
+				TestingOverrideBaseCloneURL: overrideURL,
+				GpgNoSigningEnabled:         true,
+			}
+			pull := models.PullRequest{
+				Num:                      -1,
+				BaseRepo:                 models.Repo{},
+				BaseBranch:               ref,
+				HeadBranch:               ref,
+				HeadCommit:               ref,
+				HardenedNonPRRefCheckout: true,
+			}
+
+			_, err := wd.Clone(logger, models.Repo{}, pull, "default")
+			ErrContains(t, "unsafe refs are not allowed", err)
+		})
+	}
+}
+
+func TestClone_LegacySyntheticNonPRBranchKeepsBranchCheckout(t *testing.T) {
+	repoDir := initRepo(t)
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	branchCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	logger := logging.NewNoopLogger(t)
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     t.TempDir(),
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+	}
+	pull := models.PullRequest{
+		Num:        -1,
+		BaseRepo:   models.Repo{},
+		BaseBranch: "branch",
+		HeadBranch: "branch",
+		HeadCommit: "branch",
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, pull, "default")
+	Ok(t, err)
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
+	Equals(t, branchCommit, actCommit)
+	actBranch := strings.TrimSpace(runCmd(t, cloneDir, "git", "symbolic-ref", "--short", "HEAD"))
+	Equals(t, "branch", actBranch)
+}
+
 // Test that if we don't have any existing files, we check out the repo
 // successfully when we're using the merge method.
 func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
@@ -165,6 +353,120 @@ func TestClone_CheckoutMergeNoneExisting(t *testing.T) {
 	// Use ls to verify the repo looks good.
 	actLsOutput := runCmd(t, cloneDir, "ls")
 	Equals(t, expLsOutput, actLsOutput)
+}
+
+// Test that on the GitHub App path (GithubAppEnabled && pr.Num > 0) the merge
+// is performed by fetching pull/<n>/head from origin and the "source" (fork)
+// remote is never created, since it isn't used to fetch the PR head.
+func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// On the GitHub App path the head is fetched as pull/<n>/head from origin,
+	// so expose the branch commit under that ref in the origin repo.
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", strings.TrimSpace(branchCommit))
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// The merge should still produce a merge commit whose parents are the base
+	// (main) and the head (branch) commits.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	// The "source" remote must not have been created on the GitHub App path.
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, !strings.Contains(remotes, "source"), "expected no \"source\" remote on the GitHub App path, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
+}
+
+func TestClone_CheckoutMergeGithubAppNonGithubUsesSourceRemote(t *testing.T) {
+	// Initialize the git repo.
+	repoDir := initRepo(t)
+
+	// Add a commit to branch 'branch' that's not on main.
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch-commit")
+	branchCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	// Now switch back to main and advance the main branch by another commit.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-file")
+	runCmd(t, repoDir, "git", "add", "main-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "main-commit")
+	mainCommit := runCmd(t, repoDir, "git", "rev-parse", "HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	wd := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		CheckoutMerge:               true,
+		CheckoutDepth:               50,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+
+	cloneDir, err := wd.Clone(logger, models.Repo{
+		VCSHost: models.VCSHost{Type: models.Gitlab},
+	}, models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		BaseBranch: "main",
+		Num:        1,
+	}, "default")
+	Ok(t, err)
+
+	// Non-GitHub repos do not have GitHub's pull/<n>/head ref, so the merge must
+	// still fetch the head branch from the source remote.
+	actBaseCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD~1")
+	actHeadCommit := runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")
+	Equals(t, mainCommit, actBaseCommit)
+	Equals(t, branchCommit, actHeadCommit)
+
+	remotes := runCmd(t, cloneDir, "git", "remote")
+	Assert(t, strings.Contains(remotes, "source"), "expected \"source\" remote for non-GitHub repo, got remotes: %q", remotes)
+	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
 }
 
 // Test that if we're using the merge method and the repo is already cloned at
@@ -454,12 +756,19 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/0/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -476,7 +785,9 @@ func TestClone_ResetOnWrongCommit(t *testing.T) {
 		BaseBranch: "main",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -500,11 +811,11 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "newfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
+	// Pretend that terraform has created a plan file, we'll check it is removed
+	// after updating the existing branch-strategy clone.
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -522,7 +833,7 @@ func TestClone_DoNotReCloneOnBaseChangeForBranchStrategy(t *testing.T) {
 		BaseBranch: "some-other-base-branch",
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not wiped out by the reclone")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD"))
@@ -606,8 +917,7 @@ func TestClone_ReCloneOnErrorAttemptingReuse(t *testing.T) {
 	// Pretend that terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(dataDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	logger := logging.NewNoopLogger(t)
@@ -671,12 +981,19 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "anotherfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
-	// Pretend that terraform has created a plan file, we'll check for it later
-	planFile := filepath.Join(dataDir, "repos/1/default/default.tfplan")
+	// Pretend that terraform has created plan files, we'll check for them later.
+	worktreeDir := filepath.Join(dataDir, "repos/1/default")
+	ignorePlanFiles(t, worktreeDir)
+	planFile := filepath.Join(worktreeDir, "default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
+	nestedPlanFile := filepath.Join(worktreeDir, "project1/default.tfplan")
+	createPlanFile(t, nestedPlanFile)
+	assert.FileExists(t, nestedPlanFile)
+	terragruntCachePlanFile := filepath.Join(worktreeDir, ".terragrunt-cache/project1/default.tfplan")
+	createPlanFile(t, terragruntCachePlanFile)
+	assert.FileExists(t, terragruntCachePlanFile)
 
 	logger := logging.NewNoopLogger(t)
 
@@ -695,7 +1012,9 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 		Num:        1,
 	}, "default")
 	Ok(t, err)
-	assert.FileExists(t, planFile, "Plan file should not been wiped out by reset")
+	assert.NoFileExists(t, planFile, "Stale plan file should be deleted after updating to new commit")
+	assert.NoFileExists(t, nestedPlanFile, "Nested stale plan file should be deleted after updating to new commit")
+	assert.FileExists(t, terragruntCachePlanFile, "Plan files in .terragrunt-cache should be preserved")
 
 	// Use rev-parse to verify at correct commit.
 	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
@@ -765,13 +1084,12 @@ func TestClone_MasterHasDiverged(t *testing.T) {
 	// Pretend terraform has created a plan file, we'll check for it later
 	planFile := filepath.Join(repoDir, "repos/0/default/default.tfplan")
 	assert.NoFileExists(t, planFile)
-	_, err := os.Create(planFile)
-	Assert(t, err == nil, "creating plan file: %v", err)
+	createPlanFile(t, planFile)
 	assert.FileExists(t, planFile)
 
 	// Run MergeAgain without the checkout merge strategy. It should return
 	// false for mergedAgain
-	_, err = wd.Clone(logger, models.Repo{}, models.PullRequest{
+	_, err := wd.Clone(logger, models.Repo{}, models.PullRequest{
 		BaseRepo:   models.Repo{},
 		HeadBranch: "second-pr",
 		BaseBranch: "main",
@@ -1144,6 +1462,66 @@ func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
 	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
 	Equals(t, true, hasDiverged)
+}
+
+func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
+	repoDir := initRepo(t)
+
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project1"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "main.tf"), []byte("resource initial\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project1")
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "stale-pr")
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "project2"), 0o755))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project2", "main.tf"), []byte("resource pr\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project2/main.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "add project2")
+	headCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	runCmd(t, repoDir, "git", "checkout", "main")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "project1", "variables.tf"), []byte("variable base\n"), 0o600))
+	runCmd(t, repoDir, "git", "add", "project1/variables.tf")
+	runCmd(t, repoDir, "git", "commit", "-m", "update project1")
+
+	prDir := filepath.Join(repoDir, "repos", "0", "default")
+	Ok(t, os.MkdirAll(prDir, 0o755))
+	runCmd(t, prDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, prDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, prDir, "git", "fetch", "source", "+refs/heads/stale-pr")
+	runCmd(t, prDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, prDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, prDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, prDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "stale-pr",
+		BaseBranch: "main",
+		HeadCommit: headCommit,
+	}
+
+	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	Equals(t, true, hasDiverged)
+
+	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	Equals(t, false, hasDiverged)
 }
 
 func TestHasDiverged_PatternHasDiverged(t *testing.T) {
@@ -2029,4 +2407,300 @@ func initRepo(t *testing.T) string {
 	runCmd(t, repoDir, "git", "commit", "-m", "initial commit")
 	runCmd(t, repoDir, "git", "branch", "branch")
 	return repoDir
+}
+
+func TestFileWorkspace_DeleteRemovesOnlyManagedSubPaths(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+	wd := &events.FileWorkspace{
+		DataDir: dataDir,
+	}
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+
+	defaultWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	otherWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "other")
+	otherPullDir := filepath.Join(dataDir, "repos", "owner", "repo", "2", "default")
+	Ok(t, os.MkdirAll(defaultWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherPullDir, 0700))
+
+	Ok(t, wd.DeleteForWorkspace(logger, repo, pull, "default"))
+	_, err := os.Stat(defaultWorkspaceDir)
+	Assert(t, os.IsNotExist(err), "expected default workspace to be deleted")
+	_, err = os.Stat(otherWorkspaceDir)
+	Ok(t, err)
+	_, err = os.Stat(otherPullDir)
+	Ok(t, err)
+
+	Ok(t, wd.Delete(logger, repo, pull))
+	_, err = os.Stat(filepath.Join(dataDir, "repos", "owner", "repo", "1"))
+	Assert(t, os.IsNotExist(err), "expected pull directory to be deleted")
+	_, err = os.Stat(otherPullDir)
+	Ok(t, err)
+}
+
+func TestFileWorkspace_DeleteRemovesSeparatePlanStorePaths(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:           dataDir,
+		LocalSharePlanDir: sharePlanDir,
+	}
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+
+	defaultWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	otherWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "other")
+	otherPullWorkspaceDir := filepath.Join(dataDir, "repos", "owner", "repo", "2", "default")
+	Ok(t, os.MkdirAll(defaultWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherWorkspaceDir, 0700))
+	Ok(t, os.MkdirAll(otherPullWorkspaceDir, 0700))
+
+	defaultPlanFile := filepath.Join(sharePlanDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	otherPlanFile := filepath.Join(sharePlanDir, "repos", "owner", "repo", "1", "other", "default.tfplan")
+	otherPullPlanFile := filepath.Join(sharePlanDir, "repos", "owner", "repo", "2", "default", "default.tfplan")
+	createPlanFile(t, defaultPlanFile)
+	createPlanFile(t, otherPlanFile)
+	createPlanFile(t, otherPullPlanFile)
+
+	Ok(t, fileWorkspace.DeleteForWorkspace(logger, repo, pull, "default"))
+	assertPathMissing(t, defaultWorkspaceDir)
+	assertPathMissing(t, defaultPlanFile)
+	assertPathExists(t, otherWorkspaceDir)
+	assertPathExists(t, otherPlanFile)
+	assertPathExists(t, otherPullWorkspaceDir)
+	assertPathExists(t, otherPullPlanFile)
+
+	Ok(t, fileWorkspace.Delete(logger, repo, pull))
+	assertPathMissing(t, filepath.Join(dataDir, "repos", "owner", "repo", "1"))
+	assertPathMissing(t, filepath.Join(sharePlanDir, "repos", "owner", "repo", "1"))
+	assertPathExists(t, otherPullWorkspaceDir)
+	assertPathExists(t, otherPullPlanFile)
+}
+
+// Re-cloning over an existing checkout invalidates any plan made against it,
+// so the separate plan store copy has to go too.
+func TestClone_ForceCloneDeletesSeparatePlanWorkspaceWhenReplacingCheckout(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+	stalePlanFile := filepath.Join(sharePlanDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	createPlanFile(t, stalePlanFile)
+
+	// A checkout that exists but isn't a usable git repo can't be reused, so
+	// Clone falls through to forceClone.
+	existingCloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	Ok(t, os.MkdirAll(existingCloneDir, 0700))
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalSharePlanDir:           sharePlanDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	assertPathExists(t, cloneDir)
+	assertPathMissing(t, stalePlanFile)
+}
+
+// A missing checkout is the restart case: the plan store holds the only
+// surviving copy of the plans, so cloning must not delete it. Staleness is
+// caught later by the recorded pull status and plan hash checks.
+func TestClone_ForceClonePreservesSeparatePlanWorkspaceWhenCheckoutMissing(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+	planFile := filepath.Join(sharePlanDir, "repos", "owner", "repo", "1", "default", "default.tfplan")
+	createPlanFile(t, planFile)
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalSharePlanDir:           sharePlanDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	cloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	assertPathExists(t, cloneDir)
+	assertPathExists(t, planFile)
+}
+
+func TestClone_UpdateDeletesSeparatePlanStoreStalePlans(t *testing.T) {
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseRepo:   repo,
+		HeadBranch: "branch",
+	}
+
+	cloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+	Ok(t, os.MkdirAll(filepath.Dir(cloneDir), 0700))
+	runCmd(t, dataDir, "git", "clone", repoDir, cloneDir)
+
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "branch-file")
+	runCmd(t, repoDir, "git", "add", "branch-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "branch file")
+	pull.HeadCommit = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	planWorkspaceDir := filepath.Join(sharePlanDir, "repos", "owner", "repo", "1", "default")
+	workspacePlanFile := filepath.Join(planWorkspaceDir, "default.tfplan")
+	projectPlanFile := filepath.Join(planWorkspaceDir, "project", "default.tfplan")
+	terragruntPlanFile := filepath.Join(planWorkspaceDir, ".terragrunt-cache", "project", "default.tfplan")
+	createPlanFile(t, workspacePlanFile)
+	createPlanFile(t, projectPlanFile)
+	createPlanFile(t, terragruntPlanFile)
+
+	fileWorkspace := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalSharePlanDir:           sharePlanDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	updatedCloneDir, err := fileWorkspace.Clone(logger, repo, pull, "default")
+	Ok(t, err)
+	Equals(t, cloneDir, updatedCloneDir)
+	Equals(t, pull.HeadCommit, strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD")))
+	assertPathMissing(t, workspacePlanFile)
+	assertPathMissing(t, projectPlanFile)
+	assertPathExists(t, terragruntPlanFile)
+}
+
+func TestFileWorkspace_PathTraversal(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+
+	wd := &events.FileWorkspace{
+		DataDir:             dataDir,
+		GpgNoSigningEnabled: true,
+	}
+
+	maliciousRepo := models.Repo{FullName: "../../../etc"}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: maliciousRepo,
+	}
+
+	t.Run("GetWorkingDir rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.GetWorkingDir(maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("GetPullDir rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.GetPullDir(maliciousRepo, pull)
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("Delete rejects traversal in repo name", func(t *testing.T) {
+		err := wd.Delete(logger, maliciousRepo, pull)
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeleteForWorkspace rejects traversal in repo name", func(t *testing.T) {
+		err := wd.DeleteForWorkspace(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeleteForWorkspace rejects traversal in workspace name", func(t *testing.T) {
+		safeRepo := models.Repo{FullName: "owner/repo"}
+		safePull := models.PullRequest{Num: 1, BaseRepo: safeRepo}
+		err := wd.DeleteForWorkspace(logger, safeRepo, safePull, "../../etc")
+		Assert(t, err != nil, "expected error for path traversal in workspace name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("Clone rejects traversal in repo name", func(t *testing.T) {
+		_, err := wd.Clone(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("DeletePlan rejects traversal in project path", func(t *testing.T) {
+		safeRepo := models.Repo{FullName: "owner/repo"}
+		safePull := models.PullRequest{Num: 1, BaseRepo: safeRepo}
+		cloneDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default")
+		Ok(t, os.MkdirAll(cloneDir, 0700))
+
+		err := wd.DeletePlan(logger, safeRepo, safePull, "default", "../../../../etc", "")
+		Assert(t, err != nil, "expected error for path traversal in project path")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+
+	t.Run("MergeAgain rejects traversal in repo name", func(t *testing.T) {
+		wdMerge := &events.FileWorkspace{
+			DataDir:             dataDir,
+			GpgNoSigningEnabled: true,
+			CheckoutMerge:       true,
+		}
+		_, err := wdMerge.MergeAgain(logger, maliciousRepo, pull, "default")
+		Assert(t, err != nil, "expected error for path traversal in repo name")
+		Assert(t, strings.Contains(err.Error(), "traversal"), "expected traversal error, got: %s", err)
+	})
+}
+
+func createPlanFile(t *testing.T, path string) {
+	t.Helper()
+
+	Ok(t, os.MkdirAll(filepath.Dir(path), 0700))
+	Ok(t, os.WriteFile(path, []byte("plan"), 0600))
+}
+
+func assertPathExists(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	Ok(t, err)
+}
+
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+
+	_, err := os.Stat(path)
+	Assert(t, os.IsNotExist(err), "expected %q to be deleted, got %v", path, err)
+}
+
+func ignorePlanFiles(t *testing.T, cloneDir string) {
+	t.Helper()
+
+	Ok(t, os.WriteFile(filepath.Join(cloneDir, ".git/info/exclude"), []byte("*.tfplan\n"), 0600))
 }

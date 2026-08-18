@@ -45,7 +45,7 @@ func (e *InstrumentedPullClosedExecutor) CleanUpPull(logger logging.SimpleLoggin
 
 	if err != nil {
 		executionError.Inc(1)
-		logger.Err("error during cleanup of pull data", err)
+		logger.Err("error during cleanup of pull data: %s", err)
 		return err
 	}
 

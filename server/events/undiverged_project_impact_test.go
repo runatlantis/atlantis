@@ -154,7 +154,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFailsForImpactedConf
 
 	ctx := newTestUndivergedProjectContext(t, "project1")
 	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
-	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified()
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
@@ -176,7 +176,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedPassesForUnrelatedCo
 
 	ctx := newTestUndivergedProjectContext(t, "project1")
 	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
-	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified()
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
@@ -199,7 +199,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedSkipsImpactResolutio
 
 	ctx := newTestUndivergedProjectContext(t, "project1")
 	ctx.ApplyRequirements = []string{raw.UnDivergedRequirement}
-	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified
+	ctx.AutoplanWhenModified = raw.DefaultAutoPlanWhenModified()
 
 	failure, err := handler.ValidateApplyProject(repoDir, ctx)
 	Ok(t, err)
@@ -282,6 +282,10 @@ type stubUndivergedProjectImpactResolver struct {
 }
 
 func (s stubUndivergedProjectImpactResolver) HasUndivergedImpact(command.ProjectContext, string, WorkingDir) (bool, bool, error) {
+	return s.handled, s.impacted, s.err
+}
+
+func (s stubUndivergedProjectImpactResolver) HasUndivergedImpactFromPullHead(command.ProjectContext, string, WorkingDir) (bool, bool, error) {
 	return s.handled, s.impacted, s.err
 }
 

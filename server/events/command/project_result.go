@@ -3,9 +3,7 @@
 
 package command
 
-import (
-	"github.com/runatlantis/atlantis/server/events/models"
-)
+import "github.com/runatlantis/atlantis/server/events/models"
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
@@ -25,6 +23,7 @@ type ProjectCommandOutput struct {
 	PlanSuccess        *models.PlanSuccess
 	PolicyCheckResults *models.PolicyCheckResults
 	ApplySuccess       string
+	ApplySuccessURL    string `json:"-"`
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
 	StateRmSuccess     *models.StateRmSuccess
@@ -86,6 +85,13 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 			return models.ErroredApplyStatus
 		}
 		return models.AppliedPlanStatus
+	case Import, State:
+		if p.Error != nil {
+			return models.ErroredPlanStatus
+		} else if p.Failure != "" {
+			return models.ErroredPlanStatus
+		}
+		return models.DiscardedPlanStatus
 	}
 
 	panic("PlanStatus() missing a combination")

@@ -59,6 +59,23 @@ func (r *undivergedProjectImpactResolver) HasUndivergedImpact(
 	repoDir string,
 	workingDir WorkingDir,
 ) (handled bool, impacted bool, err error) {
+	return r.hasUndivergedImpact(ctx, repoDir, workingDir, false)
+}
+
+func (r *undivergedProjectImpactResolver) HasUndivergedImpactFromPullHead(
+	ctx command.ProjectContext,
+	repoDir string,
+	workingDir WorkingDir,
+) (handled bool, impacted bool, err error) {
+	return r.hasUndivergedImpact(ctx, repoDir, workingDir, true)
+}
+
+func (r *undivergedProjectImpactResolver) hasUndivergedImpact(
+	ctx command.ProjectContext,
+	repoDir string,
+	workingDir WorkingDir,
+	fromPullHead bool,
+) (handled bool, impacted bool, err error) {
 	target, err := r.resolveTarget(ctx, repoDir)
 	if err != nil {
 		return false, false, err
@@ -72,7 +89,12 @@ func (r *undivergedProjectImpactResolver) HasUndivergedImpact(
 		return false, false, nil
 	}
 
-	divergedFiles, err := workingDir.GetDivergedFiles(ctx.Log, repoDir, ctx.Pull)
+	var divergedFiles []string
+	if fromPullHead {
+		divergedFiles, err = workingDir.GetDivergedFilesFromPullHead(ctx.Log, repoDir, ctx.Pull)
+	} else {
+		divergedFiles, err = workingDir.GetDivergedFiles(ctx.Log, repoDir, ctx.Pull)
+	}
 	if err != nil {
 		return true, false, err
 	}

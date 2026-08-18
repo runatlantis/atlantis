@@ -4,12 +4,11 @@
 package raw_test
 
 import (
+	"errors"
 	"io"
 	"strings"
 
-	"errors"
-
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Bool is a helper routine that allocates a new bool value

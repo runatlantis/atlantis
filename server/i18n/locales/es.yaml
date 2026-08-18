@@ -1,0 +1,12 @@
+pull_request_label: Solicitud de extracción
+merge_request_label: Solicitud de fusión
+command_titles:
+  apply: Aplicar
+  plan: Planificar
+  unlock: Desbloquear
+  policy_check: Verificar políticas
+  approve_policies: Aprobar políticas
+  version: Versión
+  import: Importar
+  state: Estado
+  cancel: Cancelar

@@ -38,7 +38,7 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -70,7 +70,7 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -112,7 +112,7 @@ func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)

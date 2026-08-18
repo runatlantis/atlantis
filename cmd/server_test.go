@@ -9,16 +9,18 @@ import (
 	"cmp"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v4"
+
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
 	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
@@ -60,6 +62,7 @@ var testFlags = map[string]any{
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
+	AutomergeMethodFlag:              "squash",
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketApiUserFlag:             "bitbucket-api-user",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
@@ -106,14 +109,18 @@ var testFlags = map[string]any{
 	HideUnchangedPlanComments:        false,
 	HidePrevPlanComments:             false,
 	IncludeGitUntrackedFiles:         false,
+	LanguageFlag:                     "es",
+	LanguageConfigFileFlag:           "",
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
 	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
+	EnableExternalStoresFlag:         false,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
+	SharePlanDirFlag:                 "/plans",
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
 	PendingApplyStatusFlag:           false,
@@ -157,10 +164,13 @@ var testFlags = map[string]any{
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
+	DisableAutomergeLabelFlag:        "no-auto-merge",
 	DisableUnlockLabelFlag:           "do-not-unlock",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
+	EnableDriftDetectionFlag:         true,
+	EnableDriftRemediationFlag:       true,
 	EnableProfilingAPI:               false,
 }
 
@@ -192,6 +202,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
+		SharePlanDirFlag:                 dataDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
 		RepoAllowlistFlag:                "*",
 		VarFileAllowlistFlag:             dataDir,
@@ -219,13 +230,102 @@ func TestExecute_Defaults(t *testing.T) {
 	}
 }
 
+func normalizePath(s string) string {
+	if s == "" || s == "." {
+		return ""
+	}
+
+	if len(s) >= 2 && s[1] == ':' {
+		s = s[2:]
+	}
+
+	s = strings.ReplaceAll(s, "\\", "/")
+	s = path.Clean(s)
+	if s == "." {
+		return ""
+	}
+
+	return s
+}
+
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		exp  string
+	}{
+		{
+			name: "empty",
+			in:   "",
+			exp:  "",
+		},
+		{
+			name: "dot",
+			in:   ".",
+			exp:  "",
+		},
+		{
+			name: "unix path",
+			in:   "foo/bar",
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows separators",
+			in:   `foo\bar`,
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows drive with backslashes",
+			in:   `C:\foo\bar`,
+			exp:  "/foo/bar",
+		},
+		{
+			name: "windows drive with slashes",
+			in:   "C:/foo/bar",
+			exp:  "/foo/bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Equals(t, tt.exp, normalizePath(tt.in))
+		})
+	}
+}
+
+var pathFlags = map[string]struct{}{
+	DataDirFlag:                      {},
+	MarkdownTemplateOverridesDirFlag: {},
+	SharePlanDirFlag:                 {},
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
+
 	c := setup(testFlags, t)
+
 	err := c.Execute()
 	Ok(t, err)
+
 	for flag, exp := range testFlags {
-		Equals(t, exp, configVal(t, passedConfig, flag))
+		got := configVal(t, passedConfig, flag)
+
+		if _, ok := pathFlags[flag]; ok {
+			expPath, ok := exp.(string)
+			Equals(t, true, ok)
+			gotPath, ok := got.(string)
+			Equals(t, true, ok)
+
+			normExp := normalizePath(expPath)
+			normGot := normalizePath(gotPath)
+
+			t.Logf("flag=%s exp=%v got=%v", flag, normExp, normGot)
+			Equals(t, normExp, normGot)
+			continue
+		}
+
+		t.Logf("flag=%s exp=%v got=%v", flag, exp, got)
+		Equals(t, exp, got)
 	}
 }
 
@@ -233,12 +333,12 @@ func getUserConfigKeysWithFlags() []string {
 	var ret []string
 	u := reflect.TypeFor[server.UserConfig]()
 
-	for i := 0; i < u.NumField(); i++ {
+	for field := range u.Fields() {
 
-		userConfigKey := u.Field(i).Tag.Get("mapstructure")
+		userConfigKey := field.Tag.Get("mapstructure")
 		// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
 		// Some fields are too complicated to have flags, so are only expressible in the config yaml
-		flagKey := u.Field(i).Tag.Get("flag")
+		flagKey := field.Tag.Get("flag")
 		if flagKey == "false" {
 			continue
 		}
@@ -352,6 +452,36 @@ func TestAllFlagsDocumented(t *testing.T) {
 		}
 	}
 
+}
+
+func TestExecute_ExpandHomeInSharePlanDir(t *testing.T) {
+	t.Log("If ~ is used as a share-plan-dir path, should expand to absolute home path")
+	c := setup(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+		SharePlanDirFlag:  "~/this/is/a/path",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/this/is/a/path", passedConfig.SharePlanDir)
+}
+
+func TestExecute_RelativeSharePlanDir(t *testing.T) {
+	t.Log("Should convert relative share-plan-dir to absolute.")
+	c := setupWithDefaults(map[string]any{
+		SharePlanDirFlag: "../",
+	}, t)
+
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.SharePlanDir)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
@@ -486,6 +616,55 @@ func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "invalid checkout strategy: not one of branch or merge", err)
+}
+
+func TestExecute_ValidateAutomergeMethod(t *testing.T) {
+	cases := []struct {
+		description string
+		method      string
+		expectErr   string
+	}{
+		{
+			"empty method uses VCS default",
+			"",
+			"",
+		},
+		{
+			"merge",
+			"merge",
+			"",
+		},
+		{
+			"rebase",
+			"rebase",
+			"",
+		},
+		{
+			"squash",
+			"squash",
+			"",
+		},
+		{
+			"invalid method",
+			"fast-forward",
+			"invalid --automerge-method: must be one of [merge rebase squash]",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.description, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{
+				AutomergeMethodFlag: testCase.method,
+			}, t)
+
+			err := c.Execute()
+			if testCase.expectErr != "" {
+				ErrEquals(t, testCase.expectErr, err)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
 }
 
 func TestExecute_ValidateSSLConfig(t *testing.T) {
@@ -1108,6 +1287,88 @@ func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
 	}
 }
 
+func TestExecute_ValidateLanguage(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]any
+		expectErr   string
+	}{
+		{
+			"english",
+			map[string]any{
+				LanguageFlag: "en",
+			},
+			"",
+		},
+		{
+			"spanish",
+			map[string]any{
+				LanguageFlag: "es",
+			},
+			"",
+		},
+		{
+			"language variant normalizes",
+			map[string]any{
+				LanguageFlag: "es-MX",
+			},
+			"",
+		},
+		{
+			"errs on unsupported language",
+			map[string]any{
+				LanguageFlag: "de",
+			},
+			`unsupported language "de": supported languages are en, es`,
+		},
+		{
+			"unsupported language with custom config file",
+			map[string]any{
+				LanguageFlag:           "de",
+				LanguageConfigFileFlag: writeTempLanguageConfig(t, "command_titles:\n  apply: Anwenden\n"),
+			},
+			"",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Log("Should validate language when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateLanguageConfigFileInvalid(t *testing.T) {
+	c := setupWithDefaults(map[string]any{
+		LanguageFlag:           "de",
+		LanguageConfigFileFlag: writeTempLanguageConfig(t, ":\n"),
+	}, t)
+	err := c.Execute()
+	if err == nil {
+		t.Fatalf("expected error for invalid language config file")
+	}
+	if !strings.Contains(err.Error(), "invalid language-config-file") {
+		t.Fatalf("expected language config validation error, got: %s", err.Error())
+	}
+}
+
+func writeTempLanguageConfig(t *testing.T, contents string) string {
+	f, err := os.CreateTemp("", "atlantis-language-*.yaml")
+	Ok(t, err)
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+	_, err = f.WriteString(contents)
+	Ok(t, err)
+	Ok(t, f.Close())
+	return f.Name()
+}
+
 func setup(flags map[string]any, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {
@@ -1236,4 +1497,11 @@ func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
+}
+
+func TestDefaultAutoplanFileList_ContainsExpectedPatterns(t *testing.T) {
+	// Pin the public server default independently of the constant.
+	// If a pattern is accidentally removed, this test fails.
+	expected := "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	Equals(t, expected, DefaultAutoplanFileList)
 }

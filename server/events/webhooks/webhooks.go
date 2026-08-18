@@ -18,6 +18,11 @@ const SlackKind = "slack"
 const HttpKind = "http"
 const ApplyEvent = "apply"
 
+// isSuccessStatus returns true if the given HTTP status code is a 2xx.
+func isSuccessStatus(code int) bool {
+	return code/100 == 2
+}
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_sender.go Sender
 
 // Sender sends webhooks.
@@ -59,6 +64,15 @@ type Clients struct {
 func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSender, error) {
 	var webhooks []Sender
 	for _, c := range configs {
+		if c.Kind == "" || c.Event == "" {
+			return nil, errors.New("must specify \"kind\" and \"event\" keys for webhooks")
+		}
+		if c.Event == DriftEvent {
+			continue // drift events are handled by DriftWebhookSender
+		}
+		if c.Event != ApplyEvent {
+			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" and \"event: %s\" are supported", c.Event, ApplyEvent, DriftEvent)
+		}
 		wr, err := regexp.Compile(c.WorkspaceRegex)
 		if err != nil {
 			return nil, err
@@ -66,12 +80,6 @@ func NewMultiWebhookSender(configs []Config, clients Clients) (*MultiWebhookSend
 		br, err := regexp.Compile(c.BranchRegex)
 		if err != nil {
 			return nil, err
-		}
-		if c.Kind == "" || c.Event == "" {
-			return nil, errors.New("must specify \"kind\" and \"event\" keys for webhooks")
-		}
-		if c.Event != ApplyEvent {
-			return nil, fmt.Errorf("\"event: %s\" not supported. Only \"event: %s\" is supported right now", c.Event, ApplyEvent)
 		}
 		switch c.Kind {
 		case SlackKind:

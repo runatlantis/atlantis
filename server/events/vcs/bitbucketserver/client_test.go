@@ -267,3 +267,50 @@ func TestClient_MarkdownPullLink(t *testing.T) {
 	exp := "#1"
 	Equals(t, exp, s)
 }
+
+func TestBitbucketServer_GetPullRequestIdentityMapsDestinationBranch(t *testing.T) {
+	assertBitbucketServerPullRequestIdentityIncludesBaseBranch(t)
+}
+
+func TestLivePullIdentityFetcher_BitbucketServerIncludesBaseBranch(t *testing.T) {
+	assertBitbucketServerPullRequestIdentityIncludesBaseBranch(t)
+}
+
+func assertBitbucketServerPullRequestIdentityIncludesBaseBranch(t *testing.T) {
+	t.Helper()
+	logger := logging.NewNoopLogger(t)
+	pullRequest, err := os.ReadFile(filepath.Join("testdata", "pull-request.json"))
+	Ok(t, err)
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.RequestURI {
+		case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+			w.Write(pullRequest) // nolint: errcheck
+			return
+		default:
+			t.Errorf("got unexpected request at %q", r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}))
+	defer testServer.Close()
+
+	client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+	Ok(t, err)
+	repo := models.Repo{
+		FullName:          "owner/repo",
+		Owner:             "owner",
+		Name:              "repo",
+		SanitizedCloneURL: fmt.Sprintf("%s/scm/ow/repo.git", testServer.URL),
+		VCSHost: models.VCSHost{
+			Type:     models.BitbucketServer,
+			Hostname: "bitbucket.org",
+		},
+	}
+	pull := models.PullRequest{Num: 1, BaseRepo: repo}
+
+	identity, err := client.GetPullRequestIdentity(logger, repo, pull)
+
+	Ok(t, err)
+	Equals(t, "bdcaa224f4b65edb853a689404ef79cf47d8cdda", identity.HeadCommit)
+	Equals(t, "main", identity.BaseBranch)
+}

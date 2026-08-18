@@ -28,12 +28,13 @@ type CommonEventData struct {
 }
 
 type PullRequest struct {
-	Version   *int    `json:"version,omitempty" validate:"required"`
-	ID        *int    `json:"id,omitempty" validate:"required"`
-	FromRef   *Ref    `json:"fromRef,omitempty" validate:"required"`
-	ToRef     *Ref    `json:"toRef,omitempty" validate:"required"`
-	State     *string `json:"state,omitempty" validate:"required"`
-	Reviewers []struct {
+	Version     *int    `json:"version,omitempty" validate:"required"`
+	ID          *int    `json:"id,omitempty" validate:"required"`
+	Description *string `json:"description,omitempty"`
+	FromRef     *Ref    `json:"fromRef,omitempty" validate:"required"`
+	ToRef       *Ref    `json:"toRef,omitempty" validate:"required"`
+	State       *string `json:"state,omitempty" validate:"required"`
+	Reviewers   []struct {
 		Approved *bool `json:"approved,omitempty" validate:"required"`
 	} `json:"reviewers,omitempty" validate:"required"`
 }

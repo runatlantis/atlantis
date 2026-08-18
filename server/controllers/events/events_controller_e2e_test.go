@@ -1439,6 +1439,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	parallelPoolSize := 1
 	silenceNoProjects := false
 
+	disableAutomergeLabel := "no-auto-merge"
 	disableUnlockLabel := "do-not-unlock"
 
 	statusUpdater := runtimemocks.NewMockStatusUpdater()
@@ -1488,11 +1489,13 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		"",
 		"**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 		false,
+		"",
 		false,
 		false,
 		"auto",
 		statsScope,
 		terraformClient,
+		&runtime.LocalPlanStore{},
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion)
@@ -1530,14 +1533,16 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			defaultTFVersion,
 			statusUpdater,
 			asyncTfExec,
+			&runtime.LocalPlanStore{},
 		),
 		ShowStepRunner:        showStepRunner,
 		PolicyCheckStepRunner: policyCheckRunner,
 		ApplyStepRunner: &runtime.ApplyStepRunner{
 			TerraformExecutor: terraformClient,
+			PlanStore:         &runtime.LocalPlanStore{},
 		},
-		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
-		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion),
+		ImportStepRunner:  runtime.NewImportStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
+		StateRmStepRunner: runtime.NewStateRmStepRunner(terraformClient, defaultTFDistribution, defaultTFVersion, &runtime.LocalPlanStore{}),
 		RunStepRunner: &runtime.RunStepRunner{
 			TerraformExecutor:       terraformClient,
 			DefaultTFDistribution:   defaultTFDistribution,
@@ -1551,6 +1556,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 			WorkingDir: workingDir,
 		},
 		CancellationTracker: cancellationTracker,
+		ApplyPlanValidator: &events.DefaultApplyPlanValidator{
+			PullStatusFetcher: database,
+		},
+		PlanStore: &runtime.LocalPlanStore{},
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -1597,6 +1606,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		e2eVCSClient,
 		&events.DefaultPendingPlanFinder{},
 		workingDir,
+		locker,
 		e2eStatusUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -1629,7 +1639,10 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		parallelPoolSize,
 		silenceNoProjects,
 		false,
+		locker,
 		e2ePullReqStatusFetcher,
+		nil,
+		disableAutomergeLabel,
 	)
 
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
@@ -1660,6 +1673,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	importCommandRunner := events.NewImportCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
@@ -1668,6 +1682,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
+		dbUpdater,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)

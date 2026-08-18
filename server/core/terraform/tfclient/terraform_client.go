@@ -7,6 +7,7 @@ package tfclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,6 +31,8 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
+const versionCommandTimeout = 10 * time.Second
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
@@ -41,8 +44,10 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
-	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
+	// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+	// Non-exact constraints are resolved using the provided distribution, or the client default distribution when nil.
+	// Returns nil if unable to determine the version.
+	DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version
 }
 
 type DefaultClient struct {
@@ -66,6 +71,11 @@ type DefaultClient struct {
 	// to the absolute path of that binary on disk (if it exists).
 	// Use versionsLock to control access.
 	versions map[string]string
+	// versionLocks serializes install/remove operations for each Terraform version.
+	// Use versionsLock to control access.
+	versionLocks map[string]*sync.Mutex
+	// downloadLock serializes downloader installs that share intermediate paths in binDir.
+	downloadLock *sync.Mutex
 
 	// versionsLock is used to ensure versions isn't being concurrently written to.
 	versionsLock *sync.Mutex
@@ -107,7 +117,9 @@ func NewClientWithDefaultVersion(
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
+	versionLocks := make(map[string]*sync.Mutex)
 	var versionsLock sync.Mutex
+	var downloadLock sync.Mutex
 
 	localPath, err := exec.LookPath(distribution.BinName())
 	if err != nil && defaultVersionStr == "" {
@@ -136,9 +148,7 @@ func NewClientWithDefaultVersion(
 		ensureVersionFunc := func() {
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
-			versionsLock.Lock()
-			_, err := ensureVersion(log, distribution, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
-			versionsLock.Unlock()
+			_, err := ensureVersion(log, distribution, versions, versionLocks, &versionsLock, &downloadLock, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed, true)
 			if err != nil {
 				log.Err("could not download %s %s: %s", distribution.BinName(), defaultVersion.String(), err)
 			}
@@ -170,6 +180,8 @@ func NewClientWithDefaultVersion(
 		downloadAllowed:         tfDownloadAllowed,
 		versionsLock:            &versionsLock,
 		versions:                versions,
+		versionLocks:            versionLocks,
+		downloadLock:            &downloadLock,
 		usePluginCache:          usePluginCache,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}, nil
@@ -277,20 +289,18 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	return tfVersions
 }
 
-// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-// It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
-// It will then select the highest version that satisfies the constraint.
-func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
-	module, diags := tfconfig.LoadModule(projectDirectory)
-	if diags.HasErrors() {
-		log.Err("trying to detect required version: %s", diags.Error())
-	}
+// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+// If downloads are allowed, non-exact constraints are resolved against the provided distribution, or the client
+// default distribution when nil, and the highest satisfying version is selected.
+// Returns nil if unable to determine the version.
+func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
+	requiredCore := c.detectRequiredCore(log, d, projectDirectory)
 
-	if len(module.RequiredCore) != 1 {
-		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+	if len(requiredCore) != 1 {
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(requiredCore))
 		return nil
 	}
-	requiredVersionSetting := module.RequiredCore[0]
+	requiredVersionSetting := requiredCore[0]
 	log.Debug("Found required_version setting of %q", requiredVersionSetting)
 
 	if !c.downloadAllowed {
@@ -309,7 +319,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
+	downloadVersion, err := c.effectiveDistribution(d).ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
 		log.Err("%s", err)
 		return nil
@@ -318,16 +328,41 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	return downloadVersion
 }
 
+// detectRequiredCore returns the required_version constraints from configuration files.
+// For OpenTofu distribution, it uses a local parser that supports .tofu/.tofu.json files
+// with proper precedence (.tofu overrides same-basename .tf). For Terraform distribution,
+// it uses hashicorp/terraform-config-inspect which only reads .tf/.tf.json files.
+func (c *DefaultClient) detectRequiredCore(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) []string {
+	dist := c.effectiveDistribution(d)
+	if dist.BinName() == "tofu" {
+		constraints, err := detectRequiredCoreFromTofu(projectDirectory)
+		if err != nil {
+			log.Err("trying to detect required version from OpenTofu config: %s", err)
+		}
+		if len(constraints) == 0 && err != nil {
+			return nil
+		}
+		return constraints
+	}
+
+	module, diags := tfconfig.LoadModule(projectDirectory)
+	if diags.HasErrors() {
+		log.Err("trying to detect required version: %s", diags.Error())
+	}
+	if module == nil {
+		return nil
+	}
+	return module.RequiredCore
+}
+
 // See Client.EnsureVersion.
 func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
 
-	var err error
-	c.versionsLock.Lock()
-	_, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
-	c.versionsLock.Unlock()
+	d = c.effectiveDistribution(d)
+	_, err := ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 	if err != nil {
 		return err
 	}
@@ -370,7 +405,7 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
 		err = fmt.Errorf("running '%s' in '%s': %w", tfCmd, path, err)
-		log.Err(err.Error())
+		log.Err("%s", err.Error())
 		return ansi.Strip(string(out)), err
 	}
 	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)
@@ -406,9 +441,8 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 		binPath = c.overrideTF
 	} else {
 		var err error
-		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
-		c.versionsLock.Unlock()
+		d = c.effectiveDistribution(d)
+		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 		if err != nil {
 			return "", nil, err
 		}
@@ -432,6 +466,13 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	envVars = append(envVars, os.Environ()...)
 	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
 	return tfCmd, envVars, nil
+}
+
+func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terraform.Distribution {
+	if d != nil {
+		return d
+	}
+	return c.distribution
 }
 
 // RunCommandAsync runs terraform with args. It immediately returns an
@@ -460,7 +501,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
 	}
 
-	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, true, c.projectCmdOutputHandler)
+	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }
@@ -482,12 +523,82 @@ func ensureVersion(
 	log logging.SimpleLogging,
 	dist terraform.Distribution,
 	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+	downloadsAllowed bool,
+	redownloadOnFailedExecution bool,
+) (string, error) {
+	if dist == nil {
+		return "", errors.New("terraform distribution is nil")
+	}
+
+	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binDir, downloadURL, downloadsAllowed)
+	if err != nil {
+		return "", err
+	}
+	if !redownloadOnFailedExecution {
+		return binPath, nil
+	}
+
+	binName := dist.BinName()
+	if err := validateVersionBinary(binPath, binName); err == nil {
+		return binPath, nil
+	} else if !downloadsAllowed {
+		return "", invalidVersionBinaryError(binPath, binName, err)
+	}
+
+	log.Warn("%s binary %s failed execution validation, attempting to re-download", binName, binPath)
+	binPath, err = redownloadVersionBinary(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binPath, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	if err := validateVersionBinary(binPath, binName); err != nil {
+		return "", invalidVersionBinaryError(binPath, binName, err)
+	}
+	return binPath, nil
+}
+
+func validateVersionBinary(binPath string, binName string) error {
+	_, err := getVersion(binPath, binName)
+	return err
+}
+
+func invalidVersionBinaryError(binPath string, binName string, err error) error {
+	return fmt.Errorf("%s binary at %s failed to execute: %w", binName, binPath, err)
+}
+
+func isManagedVersionBinary(binPath string, binDir string) bool {
+	rel, err := filepath.Rel(binDir, binPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
+// findOrDownloadVersionBinaryPath returns the path to a terraform binary of version v.
+// It will download this version if we don't have it.
+func findOrDownloadVersionBinaryPath(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binDir string,
 	downloadURL string,
 	downloadsAllowed bool,
 ) (string, error) {
-	if binPath, ok := versions[v.String()]; ok {
+	if binPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok {
+		return binPath, nil
+	}
+
+	versionLock := getVersionOperationLock(versionLocks, versionsLock, v)
+	versionLock.Lock()
+	defer versionLock.Unlock()
+
+	if binPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok {
 		return binPath, nil
 	}
 
@@ -496,7 +607,7 @@ func ensureVersion(
 	// terraform{version} binaries. In this case we don't want to re-download.
 	binFile := dist.BinName() + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
-		versions[v.String()] = binPath
+		setVersionBinaryPath(versions, versionsLock, v, binPath)
 		return binPath, nil
 	}
 
@@ -504,7 +615,7 @@ func ensureVersion(
 	// This could happen if Atlantis was restarted without losing its disk.
 	dest := filepath.Join(binDir, binFile)
 	if _, err := os.Stat(dest); err == nil {
-		versions[v.String()] = dest
+		setVersionBinaryPath(versions, versionsLock, v, dest)
 		return dest, nil
 	}
 	if !downloadsAllowed {
@@ -517,18 +628,106 @@ func ensureVersion(
 	}
 
 	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	setVersionBinaryPath(versions, versionsLock, v, execPath)
+	return execPath, nil
+}
+
+func redownloadVersionBinary(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binPath string,
+	binDir string,
+	downloadURL string,
+) (string, error) {
+	versionLock := getVersionOperationLock(versionLocks, versionsLock, v)
+	versionLock.Lock()
+	defer versionLock.Unlock()
+
+	if currentPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok && currentPath != binPath {
+		return currentPath, nil
+	} else if ok {
+		if err := validateVersionBinary(currentPath, dist.BinName()); err == nil {
+			return currentPath, nil
+		}
+	}
+	deleteVersionBinaryPath(versions, versionsLock, v, binPath)
+	if isManagedVersionBinary(binPath, binDir) {
+		if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("removing cached %s binary for redownload at %s: %w", dist.BinName(), binPath, err)
+		}
+	}
+
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	setVersionBinaryPath(versions, versionsLock, v, execPath)
+	return execPath, nil
+}
+
+func downloadVersionBinary(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+) (string, error) {
+	downloadLock.Lock()
+	defer downloadLock.Unlock()
 
 	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
 
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
-
 	if err != nil {
 		return "", fmt.Errorf("error downloading %s version %s: %w", dist.BinName(), v.String(), err)
 	}
 
 	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), execPath)
-	versions[v.String()] = execPath
 	return execPath, nil
+}
+
+func getVersionOperationLock(versionLocks map[string]*sync.Mutex, versionsLock *sync.Mutex, v *version.Version) *sync.Mutex {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+
+	lockKey := v.String()
+	versionLock, ok := versionLocks[lockKey]
+	if !ok {
+		versionLock = &sync.Mutex{}
+		versionLocks[lockKey] = versionLock
+	}
+	return versionLock
+}
+
+func getVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version) (string, bool) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	binPath, ok := versions[v.String()]
+	return binPath, ok
+}
+
+func setVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version, binPath string) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	versions[v.String()] = binPath
+}
+
+func deleteVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version, binPath string) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	if versions[v.String()] == binPath {
+		delete(versions, v.String())
+	}
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken
@@ -571,8 +770,15 @@ func isAsyncEligibleCommand(cmd string) bool {
 }
 
 func getVersion(tfBinary string, binName string) (*version.Version, error) {
-	versionOutBytes, err := exec.Command(tfBinary, "version").Output() // #nosec
+	ctx, cancel := context.WithTimeout(context.Background(), versionCommandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, tfBinary, "version") // #nosec
+	cmd.Env = terraformVersionEnv(os.Environ())
+	versionOutBytes, err := cmd.Output()
 	versionOutput := string(versionOutBytes)
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("running %s version timed out after %s", binName, versionCommandTimeout)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("running %s version: %s: %w", binName, versionOutput, err)
 	}
@@ -581,6 +787,18 @@ func getVersion(tfBinary string, binName string) (*version.Version, error) {
 		return nil, fmt.Errorf("could not parse %s version from %s", binName, versionOutput)
 	}
 	return version.NewVersion(match[1])
+}
+
+func terraformVersionEnv(env []string) []string {
+	out := make([]string, 0, len(env)+3)
+	for _, envVar := range env {
+		key, _, ok := strings.Cut(envVar, "=")
+		if ok && (key == "CHECKPOINT_DISABLE" || key == "TF_CLI_ARGS" || key == "TF_CLI_ARGS_version") {
+			continue
+		}
+		out = append(out, envVar)
+	}
+	return append(out, "CHECKPOINT_DISABLE=1", "TF_CLI_ARGS=", "TF_CLI_ARGS_version=")
 }
 
 // rcFileContents is a format string to be used with Sprintf that can be used

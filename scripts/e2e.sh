@@ -40,11 +40,12 @@ if [ -n "${ATLANTIS_GH_APP_ID:-}" ]; then
   WRITE_GIT_CREDS="--write-git-creds"
 fi
 
+# repo_locks is needed for the on_apply lock-lifecycle fixture to activate from its test PR branch.
 ./atlantis server \
   --data-dir="/tmp" \
   --log-level="debug" \
   --repo-allowlist="github.com/runatlantis/atlantis-tests,gitlab.com/runatlantis/atlantis-tests" \
-  --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow"], "allow_custom_workflows":true}]}' \
+  --repo-config-json='{"repos":[{"id":"/.*/", "allowed_overrides":["apply_requirements","workflow","repo_locks"], "allow_custom_workflows":true}]}' \
   $WRITE_GIT_CREDS \
   &> /tmp/atlantis-server.log &
 ATLANTIS_PID=$!

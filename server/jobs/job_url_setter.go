@@ -36,10 +36,17 @@ func NewJobURLSetter(projectJobURLGenerator ProjectJobURLGenerator, projectStatu
 }
 
 func (j *JobURLSetter) SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, result *command.ProjectCommandOutput) error {
+	if ctx.SuppressVCSStatus {
+		return nil
+	}
+
 	url, err := j.projectJobURLGenerator.GenerateProjectJobURL(ctx)
 
 	if err != nil {
 		return err
+	}
+	if cmdName == command.Apply && result != nil && result.ApplySuccessURL != "" {
+		url = result.ApplySuccessURL
 	}
 	return j.projectStatusUpdater.UpdateProject(ctx, cmdName, status, url, result)
 }

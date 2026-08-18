@@ -98,6 +98,19 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			"/b",
 			`invalid repo format "/b", owner "" or repo "b" was empty`,
 		},
+		{
+			"owner../repo",
+			`invalid repo format "owner../repo", owner or repo cannot contain '..'`,
+		},
+		{
+			"owner/..repo",
+			`invalid repo format "owner/..repo", owner or repo cannot contain '..'`,
+		},
+		// Trailing ".." in repo name
+		{
+			"owner/repo..",
+			`invalid repo format "owner/repo..", owner or repo cannot contain '..'`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.repoFullName, func(t *testing.T) {
@@ -106,6 +119,15 @@ func TestNewRepo_FullNameWrongFormat(t *testing.T) {
 			ErrEquals(t, c.expErr, err)
 		})
 	}
+
+	// GitLab allows subgroups (slashes in owner), so the ".." check fires for
+	// a path like "group/subgroup/../../../etc/repo" where the owner contains "..".
+	t.Run("gitlab subgroup owner with ..", func(t *testing.T) {
+		repoFullName := "group/subgroup/../../etc/repo"
+		cloneURL := fmt.Sprintf("https://gitlab.com/%s.git", repoFullName)
+		_, err := models.NewRepo(models.Gitlab, repoFullName, cloneURL, "u", "p", "")
+		ErrEquals(t, `invalid repo format "group/subgroup/../../etc/repo", owner or repo cannot contain '..'`, err)
+	})
 }
 
 // If the clone url doesn't end with .git, and VCS is not Azure DevOps, it is appended
@@ -484,6 +506,18 @@ func TestPlanSuccess_Summary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"Note: Objects have changed outside of Terraform\nunit1\nPlan: 1 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 2 to add, 3 to change, 0 to destroy.",
+			"\n**Note: Objects have changed outside of Terraform**\nPlan: 3 to add, 3 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			"No changes. Infrastructure is up-to-date.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -516,6 +550,38 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 			"dummy\nNo changes. Your infrastructure matches the configuration.",
 			"No changes. Your infrastructure matches the configuration.",
 		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 2 to change, 1 to destroy.",
+			"Plan: 8 to add, 2 to change, 1 to destroy.",
+		},
+		{
+			"unit1\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy.\nunit2\nPlan: 5 to import, 6 to add, 7 to change, 8 to destroy.",
+			"Plan: 6 to import, 8 to add, 10 to change, 12 to destroy.",
+		},
+		{
+			"dummy\nPlan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+			"Plan: 0 to add, 0 to change, 0 to destroy, 2 to forget.",
+		},
+		{
+			"dummy\nPlan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+			"Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.",
+		},
+		{
+			"unit1\nPlan: 5 to add, 0 to change, 0 to destroy.\nunit2\nNo changes. Infrastructure is up-to-date.",
+			"Plan: 5 to add, 0 to change, 0 to destroy.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 0 to change, 0 to destroy, 3 to forget.\nunit2\nPlan: 4 to add, 1 to change, 0 to destroy, 5 to forget.",
+			"Plan: 6 to add, 1 to change, 0 to destroy, 8 to forget.",
+		},
+		{
+			"unit1\nPlan: 2 to add, 1 to change, 0 to destroy.\nunit2\nPlan: 3 to add, 0 to change, 1 to destroy.\nunit3\nPlan: 1 to add, 4 to change, 2 to destroy.",
+			"Plan: 6 to add, 5 to change, 3 to destroy.",
+		},
+		{
+			"unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.\nunit3\nNo changes. Your infrastructure matches the configuration.",
+			"Plan: 4 to add, 0 to change, 0 to destroy.",
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("summary %d", i), func(t *testing.T) {
@@ -523,6 +589,44 @@ func TestPlanSuccess_DiffSummary(t *testing.T) {
 				TerraformOutput: c.input,
 			}
 			Equals(t, c.exp, pcs.DiffSummary())
+		})
+	}
+}
+
+func TestPlanSuccess_NoChanges(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		exp   bool
+	}{
+		{
+			name:  "no changes",
+			input: "dummy\nNo changes. Infrastructure is up-to-date.",
+			exp:   true,
+		},
+		{
+			name:  "changes",
+			input: "dummy\nPlan: 1 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+		{
+			name:  "multiple units all no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nNo changes. Your infrastructure matches the configuration.",
+			exp:   true,
+		},
+		{
+			name:  "multiple units mixed changes and no changes",
+			input: "unit1\nNo changes. Infrastructure is up-to-date.\nunit2\nPlan: 4 to add, 0 to change, 0 to destroy.",
+			exp:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pcs := models.PlanSuccess{
+				TerraformOutput: c.input,
+			}
+			Equals(t, c.exp, pcs.NoChanges())
 		})
 	}
 }
@@ -1247,6 +1351,26 @@ func TestPlanSuccessStats(t *testing.T) {
 			},
 		},
 		{
+			"with forget",
+			`Terraform used the selected providers to generate the following execution
+			plan. Resource actions are indicated with the following symbols:
+			  + create
+			  ~ update in-place
+			  - destroy
+			Terraform will perform the following actions:
+			  - null_resource.hi[1]
+			Plan: 42 to import, 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  42,
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
+			},
+		},
+		{
 			"changes and changes outside",
 			`Note: Objects have changed outside of Terraform
 					Terraform detected the following changes made outside of Terraform since the
@@ -1264,6 +1388,95 @@ func TestPlanSuccessStats(t *testing.T) {
 				Add:     3,
 				Change:  0,
 				Destroy: 1,
+			},
+		},
+		{
+			"multiple units aggregated",
+			`unit1
+					Plan: 5 to add, 0 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 2 to change, 1 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     8,
+				Change:  2,
+				Destroy: 1,
+			},
+		},
+		{
+			"multiple units with imports aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy.
+					unit2
+					Plan: 5 to import, 6 to add, 7 to change, 8 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  6,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+			},
+		},
+		{
+			"multiple units with forget aggregated",
+			`unit1
+					Plan: 1 to import, 2 to add, 3 to change, 4 to destroy, 5 to forget.
+					unit2
+					Plan: 6 to add, 7 to change, 8 to destroy, 9 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Import:  1,
+				Add:     8,
+				Change:  10,
+				Destroy: 12,
+				Forget:  14,
+			},
+		},
+		{
+			"three units aggregated",
+			`unit1
+					Plan: 2 to add, 1 to change, 0 to destroy.
+					unit2
+					Plan: 3 to add, 0 to change, 1 to destroy.
+					unit3
+					Plan: 1 to add, 4 to change, 2 to destroy.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     6,
+				Change:  5,
+				Destroy: 3,
+			},
+		},
+		{
+			"mix of changing and no-changes units",
+			`unit1
+					No changes. Infrastructure is up-to-date.
+					unit2
+					Plan: 4 to add, 0 to change, 0 to destroy.
+					unit3
+					No changes. Your infrastructure matches the configuration.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add: 4,
+			},
+		},
+		{
+			"with forget and no imports",
+			`Terraform will perform the following actions:
+      - null_resource.hi[1]
+    Plan: 31 to add, 20 to change, 1 to destroy, 7 to forget.`,
+			models.PlanSuccessStats{
+				Changes: true,
+
+				Add:     31,
+				Change:  20,
+				Destroy: 1,
+				Forget:  7,
 			},
 		},
 	}
@@ -1575,6 +1788,52 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
     }`,
 		},
 		{
+			// Regression test for https://github.com/runatlantis/atlantis/issues/6419
+			// Spaced YAML list scalars inside a heredoc must not be mistaken for
+			// Terraform diff markers.
+			"argocd application with spaced yaml key=value list item in heredoc",
+			`  # argocd_application.example will be updated in-place
+  ~ resource "argocd_application" "example" {
+        id   = "my-app"
+      ~ metadata {
+          ~ resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+			`# argocd_application.example will be updated in-place
+!   resource "argocd_application" "example" {
+        id   = "my-app"
+!       metadata {
+!           resource_version = "12345" -> (known after apply)
+        }
+        spec = <<-EOT
+            destination:
+              namespace: default
+              server: https://kubernetes.default.svc
+            source:
+              repoURL: https://github.com/example/repo
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+              -   ServerSideApply = true
+        EOT
+    }`,
+		},
+		{
 			"cloudformation stack with extra-spaced yaml list items in heredoc",
 			`  + resource "aws_cloudformation_stack" "conditions" {
       + id            = (known after apply)
@@ -1609,6 +1868,141 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
                   -   !Ref Environment
                   -   production
         EOT
+    }`,
+		},
+		{
+			// Regression test: changes inside a heredoc / multiline-string attribute.
+			// Terraform renders a line-by-line string diff with the marker in a gutter,
+			// preserving the line's own indentation after it. The marker must be pulled
+			// to column 0 so the diff highlighter colors it.
+			"heredoc multiline-string attribute diff",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+          -         image        = "registry/ogc:5.224.0"
+          +         image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            job "ogc" {
+              group "ogc" {
+                config {
+-                   image        = "registry/ogc:5.224.0"
++                   image        = "registry/ogc:5.226.0"
+                  }
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"heredoc multiline-string attribute diff with short indentation",
+			`  # module.ogc.nomad_job.ogc will be updated in-place
+  ~ resource "nomad_job" "ogc" {
+        id      = "ogc"
+      ~ jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+          -   image = "registry/ogc:5.224.0"
+          +   image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+			`# module.ogc.nomad_job.ogc will be updated in-place
+!   resource "nomad_job" "ogc" {
+        id      = "ogc"
+!       jobspec = <<-EOT
+            syncOptions:
+              -   ServerSideApply = true
+            EOT
+            job "ogc" {
+              group "ogc" {
+-             image = "registry/ogc:5.224.0"
++             image = "registry/ogc:5.226.0"
+              }
+            }
+        EOT
+    }`,
+		},
+		{
+			"quoted heredoc-like string does not enter heredoc mode",
+			`  # null_resource.example will be updated in-place
+  ~ resource "null_resource" "example" {
+      ~ cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+      ~ triggers = {
+          + changed = "true"
+        }
+    }`,
+			`# null_resource.example will be updated in-place
+!   resource "null_resource" "example" {
+!       cmd      = "cat <<EOF" -> "cat <<EOF --changed"
+!       triggers = {
++           changed = "true"
+        }
+    }`,
+		},
+		{
+			"heredoc terminator with terraform suffix exits heredoc mode",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ output = <<-EOT
+          old
+        EOT -> (known after apply)
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       output = <<-EOT
+          old
+        EOT -> (known after apply)
++       triggers_replace = [
++           "changed",
+        ]
+    }`,
+		},
+		{
+			"collection element heredoc diff",
+			`  # terraform_data.example will be updated in-place
+  ~ resource "terraform_data" "example" {
+      ~ input = [
+          ~ <<-EOT
+              first
+              - old
+              + new
+            EOT,
+        ]
+      + triggers_replace = [
+          + "changed",
+        ]
+    }`,
+			`# terraform_data.example will be updated in-place
+!   resource "terraform_data" "example" {
+!       input = [
+!           <<-EOT
+              first
+-               old
++               new
+            EOT,
+        ]
++       triggers_replace = [
++           "changed",
+        ]
     }`,
 		},
 	}

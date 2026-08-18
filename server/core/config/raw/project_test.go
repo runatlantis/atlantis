@@ -4,6 +4,8 @@
 package raw_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation"
@@ -418,6 +420,46 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: "",
 		},
+		{
+			description: "workspace with ..",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("../evil"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "workspace beginning with /",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("/etc"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "workspace with embedded /",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("sub/dir"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "workspace with backslash",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("sub\\dir"),
+			},
+			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+		},
+		{
+			description: "valid workspace",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("my-workspace"),
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
@@ -452,7 +494,7 @@ func TestProject_ToValid(t *testing.T) {
 				WorkflowName:     nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 				ApplyRequirements: nil,
@@ -505,7 +547,7 @@ func TestProject_ToValid(t *testing.T) {
 				Workspace:        "default",
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -520,7 +562,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -534,7 +576,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "a/b/c",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -548,7 +590,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -563,7 +605,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       "mydir",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -577,7 +619,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -591,7 +633,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -605,7 +647,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -621,7 +663,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:       ".",
 				Workspace: "default",
 				Autoplan: valid.Autoplan{
-					WhenModified: raw.DefaultAutoPlanWhenModified,
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
 				},
 			},
@@ -630,6 +672,180 @@ func TestProject_ToValid(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			Equals(t, c.exp, c.input.ToValid())
+		})
+	}
+}
+
+func TestIsTerraformProjectDir(t *testing.T) {
+	cases := []struct {
+		description string
+		files       map[string]string
+		exp         bool
+	}{
+		{
+			description: "no files",
+			files:       map[string]string{},
+			exp:         false,
+		},
+		{
+			description: "unrelated file",
+			files: map[string]string{
+				"foo.txt": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: ".tf file",
+			files: map[string]string{
+				"foo.tf": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tf.json file",
+			files: map[string]string{
+				"foo.tf.json": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: "terragrunt.hcl file",
+			files: map[string]string{
+				"terragrunt.hcl": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: "tfvars-only directory",
+			files: map[string]string{
+				"vars.tfvars": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "tfvars json-only directory",
+			files: map[string]string{
+				"vars.tfvars.json": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "tfstate-only directory",
+			files: map[string]string{
+				"terraform.tfstate": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "lockfile-only directory",
+			files: map[string]string{
+				".terraform.lock.hcl": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: "non-config tf suffix",
+			files: map[string]string{
+				"non.tf.suffix": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: ".tf file in a subdirectory",
+			files: map[string]string{
+				"subdir/foo.tf": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: ".tf is a directory ",
+			files: map[string]string{
+				"foo.tf/bar.txt": "Some content",
+			},
+			exp: false,
+		},
+		{
+			description: ".tofu file",
+			files: map[string]string{
+				"main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu.json file",
+			files: map[string]string{
+				"main.tofu.json": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu and .tf together",
+			files: map[string]string{
+				"main.tf":       "Some content",
+				"versions.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: "hidden .tofu file still matches indicator glob",
+			files: map[string]string{
+				".main.tofu": "Some content",
+			},
+			exp: true,
+		},
+		{
+			description: ".tofu in subdirectory only",
+			files: map[string]string{
+				"subdir/main.tofu": "Some content",
+			},
+			exp: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			// Setup contents from dir
+			dir := t.TempDir()
+			for path, content := range c.files {
+				fullPath := filepath.Join(dir, path)
+				dirPath := filepath.Dir(fullPath)
+
+				err := os.MkdirAll(dirPath, 0o700)
+				Ok(t, err)
+
+				err = os.WriteFile(fullPath, []byte(content), 0o600)
+				Ok(t, err)
+
+			}
+			actual, err := raw.IsTerraformProjectDir(dir)
+			Ok(t, err)
+			Equals(t, c.exp, actual)
+		})
+	}
+}
+
+func TestIsProjectIndicatorFile(t *testing.T) {
+	cases := []struct {
+		name string
+		exp  bool
+	}{
+		{"main.tf", true},
+		{"versions.tf", true},
+		{"main.tf.json", true},
+		{"versions.tf.json", true},
+		{"main.tofu", true},
+		{"versions.tofu", true},
+		{"main.tofu.json", true},
+		{"versions.tofu.json", true},
+		{"terragrunt.hcl", true},
+		{"README.md", false},
+		{"main.go", false},
+		{"terraform.tfstate", false},
+		{".terraform.lock.hcl", false},
+		{"vars.tfvars", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, raw.IsProjectIndicatorFile(c.name))
 		})
 	}
 }

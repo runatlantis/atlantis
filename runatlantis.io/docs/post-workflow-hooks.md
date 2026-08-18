@@ -91,12 +91,12 @@ command](custom-workflows.md#custom-run-command).
 - run: custom-command
 ```
 
-| Key         | Type   | Default | Required | Description           |
-| ----------- | ------ | ------- | -------- | --------------------- |
-| run         | string | none    | no       | Run a custom command  |
-| description | string | none    | no       | Post hook description |
-| shell       | string | 'sh'    | no       | The shell to use for running the command |
-| shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| run | string | none | no | Run a custom command |
+| description | string | none | no | Post hook description |
+| shell | string | 'sh' | no | The shell to use for running the command |
+| shellArgs | string | '-c' | no | The shell arguments to use for running the command |
 
 ::: tip Notes
 

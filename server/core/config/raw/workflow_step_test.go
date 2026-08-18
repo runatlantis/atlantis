@@ -9,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestWorkflowHook_YAMLMarshalling(t *testing.T) {
@@ -50,7 +50,7 @@ key: value`,
 key:
   value:
     another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!map into string",
+			expErr: "yaml: construct errors: line 3: cannot construct !!map into string",
 		},
 	}
 

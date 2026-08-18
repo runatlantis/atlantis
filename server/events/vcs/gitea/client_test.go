@@ -203,6 +203,105 @@ func TestClient_GetPullLabelsPagination(t *testing.T) {
 	Equals(t, []int{1, 2}, pages)
 }
 
+func TestClient_NilResponseErrorsDoNotPanic(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repo := models.Repo{Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "abc123",
+		BaseRepo:   repo,
+	}
+
+	cases := []struct {
+		description string
+		run         func(client *gitea.Client) error
+	}{
+		{
+			description: "GetPullRequest",
+			run: func(client *gitea.Client) error {
+				_, err := client.GetPullRequest(logger, repo, pull.Num)
+				return err
+			},
+		},
+		{
+			description: "GetModifiedFiles",
+			run: func(client *gitea.Client) error {
+				_, err := client.GetModifiedFiles(logger, repo, pull)
+				return err
+			},
+		},
+		{
+			description: "CreateComment",
+			run: func(client *gitea.Client) error {
+				return client.CreateComment(logger, repo, pull.Num, "comment", "plan")
+			},
+		},
+		{
+			description: "ReactToComment",
+			run: func(client *gitea.Client) error {
+				return client.ReactToComment(logger, repo, pull.Num, 1, "+1")
+			},
+		},
+		{
+			description: "HidePrevCommandComments",
+			run: func(client *gitea.Client) error {
+				return client.HidePrevCommandComments(logger, repo, pull.Num, "plan", "")
+			},
+		},
+		{
+			description: "PullIsApproved",
+			run: func(client *gitea.Client) error {
+				_, err := client.PullIsApproved(logger, repo, pull)
+				return err
+			},
+		},
+		{
+			description: "UpdateStatus",
+			run: func(client *gitea.Client) error {
+				return client.UpdateStatus(logger, repo, pull, models.PendingCommitStatus, "atlantis/plan", "pending", "")
+			},
+		},
+		{
+			description: "MergePull",
+			run: func(client *gitea.Client) error {
+				return client.MergePull(logger, pull, models.PullRequestOptions{})
+			},
+		},
+		{
+			description: "GetFileContent",
+			run: func(client *gitea.Client) error {
+				_, _, err := client.GetFileContent(logger, repo, "main", "atlantis.yaml")
+				return err
+			},
+		},
+		{
+			description: "GetPullLabels",
+			run: func(client *gitea.Client) error {
+				_, err := client.GetPullLabels(logger, repo, pull)
+				return err
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			client := newClosedTestClient(t, 2)
+
+			var err error
+			func() {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						t.Fatalf("unexpected panic: %v", recovered)
+					}
+				}()
+				err = c.run(client)
+			}()
+
+			Assert(t, err != nil, "expected network error")
+		})
+	}
+}
+
 func TestClient_GetModifiedFilesPaginationEmergencyBreak(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	pages := make([]int, 0, 500)
@@ -265,6 +364,24 @@ func newTestClient(t *testing.T, pageSize int, apiHandler http.HandlerFunc) *git
 
 	client, err := gitea.New(testServer.URL, "user", "token", pageSize, logging.NewNoopLogger(t))
 	Ok(t, err)
+	return client
+}
+
+func newClosedTestClient(t *testing.T, pageSize int) *gitea.Client {
+	t.Helper()
+	versionResponse := mustReadTestData(t, "version-response.json")
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/v1/version" {
+			_, _ = w.Write(versionResponse)
+			return
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+
+	client, err := gitea.New(testServer.URL, "user", "token", pageSize, logging.NewNoopLogger(t))
+	Ok(t, err)
+	testServer.Close()
 	return client
 }
 

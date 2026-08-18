@@ -502,6 +502,55 @@ func TestUnlockingMultiple(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
+func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should ignore missing locks")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+}
+
+func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Assert(t, existing != nil, "expected lock to remain")
+	Equals(t, pullNum, existing.Pull.Num)
+}
+
+func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	_, _, err := rdb.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := rdb.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Assert(t, deleted != nil, "expected deleted lock")
+	Equals(t, lock.Project, deleted.Project)
+	Equals(t, lock.Workspace, deleted.Workspace)
+	Equals(t, lock.Pull, deleted.Pull)
+	Equals(t, lock.User, deleted.User)
+
+	existing, err := rdb.GetLock(project, workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), existing)
+}
+
 func TestUnlockByPullNone(t *testing.T) {
 	t.Log("UnlockByPull should be successful when there are no locks")
 	s := miniredis.RunT(t)
@@ -848,6 +897,140 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, maybeStatus.Projects)
+}
+
+func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := rdb.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "release"
+	status, err := rdb.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+
+	maybeStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, maybeStatus.Projects)
+}
+
+func TestRedis_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := rdb.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "main"
+	status, err := rdb.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, "main", status.Pull.BaseBranch)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
+
+	maybeStatus, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, "main", maybeStatus.Pull.BaseBranch)
+	Equals(t, status.Projects, maybeStatus.Projects)
 }
 
 // Test that if we update an existing pull status via Apply and our new status is for a
