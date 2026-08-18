@@ -708,6 +708,8 @@ Comment command trigger executable name. Defaults to `atlantis`.
 
 This is useful when running multiple Atlantis servers against a single repository.
 
+Note: the "did you mean" misspelling warning only applies to the default executable name (`atlantis`). If you set a custom `--executable-name`, Atlantis won't warn about comments that are Levenshtein-close to it — this avoids spurious warnings when multiple servers with similar names (e.g. `atlantis-dev` and `atlantis-prod`) receive the same comment.
+
 ### `--fail-on-pre-workflow-hook-error` <Badge text="v0.27.0+" type="info"/>
 
 ```bash
