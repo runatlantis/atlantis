@@ -55,6 +55,7 @@ manually configured project, the manually configured project will take precedenc
 ```yaml
 version: 3 # Available since v0.1.0
 automerge: true # Available since v0.15.0
+automerge_method: merge # Optional, one of "merge", "rebase", "squash" or "fast-forward" depending on the VCS provider
 autodiscover: # Available since v0.18.0
   mode: auto
   ignore_paths:
@@ -450,6 +451,7 @@ allowed_regexp_prefixes:
 | ----------------------------- | ------------------------------------------------------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | version                       | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                       |
 | automerge                     | bool                                                   | `false` | no       | Automatically merges pull request when all plans are applied.                                                                      |
+| automerge_method              | string                                                 | none    | no       | Merge method for automerging: `merge`, `rebase`, `squash` or `fast-forward` (supported values vary by VCS provider).               |
 | delete_source_branch_on_merge | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                  |
 | projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
 | workflows<br />_(restricted)_ | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |

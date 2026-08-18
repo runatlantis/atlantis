@@ -42,6 +42,9 @@ type ProjectContext struct {
 	// AutomergeEnabled is true if automerge is enabled for the repo that this
 	// project is in.
 	AutomergeEnabled bool
+	// AutoMergeMethod is the merge method configured via the repo's
+	// atlantis.yaml automerge_method key, or "" if unset.
+	AutoMergeMethod string
 	// ParallelApplyEnabled is true if parallel apply is enabled for this project.
 	ParallelApplyEnabled bool
 	// ParallelPlanEnabled is true if parallel plan is enabled for this project.
