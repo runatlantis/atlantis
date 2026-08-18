@@ -120,6 +120,7 @@ var testFlags = map[string]any{
 	EnableExternalStoresFlag:         false,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
+	SharePlanDirFlag:                 "/plans",
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
 	PendingApplyStatusFlag:           false,
@@ -202,6 +203,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
+		SharePlanDirFlag:                 dataDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
 		RepoAllowlistFlag:                "*",
 		VarFileAllowlistFlag:             dataDir,
@@ -295,6 +297,7 @@ func TestNormalizePath(t *testing.T) {
 var pathFlags = map[string]struct{}{
 	DataDirFlag:                      {},
 	MarkdownTemplateOverridesDirFlag: {},
+	SharePlanDirFlag:                 {},
 }
 
 func TestExecute_Flags(t *testing.T) {
@@ -450,6 +453,36 @@ func TestAllFlagsDocumented(t *testing.T) {
 		}
 	}
 
+}
+
+func TestExecute_ExpandHomeInSharePlanDir(t *testing.T) {
+	t.Log("If ~ is used as a share-plan-dir path, should expand to absolute home path")
+	c := setup(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+		SharePlanDirFlag:  "~/this/is/a/path",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/this/is/a/path", passedConfig.SharePlanDir)
+}
+
+func TestExecute_RelativeSharePlanDir(t *testing.T) {
+	t.Log("Should convert relative share-plan-dir to absolute.")
+	c := setupWithDefaults(map[string]any{
+		SharePlanDirFlag: "../",
+	}, t)
+
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.SharePlanDir)
 }
 
 func TestExecute_ConfigFile(t *testing.T) {
