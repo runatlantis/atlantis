@@ -283,58 +283,59 @@ func newProjectCommandContext(ctx *command.Context,
 	}
 
 	return command.ProjectContext{
-		CommandName:                cmd,
-		SubCommand:                 subCommand,
-		ApplyCmd:                   applyCmd,
-		ApprovePoliciesCmd:         approvePoliciesCmd,
-		BaseRepo:                   ctx.Pull.BaseRepo,
-		EscapedCommentArgs:         escapedCommentArgs,
-		AutomergeEnabled:           automergeEnabled,
-		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocksMode:              projCfg.RepoLocks.Mode,
-		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
-		ParallelApplyEnabled:       parallelApplyEnabled,
-		ParallelPlanEnabled:        parallelPlanEnabled,
-		ParallelPolicyCheckEnabled: parallelPlanEnabled,
-		DependsOn:                  projCfg.DependsOn,
-		AutoplanEnabled:            projCfg.AutoplanEnabled,
-		AutoplanWhenModified:       projCfg.AutoplanWhenModified,
-		Steps:                      steps,
-		HeadRepo:                   ctx.HeadRepo,
-		Log:                        ctx.Log,
-		Scope:                      scope,
-		ProjectPlanStatus:          projectPlanStatus,
-		ProjectPolicyStatus:        projectPolicyStatus,
-		Pull:                       ctx.Pull,
-		ProjectName:                projCfg.Name,
-		PlanRequirements:           projCfg.PlanRequirements,
-		ApplyRequirements:          projCfg.ApplyRequirements,
-		ImportRequirements:         projCfg.ImportRequirements,
-		RePlanCmd:                  planCmd,
-		RepoRelDir:                 projCfg.RepoRelDir,
-		RepoConfigVersion:          projCfg.RepoCfgVersion,
-		TerraformDistribution:      projCfg.TerraformDistribution,
-		TerraformVersion:           projCfg.TerraformVersion,
-		User:                       ctx.User,
-		Verbose:                    verbose,
-		Workspace:                  projCfg.Workspace,
-		PolicySets:                 policySets,
-		PolicySetTarget:            ctx.PolicySet,
-		ClearPolicyApproval:        ctx.ClearPolicyApproval,
-		PullReqStatus:              pullReqStatus,
-		PullStatus:                 pullStatus,
-		JobID:                      uuid.New().String(),
-		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
-		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
-		SilencePRComments:          projCfg.SilencePRComments,
-		TeamAllowlistChecker:       teamAllowlistChecker,
-		API:                        ctx.API,
-		SkipPRRequirements:         ctx.SkipPRRequirements,
-		RunPolicyChecks:            ctx.RunPolicyChecks,
-		SuppressVCSStatus:          ctx.SuppressVCSStatus,
-		SuppressJobOutput:          ctx.SuppressJobOutput,
-		SuppressApplyWebhooks:      ctx.SuppressApplyWebhooks,
-		FailOnMissingDependencies:  ctx.FailOnMissingDependencies,
+		CommandName:                     cmd,
+		SubCommand:                      subCommand,
+		ApplyCmd:                        applyCmd,
+		ApprovePoliciesCmd:              approvePoliciesCmd,
+		BaseRepo:                        ctx.Pull.BaseRepo,
+		EscapedCommentArgs:              escapedCommentArgs,
+		AutomergeEnabled:                automergeEnabled,
+		DeleteSourceBranchOnMerge:       projCfg.DeleteSourceBranchOnMerge,
+		RepoLocksMode:                   projCfg.RepoLocks.Mode,
+		CustomPolicyCheck:               projCfg.CustomPolicyCheck,
+		ParallelApplyEnabled:            parallelApplyEnabled,
+		ParallelPlanEnabled:             parallelPlanEnabled,
+		ParallelPolicyCheckEnabled:      parallelPlanEnabled,
+		DependsOn:                       projCfg.DependsOn,
+		AutoplanEnabled:                 projCfg.AutoplanEnabled,
+		AutoplanWhenModified:            projCfg.AutoplanWhenModified,
+		Steps:                           steps,
+		RequiresAtlantisManagedPlanFile: requiresAtlantisManagedPlanFile(projCfg.Workflow),
+		HeadRepo:                        ctx.HeadRepo,
+		Log:                             ctx.Log,
+		Scope:                           scope,
+		ProjectPlanStatus:               projectPlanStatus,
+		ProjectPolicyStatus:             projectPolicyStatus,
+		Pull:                            ctx.Pull,
+		ProjectName:                     projCfg.Name,
+		PlanRequirements:                projCfg.PlanRequirements,
+		ApplyRequirements:               projCfg.ApplyRequirements,
+		ImportRequirements:              projCfg.ImportRequirements,
+		RePlanCmd:                       planCmd,
+		RepoRelDir:                      projCfg.RepoRelDir,
+		RepoConfigVersion:               projCfg.RepoCfgVersion,
+		TerraformDistribution:           projCfg.TerraformDistribution,
+		TerraformVersion:                projCfg.TerraformVersion,
+		User:                            ctx.User,
+		Verbose:                         verbose,
+		Workspace:                       projCfg.Workspace,
+		PolicySets:                      policySets,
+		PolicySetTarget:                 ctx.PolicySet,
+		ClearPolicyApproval:             ctx.ClearPolicyApproval,
+		PullReqStatus:                   pullReqStatus,
+		PullStatus:                      pullStatus,
+		JobID:                           uuid.New().String(),
+		ExecutionOrderGroup:             projCfg.ExecutionOrderGroup,
+		AbortOnExecutionOrderFail:       abortOnExecutionOrderFail,
+		SilencePRComments:               projCfg.SilencePRComments,
+		TeamAllowlistChecker:            teamAllowlistChecker,
+		API:                             ctx.API,
+		SkipPRRequirements:              ctx.SkipPRRequirements,
+		RunPolicyChecks:                 ctx.RunPolicyChecks,
+		SuppressVCSStatus:               ctx.SuppressVCSStatus,
+		SuppressJobOutput:               ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:           ctx.SuppressApplyWebhooks,
+		FailOnMissingDependencies:       ctx.FailOnMissingDependencies,
 	}
 }
 
@@ -348,4 +349,31 @@ func escapeArgs(args []string) []string {
 		escaped = append(escaped, escapedArg.String())
 	}
 	return escaped
+}
+
+// requiresAtlantisManagedPlanFile reports whether Atlantis owns the convention
+// plan artifact (<workspace>.tfplan) for this workflow. That is true when the
+// workflow uses the built-in plan step (Atlantis writes the file) or the
+// built-in apply step (Atlantis reads it). A workflow built only from custom
+// run steps writes its plan wherever the user's commands choose, so Atlantis
+// must not require, hash, or delete a convention plan file for it.
+func requiresAtlantisManagedPlanFile(workflow valid.Workflow) bool {
+	return hasAtlantisManagedPlanStep(workflow.Plan.Steps) || hasAtlantisManagedApplyStep(workflow.Apply.Steps)
+}
+
+func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
+	return hasStepNamed(steps, "plan")
+}
+
+func hasAtlantisManagedApplyStep(steps []valid.Step) bool {
+	return hasStepNamed(steps, "apply")
+}
+
+func hasStepNamed(steps []valid.Step, name string) bool {
+	for _, step := range steps {
+		if step.StepName == name {
+			return true
+		}
+	}
+	return false
 }
