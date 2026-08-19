@@ -181,7 +181,7 @@ func TestUnlock_NoOpLocker(t *testing.T) {
 	l := locking.NewNoOpLocker()
 	lock, err := l.Unlock("owner/repo/path/workspace/projectName")
 	Ok(t, err)
-	Equals(t, &models.ProjectLock{}, lock)
+	Equals(t, (*models.ProjectLock)(nil), lock)
 }
 
 func TestList_NoOpLocker(t *testing.T) {

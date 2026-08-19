@@ -6,6 +6,7 @@ package events
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -729,6 +730,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -950,6 +955,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -1195,6 +1204,10 @@ workflows:
 				c.expCtx.CommandName = cmd
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
+				// These cases only override policy_check, so plan and apply
+				// fall back to the built-in default steps and Atlantis owns
+				// the convention plan artifact.
+				c.expCtx.RequiresAtlantisManagedPlanFile = true
 				ctx.PolicySets = emptyPolicySets
 
 				// Job ID cannot be compared since its generated at random
