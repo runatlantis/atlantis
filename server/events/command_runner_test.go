@@ -1142,6 +1142,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 			setup: func() {
 				ch.GlobalCfg.Repos[0].BranchRegex = regexp.MustCompile("^main$")
 			},
+			wantComment: "Commands are not enabled for branch `release`. Destination branch does not match the required pattern: `^main$`",
 		},
 	}
 
