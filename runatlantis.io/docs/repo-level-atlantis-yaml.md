@@ -482,7 +482,7 @@ workflow: myworkflow
 | name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                       |
 | branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                     |
 | dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
-| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workspace when planning/applying and will create it if it doesn't exist. Cannot contain `/`, `\\`, `..`, `$`, whitespace or control characters, and cannot start with `-` or `~`.                  |
+| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workspace when planning/applying and will create it if it doesn't exist.                  |
 | execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                         |
 | delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
 | repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |
@@ -495,6 +495,13 @@ workflow: myworkflow
 | import_requirements<br />_(restricted)_ | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                       |
 | workflow <br />_(restricted)_           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                            |
+
+::: tip Workspace names
+A `workspace` is used as a Terraform command argument and as a component of the
+paths Atlantis writes, so it cannot contain `/`, `\\`, `..`, `$`, whitespace or
+control characters, and cannot start with `-` or `~`. The same rule applies to
+the `-w` flag in a comment and to the workspace named in a `cloud` block.
+:::
 
 ::: tip
 A project represents a Terraform state. Typically, there is one state per directory and workspace however it's possible to
