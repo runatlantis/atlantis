@@ -37,7 +37,7 @@ func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string
 	tfDistribution := p.defaultTfDistribution
 	tfVersion := p.defaultTFVersion
 	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution, "", terraform.APIAuth{})
 	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
