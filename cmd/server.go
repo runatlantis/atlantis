@@ -149,6 +149,9 @@ const (
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
+	TFDownloadUsernameFlag           = "tf-download-username"
+	TFDownloadPasswordFlag           = "tf-download-password"
+	TFDownloadTokenFlag              = "tf-download-token"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
@@ -479,6 +482,18 @@ var stringFlags = map[string]stringFlag{
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
+	},
+	TFDownloadUsernameFlag: {
+		description: "Username for HTTP basic auth when downloading Terraform from a custom --tf-download-url mirror.",
+	},
+	TFDownloadPasswordFlag: {
+		description: "Password for HTTP basic auth when downloading Terraform from a custom --tf-download-url mirror." +
+			" For security, set via the ATLANTIS_TF_DOWNLOAD_PASSWORD environment variable.",
+	},
+	TFDownloadTokenFlag: {
+		description: "Bearer token for authenticating against a custom --tf-download-url mirror." +
+			" Takes precedence over basic auth when both are set." +
+			" For security, set via the ATLANTIS_TF_DOWNLOAD_TOKEN environment variable.",
 	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
