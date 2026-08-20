@@ -496,6 +496,13 @@ workflow: myworkflow
 | silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                       |
 | workflow <br />_(restricted)_           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                            |
 
+::: tip Workspace names
+A `workspace` is used as a Terraform command argument and as a component of the
+paths Atlantis writes, so it cannot contain `/`, `\\`, `..`, `$`, whitespace or
+control characters, and cannot start with `-` or `~`. The same rule applies to
+the `-w` flag in a comment and to the workspace named in a `cloud` block.
+:::
+
 ::: tip
 A project represents a Terraform state. Typically, there is one state per directory and workspace however it's possible to
 have multiple states in the same directory using `terraform init -backend-config=custom-config.tfvars`.
