@@ -127,6 +127,7 @@ type UserConfig struct {
 	SilenceVCSStatusNoProjects bool            `mapstructure:"silence-vcs-status-no-projects"`
 	SilenceAllowlistErrors     bool            `mapstructure:"silence-allowlist-errors"`
 	SkipCloneNoChanges         bool            `mapstructure:"skip-clone-no-changes"`
+	SlackIncludeBody           bool            `mapstructure:"slack-include-body"`
 	SlackToken                 string          `mapstructure:"slack-token"`
 	SSLCertFile                string          `mapstructure:"ssl-cert-file"`
 	SSLKeyFile                 string          `mapstructure:"ssl-key-file"`
