@@ -133,6 +133,16 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+::: tip Note
+Each entry in `extra_args` is passed to Terraform as a single argument. It is not
+interpreted by a shell, so shell operators (`;`, `&&`, `|`, redirections),
+globbing and word splitting do not apply. Environment variable references such
+as `$WORKSPACE`, `$DIR` and `$ATLANTIS_TERRAFORM_VERSION` are still expanded.
+
+If you need shell behaviour, use a `run` step, which is executed with a shell by
+design.
+:::
+
 If [policy checking](policy-checking.md#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml

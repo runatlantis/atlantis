@@ -72,6 +72,52 @@ func NewShellCommandRunner(
 	}
 }
 
+// NewArgvCommandRunner runs a binary directly, passing argv[1:] to it as an
+// argument vector. Nothing is interpreted by a shell, so a metacharacter in an
+// argument reaches the process as literal text. Use this for commands Atlantis
+// builds itself; NewShellCommandRunner is for `run` steps, where the user
+// deliberately supplies shell source.
+func NewArgvCommandRunner(
+	argv []string,
+	display string,
+	environ []string,
+	workingDir string,
+	streamOutput bool,
+	outputHandler jobs.ProjectCommandOutputHandler,
+) *ShellCommandRunner {
+	cmd := exec.Command(argv[0], argv[1:]...) // #nosec G204 -- argv[0] is a resolved executable path, and the arguments are passed as a vector rather than as shell source
+	cmd.Env = environ
+	cmd.Dir = workingDir
+
+	return &ShellCommandRunner{
+		command:       display,
+		workingDir:    workingDir,
+		outputHandler: outputHandler,
+		streamOutput:  streamOutput,
+		cmd:           cmd,
+	}
+}
+
+// describe renders the command for messages that quote it as a single unit. A
+// runner built by NewArgvCommandRunner has no shell, so there is nothing to
+// name in front of the command. The shell-backed wording is unchanged: these
+// strings are shown to users on pull requests when a `run` step fails.
+func (s *ShellCommandRunner) describe() string {
+	if s.shell == nil {
+		return s.command
+	}
+	return fmt.Sprintf("%s %q", s.shell.String(), s.command)
+}
+
+// describeSplit renders the command for messages that quote the shell and the
+// command as two separate units.
+func (s *ShellCommandRunner) describeSplit() string {
+	if s.shell == nil {
+		return fmt.Sprintf("'%s'", s.command)
+	}
+	return fmt.Sprintf("'%s' '%s'", s.shell.String(), s.command)
+}
+
 func (s *ShellCommandRunner) Run(ctx command.ProjectContext) (string, error) {
 	_, outCh := s.RunCommandAsync(ctx)
 
@@ -115,10 +161,10 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 		stderr, _ := s.cmd.StderrPipe()
 		stdin, _ := s.cmd.StdinPipe()
 
-		ctx.Log.Debug("starting '%s %q' in '%s'", s.shell.String(), s.command, s.workingDir)
+		ctx.Log.Debug("starting '%s' in '%s'", s.describe(), s.workingDir)
 		err := s.cmd.Start()
 		if err != nil {
-			err = fmt.Errorf("running '%s %q' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
+			err = fmt.Errorf("running '%s' in '%s': %w", s.describe(), s.workingDir, err)
 			ctx.Log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 			return
@@ -193,12 +239,12 @@ func (s *ShellCommandRunner) RunCommandAsync(ctx command.ProjectContext) (chan<-
 
 		// We're done now. Send an error if there was one.
 		if err != nil {
-			err = fmt.Errorf("running '%s' '%s' in '%s': %w", s.shell.String(), s.command, s.workingDir, err)
+			err = fmt.Errorf("running %s in '%s': %w", s.describeSplit(), s.workingDir, err)
 			log.Err("%s", err.Error())
 			outCh <- Line{Err: err}
 		} else {
-			log.Info("successfully ran '%s' '%s' in '%s'",
-				s.shell.String(), s.command, s.workingDir)
+			log.Info("successfully ran %s in '%s'",
+				s.describeSplit(), s.workingDir)
 		}
 	}()
 
