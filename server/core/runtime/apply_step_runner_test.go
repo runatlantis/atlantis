@@ -81,7 +81,7 @@ func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
 	_, err = o.Run(ctx, nil, tmpDir, nil)
 
 	Assert(t, errors.Is(err, applyErr), "expected the local apply error, got %v", err)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", fmt.Sprintf("%q", planPath)}, nil, tfDistribution, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", planPath}, nil, tfDistribution, nil, "workspace")
 	_, statErr := os.Stat(planPath)
 	Ok(t, statErr)
 }
@@ -95,8 +95,11 @@ func TestRun_Success(t *testing.T) {
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -109,12 +112,16 @@ func TestRun_Success(t *testing.T) {
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
 
+	// extra_args is marked expandable on the context the client receives.
+
+	ctx.ExpandableArgs = []string{"extra", "args"}
+
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", planPath}, map[string]string(nil), tfDistribution, nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -131,6 +138,7 @@ func TestRun_UsesLocalSharePlanDir(t *testing.T) {
 		BaseRepo: models.Repo{
 			FullName: "owner/repo",
 		},
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		LocalSharePlanDir:  sharePlanDir,
 		Log:                logger,
@@ -140,6 +148,8 @@ func TestRun_UsesLocalSharePlanDir(t *testing.T) {
 		RepoRelDir: "env",
 		Workspace:  "workspace",
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -156,7 +166,7 @@ func TestRun_UsesLocalSharePlanDir(t *testing.T) {
 	output, err := o.Run(ctx, []string{"extra", "args"}, projectPath, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, projectPath, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, projectPath, []string{"apply", "-input=false", "extra", "args", "comment", "args", planPath}, map[string]string(nil), tfDistribution, nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -173,8 +183,11 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		ProjectName:        "projectname",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -191,7 +204,7 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", planPath}, map[string]string(nil), tfDistribution, nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -207,10 +220,13 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	ctx := command.ProjectContext{
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		Log:                logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -226,7 +242,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", planPath}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -245,10 +261,13 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	ctx := command.ProjectContext{
 		Workspace:             "workspace",
 		RepoRelDir:            ".",
+		CommentArgs:           []string{"comment", "args"},
 		EscapedCommentArgs:    []string{"comment", "args"},
 		TerraformDistribution: &projTFDistribution,
 		Log:                   logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -263,7 +282,7 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", planPath}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -337,7 +356,8 @@ func TestRun_UsingTarget(t *testing.T) {
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
-				EscapedCommentArgs: c.commentFlags,
+				CommentArgs:        c.commentFlags,
+				EscapedCommentArgs: escapeForTest(c.commentFlags),
 			}, c.extraArgs, tmpDir, map[string]string(nil))
 			Equals(t, "", output)
 			if c.expErr {
@@ -382,10 +402,13 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		RemoteApplyRunURL:  &remoteApplyRunURL,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	<-tfExec.DoneCh
 
@@ -446,6 +469,7 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -580,3 +604,17 @@ var noConfirmationOut = `
 
 Error: Apply discarded.
 `
+
+// escapeForTest mirrors the production escaping applied to EscapedCommentArgs,
+// so that a test setting both fields reflects what a real context looks like.
+func escapeForTest(args []string) []string {
+	var escaped []string
+	for _, arg := range args {
+		var b strings.Builder
+		for i := range arg {
+			b.WriteString("\\" + string(arg[i]))
+		}
+		escaped = append(escaped, b.String())
+	}
+	return escaped
+}

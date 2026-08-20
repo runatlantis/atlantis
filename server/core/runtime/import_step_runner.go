@@ -30,6 +30,12 @@ func NewImportStepRunner(terraformExecutor TerraformExec, defaultTfDistribution 
 }
 
 func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	// extra_args comes from configuration, so environment variable references
+	// in it may be expanded. Marked on this copy of the context; everything
+	// else, including comment args, stays literal.
+	if len(extraArgs) > 0 {
+		ctx.ExpandableArgs = extraArgs
+	}
 	tfDistribution := p.defaultTFDistribution
 	tfVersion := p.defaultTFVersion
 	if ctx.TerraformDistribution != nil {
@@ -41,7 +47,7 @@ func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 
 	importCmd := []string{"import"}
 	importCmd = append(importCmd, extraArgs...)
-	importCmd = append(importCmd, ctx.EscapedCommentArgs...)
+	importCmd = append(importCmd, ctx.CommentArgs...)
 	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), importCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the import was successful and a plan file exists, delete the plan.
