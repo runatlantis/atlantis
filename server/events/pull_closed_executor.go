@@ -6,6 +6,7 @@ package events
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -93,9 +94,12 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
-	var workspaceErr error
+	// Collect cleanup errors but always attempt lock deletion. Returning early
+	// after workspace failure left Redis project locks forever when the local
+	// clone was already gone (e.g. multi-pod apply with external plan store).
+	var cleanupErrs []error
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
-		workspaceErr = fmt.Errorf("cleaning workspace: %w", err)
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleaning workspace: %w", err))
 	}
 
 	// Always attempt external plan cleanup even if workspace deletion failed,
@@ -106,20 +110,14 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
-	if workspaceErr != nil {
-		return workspaceErr
-	}
-
-	// Finally, delete locks. We do this last because when someone
-	// unlocks a project, right now we don't actually delete the plan
-	// so we might have plans laying around but no locks.
+	// Delete locks even when workspace cleanup failed so merge does not leave
+	// stale project locks that block other PRs.
 	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 	if err != nil {
-		return fmt.Errorf("cleaning up locks: %w", err)
-	}
-
-	// Delete pull from DB.
-	if err := p.Database.DeletePullStatus(pull); err != nil {
+		cleanupErrs = append(cleanupErrs, fmt.Errorf("cleaning up locks: %w", err))
+	} else if err := p.Database.DeletePullStatus(pull); err != nil {
+		// Drop pull status only after locks are gone. A Redis outage that
+		// fails UnlockByPull must not erase the plan record while locks remain.
 		logger.Err("deleting pull from db: %s", err)
 	}
 
@@ -128,17 +126,18 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		p.CancellationTracker.Clear(pull)
 	}
 
-	// If there are no locks then there's no need to comment.
-	if len(locks) == 0 {
-		return nil
+	// Comment when we successfully unlocked at least one project.
+	if len(locks) > 0 {
+		templateData := p.buildTemplateData(locks)
+		var buf bytes.Buffer
+		if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("rendering template for comment: %w", err))
+		} else if err := p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), ""); err != nil {
+			cleanupErrs = append(cleanupErrs, fmt.Errorf("creating cleanup comment: %w", err))
+		}
 	}
 
-	templateData := p.buildTemplateData(locks)
-	var buf bytes.Buffer
-	if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
-		return fmt.Errorf("rendering template for comment: %w", err)
-	}
-	return p.VCSClient.CreateComment(logger, repo, pull.Num, buf.String(), "")
+	return errors.Join(cleanupErrs...)
 }
 
 // buildTemplateData formats the lock data into a slice that can easily be
