@@ -78,8 +78,8 @@ type ProjectContext struct {
 	PullReqStatus models.PullReqStatus
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
-	// ExpectedPlanHash is the SHA-256 hash of the plan file selected when the
-	// apply command was built.
+	// ExpectedPlanHash is the SHA-256 hash of the plan file apply will use.
+	// The runner sets it after PlanStore.Load. A later change fails apply.
 	ExpectedPlanHash string
 	// RequiresAtlantisManagedPlanFile is true when this project's workflow uses
 	// the built-in plan or apply step, meaning Atlantis owns the convention plan
