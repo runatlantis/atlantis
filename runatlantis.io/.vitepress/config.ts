@@ -20,6 +20,41 @@ const config = defineConfig({
                 sidebar: sidebars.en,
             },
         },
+        // Machine-translated, reviewed by maintainers before merge. Pages that
+        // have not been translated yet fall back to English in the nav and
+        // sidebar — see runatlantis.io/.vitepress/sidebars.ts.
+        es: {
+            label: 'Español',
+            lang: 'es-ES',
+            themeConfig: {
+                nav: navbars.es,
+                sidebar: sidebars.es,
+                editLink: {
+                    pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path',
+                    text: 'Editar esta página en GitHub',
+                },
+                docFooter: {
+                    prev: 'Anterior',
+                    next: 'Siguiente',
+                },
+                outline: {
+                    level: [2, 3],
+                    label: 'En esta página',
+                },
+                lastUpdated: {
+                    text: 'Última actualización',
+                },
+                darkModeSwitchLabel: 'Apariencia',
+                lightModeSwitchTitle: 'Cambiar a modo claro',
+                darkModeSwitchTitle: 'Cambiar a modo oscuro',
+                sidebarMenuLabel: 'Menú',
+                returnToTopLabel: 'Volver arriba',
+                langMenuLabel: 'Cambiar idioma',
+                footer: {
+                    message: 'Copyright Atlantis a Series of LF Projects, LLC. Para los términos de uso del sitio web, la política de marcas y otras políticas del proyecto, consulta <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
+                },
+            },
+        },
     },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
@@ -45,6 +80,17 @@ const config = defineConfig({
                         translations: {
                             button: {
                                 buttonText: 'Search Documentation',
+                            },
+                        },
+                    },
+                    // NOTE: results stay English-only until the DocSearch
+                    // crawler is configured to index /es/ with a `lang` facet.
+                    // That change lives in Algolia's crawler config, not here.
+                    '/es/': {
+                        placeholder: 'Buscar en la documentación',
+                        translations: {
+                            button: {
+                                buttonText: 'Buscar',
                             },
                         },
                     },
