@@ -63,6 +63,7 @@ delete_source_branch_on_merge: true # Available since v0.15.0
 parallel_plan: true # Available since v0.17.0
 parallel_apply: true # Available since v0.17.0
 abort_on_execution_order_fail: true # Available since v0.17.0
+pause_apply_between_execution_order_groups: true
 projects:
 - name: my-project-name # Available since v0.1.0
   branch: /main/ # Available since v0.21.0
@@ -320,6 +321,7 @@ to be allowed to set this key. See [Server-Side Repo Config Use Cases](server-si
 ```yaml
 version: 3
 abort_on_execution_order_fail: true
+pause_apply_between_execution_order_groups: true
 projects:
    - dir: project1
      execution_order_group: 2
@@ -331,6 +333,56 @@ With this config above, Atlantis runs planning/applying for project2 first, then
 Several projects can have same `execution_order_group`. Any order in one group isn't guaranteed.
 `parallel_plan` and `parallel_apply` respect these order groups, so parallel planning/applying works
 in each group one by one.
+
+By default, an unscoped `atlantis apply` applies all pending execution order groups in order. When
+`pause_apply_between_execution_order_groups` is set to `true`, Atlantis instead applies only the
+lowest remaining execution order group. Planning is unchanged, so `atlantis plan` still plans every
+project selected by the normal Atlantis behavior.
+
+If more groups remain after the selected group succeeds, the apply comment lists the remaining
+groups and tells the user to run `atlantis apply` again. Projects in the selected group still honor
+`parallel_apply`, so projects in that group can run concurrently while later groups remain pending.
+
+Each repeated `atlantis apply` is an independent command. Atlantis reads the repo configuration
+again and validates the remaining current-head plan files at every checkpoint. This setting does not
+pin a plan-file or dynamic-configuration snapshot across separate comments.
+
+[Pre-workflow hooks](pre-workflow-hooks.md) and [post-workflow hooks](post-workflow-hooks.md) also
+run for every repeated command. A post-workflow hook therefore runs after each selected group, not
+only after the final execution order group. Hooks do not currently receive checkpoint-specific
+metadata.
+
+When `silence_pr_comments` includes `apply`, Atlantis also suppresses the staged continuation
+footer. The remaining groups still stay pending, but an operator must run the next unscoped
+`atlantis apply` without a PR-comment prompt.
+
+::: warning GitHub mergeable requirements between checkpoints
+The combined `atlantis/apply` status remains pending while later groups have not been applied. If
+GitHub requires that status and the repo also uses the `mergeable` apply requirement, enable
+[`--gh-allow-mergeable-bypass-apply`](command-requirements.md#github) so Atlantis does not block the
+next checkpoint on its own pending status.
+:::
+
+::: warning Targeted applies bypass staged checkpoints
+This setting sequences only unscoped `atlantis apply` commands. Targeted applies using `-p`, `-d`,
+or `-w` keep their current behavior and can apply a later group directly. Do not treat this setting
+as an authorization boundary when users are allowed to run targeted applies.
+:::
+
+The setting applies to unscoped pull-request comment commands. Apply requests made through the
+[API](api-endpoints.md) remain explicitly targeted by project or path, and automated remediation
+flows are not paused between execution order groups.
+
+If a project in the selected group fails, later groups remain pending and Atlantis does not prompt
+the user to advance. Resolve the failure using the normal apply or re-plan workflow, then run an
+unscoped `atlantis apply` again. Atlantis will not skip a lower group while it still has a pending
+plan. If automerge is enabled, Atlantis waits until all planned projects have been applied before
+merging the pull request.
+
+Staged progression uses the remaining plan files. A custom apply workflow implemented with a `run`
+step must remove `$PLANFILE` after a successful apply; otherwise the next unscoped apply fails closed
+and requires a new plan. When Atlantis uses an external plan store, use the built-in `apply` step so
+Atlantis can remove both the local and externally stored plan.
 
 If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
@@ -441,19 +493,21 @@ See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.md#custo
 version: 3
 automerge: false
 delete_source_branch_on_merge: false
+pause_apply_between_execution_order_groups: false
 projects:
 workflows:
 allowed_regexp_prefixes:
 ```
 
-| Key                           | Type                                                   | Default | Required | Description                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| version                       | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                       |
-| automerge                     | bool                                                   | `false` | no       | Automatically merges pull request when all plans are applied.                                                                      |
-| delete_source_branch_on_merge | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                  |
-| projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
-| workflows<br />_(restricted)_ | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |
-| allowed_regexp_prefixes       | array\[string\]                                        | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
+| Key                                        | Type                                                   | Default | Required | Description                                                                                                                                                                                |
+| ------------------------------------------ | ------------------------------------------------------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| version                                    | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                                                                               |
+| automerge                                  | bool                                                   | `false` | no       | Automatically merges pull request when all plans are applied.                                                                                                                              |
+| delete_source_branch_on_merge              | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                                                                          |
+| pause_apply_between_execution_order_groups | bool                                                   | `false` | no       | Makes an unscoped `atlantis apply` apply only the lowest remaining execution order group. Targeted applies are unchanged. See [Order of planning/applying](#order-of-planningapplying).    |
+| projects                                   | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                                                                           |
+| workflows<br />_(restricted)_              | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                                                                          |
+| allowed_regexp_prefixes                    | array\[string\]                                        | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used.                                                         |
 
 ### Project
 
