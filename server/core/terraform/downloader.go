@@ -46,7 +46,9 @@ func (d *TofuDownloader) Install(ctx context.Context, dir string, _downloadURL s
 	return file, nil
 }
 
-type TerraformDownloader struct{}
+type TerraformDownloader struct {
+	apiAuth APIAuth
+}
 
 func (d *TerraformDownloader) Install(ctx context.Context, dir string, downloadURL string, v *version.Version) (string, error) {
 	installer := install.NewInstaller()
@@ -56,6 +58,7 @@ func (d *TerraformDownloader) Install(ctx context.Context, dir string, downloadU
 			Version:    v,
 			InstallDir: dir,
 			ApiBaseURL: downloadURL,
+			Transport:  d.apiAuth.transport(),
 		},
 	})
 	if err != nil {

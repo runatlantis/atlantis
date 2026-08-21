@@ -452,7 +452,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
-	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution)
+	apiAuth := terraform.APIAuth{
+		Username:    userConfig.TFDownloadUsername,
+		Password:    userConfig.TFDownloadPassword,
+		BearerToken: userConfig.TFDownloadToken,
+	}
+	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution, userConfig.TFDownloadURL, apiAuth)
 
 	terraformClient, err := tfclient.NewClient(
 		logger,
