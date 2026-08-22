@@ -689,7 +689,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 			return false
 		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -698,7 +698,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
 		if shouldComment {
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Commands can't be run on closed pull requests", ""); err != nil {
 				ctx.Log.Err("unable to comment: %s", err)
 			}
 		}
