@@ -50,6 +50,7 @@ const (
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
+	AtlantisPluginCacheFlag          = "atlantis-plugin-cache"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	AutomergeMethodFlag              = "automerge-method"
@@ -538,6 +539,12 @@ var stringFlags = map[string]stringFlag{
 var boolFlags = map[string]boolFlag{
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
+	},
+	AtlantisPluginCacheFlag: {
+		description: "Declare that Atlantis uses a shared Terraform plugin cache. Because terraform init is not " +
+			"concurrency safe against a shared plugin cache (hashicorp/terraform#25849), enabling this serializes " +
+			"terraform init commands so only one runs at a time. Plan and apply parallelism are not affected.",
 		defaultValue: false,
 	},
 	AutoplanModules: {

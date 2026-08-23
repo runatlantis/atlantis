@@ -20,6 +20,7 @@ type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	BlockedExtraArgs            string `mapstructure:"blocked-extra-args"`
+	AtlantisPluginCache         bool   `mapstructure:"atlantis-plugin-cache"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`

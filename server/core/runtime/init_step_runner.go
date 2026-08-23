@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"path/filepath"
+	"sync"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/runtime/common"
@@ -18,6 +19,13 @@ type InitStepRunner struct {
 	TerraformExecutor     TerraformExec
 	DefaultTFDistribution terraform.Distribution
 	DefaultTFVersion      *version.Version
+	// PluginCache set to true declares that Atlantis uses a shared Terraform
+	// plugin cache which is not concurrency safe, so terraform init runs are
+	// serialized and only one init executes at a time. Plan and apply
+	// parallelism are not affected.
+	PluginCache bool
+	// initMu serializes terraform init execution when PluginCache is enabled.
+	initMu sync.Mutex
 }
 
 func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -74,6 +82,11 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	finalArgs := common.DeDuplicateExtraArgs(terraformInitArgs, extraArgs)
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
+
+	if i.PluginCache {
+		i.initMu.Lock()
+		defer i.initMu.Unlock()
+	}
 
 	out, err := i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's

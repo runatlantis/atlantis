@@ -811,6 +811,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
 			DefaultTFVersion:      defaultTfVersion,
+			PluginCache:           userConfig.AtlantisPluginCache,
 		},
 		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, planStore),
 		ShowStepRunner:        showStepRunner,

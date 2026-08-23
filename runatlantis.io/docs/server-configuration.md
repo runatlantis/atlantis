@@ -106,6 +106,21 @@ ATLANTIS_API_SECRET="secret"
 
 Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.md).
 
+### `--atlantis-plugin-cache` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --atlantis-plugin-cache
+# or
+ATLANTIS_ATLANTIS_PLUGIN_CACHE=true
+```
+
+Declare that Atlantis uses a shared Terraform plugin cache (e.g. via `TF_PLUGIN_CACHE_DIR`). Because `terraform init`
+is not concurrency safe against a shared plugin cache
+(see [hashicorp/terraform#25849](https://github.com/hashicorp/terraform/issues/25849)), enabling this serializes all
+`terraform init` commands so only one runs at a time, while plan and apply operations keep using
+[`--parallel-plan`](#parallel-plan), [`--parallel-apply`](#parallel-apply) and
+[`--parallel-pool-size`](#parallel-pool-size). Defaults to `false`.
+
 ### `--atlantis-url` <Badge text="v0.1.3+" type="info"/>
 
 ```bash

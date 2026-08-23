@@ -53,6 +53,7 @@ var testFlags = map[string]any{
 	ADUserFlag:                       "ad-user",
 	ADWebhookPasswordFlag:            "ad-wh-pass",
 	ADWebhookUserFlag:                "ad-wh-user",
+	AtlantisPluginCacheFlag:          true,
 	AtlantisURLFlag:                  "url",
 	AutoplanModules:                  false,
 	AutoplanModulesFromProjects:      "",
