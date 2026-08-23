@@ -502,16 +502,14 @@ func TestRun_InitSerializedWhenPluginCacheEnabled(t *testing.T) {
 	const n = 5
 	var wg sync.WaitGroup
 	for range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := iso.Run(command.ProjectContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
 			}, nil, "/path", map[string]string(nil))
 			Ok(t, err)
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -535,16 +533,14 @@ func TestRun_InitParallelByDefault(t *testing.T) {
 	const n = 5
 	var wg sync.WaitGroup
 	for range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := iso.Run(command.ProjectContext{
 				Workspace:  "workspace",
 				RepoRelDir: ".",
 				Log:        logger,
 			}, nil, "/path", map[string]string(nil))
 			Ok(t, err)
-		}()
+		})
 	}
 
 	// Wait until all runs have entered the executor. If they were serialized

@@ -419,7 +419,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	cacheDir := filepath.Join(userConfig.DataDir, TerraformPluginCacheDirName)
+	var cacheDir string
 	if userConfig.TFPluginCacheDir != "" {
 		// Terraform does not create TF_PLUGIN_CACHE_DIR itself so ensure the
 		// override directory exists before handing it to terraform.
