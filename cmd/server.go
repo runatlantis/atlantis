@@ -49,8 +49,8 @@ const (
 	AllowCommandsFlag                = "allow-commands"
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
-	AtlantisURLFlag                  = "atlantis-url"
 	AtlantisPluginCacheFlag          = "atlantis-plugin-cache"
+	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
 	AutomergeMethodFlag              = "automerge-method"
@@ -1229,6 +1229,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
+	}
+
+	if userConfig.TFPluginCacheDir != "" && !userConfig.UseTFPluginCache {
+		fmt.Printf("WARNING: --%s has no effect because --%s is disabled; the Terraform plugin cache is not used.\n",
+			TFPluginCacheDirFlag, UseTFPluginCache)
 	}
 
 	return nil
