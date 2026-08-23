@@ -63,9 +63,14 @@
 **VCS pagination:** When following provider-returned pagination links, validate the next URL against the configured provider API origin before issuing the request. Bitbucket Cloud diffstat pagination uses this guard in both modified-file and mergeability checks.
 
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
+
+**Server CLI flags:** Add the flag const + entry in the right map (`stringFlags`/`boolFlags`/`intFlags`) in `cmd/server.go`, keeping consts alphabetical → add the field to `server/user_config.go` (matching `mapstructure` tag) → add an entry to `testFlags` in `cmd/server_test.go` (that test asserts every flag is exercised) → document it in `runatlantis.io/docs/server-configuration.md`. Path-valued flags should be normalized in `run()` (e.g. `setTFPluginCacheDir`: expand `~`, make absolute).
+
 **i18n changes:** Keep command routing/template selection keyed on stable command identifiers (`command.Name`), and use localized titles only for display text.
 
 **Terraform execution:** Modify `server/core/terraform/tfclient/terraform_client.go` or `server/core/runtime/*_step_runner.go` (uses `hashicorp/hc-install`)
+
+**TF plugin cache:** `terraform init` is not concurrency safe against the plugin cache (hashicorp/terraform#25849). `--atlantis-plugin-cache` serializes init via a `sync.Mutex` on the single `*InitStepRunner` — this is in-process only, so it protects one instance against itself, not multiple replicas sharing a cache dir; each replica needs its own cache. `TF_PLUGIN_CACHE_DIR` (`--tf-plugin-cache-dir`) is only exported when `--use-tf-plugin-cache` is enabled (default true).
 
 **Combined VCS statuses:** `server/events/commit_status_updater.go` uses `models.ProjectCounts`. For failed apply/policy status text, count actual errored projects with `Errored`, not `Total - Success`, because planned or untouched projects may still be pending. For apply status text, `NoChanges` is a subset of `Success` and should be reported as up to date, not applied.
 
