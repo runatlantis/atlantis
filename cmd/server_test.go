@@ -150,6 +150,7 @@ var testFlags = map[string]any{
 	TFDistributionFlag:               "terraform",
 	TFDownloadFlag:                   true,
 	TFDownloadURLFlag:                "https://my-hostname.com",
+	TFPluginCacheDirFlag:             "/tf-plugin-cache",
 	TFEHostnameFlag:                  "my-hostname",
 	TFELocalExecutionModeFlag:        true,
 	TFETokenFlag:                     "my-token",

@@ -135,6 +135,7 @@ type UserConfig struct {
 	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
+	TFPluginCacheDir           string          `mapstructure:"tf-plugin-cache-dir"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`
 	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
 	TFEToken                   string          `mapstructure:"tfe-token"`
