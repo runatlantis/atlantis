@@ -279,6 +279,20 @@ func TestParse_DidYouMeanAtlantis(t *testing.T) {
 	}
 }
 
+func TestParse_NoMisspellWarningForCustomExecutableName(t *testing.T) {
+	t.Log("given a custom (non-default) ExecutableName, misspell-based 'did you mean'" +
+		" should not fire even when a comment is Levenshtein-close to it, since operators" +
+		" running multiple Atlantis servers against one repo would otherwise see spurious replies")
+	cp := events.CommentParser{
+		GithubUser:     "github-user",
+		ExecutableName: "atlantis-sec",
+	}
+	// "atlantis-dev" is Levenshtein distance 2 from "atlantis-sec".
+	r := cp.Parse("atlantis-dev unlock", models.Github)
+	Assert(t, r.CommentResponse == "",
+		"expected no did-you-mean CommentResponse, got %q", r.CommentResponse)
+}
+
 func TestParse_InvalidCommand(t *testing.T) {
 	t.Log("given a comment with an invalid atlantis command, should return " +
 		"a warning.")
@@ -541,6 +555,52 @@ func TestParse_WorkspaceTildeInvalid(t *testing.T) {
 		t.Run(c, func(t *testing.T) {
 			r := commentParser.Parse(c, models.Github)
 			exp := "Error: invalid workspace"
+			Assert(t, strings.Contains(r.CommentResponse, exp),
+				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
+		})
+	}
+}
+
+func TestParse_WorkspaceShellMetacharactersAllowed(t *testing.T) {
+	t.Log("shell metacharacters in -w are accepted, because Atlantis runs Terraform with an argument vector")
+	// These were rejected while Atlantis built its Terraform command line as
+	// shell source. Commands are now executed as argument vectors, so these
+	// characters carry no meaning, and Terraform itself accepts names like
+	// these. Rejecting them would break existing workspaces.
+	comments := []string{
+		"atlantis plan -w a;id",
+		"atlantis plan -w a&&id",
+		"atlantis apply -w a&&id",
+		"atlantis plan -w a|id",
+		"atlantis plan -w a`id`b",
+		"atlantis plan -w a>b",
+		"atlantis plan -w a=b",
+		"atlantis plan -w a:b",
+		"atlantis plan -w a@b",
+		"atlantis plan -w a+b",
+		"atlantis plan -w _foo",
+		"atlantis plan -w .hidden",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			Assert(t, !strings.Contains(r.CommentResponse, "invalid workspace"),
+				"For comment %q expected no workspace error, got %q", c, r.CommentResponse)
+		})
+	}
+}
+
+func TestParse_WorkspaceUnsafeForPathsInvalid(t *testing.T) {
+	t.Log("workspace names that are unsafe as a path component or as a flag are rejected")
+	comments := []string{
+		// '$' is expanded by Atlantis when building Terraform arguments.
+		"atlantis plan -w a$HOME",
+		"atlantis plan -w a$(id)b",
+	}
+	for _, c := range comments {
+		t.Run(c, func(t *testing.T) {
+			r := commentParser.Parse(c, models.Github)
+			exp := "invalid workspace"
 			Assert(t, strings.Contains(r.CommentResponse, exp),
 				"For comment %q expected CommentResponse %q to contain %q", c, r.CommentResponse, exp)
 		})

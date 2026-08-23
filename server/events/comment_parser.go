@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/shlex"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -176,8 +176,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
 	}
 
-	// Helpfully warn the user that the command might be misspelled
-	if utils.IsSimilarWord(executableName, e.ExecutableName) {
+	// Helpfully warn the user that the command might be misspelled. Only do this
+	// when running under the default executable name — operators who've
+	// customized ExecutableName (e.g. running multiple Atlantis servers against
+	// one repo) can otherwise get spurious "did you mean" replies to ordinary
+	// comments that happen to be Levenshtein-close to their custom name.
+	if e.ExecutableName == defaultExecutableName && utils.IsSimilarWord(executableName, e.ExecutableName) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
@@ -320,15 +324,13 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
-	// we also don't allow '..'. We don't want the workspace to contain a path
-	// since we create files based on the name.
-	// Additionally reject workspace names that start with '~': the shell
-	// expands leading tildes (tilde expansion) when the workspace name is
-	// used as a word in a "sh -c" command, which would produce unexpected and
-	// potentially unsafe behaviour.
-	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") || strings.HasPrefix(workspace, "~") {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
+	// The workspace ends up both in the string Atlantis runs via "sh -c" when
+	// invoking Terraform and in the paths of files we create, so it is
+	// restricted to the same character set as a repo-config workspace. The
+	// previous check here used url.PathEscape, which leaves shell
+	// metacharacters such as '&' untouched.
+	if err := valid.ValidateWorkspaceName(workspace); err != nil {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace %q: %s", workspace, err), cmd, flagSet)}
 	}
 
 	// If project is specified, dir or workspace should not be set. Since we
@@ -662,6 +664,14 @@ Use "{{ .ExecutableName }} [command] --help" for more information about a comman
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a misspelled command or terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
+
+// DefaultExecutableName is the value of ExecutableName Atlantis uses unless
+// an operator overrides it via --executable-name / ATLANTIS_EXECUTABLE_NAME.
+// This is intentionally a separate literal from cmd.DefaultExecutableName:
+// server/events cannot import cmd (cmd imports server, so the reverse would
+// be an import cycle). If the default executable name ever changes, update
+// both constants.
+const defaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.

@@ -43,7 +43,7 @@ func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string
 		tfVersion = ctx.TerraformVersion
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planFile := GetPlanFilePath(ctx, path)
 	showResultFile := filepath.Join(path, ctx.GetShowResultFileName())
 
 	output, err := p.terraformExecutor.RunCommandWithVersion(
