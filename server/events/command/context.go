@@ -108,4 +108,11 @@ type Context struct {
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
+
+	// ReleaseProjectLocksAfterPlan makes each project's plan release its
+	// project lock as soon as the plan finishes rather than holding it until
+	// the whole command finishes. Drift detection uses this because it plans
+	// many projects under one synthetic pull and would otherwise hold every
+	// already-planned project locked for the duration of the whole run.
+	ReleaseProjectLocksAfterPlan bool
 }

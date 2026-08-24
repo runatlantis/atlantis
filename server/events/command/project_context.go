@@ -198,6 +198,12 @@ type ProjectContext struct {
 	// FailOnMissingDependencies makes apply dependency validation fail when a
 	// configured dependency is not present in PullStatus.
 	FailOnMissingDependencies bool
+
+	// ReleaseLockAfterPlan is set for API drift-detection plans, whose plan
+	// files are never consumed by a later apply (remediation re-plans
+	// instead), so the project lock is released as soon as the plan finishes
+	// instead of being held until the whole detection run responds.
+	ReleaseLockAfterPlan bool
 }
 
 // SetProjectScopeTags adds ProjectContext tags to a new returned scope.

@@ -125,6 +125,77 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 	}
 }
 
+// Test that doPlan releases the project lock right after a successful plan
+// when ReleaseLockAfterPlan is set (drift detection), and leaves the lock
+// held for a regular plan where it is unset.
+func TestDefaultProjectCommandRunner_PlanReleaseLockAfterPlan(t *testing.T) {
+	cases := []struct {
+		name                 string
+		releaseLockAfterPlan bool
+		expUnlockCalled      bool
+	}{
+		{
+			name:                 "releases lock when set",
+			releaseLockAfterPlan: true,
+			expUnlockCalled:      true,
+		},
+		{
+			name:                 "keeps lock when unset",
+			releaseLockAfterPlan: false,
+			expUnlockCalled:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockPlan := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			mockCommandRequirementHandler := mocks.NewMockCommandRequirementHandler()
+
+			runner := events.DefaultProjectCommandRunner{
+				Locker:                    mockLocker,
+				LockURLGenerator:          mockURLGenerator{},
+				PlanStepRunner:            mockPlan,
+				WorkingDir:                mockWorkingDir,
+				WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: mockCommandRequirementHandler,
+			}
+
+			repoDir := t.TempDir()
+			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+
+			unlockCalled := false
+			When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
+				Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{
+				LockAcquired: true,
+				LockKey:      "lock-key",
+				UnlockFn: func() error {
+					unlockCalled = true
+					return nil
+				},
+			}, nil)
+
+			ctx := command.ProjectContext{
+				Log:                  logging.NewNoopLogger(t),
+				Steps:                []valid.Step{{StepName: "plan"}},
+				Workspace:            "default",
+				RepoRelDir:           ".",
+				ReleaseLockAfterPlan: c.releaseLockAfterPlan,
+			}
+			When(mockPlan.Run(ctx, nil, repoDir, map[string]string{})).ThenReturn("plan", nil)
+
+			res := runner.Plan(ctx)
+
+			Assert(t, res.PlanSuccess != nil, "exp plan success")
+			Equals(t, c.expUnlockCalled, unlockCalled)
+		})
+	}
+}
+
 func TestDefaultProjectCommandRunner_ProjectLockJobURL(t *testing.T) {
 	const jobURL = "https://atlantis.example.com/jobs/job-id"
 	tests := []struct {

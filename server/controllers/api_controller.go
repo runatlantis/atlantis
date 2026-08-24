@@ -2178,16 +2178,17 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			BaseRepo:                 baseRepo,
 			HardenedNonPRRefCheckout: true,
 		},
-		Scope:                     a.Scope,
-		Log:                       a.Logger,
-		API:                       true,
-		SkipPRModifiedFiles:       true,
-		SuppressVCSStatus:         true,
-		SuppressJobOutput:         true,
-		RunPolicyChecks:           true,
-		FailOnTeamAllowlistDenied: true,
-		ExactProjectNameMatching:  true,
-		SortByExecutionOrder:      true,
+		Scope:                        a.Scope,
+		Log:                          a.Logger,
+		API:                          true,
+		SkipPRModifiedFiles:          true,
+		SuppressVCSStatus:            true,
+		SuppressJobOutput:            true,
+		RunPolicyChecks:              true,
+		FailOnTeamAllowlistDenied:    true,
+		ExactProjectNameMatching:     true,
+		SortByExecutionOrder:         true,
+		ReleaseProjectLocksAfterPlan: true,
 	}
 
 	// Setup working directory
@@ -2211,6 +2212,11 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx.PreWorkflowHooksAlreadyRun = true
 
+	// Registered before apiPlan runs so a mid-sweep error still cleans up any
+	// locks already acquired on the synthetic pull. Safe to call with no
+	// locks held.
+	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+
 	result, err := a.apiPlan(apiRequest, ctx)
 	if err != nil {
 		if errors.Is(err, events.ErrTeamAllowlistDenied) {
@@ -2220,7 +2226,6 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.InternalError(w, r, err)
 		return
 	}
-	defer a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
 
 	// Process results and store drift data
 	detectionResult := models.NewDriftDetectionResult(request.Repository)
