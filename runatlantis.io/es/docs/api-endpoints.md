@@ -617,6 +617,7 @@ Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detectio
 | base_branch         | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia                  |
 | type                | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                                       |
 | projects            | []string             | No          | Lista de nombres de proyecto a verificar. Si está vacía, se verifican todos                              |
+| exclude_projects    | []string             | No          | Lista de nombres de proyecto a omitir durante la detección completa. No se puede combinar con `projects` ni `paths` |
 | paths               | []DriftDetectionPath | No          | Lista de paths a verificar. Si está vacía, se usan nombres de proyecto                                   |
 | include_plan_output | boolean              | No          | Si es true, incluye `plan_output` para cada proyecto en la respuesta. El valor predeterminado es `false` |
 
@@ -630,7 +631,7 @@ Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detectio
 Los selectores path son rutas literales normalizadas relativas al repo. Los patrones glob como `envs/*` no son compatibles.
 
 ::: tip NOTE
-Se debe especificar al menos uno de `projects` o `paths` para una detección dirigida. Si ambos están vacíos, la detección de drift puede escanear todos los proyectos descubiertos. `projects` y `paths` son mutuamente excluyentes para la detección de drift; use un tipo de selector por solicitud.
+Se debe especificar al menos uno de `projects` o `paths` para una detección dirigida. Si ambos están vacíos, la detección de drift puede escanear todos los proyectos descubiertos. `projects` y `paths` son mutuamente excluyentes para la detección de drift; use un tipo de selector por solicitud. Para escanear todos los proyectos descubiertos excepto algunos, use `exclude_projects` en lugar de enumerar cada proyecto en `projects`. `exclude_projects` no se puede combinar con `projects` ni `paths`, ya que solo se aplica al descubrimiento completo, y conserva los registros de drift almacenados de los proyectos que omite en lugar de reconciliarlos.
 :::
 
 ::: tip Efectos secundarios de estado
@@ -674,6 +675,21 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
         {"directory": "modules/vpc", "workspace": "production"},
         {"directory": "modules/ec2", "workspace": "production"}
     ],
+    "include_plan_output": true
+}'
+```
+
+#### Solicitud de ejemplo (todos los proyectos excepto algunos)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "exclude_projects": ["legacy", "sandbox"],
     "include_plan_output": true
 }'
 ```

@@ -4122,6 +4122,181 @@ func TestAPIController_DetectDriftEmptySelectorsDiscoverAllProjects(t *testing.T
 	Assert(t, capturedCtx.SortByExecutionOrder, "expected drift API contexts to opt into execution-order sorting")
 }
 
+func TestAPIController_DetectDrift_ExcludeProjectsSkipsDiscoveredProjects(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{CommandName: command.Plan, ProjectName: "app", RepoRelDir: "app", Workspace: events.DefaultWorkspace},
+			{CommandName: command.Plan, ProjectName: "db", RepoRelDir: "db", Workspace: events.DefaultWorkspace},
+		}, nil)
+	var planMu sync.Mutex
+	var plannedProjects []string
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			planMu.Lock()
+			plannedProjects = append(plannedProjects, projectCtx.ProjectName)
+			planMu.Unlock()
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "No changes. Your infrastructure matches the configuration."},
+			}}
+		})
+
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository:      "Repo",
+		Ref:             "main",
+		Type:            "Gitlab",
+		ExcludeProjects: []string{"db"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, "app", result.Projects[0].ProjectName)
+
+	// The excluded project must never reach the plan runner, otherwise the
+	// exclusion would only be filtering the response rather than saving compute.
+	planMu.Lock()
+	defer planMu.Unlock()
+	Equals(t, []string{"app"}, plannedProjects)
+
+	stored, err := storage.Get("gitlab.com/Repo", drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	Equals(t, 1, len(stored))
+	Equals(t, "app", stored[0].ProjectName)
+}
+
+func TestAPIController_DetectDrift_ExcludeAllProjectsPlansNothing(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	for _, projectName := range []string{"app", "db"} {
+		Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+			ProjectName: projectName,
+			Path:        projectName,
+			Workspace:   events.DefaultWorkspace,
+			Ref:         "main",
+			BaseBranch:  "main",
+			LastChecked: time.Now(),
+		}))
+	}
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{CommandName: command.Plan, ProjectName: "app", RepoRelDir: "app", Workspace: events.DefaultWorkspace},
+			{CommandName: command.Plan, ProjectName: "db", RepoRelDir: "db", Workspace: events.DefaultWorkspace},
+		}, nil)
+	var planMu sync.Mutex
+	planCalls := 0
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(_ []Param) ReturnValues {
+			planMu.Lock()
+			planCalls++
+			planMu.Unlock()
+			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+		})
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository:      "Repo",
+		Ref:             "main",
+		Type:            "Gitlab",
+		ExcludeProjects: []string{"app", "db"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 0, len(result.Projects))
+
+	planMu.Lock()
+	defer planMu.Unlock()
+	Equals(t, 0, planCalls)
+
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	names := make(map[string]struct{}, len(records))
+	for _, r := range records {
+		names[r.ProjectName] = struct{}{}
+	}
+	_, hasApp := names["app"]
+	_, hasDB := names["db"]
+	Assert(t, hasApp, "expected excluded project record to be preserved")
+	Assert(t, hasDB, "expected excluded project record to be preserved")
+}
+
+func TestAPIController_DetectDrift_ExcludeProjectsPreservesStoredRecords(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	storage := drift.NewInMemoryStorage()
+	ac.DriftStorage = storage
+	repositoryKey := "gitlab.com/Repo"
+	// An excluded project with an existing record must be preserved.
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "db",
+		Path:        "db",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+	// A truly stale project must still be reconciled away.
+	Ok(t, storage.Store(repositoryKey, models.ProjectDrift{
+		ProjectName: "stale",
+		Path:        "stale",
+		Workspace:   events.DefaultWorkspace,
+		Ref:         "main",
+		BaseBranch:  "main",
+		LastChecked: time.Now(),
+	}))
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository:      "Repo",
+		Ref:             "main",
+		Type:            "Gitlab",
+		ExcludeProjects: []string{"db"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	records, err := storage.Get(repositoryKey, drift.GetOptions{Ref: "main"})
+	Ok(t, err)
+	names := make(map[string]struct{}, len(records))
+	for _, r := range records {
+		names[r.ProjectName] = struct{}{}
+	}
+	_, hasApp := names["app"]
+	_, hasDB := names["db"]
+	_, hasStale := names["stale"]
+	Assert(t, hasApp, "expected planned project to be stored")
+	Assert(t, hasDB, "expected excluded project record to be preserved")
+	Assert(t, !hasStale, "expected stale record to be reconciled away")
+}
+
 func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {
 	ac, projectCommandBuilder, _ := setup(t)
 	var capturedCtx *command.Context
