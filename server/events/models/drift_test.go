@@ -355,6 +355,38 @@ func TestDriftDetectionRequestValidateRejectsEmptySelectors(t *testing.T) {
 			},
 			field: "paths",
 		},
+		{
+			name: "empty exclude project",
+			request: models.DriftDetectionRequest{
+				Repository:      "owner/repo",
+				Ref:             "main",
+				Type:            "Github",
+				ExcludeProjects: []string{""},
+			},
+			field: "exclude_projects",
+		},
+		{
+			name: "exclude combined with projects",
+			request: models.DriftDetectionRequest{
+				Repository:      "owner/repo",
+				Ref:             "main",
+				Type:            "Github",
+				Projects:        []string{"app"},
+				ExcludeProjects: []string{"db"},
+			},
+			field: "exclude_projects",
+		},
+		{
+			name: "exclude combined with paths",
+			request: models.DriftDetectionRequest{
+				Repository:      "owner/repo",
+				Ref:             "main",
+				Type:            "Github",
+				Paths:           []models.DriftDetectionPath{{Directory: "env"}},
+				ExcludeProjects: []string{"db"},
+			},
+			field: "exclude_projects",
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			errs := c.request.Validate()
@@ -362,6 +394,16 @@ func TestDriftDetectionRequestValidateRejectsEmptySelectors(t *testing.T) {
 			Equals(t, c.field, errs[0].Field)
 		})
 	}
+}
+
+func TestDriftDetectionRequestValidateAcceptsExcludeProjects(t *testing.T) {
+	request := models.DriftDetectionRequest{
+		Repository:      "owner/repo",
+		Ref:             "main",
+		Type:            "Github",
+		ExcludeProjects: []string{"db", "cache"},
+	}
+	Equals(t, 0, len(request.Validate()))
 }
 
 func TestDriftDetectionRequestValidateRejectsUnsupportedVCSTypes(t *testing.T) {
