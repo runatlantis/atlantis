@@ -394,6 +394,12 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 	if err != nil {
 		return "", err
 	}
+	unlock, err := c.lockPluginCache(ctx.Log, args[0], cmd.Env)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	dur := time.Since(start)
@@ -540,31 +546,66 @@ func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terrafor
 	return c.distribution
 }
 
-// RunCommandAsync runs terraform with args. It immediately returns an
-// input and output channel. Callers can use the output channel to
-// get the realtime output from the command.
-// Callers can use the input channel to pass stdin input to the command.
-// If any error is passed on the out channel, there will be no
-// further output (so callers are free to exit).
+// RunCommandAsync prepares terraform and acquires any plugin-cache lock, then
+// returns channels for realtime output and stdin. An error is always the final
+// output value, so callers may stop reading it.
 func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
 	argv, display, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args, customEnvVars, ctx.ExpandableArgs, ctx.CommentArgs)
 	if err != nil {
-		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
-		// once reading the output. Since we won't be spawning a process, simulate that by sending the
-		// errorcustomEnvVars to the output channel.
 		outCh := make(chan models.Line)
 		inCh := make(chan string)
 		go func() {
+			defer close(outCh)
+			defer close(inCh)
 			outCh <- models.Line{Err: err}
-			close(outCh)
-			close(inCh)
 		}()
 		return inCh, outCh
 	}
 
+	unlock, err := c.lockPluginCache(ctx.Log, args[0], envVars)
+	if err != nil {
+		outCh := make(chan models.Line, 1)
+		inCh := make(chan string)
+		outCh <- models.Line{Err: err}
+		close(outCh)
+		close(inCh)
+		return inCh, outCh
+	}
+
 	runner := models.NewArgvCommandRunner(argv, display, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
-	inCh, outCh := runner.RunCommandAsync(ctx)
+	inCh, runnerOutCh := runner.RunCommandAsync(ctx)
+	outCh := make(chan models.Line)
+	go func() {
+		defer close(outCh)
+		defer unlock()
+		// ShellCommandRunner guarantees that an error is its final send before
+		// closing runnerOutCh. Callers may therefore stop after receiving it
+		// without preventing this goroutine from releasing the cache lock.
+		for line := range runnerOutCh {
+			outCh <- line
+		}
+	}()
 	return inCh, outCh
+}
+
+// Terraform's plugin cache is not safe when init writes to it while another
+// Terraform command is reading from it.
+func (c *DefaultClient) lockPluginCache(log logging.SimpleLogging, command string, environ []string) (func(), error) {
+	cacheDir := envLookup(environ)("TF_PLUGIN_CACHE_DIR")
+	if cacheDir == "" {
+		return func() {}, nil
+	}
+	if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+		return nil, fmt.Errorf("creating terraform plugin cache directory: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), pluginCacheLockTimeout)
+	defer cancel()
+	unlock, err := lockFile(ctx, log, filepath.Join(cacheDir, ".atlantis.lock"), command == "init")
+	if err != nil {
+		return nil, fmt.Errorf("locking terraform plugin cache: %w", err)
+	}
+	return unlock, nil
 }
 
 // MustConstraint will parse one or more constraints from the given

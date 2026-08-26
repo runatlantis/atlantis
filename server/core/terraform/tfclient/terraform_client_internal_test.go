@@ -4,11 +4,14 @@
 package tfclient
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
@@ -446,6 +449,158 @@ func TestDefaultClient_RunCommandAsync_Input(t *testing.T) {
 	Equals(t, "echo me", out)
 
 	logger.VerifyWasCalledOnce().With(Eq("duration"), Any[any]())
+}
+
+func TestDefaultClient_PluginCacheInitLockBlocksPlan(t *testing.T) {
+	cacheDir := filepath.Join(t.TempDir(), "missing-cache")
+	logger := logging.NewNoopLogger(t)
+	initClient := &DefaultClient{}
+	planClient := &DefaultClient{}
+	environ := []string{"TF_PLUGIN_CACHE_DIR=" + cacheDir}
+
+	unlockInit, err := initClient.lockPluginCache(logger, "init", environ)
+	Ok(t, err)
+
+	type result struct {
+		unlock func()
+		err    error
+	}
+	planLocked := make(chan result, 1)
+	go func() {
+		unlock, err := planClient.lockPluginCache(logger, "plan", environ)
+		planLocked <- result{unlock: unlock, err: err}
+	}()
+
+	select {
+	case got := <-planLocked:
+		if got.unlock != nil {
+			got.unlock()
+		}
+		unlockInit()
+		t.Fatalf("plan acquired the shared plugin cache while init held it: %v", got.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	unlockInit()
+	select {
+	case got := <-planLocked:
+		Ok(t, got.err)
+		got.unlock()
+	case <-time.After(time.Second):
+		t.Fatal("plan did not acquire the shared plugin cache after init released it")
+	}
+}
+
+func TestDefaultClient_RunCommandAsyncHoldsPluginCacheLockUntilExit(t *testing.T) {
+	cacheDir := t.TempDir()
+	started := filepath.Join(t.TempDir(), "started")
+	release := filepath.Join(t.TempDir(), "release")
+	logger := logging.NewNoopLogger(t)
+	v := version.Must(version.NewVersion("0.11.11"))
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: cacheDir,
+		overrideTF:              "sh",
+		usePluginCache:          true,
+	}
+	ctx := command.ProjectContext{Log: logger}
+	_, outCh := client.RunCommandAsync(ctx, t.TempDir(), []string{"-c", `touch "$1"; while [ ! -e "$2" ]; do sleep 0.01; done`, "sh", started, release}, nil, terraform.NewDistributionTerraform(), v, "default")
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("async terraform command did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	type result struct {
+		unlock func()
+		err    error
+	}
+	initLocked := make(chan result, 1)
+	go func() {
+		unlock, err := client.lockPluginCache(logger, "init", []string{"TF_PLUGIN_CACHE_DIR=" + cacheDir})
+		initLocked <- result{unlock: unlock, err: err}
+	}()
+	select {
+	case got := <-initLocked:
+		Ok(t, got.err)
+		got.unlock()
+		t.Fatal("init acquired the plugin cache while async command was running")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	Ok(t, os.WriteFile(release, nil, 0o600))
+	_, err := waitCh(outCh)
+	Ok(t, err)
+	select {
+	case got := <-initLocked:
+		Ok(t, got.err)
+		got.unlock()
+	case <-time.After(time.Second):
+		t.Fatal("init did not acquire the plugin cache after async command exited")
+	}
+}
+
+func TestDefaultClient_RunCommandAsyncReleasesPluginCacheLockWhenConsumerBreaksOnError(t *testing.T) {
+	cacheDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+	v := version.Must(version.NewVersion("0.11.11"))
+	client := &DefaultClient{
+		defaultVersion:          v,
+		terraformPluginCacheDir: cacheDir,
+		overrideTF:              "sh",
+		usePluginCache:          true,
+	}
+	ctx := command.ProjectContext{Log: logger}
+	_, outCh := client.RunCommandAsync(ctx, t.TempDir(), []string{"-c", "exit 1"}, nil, terraform.NewDistributionTerraform(), v, "default")
+
+	sawError := false
+	for line := range outCh {
+		if line.Err != nil {
+			sawError = true
+			break
+		}
+	}
+	Assert(t, sawError, "expected the command to emit an error")
+
+	acquired := make(chan error, 1)
+	go func() {
+		unlock, err := client.lockPluginCache(logger, "init", []string{"TF_PLUGIN_CACHE_DIR=" + cacheDir})
+		if err == nil {
+			unlock()
+		}
+		acquired <- err
+	}()
+	select {
+	case err := <-acquired:
+		Ok(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("init did not acquire the plugin cache after the consumer stopped on command error")
+	}
+}
+
+func TestPluginCacheLockHonorsContextCancellation(t *testing.T) {
+	cacheDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+	unlock, err := lockFile(context.Background(), logger, filepath.Join(cacheDir, ".atlantis.lock"), true)
+	Ok(t, err)
+	defer unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err = lockFile(ctx, logger, filepath.Join(cacheDir, ".atlantis.lock"), false)
+	Assert(t, errors.Is(err, context.DeadlineExceeded), "expected lock wait to honor context cancellation")
+}
+
+func TestDefaultClient_PluginCacheNoEnvironmentNeedsNoLock(t *testing.T) {
+	unlock, err := (&DefaultClient{}).lockPluginCache(logging.NewNoopLogger(t), "init", nil)
+	Ok(t, err)
+	unlock()
 }
 
 func waitCh(ch <-chan runtimemodels.Line) (string, error) {
