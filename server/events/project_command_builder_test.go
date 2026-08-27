@@ -5777,6 +5777,110 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 	Equals(t, 1, len(ctxs))
 }
 
+// Test that plans are restored from the external store when the pull directory
+// exists on this replica but holds no plan files. With more than one replica
+// the apply can land on a replica that has a working dir for the pull (created
+// by an earlier event) but no plan in it, while the plan itself is in the
+// store.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecoveryPullDirWithoutPlans(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	// The pull dir exists and is a git repo, but has no .tfplan in it.
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	restoreCalled := false
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default"},
+		restoreFn: func(pullDir, owner, repo string, pullNum int) error {
+			restoreCalled = true
+			// Restoring drops the plan back into the workspace dir.
+			return os.WriteFile(
+				filepath.Join(pullDir, "default", "project1", "default.tfplan"),
+				[]byte("plan"), 0600)
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						RepoRelDir: "project1",
+						Workspace:  "default",
+						Status:     models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			Name: command.Apply,
+		})
+	Ok(t, err)
+	Assert(t, restoreCalled, "expected RestorePlans to be called")
+	Equals(t, 1, len(ctxs))
+}
+
 // mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
 // the external plan store recovery path.
 type mockExternalPlanStore struct {
