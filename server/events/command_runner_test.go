@@ -31,6 +31,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/mock/gomock"
 )
 
@@ -2210,6 +2211,77 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+}
+
+// TestRunAutoplanCommand_GitlabRefetchesHeadCommitFromAPI guards against the
+// autoplan/apply automerge bug: GitLab merge_request webhooks carry
+// event.ObjectAttributes.LastCommit.ID as HeadCommit, but every
+// comment-triggered command (including `atlantis apply -p <project>`)
+// refetches the MR via the API and uses mr.SHA instead. If autoplan stored
+// PullStatus under the webhook's HeadCommit, a later apply's refetch would
+// see a HeadCommit mismatch and BoltDB.UpdatePullWithResults would treat the
+// pull as out of date - discarding every other project's tracked status,
+// which could make AutoMerger.automerge think all projects were applied and
+// merge the MR early. Autoplan must therefore store PullStatus under the
+// same API-sourced HeadCommit that comment-triggered commands will later use.
+func TestRunAutoplanCommand_GitlabRefetchesHeadCommitFromAPI(t *testing.T) {
+	setup(t)
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	dbUpdater.Database = boltDB
+
+	webhookPull := testdata.Pull
+	webhookPull.BaseRepo = testdata.GitlabRepo
+	webhookPull.HeadCommit = "webhook-sha"
+
+	apiPull := webhookPull
+	apiPull.HeadCommit = "api-sha"
+
+	var mr gitlab.MergeRequest
+	When(gitlabGetter.GetMergeRequest(Any[logging.SimpleLogging](), Eq(testdata.GitlabRepo.FullName), Eq(webhookPull.Num))).ThenReturn(&mr, nil)
+	When(eventParsing.ParseGitlabMergeRequest(Eq(&mr), Eq(testdata.GitlabRepo))).ThenReturn(apiPull)
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunAutoplanCommand(testdata.GitlabRepo, testdata.GitlabRepo, webhookPull, testdata.User)
+
+	pullStatus, err := dbUpdater.Database.GetPullStatus(apiPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected PullStatus to be stored under the API-sourced HeadCommit")
+	Equals(t, "api-sha", pullStatus.Pull.HeadCommit)
+}
+
+// TestRunAutoplanCommand_GitlabRefetchFailsFallsBackToWebhookPull ensures a
+// transient GitLab API error while refreshing the MR doesn't abort autoplan -
+// it should fail open and continue with the webhook-derived pull.
+func TestRunAutoplanCommand_GitlabRefetchFailsFallsBackToWebhookPull(t *testing.T) {
+	setup(t)
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	dbUpdater.Database = boltDB
+
+	webhookPull := testdata.Pull
+	webhookPull.BaseRepo = testdata.GitlabRepo
+	webhookPull.HeadCommit = "webhook-sha"
+
+	When(gitlabGetter.GetMergeRequest(Any[logging.SimpleLogging](), Eq(testdata.GitlabRepo.FullName), Eq(webhookPull.Num))).ThenReturn(nil, errors.New("gitlab api unavailable"))
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	ch.RunAutoplanCommand(testdata.GitlabRepo, testdata.GitlabRepo, webhookPull, testdata.User)
+
+	pullStatus, err := dbUpdater.Database.GetPullStatus(webhookPull)
+	Ok(t, err)
+	Assert(t, pullStatus != nil, "expected PullStatus to fall back to the webhook-derived HeadCommit")
+	Equals(t, "webhook-sha", pullStatus.Pull.HeadCommit)
 }
 
 func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
