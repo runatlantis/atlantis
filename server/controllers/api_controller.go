@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -521,7 +522,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	baseRepo := ctx.Pull.BaseRepo
 	headRepo := ctx.HeadRepo
 
-	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", cmdName)
+	unlockFn, err := a.WorkingDirLocker.TryLock(baseRepo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", cmdName, events.WorkingDirLockMetadataForPull(pull))
 	if err != nil {
 		return err
 	}
@@ -1027,6 +1028,15 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+
+	// A workspace becomes a Terraform command argument, which Atlantis runs
+	// through `sh -c`, and a path component of the files it writes. Validate it
+	// the same way as a workspace named in a pull request comment.
+	for _, path := range request.Paths {
+		if err = valid.ValidateWorkspaceName(path.Workspace); err != nil {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", path.Workspace, err)
+		}
 	}
 
 	VCSHostType, err := models.NewVCSHostType(request.Type)
@@ -2007,6 +2017,7 @@ func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolv
 		projectDrift.Drift = models.DriftSummary{HasDrift: false}
 	} else if pr.PlanSuccess != nil {
 		projectDrift.Drift = models.NewDriftSummaryFromPlanSuccess(pr.PlanSuccess)
+		projectDrift.PlanOutput = pr.PlanSuccess.TerraformOutput
 	}
 
 	return projectDrift
@@ -2218,6 +2229,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
+		// PlanOutput is only ever returned in the immediate detect response;
+		// Store strips it before persisting, so it is never persisted.
 		if err := a.DriftStorage.Store(baseRepo.ID(), projectDrift); err != nil {
 			storeFailed = true
 			projectDrift.Error = appendDriftProjectError(projectDrift.Error, fmt.Sprintf("storing drift result: %v", err))
@@ -2242,7 +2255,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to API DTO and return
-	apiResult := NewDriftDetectionResultAPI(detectionResult)
+	apiResult := NewDriftDetectionResultAPI(detectionResult, request.IncludePlanOutput)
 
 	code := http.StatusOK
 	if driftDetectionHasErrors(detectionResult) {

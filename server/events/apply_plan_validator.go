@@ -21,6 +21,10 @@ import (
 
 type ApplyPlanValidator interface {
 	ValidateProjectPlan(ctx command.ProjectContext, absPath string) error
+	// ValidateProjectPlanStatus validates only durable plan state. It is used
+	// for workflows that do not consume the Atlantis convention plan file, so
+	// no plan artifact may be inspected or removed.
+	ValidateProjectPlanStatus(ctx command.ProjectContext) error
 }
 
 type ApplyCommandStartValidator interface {
@@ -38,6 +42,20 @@ type DefaultApplyPlanValidator struct {
 
 var errStaleCommandHead = errors.New("stale command head")
 
+// planRejectionError marks a durable-status failure that must also remove the
+// convention-managed plan artifact when one is being validated. Failures that
+// are not wrapped in it (for example a stale command head) leave the artifact
+// in place because another replica may have replaced it.
+type planRejectionError struct{ err error }
+
+func (e planRejectionError) Error() string { return e.err.Error() }
+
+func (e planRejectionError) Unwrap() error { return e.err }
+
+func rejectionErrorf(format string, args ...any) error {
+	return planRejectionError{err: fmt.Errorf(format, args...)}
+}
+
 func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.ProjectContext) error {
 	if v == nil || v.LivePullHeadFetcher == nil {
 		return nil
@@ -49,21 +67,26 @@ func (v *DefaultApplyPlanValidator) ValidateCommandStartHead(ctx command.Project
 	return validateCommandStartIdentity(ctx, livePull)
 }
 
-func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
+// ValidateProjectPlanStatus validates durable plan state without inspecting or
+// removing any plan artifact. Workflows with a custom apply step manage their
+// own plan file, which Atlantis neither creates nor can locate.
+func (v *DefaultApplyPlanValidator) ValidateProjectPlanStatus(ctx command.ProjectContext) error {
 	if v == nil || v.PullStatusFetcher == nil {
 		return nil
 	}
-	planPath, err := safePlanFilePath(ctx, absPath)
-	if err != nil {
-		return err
-	}
+	return v.validateProjectPlanStatus(ctx)
+}
 
+// validateProjectPlanStatus only validates durable state. Failures that should
+// also discard a convention-managed plan artifact are wrapped in
+// planRejectionError; the caller decides whether an artifact exists to remove.
+func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) error {
 	pullStatus, err := v.pullStatusForApply(ctx)
 	if err != nil {
 		return fmt.Errorf("fetching current plan status: %w", err)
 	}
 	if pullStatus == nil {
-		return rejectProjectPlan(planPath, "no current plan status found; run `atlantis plan` before apply")
+		return rejectionErrorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
 	livePull, err := v.getLivePullIdentity(ctx)
@@ -83,27 +106,46 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 			return err
 		}
 	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
-		return rejectProjectPlan(planPath, "%s", err)
+		return rejectionErrorf("%s", err)
 	}
 
 	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
 	if proj == nil {
-		return rejectProjectPlan(planPath,
+		return rejectionErrorf(
 			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 		)
 	}
 	if !statusAllowedForApplyExecution(proj.Status) {
 		if proj.Status == models.ErroredPolicyCheckStatus {
-			return rejectProjectPlan(planPath,
+			return rejectionErrorf(
 				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
 				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 			)
 		}
-		return rejectProjectPlan(planPath,
+		return rejectionErrorf(
 			"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, proj.Status.String(),
 		)
+	}
+	return nil
+}
+
+func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
+	if v == nil || v.PullStatusFetcher == nil {
+		return nil
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+
+	if err := v.validateProjectPlanStatus(ctx); err != nil {
+		var rejection planRejectionError
+		if errors.As(err, &rejection) {
+			return rejectProjectPlan(planPath, "%s", rejection.err)
+		}
+		return err
 	}
 
 	if _, err := os.Stat(planPath); err != nil {
@@ -117,7 +159,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	if ctx.ExpectedPlanHash != "" {
-		actualHash, err := hashFile(absPath, planPath)
+		actualHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
 		if err != nil {
 			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 		}
@@ -196,19 +238,19 @@ func statusAllowedForApplyExecution(status models.ProjectPlanStatus) bool {
 }
 
 func planFilePath(ctx command.ProjectContext, absPath string) string {
-	return filepath.Join(absPath, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	return runtime.GetPlanFilePath(ctx, absPath)
 }
 
 func safePlanFilePath(ctx command.ProjectContext, absPath string) (string, error) {
 	planPath := planFilePath(ctx, absPath)
-	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
+	if _, err := containedPlanRelPath(runtime.GetPlanFileDir(ctx, absPath), planPath); err != nil {
 		return "", err
 	}
 	return planPath, nil
 }
 
 func pendingPlanFilePath(plan PendingPlan) (string, error) {
-	absPath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+	absPath := filepath.Join(plan.planRepoDir(), plan.RepoRelDir)
 	planPath := filepath.Join(absPath, runtime.GetPlanFilename(plan.Workspace, plan.ProjectName))
 	if _, err := containedPlanRelPath(absPath, planPath); err != nil {
 		return "", err
