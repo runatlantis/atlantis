@@ -87,6 +87,9 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
+	// LocalSharePlanDir is the root directory for local Terraform plan files.
+	// If empty, DataDir is used for backward compatibility.
+	LocalSharePlanDir string
 	// CheckoutMerge is true if we should check out the branch that corresponds
 	// to what the base branch will look like *after* the pull request is merged.
 	// If this is false, then we will check out the head branch from the pull
@@ -613,6 +616,18 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 }
 
 func (w *FileWorkspace) cleanStalePlanFiles(logger logging.SimpleLogging, c wrappedGitContext) error {
+	if filepath.Clean(w.localSharePlanDir()) != filepath.Clean(w.DataDir) {
+		workspace, err := w.workspaceFromCloneDir(c.pr.BaseRepo, c.pr, c.dir)
+		if err != nil {
+			return err
+		}
+		planWorkspaceDir, err := w.planWorkspaceDir(c.pr.BaseRepo, c.pr, workspace)
+		if err != nil {
+			return err
+		}
+		return removeTfPlanFiles(planWorkspaceDir)
+	}
+
 	// Plan files are untracked, so git reset --hard does not remove them.
 	// Use -x because Terraform plan files are commonly ignored by repos.
 	return w.wrappedGit(logger, c, "clean", "-f", "-x", "-e", ".terragrunt-cache", "--", ":(glob)**/*.tfplan")
@@ -657,9 +672,23 @@ func (w *FileWorkspace) usesPRSourceRemote(head models.Repo, p models.PullReques
 }
 
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// Plans held in a separate store are only invalidated when we are replacing
+	// an existing checkout. When the checkout is merely absent — a restart with
+	// an ephemeral repo volume — the stored plans still describe the commit
+	// they were created at, and apply re-validates them against the recorded
+	// pull status and plan hash before using them. Discarding them here would
+	// stop a separate plan store from ever outliving the working dir.
+	_, statErr := os.Stat(c.dir)
+	replacingCheckout := statErr == nil
+
 	err := os.RemoveAll(c.dir)
 	if err != nil {
 		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
+	}
+	if replacingCheckout {
+		if err := w.deletePlanWorkspaceIfSeparate(c.pr.BaseRepo, c.pr, c.dir); err != nil {
+			return err
+		}
 	}
 
 	// Create the directory and parents if necessary.
@@ -897,7 +926,21 @@ func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p mo
 		return err
 	}
 	logger.Info("Deleting repo pull directory: %s", repoPullDir)
-	return removeAllSubPath(filepath.Join(w.DataDir, workingDirPrefix), repoPullDir)
+	cloneErr := removeAllSubPath(filepath.Join(w.DataDir, workingDirPrefix), repoPullDir)
+
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(planPullDir) == filepath.Clean(repoPullDir) {
+		return cloneErr
+	}
+	logger.Info("Deleting plan pull directory: %s", planPullDir)
+	planErr := removeAllSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), planPullDir)
+	if cloneErr != nil {
+		return cloneErr
+	}
+	return planErr
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
@@ -911,7 +954,25 @@ func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r model
 	if err != nil {
 		return err
 	}
-	return removeAllSubPath(pullDir, workspaceDir)
+	cloneErr := removeAllSubPath(pullDir, workspaceDir)
+
+	planWorkspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(planWorkspaceDir) == filepath.Clean(workspaceDir) {
+		return cloneErr
+	}
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	logger.Info("Deleting plan workspace directory: %s", planWorkspaceDir)
+	planErr := removeAllSubPath(planPullDir, planWorkspaceDir)
+	if cloneErr != nil {
+		return cloneErr
+	}
+	return planErr
 }
 
 func removeAllSubPath(baseDir, targetDir string) error {
@@ -944,6 +1005,100 @@ func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) (string
 		return "", fmt.Errorf("repo path traversal detected: %w", err)
 	}
 	return dir, nil
+}
+
+func (w *FileWorkspace) localSharePlanDir() string {
+	if w.LocalSharePlanDir == "" {
+		return w.DataDir
+	}
+	return w.LocalSharePlanDir
+}
+
+func (w *FileWorkspace) planPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	dir := runtime.GetPlanPullDir(w.localSharePlanDir(), r, p)
+	if err := utils.EnsureSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), dir); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) planWorkspaceDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	pullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(pullDir, workspace)
+	if err := utils.EnsureSubPath(pullDir, dir); err != nil {
+		return "", fmt.Errorf("plan workspace path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) planProjectDir(r models.Repo, p models.PullRequest, workspace string, projectPath string) (string, error) {
+	workspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(workspaceDir, projectPath)
+	if err := utils.EnsureSubPath(workspaceDir, dir); err != nil {
+		return "", fmt.Errorf("plan project path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) workspaceFromCloneDir(r models.Repo, p models.PullRequest, cloneDir string) (string, error) {
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	workspace, err := filepath.Rel(pullDir, cloneDir)
+	if err != nil {
+		return "", fmt.Errorf("checking clone directory %q: %w", cloneDir, err)
+	}
+	if workspace == "." || workspace == ".." || filepath.IsAbs(workspace) || strings.HasPrefix(workspace, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("clone directory %q escapes pull directory %q", cloneDir, pullDir)
+	}
+	return workspace, nil
+}
+
+func (w *FileWorkspace) deletePlanWorkspaceIfSeparate(r models.Repo, p models.PullRequest, cloneDir string) error {
+	if filepath.Clean(w.localSharePlanDir()) == filepath.Clean(w.DataDir) {
+		return nil
+	}
+	workspace, err := w.workspaceFromCloneDir(r, p, cloneDir)
+	if err != nil {
+		return err
+	}
+	planWorkspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	return removeAllSubPath(planPullDir, planWorkspaceDir)
+}
+
+func removeTfPlanFiles(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if path == root && os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".terragrunt-cache" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) != ".tfplan" {
+			return nil
+		}
+		return utils.RemoveIgnoreNonExistent(path)
+	})
 }
 
 func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
@@ -988,12 +1143,12 @@ func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 }
 
 func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
-	cloneDir, err := w.cloneDir(r, p, workspace)
+	planDir, err := w.planProjectDir(r, p, workspace, projectPath)
 	if err != nil {
 		return err
 	}
-	planPath := filepath.Join(cloneDir, projectPath, runtime.GetPlanFilename(workspace, projectName))
-	if err := utils.EnsureSubPath(cloneDir, planPath); err != nil {
+	planPath := filepath.Join(planDir, runtime.GetPlanFilename(workspace, projectName))
+	if err := utils.EnsureSubPath(planDir, planPath); err != nil {
 		return fmt.Errorf("plan path traversal detected: %w", err)
 	}
 	logger.Info("Deleting plan: %s", planPath)

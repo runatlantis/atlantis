@@ -54,10 +54,27 @@ type ProjectContext struct {
 	AutoplanWhenModified []string
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo models.Repo
-	// EscapedCommentArgs are the extra arguments that were added to the atlantis
-	// command, ex. atlantis plan -- -target=resource. We then escape them
-	// by adding a \ before each character so that they can be used within
-	// sh -c safely, i.e. sh -c "terraform plan $(touch bad)".
+	// ExpandableArgs are the arguments that came from operator-configured
+	// extra_args and may therefore have environment variable references
+	// expanded. Every other argument, in particular anything that came from a
+	// pull request comment, is passed to the process literally: expanding those
+	// would let a commenter read the Atlantis process environment by naming a
+	// variable and reading the value back out of a command's error output.
+	//
+	// Step runners set this on their own copy of the context before invoking
+	// the Terraform client. ProjectContext is passed by value, so this does not
+	// leak between steps.
+	ExpandableArgs []string
+	// CommentArgs are the extra arguments that were added to the atlantis
+	// command, ex. atlantis plan -- -target=resource, exactly as the user wrote
+	// them. Use these when building an argument vector for a command Atlantis
+	// executes directly, since no shell will remove escaping.
+	CommentArgs []string
+	// EscapedCommentArgs are the same arguments with a \ before each character
+	// so that they survive being embedded in shell source, i.e.
+	// sh -c "terraform plan $(touch bad)". Use these only where the value is
+	// interpolated into a shell command or exported to one, such as the
+	// COMMENT_ARGS variable available to `run` steps and workflow hooks.
 	EscapedCommentArgs []string
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
@@ -81,6 +98,11 @@ type ProjectContext struct {
 	// ExpectedPlanHash is the SHA-256 hash of the plan file selected when the
 	// apply command was built.
 	ExpectedPlanHash string
+	// RequiresAtlantisManagedPlanFile is true when this project's workflow uses
+	// the built-in plan or apply step, meaning Atlantis owns the convention plan
+	// artifact (<workspace>.tfplan). Workflows built only from custom run steps
+	// manage their own plan file, so Atlantis must not require or inspect one.
+	RequiresAtlantisManagedPlanFile bool
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
 	// ProjectPolicyStatus is the status of policy sets of the current project prior to this command.
@@ -94,6 +116,9 @@ type ProjectContext struct {
 	// ProjectName is the name of the project set in atlantis.yaml. If there was
 	// no name this will be an empty string.
 	ProjectName string
+	// LocalSharePlanDir is the root directory for local Terraform plan files.
+	// If empty, plan files are stored in the project working directory.
+	LocalSharePlanDir string
 	// RepoConfigVersion is the version of the repo's atlantis.yaml file. If
 	// there was no file, this will be 0.
 	RepoConfigVersion int
