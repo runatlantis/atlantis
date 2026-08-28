@@ -107,6 +107,10 @@ lint: ## Run linter locally
 check-fmt: ## Fail if not formatted
 	./scripts/fmt.sh
 
+.PHONY: check-go-toolchain
+check-go-toolchain: ## Fail if the golang image pins drift from go.mod
+	./scripts/verify-go-toolchain.sh
+
 .PHONY: end-to-end-deps
 end-to-end-deps: ## Install e2e dependencies
 	./scripts/e2e-deps.sh
