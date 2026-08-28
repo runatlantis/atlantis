@@ -14,7 +14,7 @@ import (
 
 	giteasdk "code.gitea.io/sdk/gitea"
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v90/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"

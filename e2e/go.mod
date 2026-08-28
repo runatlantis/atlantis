@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
-	github.com/google/go-github/v88 v88.0.0
+	github.com/google/go-github/v90 v90.0.0
 	github.com/hashicorp/go-multierror v1.1.1
 	gitlab.com/gitlab-org/api/client-go v0.161.1
 )
