@@ -7,6 +7,7 @@ package events
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"strings"
@@ -74,6 +75,10 @@ type commonData struct {
 type errData struct {
 	Error           string
 	RenderedContext string
+	HeadCommit      string
+	CommitURL       string
+	JobURL          string
+	MultipleJobs    bool
 	commonData
 }
 
@@ -222,7 +227,7 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), errData{res.Error.Error(), "", common})
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), newErrData(res.Error, "", common))
 	}
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
@@ -351,7 +356,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			if m.shouldUseWrappedTmpl(vcsHost, result.Error.Error()) {
 				tmpl = templates.Lookup("wrappedErr")
 			}
-			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, errData{result.Error.Error(), resultData.Rendered, common})
+			resultData.Rendered = m.renderTemplateTrimSpace(tmpl, newErrData(result.Error, resultData.Rendered, common))
 			if common.CommandName == applyCommandTitle {
 				numApplyErrors++
 			}
@@ -428,6 +433,18 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
+}
+
+func newErrData(err error, renderedContext string, common commonData) errData {
+	data := errData{Error: err.Error(), RenderedContext: renderedContext, commonData: common}
+	var lockErr *workingDirLockError
+	if errors.As(err, &lockErr) {
+		data.HeadCommit = lockErr.metadata.HeadCommit
+		data.CommitURL = lockErr.metadata.CommitURL
+		data.JobURL = lockErr.metadata.JobURL
+		data.MultipleJobs = lockErr.multipleJobs
+	}
+	return data
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown

@@ -30,6 +30,12 @@ func NewStateRmStepRunner(terraformExecutor TerraformExec, defaultTfDistribution
 }
 
 func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	// extra_args comes from configuration, so environment variable references
+	// in it may be expanded. Marked on this copy of the context; everything
+	// else, including comment args, stays literal.
+	if len(extraArgs) > 0 {
+		ctx.ExpandableArgs = extraArgs
+	}
 	tfDistribution := p.defaultTFDistribution
 	tfVersion := p.defaultTFVersion
 	if ctx.TerraformDistribution != nil {
@@ -41,11 +47,11 @@ func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 
 	stateRmCmd := []string{"state", "rm"}
 	stateRmCmd = append(stateRmCmd, extraArgs...)
-	stateRmCmd = append(stateRmCmd, ctx.EscapedCommentArgs...)
+	stateRmCmd = append(stateRmCmd, ctx.CommentArgs...)
 	out, err := p.terraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), stateRmCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 
 	// If the state rm was successful and a plan file exists, delete the plan.
-	planPath := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planPath := GetPlanFilePath(ctx, path)
 	if err == nil {
 		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("state rm successful, deleting planfile")

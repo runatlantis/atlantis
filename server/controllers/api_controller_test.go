@@ -2246,7 +2246,7 @@ func setup(t *testing.T, options ...func(*apiControllerTestConfig)) (*controller
 		})
 
 	workingDirLocker := NewMockWorkingDirLocker()
-	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name]())).
+	When(workingDirLocker.TryLock(Any[string](), Any[int](), Eq(events.DefaultWorkspace), Eq(events.DefaultRepoRelDir), Eq(""), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).
 		ThenReturn(func() {}, nil)
 
 	projectCommandBuilder := NewMockProjectCommandBuilder()
@@ -3896,6 +3896,153 @@ func TestAPIController_DetectDriftSendsWebhookWhenDriftDetected(t *testing.T) {
 	Equals(t, events.DefaultWorkspace, sender.results[0].Projects[0].Workspace)
 }
 
+func TestAPIController_DetectDrift_IncludesPlanOutput(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	planOutput := "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place\n\nPlan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, err := json.Marshal(models.DriftDetectionRequest{
+		Repository:        "Repo",
+		Ref:               "main",
+		Type:              "Gitlab",
+		Projects:          []string{"app"},
+		IncludePlanOutput: true,
+	})
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, w.Body.Bytes(), &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, planOutput, result.Projects[0].PlanOutput)
+
+	driftStorage.VerifyWasCalledOnce().
+		Store(Eq("gitlab.com/Repo"), Any[models.ProjectDrift]())
+}
+
+func TestAPIController_DetectDrift_OmitsPlanOutputByDefault(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName: command.Plan,
+			ProjectName: "app",
+			RepoRelDir:  "app",
+			Workspace:   events.DefaultWorkspace,
+		}}, nil)
+	planOutput := "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place\n\nPlan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, err := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"app"},
+	})
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, w.Body.Bytes(), &result)
+	Equals(t, 1, len(result.Projects))
+	Equals(t, "", result.Projects[0].PlanOutput)
+}
+
+func TestAPIController_DetectDrift_ErrorProjectOmitsPlanOutputWhenIncluded(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+				ProjectName: "ok",
+				RepoRelDir:  "ok",
+				Workspace:   events.DefaultWorkspace,
+			},
+			{
+				CommandName: command.Plan,
+				ProjectName: "bad",
+				RepoRelDir:  "bad",
+				Workspace:   events.DefaultWorkspace,
+			},
+		}, nil)
+	planOutput := "Plan: 1 to add, 0 to change, 0 to destroy."
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			projectCtx := args[0].(command.ProjectContext)
+			if projectCtx.ProjectName == "bad" {
+				return ReturnValues{command.ProjectCommandOutput{Error: errors.New("terraform plan failed")}}
+			}
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: planOutput},
+			}}
+		})
+
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, err := json.Marshal(models.DriftDetectionRequest{
+		Repository:        "Repo",
+		Ref:               "main",
+		Type:              "Gitlab",
+		IncludePlanOutput: true,
+	})
+	Ok(t, err)
+	req, err := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	Ok(t, err)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusMultiStatus, w.Code)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, w.Body.Bytes(), &result)
+	Equals(t, 2, len(result.Projects))
+
+	var okProject, badProject *controllers.DriftProjectAPI
+	for i := range result.Projects {
+		switch result.Projects[i].ProjectName {
+		case "ok":
+			okProject = &result.Projects[i]
+		case "bad":
+			badProject = &result.Projects[i]
+		}
+	}
+	Assert(t, okProject != nil, "expected 'ok' project in response")
+	Assert(t, badProject != nil, "expected 'bad' project in response")
+	Equals(t, planOutput, okProject.PlanOutput)
+	Equals(t, "", badProject.PlanOutput)
+}
+
 func TestAPIController_DetectDriftSendsWebhookWhenNoDrift(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
@@ -5283,4 +5430,33 @@ func TestAPIController_DetectDrift_PreWorkflowHooksFailure(t *testing.T) {
 	response, _ := io.ReadAll(w.Result().Body)
 	apiErr := parseAPIError(t, response)
 	Equals(t, controllers.ErrCodeInternal, apiErr.Code)
+}
+
+func TestAPIController_RejectsWorkspaceUnsafeForPaths(t *testing.T) {
+	// paths[].workspace becomes a path component of the files Atlantis writes
+	// and a Terraform command argument. Commands are run as argument vectors,
+	// so shell metacharacters carry no meaning and are allowed; what is
+	// rejected is what is unsafe as a path or would be read as a flag.
+	for _, workspace := range []string{"../evil", "sub/dir", "-chdir", "~root", "a b", "a$HOME"} {
+		t.Run(workspace, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Paths: []controllers.APIRequestPath{
+					{Directory: ".", Workspace: workspace},
+				},
+			})
+
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			ResponseContains(t, w, http.StatusBadRequest, "invalid workspace")
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+			projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		})
+	}
 }

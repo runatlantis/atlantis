@@ -6,6 +6,7 @@ package events
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -68,6 +69,7 @@ workflows:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
@@ -126,6 +128,7 @@ projects:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -188,6 +191,7 @@ projects:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -258,6 +262,7 @@ projects:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -415,6 +420,7 @@ workflows:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -479,6 +485,7 @@ projects:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -546,6 +553,7 @@ workflows:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -599,6 +607,7 @@ projects:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
@@ -729,6 +738,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -816,6 +829,7 @@ projects:
 				ApplyCmd:             "atlantis apply -p myproject_1",
 				ApprovePoliciesCmd:   "atlantis approve_policies -p myproject_1",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -950,6 +964,10 @@ projects:
 					c.expCtx.CommandName = cmd
 					// Init fields we couldn't in our cases map.
 					c.expCtx.Steps = expSteps
+					// Atlantis owns the convention plan artifact only when the
+					// workflow uses the built-in plan or apply step.
+					c.expCtx.RequiresAtlantisManagedPlanFile = slices.Contains(c.expPlanSteps, "plan") ||
+						slices.Contains(c.expApplySteps, "apply")
 					ctx.PolicySets = emptyPolicySets
 
 					// Job ID cannot be compared since its generated at random
@@ -1002,6 +1020,7 @@ repos:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     false,
 				AutoplanEnabled:      true,
@@ -1065,6 +1084,7 @@ workflows:
 				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
 				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
 				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
 				EscapedCommentArgs:   []string{`\f\l\a\g`},
 				AutomergeEnabled:     true,
 				AutoplanEnabled:      true,
@@ -1195,6 +1215,10 @@ workflows:
 				c.expCtx.CommandName = cmd
 				// Init fields we couldn't in our cases map.
 				c.expCtx.Steps = expSteps
+				// These cases only override policy_check, so plan and apply
+				// fall back to the built-in default steps and Atlantis owns
+				// the convention plan artifact.
+				c.expCtx.RequiresAtlantisManagedPlanFile = true
 				ctx.PolicySets = emptyPolicySets
 
 				// Job ID cannot be compared since its generated at random

@@ -124,6 +124,19 @@ workflows:
             extra_args: ["-p /home/atlantis/conftest_policies/", "--all-namespaces"]
 ```
 
+::: tip Note
+Conftest is run with an argument vector rather than through a shell. A policy
+set `path` and each `extra_args` entry are still split on whitespace, so a value
+carrying more than one argument, like `"-p /home/atlantis/conftest_policies/"`
+above, keeps working. Shell operators and command substitution are passed
+through as ordinary text. To use a path that genuinely contains a space, quote
+it, e.g.
+`"'/home/atlantis/my policies'"`. Environment references in unquoted or
+double-quoted text are expanded from the policy-check environment without
+splitting the expanded value. Use single quotes or a backslash before `$` when
+the reference should remain literal.
+:::
+
 ### Step 3: Write the policy
 
 Conftest policies are based on [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) and written in [rego](https://www.openpolicyagent.org/docs/latest/policy-language/#what-is-rego). Following our example, simply create a `rego` file in `null_resource_warning` folder with following code, the code below a simple policy that will fail for plans containing newly created `null_resource`s.

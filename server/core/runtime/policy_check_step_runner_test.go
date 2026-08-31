@@ -27,6 +27,7 @@ func TestRun(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
 		RepoRelDir:         ".",
