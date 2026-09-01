@@ -1660,12 +1660,11 @@ atlantis server --use-tf-plugin-cache=false
 
 Set to false if you want to disable terraform plugin cache.
 
-This flag is useful when having multiple projects that need to run a plan and apply in the same PR to avoid the race condition of `plugin_cache_dir` concurrently, this is a terraform known issue, more info:
+Terraform's plugin cache is not concurrency-safe. Atlantis coordinates built-in Terraform commands that use the shared cache so `terraform init` cannot modify a provider while another command is using it. This includes Terraform Cloud/Enterprise remote operations because project provider paths may still link into the cache. Custom `run` steps must coordinate access themselves if they use `TF_PLUGIN_CACHE_DIR`.
 
-- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
-- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+Coordination across Atlantis replicas requires a shared filesystem with reliable cross-host advisory locks. Some NFS configurations, including `local_lock`, can accept a lock without coordinating other hosts.
 
-The effect of the race condition is more evident when using parallel configuration to run plan and apply. Disabling the use of plugin cache will impact the performance when starting a new plan or apply, but in large Atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
+See Terraform's [plugin cache concurrency issue](https://github.com/hashicorp/terraform/issues/31964) for details.
 
 ### `--var-file-allowlist` <Badge text="v0.19.5" type="info"/>
 
