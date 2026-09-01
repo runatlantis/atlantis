@@ -6,7 +6,10 @@ ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc40
 ARG GOLANG_TAG=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.14.9
+ARG TERRAFORM_1_15_VERSION=1.15.9
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+ARG TERRAFORM_1_16_VERSION=1.16.0
+ARG DEFAULT_TERRAFORM_VERSION=${TERRAFORM_1_16_VERSION}
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.12.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
@@ -143,6 +146,8 @@ RUN case ${TARGETPLATFORM} in \
     git-lfs --version
 
 # install terraform binaries
+ARG TERRAFORM_1_15_VERSION
+ARG TERRAFORM_1_16_VERSION
 ARG DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 ARG DEFAULT_OPENTOFU_VERSION
@@ -151,13 +156,12 @@ ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
 # COPY scripts/download-release.sh .
 COPY --from=builder /app/scripts/download-release.sh download-release.sh
 
-# In the official Atlantis image, we only have the latest of each Terraform version.
-# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
+# HashiCorp patches only the two most recent minor releases.
 RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.8.5 1.9.8 1.10.5 ${DEFAULT_TERRAFORM_VERSION}" \
+        "${TERRAFORM_1_15_VERSION} ${TERRAFORM_1_16_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
