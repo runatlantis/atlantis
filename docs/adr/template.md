@@ -1,4 +1,4 @@
-# NNNN. Short title
+# N. Short title
 
 Date: YYYY-MM-DD
 
@@ -6,7 +6,7 @@ Date: YYYY-MM-DD
 
 Proposed
 
-<!-- Proposed, Accepted, Rejected, Superseded by NNNN, or Deprecated. -->
+<!-- Proposed, Accepted, Rejected, Superseded by [NNNN](NNNN-short-title.md), or Deprecated. -->
 
 ## Context
 
