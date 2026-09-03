@@ -2,7 +2,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.62.1",
     "@types/node": "24.12.4",
     "@vueuse/core": "12.8.2",
     "markdown-it-footnote": "4.0.0",
@@ -11,7 +11,7 @@
     "vite": "6.4.3",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17",
-    "vue": "3.5.41"
+    "vue": "3.5.42"
   },
   "overrides": {
     "minimatch": "^10.2.1",
