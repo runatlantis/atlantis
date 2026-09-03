@@ -1270,6 +1270,66 @@ ATLANTIS_PORT=4141
 
 Port to bind to. Defaults to `4141`.
 
+### `--provider-cache`
+
+```bash
+atlantis server --provider-cache
+# or
+ATLANTIS_PROVIDER_CACHE=true
+```
+
+Run a local caching proxy for Terraform providers and point Terraform at it via
+a generated CLI configuration file (`~/.terraformrc`). When enabled, the many
+parallel `terraform init` commands Atlantis runs across workspaces and pull
+requests fetch providers through the proxy, which downloads each provider
+archive from the upstream registry once, caches it on disk, and serves the
+cached copy to every subsequent (including concurrent) request. This mirrors the
+provider cache server that Terragrunt ships.
+
+The archive bytes are served unchanged, so Terraform's normal checksum and
+signature verification is unaffected. Defaults to `false`.
+
+::: tip
+This complements `--use-tf-plugin-cache`: the plugin cache lets a single
+Terraform process reuse an already-installed provider, while the provider cache
+proxy de-duplicates the *downloads* across many parallel processes.
+:::
+
+### `--provider-cache-dir`
+
+```bash
+atlantis server --provider-cache-dir="/path/to/cache"
+# or
+ATLANTIS_PROVIDER_CACHE_DIR="/path/to/cache"
+```
+
+Directory the provider cache proxy stores downloaded provider archives in. Only
+used when `--provider-cache` is set. Defaults to the `provider-cache`
+subdirectory of the data directory.
+
+### `--provider-cache-port`
+
+```bash
+atlantis server --provider-cache-port=0
+# or
+ATLANTIS_PROVIDER_CACHE_PORT=0
+```
+
+Port the provider cache proxy binds to on localhost. Only used when
+`--provider-cache` is set. Defaults to `0`, which selects a random free port.
+
+### `--provider-cache-registry-hosts`
+
+```bash
+atlantis server --provider-cache-registry-hosts="registry.terraform.io,registry.opentofu.org"
+# or
+ATLANTIS_PROVIDER_CACHE_REGISTRY_HOSTS="registry.terraform.io,registry.opentofu.org"
+```
+
+Comma-separated list of provider registry hostnames whose provider downloads are
+routed through the provider cache proxy. Only used when `--provider-cache` is
+set. Defaults to `registry.terraform.io`.
+
 ### `--quiet-policy-checks` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
