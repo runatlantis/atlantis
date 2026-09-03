@@ -1,0 +1,51 @@
+# Goss tests for the *-slim image targets.
+# See: https://github.com/goss-org/goss/blob/master/docs/gossfile.md
+#
+# The slim images ship without Terraform and OpenTofu. Everything else the full
+# image carries must still be there, and the two binaries must be absent.
+
+command:
+  # ensure atlantis is available
+  atlantis-available:
+    exec: "atlantis version"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure conftest is available
+  conftest-available:
+    exec: "conftest -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure git-lfs is available
+  git-lfs-available:
+    exec: "git-lfs -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure terraform is NOT on PATH (127 is "command not found" from sh)
+  terraform-absent:
+    exec: "terraform version"
+    exit-status: 127
+
+  # ensure tofu is NOT on PATH
+  tofu-absent:
+    exec: "tofu version"
+    exit-status: 127
+
+  # ensure a default Terraform version is set so Atlantis can start and
+  # download it on first use
+  default-tf-version-set:
+    exec: "printenv ATLANTIS_DEFAULT_TF_VERSION"
+    exit-status: 0
+    stdout:
+      - "/^[0-9]+\\.[0-9]+\\.[0-9]+$/"
+
+file:
+  /usr/local/bin/terraform:
+    exists: false
+  /usr/local/bin/tofu:
+    exists: false

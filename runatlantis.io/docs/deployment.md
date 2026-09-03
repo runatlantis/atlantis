@@ -628,6 +628,26 @@ After it is deployed, see [Next Steps](#next-steps).
 
 Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
+#### Image variants
+
+Every release is published in four variants. The unsuffixed tag (for example `v0.47.1` or `latest`) is the Alpine image.
+
+| Tag suffix     | Base   | Bundled Terraform and OpenTofu |
+|----------------|--------|--------------------------------|
+| `-alpine`      | Alpine | yes                            |
+| `-debian`      | Debian | yes                            |
+| `-alpine-slim` | Alpine | no                             |
+| `-debian-slim` | Debian | no                             |
+
+The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
+
+The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to know which version that is:
+
+* `ATLANTIS_DEFAULT_TF_VERSION` is preset in the slim image to the same version the full image bundles. Override it to pin a different version.
+* Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
+* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and `ATLANTIS_DEFAULT_TF_VERSION` to an OpenTofu version. The preset value is a Terraform version and will not exist as an OpenTofu release.
+* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
+
 #### Customization
 
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:

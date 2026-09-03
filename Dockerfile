@@ -142,6 +142,13 @@ RUN case ${TARGETPLATFORM} in \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version
 
+# Terraform and OpenTofu live in their own stage so the slim targets never
+# download them. The full targets copy from tf-deps; the slim targets do not.
+FROM deps AS tf-deps
+
+ARG TARGETPLATFORM
+WORKDIR /tmp/build
+
 # install terraform binaries
 ARG DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
@@ -165,8 +172,16 @@ RUN ./download-release.sh \
         "${DEFAULT_OPENTOFU_VERSION}"
 
 # Stage 2 - Alpine
-# Creating the individual distro builds using targets
-FROM alpine:${ALPINE_TAG} AS alpine
+# Creating the individual distro builds using targets.
+#
+# Each distro has a runtime stage with everything except the Terraform and
+# OpenTofu binaries, and two final targets built on it:
+#   <distro>-slim  no Terraform or OpenTofu. Atlantis downloads the version it
+#                  needs at runtime (see --tf-download), so this image carries
+#                  none of the advisories filed against bundled binaries.
+#   <distro>       the runtime stage plus the bundled binaries. This is the
+#                  image that has always been published.
+FROM alpine:${ALPINE_TAG} AS alpine-runtime
 
 ARG ATLANTIS_PORT=4141
 
@@ -183,9 +198,6 @@ RUN addgroup --gid 1000 atlantis && \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -256,8 +268,23 @@ USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
+FROM alpine-runtime AS alpine-slim
+
+# With no terraform on PATH, Atlantis needs to be told a default version so it
+# can download it on first use. Set the same version the full image bundles.
+# OpenTofu users override this together with ATLANTIS_TF_DISTRIBUTION.
+ARG DEFAULT_TERRAFORM_VERSION
+ENV ATLANTIS_DEFAULT_TF_VERSION=${DEFAULT_TERRAFORM_VERSION}
+
+FROM alpine-runtime AS alpine
+
+# copy terraform binaries. These come out of release zip files, which carry no
+# file capabilities, so the capability strip in alpine-runtime still holds.
+COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/
+
 # Stage 2 - Debian
-FROM debian-base AS debian
+FROM debian-base AS debian-runtime
 
 ARG ATLANTIS_PORT=4141
 
@@ -268,9 +295,6 @@ HEALTHCHECK --interval=5m --timeout=3s \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -311,3 +335,16 @@ RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
+
+FROM debian-runtime AS debian-slim
+
+# See alpine-slim.
+ARG DEFAULT_TERRAFORM_VERSION
+ENV ATLANTIS_DEFAULT_TF_VERSION=${DEFAULT_TERRAFORM_VERSION}
+
+FROM debian-runtime AS debian
+
+# copy terraform binaries. See the alpine target for why this is safe to do
+# after the capability strip.
+COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/

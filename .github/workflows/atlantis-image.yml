@@ -50,6 +50,7 @@ jobs:
               - '.dockerignore'
               - 'docker-entrypoint.sh'
               - 'goss.yaml'
+              - 'goss-slim.yaml'
               - 'scripts/download-release.sh'
               - '.github/workflows/atlantis-image.yml'
               - 'cmd/**'
@@ -70,7 +71,9 @@ jobs:
       attestations: write
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        # The -slim variants carry no Terraform or OpenTofu binaries; Atlantis
+        # downloads the version it needs at runtime. See the Dockerfile.
+        image_type: [alpine, debian, alpine-slim, debian-slim]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -116,6 +119,7 @@ jobs:
     # release tag also has the image type appended i.e. latest-alpine
     # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
+    # the slim variants only ever get the suffixed form, i.e. v0.10.0-alpine-slim, latest-debian-slim
     - name: Docker meta
       id: meta
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
@@ -216,7 +220,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, debian, alpine-slim, debian-slim]
         platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -252,6 +256,10 @@ jobs:
           version: "v0.4.7"
 
       - name: Execute Goss tests
+        env:
+          # The slim images have their own test file asserting the Terraform
+          # and OpenTofu binaries are absent.
+          GOSS_FILE: ${{ endsWith(matrix.image_type, '-slim') && 'goss-slim.yaml' || 'goss.yaml' }}
         run: |
           dgoss run --rm ${{ env.DOCKER_REPO }}:goss-test bash -c 'while true; do sleep 1; done;'
 
@@ -263,7 +271,7 @@ jobs:
       contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, debian, alpine-slim, debian-slim]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
