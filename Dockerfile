@@ -270,11 +270,13 @@ CMD ["server"]
 
 FROM alpine-runtime AS alpine-slim
 
-# With no terraform on PATH, Atlantis needs to be told a default version so it
-# can download it on first use. Set the same version the full image bundles.
-# OpenTofu users override this together with ATLANTIS_TF_DISTRIBUTION.
-ARG DEFAULT_TERRAFORM_VERSION
-ENV ATLANTIS_DEFAULT_TF_VERSION=${DEFAULT_TERRAFORM_VERSION}
+# Nothing to add. With no terraform on PATH, Atlantis refuses to start until
+# --default-tf-version is set (flag, ATLANTIS_DEFAULT_TF_VERSION, or the
+# server config file) and then downloads that version on first use.
+#
+# Deliberately no ENV ATLANTIS_DEFAULT_TF_VERSION here: environment variables
+# take precedence over the server config file, so a version baked into the
+# image would silently override a version pinned in that file.
 
 FROM alpine-runtime AS alpine
 
@@ -338,9 +340,7 @@ CMD ["server"]
 
 FROM debian-runtime AS debian-slim
 
-# See alpine-slim.
-ARG DEFAULT_TERRAFORM_VERSION
-ENV ATLANTIS_DEFAULT_TF_VERSION=${DEFAULT_TERRAFORM_VERSION}
+# Nothing to add. See alpine-slim for why no default Terraform version is set.
 
 FROM debian-runtime AS debian
 

@@ -641,11 +641,11 @@ Every release is published in four variants. The unsuffixed tag (for example `v0
 
 The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
 
-The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to know which version that is:
+The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to be told which version that is:
 
-* `ATLANTIS_DEFAULT_TF_VERSION` is preset in the slim image to the same version the full image bundles. Override it to pin a different version.
+* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The slim image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
 * Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
-* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and `ATLANTIS_DEFAULT_TF_VERSION` to an OpenTofu version. The preset value is a Terraform version and will not exist as an OpenTofu release.
+* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and give an OpenTofu version as the default.
 * If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
 
 #### Customization
