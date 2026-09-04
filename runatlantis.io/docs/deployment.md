@@ -628,6 +628,26 @@ After it is deployed, see [Next Steps](#next-steps).
 
 Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
+#### Image variants
+
+Every release is published in four variants. The unsuffixed tag (for example `v0.47.1` or `latest`) is the Alpine image.
+
+| Tag suffix     | Base   | Bundled Terraform and OpenTofu |
+|----------------|--------|--------------------------------|
+| `-alpine`      | Alpine | yes                            |
+| `-debian`      | Debian | yes                            |
+| `-alpine-slim` | Alpine | no                             |
+| `-debian-slim` | Debian | no                             |
+
+The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
+
+The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to be told which version that is:
+
+* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The slim image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
+* Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
+* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and give an OpenTofu version as the default.
+* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
+
 #### Customization
 
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
