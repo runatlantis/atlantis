@@ -153,6 +153,26 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
+
+	// GitLab merge request webhooks populate HeadCommit from the webhook
+	// payload (event.ObjectAttributes.LastCommit.ID), while comment-triggered
+	// commands (e.g. atlantis apply -p <project>) always refetch the MR via
+	// the API and use mr.SHA instead (see getGitlabData). These two GitLab
+	// fields can diverge even without a genuine new push. Since PullStatus is
+	// keyed by HeadCommit (see BoltDB.UpdatePullWithResults), a divergence
+	// here can make Atlantis think a later apply belongs to a "new" pull and
+	// silently forget about sibling projects that still need applying - which
+	// can in turn make automerge fire early. Refetch via the API here so
+	// autoplan uses the same HeadCommit source as every subsequent
+	// comment-triggered command for this pull.
+	if baseRepo.VCSHost.Type == models.Gitlab {
+		if freshPull, err := c.getGitlabData(log, baseRepo, pull.Num); err == nil {
+			pull = freshPull
+		} else {
+			log.Warn("unable to refresh GitLab merge request data for autoplan, using webhook payload: %s", err)
+		}
+	}
+
 	status, err := c.PullStatusFetcher.GetPullStatus(pull)
 
 	if err != nil {
