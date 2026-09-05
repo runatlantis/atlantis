@@ -30,53 +30,7 @@ import (
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
-	t.Log("when workspace.Delete returns an error, we return it")
-	RegisterMockTestingT(t)
-	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
-	tmp := t.TempDir()
-	db, err := boltdb.New(tmp)
-	t.Cleanup(func() {
-		db.Close()
-	})
-	Ok(t, err)
-	pce := events.PullClosedExecutor{
-		WorkingDir:         w,
-		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Database:           db,
-	}
-	err = errors.New("err")
-	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
-	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
-	Equals(t, "cleaning workspace: err", actualErr.Error())
-}
-
-func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
-	t.Log("when workspace.Delete fails, external plans are still cleaned up")
-	RegisterMockTestingT(t)
-	logger := logging.NewNoopLogger(t)
-	w := mocks.NewMockWorkingDir()
-	tmp := t.TempDir()
-	db, err := boltdb.New(tmp)
-	t.Cleanup(func() {
-		db.Close()
-	})
-	Ok(t, err)
-	store := &countingPlanStore{}
-	pce := events.PullClosedExecutor{
-		WorkingDir:         w,
-		PullClosedTemplate: &events.PullClosedEventTemplate{},
-		Database:           db,
-		PlanStore:          store,
-	}
-	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
-	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
-	Equals(t, "cleaning workspace: disk full", actualErr.Error())
-	Equals(t, 1, store.deleteForPullCalls)
-}
-
-func TestCleanUpPullUnlockErr(t *testing.T) {
-	t.Log("when locker.UnlockByPull returns an error, we return it")
+	t.Log("when workspace.Delete returns an error, we still unlock and return the workspace error")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
@@ -91,13 +45,112 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	pce := events.PullClosedExecutor{
 		Locker:             l,
 		WorkingDir:         w,
-		Database:           db,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+	}
+	err = errors.New("err")
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning workspace: err", actualErr.Error())
+}
+
+func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
+	t.Log("when workspace.Delete fails, external plans and locks are still cleaned up")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	store := &countingPlanStore{}
+	pce := events.PullClosedExecutor{
+		Locker:             l,
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+		PlanStore:          store,
+	}
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning workspace: disk full", actualErr.Error())
+	Equals(t, 1, store.deleteForPullCalls)
+}
+
+func TestCleanUpPullWorkspaceErrStillUnlocks(t *testing.T) {
+	t.Log("when workspace.Delete fails, UnlockByPull still runs so Redis locks are not orphaned")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	cp := vcsmocks.NewMockClient()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	lock := models.ProjectLock{
+		Pull:      testdata.Pull,
+		Workspace: "default",
+		Project:   models.NewProject(testdata.GithubRepo.FullName, "path", ""),
+	}
+	pce := events.PullClosedExecutor{
+		Locker:             l,
+		VCSClient:          cp,
+		WorkingDir:         w,
+		PullClosedTemplate: &events.PullClosedEventTemplate{},
+		Database:           db,
+	}
+	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return([]models.ProjectLock{lock}, nil)
+	When(cp.CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())).ThenReturn(nil)
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning workspace: disk full", actualErr.Error())
+	cp.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
+func TestCleanUpPullUnlockErr(t *testing.T) {
+	t.Log("when locker.UnlockByPull returns an error, we return it and keep pull status")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	_, err = db.UpdatePullWithResults(testdata.Pull, []command.ProjectResult{{
+		RepoRelDir:  "path",
+		Workspace:   "default",
+		ProjectName: "proj",
+	}})
+	Ok(t, err)
+	cleaner := mocks.NewMockResourceCleaner()
+	pce := events.PullClosedExecutor{
+		Locker:                   l,
+		WorkingDir:               w,
+		Database:                 db,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		LogStreamResourceCleaner: cleaner,
 	}
 	err = errors.New("err")
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
+	status, err := db.GetPullStatus(testdata.Pull)
+	Ok(t, err)
+	Assert(t, status != nil, "pull status must remain when unlock fails")
 }
 
 func TestCleanUpPullNoLocks(t *testing.T) {
