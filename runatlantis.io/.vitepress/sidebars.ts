@@ -1,4 +1,14 @@
-const en = [
+import { existsSync } from "node:fs";
+import path from "node:path";
+
+interface SidebarItem {
+  text: string;
+  link?: string;
+  collapsed?: boolean;
+  items?: SidebarItem[];
+}
+
+const en: SidebarItem[] = [
   {
     text: "Guide",
     link: "/guide",
@@ -172,4 +182,76 @@ const en = [
   }
 ]
 
-export { en }
+const SITE_ROOT = path.resolve(import.meta.dirname, "..");
+
+// A locale is translated page by page. Point at the localized page when it
+// exists and fall back to English when it doesn't, so a partially translated
+// locale degrades to mixed-language navigation instead of dead links.
+const localizedLink = (link: string, locale: string): string =>
+  existsSync(path.join(SITE_ROOT, locale, `${link}.md`)) ? `/${locale}${link}` : link;
+
+const localizeSidebar = (
+  items: SidebarItem[],
+  locale: string,
+  labels: Record<string, string>,
+): SidebarItem[] =>
+  items.map((item) => ({
+    ...item,
+    text: labels[item.text] ?? item.text,
+    ...(item.link ? { link: localizedLink(item.link, locale) } : {}),
+    ...(item.items ? { items: localizeSidebar(item.items, locale, labels) } : {}),
+  }));
+
+// Section labels only. Blog post titles are left in English on purpose: the
+// posts themselves are not translated.
+const esLabels: Record<string, string> = {
+  "Guide": "Guía",
+  "Test Drive": "Prueba rápida",
+  "Testing locally": "Pruebas en local",
+  "Docs": "Documentación",
+  "Installing Atlantis": "Instalar Atlantis",
+  "Installing Guide": "Guía de instalación",
+  "Requirements": "Requisitos",
+  "Git Host Access Credentials": "Credenciales de acceso al host de Git",
+  "Webhook Secrets": "Secretos de webhook",
+  "Deployment": "Despliegue",
+  "Configuring Webhooks": "Configurar webhooks",
+  "Provider Credentials": "Credenciales del proveedor",
+  "Configuring Atlantis": "Configurar Atlantis",
+  "Overview": "Visión general",
+  "Server Configuration": "Configuración del servidor",
+  "Server Side Repo Config": "Configuración de repositorios en el servidor",
+  "Pre Workflow Hooks": "Hooks previos al workflow",
+  "Post Workflow Hooks": "Hooks posteriores al workflow",
+  "Conftest Policy Checking": "Comprobación de políticas con Conftest",
+  "Custom Workflows": "Workflows personalizados",
+  "Repo and Project Permissions": "Permisos de repositorio y proyecto",
+  "Repo Level atlantis.yaml": "atlantis.yaml a nivel de repositorio",
+  "Upgrading atlantis.yaml": "Actualizar atlantis.yaml",
+  "Command Requirements": "Requisitos de los comandos",
+  "Checkout Strategy": "Estrategia de checkout",
+  "Terraform Versions": "Versiones de Terraform",
+  "Terraform Cloud": "Terraform Cloud",
+  "Sending Notifications via Webhooks": "Enviar notificaciones mediante webhooks",
+  "Stats": "Estadísticas",
+  "FAQ": "Preguntas frecuentes",
+  "Using Atlantis": "Usar Atlantis",
+  "API endpoints": "Endpoints de la API",
+  "How Atlantis Works": "Cómo funciona Atlantis",
+  "Locking": "Bloqueos",
+  "Autoplanning": "Autoplanning",
+  "Automerging": "Automerge",
+  "Security": "Seguridad",
+  "Real-time Terraform Logs": "Logs de Terraform en tiempo real",
+  "Troubleshooting": "Resolución de problemas",
+  "HTTPS, SSL, TLS": "HTTPS, SSL, TLS",
+  "Contributing": "Contribuir",
+  "Implementation Details": "Detalles de implementación",
+  "Events Controller": "Controlador de eventos",
+  "Glossary": "Glosario",
+  "Blog": "Blog",
+};
+
+const es: SidebarItem[] = localizeSidebar(en, "es", esLabels);
+
+export { en, es }
