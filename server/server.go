@@ -763,6 +763,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverModeFlag,
 		statsScope,
