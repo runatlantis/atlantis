@@ -904,6 +904,10 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 			return nil, err
 		}
 		if shouldSkipClone {
+			// No projects were modified, so nothing was cloned. Post-workflow
+			// hooks assume a clone exists, so RunPostHooks must not run them.
+			// See https://github.com/runatlantis/atlantis/issues/6712
+			ctx.CloneSkipped = true
 			return []command.ProjectContext{}, nil
 		}
 	}

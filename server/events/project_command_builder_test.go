@@ -4540,7 +4540,7 @@ projects:
 			headRepo.Owner = "repoForker"
 		}
 
-		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
+		ctx := &command.Context{
 			HeadRepo: headRepo,
 			Pull: models.PullRequest{
 				BaseRepo: baseRepo,
@@ -4551,7 +4551,8 @@ projects:
 			PullRequestStatus: models.PullReqStatus{
 				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
-		})
+		}
+		actCtxs, err = builder.BuildAutoplanCommands(ctx)
 
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
@@ -4562,6 +4563,10 @@ projects:
 			_, actRepo, _, _ := res.GetCapturedArguments()
 			Equals(t, headRepo, actRepo)
 		}
+		// Regression test for #6712: ctx.CloneSkipped must be set exactly when
+		// the clone was actually skipped, so callers (e.g. RunPostHooks) know
+		// not to assume a working dir exists.
+		Equals(t, c.ExpectedClones == 0, ctx.CloneSkipped)
 	}
 }
 

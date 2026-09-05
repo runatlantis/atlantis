@@ -104,6 +104,13 @@ type Context struct {
 	// Set true if the command was intentionally skipped without executing work.
 	CommandSkipped bool
 
+	// CloneSkipped is set true when project command building determined no
+	// project was modified (skip-clone-no-changes) and returned without
+	// cloning the repo. Unlike CommandSkipped (which covers targeted-ignore
+	// dirs), this specifically means no clone/working dir exists, so
+	// post-workflow hooks - which assume a clone - must not run.
+	CloneSkipped bool
+
 	// PreferLocalRepoCfgForTargetedIgnore makes targeted ignore checks read a
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
