@@ -272,11 +272,18 @@ func TestClient_MergePull(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
+			var gotMergeSHA string
 			testServer := httptest.NewServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					switch r.RequestURI {
 					// The first request should hit this URL.
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
+						body, _ := io.ReadAll(r.Body)
+						var opts struct {
+							SHA string `json:"sha"`
+						}
+						json.Unmarshal(body, &opts) // nolint: errcheck
+						gotMergeSHA = opts.SHA
 						w.WriteHeader(c.code)
 						w.Write(c.glResponse) // nolint: errcheck
 					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
@@ -304,7 +311,8 @@ func TestClient_MergePull(t *testing.T) {
 			err = client.MergePull(
 				logger,
 				models.PullRequest{
-					Num: 1,
+					Num:        1,
+					HeadCommit: "sha",
 					BaseRepo: models.Repo{
 						FullName: "runatlantis/atlantis",
 						Owner:    "runatlantis",
@@ -319,6 +327,9 @@ func TestClient_MergePull(t *testing.T) {
 				ErrContains(t, c.expErr, err)
 				ErrContains(t, "unable to merge merge request, it may not be in a mergeable state", err)
 			}
+			// GitLab 19.2+ ("Require a commit SHA on the merge requests API")
+			// rejects the merge call without a sha; assert MergePull sends it.
+			Equals(t, "sha", gotMergeSHA)
 		})
 	}
 }
