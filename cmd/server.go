@@ -143,6 +143,7 @@ const (
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
 	SlackTokenFlag                   = "slack-token"
+	SlackIncludeBody                 = "slack-include-body"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
@@ -703,6 +704,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	UseTFPluginCache: {
 		description:  "Enable the use of the Terraform plugin cache",
+		defaultValue: true,
+	},
+	SlackIncludeBody: {
+		description:  "Whether to include the body of the pull request as an extra \"description\" field in Slack output.",
 		defaultValue: true,
 	},
 }
