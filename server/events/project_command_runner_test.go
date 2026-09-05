@@ -745,7 +745,7 @@ func TestDefaultProjectCommandRunner_PlanUndivergedBlocksAfterMergeAgain(t *test
 
 	res := runner.Plan(ctx)
 
-	Equals(t, "Default branch must be rebased onto pull request before running plan.", res.Failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running plan.", res.Failure)
 	mockWorkingDir.VerifyWasCalledOnce().MergeAgain(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
 }
@@ -830,7 +830,7 @@ func TestDefaultProjectCommandRunner_PlanValidationFailureKeepsLockWhenDeletePla
 
 	res := runner.Plan(ctx)
 
-	Equals(t, "Default branch must be rebased onto pull request before running plan.", res.Failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running plan.", res.Failure)
 	Assert(t, res.Error != nil, "expected delete plan error")
 	Equals(t, "deleting stale plan after plan validation failure: delete failed", res.Error.Error())
 	Equals(t, 0, unlockCalls)
@@ -920,7 +920,7 @@ func TestDefaultProjectCommandRunner_ApplyDiverged(t *testing.T) {
 	When(mockWorkingDir.HasDiverged(ctx.Log, tmp, ctx.RepoRelDir, ctx.AutoplanWhenModified, ctx.Pull)).ThenReturn(true)
 
 	res := runner.Apply(ctx)
-	Equals(t, "Default branch must be rebased onto pull request before running apply.", res.Failure)
+	Equals(t, "Pull request branch must include the latest default branch commit before running apply.", res.Failure)
 }
 
 func TestProjectCommandRunner_ApplyRevalidatesPlanUnderLock(t *testing.T) {
