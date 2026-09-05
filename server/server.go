@@ -54,6 +54,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/runtime/policy"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/providercache"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -87,7 +88,25 @@ const (
 	// terraformPluginCacheDir is the name of the dir inside our data dir
 	// where we tell terraform to cache plugins and modules.
 	TerraformPluginCacheDirName = "plugin-cache"
+	// ProviderCacheDirName is the name of the dir inside our data dir where the
+	// provider cache proxy stores downloaded provider archives.
+	ProviderCacheDirName = "provider-cache"
+	// DefaultProviderCacheRegistryHost is the registry served by the provider
+	// cache proxy when none is explicitly configured.
+	DefaultProviderCacheRegistryHost = "registry.terraform.io"
 )
+
+// splitAndTrim splits a comma-separated list, trimming whitespace and dropping
+// empty entries.
+func splitAndTrim(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
 
 // Server runs the Atlantis web server.
 type Server struct {
@@ -128,6 +147,7 @@ type Server struct {
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
 	database                       db.Database
+	ProviderCacheServer            *providercache.Server
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -454,7 +474,40 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution)
 
-	terraformClient, err := tfclient.NewClient(
+	// Optionally start the provider cache proxy. When enabled, terraform is
+	// pointed at it via a host block in the generated CLI config file so that
+	// parallel `terraform init` runs share a single on-disk provider cache
+	// instead of each downloading providers from the upstream registry.
+	var providerCacheServer *providercache.Server
+	var providerCacheConfig *tfclient.ProviderCacheConfig
+	if userConfig.ProviderCache {
+		providerCacheDir := userConfig.ProviderCacheDir
+		if providerCacheDir == "" {
+			providerCacheDir, err = mkSubDir(userConfig.DataDir, ProviderCacheDirName)
+			if err != nil {
+				return nil, err
+			}
+		} else if err := os.MkdirAll(providerCacheDir, 0700); err != nil {
+			return nil, fmt.Errorf("unable to create provider cache dir %q: %w", providerCacheDir, err)
+		}
+
+		registries := splitAndTrim(userConfig.ProviderCacheRegistryHosts)
+		if len(registries) == 0 {
+			registries = []string{DefaultProviderCacheRegistryHost}
+		}
+
+		providerCacheServer, err = providercache.New(logger, providerCacheDir, registries, userConfig.ProviderCachePort)
+		if err != nil {
+			return nil, fmt.Errorf("starting provider cache proxy: %w", err)
+		}
+		providerCacheServer.Start()
+		providerCacheConfig = &tfclient.ProviderCacheConfig{
+			MirrorBaseURL: providerCacheServer.MirrorBaseURL(),
+			RegistryHosts: registries,
+		}
+	}
+
+	terraformClient, err := tfclient.NewClientWithDefaultVersion(
 		logger,
 		distribution,
 		binDir,
@@ -466,6 +519,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFDownloadURL,
 		userConfig.TFDownload,
 		userConfig.UseTFPluginCache,
+		providerCacheConfig,
+		true,
 		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
 	// are, then we don't error out because we don't have/want terraform
@@ -1182,6 +1237,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebUsername:                    userConfig.WebUsername,
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
+		ProviderCacheServer:            providerCacheServer,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
 		database:                       database,
 	}
@@ -1300,6 +1356,15 @@ func (s *Server) Start() error {
 	// Attempt to close the database
 	if err := s.closeDatabase(1 * time.Second); err != nil {
 		s.Logger.Err("while closing database: %v", err)
+	}
+
+	// Shut down the provider cache proxy if it was started.
+	if s.ProviderCacheServer != nil {
+		pcCtx, pcCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := s.ProviderCacheServer.Stop(pcCtx); err != nil {
+			s.Logger.Err("while shutting down provider cache proxy: %v", err)
+		}
+		pcCancel()
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

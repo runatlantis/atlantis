@@ -150,6 +150,10 @@ const (
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
+	ProviderCacheFlag                = "provider-cache"
+	ProviderCacheDirFlag             = "provider-cache-dir"
+	ProviderCachePortFlag            = "provider-cache-port"
+	ProviderCacheRegistryHostsFlag   = "provider-cache-registry-hosts"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
@@ -194,6 +198,8 @@ const (
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
 	DefaultPort                         = 4141
+	DefaultProviderCachePort            = 0
+	DefaultProviderCacheRegistryHosts   = "registry.terraform.io"
 	DefaultRedisDB                      = 0
 	DefaultRedisPort                    = 6379
 	DefaultRedisTLSEnabled              = false
@@ -501,6 +507,15 @@ var stringFlags = map[string]stringFlag{
 		description: "Comma-separated list of additional paths where variable definition files can be read from." +
 			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
 	},
+	ProviderCacheDirFlag: {
+		description: "Directory the provider cache proxy stores downloaded provider archives in." +
+			" Only used when --" + ProviderCacheFlag + " is set. Defaults to the 'provider-cache' subdirectory of the data directory.",
+	},
+	ProviderCacheRegistryHostsFlag: {
+		description: "Comma-separated list of provider registry hostnames whose provider downloads are routed through the provider cache proxy." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheRegistryHosts,
+	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
@@ -705,6 +720,12 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
 	},
+	ProviderCacheFlag: {
+		description: "Run a local caching proxy for Terraform providers and point terraform at it via a generated CLI config file." +
+			" Parallel `terraform init` runs then share a single on-disk provider cache instead of each downloading providers" +
+			" from the upstream registry.",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
@@ -728,6 +749,11 @@ var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
+	},
+	ProviderCachePortFlag: {
+		description: "Port the provider cache proxy binds to on localhost." +
+			" Only used when --" + ProviderCacheFlag + " is set. Defaults to 0, which selects a random free port.",
+		defaultValue: DefaultProviderCachePort,
 	},
 	RedisDB: {
 		description:  "The Redis Database to use when using a Locking DB type of 'redis'.",
@@ -1044,6 +1070,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
+	}
+	if c.ProviderCacheRegistryHosts == "" {
+		c.ProviderCacheRegistryHosts = DefaultProviderCacheRegistryHosts
 	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution

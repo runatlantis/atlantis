@@ -27,11 +27,75 @@ import (
 func TestGenerateRCFile_WritesFile(t *testing.T) {
 	tmp := t.TempDir()
 
-	err := generateRCFile("token", "hostname", tmp)
+	err := generateRCFile("token", "hostname", nil, tmp)
 	Ok(t, err)
 
 	expContents := `credentials "hostname" {
   token = "token"
+}`
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
+	Ok(t, err)
+	Equals(t, expContents, string(actContents))
+}
+
+// Test that when the provider cache proxy is configured we write a host block
+// per registry, alongside the credentials block.
+func TestGenerateRCFile_WritesProviderCacheHostBlocks(t *testing.T) {
+	tmp := t.TempDir()
+
+	pc := &ProviderCacheConfig{
+		MirrorBaseURL: "http://127.0.0.1:8080/",
+		RegistryHosts: []string{"registry.terraform.io", "registry.opentofu.org"},
+	}
+	err := generateRCFile("token", "hostname", pc, tmp)
+	Ok(t, err)
+
+	expContents := `credentials "hostname" {
+  token = "token"
+}
+
+host "registry.terraform.io" {
+  services = {
+    "providers.v1" = "http://127.0.0.1:8080/registry.terraform.io/v1/providers/"
+  }
+}
+
+host "registry.opentofu.org" {
+  services = {
+    "providers.v1" = "http://127.0.0.1:8080/registry.opentofu.org/v1/providers/"
+  }
+}`
+	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
+	Ok(t, err)
+	Equals(t, expContents, string(actContents))
+}
+
+// Test that with no TFE token and no provider cache there is nothing to write.
+func TestGenerateRCFile_NoopWhenNothingConfigured(t *testing.T) {
+	tmp := t.TempDir()
+
+	err := generateRCFile("", "hostname", nil, tmp)
+	Ok(t, err)
+
+	_, err = os.Stat(filepath.Join(tmp, ".terraformrc"))
+	Assert(t, os.IsNotExist(err), "expected no .terraformrc to be written")
+}
+
+// Test that the provider cache host block can be written without a TFE token.
+func TestGenerateRCFile_ProviderCacheOnly(t *testing.T) {
+	tmp := t.TempDir()
+
+	pc := &ProviderCacheConfig{
+		MirrorBaseURL: "http://127.0.0.1:9999/",
+		RegistryHosts: []string{"registry.terraform.io"},
+	}
+	err := generateRCFile("", "hostname", pc, tmp)
+	Ok(t, err)
+
+	expContents := `host "registry.terraform.io" {
+  services = {
+    "providers.v1" = "http://127.0.0.1:9999/registry.terraform.io/v1/providers/"
+  }
 }`
 	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
 	Ok(t, err)
@@ -47,8 +111,8 @@ func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
 	err := os.WriteFile(rcFile, []byte("contents"), 0600)
 	Ok(t, err)
 
-	actErr := generateRCFile("token", "hostname", tmp)
-	expErr := fmt.Sprintf("can't write TFE token to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
+	actErr := generateRCFile("token", "hostname", nil, tmp)
+	expErr := fmt.Sprintf("can't write Terraform CLI config to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
 	ErrEquals(t, expErr, actErr)
 }
 
@@ -64,7 +128,7 @@ func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
 	err := os.WriteFile(rcFile, []byte(contents), 0600)
 	Ok(t, err)
 
-	err = generateRCFile("token", "app.terraform.io", tmp)
+	err = generateRCFile("token", "app.terraform.io", nil, tmp)
 	Ok(t, err)
 }
 
@@ -78,15 +142,15 @@ func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
 	Ok(t, err)
 
 	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
-	actErr := generateRCFile("token", "hostname", tmp)
+	actErr := generateRCFile("token", "hostname", nil, tmp)
 	ErrEquals(t, expErr, actErr)
 }
 
 // Test that if we can't write, we error out.
 func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 	rcFile := "/this/dir/does/not/exist/.terraformrc"
-	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
-	actErr := generateRCFile("token", "hostname", "/this/dir/does/not/exist")
+	expErr := fmt.Sprintf("writing generated .terraformrc file to %s: open %s: no such file or directory", rcFile, rcFile)
+	actErr := generateRCFile("token", "hostname", nil, "/this/dir/does/not/exist")
 	ErrEquals(t, expErr, actErr)
 }
 
