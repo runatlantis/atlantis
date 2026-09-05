@@ -3,7 +3,10 @@
 
 package github
 
+import "github.com/runatlantis/atlantis/server/events/vcs/common"
+
 // GithubConfig allows for custom github-specific functionality and behavior
 type Config struct {
 	AllowMergeableBypassApply bool
+	CommentNamespace          common.CommentNamespace
 }
