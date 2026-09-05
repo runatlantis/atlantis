@@ -20,6 +20,7 @@ type UserConfig struct {
 	AllowForkPRs                bool   `mapstructure:"allow-fork-prs"`
 	AllowCommands               string `mapstructure:"allow-commands"`
 	BlockedExtraArgs            string `mapstructure:"blocked-extra-args"`
+	AtlantisPluginCache         bool   `mapstructure:"atlantis-plugin-cache"`
 	AtlantisURL                 string `mapstructure:"atlantis-url"`
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
@@ -134,6 +135,7 @@ type UserConfig struct {
 	TFDistribution             string          `mapstructure:"tf-distribution"` // deprecated in favor of DefaultTFDistribution
 	TFDownload                 bool            `mapstructure:"tf-download"`
 	TFDownloadURL              string          `mapstructure:"tf-download-url"`
+	TFPluginCacheDir           string          `mapstructure:"tf-plugin-cache-dir"`
 	TFEHostname                string          `mapstructure:"tfe-hostname"`
 	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
 	TFEToken                   string          `mapstructure:"tfe-token"`
