@@ -43,15 +43,22 @@ ENV BUILDER_BASH_VERSION="5.3.9-r1"
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}
 
+# Install the OpenTelemetry compile-time instrumentation tool (otelc) to build the atlantis binary with auto-instrumentation.
+# renovate: datasource=github-releases depName=open-telemetry/opentelemetry-go-compile-instrumentation versioning=semver
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install go.opentelemetry.io/otelc/tool/cmd/otelc@v1.0.1
+
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod graph | awk '{if ($1 !~ "@") print $2}' | xargs go get
 
 COPY . /app
+
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} otelc go build -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
 FROM debian:${DEBIAN_TAG} AS debian-base
 
