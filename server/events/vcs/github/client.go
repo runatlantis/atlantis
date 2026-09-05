@@ -30,6 +30,13 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
+// MergeQueueMergeMethod is the merge method that makes Atlantis add the pull
+// request to the base branch's GitHub merge queue instead of merging it itself.
+// Unlike merge/rebase/squash it doesn't describe how the commits are combined —
+// that's configured on the branch's merge queue ruleset — only who does the
+// merging.
+const MergeQueueMergeMethod = "merge-queue"
+
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
 	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
@@ -1004,6 +1011,12 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 // MergePull merges the pull request.
 func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
+	// The merge queue doesn't merge the pull request itself, it hands it off to
+	// GitHub, so it bypasses the merge method negotiation below entirely.
+	if pullOptions.MergeMethod == MergeQueueMergeMethod {
+		return g.enqueuePull(logger, pull)
+	}
+
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
 	// We detect which types aren't allowed and use the type that is.
@@ -1027,7 +1040,9 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		squashMergeMethod:  repo.GetAllowSquashMerge,
 	}
 
-	mergeMethodsName := slices.Collect(maps.Keys(mergeMethodsAllow))
+	// MergeQueueMergeMethod is handled above and so isn't in mergeMethodsAllow,
+	// but it's still a value the user could legitimately have meant.
+	mergeMethodsName := append(slices.Collect(maps.Keys(mergeMethodsAllow)), MergeQueueMergeMethod)
 	sort.Strings(mergeMethodsName)
 
 	var method string
@@ -1077,6 +1092,69 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
 	}
 	return nil
+}
+
+// enqueuePull adds the pull request to the base branch's GitHub merge queue
+// instead of merging it. GitHub only exposes the merge queue through GraphQL,
+// so unlike MergePull this can't go through the REST client.
+func (g *Client) enqueuePull(logger logging.SimpleLogging, pull models.PullRequest) error {
+	logger.Debug("Adding GitHub pull request %d to the merge queue", pull.Num)
+
+	pullID, err := g.lookupPullRequestId(pull)
+	if err != nil {
+		return err
+	}
+
+	// https://docs.github.com/en/graphql/reference/mutations#enqueuepullrequest
+	var mutation struct {
+		EnqueuePullRequest struct {
+			MergeQueueEntry struct {
+				Position githubv4.Int
+				State    githubv4.String
+			}
+		} `graphql:"enqueuePullRequest(input: $input)"`
+	}
+
+	input := githubv4.EnqueuePullRequestInput{
+		PullRequestID:    pullID,
+		ClientMutationID: clientMutationID,
+	}
+	// Guard against a commit landing between the apply and the enqueue. GitHub
+	// rejects the mutation if the head has moved on, which is what we want:
+	// the queue would otherwise merge code that was never planned.
+	if pull.HeadCommit != "" {
+		input.ExpectedHeadOid = githubv4.NewGitObjectID(githubv4.GitObjectID(pull.HeadCommit))
+	}
+
+	if err := g.v4Client.Mutate(g.ctx, &mutation, input, nil); err != nil {
+		return fmt.Errorf("adding pull request to the merge queue: %w", err)
+	}
+
+	entry := mutation.EnqueuePullRequest.MergeQueueEntry
+	logger.Info("added GitHub pull request %d to the merge queue in position %d with state %q", pull.Num, entry.Position, entry.State)
+	return nil
+}
+
+// lookupPullRequestId resolves a pull request number to the GraphQL node ID
+// that the merge queue mutations take.
+func (g *Client) lookupPullRequestId(pull models.PullRequest) (githubv4.ID, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ID githubv4.ID
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]any{
+		"owner":  githubv4.String(pull.BaseRepo.Owner),
+		"name":   githubv4.String(pull.BaseRepo.Name),
+		"number": githubv4.Int(pull.Num), // #nosec G115: integer overflow conversion int -> int32
+	}
+
+	if err := g.v4Client.Query(g.ctx, &query, variables); err != nil {
+		return nil, fmt.Errorf("getting pull request id from GraphQL: %w", err)
+	}
+	return query.Repository.PullRequest.ID, nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.
