@@ -677,8 +677,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHookRunner: runtime.DefaultPreWorkflowHookRunner{
 			OutputHandler: projectCmdOutputHandler,
 		},
-		CommitStatusUpdater: commitStatusUpdater,
-		Router:              router,
+		CommitStatusUpdater:        commitStatusUpdater,
+		Router:                     router,
+		FailOnPreWorkflowHookError: userConfig.FailOnPreWorkflowHookError,
 	}
 	postWorkflowHooksCommandRunner := &events.DefaultPostWorkflowHooksCommandRunner{
 		VCSClient:        vcsClient,
@@ -895,6 +896,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 		cancellationTracker,
+		preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner,
 		dbUpdater,
 		pullUpdater,
 		policyCheckCommandRunner,
@@ -916,6 +919,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 		cancellationTracker,
+		preWorkflowHooksCommandRunner,
+		postWorkflowHooksCommandRunner,
 		autoMerger,
 		pullUpdater,
 		dbUpdater,
