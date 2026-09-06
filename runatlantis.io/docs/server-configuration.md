@@ -1292,7 +1292,7 @@ signature verification is unaffected. Defaults to `false`.
 ::: tip
 This complements `--use-tf-plugin-cache`: the plugin cache lets a single
 Terraform process reuse an already-installed provider, while the provider cache
-proxy de-duplicates the *downloads* across many parallel processes.
+proxy de-duplicates the _downloads_ across many parallel processes.
 :::
 
 ### `--provider-cache-dir`

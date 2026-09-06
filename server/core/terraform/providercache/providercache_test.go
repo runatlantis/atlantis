@@ -115,10 +115,15 @@ func TestProxy_DownloadRewritesURLsThroughArtifactEndpoint(t *testing.T) {
 	var meta map[string]any
 	Ok(t, json.Unmarshal([]byte(body), &meta))
 
-	for _, field := range []string{"download_url", "shasums_url", "shasums_signature_url"} {
+	artifactBase := s.MirrorBaseURL() + "artifact/" + registryHost + "/hashicorp/null/3.2.1/linux/amd64/"
+	expected := map[string]string{
+		"download_url":          artifactBase + "archive",
+		"shasums_url":           artifactBase + "shasums",
+		"shasums_signature_url": artifactBase + "signature",
+	}
+	for field, want := range expected {
 		v, _ := meta[field].(string)
-		Assert(t, strings.HasPrefix(v, s.MirrorBaseURL()+"artifact?"),
-			"%s should be rewritten through the artifact endpoint, got %q", field, v)
+		Equals(t, want, v)
 		Assert(t, !strings.Contains(v, upstream.URL), "%s should not leak the upstream URL, got %q", field, v)
 	}
 	// Fields that must survive untouched.
@@ -130,7 +135,8 @@ func TestProxy_ArtifactCachesAndDedupes(t *testing.T) {
 	upstream, archiveHits := newUpstream(t)
 	s := newProxy(t, upstream)
 
-	// Get the rewritten (signed) download URL from the metadata endpoint.
+	// Get the rewritten (coordinate-addressed) download URL from the metadata
+	// endpoint.
 	_, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/3.2.1/download/linux/amd64")
 	var meta map[string]any
 	Ok(t, json.Unmarshal([]byte(body), &meta))
@@ -153,20 +159,46 @@ func TestProxy_ArtifactCachesAndDedupes(t *testing.T) {
 	Equals(t, int32(1), atomic.LoadInt32(archiveHits))
 }
 
-func TestProxy_ArtifactRejectsUnsignedURL(t *testing.T) {
+func TestProxy_ArtifactServesShasumsAndSignature(t *testing.T) {
 	upstream, _ := newUpstream(t)
 	s := newProxy(t, upstream)
 
-	// A caller cannot supply an arbitrary URL without a valid signature.
-	resp, _ := mustGet(t, s.MirrorBaseURL()+"artifact?url="+upstream.URL+"/archives/x.zip")
-	Equals(t, http.StatusForbidden, resp.StatusCode)
+	base := s.MirrorBaseURL() + "artifact/" + registryHost + "/hashicorp/null/3.2.1/linux/amd64/"
+	for kind, wantCT := range map[string]string{
+		"shasums":   "text/plain; charset=utf-8",
+		"signature": "application/octet-stream",
+	} {
+		resp, body := mustGet(t, base+kind)
+		Equals(t, http.StatusOK, resp.StatusCode)
+		Equals(t, zipBody, body)
+		Equals(t, wantCT, resp.Header.Get("Content-Type"))
+	}
+}
 
-	// Even a correctly signed but tampered URL is rejected.
-	signed, err := s.artifactURL(upstream.URL + "/archives/terraform-provider-null_3.2.1_linux_amd64.zip")
-	Ok(t, err)
-	tampered := strings.Replace(signed, "null_3.2.1", "null_9.9.9", 1)
-	resp2, _ := mustGet(t, tampered)
-	Equals(t, http.StatusForbidden, resp2.StatusCode)
+func TestProxy_ArtifactRejectsUnknownKind(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"artifact/"+registryHost+"/hashicorp/null/3.2.1/linux/amd64/bogus")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestProxy_ArtifactRejectsUnconfiguredRegistryHost(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	// The artifact endpoint is also bound to the configured registry allowlist.
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"artifact/evil.example.com/hashicorp/null/3.2.1/linux/amd64/archive")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestSegmentPattern(t *testing.T) {
+	for _, v := range []string{"hashicorp", "null", "3.2.1", "1.0.0-rc1", "linux", "amd64", "aws_v2"} {
+		Assert(t, segmentPattern.MatchString(v), "%q should be a valid segment", v)
+	}
+	for _, v := range []string{"", "..", "a/b", "a b", "-x", ".x", "a?b", strings.Repeat("a", 200)} {
+		Assert(t, !segmentPattern.MatchString(v), "%q should be an invalid segment", v)
+	}
 }
 
 func TestProxy_RejectsUnconfiguredRegistryHost(t *testing.T) {

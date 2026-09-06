@@ -25,24 +25,38 @@
 // GPG-signature verification of providers is unaffected: this proxy only
 // changes where the bytes come from, never what they are.
 //
+// # Trust boundaries
+//
+// The proxy makes outbound requests, so it is careful about what it will reach:
+//   - The registry host in every request path must be one of the operator-
+//     configured registries (allowedRegistry); requests for any other host are
+//     refused. So the registry it talks to is never attacker-controlled.
+//   - Every other path segment (provider namespace, type, version, os, arch)
+//     is validated against a strict character allowlist before it is used to
+//     build an upstream URL, so it cannot alter the request target.
+//   - The archive / checksum / signature files are fetched from the URLs the
+//     trusted registry itself returns in its download-metadata response, never
+//     from a URL supplied in the incoming request. Terraform only ever receives
+//     coordinate-based artifact URLs from this proxy.
+//
 // This mirrors the provider cache server that Terragrunt already ships.
 package providercache
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -59,10 +73,24 @@ const (
 	// not be exposed on a routable interface.
 	loopbackHost = "127.0.0.1"
 
-	// discoveryTimeout bounds service-discovery and metadata requests. Archive
+	// metadataTimeout bounds service-discovery and metadata requests. Archive
 	// downloads are deliberately not bounded by this because they can be large.
 	metadataTimeout = 30 * time.Second
 )
+
+// segmentPattern is the allowlist a provider coordinate path segment (namespace,
+// type, version, os, arch) must match before it is used to build an upstream
+// URL. It permits only unreserved provider-address characters and cannot
+// express a path-traversal or host-manipulation sequence.
+var segmentPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
+// artifactKinds maps the artifact path suffix to the field of the registry
+// download-metadata response that holds its real URL.
+var artifactKinds = map[string]string{
+	"archive":   "download_url",
+	"shasums":   "shasums_url",
+	"signature": "shasums_signature_url",
+}
 
 // Server is the caching provider proxy. Create it with New and start it with
 // Start.
@@ -78,11 +106,6 @@ type Server struct {
 	// block is generated for each.
 	registries []string
 
-	// hmacKey signs the rewritten artifact URLs so that the artifact endpoint
-	// only ever fetches URLs the proxy itself produced, preventing it from being
-	// abused as a generic outbound HTTP proxy (SSRF).
-	hmacKey []byte
-
 	metadataClient *http.Client
 	// downloadClient has no overall timeout because provider archives can be
 	// hundreds of megabytes; the transport still bounds connect/idle time.
@@ -91,6 +114,12 @@ type Server struct {
 	// disco caches the resolved providers.v1 base URL per registry host.
 	discoMu sync.Mutex
 	disco   map[string]string
+
+	// meta caches the download-metadata response per provider coordinate, so the
+	// three artifact fetches (archive, shasums, signature) for one platform share
+	// a single upstream metadata request.
+	metaMu sync.Mutex
+	meta   map[string]map[string]any
 
 	// sf de-duplicates concurrent downloads of the same artifact so a burst of
 	// parallel `terraform init` runs triggers a single upstream download.
@@ -114,11 +143,6 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		return nil, fmt.Errorf("provider cache dir %q is not a directory", cacheDir)
 	}
 
-	hmacKey := make([]byte, 32)
-	if _, err := rand.Read(hmacKey); err != nil {
-		return nil, fmt.Errorf("generating provider cache signing key: %w", err)
-	}
-
 	listener, err := net.Listen("tcp", net.JoinHostPort(loopbackHost, fmt.Sprintf("%d", port)))
 	if err != nil {
 		return nil, fmt.Errorf("listening on %s: %w", loopbackHost, err)
@@ -128,10 +152,10 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		log:            log,
 		cacheDir:       cacheDir,
 		registries:     registries,
-		hmacKey:        hmacKey,
 		metadataClient: &http.Client{Timeout: metadataTimeout},
 		downloadClient: &http.Client{},
 		disco:          make(map[string]string),
+		meta:           make(map[string]map[string]any),
 		listener:       listener,
 	}
 
@@ -140,8 +164,10 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 	// host so a single proxy can serve multiple registries.
 	router.HandleFunc("/{host}/v1/providers/{namespace}/{type}/versions", s.handleVersions).Methods(http.MethodGet)
 	router.HandleFunc("/{host}/v1/providers/{namespace}/{type}/{version}/download/{os}/{arch}", s.handleDownload).Methods(http.MethodGet)
-	// The rewritten archive/checksum download endpoint that actually caches.
-	router.HandleFunc("/artifact", s.handleArtifact).Methods(http.MethodGet)
+	// The coordinate-addressed artifact endpoint that actually caches. It carries
+	// no URL: the proxy re-resolves the real download location from the trusted
+	// registry's metadata response.
+	router.HandleFunc("/artifact/{host}/{namespace}/{type}/{version}/{os}/{arch}/{kind}", s.handleArtifact).Methods(http.MethodGet)
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }).Methods(http.MethodGet)
 
 	s.httpServer = &http.Server{
@@ -184,28 +210,10 @@ func (s *Server) Registries() []string {
 	return s.registries
 }
 
-// handleVersions proxies the "list available versions" registry endpoint. The
-// response contains no URLs, so it is passed straight through.
-func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	host, ok := s.allowedRegistry(vars["host"])
-	if !ok {
-		http.Error(w, "unknown registry host", http.StatusNotFound)
-		return
-	}
-	base, err := s.discover(r.Context(), host)
-	if err != nil {
-		s.proxyError(w, "service discovery", host, err)
-		return
-	}
-	upstream := base + url.PathEscape(vars["namespace"]) + "/" + url.PathEscape(vars["type"]) + "/versions"
-	s.pipe(w, r, upstream)
-}
-
 // allowedRegistry reports whether host is one of the configured registries and,
 // if so, returns the trusted, configured spelling of it. Returning the value
 // from the configured list (rather than the request-derived string) bounds all
-// outbound metadata requests to registries the operator explicitly enabled.
+// outbound requests to registries the operator explicitly enabled.
 func (s *Server) allowedRegistry(host string) (string, bool) {
 	for _, r := range s.registries {
 		if r == host {
@@ -215,14 +223,32 @@ func (s *Server) allowedRegistry(host string) (string, bool) {
 	return "", false
 }
 
-// downloadResponse is the subset of the "find a provider package" response we
-// need to rewrite. Unknown fields are preserved via the raw map so that
-// signing_keys, shasum, filename, protocols, etc. reach Terraform unchanged.
-func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	host, ok := s.allowedRegistry(vars["host"])
+// coordinates validates and returns the provider path segments common to the
+// download and artifact endpoints. ok is false (and an error already written) if
+// the host is not an allowed registry or any segment is malformed.
+func (s *Server) coordinates(w http.ResponseWriter, vars map[string]string, keys ...string) (host string, segs map[string]string, ok bool) {
+	host, ok = s.allowedRegistry(vars["host"])
 	if !ok {
 		http.Error(w, "unknown registry host", http.StatusNotFound)
+		return "", nil, false
+	}
+	segs = make(map[string]string, len(keys))
+	for _, k := range keys {
+		v := vars[k]
+		if !segmentPattern.MatchString(v) {
+			http.Error(w, "invalid provider "+k, http.StatusBadRequest)
+			return "", nil, false
+		}
+		segs[k] = v
+	}
+	return host, segs, true
+}
+
+// handleVersions proxies the "list available versions" registry endpoint. The
+// response contains no URLs, so it is passed straight through.
+func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request) {
+	host, segs, ok := s.coordinates(w, mux.Vars(r), "namespace", "type")
+	if !ok {
 		return
 	}
 	base, err := s.discover(r.Context(), host)
@@ -230,89 +256,163 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		s.proxyError(w, "service discovery", host, err)
 		return
 	}
-	upstream := base +
-		url.PathEscape(vars["namespace"]) + "/" +
-		url.PathEscape(vars["type"]) + "/" +
-		url.PathEscape(vars["version"]) + "/download/" +
-		url.PathEscape(vars["os"]) + "/" +
-		url.PathEscape(vars["arch"])
+	upstream := base + segs["namespace"] + "/" + segs["type"] + "/versions"
+	s.pipe(w, r, upstream)
+}
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
+// handleDownload proxies the "find a provider package" registry endpoint,
+// rewriting the archive/checksum/signature URLs so Terraform fetches them back
+// through the caching artifact endpoint. Every other field (signing_keys,
+// shasum, filename, protocols, ...) reaches Terraform unchanged.
+func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	host, segs, ok := s.coordinates(w, vars, "namespace", "type", "version", "os", "arch")
+	if !ok {
+		return
+	}
+
+	body, status, err := s.downloadMetadata(r.Context(), host, segs)
 	if err != nil {
-		s.proxyError(w, "building request", upstream, err)
+		s.proxyError(w, "download metadata", host, err)
 		return
 	}
-	resp, err := s.metadataClient.Do(req)
-	if err != nil {
-		s.proxyError(w, "download metadata", upstream, err)
-		return
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		s.relayStatus(w, resp)
+	if status != http.StatusOK {
+		http.Error(w, "registry returned status "+fmt.Sprint(status), status)
 		return
 	}
 
-	var body map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		s.proxyError(w, "decoding download metadata", upstream, err)
-		return
-	}
-
-	// Rewrite the three fields that point at externally-hosted files so that
-	// Terraform fetches them back through the caching artifact endpoint.
-	for _, field := range []string{"download_url", "shasums_url", "shasums_signature_url"} {
-		orig, ok := body[field].(string)
-		if !ok || orig == "" {
-			continue
+	// Rewrite the three externally-hosted file URLs to coordinate-addressed
+	// artifact endpoints. Terraform never sees the real upstream URL. Copy first
+	// so the cached metadata (which handleArtifact reads to find the real URLs)
+	// keeps its original values.
+	out := make(map[string]any, len(body))
+	maps.Copy(out, body)
+	for suffix, field := range artifactKinds {
+		if orig, ok := out[field].(string); ok && orig != "" {
+			out[field] = s.artifactURL(host, segs, suffix)
 		}
-		signed, err := s.artifactURL(orig)
-		if err != nil {
-			s.proxyError(w, "rewriting "+field, orig, err)
-			return
-		}
-		body[field] = signed
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(body); err != nil {
+	if err := json.NewEncoder(w).Encode(out); err != nil {
 		s.log.Err("provider cache: writing download response: %s", err)
 	}
 }
 
-// handleArtifact downloads (once) and caches the artifact identified by the
-// signed url query parameter, then serves it from disk.
+// handleArtifact serves (and caches on first request) the archive, checksum or
+// signature file for a provider coordinate. The real download location is taken
+// from the trusted registry's metadata response, not from the incoming request.
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
-	raw := r.URL.Query().Get("url")
-	sig := r.URL.Query().Get("sig")
-	if raw == "" || !s.validSignature(raw, sig) {
-		http.Error(w, "invalid or unsigned artifact url", http.StatusForbidden)
+	vars := mux.Vars(r)
+	host, segs, ok := s.coordinates(w, vars, "namespace", "type", "version", "os", "arch")
+	if !ok {
 		return
 	}
-	parsed, err := url.Parse(raw)
-	if err != nil || !allowedArtifactURL(parsed) {
-		http.Error(w, "artifact url must be https (or http to a loopback address)", http.StatusBadRequest)
+	field, ok := artifactKinds[vars["kind"]]
+	if !ok {
+		http.Error(w, "unknown artifact kind", http.StatusNotFound)
 		return
 	}
 
-	cachePath, err := s.ensureCached(r.Context(), raw)
+	body, status, err := s.downloadMetadata(r.Context(), host, segs)
 	if err != nil {
-		s.proxyError(w, "caching artifact", raw, err)
+		s.proxyError(w, "download metadata", host, err)
+		return
+	}
+	if status != http.StatusOK {
+		http.Error(w, "registry returned status "+fmt.Sprint(status), status)
+		return
+	}
+	// target originates from the registry's response, so it is not attacker-
+	// controlled data from the incoming request.
+	target, _ := body[field].(string)
+	if target == "" {
+		http.Error(w, "artifact not available", http.StatusNotFound)
+		return
+	}
+	if parsed, perr := url.Parse(target); perr != nil || !allowedArtifactURL(parsed) {
+		s.proxyError(w, "resolving artifact", host, fmt.Errorf("registry returned unusable url"))
 		return
 	}
 
-	// Give archives and checksum files sensible content types. http.ServeFile
-	// handles Range requests, caching headers and streaming from disk.
-	switch {
-	case strings.HasSuffix(parsed.Path, ".zip"):
+	cachePath, err := s.ensureCached(r.Context(), target)
+	if err != nil {
+		s.proxyError(w, "caching artifact", host, err)
+		return
+	}
+
+	switch vars["kind"] {
+	case "archive":
 		w.Header().Set("Content-Type", "application/zip")
-	case strings.HasSuffix(parsed.Path, ".sig"):
+	case "signature":
 		w.Header().Set("Content-Type", "application/octet-stream")
 	default:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	// #nosec G703 -- cachePath is filepath.Join(cacheDir, hex-sha256(url)); the file name is a fixed-length [0-9a-f] hash with no separators, so it cannot escape cacheDir.
 	http.ServeFile(w, r, cachePath)
+}
+
+// artifactURL builds the coordinate-addressed, proxy-local URL Terraform should
+// use to fetch an artifact of the given kind through the cache.
+func (s *Server) artifactURL(host string, segs map[string]string, kind string) string {
+	return s.MirrorBaseURL() + "artifact/" +
+		url.PathEscape(host) + "/" +
+		url.PathEscape(segs["namespace"]) + "/" +
+		url.PathEscape(segs["type"]) + "/" +
+		url.PathEscape(segs["version"]) + "/" +
+		url.PathEscape(segs["os"]) + "/" +
+		url.PathEscape(segs["arch"]) + "/" +
+		kind
+}
+
+// downloadMetadata fetches (and caches per coordinate) the registry's "find a
+// provider package" response. host is a trusted registry and every segment has
+// been validated, so the upstream URL target is not attacker-controlled.
+func (s *Server) downloadMetadata(ctx context.Context, host string, segs map[string]string) (map[string]any, int, error) {
+	key := host + "/" + segs["namespace"] + "/" + segs["type"] + "/" + segs["version"] + "/" + segs["os"] + "/" + segs["arch"]
+
+	s.metaMu.Lock()
+	cached, ok := s.meta[key]
+	s.metaMu.Unlock()
+	if ok {
+		return cached, http.StatusOK, nil
+	}
+
+	base, err := s.discover(ctx, host)
+	if err != nil {
+		return nil, 0, err
+	}
+	upstream := base +
+		segs["namespace"] + "/" +
+		segs["type"] + "/" +
+		segs["version"] + "/download/" +
+		segs["os"] + "/" +
+		segs["arch"]
+
+	// #nosec G704 -- host is an operator-configured registry (allowedRegistry) and every path segment is regexp-validated (segmentPattern), so the request target is not attacker-controlled.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, upstream, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	resp, err := s.metadataClient.Do(req) // #nosec G704 -- see above; upstream host is trusted and segments are validated.
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, resp.StatusCode, nil
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return nil, 0, err
+	}
+
+	s.metaMu.Lock()
+	s.meta[key] = body
+	s.metaMu.Unlock()
+	return body, http.StatusOK, nil
 }
 
 // ensureCached returns the on-disk path of the artifact at rawURL, downloading
@@ -341,19 +441,16 @@ func (s *Server) ensureCached(ctx context.Context, rawURL string) (string, error
 }
 
 // download streams rawURL to cachePath atomically (via a temp file + rename) so
-// a partial download can never be observed as a complete cache entry.
+// a partial download can never be observed as a complete cache entry. rawURL is
+// a location returned by a trusted registry (see handleArtifact), not a value
+// from the incoming request.
 func (s *Server) download(ctx context.Context, rawURL, cachePath string) error {
-	// rawURL only reaches here after handleArtifact has verified it carries a
-	// valid per-process HMAC signature (so it is a URL this proxy itself emitted
-	// from a trusted registry's response) and that its scheme is https or http to
-	// a loopback address. Fetching that registry-provided URL is this endpoint's
-	// entire purpose.
-	// #nosec G704 -- rawURL is HMAC-signed by this process and scheme-restricted (see handleArtifact).
+	// #nosec G704 -- rawURL is a location returned by a trusted registry's download-metadata response (see handleArtifact), not a value from the incoming request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := s.downloadClient.Do(req) // #nosec G704 -- see above; request target is a verified, self-signed URL.
+	resp, err := s.downloadClient.Do(req) // #nosec G704 -- see above; the URL comes from a trusted registry response and is scheme-checked.
 	if err != nil {
 		return err
 	}
@@ -415,11 +512,12 @@ func (s *Server) discoverUncached(ctx context.Context, host string) string {
 	fallback := fmt.Sprintf("https://%s/v1/providers/", host)
 
 	discoURL := fmt.Sprintf("https://%s/.well-known/terraform.json", host)
+	// #nosec G704 -- host is an operator-configured registry (allowedRegistry), not attacker-controlled.
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoURL, nil)
 	if err != nil {
 		return fallback
 	}
-	resp, err := s.metadataClient.Do(req)
+	resp, err := s.metadataClient.Do(req) // #nosec G704 -- see above; discovery host is a trusted, configured registry.
 	if err != nil {
 		s.log.Warn("provider cache: service discovery for %s failed (%s); using %s", host, err, fallback)
 		return fallback
@@ -450,14 +548,16 @@ func (s *Server) discoverUncached(ctx context.Context, host string) string {
 }
 
 // pipe forwards a GET to upstream and copies the status, content type and body
-// back to the client unchanged.
+// back to the client unchanged. upstream is built from a trusted registry host
+// and validated path segments.
 func (s *Server) pipe(w http.ResponseWriter, r *http.Request, upstream string) {
+	// #nosec G704 -- upstream is built from a trusted, configured registry host and regexp-validated path segments (see handleVersions), so it is not attacker-controlled.
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
 	if err != nil {
 		s.proxyError(w, "building request", upstream, err)
 		return
 	}
-	resp, err := s.metadataClient.Do(req)
+	resp, err := s.metadataClient.Do(req) // #nosec G704 -- see above; upstream host is trusted and segments are validated.
 	if err != nil {
 		s.proxyError(w, "proxying", upstream, err)
 		return
@@ -472,43 +572,9 @@ func (s *Server) pipe(w http.ResponseWriter, r *http.Request, upstream string) {
 	}
 }
 
-// relayStatus forwards a non-200 upstream response (status + body) to the
-// client so Terraform sees the registry's own error (e.g. 404 for an unknown
-// provider).
-func (s *Server) relayStatus(w http.ResponseWriter, resp *http.Response) {
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		w.Header().Set("Content-Type", ct)
-	}
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
-}
-
 func (s *Server) proxyError(w http.ResponseWriter, action, target string, err error) {
 	s.log.Err("provider cache: %s %s: %s", action, target, err)
 	http.Error(w, fmt.Sprintf("provider cache: %s failed", action), http.StatusBadGateway)
-}
-
-// artifactURL builds the signed, proxy-local URL Terraform should use to fetch
-// an upstream artifact through the cache.
-func (s *Server) artifactURL(upstream string) (string, error) {
-	if _, err := url.Parse(upstream); err != nil {
-		return "", err
-	}
-	q := url.Values{}
-	q.Set("url", upstream)
-	q.Set("sig", s.sign(upstream))
-	return s.MirrorBaseURL() + "artifact?" + q.Encode(), nil
-}
-
-func (s *Server) sign(v string) string {
-	mac := hmac.New(sha256.New, s.hmacKey)
-	mac.Write([]byte(v))
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
-func (s *Server) validSignature(v, sig string) bool {
-	expected := s.sign(v)
-	return hmac.Equal([]byte(expected), []byte(sig))
 }
 
 // cachePath is the on-disk location for a cached artifact. The file name is
@@ -524,8 +590,7 @@ func (s *Server) cachePath(rawURL string) string {
 
 // allowedArtifactURL reports whether the proxy is willing to fetch the given
 // URL. Real registries always hand out https download URLs; http is permitted
-// only for loopback addresses so that local test registries work. Combined with
-// the HMAC signature check this bounds where the artifact endpoint can reach.
+// only for loopback addresses so that local test registries work.
 func allowedArtifactURL(u *url.URL) bool {
 	switch u.Scheme {
 	case "https":
