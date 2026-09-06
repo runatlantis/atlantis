@@ -42,7 +42,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -74,8 +73,9 @@ type Server struct {
 	// are stored on disk, keyed by a hash of their upstream URL.
 	cacheDir string
 
-	// registries is the set of registry hostnames (e.g. "registry.terraform.io")
-	// that this proxy will serve. A CLI-config host block is generated for each.
+	// registries is the ordered set of registry hostnames (e.g.
+	// "registry.terraform.io") that this proxy will serve. A CLI-config host
+	// block is generated for each.
 	registries []string
 
 	// hmacKey signs the rewritten artifact URLs so that the artifact endpoint
@@ -188,13 +188,31 @@ func (s *Server) Registries() []string {
 // response contains no URLs, so it is passed straight through.
 func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	base, err := s.discover(r.Context(), vars["host"])
+	host, ok := s.allowedRegistry(vars["host"])
+	if !ok {
+		http.Error(w, "unknown registry host", http.StatusNotFound)
+		return
+	}
+	base, err := s.discover(r.Context(), host)
 	if err != nil {
-		s.proxyError(w, "service discovery", vars["host"], err)
+		s.proxyError(w, "service discovery", host, err)
 		return
 	}
 	upstream := base + url.PathEscape(vars["namespace"]) + "/" + url.PathEscape(vars["type"]) + "/versions"
 	s.pipe(w, r, upstream)
+}
+
+// allowedRegistry reports whether host is one of the configured registries and,
+// if so, returns the trusted, configured spelling of it. Returning the value
+// from the configured list (rather than the request-derived string) bounds all
+// outbound metadata requests to registries the operator explicitly enabled.
+func (s *Server) allowedRegistry(host string) (string, bool) {
+	for _, r := range s.registries {
+		if r == host {
+			return r, true
+		}
+	}
+	return "", false
 }
 
 // downloadResponse is the subset of the "find a provider package" response we
@@ -202,9 +220,14 @@ func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request) {
 // signing_keys, shasum, filename, protocols, etc. reach Terraform unchanged.
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	base, err := s.discover(r.Context(), vars["host"])
+	host, ok := s.allowedRegistry(vars["host"])
+	if !ok {
+		http.Error(w, "unknown registry host", http.StatusNotFound)
+		return
+	}
+	base, err := s.discover(r.Context(), host)
 	if err != nil {
-		s.proxyError(w, "service discovery", vars["host"], err)
+		s.proxyError(w, "service discovery", host, err)
 		return
 	}
 	upstream := base +
@@ -481,15 +504,14 @@ func (s *Server) validSignature(v, sig string) bool {
 	return hmac.Equal([]byte(expected), []byte(sig))
 }
 
-// cachePath is the on-disk location for a cached artifact. The name is a hash of
-// the upstream URL, preserving the archive extension so served files keep a
-// meaningful suffix.
+// cachePath is the on-disk location for a cached artifact. The file name is
+// solely the hex SHA-256 of the upstream URL: a fixed-length string over
+// [0-9a-f] with no separators or dots, so it cannot contain path-traversal
+// sequences regardless of the URL. filepath.Base is applied as a defensive
+// barrier to guarantee the name stays a single path element.
 func (s *Server) cachePath(rawURL string) string {
 	sum := sha256.Sum256([]byte(rawURL))
-	name := hex.EncodeToString(sum[:])
-	if ext := path.Ext(pathOnly(rawURL)); ext != "" {
-		name += ext
-	}
+	name := filepath.Base(hex.EncodeToString(sum[:]))
 	return filepath.Join(s.cacheDir, name)
 }
 
@@ -513,13 +535,4 @@ func allowedArtifactURL(u *url.URL) bool {
 	default:
 		return false
 	}
-}
-
-// pathOnly returns just the path component of a URL, used to derive a file
-// extension without query-string noise.
-func pathOnly(rawURL string) string {
-	if u, err := url.Parse(rawURL); err == nil {
-		return u.Path
-	}
-	return rawURL
 }

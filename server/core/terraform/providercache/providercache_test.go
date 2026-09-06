@@ -171,6 +171,16 @@ func TestProxy_ArtifactRejectsUnsignedURL(t *testing.T) {
 	Equals(t, http.StatusForbidden, resp2.StatusCode)
 }
 
+func TestProxy_RejectsUnconfiguredRegistryHost(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	// A host that is not in the configured registry allowlist must be refused
+	// so the proxy cannot be used to reach arbitrary hosts (SSRF).
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"evil.example.com/v1/providers/hashicorp/null/versions")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
 func TestAllowedArtifactURL(t *testing.T) {
 	cases := map[string]bool{
 		"https://releases.hashicorp.com/x.zip": true,
