@@ -65,8 +65,15 @@ func TestCreateAttachments_NoDescriptionWhenBodyEmpty(t *testing.T) {
 	Equals(t, false, ok)
 }
 
+func TestCreateAttachments_NoDescriptionWhenExplicitlyDisabled(t *testing.T) {
+	c := DefaultSlackClient{IncludeBody: false}
+	attachments := c.createAttachments(applyResultWithBody("a pull request description"))
+	_, ok := descriptionField(attachments)
+	Equals(t, false, ok)
+}
+
 func TestCreateAttachments_IncludesDescription(t *testing.T) {
-	c := DefaultSlackClient{}
+	c := DefaultSlackClient{IncludeBody: true}
 	attachments := c.createAttachments(applyResultWithBody("a pull request description"))
 	field, ok := descriptionField(attachments)
 	Assert(t, ok, "expected a Description field")
@@ -75,7 +82,7 @@ func TestCreateAttachments_IncludesDescription(t *testing.T) {
 }
 
 func TestCreateAttachments_TruncatesLongDescription(t *testing.T) {
-	c := DefaultSlackClient{}
+	c := DefaultSlackClient{IncludeBody: true}
 	attachments := c.createAttachments(applyResultWithBody(strings.Repeat("a", 1500)))
 	field, ok := descriptionField(attachments)
 	Assert(t, ok, "expected a Description field")
@@ -85,7 +92,7 @@ func TestCreateAttachments_TruncatesLongDescription(t *testing.T) {
 }
 
 func TestCreateAttachments_DoesNotTruncateAtLimit(t *testing.T) {
-	c := DefaultSlackClient{}
+	c := DefaultSlackClient{IncludeBody: true}
 	body := strings.Repeat("a", maxDescriptionGraphemeClusters)
 	attachments := c.createAttachments(applyResultWithBody(body))
 	field, ok := descriptionField(attachments)
@@ -94,7 +101,7 @@ func TestCreateAttachments_DoesNotTruncateAtLimit(t *testing.T) {
 }
 
 func TestCreateAttachments_TruncatesDescriptionAtGraphemeBoundary(t *testing.T) {
-	c := DefaultSlackClient{}
+	c := DefaultSlackClient{IncludeBody: true}
 	body := strings.Repeat("a", maxDescriptionGraphemeClusters-2) + "🧑‍💻bc"
 	attachments := c.createAttachments(applyResultWithBody(body))
 	field, ok := descriptionField(attachments)
