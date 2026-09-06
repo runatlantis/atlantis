@@ -311,6 +311,7 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
+	// #nosec G703 -- cachePath is filepath.Join(cacheDir, hex-sha256(url)); the file name is a fixed-length [0-9a-f] hash with no separators, so it cannot escape cacheDir.
 	http.ServeFile(w, r, cachePath)
 }
 
@@ -342,11 +343,17 @@ func (s *Server) ensureCached(ctx context.Context, rawURL string) (string, error
 // download streams rawURL to cachePath atomically (via a temp file + rename) so
 // a partial download can never be observed as a complete cache entry.
 func (s *Server) download(ctx context.Context, rawURL, cachePath string) error {
+	// rawURL only reaches here after handleArtifact has verified it carries a
+	// valid per-process HMAC signature (so it is a URL this proxy itself emitted
+	// from a trusted registry's response) and that its scheme is https or http to
+	// a loopback address. Fetching that registry-provided URL is this endpoint's
+	// entire purpose.
+	// #nosec G704 -- rawURL is HMAC-signed by this process and scheme-restricted (see handleArtifact).
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := s.downloadClient.Do(req)
+	resp, err := s.downloadClient.Do(req) // #nosec G704 -- see above; request target is a verified, self-signed URL.
 	if err != nil {
 		return err
 	}

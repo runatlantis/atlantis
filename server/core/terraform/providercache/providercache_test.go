@@ -140,15 +140,13 @@ func TestProxy_ArtifactCachesAndDedupes(t *testing.T) {
 	// runs would. Only a single upstream download should happen.
 	const n = 15
 	var wg sync.WaitGroup
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range n {
+		wg.Go(func() {
 			resp, got := mustGet(t, artifactURL)
 			Equals(t, http.StatusOK, resp.StatusCode)
 			Equals(t, zipBody, got)
 			Equals(t, "application/zip", resp.Header.Get("Content-Type"))
-		}()
+		})
 	}
 	wg.Wait()
 
