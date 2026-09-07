@@ -6,6 +6,7 @@ package events
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -69,49 +70,56 @@ func TestRunProjectCmdsParallel_CancelledBeforeExecution(t *testing.T) {
 // When the number of commands exceeds the pool size, commands queued behind a full pool
 // must be cancelled rather than left waiting indefinitely.
 //
-// The slow runner simulates real workload by sleeping, keeping the pool saturated long
-// enough for the cancellation to be registered before any worker finishes. Queued
-// commands (p3–p5) pick up the cancellation in the post-wg.Add() check.
+// Block both workers until cancellation, so queued commands must observe the
+// cancellation after acquiring a pool slot.
 func TestRunProjectCmdsParallel_CancelledWhileExceedingPoolSize(t *testing.T) {
-	const poolSize = 2
-	const totalCmds = 5
-	const expectedCancelled = totalCmds - poolSize
-
-	tracker := NewCancellationTracker()
-	pull := models.PullRequest{Num: 1}
-
-	slowRunner := func(_ command.ProjectContext) command.ProjectCommandOutput {
-		time.Sleep(500 * time.Millisecond)
-		return command.ProjectCommandOutput{}
-	}
-
-	cmds := []command.ProjectContext{
-		makeProjectContext("p1"),
-		makeProjectContext("p2"),
-		makeProjectContext("p3"),
-		makeProjectContext("p4"),
-		makeProjectContext("p5"),
-	}
-
-	go func() {
-		// Cancel after a short delay, while p1 and p2 are still running
-		// and p3–p5 are queued waiting for a free pool slot.
-		time.Sleep(50 * time.Millisecond)
-		tracker.Cancel(pull)
-	}()
-
-	result := runProjectCmdsParallel(cmds, slowRunner, poolSize, tracker, pull)
-
-	require.Len(t, result.ProjectResults, totalCmds)
-
-	cancelledCount := 0
-	for _, r := range result.ProjectResults {
-		if r.Error != nil {
-			assert.Contains(t, r.Error.Error(), "cancelled")
-			cancelledCount++
+	synctest.Test(t, func(t *testing.T) {
+		const poolSize = 2
+		tracker := NewCancellationTracker()
+		pull := models.PullRequest{Num: 1}
+		started := make(chan string, poolSize)
+		release := make(chan struct{})
+		cancelAndRelease := sync.OnceFunc(func() {
+			tracker.Cancel(pull)
+			close(release)
+		})
+		defer cancelAndRelease()
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{}
 		}
-	}
-	assert.Equal(t, expectedCancelled, cancelledCount)
+		cmds := []command.ProjectContext{
+			makeProjectContext("p1"),
+			makeProjectContext("p2"),
+			makeProjectContext("p3"),
+			makeProjectContext("p4"),
+			makeProjectContext("p5"),
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- runProjectCmdsParallel(cmds, runner, poolSize, tracker, pull)
+		}()
+
+		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
+		// Both workers and the submission waiting for a pool slot must be blocked.
+		synctest.Wait()
+		cancelAndRelease()
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, len(cmds))
+		var completed, cancelled []string
+		for _, r := range result.ProjectResults {
+			if r.Error != nil {
+				assert.Contains(t, r.Error.Error(), "cancelled")
+				cancelled = append(cancelled, r.ProjectName)
+			} else {
+				completed = append(completed, r.ProjectName)
+			}
+		}
+		assert.ElementsMatch(t, []string{"p1", "p2"}, completed)
+		assert.ElementsMatch(t, []string{"p3", "p4", "p5"}, cancelled)
+	})
 }
 
 func TestRunProjectCmds_Sequential(t *testing.T) {
