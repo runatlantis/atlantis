@@ -125,7 +125,7 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.7.1
+ENV GIT_LFS_VERSION=3.8.0
 
 # Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
 # SHA256 hashes are published in the release's signed sha256sums.asc file.
