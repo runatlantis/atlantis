@@ -593,10 +593,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ExecutableName: userConfig.ExecutableName,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
-		Locker:           lockingClient,
-		WorkingDir:       workingDir,
-		WorkingDirLocker: workingDirLocker,
-		Database:         database,
+		DataDir:           userConfig.DataDir,
+		LocalSharePlanDir: userConfig.SharePlanDir,
+		Locker:            lockingClient,
+		WorkingDir:        workingDir,
+		WorkingDirLocker:  workingDirLocker,
+		Database:          database,
 	}
 
 	eventParser := &events.EventParser{
@@ -907,6 +909,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
 	)
+
+	planCommandRunner.PlanReaper = deleteLockCommand
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,

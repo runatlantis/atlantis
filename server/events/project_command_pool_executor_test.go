@@ -447,3 +447,26 @@ func TestRunProjectCmdsWithCancellationTracker_UpdatesPullStatusBetweenGroups(t 
 	// Verify both projects ran
 	Assert(t, len(result.ProjectResults) == 2, "expected 2 project results, got %d", len(result.ProjectResults))
 }
+
+func TestRunOneProjectCmdCarriesGenerationAndSavedArtifact(t *testing.T) {
+	cmd := makeProjectContext("project")
+	cmd.PlanGeneration = "G1"
+	var digest string
+	cmd.SavedPlanHash = &digest
+	result := RunOneProjectCmd(func(ctx command.ProjectContext) command.ProjectCommandOutput {
+		*ctx.SavedPlanHash = "saved digest"
+		return successRunner(ctx)
+	}, cmd)
+	require.Equal(t, "G1", result.PlanGeneration)
+	require.Equal(t, "saved digest", result.ManagedPlanHash)
+}
+
+func TestCancelledProjectResultsCarryGeneration(t *testing.T) {
+	cmd := makeProjectContext("project")
+	cmd.PlanGeneration = "G1"
+	results := createCancelledResults([][]command.ProjectContext{{cmd}})
+	require.Len(t, results, 1)
+	require.Equal(t, "G1", results[0].PlanGeneration)
+	require.Error(t, results[0].Error)
+	require.Empty(t, results[0].ManagedPlanHash)
+}
