@@ -191,23 +191,23 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20260611-r0"
-# renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/curl versioning=loose
 ENV CURL_VERSION="8.22.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/git versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/git versioning=loose
 ENV GIT_VERSION="2.54.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/unzip versioning=loose
 ENV UNZIP_VERSION="6.0-r16"
-# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
 ENV BASH_VERSION="5.3.9-r1"
-# renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/openssh versioning=loose
 ENV OPENSSH_VERSION="10.3_p1-r1"
-# renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/dumb-init versioning=loose
 ENV DUMB_INIT_VERSION="1.2.5-r4"
-# renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/gcompat versioning=loose
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/coreutils versioning=loose
 ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
@@ -229,7 +229,7 @@ RUN apk add --no-cache \
 # etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
 # and verify share the same list; post-pass getcap|grep fails the build if
 # capabilities remain under that scope.
-# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/libcap versioning=loose
 ENV LIBCAP_VERSION="2.78-r0"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
