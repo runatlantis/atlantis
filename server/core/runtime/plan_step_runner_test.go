@@ -5,7 +5,6 @@ package runtime_test
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -53,15 +52,15 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		"-input=false",
 		"-refresh",
 		"-out",
-		fmt.Sprintf("%q", filepath.Join(tmpDir, "workspace.tfplan")),
+		filepath.Join(tmpDir, "workspace.tfplan"),
 		"-var",
-		"atlantis_user=\"username\"",
+		"atlantis_user=username",
 		"-var",
-		"atlantis_repo=\"owner/repo\"",
+		"atlantis_repo=owner/repo",
 		"-var",
-		"atlantis_repo_name=\"repo\"",
+		"atlantis_repo_name=repo",
 		"-var",
-		"atlantis_repo_owner=\"owner\"",
+		"atlantis_repo_owner=owner",
 		"-var",
 		"atlantis_pull_num=2",
 		"extra",
@@ -76,6 +75,7 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		User:               models.User{Username: "username"},
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,
@@ -86,6 +86,8 @@ func TestRun_AddsEnvVarFile(t *testing.T) {
 			Name:     "repo",
 		},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	When(terraform.RunCommandWithVersion(ctx, tmpDir, expPlanArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("output", nil)
 
 	output, err := s.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -114,6 +116,7 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		User:               models.User{Username: "username"},
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		ProjectName:        "projectname",
 		Pull: models.PullRequest{
@@ -125,21 +128,23 @@ func TestRun_UsesDiffPathForProject(t *testing.T) {
 			Name:     "repo",
 		},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	When(terraform.RunCommandWithVersion(ctx, "/path", []string{"workspace", "show"}, map[string]string(nil), tfDistribution, tfVersion, "workspace")).ThenReturn("workspace\n", nil)
 
 	expPlanArgs := []string{"plan",
 		"-input=false",
 		"-refresh",
 		"-out",
-		"\"/path/projectname-default.tfplan\"",
+		"/path/projectname-default.tfplan",
 		"-var",
-		"atlantis_user=\"username\"",
+		"atlantis_user=username",
 		"-var",
-		"atlantis_repo=\"owner/repo\"",
+		"atlantis_repo=owner/repo",
 		"-var",
-		"atlantis_repo_name=\"repo\"",
+		"atlantis_repo_name=repo",
 		"-var",
-		"atlantis_repo_owner=\"owner\"",
+		"atlantis_repo_owner=owner",
 		"-var",
 		"atlantis_pull_num=2",
 		"extra",
@@ -280,7 +285,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 		"-input=false",
 		"-refresh",
 		"-out",
-		fmt.Sprintf("%q", "/path/default.tfplan"),
+		"/path/default.tfplan",
 		"extra",
 		"args",
 		"comment",
@@ -323,6 +328,7 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
+				CommentArgs:        []string{"comment", "args"},
 				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
@@ -333,6 +339,8 @@ func TestRun_NoOptionalVarsIn012(t *testing.T) {
 					Name:     "repo",
 				},
 			}
+			// extra_args is marked expandable on the context the client receives.
+			ctx.ExpandableArgs = []string{"extra", "args"}
 
 			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
@@ -393,6 +401,7 @@ locally at this time.
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
+				CommentArgs:        []string{"comment", "args"},
 				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
@@ -403,6 +412,8 @@ locally at this time.
 					Name:     "repo",
 				},
 			}
+			// extra_args is marked expandable on the context the client receives.
+			ctx.ExpandableArgs = []string{"extra", "args"}
 			RegisterMockTestingT(t)
 			terraform := tfclientmocks.NewMockClient()
 			commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
@@ -428,15 +439,15 @@ locally at this time.
 				"-input=false",
 				"-refresh",
 				"-out",
-				fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+				filepath.Join(absProjectPath, "default.tfplan"),
 				"-var",
-				"atlantis_user=\"username\"",
+				"atlantis_user=username",
 				"-var",
-				"atlantis_repo=\"owner/repo\"",
+				"atlantis_repo=owner/repo",
 				"-var",
-				"atlantis_repo_name=\"repo\"",
+				"atlantis_repo_name=repo",
 				"-var",
-				"atlantis_repo_owner=\"owner\"",
+				"atlantis_repo_owner=owner",
 				"-var",
 				"atlantis_pull_num=2",
 				"extra",
@@ -449,7 +460,7 @@ locally at this time.
 					"-input=false",
 					"-refresh",
 					"-out",
-					fmt.Sprintf("%q", filepath.Join(absProjectPath, "default.tfplan")),
+					filepath.Join(absProjectPath, "default.tfplan"),
 					"extra",
 					"args",
 					"comment",
@@ -566,7 +577,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 		"-input=false",
 		"-refresh",
 		"-out",
-		fmt.Sprintf("%q", "/path/default.tfplan"),
+		"/path/default.tfplan",
 		"extra",
 		"args",
 		"comment",
@@ -612,6 +623,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 				Workspace:          "default",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
+				CommentArgs:        []string{"comment", "args"},
 				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
@@ -623,6 +635,8 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 				},
 				TerraformDistribution: &c.tfDistribution,
 			}
+			// extra_args is marked expandable on the context the client receives.
+			ctx.ExpandableArgs = []string{"extra", "args"}
 
 			output, err := s.Run(ctx, []string{"extra", "args"}, "/path", map[string]string(nil))
 			Ok(t, err)
@@ -795,3 +809,42 @@ var remotePlanOutputSensitiveMasked = `Terraform will perform the following acti
         EOT
     }
 Plan: 0 to add, 1 to change, 0 to destroy.`
+
+// Comment args reach Terraform as an argument vector, so they must be the raw
+// values the user typed. EscapedCommentArgs carries a backslash before every
+// byte for embedding in shell source, and those backslashes would otherwise be
+// passed to Terraform literally.
+func TestRun_UsesRawCommentArgsNotEscaped(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("0.15.0")
+	logger := logging.NewNoopLogger(t)
+	commitStatusUpdater := runtimemocks.NewMockStatusUpdater()
+	asyncTfExec := runtimemocks.NewMockAsyncTFExec()
+	s := runtime.NewPlanStepRunner(terraform, tfDistribution, tfVersion, commitStatusUpdater, asyncTfExec, &runtime.LocalPlanStore{})
+
+	ctx := command.ProjectContext{
+		Log:                logger,
+		Workspace:          "default",
+		RepoRelDir:         ".",
+		User:               models.User{Username: "username"},
+		CommentArgs:        []string{"-lock=false", "-target=module.foo"},
+		EscapedCommentArgs: []string{`\-\l\o\c\k\=\f\a\l\s\e`, `\-\t\a\r\g\e\t\=\m\o\d\u\l\e\.\f\o\o`},
+		Pull:               models.PullRequest{Num: 2},
+		BaseRepo:           models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"},
+	}
+
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](),
+		Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("output", nil)
+
+	_, err := s.Run(ctx, nil, "/path", map[string]string(nil))
+	Ok(t, err)
+
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path",
+		[]string{"plan", "-input=false", "-refresh", "-out", "/path/default.tfplan",
+			"-lock=false", "-target=module.foo"},
+		map[string]string(nil), tfDistribution, tfVersion, "default")
+}

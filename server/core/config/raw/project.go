@@ -138,14 +138,10 @@ func (p Project) Validate() error {
 
 	validWorkspace := func(value any) error {
 		strPtr := value.(*string)
-		if strPtr == nil || *strPtr == "" {
+		if strPtr == nil {
 			return nil
 		}
-		ws := *strPtr
-		if strings.Contains(ws, "..") || strings.ContainsAny(ws, "/\\") {
-			return errors.New("cannot contain '..', '/', or '\\'")
-		}
-		return nil
+		return valid.ValidateWorkspaceName(*strPtr)
 	}
 
 	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'

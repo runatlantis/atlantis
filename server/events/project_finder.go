@@ -143,6 +143,13 @@ func (p *DefaultProjectFinder) DetermineWorkspaceFromHCL(log logging.SimpleLoggi
 		}
 
 		if len(workspace) > 0 {
+			// The workspace name comes from pull-request controlled HCL and
+			// ends up as a Terraform command argument and as a path component,
+			// so it has to pass the same check as a workspace configured in
+			// atlantis.yaml or named in a comment.
+			if err := valid.ValidateWorkspaceName(workspace); err != nil {
+				return "", fmt.Errorf("invalid Terraform Cloud workspace name %q in %q: %w", workspace, name, err)
+			}
 			log.Debug("found configured Terraform Cloud workspace with name %q", workspace)
 			return workspace, nil
 		}

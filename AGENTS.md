@@ -7,6 +7,8 @@
 **Key Info:** ~35MB repo, server + CLI app, E2E tests with Playwright, integration tests with Terraform
 
 > **AI Usage Policy:** Before contributing with AI assistance, read the [AI_USAGE_POLICY.md](AI_USAGE_POLICY.md).
+>
+> **Change proposals:** Before implementing user-visible or architectural changes, follow [the issue and ADR process](docs/adr/README.md#which-process-should-i-use).
 
 ## Build & Test (Always from repo root)
 

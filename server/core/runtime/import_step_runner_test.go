@@ -19,7 +19,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestImportStepRunner_Run_Success(t *testing.T) {
+func TestImportStepRunner_Run_UsesRawCommentArgs(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	tmpDir := t.TempDir()
@@ -29,7 +29,8 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
-		EscapedCommentArgs: []string{"-var", "foo=bar", "addr", "id"},
+		CommentArgs:        []string{"-var", "foo=bar", "addr", "id"},
+		EscapedCommentArgs: []string{`\-\v\a\r`, `\f\o\o\=\b\a\r`, `\a\d\d\r`, `\i\d`},
 		Workspace:          workspace,
 	}
 
@@ -61,6 +62,7 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"-var", "foo=bar", "addr", "id"},
 		EscapedCommentArgs: []string{"-var", "foo=bar", "addr", "id"},
 		Workspace:          workspace,
 	}
@@ -101,6 +103,7 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	projTFDistribution := "opentofu"
 	context := command.ProjectContext{
 		Log:                   logger,
+		CommentArgs:           []string{"-var", "foo=bar", "addr", "id"},
 		EscapedCommentArgs:    []string{"-var", "foo=bar", "addr", "id"},
 		Workspace:             workspace,
 		TerraformDistribution: &projTFDistribution,
