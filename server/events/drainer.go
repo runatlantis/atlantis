@@ -62,5 +62,8 @@ func (d *Drainer) ShutdownBlocking() {
 }
 
 func (d *Drainer) GetStatus() DrainStatus {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	return d.status
 }
