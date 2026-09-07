@@ -13,6 +13,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/runatlantis/atlantis/server/events/command"
+
 	"github.com/runatlantis/atlantis/server/logging"
 
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -119,7 +121,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	}
 
 	// Delete pull from DB.
-	if err := p.Database.DeletePullStatus(pull); err != nil {
+	if err := p.Database.DeletePullStatus(pull, command.NoClaim{}); err != nil {
 		logger.Err("deleting pull from db: %s", err)
 	}
 

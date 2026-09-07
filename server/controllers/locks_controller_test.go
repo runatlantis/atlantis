@@ -289,7 +289,7 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	locker := locking.NewClient(database)
 	held, err := locker.TryLock(project, "workspace", pull, models.User{})
 	Ok(t, err)
-	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: "path", Workspace: "workspace", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: "path", Workspace: "workspace", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	workingDir := mocks2.NewMockWorkingDir()
 	lc := controllers.LocksController{

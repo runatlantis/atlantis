@@ -403,8 +403,8 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 
 // UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
-	_, err := r.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus, mode command.PublicationWriteMode) error {
+	_, err := r.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		return db.UpdateLegacyProjectStatus(current, pull, workspace, repoRelDir, newStatus)
 	})
 	if errors.Is(err, db.ErrPlanStatusNotFound) {
@@ -426,20 +426,33 @@ func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, er
 	return pullStatus, nil
 }
 
-func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
+func (r *RedisDB) DeletePullStatus(pull models.PullRequest, mode command.PublicationWriteMode) error {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return err
 	}
-	err = r.deletePull(key)
+	leaseKey, err := publicationLeaseKey(key)
+	if err != nil {
+		return err
+	}
+	owner, err := publicationWriteOwner(mode)
+	if err != nil {
+		return err
+	}
+	opCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	changed, err := r.client.Eval(opCtx, publicationWriteGuardLua+`redis.call("DEL", KEYS[1], KEYS[2]); return 1`, []string{key, leaseKey}, "", "", "", owner).Int()
+	if err == nil && changed < 0 {
+		return publicationWriteError(changed)
+	}
 	if err != nil {
 		return fmt.Errorf("db transaction failed: %w", err)
 	}
 	return nil
 }
 
-func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
-	return r.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult, mode command.PublicationWriteMode) (models.PullStatus, error) {
+	return r.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		return db.MergePullResults(current, pull, newResults)
 	})
 }
@@ -457,14 +470,6 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, val, err)
 	}
 	return &p, nil
-}
-
-func (r *RedisDB) deletePull(key string) error {
-	err := r.client.Del(ctx, key).Err()
-	if err != nil {
-		return fmt.Errorf("DB Transaction failed: %w", err)
-	}
-	return nil
 }
 
 func (r *RedisDB) lockKey(p models.Project, workspace string) string {

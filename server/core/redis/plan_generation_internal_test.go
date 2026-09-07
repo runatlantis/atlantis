@@ -50,7 +50,7 @@ func TestPlanGeneration_ConcurrentAdmissionRetriesCAS(t *testing.T) {
 	results := make(chan error, 2)
 	for _, name := range []string{"a", "b"} {
 		go func() {
-			_, err := database.BeginPlanGeneration(pull, name, []command.ProjectContext{{Workspace: "default", RepoRelDir: ".", ProjectName: name}}, false)
+			_, err := database.BeginPlanGeneration(pull, name, []command.ProjectContext{{Workspace: "default", RepoRelDir: ".", ProjectName: name}}, false, command.NoClaim{})
 			results <- err
 		}()
 	}
