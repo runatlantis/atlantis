@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # what distro is the image being built for
-ARG ALPINE_TAG=3.23.5@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+ARG ALPINE_TAG=3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
 ARG GOLANG_TAG=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
@@ -191,24 +191,24 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/ca-certificates versioning=loose
 ENV CA_CERTIFICATES_VERSION="20260611-r0"
-# renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/curl versioning=loose
 ENV CURL_VERSION="8.22.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/git versioning=loose
-ENV GIT_VERSION="2.52.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/git versioning=loose
+ENV GIT_VERSION="2.54.0-r0"
+# renovate: datasource=repology depName=alpine_3_24/unzip versioning=loose
 ENV UNZIP_VERSION="6.0-r16"
-# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BASH_VERSION="5.3.3-r1"
-# renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
-ENV OPENSSH_VERSION="10.2_p1-r0"
-# renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
-ENV DUMB_INIT_VERSION="1.2.5-r3"
-# renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
+ENV BASH_VERSION="5.3.9-r1"
+# renovate: datasource=repology depName=alpine_3_24/openssh versioning=loose
+ENV OPENSSH_VERSION="10.3_p1-r1"
+# renovate: datasource=repology depName=alpine_3_24/dumb-init versioning=loose
+ENV DUMB_INIT_VERSION="1.2.5-r4"
+# renovate: datasource=repology depName=alpine_3_24/gcompat versioning=loose
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
-ENV COREUTILS_ENV_VERSION="9.8-r1"
+# renovate: datasource=repology depName=alpine_3_24/coreutils versioning=loose
+ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -229,7 +229,7 @@ RUN apk add --no-cache \
 # etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
 # and verify share the same list; post-pass getcap|grep fails the build if
 # capabilities remain under that scope.
-# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+# renovate: datasource=repology depName=alpine_3_24/libcap versioning=loose
 ENV LIBCAP_VERSION="2.78-r0"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
