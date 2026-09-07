@@ -59,6 +59,21 @@ func (mr *MockDatabaseMockRecorder) AcquirePublicationLease(arg0, arg1, arg2, ar
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquirePublicationLease", reflect.TypeOf((*MockDatabase)(nil).AcquirePublicationLease), arg0, arg1, arg2, arg3)
 }
 
+// BeginApplyExecution mocks base method.
+func (m *MockDatabase) BeginApplyExecution(pull models.PullRequest, projects []command.ProjectContext, executionID string, mode command.PublicationWriteMode) (models.PullStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeginApplyExecution", pull, projects, executionID, mode)
+	ret0, _ := ret[0].(models.PullStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BeginApplyExecution indicates an expected call of BeginApplyExecution.
+func (mr *MockDatabaseMockRecorder) BeginApplyExecution(pull, projects, executionID, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginApplyExecution", reflect.TypeOf((*MockDatabase)(nil).BeginApplyExecution), pull, projects, executionID, mode)
+}
+
 // BeginPlanGeneration mocks base method.
 func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool, mode command.PublicationWriteMode) (db.PlanGenerationBeginResult, error) {
 	m.ctrl.T.Helper()

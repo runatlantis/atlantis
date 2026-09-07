@@ -18,6 +18,7 @@ import (
 type Database interface {
 	PublicationLeaseStore
 	PublicationRecoveryStore
+	BeginApplyExecution(pull models.PullRequest, projects []command.ProjectContext, executionID string, mode command.PublicationWriteMode) (models.PullStatus, error)
 	BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool, mode command.PublicationWriteMode) (PlanGenerationBeginResult, error)
 	DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus, mode command.PublicationWriteMode) (bool, error)
 

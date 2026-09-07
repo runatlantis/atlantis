@@ -16,9 +16,13 @@ import (
 )
 
 var (
+	ErrApplyAlreadyStarted      = errors.New("this plan has an unresolved apply execution; confirm the previous execution has stopped, reconcile the state, discard the plan, and run `atlantis plan` before another apply")
 	ErrPlanStatusNotFound       = errors.New("no durable plan status exists")
 	ErrPlanGenerationSuperseded = errors.New("plan generation was superseded; run `atlantis plan` again")
 	ErrPlanGenerationInvalid    = errors.New("invalid plan generation transition")
+	// ErrApplyExecutionSuperseded commits only the release of an obsolete
+	// reservation whose owner confirms no apply steps were attempted.
+	ErrApplyExecutionSuperseded = fmt.Errorf("%w: pre-execution reservation released", ErrPlanGenerationSuperseded)
 	ErrApplyExecutionAmbiguous  = errors.New("apply changed infrastructure after its plan generation was superseded; reconcile the state and run `atlantis plan` before applying again")
 )
 
@@ -73,11 +77,22 @@ func BeginPlanGeneration(current *models.PullStatus, pull models.PullRequest, ge
 		project := models.ProjectStatus{Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, Status: models.ErroredPlanStatus, PlanGeneration: generation, PlanGenerationActive: true, ManagedPlan: ctx.RequiresAtlantisManagedPlanFile || slices.ContainsFunc(ctx.Steps, func(step valid.Step) bool { return step.StepName == "plan" || step.StepName == "apply" })}
 		if old := findProject(result.Previous, key); old != nil {
 			project.PolicyStatus = slices.Clone(old.PolicyStatus)
+			project.ApplyExecutionID = old.ApplyExecutionID
 		}
 		if old := findProject(result.Projects, key); old != nil {
 			*old = project
 		} else {
 			result.Projects = append(result.Projects, project)
+		}
+	}
+	// Removing a project must not erase an unresolved infrastructure operation.
+	// Ordinary no-project updates retain their existing cleanup behavior.
+	for _, old := range result.Previous {
+		if old.ApplyExecutionID != "" {
+			kept := findProject(result.Projects, projectIdentity{old.Workspace, old.RepoRelDir, old.ProjectName})
+			if kept == nil || kept.ApplyExecutionID != old.ApplyExecutionID {
+				return PlanGenerationBeginResult{}, ErrApplyAlreadyStarted
+			}
 		}
 	}
 	return result, nil
@@ -117,7 +132,7 @@ func MergePullResults(current *models.PullStatus, pull models.PullRequest, resul
 			}
 		}
 	}
-	if current != nil && !samePullIdentity(current.Pull, pull) && slices.ContainsFunc(current.Projects, func(p models.ProjectStatus) bool { return p.PlanGeneration != "" }) {
+	if current != nil && !samePullIdentity(current.Pull, pull) && slices.ContainsFunc(current.Projects, func(p models.ProjectStatus) bool { return p.PlanGeneration != "" || p.ApplyExecutionID != "" }) {
 		conflict = ErrPlanGenerationSuperseded
 	}
 	for _, result := range results {
@@ -133,8 +148,15 @@ func MergePullResults(current *models.PullStatus, pull models.PullRequest, resul
 			next = *current
 			next.Projects = slices.Clone(current.Projects)
 		}
-		ambiguous := false
+		ambiguous, released := false, false
 		for _, result := range results {
+			if result.Command == command.Apply && result.ApplyExecutionID != "" && !result.ApplyAttempted && !result.ApplyExecuted && result.ApplySuccess == "" && (result.Error != nil || result.Failure != "") {
+				if project := findProject(next.Projects, resultIdentity(result)); project != nil && project.ApplyExecutionID == result.ApplyExecutionID {
+					project.ApplyExecutionID = ""
+					released = true
+				}
+			}
+
 			if result.Command != command.Apply || (!result.ApplyExecuted && (result.ApplySuccess == "" || result.Error != nil || result.Failure != "")) {
 				continue
 			}
@@ -144,16 +166,28 @@ func MergePullResults(current *models.PullStatus, pull models.PullRequest, resul
 				project.PlanGenerationActive = false
 				project.AcceptedPlanGeneration = ""
 				project.ManagedPlanHash = ""
+				if result.ApplyExecutionID != "" && project.ApplyExecutionID == result.ApplyExecutionID {
+					project.ApplyExecutionID = ""
+				}
 			}
 		}
 		if ambiguous {
 			return next, ErrApplyExecutionAmbiguous
+		}
+		if released {
+			return next, ErrApplyExecutionSuperseded
 		}
 		return next, conflict
 	}
 
 	for _, result := range results {
 		key := resultIdentity(result)
+		if result.ExcludeFromPlanStatus && result.Command == command.Apply {
+			// A directory error precedes execution: release only this admission,
+			// without replacing the existing status with an errored apply row.
+			findProject(next.Projects, key).ApplyExecutionID = ""
+			continue
+		}
 		if result.ExcludeFromPlanStatus {
 			next.Projects = slices.DeleteFunc(next.Projects, func(project models.ProjectStatus) bool {
 				return projectIdentity{project.Workspace, project.RepoRelDir, project.ProjectName} == key
@@ -191,6 +225,14 @@ func MergePullResults(current *models.PullStatus, pull models.PullRequest, resul
 			project.AcceptedPlanGeneration = result.PlanGeneration
 			if project.ManagedPlan {
 				project.ManagedPlanHash = result.ManagedPlanHash
+			}
+		}
+		if result.Command == command.Apply && result.ApplyExecutionID != "" {
+			if (result.Error == nil && result.Failure == "") || !result.ApplyAttempted {
+				project.ApplyExecutionID = ""
+			} else {
+				project.AcceptedPlanGeneration = ""
+				project.ManagedPlanHash = ""
 			}
 		}
 		mergePolicies(project, result.PolicyStatus())
@@ -231,12 +273,21 @@ func samePullIdentity(left, right models.PullRequest) bool {
 }
 
 func validateGenerationResult(current *models.PullStatus, pull models.PullRequest, result command.ProjectResult) error {
-	if result.ExcludeFromPlanStatus && (result.Command != command.Plan || result.Error == nil || result.PlanGeneration == "") {
-		return fmt.Errorf("%w: invalid excluded plan result", ErrPlanGenerationInvalid)
+	if result.ExcludeFromPlanStatus {
+		planError := result.Command == command.Plan && result.PlanGeneration != ""
+		applyError := result.Command == command.Apply && result.ApplyExecutionID != "" && !result.ApplyAttempted && !result.ApplyExecuted
+		if result.Error == nil || (!planError && !applyError) {
+			return fmt.Errorf("%w: invalid excluded result", ErrPlanGenerationInvalid)
+		}
 	}
 	var prior *models.ProjectStatus
 	if current != nil {
 		prior = findProject(current.Projects, resultIdentity(result))
+	}
+	if result.Command == command.Apply && (result.ApplyExecutionID != "" || (prior != nil && prior.ApplyExecutionID != "")) {
+		if prior == nil || result.ApplyExecutionID == "" || prior.ApplyExecutionID != result.ApplyExecutionID || prior.Status == models.DiscardedPlanStatus {
+			return ErrApplyAlreadyStarted
+		}
 	}
 	if result.PlanGeneration == "" && (prior == nil || prior.PlanGeneration == "") {
 		return nil
@@ -245,6 +296,9 @@ func validateGenerationResult(current *models.PullStatus, pull models.PullReques
 		return ErrPlanGenerationSuperseded
 	}
 	if result.Command == command.Plan {
+		if result.ExcludeFromPlanStatus && prior.ApplyExecutionID != "" {
+			return ErrApplyAlreadyStarted
+		}
 		if !prior.PlanGenerationActive || prior.AcceptedPlanGeneration != "" || prior.Status != models.ErroredPlanStatus {
 			return fmt.Errorf("%w: %w: generation already completed", ErrPlanGenerationInvalid, ErrPlanGenerationSuperseded)
 		}
@@ -277,6 +331,7 @@ func validateGenerationResult(current *models.PullStatus, pull models.PullReques
 func LegacyPullStatus(data []byte) bool {
 	var projection struct {
 		Projects []struct {
+			ApplyExecutionID       string
 			PlanGeneration         string
 			AcceptedPlanGeneration string
 			ManagedPlanHash        string
@@ -287,7 +342,7 @@ func LegacyPullStatus(data []byte) bool {
 		return false
 	}
 	for _, project := range projection.Projects {
-		if project.PlanGeneration != "" || project.AcceptedPlanGeneration != "" || project.ManagedPlanHash != "" || project.PlanGenerationActive {
+		if project.PlanGeneration != "" || project.AcceptedPlanGeneration != "" || project.ManagedPlanHash != "" || project.PlanGenerationActive || project.ApplyExecutionID != "" {
 			return false
 		}
 	}
@@ -307,7 +362,7 @@ func UpdateLegacyProjectStatus(current *models.PullStatus, pull models.PullReque
 		if project.Workspace != workspace || project.RepoRelDir != dir {
 			continue
 		}
-		if project.PlanGeneration != "" {
+		if project.PlanGeneration != "" || project.ApplyExecutionID != "" {
 			return *current, ErrPlanGenerationSuperseded
 		}
 		if project.Status != models.AppliedPlanStatus || status != models.DiscardedPlanStatus {
@@ -328,7 +383,7 @@ func DiscardPlanStatus(current *models.PullStatus, pull models.PullRequest, expe
 	next := *current
 	next.Projects = slices.Clone(current.Projects)
 	project := findProject(next.Projects, projectIdentity{expected.Workspace, expected.RepoRelDir, expected.ProjectName})
-	if project == nil || project.PlanGeneration != expected.PlanGeneration || project.AcceptedPlanGeneration != expected.AcceptedPlanGeneration || project.ManagedPlanHash != expected.ManagedPlanHash || project.Status != expected.Status || project.PlanGenerationActive != expected.PlanGenerationActive || project.ManagedPlan != expected.ManagedPlan {
+	if project == nil || project.PlanGeneration != expected.PlanGeneration || project.AcceptedPlanGeneration != expected.AcceptedPlanGeneration || project.ManagedPlanHash != expected.ManagedPlanHash || project.Status != expected.Status || project.PlanGenerationActive != expected.PlanGenerationActive || project.ManagedPlan != expected.ManagedPlan || project.ApplyExecutionID != expected.ApplyExecutionID {
 		return *current, false, ErrPlanGenerationSuperseded
 	}
 	if project.Status == models.AppliedPlanStatus {
@@ -338,5 +393,45 @@ func DiscardPlanStatus(current *models.PullStatus, pull models.PullRequest, expe
 	project.PlanGenerationActive = false
 	project.AcceptedPlanGeneration = ""
 	project.ManagedPlanHash = ""
+	project.ApplyExecutionID = ""
 	return next, true, nil
+}
+
+// BeginApplyExecution consumes the right to start this plan before Terraform
+// runs. A crash requires reconciliation and exact discard before replanning,
+// not automatic replay of an operation that may have changed infrastructure.
+func BeginApplyExecution(current *models.PullStatus, pull models.PullRequest, projects []command.ProjectContext, executionID string) (models.PullStatus, error) {
+	if executionID == "" || current == nil || !samePullIdentity(current.Pull, pull) {
+		return models.PullStatus{}, ErrPlanGenerationSuperseded
+	}
+	next := *current
+	next.Projects = slices.Clone(current.Projects)
+	for _, ctx := range projects {
+		project := findProject(next.Projects, projectIdentity{ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName})
+		if project == nil || project.PlanGenerationActive || project.PlanGeneration != ctx.PlanGeneration {
+			return models.PullStatus{}, ErrPlanGenerationSuperseded
+		}
+		if project.ApplyExecutionID != "" {
+			return models.PullStatus{}, ErrApplyAlreadyStarted
+		}
+		if project.PlanGeneration != "" {
+			if project.AcceptedPlanGeneration != project.PlanGeneration || project.AcceptedPlanGeneration != ctx.AcceptedPlanGeneration {
+				return models.PullStatus{}, ErrPlanGenerationSuperseded
+			}
+			managed := project.ManagedPlan || ctx.RequiresAtlantisManagedPlanFile || slices.ContainsFunc(ctx.Steps, func(step valid.Step) bool { return step.StepName == "apply" })
+			if managed {
+				digest, err := hex.DecodeString(project.ManagedPlanHash)
+				if err != nil || len(digest) != 32 || project.ManagedPlanHash != ctx.ExpectedPlanHash {
+					return models.PullStatus{}, ErrPlanGenerationSuperseded
+				}
+			}
+		}
+		switch project.Status {
+		case models.PlannedPlanStatus, models.PlannedNoChangesPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus:
+		default:
+			return models.PullStatus{}, ErrPlanGenerationSuperseded
+		}
+		project.ApplyExecutionID = executionID
+	}
+	return next, nil
 }

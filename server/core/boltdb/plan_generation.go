@@ -43,7 +43,7 @@ func (b *BoltDB) mutatePullStatus(pull models.PullRequest, mode command.Publicat
 			current = nil
 		}
 		next, transitionErr = transition(current)
-		if transitionErr != nil && !errors.Is(transitionErr, db.ErrApplyExecutionAmbiguous) {
+		if transitionErr != nil && !errors.Is(transitionErr, db.ErrApplyExecutionAmbiguous) && !errors.Is(transitionErr, db.ErrApplyExecutionSuperseded) {
 			return transitionErr
 		}
 		if current == nil && transitionErr != nil {
@@ -65,4 +65,10 @@ func (b *BoltDB) DiscardPlanStatus(pull models.PullRequest, expected models.Proj
 		return next, transitionErr
 	})
 	return discarded, err
+}
+
+func (b *BoltDB) BeginApplyExecution(pull models.PullRequest, projects []command.ProjectContext, executionID string, mode command.PublicationWriteMode) (models.PullStatus, error) {
+	return b.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.BeginApplyExecution(current, pull, projects, executionID)
+	})
 }
