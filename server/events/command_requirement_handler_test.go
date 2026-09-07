@@ -101,7 +101,7 @@ func TestAggregateApplyRequirements_ValidatePlanProject(t *testing.T) {
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDivergedFromPullHead(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
-			wantFailure: "Default branch must be rebased onto pull request before running plan.",
+			wantFailure: "Pull request branch must include the latest default branch commit before running plan.",
 			wantErr:     assert.NoError,
 		},
 	}
@@ -229,7 +229,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 					Any[models.PullRequest](),
 				)).ThenReturn(true)
 			},
-			wantFailure: "Default branch must be rebased onto pull request before running apply.",
+			wantFailure: "Pull request branch must include the latest default branch commit before running apply.",
 			wantErr:     assert.NoError,
 		},
 		{
@@ -363,7 +363,7 @@ func TestAggregateApplyRequirements_ValidateApplyProject(t *testing.T) {
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
-			wantFailure: "Default branch must be rebased onto pull request before running apply.",
+			wantFailure: "Pull request branch must include the latest default branch commit before running apply.",
 			wantErr:     assert.NoError,
 		},
 	}
@@ -879,7 +879,7 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 			setup: func(workingDir *mocks.MockWorkingDir) {
 				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(true)
 			},
-			wantFailure: "Default branch must be rebased onto pull request before running import.",
+			wantFailure: "Pull request branch must include the latest default branch commit before running import.",
 			wantErr:     assert.NoError,
 		},
 	}
