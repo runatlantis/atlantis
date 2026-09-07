@@ -196,19 +196,19 @@ ENV CA_CERTIFICATES_VERSION="20260611-r0"
 # renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
 ENV CURL_VERSION="8.22.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/git versioning=loose
-ENV GIT_VERSION="2.52.0-r0"
+ENV GIT_VERSION="2.54.0-r0"
 # renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
 ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BASH_VERSION="5.3.3-r1"
+ENV BASH_VERSION="5.3.9-r1"
 # renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
-ENV OPENSSH_VERSION="10.2_p1-r0"
+ENV OPENSSH_VERSION="10.3_p1-r1"
 # renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
-ENV DUMB_INIT_VERSION="1.2.5-r3"
+ENV DUMB_INIT_VERSION="1.2.5-r4"
 # renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
 ENV GCOMPAT_VERSION="1.1.0-r4"
 # renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
-ENV COREUTILS_ENV_VERSION="9.8-r1"
+ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
