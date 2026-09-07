@@ -56,11 +56,11 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// This runner is itself a built-in apply step, irrespective of the
 	// context's managed-plan classification. Never fall back to mutable bytes.
 	if ctx.ExpectedPlanHash == "" {
-		return "", fmt.Errorf("expected plan hash is missing; run `atlantis plan` before apply")
+		return "", fmt.Errorf("expected plan hash is missing for dir %q workspace %q project %q; run `atlantis plan` before apply", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
 	}
 	digest := sha256.Sum256(contents)
 	if hex.EncodeToString(digest[:]) != ctx.ExpectedPlanHash {
-		return "", fmt.Errorf("plan file changed; run `atlantis plan` before apply")
+		return "", fmt.Errorf("plan file changed for dir %q workspace %q project %q; run `atlantis plan` before apply", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
 	}
 
 	ctx.Log.Info("starting apply")
@@ -287,9 +287,10 @@ To resolve, re-run plan.`
 var waitingForConfirmation = `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.`
 
-// Keep execution copies outside the checkout so custom steps still see the
-// convention PLANFILE. A private directory also prevents accidental discovery
-// by repository globs. Terraform consumes only these verified bytes.
+// Keep execution copies in a private temporary directory without changing the
+// convention PLANFILE exposed to custom steps. The system temporary directory
+// is normally outside the checkout, but operators can override it with TMPDIR.
+// Terraform consumes only these verified bytes.
 func writeValidatedPlanSnapshot(contents []byte) (string, func(), error) {
 	dir, err := os.MkdirTemp("", "atlantis-validated-plan-")
 	if err != nil {

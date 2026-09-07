@@ -717,7 +717,7 @@ func TestApplyStepRunner_SnapshotIntegrity(t *testing.T) {
 			planPath := filepath.Join(dir, "default.tfplan")
 			original := []byte("accepted plan bytes")
 			Ok(t, os.WriteFile(planPath, original, 0600))
-			ctx := command.ProjectContext{Workspace: "default", Log: logging.NewNoopLogger(t), ExpectedPlanHash: expectedPlanHash(t, planPath)}
+			ctx := command.ProjectContext{Workspace: "default", RepoRelDir: "infra", ProjectName: "", Log: logging.NewNoopLogger(t), ExpectedPlanHash: expectedPlanHash(t, planPath)}
 			if scenario == "missing hash" {
 				ctx.ExpectedPlanHash = ""
 			}
@@ -747,6 +747,7 @@ func TestApplyStepRunner_SnapshotIntegrity(t *testing.T) {
 			_, err := runner.Run(ctx, nil, dir, nil)
 			if scenario == "missing hash" || scenario == "mutated before snapshot" {
 				Assert(t, err != nil && !called, "must reject before execution: %v", err)
+				Assert(t, strings.Contains(err.Error(), `dir "infra" workspace "default" project ""`), "error must identify the project: %v", err)
 				_, statErr := os.Stat(planPath)
 				Ok(t, statErr)
 			} else {
