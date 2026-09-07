@@ -2131,6 +2131,70 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 }
 
+// Leftover replica .tfplan must not fail apply after PlanStore.Load overwrites it.
+func TestProjectCommandRunner_ApplyUsesLoadedPlanHashWhenLocalFileDiffers(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockApply := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	leftoverContents := []byte("leftover-local-plan")
+	storedContents := []byte("external-store-plan")
+	store := &restoringPlanStore{contents: storedContents}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           mockApply,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+		PlanStore:                 store,
+	}
+	ctx := command.ProjectContext{
+		Log:              logging.NewNoopLogger(t),
+		CommandName:      command.Apply,
+		Steps:            valid.DefaultApplyStage.Steps,
+		Workspace:        "default",
+		RepoRelDir:       ".",
+		ProjectName:      "projA",
+		ExpectedPlanHash: planHashForContent(leftoverContents),
+		Pull: models.PullRequest{
+			Num:        1,
+			HeadCommit: "abc123",
+			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"},
+		},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{Workspace: "default", RepoRelDir: ".", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, leftoverContents, 0600))
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockApply.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
+		ThenReturn("apply ok", nil)
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "", res.Failure)
+	Equals(t, "apply ok", res.ApplySuccess)
+	Assert(t, store.loadCalls == 1, "expected one PlanStore.Load, got %d", store.loadCalls)
+	got, readErr := os.ReadFile(planPath)
+	Ok(t, readErr)
+	Equals(t, string(storedContents), string(got))
+	mockApply.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
 func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCommandStart(t *testing.T) {
 	RegisterMockTestingT(t)
 	mockApply := mocks.NewMockStepRunner()
