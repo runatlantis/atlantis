@@ -613,7 +613,6 @@ func (p *PlanCommandRunner) publishPlanStatuses(projectCmds []command.ProjectCon
 func (p *PlanCommandRunner) planPersistenceFailed(ctx *command.Context, cmd PullCommand, projectCmds []command.ProjectContext, result command.Result, err error) {
 	ctx.CommandHasErrors = true
 	result.Error = fmt.Errorf("persisting plan results: %w; restore database connectivity and run `atlantis plan` again before applying", err)
-	ctx.Log.Err("%s", result.Error)
 	p.publishPlanStatuses(projectCmds, result, models.FailedCommitStatus)
 	for _, name := range []command.Name{command.Plan, command.Apply} {
 		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, name); statusErr != nil {
