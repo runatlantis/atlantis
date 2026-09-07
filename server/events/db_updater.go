@@ -5,6 +5,7 @@ package events
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -27,7 +28,7 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 		}
 	}
 
-	if staleApplyResultForCurrentPull(pull, results) {
+	if staleApplyResultForCurrentPull(pull, results) && !slices.ContainsFunc(results, func(r command.ProjectResult) bool { return r.PlanGeneration != "" }) {
 		pullStatus, err := c.Database.GetPullStatus(pull)
 		if err != nil {
 			return models.PullStatus{}, err
@@ -46,9 +47,13 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 	for _, r := range results {
 		if _, ok := r.Error.(DirNotExistErr); ok {
 			ctx.Log.Debug("ignoring error result from project at dir %q workspace %q because it is dir not exist error", r.RepoRelDir, r.Workspace)
+			if r.Command == command.Plan && r.PlanGeneration != "" {
+				r.ExcludeFromPlanStatus = true
+				filtered = append(filtered, r)
+			}
 			continue
 		}
-		if errors.Is(r.Error, errStaleCommandHead) {
+		if r.PlanGeneration == "" && errors.Is(r.Error, errStaleCommandHead) {
 			ctx.Log.Debug("ignoring stale command-head result from project at dir %q workspace %q project %q", r.RepoRelDir, r.Workspace, r.ProjectName)
 			skippedStaleCommandHead = true
 			continue

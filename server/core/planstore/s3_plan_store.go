@@ -4,6 +4,7 @@
 package planstore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -113,6 +114,9 @@ func NewS3PlanStoreWithClient(client S3Client, bucket, prefix string, logger log
 
 // Save uploads the plan file at planPath to S3.
 func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" {
+		return s.saveGeneration(ctx, planPath)
+	}
 	key := s.s3Key(ctx, planPath)
 
 	f, err := os.Open(planPath)
@@ -147,6 +151,9 @@ func (s *S3PlanStore) Save(ctx command.ProjectContext, planPath string) error {
 
 // Load downloads the plan file from S3 and writes it to planPath.
 func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" {
+		return s.loadGeneration(ctx, planPath)
+	}
 	key := s.s3Key(ctx, planPath)
 
 	opCtx, opCancel := s3Ctx()
@@ -200,6 +207,22 @@ func (s *S3PlanStore) Load(ctx command.ProjectContext, planPath string) error {
 
 // Remove deletes the plan file from S3 and locally.
 func (s *S3PlanStore) Remove(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" {
+		if ctx.AcceptedPlanGeneration == "" {
+			// Failed generations have no accepted object to reap.
+			return (&LocalPlanStore{}).Remove(ctx, planPath)
+		}
+		key, err := s.generationKey(ctx, planPath, ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash)
+		if err != nil {
+			return err
+		}
+		opCtx, cancel := s3Ctx()
+		defer cancel()
+		if _, err := s.client.DeleteObject(opCtx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}); err != nil {
+			return fmt.Errorf("removing accepted generation plan from S3: %w", err)
+		}
+		return (&LocalPlanStore{}).Remove(ctx, planPath)
+	}
 	key := s.s3Key(ctx, planPath)
 
 	opCtx, opCancel := s3Ctx()
@@ -370,6 +393,14 @@ func (s *S3PlanStore) downloadObjectTo(key, localPath string) error {
 
 // DeleteForPull removes all plan objects stored under the pull request prefix in S3.
 func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
+	return s.deleteForPull(owner, repo, pullNum, true)
+}
+
+func (s *S3PlanStore) DeleteLegacyForPull(owner, repo string, pullNum int) error {
+	return s.deleteForPull(owner, repo, pullNum, false)
+}
+
+func (s *S3PlanStore) deleteForPull(owner, repo string, pullNum int, includeGenerations bool) error {
 	prefixParts := []string{}
 	if s.prefix != "" {
 		prefixParts = append(prefixParts, s.prefix)
@@ -393,6 +424,9 @@ func (s *S3PlanStore) DeleteForPull(owner, repo string, pullNum int) error {
 
 		for _, obj := range resp.Contents {
 			key := aws.ToString(obj.Key)
+			if !includeGenerations && strings.Contains(key, generationSuffix+"/") {
+				continue
+			}
 			delCtx, delCancel := s3Ctx()
 			_, err := s.client.DeleteObject(delCtx, &s3.DeleteObjectInput{
 				Bucket: aws.String(s.bucket),
@@ -473,3 +507,69 @@ var _ PlanStore = (*S3PlanStore)(nil)
 
 // Ensure the real S3 client satisfies our interface at compile time.
 var _ S3Client = (*s3.Client)(nil)
+
+// Generation objects are addressed by durable acceptance, never by a mutable
+// canonical key or by the PR head alone (two plans may have the same head).
+func (s *S3PlanStore) generationKey(ctx command.ProjectContext, planPath, generation, digest string) (string, error) {
+	if _, err := generationPath(planPath, generation, digest); err != nil {
+		return "", err
+	}
+	return s.s3Key(ctx, canonicalPlanPath(ctx, planPath)) + generationSuffix + "/" + generation + "/" + digest, nil
+}
+
+func (s *S3PlanStore) saveGeneration(ctx command.ProjectContext, planPath string) error {
+	contents, digest, identityPath, err := readGenerationPlan(ctx, planPath)
+	if err != nil {
+		return err
+	}
+	key, err := s.generationKey(ctx, planPath, ctx.PlanGeneration, digest)
+	if err != nil {
+		return err
+	}
+	opCtx, cancel := s3Ctx()
+	defer cancel()
+	_, err = s.client.PutObject(opCtx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(key), Body: bytes.NewReader(contents),
+		Metadata: map[string]string{"head-commit": ctx.Pull.HeadCommit},
+	})
+	if err != nil {
+		return fmt.Errorf("saving generation plan to S3: %w", err)
+	}
+	if err := replacePlan(identityPath, contents); err != nil {
+		return fmt.Errorf("saving local generation plan: %w", err)
+	}
+	if err := replacePlan(canonicalPlanPath(ctx, planPath), contents); err != nil {
+		return fmt.Errorf("publishing convention plan file: %w", err)
+	}
+	*ctx.SavedPlanHash = digest
+	return nil
+}
+
+func (s *S3PlanStore) loadGeneration(ctx command.ProjectContext, planPath string) error {
+	key, err := s.generationKey(ctx, planPath, ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash)
+	if err != nil {
+		return err
+	}
+	opCtx, cancel := s3Ctx()
+	defer cancel()
+	resp, err := s.client.GetObject(opCtx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		return fmt.Errorf("loading accepted generation plan from S3: %w", err)
+	}
+	defer resp.Body.Close()
+	contents, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading accepted generation plan from S3: %w", err)
+	}
+	if err := verifyGenerationPlan(contents, ctx.ExpectedPlanHash); err != nil {
+		return err
+	}
+	identityPath, err := generationPath(planPath, ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash)
+	if err != nil {
+		return err
+	}
+	if err := replacePlan(identityPath, contents); err != nil {
+		return err
+	}
+	return replacePlan(planPath, contents)
+}

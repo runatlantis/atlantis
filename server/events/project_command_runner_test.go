@@ -20,6 +20,7 @@ import (
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	tmocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
@@ -5486,4 +5487,47 @@ func TestDefaultProjectCommandRunner_ApplyManagedPlanFileStillRequired(t *testin
 	Assert(t, res.Error != nil, "expected missing managed plan file to be rejected")
 	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+func TestProjectCommandRunner_ObsoleteExecutedApplyInvalidatesNewAcceptance(t *testing.T) {
+	storage := newTestBoltDB(t)
+	repoDir := t.TempDir()
+	runner, applyStep := newNonPRAPIApplyRunner(t, repoDir)
+	runner.ApplyPlanValidator = &events.DefaultApplyPlanValidator{PullStatusFetcher: storage}
+	ctx := command.ProjectContext{
+		CommandName: command.Apply, Steps: valid.DefaultApplyStage.Steps,
+		Workspace: "default", RepoRelDir: ".", ProjectName: "project", Log: logging.NewNoopLogger(t),
+		Pull: models.PullRequest{Num: 1, HeadCommit: "same-head", BaseRepo: models.Repo{FullName: "owner/repo"}},
+	}
+	store := &runtime.LocalPlanStore{}
+	runner.PlanStore = store
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	accept := func(generation, contents string) string {
+		_, err := storage.BeginPlanGeneration(ctx.Pull, generation, []command.ProjectContext{ctx}, false)
+		Ok(t, err)
+		writeCtx := ctx
+		writeCtx.PlanGeneration = generation
+		writeCtx.SavedPlanHash = new(string)
+		Ok(t, os.WriteFile(planPath, []byte(contents), 0o600))
+		Ok(t, store.Save(writeCtx, planPath))
+		_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: generation, ManagedPlanHash: *writeCtx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+		Ok(t, err)
+		return *writeCtx.SavedPlanHash
+	}
+	ctx.ExpectedPlanHash = accept("G1", "first plan")
+	ctx.PlanGeneration, ctx.AcceptedPlanGeneration = "G1", "G1"
+	When(applyStep.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).Then(func([]Param) ReturnValues {
+		accept("G2", "newer plan")
+		return ReturnValues{"infrastructure changed", nil}
+	})
+	output := runner.Apply(ctx)
+	Assert(t, output.ApplyExecuted, "successful execution must survive the final validation error")
+	Assert(t, errors.Is(output.Error, db.ErrApplyExecutionAmbiguous), "expected explicit reconciliation error: %v", output.Error)
+	_, err := storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Apply, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ProjectCommandOutput: output}})
+	Assert(t, errors.Is(err, db.ErrApplyExecutionAmbiguous), "obsolete execution must invalidate acceptance: %v", err)
+	status, err := storage.GetPullStatus(ctx.Pull)
+	Ok(t, err)
+	Equals(t, models.ErroredApplyStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].AcceptedPlanGeneration)
+	Equals(t, "", status.Projects[0].ManagedPlanHash)
 }

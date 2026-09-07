@@ -13,6 +13,7 @@ import (
 	reflect "reflect"
 	time "time"
 
+	db "github.com/runatlantis/atlantis/server/core/db"
 	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	gomock "go.uber.org/mock/gomock"
@@ -40,6 +41,21 @@ func NewMockDatabase(ctrl *gomock.Controller) *MockDatabase {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
+}
+
+// BeginPlanGeneration mocks base method.
+func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool) (db.PlanGenerationBeginResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeginPlanGeneration", pull, generation, projects, replace)
+	ret0, _ := ret[0].(db.PlanGenerationBeginResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BeginPlanGeneration indicates an expected call of BeginPlanGeneration.
+func (mr *MockDatabaseMockRecorder) BeginPlanGeneration(pull, generation, projects, replace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGeneration), pull, generation, projects, replace)
 }
 
 // CheckCommandLock mocks base method.
@@ -83,6 +99,21 @@ func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
 func (mr *MockDatabaseMockRecorder) DeletePullStatus(pull any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePullStatus", reflect.TypeOf((*MockDatabase)(nil).DeletePullStatus), pull)
+}
+
+// DiscardPlanStatus mocks base method.
+func (m *MockDatabase) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DiscardPlanStatus", pull, expected)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DiscardPlanStatus indicates an expected call of DiscardPlanStatus.
+func (mr *MockDatabaseMockRecorder) DiscardPlanStatus(pull, expected any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardPlanStatus", reflect.TypeOf((*MockDatabase)(nil).DiscardPlanStatus), pull, expected)
 }
 
 // GetLock mocks base method.
