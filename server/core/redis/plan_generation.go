@@ -75,7 +75,7 @@ func (r *RedisDB) mutatePullStatus(pull models.PullRequest, mode command.Publica
 			}
 		}
 		next, transitionErr := transition(current)
-		if transitionErr != nil && !errors.Is(transitionErr, db.ErrApplyExecutionAmbiguous) {
+		if transitionErr != nil && !errors.Is(transitionErr, db.ErrApplyExecutionAmbiguous) && !errors.Is(transitionErr, db.ErrApplyExecutionSuperseded) {
 			return models.PullStatus{}, transitionErr
 		}
 		if current == nil && transitionErr != nil {
@@ -107,4 +107,10 @@ func (r *RedisDB) DiscardPlanStatus(pull models.PullRequest, expected models.Pro
 		return next, transitionErr
 	})
 	return discarded, err
+}
+
+func (r *RedisDB) BeginApplyExecution(pull models.PullRequest, projects []command.ProjectContext, executionID string, mode command.PublicationWriteMode) (models.PullStatus, error) {
+	return r.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.BeginApplyExecution(current, pull, projects, executionID)
+	})
 }

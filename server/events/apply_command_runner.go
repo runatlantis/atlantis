@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/google/uuid"
+
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -224,7 +226,19 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	if len(projectCmds) > 0 {
-		a.updatePendingCommitStatus(ctx)
+		if err := a.updatePendingCommitStatus(ctx); err != nil {
+			ctx.CommandHasErrors = true
+			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("starting apply: %w", err)})
+			return
+		}
+		if err := a.beginDurableApply(ctx, projectCmds); err != nil {
+			ctx.CommandHasErrors = true
+			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
+				ctx.Log.Warn("unable to update commit status: %s", statusErr)
+			}
+			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("starting apply: %w", err)})
+			return
+		}
 	}
 
 	preApplyPullStatus := ctx.PullStatus
@@ -421,14 +435,15 @@ func (a *ApplyCommandRunner) refreshLivePullIdentity(ctx *command.Context) (mode
 	return livePull, nil
 }
 
-func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) {
+func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) error {
 	if a.silenceVCSStatusNoProjects {
 		ctx.Log.Debug("silence enabled - not setting pending VCS status")
-		return
+		return nil
 	}
 	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
+		return err
 	}
+	return nil
 }
 
 func (a *ApplyCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
@@ -505,7 +520,7 @@ func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentC
 		changed := false
 		for i := range result.ProjectResults {
 			project := &result.ProjectResults[i]
-			if project.PlanGeneration != "" && project.ApplyExecuted {
+			if (project.PlanGeneration != "" || project.ApplyExecutionID != "") && project.ApplyExecuted {
 				project.Error = fmt.Errorf("%w: %w", db.ErrApplyExecutionAmbiguous, failure)
 				changed = true
 			}
@@ -521,4 +536,31 @@ func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentC
 		ctx.Log.Warn("updating apply failure status %v", err)
 	}
 	a.pullUpdater.updatePull(ctx, cmd, result)
+}
+
+// beginDurableApply consumes generation-backed plans before executing any steps.
+// Legacy plans and the request-local API flow retain their existing behavior.
+// Publication ordering across replicas is a separate coordinator concern.
+func (a *ApplyCommandRunner) beginDurableApply(ctx *command.Context, projects []command.ProjectContext) error {
+	var durable []command.ProjectContext
+	for _, project := range projects {
+		if project.PlanGeneration != "" {
+			durable = append(durable, project)
+		}
+	}
+	if len(durable) == 0 {
+		return nil
+	}
+	executionID := uuid.NewString()
+	status, err := a.dbUpdater.Database.BeginApplyExecution(ctx.Pull, durable, executionID, command.NoClaim{})
+	if err != nil {
+		return err
+	}
+	ctx.PullStatus = &status
+	for i := range projects {
+		if projects[i].PlanGeneration != "" {
+			projects[i].ApplyExecutionID = executionID
+		}
+	}
+	return nil
 }
