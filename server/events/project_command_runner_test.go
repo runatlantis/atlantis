@@ -2173,7 +2173,7 @@ func TestProjectCommandRunner_ApplyUsesLoadedPlanHashWhenLocalFileDiffers(t *tes
 			},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, leftoverContents, 0600))
