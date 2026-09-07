@@ -216,6 +216,13 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
 
+	// A generation can become obsolete while Terraform fails. Defer every
+	// terminal plan status until completion has checked durable identity.
+	if commandName == command.Plan && ctx.PlanGeneration != "" {
+		p.streamFailureToJob(ctx, result)
+		return result
+	}
+
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
 			ctx.Log.Err("updating project PR status: %s", err)
@@ -1264,16 +1271,17 @@ func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 
 func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
 	for _, res := range result.ProjectResults {
-		if res.Command != command.Plan || res.PlanSuccess == nil || res.Error != nil {
+		if res.Command != command.Plan {
+			continue
+		}
+		if res.PlanGeneration == "" && (res.PlanSuccess == nil || res.Error != nil || res.Failure != "") {
 			continue
 		}
 		projectStatus := status
-		if res.Failure != "" {
-			if !result.PlansDeleted || res.PlanGeneration == "" {
-				continue
-			}
+		if res.Error != nil || res.Failure != "" {
 			projectStatus = models.FailedCommitStatus
 		}
+
 		for _, ctx := range projectCmds {
 			if ctx.CommandName != command.Plan || ctx.RepoRelDir != res.RepoRelDir || ctx.Workspace != res.Workspace || ctx.ProjectName != res.ProjectName || ctx.SuppressVCSStatus {
 				continue

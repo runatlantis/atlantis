@@ -535,10 +535,10 @@ func (s *S3PlanStore) saveGeneration(ctx command.ProjectContext, planPath string
 	if err != nil {
 		return fmt.Errorf("saving generation plan to S3: %w", err)
 	}
-	if err := replacePlan(identityPath, contents); err != nil {
+	if err := replacePlan(canonicalPlanPath(ctx, planPath), identityPath, contents); err != nil {
 		return fmt.Errorf("saving local generation plan: %w", err)
 	}
-	if err := replacePlan(canonicalPlanPath(ctx, planPath), contents); err != nil {
+	if err := replacePlan(canonicalPlanPath(ctx, planPath), canonicalPlanPath(ctx, planPath), contents); err != nil {
 		return fmt.Errorf("publishing convention plan file: %w", err)
 	}
 	*ctx.SavedPlanHash = digest
@@ -568,8 +568,8 @@ func (s *S3PlanStore) loadGeneration(ctx command.ProjectContext, planPath string
 	if err != nil {
 		return err
 	}
-	if err := replacePlan(identityPath, contents); err != nil {
+	if err := replacePlan(canonicalPlanPath(ctx, planPath), identityPath, contents); err != nil {
 		return err
 	}
-	return replacePlan(planPath, contents)
+	return replacePlan(planPath, planPath, contents)
 }

@@ -338,3 +338,36 @@ func TestDeleteLocksByPull_ReapsHostedPlanWithoutLocalLock(t *testing.T) {
 	_, err = os.Stat(path)
 	Assert(t, os.IsNotExist(err), "convention cache must also be reaped")
 }
+
+func TestDeleteLock_ReapsSeparatePlanDirectory(t *testing.T) {
+	RegisterMockTestingT(t)
+	root := t.TempDir()
+	shared := t.TempDir()
+	storage, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { Ok(t, storage.Close()) })
+	pull := models.PullRequest{Num: 1, HeadCommit: "current", BaseRepo: models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}}
+	ctx := command.ProjectContext{BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "path", ProjectName: "selected", LocalSharePlanDir: shared, RequiresAtlantisManagedPlanFile: true, PlanGeneration: "G1", SavedPlanHash: new(string)}
+	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true)
+	Ok(t, err)
+	store := &planstore.LocalPlanStore{}
+	path := runtime.GetPlanFilePath(ctx, filepath.Join(planstore.PullDir(root, pull.BaseRepo.FullName, pull.Num), ctx.Workspace, ctx.RepoRelDir))
+	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	Ok(t, os.WriteFile(path, []byte("accepted plan"), 0o600))
+	Ok(t, store.Save(ctx, path))
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	Ok(t, err)
+	locker := locking.NewClient(storage)
+	oldLockPull := pull
+	oldLockPull.HeadCommit = "older lock head"
+	held, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.Workspace, oldLockPull, models.User{})
+	Ok(t, err)
+	deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: storage, WorkingDir: events.NewMockWorkingDir(), PlanStore: store, DataDir: root, LocalSharePlanDir: shared}
+	_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey)
+	Ok(t, err)
+	Assert(t, discarded, "exact current status may be discarded even if lock metadata is older")
+	ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash = "G1", *ctx.SavedPlanHash
+	Assert(t, store.Load(ctx, path) != nil, "discard must reap the accepted artifact")
+	_, err = os.Stat(path)
+	Assert(t, os.IsNotExist(err), "convention cache must also be reaped")
+}

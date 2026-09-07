@@ -1950,6 +1950,9 @@ func (p *DefaultProjectCommandBuilder) restoreAcceptedGenerationPlans(ctx *comma
 		if err != nil {
 			return err
 		}
+		if err := runtime.EnsurePlanFileDir(projectCtx, filepath.Join(repoDir, project.RepoRelDir)); err != nil {
+			return err
+		}
 		if err := p.PlanStore.Load(projectCtx, planPath); err != nil {
 			return fmt.Errorf("restoring accepted plan for dir %q workspace %q project %q: %w", project.RepoRelDir, project.Workspace, project.ProjectName, err)
 		}
