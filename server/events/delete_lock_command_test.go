@@ -78,7 +78,7 @@ func TestDeleteLock_Success(t *testing.T) {
 		db.Close()
 	})
 	Ok(t, err)
-	_, err = db.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: workspace, RepoRelDir: path, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = db.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: workspace, RepoRelDir: path, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	dlc := events.DefaultDeleteLockCommand{
 		Locker:           l,
@@ -222,7 +222,7 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 
 type rejectDiscardDatabase struct{ db.Database }
 
-func (d rejectDiscardDatabase) DiscardPlanStatus(models.PullRequest, models.ProjectStatus) (bool, error) {
+func (d rejectDiscardDatabase) DiscardPlanStatus(_ models.PullRequest, _ models.ProjectStatus, _ command.PublicationWriteMode) (bool, error) {
 	return false, errors.New("durable discard write failed")
 }
 
@@ -247,7 +247,7 @@ func TestDeleteLock_DurableStatusRequiredBeforeUnlock(t *testing.T) {
 					result.Command = command.Apply
 					result.ApplySuccess = "applied"
 				}
-				_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{result})
+				_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{result}, command.NoClaim{})
 				Ok(t, err)
 			}
 			var database db.Database = storage
@@ -283,14 +283,14 @@ func TestDeleteLock_ReapsExactAcceptedGeneration(t *testing.T) {
 	t.Cleanup(func() { Ok(t, storage.Close()) })
 	pull := models.PullRequest{Num: 1, HeadCommit: "current", BaseRepo: models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}}
 	ctx := command.ProjectContext{BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "path", ProjectName: "selected", RequiresAtlantisManagedPlanFile: true, PlanGeneration: "G1", SavedPlanHash: new(string)}
-	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true)
+	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true, command.NoClaim{})
 	Ok(t, err)
 	store := &planstore.LocalPlanStore{}
 	path := runtime.GetPlanFilePath(ctx, filepath.Join(planstore.PullDir(root, pull.BaseRepo.FullName, pull.Num), ctx.Workspace, ctx.RepoRelDir))
 	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	Ok(t, os.WriteFile(path, []byte("accepted plan"), 0o600))
 	Ok(t, store.Save(ctx, path))
-	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	locker := locking.NewClient(storage)
 	oldLockPull := pull
@@ -315,14 +315,14 @@ func TestDeleteLocksByPull_ReapsHostedPlanWithoutLocalLock(t *testing.T) {
 	t.Cleanup(func() { Ok(t, storage.Close()) })
 	pull := models.PullRequest{Num: 1, HeadCommit: "current", BaseRepo: models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo", VCSHost: models.VCSHost{Hostname: "github.com", Type: models.Github}}}
 	ctx := command.ProjectContext{BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "path", ProjectName: "selected", RequiresAtlantisManagedPlanFile: true, PlanGeneration: "G1", SavedPlanHash: new(string)}
-	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true)
+	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true, command.NoClaim{})
 	Ok(t, err)
 	store := &planstore.LocalPlanStore{}
 	path := runtime.GetPlanFilePath(ctx, filepath.Join(planstore.PullDir(root, pull.BaseRepo.FullName, pull.Num), ctx.Workspace, ctx.RepoRelDir))
 	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	Ok(t, os.WriteFile(path, []byte("accepted plan"), 0o600))
 	Ok(t, store.Save(ctx, path))
-	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	locker := locking.NewClient(storage)
 	deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: storage, WorkingDir: events.NewMockWorkingDir(), PlanStore: store, DataDir: root}
@@ -348,14 +348,14 @@ func TestDeleteLock_ReapsSeparatePlanDirectory(t *testing.T) {
 	t.Cleanup(func() { Ok(t, storage.Close()) })
 	pull := models.PullRequest{Num: 1, HeadCommit: "current", BaseRepo: models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}}
 	ctx := command.ProjectContext{BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "path", ProjectName: "selected", LocalSharePlanDir: shared, RequiresAtlantisManagedPlanFile: true, PlanGeneration: "G1", SavedPlanHash: new(string)}
-	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true)
+	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{ctx}, true, command.NoClaim{})
 	Ok(t, err)
 	store := &planstore.LocalPlanStore{}
 	path := runtime.GetPlanFilePath(ctx, filepath.Join(planstore.PullDir(root, pull.BaseRepo.FullName, pull.Num), ctx.Workspace, ctx.RepoRelDir))
 	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	Ok(t, os.WriteFile(path, []byte("accepted plan"), 0o600))
 	Ok(t, store.Save(ctx, path))
-	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ManagedPlanHash: *ctx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	locker := locking.NewClient(storage)
 	oldLockPull := pull

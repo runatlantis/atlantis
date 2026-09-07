@@ -646,7 +646,7 @@ func TestPullStatus_UpdateGet(t *testing.T) {
 					Failure: "failure",
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	maybeStatus, err := b.GetPullStatus(pull)
@@ -698,10 +698,10 @@ func TestPullStatus_UpdateDeleteGet(t *testing.T) {
 					Failure: "failure",
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
-	err = b.DeletePullStatus(pull)
+	err = b.DeletePullStatus(pull, command.NoClaim{})
 	Ok(t, err)
 
 	maybeStatus, err := b.GetPullStatus(pull)
@@ -753,10 +753,10 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 					ApplySuccess: "success!",
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
-	err = b.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
+	err = b.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus, command.NoClaim{})
 	Ok(t, err)
 
 	status, err := b.GetPullStatus(pull)
@@ -814,7 +814,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 					Failure: "failure",
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	pull.HeadCommit = "newsha"
@@ -827,7 +827,7 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 					ApplySuccess: "success!",
 				},
 			},
-		})
+		}, command.NoClaim{})
 
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
@@ -880,7 +880,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	pull.BaseBranch = "release"
@@ -894,7 +894,7 @@ func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-		})
+		}, command.NoClaim{})
 
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
@@ -946,7 +946,7 @@ func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *tes
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	pull.BaseBranch = "main"
@@ -960,7 +960,7 @@ func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *tes
 					PlanSuccess: &models.PlanSuccess{},
 				},
 			},
-		})
+		}, command.NoClaim{})
 
 	Ok(t, err)
 	Equals(t, "main", status.Pull.BaseBranch)
@@ -1038,7 +1038,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	updateStatus, err := b.UpdatePullWithResults(pull,
@@ -1068,7 +1068,7 @@ func TestPullStatus_UpdateMerge_Apply(t *testing.T) {
 					ApplySuccess: "success!",
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	getStatus, err := b.GetPullStatus(pull)
@@ -1166,7 +1166,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	updateStatus, err := b.UpdatePullWithResults(pull,
@@ -1187,7 +1187,7 @@ func TestPullStatus_UpdateMerge_ApprovePolicies(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, command.NoClaim{})
 	Ok(t, err)
 
 	getStatus, err := b.GetPullStatus(pull)
@@ -1274,7 +1274,7 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	// Push new commit B with a plan result (no PolicyCheckResults).
@@ -1292,7 +1292,7 @@ func TestPullStatus_UpdateNewCommit_PreservesPolicyApprovals(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	// The policy approvals from commit A should be preserved.
@@ -1372,7 +1372,7 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 				PlanSuccess: &models.PlanSuccess{TerraformOutput: "plan output"},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 	Equals(t, 1, len(status.Projects))
 	Equals(t, "mydir", status.Projects[0].RepoRelDir)
@@ -1451,9 +1451,9 @@ func TestPlanGeneration_UnreadableStatusRecovery(t *testing.T) {
 			Ok(t, err)
 			t.Cleanup(func() { Ok(t, rdb.Close()) })
 
-			_, writeErr := rdb.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: "default", RepoRelDir: ".", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+			_, writeErr := rdb.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: "default", RepoRelDir: ".", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 			Assert(t, writeErr != nil, "ordinary writer must reject unreadable generation state")
-			admitted, beginErr := rdb.BeginPlanGeneration(pull, "G2", []command.ProjectContext{{Workspace: "default", RepoRelDir: ".", RequiresAtlantisManagedPlanFile: true}}, false)
+			admitted, beginErr := rdb.BeginPlanGeneration(pull, "G2", []command.ProjectContext{{Workspace: "default", RepoRelDir: ".", RequiresAtlantisManagedPlanFile: true}}, false, command.NoClaim{})
 			Ok(t, beginErr)
 			Equals(t, 1, len(admitted.Projects))
 			Equals(t, "G2", admitted.Projects[0].PlanGeneration)

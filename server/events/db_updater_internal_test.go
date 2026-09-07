@@ -56,7 +56,7 @@ func assertDBUpdaterSameHeadDifferentBaseApplyFailurePreservesCurrentBase(t *tes
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func assertDBUpdaterStaleApplyPreservesNewerPullStatus(t *testing.T, output comm
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestDBUpdater_SameHeadApplyFailureWritesErroredApplyStatus(t *testing.T) {
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestDBUpdater_SameHeadSameBaseApplyFailureWritesErroredApplyStatus(t *testi
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestDBUpdater_BaseRetargetStaleCommandDoesNotWriteApplyError(t *testing.T) 
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestDBUpdater_SameHeadApplyErrorDoesNotTriggerStaleResultGuard(t *testing.T
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,7 +382,7 @@ func TestDBUpdater_StaleApplyResultGuardRunsBeforeDirNotExistFiltering(t *testin
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,9 +13,9 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool) (db.PlanGenerationBeginResult, error) {
+func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool, mode command.PublicationWriteMode) (db.PlanGenerationBeginResult, error) {
 	var result db.PlanGenerationBeginResult
-	_, err := b.mutatePullStatus(pull, true, func(current *models.PullStatus) (models.PullStatus, error) {
+	_, err := b.mutatePullStatus(pull, mode, true, func(current *models.PullStatus) (models.PullStatus, error) {
 		var transitionErr error
 		result, transitionErr = db.BeginPlanGeneration(current, pull, generation, projects, replace)
 		return result.PullStatus, transitionErr
@@ -23,7 +23,7 @@ func (b *BoltDB) BeginPlanGeneration(pull models.PullRequest, generation string,
 	return result, err
 }
 
-func (b *BoltDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool, transition func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
+func (b *BoltDB) mutatePullStatus(pull models.PullRequest, mode command.PublicationWriteMode, allowUnreadable bool, transition func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return models.PullStatus{}, err
@@ -31,6 +31,9 @@ func (b *BoltDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool,
 	var next models.PullStatus
 	var transitionErr error
 	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := checkPublicationWrite(tx, key, mode); err != nil {
+			return err
+		}
 		bucket := tx.Bucket(b.pullsBucketName)
 		current, readErr := b.getPullFromBucket(bucket, key)
 		if readErr != nil {
@@ -54,9 +57,9 @@ func (b *BoltDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool,
 	return next, transitionErr
 }
 
-func (b *BoltDB) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus) (bool, error) {
+func (b *BoltDB) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus, mode command.PublicationWriteMode) (bool, error) {
 	var discarded bool
-	_, err := b.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+	_, err := b.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		next, changed, transitionErr := db.DiscardPlanStatus(current, pull, expected)
 		discarded = changed
 		return next, transitionErr
