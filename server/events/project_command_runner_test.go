@@ -5531,3 +5531,21 @@ func TestProjectCommandRunner_ObsoleteExecutedApplyInvalidatesNewAcceptance(t *t
 	Equals(t, "", status.Projects[0].AcceptedPlanGeneration)
 	Equals(t, "", status.Projects[0].ManagedPlanHash)
 }
+
+func TestProjectOutputWrapper_GenerationPlanFailureWaitsForDurableCompletion(t *testing.T) {
+	RegisterMockTestingT(t)
+	runner := mocks.NewMockProjectCommandRunner()
+	setter := mocks.NewMockJobURLSetter()
+	wrapper := events.ProjectOutputWrapper{ProjectCommandRunner: runner, JobURLSetter: setter, JobMessageSender: mocks.NewMockJobMessageSender()}
+	ctx := command.ProjectContext{CommandName: command.Plan, PlanGeneration: "G1", Log: logging.NewNoopLogger(t), Workspace: "default", RepoRelDir: "."}
+	output := command.ProjectCommandOutput{Error: errors.New("terraform plan failed")}
+	When(runner.Plan(ctx)).ThenReturn(output)
+	got := wrapper.Plan(ctx)
+	Equals(t, output, got)
+	setter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.PendingCommitStatus, nil)
+	setter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.FailedCommitStatus), Any[*command.ProjectCommandOutput]())
+	// A superseded command omits this publication entirely. A matching durable
+	// completion publishes its failure using the same deferred path as success.
+	wrapper.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{Command: command.Plan, PlanGeneration: "G1", Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectCommandOutput: output}}}, models.SuccessCommitStatus)
+	setter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &output)
+}

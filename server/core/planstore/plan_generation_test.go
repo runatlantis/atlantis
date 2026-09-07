@@ -210,3 +210,20 @@ func TestManagedGeneration_RemediationWithoutAcceptedArtifact(t *testing.T) {
 		})
 	}
 }
+
+func TestManagedGeneration_RejectsArtifactDirectorySymlinkEscape(t *testing.T) {
+	canonical := filepath.Join(t.TempDir(), "default.tfplan")
+	outside := t.TempDir()
+	require.NoError(t, os.Symlink(outside, canonical+".atlantis-managed"))
+	ctx := testProjectContext()
+	ctx.PlanGeneration = "G1"
+	ctx.SavedPlanHash = new(string)
+	require.NoError(t, os.WriteFile(canonical, []byte("plan bytes"), 0600))
+	_, _, err := planstore.StagePlan(ctx, canonical)
+	require.Error(t, err)
+	require.Error(t, (&planstore.LocalPlanStore{}).Save(ctx, canonical))
+	require.Empty(t, *ctx.SavedPlanHash)
+	entries, err := os.ReadDir(outside)
+	require.NoError(t, err)
+	require.Empty(t, entries, "generation storage must not write through an escaping symlink")
+}

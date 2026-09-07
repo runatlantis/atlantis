@@ -105,9 +105,12 @@ func (s *LocalPlanStore) Remove(ctx command.ProjectContext, planPath string) err
 		if err != nil {
 			return err
 		}
-		if err := utils.RemoveIgnoreNonExistent(identityPath); err != nil {
+		if err := removePlanWithinRoot(planPath, identityPath); err != nil {
 			return err
 		}
+	}
+	if ctx.PlanGeneration != "" {
+		return removePlanWithinRoot(planPath, planPath)
 	}
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
