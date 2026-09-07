@@ -153,6 +153,50 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	Assert(t, status != nil, "pull status must remain when unlock fails")
 }
 
+func TestCleanUpPullPartialUnlockErrDoesNotComment(t *testing.T) {
+	t.Log("when UnlockByPull returns some locks and an error, do not post a locks-deleted comment")
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	cp := vcsmocks.NewMockClient()
+	tmp := t.TempDir()
+	db, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	_, err = db.UpdatePullWithResults(testdata.Pull, []command.ProjectResult{{
+		RepoRelDir:  "path",
+		Workspace:   "default",
+		ProjectName: "proj",
+	}})
+	Ok(t, err)
+	lock := models.ProjectLock{
+		Pull:      testdata.Pull,
+		Workspace: "default",
+		Project:   models.NewProject(testdata.GithubRepo.FullName, "path", ""),
+	}
+	cleaner := mocks.NewMockResourceCleaner()
+	pce := events.PullClosedExecutor{
+		Locker:                   l,
+		VCSClient:                cp,
+		WorkingDir:               w,
+		PullClosedTemplate:       &events.PullClosedEventTemplate{},
+		Database:                 db,
+		LogStreamResourceCleaner: cleaner,
+	}
+	unlockErr := errors.New("unlock remaining lock")
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return([]models.ProjectLock{lock}, unlockErr)
+	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+	Equals(t, "cleaning up locks: unlock remaining lock", actualErr.Error())
+	status, err := db.GetPullStatus(testdata.Pull)
+	Ok(t, err)
+	Assert(t, status != nil, "pull status must remain when unlock fails")
+	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
 func TestCleanUpPullNoLocks(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	t.Log("when there are no locks to clean up, we don't comment")

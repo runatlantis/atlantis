@@ -126,8 +126,10 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		p.CancellationTracker.Clear(pull)
 	}
 
-	// Comment when we successfully unlocked at least one project.
-	if len(locks) > 0 {
+	// Comment only when unlock finished with no error and deleted at least one lock.
+	// UnlockByPull can return locks it already removed plus an error; a success
+	// comment would hide remaining locks.
+	if err == nil && len(locks) > 0 {
 		templateData := p.buildTemplateData(locks)
 		var buf bytes.Buffer
 		if err = pullClosedTemplate.Execute(&buf, templateData); err != nil {
