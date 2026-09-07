@@ -187,13 +187,14 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
-
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		p.planPersistenceFailed(ctx, AutoplanCommand{}, projectCmds, result, err)
+		return
 	}
 
+	p.publishPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
+	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -334,11 +335,6 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		result.PlansDeleted = true
 	}
 
-	p.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	var pullStatus models.PullStatus
 	if noProjectPullStatus != nil {
 		pullStatus = *noProjectPullStatus
@@ -348,10 +344,12 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	}
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		p.planPersistenceFailed(ctx, cmd, projectCmds, result, err)
 		return
 	}
 
+	p.publishPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
+	p.pullUpdater.updatePull(ctx, cmd, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -603,4 +601,24 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// Successful project checks are deferred until the command's results are durable.
+func (p *PlanCommandRunner) publishPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	if publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher); ok {
+		publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+	}
+}
+
+func (p *PlanCommandRunner) planPersistenceFailed(ctx *command.Context, cmd PullCommand, projectCmds []command.ProjectContext, result command.Result, err error) {
+	ctx.CommandHasErrors = true
+	result.Error = fmt.Errorf("persisting plan results: %w; restore database connectivity and run `atlantis plan` again before applying", err)
+	ctx.Log.Err("%s", result.Error)
+	p.publishPlanStatuses(projectCmds, result, models.FailedCommitStatus)
+	for _, name := range []command.Name{command.Plan, command.Apply} {
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, name); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+	}
+	p.pullUpdater.updatePull(ctx, cmd, result)
 }
