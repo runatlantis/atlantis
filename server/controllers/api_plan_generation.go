@@ -85,3 +85,23 @@ func refreshAPIGeneration(projects []command.ProjectContext, status *models.Pull
 		}
 	}
 }
+
+// beginAPIApply reserves this project after pre-workflow hooks and before any
+// execution. Each API project persists its result before the next one starts.
+func (a *APIController) beginAPIApply(ctx *command.Context, project *command.ProjectContext) error {
+	if ctx.Pull.Num <= 0 || project.PlanGeneration == "" {
+		return nil
+	}
+	if a.PlanGenerationDB == nil {
+		return fmt.Errorf("reserving PR API apply requires a generation database")
+	}
+	executionID := uuid.NewString()
+	status, err := a.PlanGenerationDB.BeginApplyExecution(ctx.Pull, []command.ProjectContext{*project}, executionID, command.NoClaim{})
+	if err != nil {
+		return fmt.Errorf("reserving API apply execution: %w", err)
+	}
+	ctx.PullStatus = &status
+	project.PullStatus = ctx.PullStatus
+	project.ApplyExecutionID = executionID
+	return nil
+}
