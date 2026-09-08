@@ -427,7 +427,7 @@ func BeginApplyExecution(current *models.PullStatus, pull models.PullRequest, pr
 			}
 		}
 		switch project.Status {
-		case models.PlannedPlanStatus, models.PlannedNoChangesPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus:
+		case models.PlannedPlanStatus, models.PlannedNoChangesPlanStatus, models.PassedPolicyCheckStatus, models.ErroredApplyStatus, models.ErroredPolicyCheckStatus:
 		default:
 			return models.PullStatus{}, ErrPlanGenerationSuperseded
 		}

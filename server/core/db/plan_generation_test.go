@@ -264,3 +264,27 @@ func TestApplyExecution_AdmissionRequiresAcceptedIdentity(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyExecution_PreservesPolicyRequirementFailure(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "head"}
+	project := generationProject("a")
+	admitted, err := db.BeginPlanGeneration(nil, pull, "G1", []command.ProjectContext{project}, false)
+	Ok(t, err)
+	accepted, err := db.MergePullResults(&admitted.PullStatus, pull, []command.ProjectResult{generationResult("a", "G1")})
+	Ok(t, err)
+	accepted.Projects[0].Status = models.ErroredPolicyCheckStatus
+	project.PlanGeneration, project.AcceptedPlanGeneration, project.ExpectedPlanHash = "G1", "G1", accepted.Projects[0].ManagedPlanHash
+	running, err := db.BeginApplyExecution(&accepted, pull, []command.ProjectContext{project}, "execution")
+	Ok(t, err)
+	// Admission reserves execution; the existing requirement evaluator still
+	// owns policy failure messages and prevents Terraform from running.
+	Equals(t, models.ErroredPolicyCheckStatus, running.Projects[0].Status)
+	result := generationResult("a", "G1")
+	result.Command, result.ApplyExecutionID = command.Apply, "execution"
+	result.PlanSuccess = nil
+	result.Failure = "All policies must pass for project before running apply."
+	completed, err := db.MergePullResults(&running, pull, []command.ProjectResult{result})
+	Ok(t, err)
+	Equals(t, "", completed.Projects[0].ApplyExecutionID)
+	Equals(t, models.ErroredApplyStatus, completed.Projects[0].Status)
+}
