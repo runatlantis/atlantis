@@ -393,8 +393,11 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
-	var executed bool
-	if ctx.PlanGeneration != "" {
+	var executed, attempted bool
+	if ctx.ApplyExecutionID != "" {
+		ctx.ApplyExecutionAttempted = &attempted
+	}
+	if ctx.PlanGeneration != "" || ctx.ApplyExecutionID != "" {
 		ctx.ApplyExecutionSucceeded = &executed
 	}
 	applyOut, applyURL, failure, err := p.doApply(ctx)
@@ -402,6 +405,7 @@ func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.
 		Failure:         failure,
 		Error:           err,
 		ApplyExecuted:   executed,
+		ApplyAttempted:  attempted,
 		ApplySuccess:    applyOut,
 		ApplySuccessURL: applyURL,
 	}
@@ -1005,6 +1009,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 
 	if _, ok := p.ApplyStepRunner.(*runtime.ApplyStepRunner); ok {
 		ctx.RemoteApplyRunURL = &remoteApplyRunURL
+	}
+	if ctx.ApplyExecutionAttempted != nil {
+		*ctx.ApplyExecutionAttempted = true
 	}
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err == nil && ctx.ApplyExecutionSucceeded != nil {

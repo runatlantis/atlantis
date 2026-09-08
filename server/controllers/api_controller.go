@@ -869,6 +869,9 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			}
 		}
 
+		if err := a.beginAPIApply(ctx, &cmd); err != nil {
+			return &command.Result{ProjectResults: projectResults}, err
+		}
 		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 		if res.Error != nil || res.Failure != "" {

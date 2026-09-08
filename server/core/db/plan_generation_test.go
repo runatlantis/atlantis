@@ -182,3 +182,109 @@ func TestPlanGeneration_PostExecutionFailureInvalidatesMatchingGeneration(t *tes
 	Equals(t, "", after.Projects[0].AcceptedPlanGeneration)
 	Equals(t, "", after.Projects[0].ManagedPlanHash)
 }
+
+func TestApplyExecution_ConsumedPlanRequiresKnownOutcome(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "head"}
+	project := generationProject("a")
+	admitted, err := db.BeginPlanGeneration(nil, pull, "G1", []command.ProjectContext{project}, false)
+	Ok(t, err)
+	accepted, err := db.MergePullResults(&admitted.PullStatus, pull, []command.ProjectResult{generationResult("a", "G1")})
+	Ok(t, err)
+	project.PlanGeneration, project.AcceptedPlanGeneration, project.ExpectedPlanHash = "G1", "G1", accepted.Projects[0].ManagedPlanHash
+	running, err := db.BeginApplyExecution(&accepted, pull, []command.ProjectContext{project}, "execution-1")
+	Ok(t, err)
+	_, err = db.BeginApplyExecution(&running, pull, []command.ProjectContext{project}, "execution-2")
+	Assert(t, errors.Is(err, db.ErrApplyAlreadyStarted), "running or crashed execution must not be retried")
+	for _, attempted := range []bool{false, true} {
+		result := generationResult("a", "G1")
+		result.Command = command.Apply
+		result.ApplyExecutionID = "execution-1"
+		result.ApplyAttempted = attempted
+		result.Error = errors.New("apply error")
+		next, err := db.MergePullResults(&running, pull, []command.ProjectResult{result})
+		Ok(t, err)
+		if attempted {
+			Equals(t, "execution-1", next.Projects[0].ApplyExecutionID)
+			Equals(t, "", next.Projects[0].AcceptedPlanGeneration)
+		} else {
+			Equals(t, "", next.Projects[0].ApplyExecutionID)
+			Equals(t, "G1", next.Projects[0].AcceptedPlanGeneration)
+		}
+	}
+	success := generationResult("a", "G1")
+	success.Command = command.Apply
+	success.ApplyExecutionID = "execution-1"
+	success.ApplyAttempted, success.ApplyExecuted = true, true
+	success.ApplySuccess = "applied"
+	completed, err := db.MergePullResults(&running, pull, []command.ProjectResult{success})
+	Ok(t, err)
+	Equals(t, "", completed.Projects[0].ApplyExecutionID)
+	Equals(t, models.AppliedPlanStatus, completed.Projects[0].Status)
+	replanned, err := db.BeginPlanGeneration(&running, pull, "G2", []command.ProjectContext{project}, false)
+	Ok(t, err)
+	Equals(t, "execution-1", replanned.Projects[0].ApplyExecutionID)
+	// Explicit discard revokes apply authorization while resolving the observed
+	// execution identity; it cannot accidentally clear a newer execution.
+	discarded, changed, err := db.DiscardPlanStatus(&replanned.PullStatus, pull, replanned.Projects[0])
+	Ok(t, err)
+	Assert(t, changed, "explicit discard must be recorded")
+	Equals(t, "", discarded.Projects[0].ApplyExecutionID)
+	Equals(t, models.DiscardedPlanStatus, discarded.Projects[0].Status)
+	Equals(t, "", discarded.Projects[0].AcceptedPlanGeneration)
+
+	Equals(t, "", replanned.Projects[0].AcceptedPlanGeneration)
+}
+
+func TestApplyExecution_AdmissionRequiresAcceptedIdentity(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "head"}
+	project := generationProject("a")
+	admitted, err := db.BeginPlanGeneration(nil, pull, "G1", []command.ProjectContext{project}, false)
+	Ok(t, err)
+	accepted, err := db.MergePullResults(&admitted.PullStatus, pull, []command.ProjectResult{generationResult("a", "G1")})
+	Ok(t, err)
+	project.PlanGeneration, project.AcceptedPlanGeneration, project.ExpectedPlanHash = "G1", "G1", accepted.Projects[0].ManagedPlanHash
+	for _, invalid := range []string{"missing expected hash", "wrong expected hash", "missing saved hash", "wrong accepted generation"} {
+		t.Run(invalid, func(t *testing.T) {
+			current := accepted
+			current.Projects = append([]models.ProjectStatus(nil), accepted.Projects...)
+			ctx := project
+			switch invalid {
+			case "missing expected hash":
+				ctx.ExpectedPlanHash = ""
+			case "wrong expected hash":
+				ctx.ExpectedPlanHash = strings.Repeat("b", 64)
+			case "missing saved hash":
+				current.Projects[0].ManagedPlanHash, ctx.ExpectedPlanHash = "", ""
+			case "wrong accepted generation":
+				current.Projects[0].AcceptedPlanGeneration, ctx.AcceptedPlanGeneration = "G0", "G0"
+			}
+			_, err := db.BeginApplyExecution(&current, pull, []command.ProjectContext{ctx}, "execution")
+			Assert(t, errors.Is(err, db.ErrPlanGenerationSuperseded), "invalid identity admitted: %v", err)
+			Equals(t, "", current.Projects[0].ApplyExecutionID)
+		})
+	}
+}
+
+func TestApplyExecution_PreservesPolicyRequirementFailure(t *testing.T) {
+	pull := models.PullRequest{HeadCommit: "head"}
+	project := generationProject("a")
+	admitted, err := db.BeginPlanGeneration(nil, pull, "G1", []command.ProjectContext{project}, false)
+	Ok(t, err)
+	accepted, err := db.MergePullResults(&admitted.PullStatus, pull, []command.ProjectResult{generationResult("a", "G1")})
+	Ok(t, err)
+	accepted.Projects[0].Status = models.ErroredPolicyCheckStatus
+	project.PlanGeneration, project.AcceptedPlanGeneration, project.ExpectedPlanHash = "G1", "G1", accepted.Projects[0].ManagedPlanHash
+	running, err := db.BeginApplyExecution(&accepted, pull, []command.ProjectContext{project}, "execution")
+	Ok(t, err)
+	// Admission reserves execution; the existing requirement evaluator still
+	// owns policy failure messages and prevents Terraform from running.
+	Equals(t, models.ErroredPolicyCheckStatus, running.Projects[0].Status)
+	result := generationResult("a", "G1")
+	result.Command, result.ApplyExecutionID = command.Apply, "execution"
+	result.PlanSuccess = nil
+	result.Failure = "All policies must pass for project before running apply."
+	completed, err := db.MergePullResults(&running, pull, []command.ProjectResult{result})
+	Ok(t, err)
+	Equals(t, "", completed.Projects[0].ApplyExecutionID)
+	Equals(t, models.ErroredApplyStatus, completed.Projects[0].Status)
+}
