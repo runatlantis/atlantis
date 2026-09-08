@@ -16,7 +16,7 @@ type PullUpdater struct {
 	MarkdownRenderer     *MarkdownRenderer
 }
 
-func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
+func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) error {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
 		ctx.Log.Err("%s", res.Error.Error())
@@ -27,10 +27,15 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	// HidePrevCommandComments will hide old comments left from previous runs to reduce
 	// clutter in a pull/merge request. This will not delete the comment, since the
 	// comment trail may be useful in auditing or backtracing problems.
-	if c.HidePrevPlanComments {
+	if c.HidePrevPlanComments && (!ctx.PublicationRequired || ctx.TerminalPublisher != nil) {
 		ctx.Log.Debug("hiding previous plan comments for command: '%v', directory: '%v'", cmd.CommandName().TitleString(), cmd.Dir())
-		if err := c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir()); err != nil {
+		if err := publishTerminal(ctx, func() error {
+			return c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir())
+		}); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
+			if ctx.PublicationRequired {
+				return err
+			}
 		}
 	}
 
@@ -45,14 +50,23 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 		}
 
 		if len(commentOnProjects) == 0 {
-			return
+			return nil
 		}
 
 		res.ProjectResults = commentOnProjects
 	}
 
 	comment := c.MarkdownRenderer.Render(ctx, res, cmd)
-	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
-		ctx.Log.Err("unable to comment: %s", err)
+	// An acquisition/publication error needs a visible historical error comment;
+	// it cannot hide previous comments or publish a successful command result.
+	if ctx.PublicationRequired && ctx.TerminalPublisher == nil && res.HasErrors() {
+		return c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String())
 	}
+	return publishTerminal(ctx, func() error {
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, cmd.CommandName().String()); err != nil {
+			ctx.Log.Err("unable to comment: %s", err)
+			return err
+		}
+		return nil
+	})
 }

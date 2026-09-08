@@ -4,11 +4,19 @@
 package events
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+
 	"slices"
 	"testing"
+	"time"
+
+	"github.com/google/go-github/v88/github"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -17,6 +25,16 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 )
+
+// These tests exercise persistence and status ordering with successful comments.
+// Unexpected VCS operations still use the failing embedded client.
+type internalApplyVCSClient struct {
+	vcs.NotConfiguredVCSClient
+}
+
+func (*internalApplyVCSClient) CreateComment(logging.SimpleLogging, models.Repo, int, string, string) error {
+	return nil
+}
 
 type unlockedApplyLockChecker struct{}
 
@@ -31,12 +49,16 @@ func (noopPullReqStatusFetcher) FetchPullStatus(logging.SimpleLogging, models.Pu
 }
 
 type recordingApplyStatusUpdater struct {
+	pendingError  error
 	combined      []models.CommitStatus
 	combinedCount []models.CommitStatus
 }
 
 func (u *recordingApplyStatusUpdater) UpdateCombined(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, status models.CommitStatus, _ command.Name) error {
 	u.combined = append(u.combined, status)
+	if status == models.PendingCommitStatus {
+		return u.pendingError
+	}
 	return nil
 }
 
@@ -82,8 +104,9 @@ func (r *recordingDeferredApplyRunner) Apply(command.ProjectContext) command.Pro
 	return r.output
 }
 
-func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) {
+func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) error {
 	r.statuses = append(r.statuses, status)
+	return nil
 }
 
 type sequenceApplyIdentityFetcher struct {
@@ -195,7 +218,7 @@ func TestApplyCommandRunner_DeferredApplySuccessFailsWhenFinalFreshnessFails(t *
 
 func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
 	t.Helper()
-	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	vcsClient := &internalApplyVCSClient{NotConfiguredVCSClient: vcs.NotConfiguredVCSClient{Host: models.Github}}
 	pullUpdater := &PullUpdater{
 		VCSClient:        vcsClient,
 		MarkdownRenderer: NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
@@ -252,7 +275,7 @@ func TestApplyCommandRunner_StaleCommandResultWithEmptyPullStatusDoesNotPublishZ
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	vcsClient := &internalApplyVCSClient{NotConfiguredVCSClient: vcs.NotConfiguredVCSClient{Host: models.Github}}
 	commitUpdater := &recordingApplyStatusUpdater{}
 	pullUpdater := &PullUpdater{
 		VCSClient:        vcsClient,
@@ -339,7 +362,7 @@ func TestApplyCommandRunner_NoPlanLegacyEmptyIdentityDoesNotPublishZeroZeroSucce
 	if _, err := database.UpdatePullWithResults(legacyPull, nil, command.NoClaim{}); err != nil {
 		t.Fatal(err)
 	}
-	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	vcsClient := &internalApplyVCSClient{NotConfiguredVCSClient: vcs.NotConfiguredVCSClient{Host: models.Github}}
 	commitUpdater := &recordingApplyStatusUpdater{}
 	pullUpdater := &PullUpdater{
 		VCSClient:        vcsClient,
@@ -411,7 +434,7 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 	if _, err := database.UpdatePullWithResults(legacyPull, nil, command.NoClaim{}); err != nil {
 		t.Fatal(err)
 	}
-	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	vcsClient := &internalApplyVCSClient{NotConfiguredVCSClient: vcs.NotConfiguredVCSClient{Host: models.Github}}
 	commitUpdater := &recordingApplyStatusUpdater{}
 	pullUpdater := &PullUpdater{
 		VCSClient:        vcsClient,
@@ -468,4 +491,159 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 
 func containsCommitStatus(statuses []models.CommitStatus, expected models.CommitStatus) bool {
 	return slices.Contains(statuses, expected)
+}
+
+type publicationApplyRunner struct {
+	run func(command.ProjectContext) command.ProjectCommandOutput
+}
+
+func (r publicationApplyRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
+	return r.run(ctx)
+}
+
+func TestApplyCommandRunner_ExecutionRunsOutsideLeaseAndCannotRepeat(t *testing.T) {
+	for _, outcome := range []string{"success", "pre-execution failure", "unknown execution outcome"} {
+		t.Run(outcome, func(t *testing.T) {
+			database, err := boltdb.New(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { database.Close() })
+			pull := testdata.Pull
+			pull.BaseRepo = testdata.GithubRepo
+			_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")}, command.NoClaim{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			project := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: DefaultWorkspace, ProjectName: "projA", ProjectPlanStatus: models.PlannedPlanStatus, Pull: pull}
+			clock := newPublicationTestClock()
+			publication := NewPublicationCoordinator(database, context.Background())
+			publication.Clock = clock
+			executed := false
+			projectRunner := publicationApplyRunner{run: func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				executed = true
+				if ctx.ApplyExecutionID == "" {
+					t.Fatal("apply must have a durable execution identity")
+				}
+				// Time spent in Terraform does not require lease renewal. A different
+				// replica can publish, but cannot execute this same plan again.
+				clock.advance(10 * publication.LeaseTTL)
+				_, err := database.AcquirePublicationLease(context.Background(), pull, "another replica", time.Minute)
+				if err != nil {
+					t.Fatalf("Terraform must not hold publication lease: %v", err)
+				}
+				fence := command.PublicationFence{Owner: "another replica"}
+				_, err = database.BeginApplyExecution(pull, []command.ProjectContext{project}, "duplicate apply", fence)
+				if !errors.Is(err, db.ErrApplyAlreadyStarted) {
+					t.Fatalf("duplicate apply must fail closed: %v", err)
+				}
+				if err := database.ReleasePublicationLease(context.Background(), pull, fence); err != nil {
+					t.Fatal(err)
+				}
+				switch outcome {
+				case "pre-execution failure":
+					return command.ProjectCommandOutput{Error: errors.New("validation rejected")}
+				case "unknown execution outcome":
+					return command.ProjectCommandOutput{ApplyAttempted: true, Error: errors.New("execution connection lost")}
+				default:
+					return command.ProjectCommandOutput{ApplyAttempted: true, ApplyExecuted: true, ApplySuccess: "applied"}
+				}
+			}}
+			runner := newInternalApplyCommandRunner(t, database, staticApplyCommandBuilder{commands: []command.ProjectContext{project}}, projectRunner, &sequenceApplyIdentityFetcher{identities: []models.PullRequest{pull}})
+			runner.Publication = publication
+			ctx := newInternalApplyContext(t, pull)
+			runner.Run(ctx, &CommentCommand{Name: command.Apply, ProjectName: "projA"})
+			if !executed {
+				t.Fatal("expected apply runner to execute")
+			}
+			if ctx.CommandHasErrors != (outcome != "success") {
+				t.Fatalf("unexpected command error flag for %s", outcome)
+			}
+			status, err := database.GetPullStatus(pull)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (status.Projects[0].ApplyExecutionID != "") != (outcome == "unknown execution outcome") {
+				t.Fatalf("unexpected execution ownership after %s: %+v", outcome, status.Projects[0])
+			}
+			if outcome == "success" && status.Projects[0].Status != models.AppliedPlanStatus {
+				t.Fatal("successful apply must be durably applied")
+			}
+			_, err = database.AcquirePublicationLease(context.Background(), pull, "after completion", time.Minute)
+			if err != nil {
+				t.Fatalf("completion must release publication lease: %v", err)
+			}
+		})
+	}
+}
+
+func TestApplyCommandRunner_AdmissionBeforePendingAndPendingFailureReleases(t *testing.T) {
+	for _, reason := range []string{"obsolete", "already executing", "pending failure", "unknown pending outcome"} {
+		t.Run(reason, func(t *testing.T) {
+			database, err := boltdb.New(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { database.Close() })
+			pull := testdata.Pull
+			pull.BaseRepo = testdata.GithubRepo
+			_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")}, command.NoClaim{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			project := command.ProjectContext{CommandName: command.Apply, RepoRelDir: "dirA", Workspace: DefaultWorkspace, ProjectName: "projA", ProjectPlanStatus: models.PlannedPlanStatus, Pull: pull}
+			if reason == "obsolete" {
+				project.PlanGeneration = "obsolete"
+			}
+			if reason == "already executing" {
+				_, err = database.BeginApplyExecution(pull, []command.ProjectContext{project}, "running", command.NoClaim{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			runner := newInternalApplyCommandRunner(t, database, staticApplyCommandBuilder{commands: []command.ProjectContext{project}}, publicationApplyRunner{run: func(command.ProjectContext) command.ProjectCommandOutput {
+				t.Error("rejected admission must not execute Terraform")
+				return command.ProjectCommandOutput{}
+			}}, &sequenceApplyIdentityFetcher{identities: []models.PullRequest{pull}})
+			runner.Publication = NewPublicationCoordinator(database, context.Background())
+			statuses := &recordingApplyStatusUpdater{}
+			if reason == "pending failure" {
+				statuses.pendingError = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusTooManyRequests}, Message: "temporary pending status rejection"}
+			}
+			if reason == "unknown pending outcome" {
+				statuses.pendingError = errors.New("request timed out after sending pending status")
+			}
+			runner.commitStatusUpdater = statuses
+			ctx := newInternalApplyContext(t, pull)
+			runner.Run(ctx, &CommentCommand{Name: command.Apply, ProjectName: "projA"})
+			if !ctx.CommandHasErrors {
+				t.Fatal("rejected apply must be visible as an error")
+			}
+			if containsCommitStatus(statuses.combined, models.PendingCommitStatus) != (reason == "pending failure" || reason == "unknown pending outcome") {
+				t.Fatalf("an obsolete/consumed command must not overwrite Pending: %v", statuses.combined)
+			}
+			status, err := database.GetPullStatus(pull)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expectedExecution := ""
+			if reason == "already executing" {
+				expectedExecution = "running"
+			}
+			if status.Projects[0].ApplyExecutionID != expectedExecution {
+				t.Fatal("pre-execution failure must not leave its own execution reservation")
+			}
+			if reason == "unknown pending outcome" {
+				lease, err := database.GetPublicationLease(context.Background(), pull)
+				if err != nil || lease == nil || !lease.Publishing {
+					t.Fatalf("unknown remote status must remain quarantined: %+v, %v", lease, err)
+				}
+				return
+			}
+			_, err = database.AcquirePublicationLease(context.Background(), pull, "next command", time.Minute)
+			if err != nil {
+				t.Fatalf("pre-execution error must release lease: %v", err)
+			}
+		})
+	}
 }

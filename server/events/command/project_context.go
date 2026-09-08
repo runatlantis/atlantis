@@ -22,6 +22,8 @@ const (
 // ProjectContext defines the context for a plan or apply stage that will
 // be executed for a project.
 type ProjectContext struct {
+	// PublicationDeferred moves project statuses into short publication sections.
+	PublicationDeferred     bool
 	ApplyExecutionID        string
 	ApplyExecutionAttempted *bool
 	CommandName             Name

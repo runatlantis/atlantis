@@ -60,6 +60,7 @@ func NewApplyCommandRunner(
 }
 
 type ApplyCommandRunner struct {
+	Publication           *PublicationCoordinator
 	DisableApplyAll       bool
 	Database              db.Database
 	locker                locking.ApplyLockChecker
@@ -104,12 +105,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if err != nil {
 		ctx.Log.Err("checking global apply lock: %s", err)
 		ctx.CommandHasErrors = true
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		if err := a.vcsClient.CreateComment(ctx.Log, baseRepo, pull.Num, applyLockCheckFailedComment, command.Apply.String()); err != nil {
-			ctx.Log.Err("unable to comment on pull request: %s", err)
-		}
+		a.reportApplyStartFailure(ctx, cmd, err, applyLockCheckFailedComment)
 		return
 	}
 
@@ -136,10 +132,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			ctx.CommandHasErrors = true
-			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-				ctx.Log.Warn("unable to update commit status: %s", statusErr)
-			}
-			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+			a.reportApplyStartFailure(ctx, cmd, err, "")
 			return
 		}
 		defer unlockPullApply()
@@ -148,20 +141,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if err := a.refreshPullStatus(ctx, pull); err != nil {
 		ctx.Log.Err("fetching current plan status: %s", err)
 		ctx.CommandHasErrors = true
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching current plan status: %w", err)})
+		a.reportApplyStartFailure(ctx, cmd, fmt.Errorf("fetching current plan status: %w", err), "")
 		return
 	}
 	livePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
 		ctx.Log.Err("fetching live pull request: %s", err)
 		ctx.CommandHasErrors = true
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("fetching live pull request: %w", err)})
+		a.reportApplyStartFailure(ctx, cmd, fmt.Errorf("fetching live pull request: %w", err), "")
 		return
 	}
 	if livePull.HeadCommit != "" && !cmd.IsForSpecificProject() {
@@ -190,121 +177,128 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	if projectCmdsErr != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: projectCmdsErr})
+		a.reportApplyStartFailure(ctx, cmd, projectCmdsErr, "")
 		return
 	}
 
-	// If there are no projects to apply, don't respond to the PR and ignore
+	// Preserve the no-project/silence behavior while refreshing its durable
+	// status and publishing inside the same short lease.
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
-		ctx.Log.Info("determined there was no project to run plan in")
-		if !a.silenceVCSStatusNoProjects {
+		err := a.Publication.RunCommand(ctx, func() error {
+			ctx.Log.Info("determined there was no project to run apply in")
+			if a.silenceVCSStatusNoProjects {
+				return nil
+			}
+			if ctx.TerminalPublisher != nil {
+				if err := a.refreshPullStatus(ctx, pull); err != nil {
+					return err
+				}
+				var err error
+				livePull, err = a.refreshLivePullIdentity(ctx)
+				if err != nil {
+					return err
+				}
+			}
 			currentPull := applyPullWithLiveIdentity(pull, livePull)
 			pullStatus, err := a.currentNoProjectApplyPullStatus(ctx, pull, currentPull)
 			if err != nil {
-				ctx.Log.Warn("not publishing no-project apply success status because %s", err)
-				ctx.CommandHasErrors = true
-				return
+				return err
 			}
 			if cmd.IsForSpecificProject() {
-				// With a specific apply, just reset the status so it's not stuck in pending state
-				ctx.Log.Debug("resetting VCS status")
-				a.updateCommitStatus(ctx, *pullStatus)
-			} else {
-				// With a generic apply, we set successful commit statuses
-				// with 0/0 projects planned successfully because some users require
-				// the Atlantis status to be passing for all pull requests.
-				// Does not apply to skipped runs for specific projects
-				ctx.Log.Debug("setting VCS status to success with no projects found")
-				if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{}); err != nil {
-					ctx.Log.Warn("unable to update commit status: %s", err)
-				}
+				return a.updateCommitStatus(ctx, *pullStatus)
 			}
+			return publishTerminal(ctx, func() error {
+				return a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, baseRepo, pull, models.SuccessCommitStatus, command.Apply, models.ProjectCounts{})
+			})
+		})
+		if err != nil {
+			ctx.CommandHasErrors = true
+			ctx.Log.Warn("not publishing no-project apply success status because %s", err)
 		}
 		return
 	}
-	if len(projectCmds) > 0 {
-		if err := a.updatePendingCommitStatus(ctx); err != nil {
-			ctx.CommandHasErrors = true
-			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("starting apply: %w", err)})
-			return
-		}
-		if err := a.beginDurableApply(ctx, projectCmds); err != nil {
-			ctx.CommandHasErrors = true
-			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
-				ctx.Log.Warn("unable to update commit status: %s", statusErr)
-			}
-			a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("starting apply: %w", err)})
-			return
-		}
+	if !a.prepareApply(ctx, cmd, projectCmds) {
+		return
 	}
 
 	preApplyPullStatus := ctx.PullStatus
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
-	finalLivePull, err := a.refreshLivePullIdentity(ctx)
-	if err != nil {
-		a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("fetching live pull request after apply: %w", err), true)
-		return
-	}
-	if err := livePullIdentityChangedDuringApply(livePull, finalLivePull); err != nil {
-		a.failApplyResult(ctx, cmd, projectCmds, result, err, true)
-		return
-	}
-	livePull = finalLivePull
-	ctx.CommandHasErrors = result.HasErrors()
-
-	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
-	if err != nil {
-		a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("persisting apply results: %w", err), false)
-		return
-	}
-	a.pullUpdater.updatePull(ctx, cmd, result)
-
-	currentPull := applyPullWithLiveIdentity(pull, livePull)
-	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
-		ctx.Log.Warn("not publishing apply success status because %s", err)
-		ctx.CommandHasErrors = true
-		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+	completionErr := a.Publication.RunCommand(ctx, func() error {
+		finalLivePull, err := a.refreshLivePullIdentity(ctx)
+		if err != nil {
+			return a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("fetching live pull request after apply: %w", err), true)
 		}
-		return
-	}
+		if err := livePullIdentityChangedDuringApply(livePull, finalLivePull); err != nil {
+			return a.failApplyResult(ctx, cmd, projectCmds, result, err, true)
+		}
+		livePull = finalLivePull
+		ctx.CommandHasErrors = result.HasErrors()
 
-	a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus)
-	a.updateCommitStatus(ctx, pullStatus)
+		pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+		if err != nil {
+			return a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("persisting apply results: %w", err), false)
+		}
+		if err := a.pullUpdater.updatePull(ctx, cmd, result); err != nil {
+			return err
+		}
 
-	if result.HasErrors() {
-		return
-	}
-	if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
-		ctx.Log.Warn("not automerging because %s", err)
-		return
-	}
-
-	if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
-		if len(a.disableAutomergeLabel) > 0 {
-			labels, err := a.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
-			if err != nil {
-				ctx.Log.Err("unable to get pull request labels so not automerging, error %s", err)
-				return
-			} else if slices.Contains(labels, a.disableAutomergeLabel) {
-				ctx.Log.Info("pull/merge request has disable automerge label %q so not automerging", a.disableAutomergeLabel)
-				return
+		currentPull := applyPullWithLiveIdentity(pull, livePull)
+		if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
+			ctx.Log.Warn("not publishing apply success status because %s", err)
+			ctx.CommandHasErrors = true
+			if err := publishTerminal(ctx, func() error { return a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus) }); err != nil {
+				return err
 			}
+			return publishTerminal(ctx, func() error {
+				return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName())
+			})
 		}
-		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
+
+		if err := publishTerminal(ctx, func() error { return a.publishDeferredApplyStatuses(projectCmds, result, models.SuccessCommitStatus) }); err != nil {
+			return err
+		}
+		if err := a.updateCommitStatus(ctx, pullStatus); err != nil {
+			return err
+		}
+
+		if result.HasErrors() {
+			return nil
+		}
+		if err := pullStatusFreshnessError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
+			ctx.Log.Warn("not automerging because %s", err)
+			return nil
+		}
+
+		if a.autoMerger.automergeEnabled(projectCmds) && !cmd.AutoMergeDisabled {
+			if len(a.disableAutomergeLabel) > 0 {
+				labels, err := a.vcsClient.GetPullLabels(ctx.Log, baseRepo, pull)
+				if err != nil {
+					ctx.Log.Err("unable to get pull request labels so not automerging, error %s", err)
+					return nil
+				} else if slices.Contains(labels, a.disableAutomergeLabel) {
+					ctx.Log.Info("pull/merge request has disable automerge label %q so not automerging", a.disableAutomergeLabel)
+					return nil
+				}
+			}
+			return a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
+		}
+		return nil
+	})
+	if completionErr != nil {
+		ctx.CommandHasErrors = true
+		if reportErr := a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("persisting or publishing apply completion: %w; do not repeat apply until its outcome is reconciled", completionErr)}); reportErr != nil {
+			ctx.Log.Err("reporting command result: %s", reportErr)
+		}
 	}
+
 }
 
-func (a *ApplyCommandRunner) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (a *ApplyCommandRunner) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
 	publisher, ok := a.prjCmdRunner.(DeferredApplyStatusPublisher)
 	if !ok {
-		return
+		return nil
 	}
-	publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
+	return publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
 }
 
 func livePullIdentityChangedDuringApply(before models.PullRequest, after models.PullRequest) error {
@@ -440,7 +434,10 @@ func (a *ApplyCommandRunner) updatePendingCommitStatus(ctx *command.Context) err
 		ctx.Log.Debug("silence enabled - not setting pending VCS status")
 		return nil
 	}
-	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply); err != nil {
+	if err := publishTerminal(ctx, func() error {
+		return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Apply)
+	}); err != nil {
+		ctx.Log.Warn("unable to update commit status: %s", err)
 		return err
 	}
 	return nil
@@ -468,7 +465,7 @@ func (a *ApplyCommandRunner) isParallelEnabled(projectCmds []command.ProjectCont
 	return len(projectCmds) > 0 && projectCmds[0].ParallelApplyEnabled
 }
 
-func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
+func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) error {
 	var numSuccess int
 	var numErrored int
 	var numNoChanges int
@@ -486,16 +483,20 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		status = models.PendingCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(
-		ctx.Log,
-		ctx.Pull.BaseRepo,
-		ctx.Pull,
-		status,
-		command.Apply,
-		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
-	); err != nil {
+	if err := publishTerminal(ctx, func() error {
+		return a.commitStatusUpdater.UpdateCombinedCount(
+			ctx.Log,
+			ctx.Pull.BaseRepo,
+			ctx.Pull,
+			status,
+			command.Apply,
+			models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
+		)
+	}); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
+		return err
 	}
+	return nil
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")
@@ -512,7 +513,7 @@ var applyLockCheckFailedComment = "**Error:** Failed to check global apply lock.
 // failApplyResult makes the outcome visible even when persistence or the final
 // live-head refresh fails. Successful execution is never presented as safe to
 // retry after its authorization becomes ambiguous.
-func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentCommand, projects []command.ProjectContext, result command.Result, failure error, recordAmbiguousExecution bool) {
+func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentCommand, projects []command.ProjectContext, result command.Result, failure error, recordAmbiguousExecution bool) error {
 	ctx.CommandHasErrors = true
 	publication := result
 	result.ProjectResults = slices.Clone(result.ProjectResults)
@@ -531,16 +532,104 @@ func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentC
 		}
 	}
 	result.Error = failure
-	a.publishDeferredApplyStatuses(projects, publication, models.FailedCommitStatus)
-	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
-		ctx.Log.Warn("updating apply failure status %v", err)
+	if err := publishTerminal(ctx, func() error { return a.publishDeferredApplyStatuses(projects, publication, models.FailedCommitStatus) }); err != nil {
+		return err
 	}
-	a.pullUpdater.updatePull(ctx, cmd, result)
+	if err := publishTerminal(ctx, func() error {
+		return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply)
+	}); err != nil {
+		return err
+	}
+	return a.pullUpdater.updatePull(ctx, cmd, result)
 }
 
-// beginDurableApply consumes generation-backed plans before executing any steps.
-// Legacy plans and the request-local API flow retain their existing behavior.
-// Publication ordering across replicas is a separate coordinator concern.
+func (a *ApplyCommandRunner) prepareApply(ctx *command.Context, cmd *CommentCommand, projects []command.ProjectContext) bool {
+	err := a.Publication.RunCommand(ctx, func() error {
+		if len(projects) == 0 {
+			return nil
+		}
+		if ctx.TerminalPublisher != nil {
+			live, err := a.refreshLivePullIdentity(ctx)
+			if err != nil {
+				return err
+			}
+			if a.livePullHeadFetcher != nil {
+				if err := validateCommandStartIdentity(command.ProjectContext{Pull: ctx.Pull}, live); err != nil {
+					return err
+				}
+			}
+		}
+		if ctx.TerminalPublisher != nil {
+			// Reject obsolete/consumed plans before overwriting a newer command's
+			// VCS status with Pending. The lease keeps this read valid until the
+			// admission write after pending publication succeeds.
+			current, err := a.dbUpdater.Database.GetPullStatus(ctx.Pull)
+			if err != nil {
+				return err
+			}
+			if _, err := db.BeginApplyExecution(current, ctx.Pull, projects, ctx.PublicationFence.Owner); err != nil {
+				return err
+			}
+		}
+		if err := a.updatePendingCommitStatus(ctx); err != nil {
+			return err
+		}
+		if ctx.TerminalPublisher == nil {
+			return a.beginDurableApply(ctx, projects)
+		}
+		for i := range projects {
+			projects[i].PublicationDeferred = true
+		}
+		if publisher, ok := a.prjCmdRunner.(PendingProjectStatusPublisher); ok {
+			if err := publishTerminal(ctx, func() error { return publisher.PublishPendingProjectStatuses(projects) }); err != nil {
+				return err
+			}
+		}
+		executionID := ctx.PublicationFence.Owner
+		status, err := a.dbUpdater.Database.BeginApplyExecution(ctx.Pull, projects, executionID, ctx.PublicationMode())
+		if err != nil {
+			return err
+		}
+		ctx.PullStatus = &status
+		for i := range projects {
+			projects[i].ApplyExecutionID = executionID
+		}
+		return nil
+	})
+	if err != nil {
+		ctx.CommandHasErrors = true
+		if reportErr := a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: fmt.Errorf("starting apply: %w", err)}); reportErr != nil {
+			ctx.Log.Err("reporting command result: %s", reportErr)
+		}
+		return false
+	}
+	return true
+}
+
+func (a *ApplyCommandRunner) reportApplyStartFailure(ctx *command.Context, cmd *CommentCommand, failure error, comment string) {
+	ctx.CommandHasErrors = true
+	err := a.Publication.RunWithObservedStatus(ctx, a.Database, a.livePullHeadFetcher, func() error {
+		if err := publishTerminal(ctx, func() error {
+			return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName())
+		}); err != nil {
+			return err
+		}
+		if comment != "" {
+			return publishTerminal(ctx, func() error {
+				return a.vcsClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, comment, command.Apply.String())
+			})
+		}
+		return a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: failure})
+	})
+	if errors.Is(err, db.ErrPlanGenerationSuperseded) {
+		ctx.Log.Warn("suppressing obsolete apply failure publication %v", err)
+	} else if err != nil {
+		if reportErr := a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: errors.Join(failure, err)}); reportErr != nil {
+			ctx.Log.Err("reporting command result: %s", reportErr)
+		}
+	}
+}
+
 func (a *ApplyCommandRunner) beginDurableApply(ctx *command.Context, projects []command.ProjectContext) error {
 	var durable []command.ProjectContext
 	for _, project := range projects {

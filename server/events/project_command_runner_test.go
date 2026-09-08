@@ -425,12 +425,12 @@ func TestProjectOutputWrapper_DefersRemoteApplyURLSuccessStatus(t *testing.T) {
 	mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
 	mockJobMessageSender.VerifyWasCalledOnce().Send(ctx, "", true)
 
-	runner.PublishDeferredApplyStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{
+	Ok(t, runner.PublishDeferredApplyStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{
 		ProjectCommandOutput: prjResult,
 		Command:              command.Apply,
 		RepoRelDir:           ctx.RepoRelDir,
 		Workspace:            ctx.Workspace,
-	}}}, models.SuccessCommitStatus)
+	}}}, models.SuccessCommitStatus))
 
 	mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, command.Apply, models.SuccessCommitStatus, &prjResult)
 }
@@ -5546,6 +5546,6 @@ func TestProjectOutputWrapper_GenerationPlanFailureWaitsForDurableCompletion(t *
 	setter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.FailedCommitStatus), Any[*command.ProjectCommandOutput]())
 	// A superseded command omits this publication entirely. A matching durable
 	// completion publishes its failure using the same deferred path as success.
-	wrapper.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{Command: command.Plan, PlanGeneration: "G1", Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectCommandOutput: output}}}, models.SuccessCommitStatus)
+	Ok(t, wrapper.PublishDeferredPlanStatuses([]command.ProjectContext{ctx}, command.Result{ProjectResults: []command.ProjectResult{{Command: command.Plan, PlanGeneration: "G1", Workspace: ctx.Workspace, RepoRelDir: ctx.RepoRelDir, ProjectCommandOutput: output}}}, models.SuccessCommitStatus))
 	setter.VerifyWasCalledOnce().SetJobURLWithStatus(ctx, command.Plan, models.FailedCommitStatus, &output)
 }

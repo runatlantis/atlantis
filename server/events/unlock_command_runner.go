@@ -25,6 +25,7 @@ func NewUnlockCommandRunner(
 }
 
 type UnlockCommandRunner struct {
+	Publication       *PublicationCoordinator
 	vcsClient         vcs.Client
 	deleteLockCommand DeleteLockCommand
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
@@ -57,24 +58,33 @@ func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 		}
 	}
 
-	var numLocks int
-	if err == nil && !hasLabel {
-		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, ctx.Pull)
-		if err != nil {
-			vcsMessage = "Failed to delete PR locks"
-			ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+	publicationErr := u.Publication.RunCommand(ctx, func() error {
+		var numLocks int
+		if err == nil && !hasLabel {
+			numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, ctx.Pull, ctx.PublicationMode())
+			if err != nil {
+				return err
+			}
 		}
-	}
-
-	// if there are no locks to delete, no errors, and SilenceNoProjects is enabled, don't comment
-	if err == nil && numLocks == 0 {
-		ctx.Log.Info("No locks to delete")
-		if u.SilenceNoProjects {
-			return
+		if err == nil && numLocks == 0 {
+			ctx.Log.Info("No locks to delete")
+			if u.SilenceNoProjects {
+				return nil
+			}
 		}
-	}
-
-	if commentErr := u.vcsClient.CreateComment(ctx.Log, baseRepo, pullNum, vcsMessage, command.Unlock.String()); commentErr != nil {
-		ctx.Log.Err("unable to comment: %s", commentErr)
+		return publishTerminal(ctx, func() error {
+			return u.vcsClient.CreateComment(ctx.Log, baseRepo, pullNum, vcsMessage, command.Unlock.String())
+		})
+	})
+	if publicationErr != nil {
+		ctx.CommandHasErrors = true
+		ctx.Log.Err("unlocking pull request: %v", publicationErr)
+		message := "Failed to delete PR locks"
+		if u.Publication != nil {
+			message = "Unable to complete unlock command: " + publicationErr.Error()
+		}
+		if commentErr := u.vcsClient.CreateComment(ctx.Log, baseRepo, pullNum, message, command.Unlock.String()); commentErr != nil {
+			ctx.Log.Err("unable to comment: %s", commentErr)
+		}
 	}
 }

@@ -4,6 +4,10 @@
 package events
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -32,6 +36,8 @@ func NewApprovePoliciesCommandRunner(
 }
 
 type ApprovePoliciesCommandRunner struct {
+	Publication         *PublicationCoordinator
+	LivePullHeadFetcher LivePullHeadFetcher
 	commitStatusUpdater CommitStatusUpdater
 	pullUpdater         *PullUpdater
 	dbUpdater           *DBUpdater
@@ -45,61 +51,64 @@ type ApprovePoliciesCommandRunner struct {
 }
 
 func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
-	baseRepo := ctx.Pull.BaseRepo
-	pull := ctx.Pull
+	// Approval checks read ownership and update policy approvals; they do not
+	// execute Terraform. Keep their durable read/modify/publication together.
+	err := a.Publication.RunWithObservedStatus(ctx, a.dbUpdater.Database, a.LivePullHeadFetcher, func() error { return a.approve(ctx, cmd) })
+	if err != nil {
+		ctx.CommandHasErrors = true
+		if errors.Is(err, db.ErrPlanGenerationSuperseded) {
+			ctx.Log.Warn("suppressing obsolete policy approval publication %v", err)
+			return
+		}
+		if reportErr := a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err}); reportErr != nil {
+			ctx.Log.Err("reporting command result: %s", reportErr)
+		}
+	}
+}
 
+func (a *ApprovePoliciesCommandRunner) approve(ctx *command.Context, cmd *CommentCommand) error {
 	projectCmds, err := a.prjCmdBuilder.BuildApprovePoliciesCommands(ctx, cmd)
 	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
-		return
+		return nil
 	}
 	if err != nil {
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		if statusErr := publishTerminal(ctx, func() error {
+			return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.PolicyCheck)
+		}); statusErr != nil {
+			return errors.Join(err, statusErr)
 		}
-		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
-		return
+		return err
 	}
-
-	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, baseRepo, pull, models.PendingCommitStatus, command.PolicyCheck); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
+	if err := publishTerminal(ctx, func() error {
+		return a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.PolicyCheck)
+	}); err != nil {
+		return err
 	}
-
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run approve_policies in")
-		if !a.silenceVCSStatusNoProjects {
-			// If there were no projects modified, we set successful commit statuses
-			// with 0/0 projects approve_policies successfully because some users require
-			// the Atlantis status to be passing for all pull requests.
-			ctx.Log.Debug("setting VCS status to success with no projects found")
-			if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{}); err != nil {
-				ctx.Log.Warn("unable to update commit status: %s", err)
-			}
+		if a.silenceVCSStatusNoProjects {
+			return nil
 		}
-		return
+		return publishTerminal(ctx, func() error {
+			return a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, command.PolicyCheck, models.ProjectCounts{})
+		})
 	}
-
 	result := runProjectCmds(projectCmds, a.prjCmdRunner.ApprovePolicies)
-
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result,
-	)
-
-	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
+	pullStatus, err := a.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
-		return
+		return fmt.Errorf("writing policy approvals: %w", err)
 	}
-
-	a.updateCommitStatus(ctx, pullStatus)
+	if err := a.pullUpdater.updatePull(ctx, cmd, result); err != nil {
+		return err
+	}
+	return a.updateCommitStatus(ctx, pullStatus)
 }
 
 func (a *ApprovePoliciesCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
 	return MarkCommandSkippedIfIgnoredTarget(ctx, cmd.CommandName(), cmd, a.prjCmdBuilder)
 }
 
-func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) {
+func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus models.PullStatus) error {
 	var numSuccess int
 	var numErrored int
 	status := models.SuccessCommitStatus
@@ -111,7 +120,7 @@ func (a *ApprovePoliciesCommandRunner) updateCommitStatus(ctx *command.Context, 
 		status = models.FailedCommitStatus
 	}
 
-	if err := a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored}); err != nil {
-		ctx.Log.Warn("unable to update commit status: %s", err)
-	}
+	return publishTerminal(ctx, func() error {
+		return a.commitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, status, command.PolicyCheck, models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored})
+	})
 }

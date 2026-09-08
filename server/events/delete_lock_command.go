@@ -22,8 +22,8 @@ import (
 
 // DeleteLockCommand is the first step after a command request has been parsed.
 type DeleteLockCommand interface {
-	DeleteLock(logger logging.SimpleLogging, id string) (*models.ProjectLock, bool, error)
-	DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest) (int, error)
+	DeleteLock(logger logging.SimpleLogging, id string, mode command.PublicationWriteMode) (*models.ProjectLock, bool, error)
+	DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest, mode command.PublicationWriteMode) (int, error)
 }
 
 // PlanArtifactReaper reaps an exact artifact captured before a durable transition.
@@ -43,7 +43,7 @@ type DefaultDeleteLockCommand struct {
 }
 
 // DeleteLock handles deleting the lock at id
-func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string) (*models.ProjectLock, bool, error) {
+func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string, mode command.PublicationWriteMode) (*models.ProjectLock, bool, error) {
 	lock, err := l.Locker.GetLock(id)
 	if err != nil {
 		return nil, false, err
@@ -65,7 +65,7 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 	if project == nil {
 		return nil, false, db.ErrPlanStatusNotFound
 	}
-	discarded, err := l.Database.DiscardPlanStatus(status.Pull, *project, command.NoClaim{})
+	discarded, err := l.Database.DiscardPlanStatus(status.Pull, *project, mode)
 	if err != nil {
 		return nil, false, err
 	}
@@ -87,7 +87,7 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
-func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest) (int, error) {
+func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest, mode command.PublicationWriteMode) (int, error) {
 	var captured []models.ProjectStatus
 	repoFullName, pullNum := pull.BaseRepo.FullName, pull.Num
 	if l.Database != nil {
@@ -99,7 +99,7 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 			pull = status.Pull
 			captured = status.Projects
 			for _, project := range captured {
-				if _, err := l.Database.DiscardPlanStatus(pull, project, command.NoClaim{}); err != nil {
+				if _, err := l.Database.DiscardPlanStatus(pull, project, mode); err != nil {
 					return 0, err
 				}
 			}

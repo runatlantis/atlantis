@@ -5,6 +5,7 @@ package controllers_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
-	for _, outcome := range []string{"success", "persistence failure", "missing saved hash"} {
+	for _, outcome := range []string{"success", "success with publication", "persistence failure", "missing saved hash", "persistence failure with publication", "missing saved hash with publication"} {
 		t.Run(outcome, func(t *testing.T) {
 
 			ac, builder, runner := setup(t)
@@ -40,9 +41,12 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			Ok(t, err)
 			ac.PullStatusFetcher = storage
 			ac.PlanGenerationDB = storage
+			if strings.Contains(outcome, "with publication") {
+				ac.Publication = events.NewPublicationCoordinator(storage, context.Background())
+			}
 			reaper := &recordingAPIPlanReaper{}
 			ac.PlanReaper = reaper
-			if outcome == "persistence failure" {
+			if strings.Contains(outcome, "persistence failure") {
 				ac.PlanGenerationDB = rejectingAPIResultDatabase{Database: storage}
 			}
 			build := func(name command.Name) func([]Param) ReturnValues {
@@ -61,7 +65,10 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			When(builder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(build(command.Apply))
 			When(runner.Plan(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 				ctx := args[0].(command.ProjectContext)
-				if ctx.SavedPlanHash != nil && outcome != "missing saved hash" {
+				lease, leaseErr := storage.GetPublicationLease(context.Background(), ctx.Pull)
+				Ok(t, leaseErr)
+				Assert(t, lease == nil, "Terraform execution must not hold the publication lease")
+				if ctx.SavedPlanHash != nil && !strings.Contains(outcome, "missing saved hash") {
 					*ctx.SavedPlanHash = strings.Repeat("b", 64)
 				}
 				return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
@@ -71,6 +78,9 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			When(runner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 				applied = true
 				ctx := args[0].(command.ProjectContext)
+				lease, leaseErr := storage.GetPublicationLease(context.Background(), ctx.Pull)
+				Ok(t, leaseErr)
+				Assert(t, lease == nil, "Terraform execution must not hold the publication lease")
 				Assert(t, ctx.ApplyExecutionID != "", "API apply must own a durable execution reservation")
 				_, admissionErr := storage.BeginApplyExecution(ctx.Pull, []command.ProjectContext{ctx}, "another-api-worker", command.NoClaim{})
 				Assert(t, errors.Is(admissionErr, db.ErrApplyAlreadyStarted), "concurrent API apply must be rejected")
@@ -85,7 +95,10 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			request.Header.Set(atlantisTokenHeader, atlantisToken)
 			response := httptest.NewRecorder()
 			ac.Apply(response, request)
-			if outcome == "success" {
+			lease, leaseErr := storage.GetPublicationLease(context.Background(), pull)
+			Ok(t, leaseErr)
+			Assert(t, lease == nil, "completed or failed API command must release its lease")
+			if strings.HasPrefix(outcome, "success") {
 				ResponseContains(t, response, http.StatusOK, "")
 				Equals(t, 1, len(reaper.projects))
 				Equals(t, "previous-plan", reaper.projects[0].AcceptedPlanGeneration)

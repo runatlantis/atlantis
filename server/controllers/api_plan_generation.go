@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,7 +30,7 @@ func (a *APIController) beginAPIPlan(ctx *command.Context, projects []command.Pr
 		return nil
 	}
 	generation := uuid.NewString()
-	begun, err := a.PlanGenerationDB.BeginPlanGeneration(ctx.Pull, generation, projects, false, command.NoClaim{})
+	begun, err := a.PlanGenerationDB.BeginPlanGeneration(ctx.Pull, generation, projects, false, ctx.PublicationMode())
 	if err != nil {
 		return fmt.Errorf("starting API plan generation: %w", err)
 	}
@@ -96,7 +97,7 @@ func (a *APIController) beginAPIApply(ctx *command.Context, project *command.Pro
 		return fmt.Errorf("reserving PR API apply requires a generation database")
 	}
 	executionID := uuid.NewString()
-	status, err := a.PlanGenerationDB.BeginApplyExecution(ctx.Pull, []command.ProjectContext{*project}, executionID, command.NoClaim{})
+	status, err := a.PlanGenerationDB.BeginApplyExecution(ctx.Pull, []command.ProjectContext{*project}, executionID, ctx.PublicationMode())
 	if err != nil {
 		return fmt.Errorf("reserving API apply execution: %w", err)
 	}
@@ -104,4 +105,58 @@ func (a *APIController) beginAPIApply(ctx *command.Context, project *command.Pro
 	project.PullStatus = ctx.PullStatus
 	project.ApplyExecutionID = executionID
 	return nil
+}
+
+// runAPIPublication checks the live identity under short ownership. Execution
+// happens outside this callback; completion persists before publishing results.
+func (a *APIController) runAPIPublication(ctx *command.Context, operation func() error) error {
+	return a.Publication.RunCommand(ctx, func() error {
+		if ctx.Pull.Num > 0 && a.LivePullHeadFetcher != nil {
+			live, err := a.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{Log: ctx.Log, Pull: ctx.Pull, PullStatus: ctx.PullStatus, API: ctx.API})
+			if err != nil {
+				return fmt.Errorf("refreshing API publication identity: %w", err)
+			}
+			if live.HeadCommit == "" || live.HeadCommit != ctx.Pull.HeadCommit || live.BaseBranch != ctx.Pull.BaseBranch {
+				return fmt.Errorf("%w: API pull identity changed; replan before applying", db.ErrPlanGenerationSuperseded)
+			}
+		}
+		return operation()
+	})
+}
+
+func publishAPIStatus(ctx *command.Context, remote func() error) error {
+	if ctx.TerminalPublisher != nil {
+		return ctx.TerminalPublisher.Publish(remote)
+	}
+	if ctx.PublicationRequired {
+		return db.ErrPublicationOwnerLost
+	}
+	return remote()
+}
+
+func (a *APIController) publishAPIEmptyResult(ctx *command.Context) error {
+	if a.SilenceVCSStatusNoProjects || ctx.SuppressVCSStatus {
+		return nil
+	}
+	return a.Publication.RunWithObservedStatus(ctx, a.PlanGenerationDB, a.LivePullHeadFetcher, func() error {
+		for _, name := range []command.Name{command.Plan, command.PolicyCheck, command.Apply} {
+			if err := publishAPIStatus(ctx, func() error {
+				return a.CommitStatusUpdater.UpdateCombinedCount(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.SuccessCommitStatus, name, models.ProjectCounts{})
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// cleanupAPIPlanLocks preserves legacy terminal cleanup while refusing to
+// remove a newer command's locks after a PR-backed API request is superseded.
+func (a *APIController) cleanupAPIPlanLocks(ctx *command.Context) {
+	if err := a.Publication.RunWithObservedStatus(ctx, a.PlanGenerationDB, a.LivePullHeadFetcher, func() error {
+		_, err := a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num)
+		return err
+	}); err != nil {
+		ctx.Log.Warn("cleaning API plan locks: %s", err)
+	}
 }

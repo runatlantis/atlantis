@@ -58,7 +58,11 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Version)
 	}
 
-	v.pullUpdater.updatePull(ctx, cmd, result)
+	if reportErr := v.pullUpdater.updatePull(ctx, cmd, result); reportErr != nil {
+
+		ctx.Log.Err("reporting command result: %s", reportErr)
+
+	}
 }
 
 func (v *VersionCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {
