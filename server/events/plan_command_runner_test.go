@@ -127,7 +127,7 @@ func TestPlanCommandRunner_IsSilenced(t *testing.T) {
 							PlanSuccess: &models.PlanSuccess{},
 						},
 					},
-				})
+				}, command.NoClaim{})
 				Ok(t, err)
 			}
 
@@ -797,7 +797,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 							},
 						},
 					},
-				})
+				}, command.NoClaim{})
 				Ok(t, err)
 			}
 
@@ -1165,12 +1165,12 @@ type observingPlanDatabase struct {
 	persisted   bool
 }
 
-func (d *observingPlanDatabase) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+func (d *observingPlanDatabase) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult, mode command.PublicationWriteMode) (models.PullStatus, error) {
 	d.beforeWrite()
 	if d.writeErr != nil {
 		return models.PullStatus{}, d.writeErr
 	}
-	status, err := d.Database.UpdatePullWithResults(pull, results)
+	status, err := d.Database.UpdatePullWithResults(pull, results, mode)
 	d.persisted = err == nil
 	return status, err
 }
@@ -1301,14 +1301,14 @@ func TestPlanCommandRunner_GenerationAdmissionAndObsoleteCompletion(t *testing.T
 					expectedGeneration = admitted.PlanGeneration
 					if superseded {
 						expectedGeneration = "newer-generation"
-						_, err := storage.BeginPlanGeneration(ctx.Pull, expectedGeneration, []command.ProjectContext{project}, false)
+						_, err := storage.BeginPlanGeneration(ctx.Pull, expectedGeneration, []command.ProjectContext{project}, false, command.NoClaim{})
 						require.NoError(t, err)
 						newer := admitted
 						newer.PlanGeneration = expectedGeneration
 						newer.SavedPlanHash = new(string)
 						require.NoError(t, os.WriteFile(canonical, []byte("newer bytes"), 0o600))
 						require.NoError(t, store.Save(newer, canonical))
-						_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: expectedGeneration, ManagedPlanHash: *newer.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+						_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: expectedGeneration, ManagedPlanHash: *newer.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 						require.NoError(t, err)
 					}
 					require.NoError(t, os.WriteFile(canonical, []byte("original command bytes"), 0o600))

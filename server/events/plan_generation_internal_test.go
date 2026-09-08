@@ -23,7 +23,7 @@ func TestGenerationCompletionExcludesMissingDirectory(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, storage.Close()) })
 	pull := models.PullRequest{Num: 1, HeadCommit: "head", BaseRepo: models.Repo{FullName: "owner/repo"}}
 	projects := []command.ProjectContext{{Workspace: "default", RepoRelDir: "removed"}, {Workspace: "default", RepoRelDir: "remaining"}}
-	_, err = storage.BeginPlanGeneration(pull, "G1", projects, true)
+	_, err = storage.BeginPlanGeneration(pull, "G1", projects, true, command.NoClaim{})
 	require.NoError(t, err)
 	directoryError := DirNotExistErr{RepoRelDir: "removed"}
 	results := []command.ProjectResult{
@@ -70,21 +70,21 @@ func TestGenerationRestoreUsesDurableInventoryAfterCheckoutLoss(t *testing.T) {
 	store := &runtime.LocalPlanStore{SeparatePlanDir: planRoot}
 	pull := models.PullRequest{Num: 1, HeadCommit: "same-head", BaseRepo: models.Repo{FullName: "owner/repo"}}
 	project := command.ProjectContext{BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "production", RepoRelDir: ".", RequiresAtlantisManagedPlanFile: true, LocalSharePlanDir: planRoot, SavedPlanHash: new(string)}
-	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{project}, true)
+	_, err = storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{project}, true, command.NoClaim{})
 	require.NoError(t, err)
-	_, err = storage.BeginPlanGeneration(pull, "G2", []command.ProjectContext{project}, true)
+	_, err = storage.BeginPlanGeneration(pull, "G2", []command.ProjectContext{project}, true, command.NoClaim{})
 	require.NoError(t, err)
 	path := runtime.GetPlanFilePath(project, t.TempDir())
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	project.PlanGeneration = "G2"
 	require.NoError(t, os.WriteFile(path, []byte("accepted G2"), 0o600))
 	require.NoError(t, store.Save(project, path))
-	accepted, err := storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G2", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	accepted, err := storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G2", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	require.NoError(t, err)
 	project.PlanGeneration = "G1"
 	require.NoError(t, os.WriteFile(path, []byte("late G1"), 0o600))
 	require.NoError(t, store.Save(project, path))
-	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G1", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G1", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	require.ErrorIs(t, err, db.ErrPlanGenerationSuperseded)
 	workingDir := &generationRestoreWorkingDir{root: t.TempDir()}
 	builder := DefaultProjectCommandBuilder{WorkingDir: workingDir, PlanStore: store, LocalSharePlanDir: planRoot}

@@ -288,7 +288,7 @@ func TestCleanUpLogStreaming(t *testing.T) {
 		}
 
 		// Create a new record for pull
-		_, err = database.UpdatePullWithResults(testdata.Pull, result)
+		_, err = database.UpdatePullWithResults(testdata.Pull, result, command.NoClaim{})
 		Ok(t, err)
 
 		workingDir := mocks.NewMockWorkingDir()
@@ -366,7 +366,7 @@ func TestCleanUpPullWithCorrectJobContext(t *testing.T) {
 	}
 
 	// Add pull status to database
-	_, err = db.UpdatePullWithResults(testdata.Pull, testProjects)
+	_, err = db.UpdatePullWithResults(testdata.Pull, testProjects, command.NoClaim{})
 	Ok(t, err)
 
 	// Create executor

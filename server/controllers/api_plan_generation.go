@@ -29,7 +29,7 @@ func (a *APIController) beginAPIPlan(ctx *command.Context, projects []command.Pr
 		return nil
 	}
 	generation := uuid.NewString()
-	begun, err := a.PlanGenerationDB.BeginPlanGeneration(ctx.Pull, generation, projects, false)
+	begun, err := a.PlanGenerationDB.BeginPlanGeneration(ctx.Pull, generation, projects, false, command.NoClaim{})
 	if err != nil {
 		return fmt.Errorf("starting API plan generation: %w", err)
 	}

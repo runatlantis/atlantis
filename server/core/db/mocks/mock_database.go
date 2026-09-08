@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
@@ -43,19 +44,48 @@ func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
 }
 
-// BeginPlanGeneration mocks base method.
-func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool) (db.PlanGenerationBeginResult, error) {
+// AcquirePublicationLease mocks base method.
+func (m *MockDatabase) AcquirePublicationLease(arg0 context.Context, arg1 models.PullRequest, arg2 string, arg3 time.Duration) (db.PublicationLease, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BeginPlanGeneration", pull, generation, projects, replace)
+	ret := m.ctrl.Call(m, "AcquirePublicationLease", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(db.PublicationLease)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AcquirePublicationLease indicates an expected call of AcquirePublicationLease.
+func (mr *MockDatabaseMockRecorder) AcquirePublicationLease(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcquirePublicationLease", reflect.TypeOf((*MockDatabase)(nil).AcquirePublicationLease), arg0, arg1, arg2, arg3)
+}
+
+// BeginPlanGeneration mocks base method.
+func (m *MockDatabase) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool, mode command.PublicationWriteMode) (db.PlanGenerationBeginResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeginPlanGeneration", pull, generation, projects, replace, mode)
 	ret0, _ := ret[0].(db.PlanGenerationBeginResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // BeginPlanGeneration indicates an expected call of BeginPlanGeneration.
-func (mr *MockDatabaseMockRecorder) BeginPlanGeneration(pull, generation, projects, replace any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) BeginPlanGeneration(pull, generation, projects, replace, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGeneration), pull, generation, projects, replace)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPlanGeneration", reflect.TypeOf((*MockDatabase)(nil).BeginPlanGeneration), pull, generation, projects, replace, mode)
+}
+
+// BeginPublication mocks base method.
+func (m *MockDatabase) BeginPublication(arg0 context.Context, arg1 models.PullRequest, arg2 db.PublicationFence) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BeginPublication", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BeginPublication indicates an expected call of BeginPublication.
+func (mr *MockDatabaseMockRecorder) BeginPublication(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BeginPublication", reflect.TypeOf((*MockDatabase)(nil).BeginPublication), arg0, arg1, arg2)
 }
 
 // CheckCommandLock mocks base method.
@@ -87,33 +117,47 @@ func (mr *MockDatabaseMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockDatabase)(nil).Close))
 }
 
-// DeletePullStatus mocks base method.
-func (m *MockDatabase) DeletePullStatus(pull models.PullRequest) error {
+// CompletePublication mocks base method.
+func (m *MockDatabase) CompletePublication(arg0 context.Context, arg1 models.PullRequest, arg2 db.PublicationFence) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePullStatus", pull)
+	ret := m.ctrl.Call(m, "CompletePublication", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompletePublication indicates an expected call of CompletePublication.
+func (mr *MockDatabaseMockRecorder) CompletePublication(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompletePublication", reflect.TypeOf((*MockDatabase)(nil).CompletePublication), arg0, arg1, arg2)
+}
+
+// DeletePullStatus mocks base method.
+func (m *MockDatabase) DeletePullStatus(pull models.PullRequest, mode command.PublicationWriteMode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePullStatus", pull, mode)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeletePullStatus indicates an expected call of DeletePullStatus.
-func (mr *MockDatabaseMockRecorder) DeletePullStatus(pull any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) DeletePullStatus(pull, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePullStatus", reflect.TypeOf((*MockDatabase)(nil).DeletePullStatus), pull)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePullStatus", reflect.TypeOf((*MockDatabase)(nil).DeletePullStatus), pull, mode)
 }
 
 // DiscardPlanStatus mocks base method.
-func (m *MockDatabase) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus) (bool, error) {
+func (m *MockDatabase) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus, mode command.PublicationWriteMode) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DiscardPlanStatus", pull, expected)
+	ret := m.ctrl.Call(m, "DiscardPlanStatus", pull, expected, mode)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DiscardPlanStatus indicates an expected call of DiscardPlanStatus.
-func (mr *MockDatabaseMockRecorder) DiscardPlanStatus(pull, expected any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) DiscardPlanStatus(pull, expected, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardPlanStatus", reflect.TypeOf((*MockDatabase)(nil).DiscardPlanStatus), pull, expected)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardPlanStatus", reflect.TypeOf((*MockDatabase)(nil).DiscardPlanStatus), pull, expected, mode)
 }
 
 // GetLock mocks base method.
@@ -129,6 +173,21 @@ func (m *MockDatabase) GetLock(project models.Project, workspace string) (*model
 func (mr *MockDatabaseMockRecorder) GetLock(project, workspace any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLock", reflect.TypeOf((*MockDatabase)(nil).GetLock), project, workspace)
+}
+
+// GetPublicationLease mocks base method.
+func (m *MockDatabase) GetPublicationLease(arg0 context.Context, arg1 models.PullRequest) (*db.PublicationLease, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPublicationLease", arg0, arg1)
+	ret0, _ := ret[0].(*db.PublicationLease)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPublicationLease indicates an expected call of GetPublicationLease.
+func (mr *MockDatabaseMockRecorder) GetPublicationLease(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPublicationLease", reflect.TypeOf((*MockDatabase)(nil).GetPublicationLease), arg0, arg1)
 }
 
 // GetPullStatus mocks base method.
@@ -188,6 +247,49 @@ func (m *MockDatabase) Ping() error {
 func (mr *MockDatabaseMockRecorder) Ping() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDatabase)(nil).Ping))
+}
+
+// RecoverPublicationLease mocks base method.
+func (m *MockDatabase) RecoverPublicationLease(arg0 context.Context, arg1 models.PullRequest, arg2 db.PublicationFence) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecoverPublicationLease", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RecoverPublicationLease indicates an expected call of RecoverPublicationLease.
+func (mr *MockDatabaseMockRecorder) RecoverPublicationLease(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverPublicationLease", reflect.TypeOf((*MockDatabase)(nil).RecoverPublicationLease), arg0, arg1, arg2)
+}
+
+// ReleasePublicationLease mocks base method.
+func (m *MockDatabase) ReleasePublicationLease(arg0 context.Context, arg1 models.PullRequest, arg2 db.PublicationFence) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReleasePublicationLease", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ReleasePublicationLease indicates an expected call of ReleasePublicationLease.
+func (mr *MockDatabaseMockRecorder) ReleasePublicationLease(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReleasePublicationLease", reflect.TypeOf((*MockDatabase)(nil).ReleasePublicationLease), arg0, arg1, arg2)
+}
+
+// RenewPublicationLease mocks base method.
+func (m *MockDatabase) RenewPublicationLease(arg0 context.Context, arg1 models.PullRequest, arg2 db.PublicationFence, arg3 time.Duration) (db.PublicationLease, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenewPublicationLease", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(db.PublicationLease)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RenewPublicationLease indicates an expected call of RenewPublicationLease.
+func (mr *MockDatabaseMockRecorder) RenewPublicationLease(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenewPublicationLease", reflect.TypeOf((*MockDatabase)(nil).RenewPublicationLease), arg0, arg1, arg2, arg3)
 }
 
 // TryLock mocks base method.
@@ -266,30 +368,30 @@ func (mr *MockDatabaseMockRecorder) UnlockIfOwnedByPull(project, workspace, pull
 }
 
 // UpdateProjectStatus mocks base method.
-func (m *MockDatabase) UpdateProjectStatus(pull models.PullRequest, workspace, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (m *MockDatabase) UpdateProjectStatus(pull models.PullRequest, workspace, repoRelDir string, newStatus models.ProjectPlanStatus, mode command.PublicationWriteMode) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectStatus", pull, workspace, repoRelDir, newStatus)
+	ret := m.ctrl.Call(m, "UpdateProjectStatus", pull, workspace, repoRelDir, newStatus, mode)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateProjectStatus indicates an expected call of UpdateProjectStatus.
-func (mr *MockDatabaseMockRecorder) UpdateProjectStatus(pull, workspace, repoRelDir, newStatus any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) UpdateProjectStatus(pull, workspace, repoRelDir, newStatus, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectStatus", reflect.TypeOf((*MockDatabase)(nil).UpdateProjectStatus), pull, workspace, repoRelDir, newStatus)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectStatus", reflect.TypeOf((*MockDatabase)(nil).UpdateProjectStatus), pull, workspace, repoRelDir, newStatus, mode)
 }
 
 // UpdatePullWithResults mocks base method.
-func (m *MockDatabase) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
+func (m *MockDatabase) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult, mode command.PublicationWriteMode) (models.PullStatus, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdatePullWithResults", pull, newResults)
+	ret := m.ctrl.Call(m, "UpdatePullWithResults", pull, newResults, mode)
 	ret0, _ := ret[0].(models.PullStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdatePullWithResults indicates an expected call of UpdatePullWithResults.
-func (mr *MockDatabaseMockRecorder) UpdatePullWithResults(pull, newResults any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) UpdatePullWithResults(pull, newResults, mode any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePullWithResults", reflect.TypeOf((*MockDatabase)(nil).UpdatePullWithResults), pull, newResults)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePullWithResults", reflect.TypeOf((*MockDatabase)(nil).UpdatePullWithResults), pull, newResults, mode)
 }

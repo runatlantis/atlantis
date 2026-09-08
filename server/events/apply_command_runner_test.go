@@ -76,7 +76,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 			Ok(t, err)
 
 			ctx := &command.Context{
@@ -210,10 +210,10 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 						RepoRelDir: "prevdir",
 						Workspace:  "default",
 					},
-				})
+				}, command.NoClaim{})
 				Ok(t, err)
 			} else if c.ExpVCSStatusSet && !c.Matched {
-				_, err = db.UpdatePullWithResults(modelPull, nil)
+				_, err = db.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 				Ok(t, err)
 			}
 
@@ -470,7 +470,7 @@ func TestApplyCommandRunner_RefreshesPullStatusAfterApplyLock(t *testing.T) {
 		tc.database = database
 	})
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply}
 	ctx := &command.Context{
@@ -506,7 +506,7 @@ func TestApplyCommandRunner_GenericApplyUsesLiveHeadForBuilderValidation(t *test
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead, base: liveBase}
 	})
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead, BaseBranch: liveBase}
-	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply}
 	ctx := &command.Context{
@@ -539,7 +539,7 @@ func TestApplyCommandRunner_GenericApplyDoesNotRejectCurrentPlanAfterPullStatusR
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
 	})
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
-	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply}
 	ctx := &command.Context{
@@ -575,7 +575,7 @@ func TestApplyCommandRunner_GenericApplyRejectsRetargetedPRSameHead(t *testing.T
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "release"}
 	})
 	storedPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
-	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply}
 	ctx := &command.Context{
@@ -620,7 +620,7 @@ func TestApplyCommandRunner_TargetedApplyPreservesCommandStartHeadAfterLiveRefre
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
 	})
 	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
-	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
 	ctx := &command.Context{
@@ -655,7 +655,7 @@ func TestApplyCommandRunner_TargetedApplyParsedBeforePushDoesNotApplyNewHeadPlan
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
 	})
 	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
-	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, "dirA", runtime.GetPlanFilename(events.DefaultWorkspace, "projA"))
 	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
@@ -726,7 +726,7 @@ func TestApplyCommandRunner_TargetedApplyRejectsRetargetedPRSameHead(t *testing.
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "release"}
 	})
 	storedPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "main"}
-	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(storedPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, "dirA", runtime.GetPlanFilename(events.DefaultWorkspace, "projA"))
 	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
@@ -777,7 +777,7 @@ func TestApplyCommandRunner_TargetedBaseRetargetPreservesCurrentPullStatus(t *te
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: head, base: "release"}
 	})
 	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: head, BaseBranch: "release"}
-	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
 	ctx := &command.Context{
@@ -816,7 +816,7 @@ func TestApplyCommandRunner_TargetedStaleApplyRequirementFailurePreservesLivePul
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
 	})
 	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
-	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
 	ctx := &command.Context{
@@ -862,7 +862,7 @@ func TestApplyCommandRunner_TargetedStaleApplyDependencyFailurePreservesLivePull
 		tc.livePullHeadFetcher = fakeLivePullHeadFetcher{head: liveHead}
 	})
 	currentPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: liveHead}
-	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
 	ctx := &command.Context{
@@ -1168,7 +1168,7 @@ func assertApplyCommandRunnerDoesNotAutomergeAfterPreservedStaleApplyWithBase(t 
 		ProjectCommandOutput: command.ProjectCommandOutput{
 			ApplySuccess: "already applied",
 		},
-	}})
+	}}, command.NoClaim{})
 	Ok(t, err)
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
@@ -1211,7 +1211,7 @@ func runApplyCommandRunnerWithBaseChangeDuringApply(t *testing.T) (db.Database, 
 		tc.database = database
 		tc.livePullHeadFetcher = fetcher
 	})
-	_, err := database.UpdatePullWithResults(initialPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(initialPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	autoMerger.GlobalAutomerge = true
 	t.Cleanup(func() { autoMerger.GlobalAutomerge = false })
@@ -1393,7 +1393,7 @@ func TestBuildApplyCommands_UsesFreshPullStatusAfterPlanFinishes(t *testing.T) {
 		tc.database = database
 	})
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "new123"}
-	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")})
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("dirA", events.DefaultWorkspace, "projA")}, command.NoClaim{})
 	Ok(t, err)
 	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "projA"}
 	ctx := &command.Context{
@@ -1787,7 +1787,7 @@ func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	pull := &github.PullRequest{State: github.Ptr("open")}
