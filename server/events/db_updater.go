@@ -122,3 +122,9 @@ func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.
 	_, err = c.updateDB(ctx, pull, discarded)
 	return err
 }
+
+// UpdateAPIResults applies the same generation and excluded-directory rules to
+// PR-backed API commands as to comment/webhook commands.
+func (c *DBUpdater) UpdateAPIResults(ctx *command.Context, results []command.ProjectResult) (models.PullStatus, error) {
+	return c.updateDB(ctx, ctx.Pull, results)
+}

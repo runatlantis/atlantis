@@ -1104,6 +1104,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CommitStatusUpdater:             commitStatusUpdater,
 		PullReqStatusFetcher:            pullReqStatusFetcher,
 		PullStatusFetcher:               database,
+		PlanGenerationDB:                database,
+		PlanReaper:                      deleteLockCommand,
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 	}
