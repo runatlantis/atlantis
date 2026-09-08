@@ -24,6 +24,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -42,6 +43,9 @@ var nonPRPullCounter atomic.Int64
 var apiErrorURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\s/@]+@`)
 
 type APIController struct {
+	// PlanGenerationDB persists PR-backed API plans before publishing success.
+	PlanGenerationDB                db.Database
+	PlanReaper                      events.PlanArtifactReaper
 	APISecret                       []byte
 	Locker                          locking.Locker `validate:"required"`
 	DriftStorage                    drift.Storage
@@ -731,13 +735,6 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
 	}
 
-	// Update the combined plan commit status to pending
-	if !ctx.SuppressVCSStatus {
-		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
-			ctx.Log.Warn("unable to update plan commit status: %s", err)
-		}
-	}
-
 	var planCmds []command.ProjectContext
 	var planCC []*events.CommentCommand
 	var policyCmds []command.ProjectContext
@@ -750,6 +747,16 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			policyCmds = append(policyCmds, cmd)
 		default:
 			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
+		}
+	}
+
+	if err := a.beginAPIPlan(ctx, planCmds); err != nil {
+		return nil, err
+	}
+	// Update the combined plan commit status to pending
+	if !ctx.SuppressVCSStatus {
+		if err := a.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.PendingCommitStatus, command.Plan); err != nil {
+			ctx.Log.Warn("unable to update plan commit status: %s", err)
 		}
 	}
 
@@ -771,6 +778,15 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	result := &command.Result{ProjectResults: projectResults}
+	if err := a.persistAPIResults(ctx, projectResults); err != nil {
+		return result, err
+	}
+	if ctx.Pull.Num > 0 && a.PlanGenerationDB != nil {
+		if publisher, ok := a.ProjectPlanCommandRunner.(events.DeferredPlanStatusPublisher); ok {
+			publisher.PublishDeferredPlanStatuses(planCmds, *result, models.SuccessCommitStatus)
+		}
+		refreshAPIGeneration(policyCmds, ctx.PullStatus)
+	}
 	if !ctx.RunPolicyChecks || result.HasErrors() || len(planCmds) == 0 {
 		return result, nil
 	}
@@ -781,6 +797,9 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		}
 		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
+	}
+	if err := a.persistAPIResults(ctx, projectResults[len(planCmds):]); err != nil {
+		return &command.Result{ProjectResults: projectResults}, err
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
 }
@@ -850,10 +869,20 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			}
 		}
 
+		if err := a.beginAPIApply(ctx, &cmd); err != nil {
+			return &command.Result{ProjectResults: projectResults}, err
+		}
 		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 		if res.Error != nil || res.Failure != "" {
 			currentGroupHasErrors = true
+		}
+		if ctx.Pull.Num > 0 && a.PlanGenerationDB != nil {
+			if err := a.persistAPIResults(ctx, []command.ProjectResult{res}); err != nil {
+				a.publishDeferredApplyStatuses([]command.ProjectContext{cmd}, &command.Result{ProjectResults: []command.ProjectResult{res}}, models.FailedCommitStatus)
+				return &command.Result{ProjectResults: projectResults}, err
+			}
+			a.publishDeferredApplyStatuses([]command.ProjectContext{cmd}, &command.Result{ProjectResults: []command.ProjectResult{res}}, models.SuccessCommitStatus)
 		}
 		updatePullStatusFromProjectResult(ctx, res)
 
@@ -864,7 +893,9 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 		a.publishDeferredApplyStatuses(cmds, result, models.FailedCommitStatus)
 		return result, err
 	}
-	a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
+	if ctx.Pull.Num <= 0 || a.PlanGenerationDB == nil {
+		a.publishDeferredApplyStatuses(cmds, result, models.SuccessCommitStatus)
+	}
 	return result, nil
 }
 
