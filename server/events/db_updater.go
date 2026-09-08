@@ -71,7 +71,7 @@ func (c *DBUpdater) updateDB(ctx *command.Context, pull models.PullRequest, resu
 		return models.PullStatus{Pull: pull}, nil
 	}
 	ctx.Log.Debug("updating DB with pull results")
-	return c.Database.UpdatePullWithResults(pull, filtered, command.NoClaim{})
+	return c.Database.UpdatePullWithResults(pull, filtered, ctx.PublicationMode())
 }
 
 func staleApplyResultForCurrentPull(pull models.PullRequest, results []command.ProjectResult) bool {
@@ -84,13 +84,6 @@ func staleApplyResultForCurrentPull(pull models.PullRequest, results []command.P
 		}
 	}
 	return false
-}
-
-func (c *DBUpdater) replaceDB(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
-	if err := c.Database.DeletePullStatus(pull, command.NoClaim{}); err != nil {
-		return models.PullStatus{}, err
-	}
-	return c.updateDB(ctx, pull, results)
 }
 
 func (c *DBUpdater) updateDBForDiscardedPlans(ctx *command.Context, pull models.PullRequest, results []command.ProjectResult) error {

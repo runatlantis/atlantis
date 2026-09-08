@@ -128,6 +128,7 @@ type Server struct {
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
 	database                       db.Database
+	stopPublication                context.CancelFunc
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -592,6 +593,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:      vcsClient,
 		ExecutableName: userConfig.ExecutableName,
 	}
+	publicationShutdown, stopPublication := context.WithCancel(context.Background())
+	publicationOwnedByServer := false
+	defer func() {
+		if !publicationOwnedByServer {
+			stopPublication()
+		}
+	}()
+	publication := events.NewPublicationCoordinator(database, publicationShutdown)
+	cancellationTracker := events.NewCancellationTracker()
+	publication.CancellationTracker = cancellationTracker
+
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		DataDir:           userConfig.DataDir,
 		LocalSharePlanDir: userConfig.SharePlanDir,
@@ -733,7 +745,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		logger,
 		&events.PullClosedExecutor{
-			Locker:                   lockingClient,
+			Publication:         publication,
+			CancellationTracker: cancellationTracker, Locker: lockingClient,
 			WorkingDir:               workingDir,
 			Database:                 database,
 			PullClosedTemplate:       &events.PullClosedEventTemplate{},
@@ -801,8 +814,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			userConfig.AutoDiscoverModeFlag,
 		),
 	}
-
-	cancellationTracker := events.NewCancellationTracker()
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
@@ -910,6 +921,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.PendingApplyStatus,
 	)
 
+	policyCheckCommandRunner.Publication = publication
+	policyCheckCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
+	planCommandRunner.Publication = publication
+	planCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
 	planCommandRunner.PlanReaper = deleteLockCommand
 
 	applyCommandRunner := events.NewApplyCommandRunner(
@@ -933,6 +948,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DisableAutomergeLabel,
 	)
 
+	applyCommandRunner.Publication = publication
+
 	approvePoliciesCommandRunner := events.NewApprovePoliciesCommandRunner(
 		commitStatusUpdater,
 		projectCommandBuilder,
@@ -944,12 +961,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		vcsClient,
 	)
 
+	approvePoliciesCommandRunner.Publication = publication
+	approvePoliciesCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
+
 	unlockCommandRunner := events.NewUnlockCommandRunner(
 		deleteLockCommand,
 		vcsClient,
 		userConfig.SilenceNoProjects,
 		userConfig.DisableUnlockLabel,
 	)
+
+	unlockCommandRunner.Publication = publication
 
 	versionCommandRunner := events.NewVersionCommandRunner(
 		pullUpdater,
@@ -974,6 +996,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
+
+	importCommandRunner.Publication = publication
+	importCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
+	stateCommandRunner.Publication = publication
+	stateCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
 
 	cancelCommandRunner := events.NewCancelCommandRunner(
 		vcsClient,
@@ -1019,6 +1046,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
+		CommandContext:                 publicationShutdown,
 		VCSClient:                      vcsClient,
 		GithubPullGetter:               githubClient,
 		GitlabMergeRequestGetter:       gitlabClient,
@@ -1050,6 +1078,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 	locksController := &controllers.LocksController{
+		Publication:        publication,
 		AtlantisVersion:    config.AtlantisVersion,
 		AtlantisURL:        parsedURL,
 		Locker:             lockingClient,
@@ -1083,6 +1112,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	apiController := &controllers.APIController{
+		Publication:                     publication,
+		PublicationRecovery:             database,
+		PublicationShutdown:             publicationShutdown,
 		APISecret:                       []byte(userConfig.APISecret),
 		Locker:                          lockingClient,
 		Logger:                          logger,
@@ -1156,6 +1188,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	server := &Server{
+		stopPublication:                stopPublication,
 		AtlantisVersion:                config.AtlantisVersion,
 		AtlantisURL:                    parsedURL,
 		Router:                         underlyingRouter,
@@ -1198,6 +1231,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	} else {
+		publicationOwnedByServer = true
 		return server, nil
 	}
 }
@@ -1215,6 +1249,8 @@ func (s *Server) SetupRoutes() {
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+	s.Router.HandleFunc("/api/publication-lease", s.APIController.PublicationLease).Methods("GET")
+	s.Router.HandleFunc("/api/publication-lease/recover", s.APIController.RecoverPublicationLease).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 	s.Router.HandleFunc("/api/drift/status", s.APIController.DriftStatus).Methods("GET")
 	s.Router.HandleFunc("/api/drift/detect", s.APIController.DetectDrift).Methods("POST")
@@ -1296,6 +1332,9 @@ func (s *Server) Start() error {
 	<-stop
 
 	s.Logger.Warn("Received interrupt. Waiting for in-progress operations to complete")
+	if s.stopPublication != nil {
+		s.stopPublication()
+	}
 	s.waitForDrain()
 
 	// flush stats before shutdown

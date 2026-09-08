@@ -163,12 +163,16 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type PendingProjectStatusPublisher interface {
+	PublishPendingProjectStatuses([]command.ProjectContext) error
+}
+
 type DeferredPlanStatusPublisher interface {
-	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus)
+	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus) error
 }
 
 type DeferredApplyStatusPublisher interface {
-	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
+	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_job_message_sender.go JobMessageSender
@@ -209,8 +213,11 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// Create a PR status to track project's plan status. The status will
 	// include a link to view the progress of atlantis plan command in real
 	// time
-	if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
-		ctx.Log.Err("updating project PR status: %s", err)
+	if !ctx.PublicationDeferred {
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.PendingCommitStatus, nil); err != nil {
+			ctx.Log.Err("updating project PR status: %s", err)
+		}
+
 	}
 
 	// ensures we are differentiating between project level command and overall command
@@ -218,7 +225,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 	// A generation can become obsolete while Terraform fails. Defer every
 	// terminal plan status until completion has checked durable identity.
-	if commandName == command.Plan && ctx.PlanGeneration != "" {
+	if ctx.PublicationDeferred || (commandName == command.Plan && ctx.PlanGeneration != "") {
 		p.streamFailureToJob(ctx, result)
 		return result
 	}
@@ -244,20 +251,29 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	return result
 }
 
-func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
 	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command != command.Apply || (projectResult.ApplySuccess == "" && !projectResult.ApplyExecuted) || projectResult.Error != nil || projectResult.Failure != "" {
+		if projectResult.Command != command.Apply {
 			continue
 		}
 		ctx, ok := deferredApplyProjectContext(projectCmds, projectResult)
 		if !ok || ctx.SuppressVCSStatus {
 			continue
 		}
+		if !ctx.PublicationDeferred && ((projectResult.ApplySuccess == "" && !projectResult.ApplyExecuted) || projectResult.Error != nil || projectResult.Failure != "") {
+			continue
+		}
+		projectStatus := status
+		if projectResult.Error != nil || projectResult.Failure != "" {
+			projectStatus = models.FailedCommitStatus
+		}
 		projectOutput := projectResult.ProjectCommandOutput
-		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, status, &projectOutput); err != nil {
+		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Apply, projectStatus, &projectOutput); err != nil {
 			ctx.Log.Err("updating project PR status: %s", err)
+			return err
 		}
 	}
+	return nil
 }
 
 func deferredApplyProjectContext(projectCmds []command.ProjectContext, result command.ProjectResult) (command.ProjectContext, bool) {
@@ -1276,7 +1292,7 @@ func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
 }
 
-func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
 	for _, res := range result.ProjectResults {
 		if res.Command != command.Plan {
 			continue
@@ -1299,8 +1315,22 @@ func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command
 			}
 			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, projectStatus, &output); err != nil {
 				ctx.Log.Err("updating project PR status: %s", err)
+				return err
 			}
 			break
 		}
 	}
+	return nil
+}
+
+func (p *ProjectOutputWrapper) PublishPendingProjectStatuses(projects []command.ProjectContext) error {
+	for _, project := range projects {
+		if project.SuppressVCSStatus {
+			continue
+		}
+		if err := p.JobURLSetter.SetJobURLWithStatus(project, project.CommandName, models.PendingCommitStatus, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }

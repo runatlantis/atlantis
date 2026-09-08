@@ -4,7 +4,10 @@
 package events
 
 import (
+	"errors"
 	"fmt"
+
+	"github.com/runatlantis/atlantis/server/core/db"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 )
@@ -24,10 +27,12 @@ func NewStateCommandRunner(
 }
 
 type StateCommandRunner struct {
-	pullUpdater   *PullUpdater
-	dbUpdater     *DBUpdater
-	prjCmdBuilder ProjectStateCommandBuilder
-	prjCmdRunner  ProjectStateCommandRunner
+	LivePullHeadFetcher LivePullHeadFetcher
+	Publication         *PublicationCoordinator
+	pullUpdater         *PullUpdater
+	dbUpdater           *DBUpdater
+	prjCmdBuilder       ProjectStateCommandBuilder
+	prjCmdRunner        ProjectStateCommandRunner
 }
 
 func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -43,11 +48,22 @@ func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.CommandSkipped {
 		return
 	}
-	if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
-		result.Error = fmt.Errorf("writing discarded plan status: %w", err)
+	err := v.Publication.RunWithObservedStatus(ctx, v.dbUpdater.Database, v.LivePullHeadFetcher, func() error {
+		if err := v.dbUpdater.updateDBForDiscardedPlans(ctx, ctx.Pull, result.ProjectResults); err != nil {
+			return fmt.Errorf("writing discarded plan status: %w", err)
+		}
+		return v.pullUpdater.updatePull(ctx, cmd, result)
+	})
+	if err != nil {
 		ctx.CommandHasErrors = true
+		if errors.Is(err, db.ErrPlanGenerationSuperseded) {
+			ctx.Log.Warn("suppressing obsolete command publication %v", err)
+			return
+		}
+		if reportErr := v.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err}); reportErr != nil {
+			ctx.Log.Err("reporting command result: %s", reportErr)
+		}
 	}
-	v.pullUpdater.updatePull(ctx, cmd, result)
 }
 
 func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) command.Result {

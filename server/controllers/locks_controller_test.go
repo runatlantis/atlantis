@@ -5,6 +5,7 @@ package controllers_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -232,7 +233,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	t.Log("If there is an error retrieving the lock, a 500 is returned")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, false, errors.New("err"))
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(nil, false, errors.New("err"))
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -248,7 +249,7 @@ func TestDeleteLock_None(t *testing.T) {
 	t.Log("If there is no lock at that ID we get a 404")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, false, nil)
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(nil, false, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -265,7 +266,7 @@ func TestDeleteLock_OldFormat(t *testing.T) {
 	RegisterMockTestingT(t)
 	cp := vcsmocks.NewMockClient()
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{}, false, nil)
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(&models.ProjectLock{}, false, nil)
 	lc := controllers.LocksController{
 		DeleteLockCommand: dlc,
 		Logger:            logging.NewNoopLogger(t),
@@ -310,7 +311,7 @@ func TestDeleteLock_CommentFailed(t *testing.T) {
 	t.Log("If the commenting fails we still return success")
 	RegisterMockTestingT(t)
 	dlc := mocks2.NewMockDeleteLockCommand()
-	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(&models.ProjectLock{
 		Pull: models.PullRequest{
 			BaseRepo: models.Repo{FullName: "owner/repo"},
 		},
@@ -355,7 +356,7 @@ func TestDeleteLock_CommentSuccess(t *testing.T) {
 	pull := models.PullRequest{
 		BaseRepo: models.Repo{FullName: "owner/repo"},
 	}
-	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
+	When(dlc.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(&models.ProjectLock{
 		Pull:      pull,
 		Workspace: "workspace",
 		Project: models.Project{
@@ -390,7 +391,7 @@ func TestDeleteLock_ConflictDoesNotCommentDiscarded(t *testing.T) {
 	RegisterMockTestingT(t)
 	deleter := mocks2.NewMockDeleteLockCommand()
 	client := vcsmocks.NewMockClient()
-	When(deleter.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(nil, false, db.ErrPlanStatusNotFound)
+	When(deleter.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(nil, false, db.ErrPlanStatusNotFound)
 	controller := controllers.LocksController{DeleteLockCommand: deleter, VCSClient: client, Logger: logging.NewNoopLogger(t)}
 	request := mux.SetURLVars(httptest.NewRequest("DELETE", "/locks", nil), map[string]string{"id": "id"})
 	response := httptest.NewRecorder()
@@ -403,11 +404,51 @@ func TestDeleteLock_AppliedUnlockDoesNotCommentDiscarded(t *testing.T) {
 	RegisterMockTestingT(t)
 	deleter := mocks2.NewMockDeleteLockCommand()
 	client := vcsmocks.NewMockClient()
-	When(deleter.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{Pull: models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}}}, false, nil)
+	When(deleter.DeleteLock(Any[logging.SimpleLogging](), Eq("id"), Eq[command.PublicationWriteMode](command.NoClaim{}))).ThenReturn(&models.ProjectLock{Pull: models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}}}, false, nil)
 	controller := controllers.LocksController{DeleteLockCommand: deleter, VCSClient: client, Logger: logging.NewNoopLogger(t)}
 	request := mux.SetURLVars(httptest.NewRequest("DELETE", "/locks", nil), map[string]string{"id": "id"})
 	response := httptest.NewRecorder()
 	controller.DeleteLock(response, request)
 	Equals(t, http.StatusOK, response.Code)
 	client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
+func TestDeleteLock_PublicationCancellationDoesNotDiscard(t *testing.T) {
+	for _, shutdown := range []bool{false, true} {
+		name := "request canceled"
+		if shutdown {
+			name = "server shutdown"
+		}
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			storage, err := boltdb.New(t.TempDir())
+			Ok(t, err)
+			t.Cleanup(func() { Ok(t, storage.Close()) })
+			pull := models.PullRequest{Num: 42, BaseRepo: models.Repo{FullName: "owner/repo"}}
+			locker := mocks.NewMockLocker(gomock.NewController(t))
+			locker.EXPECT().GetLock("id").Return(&models.ProjectLock{Pull: pull}, nil)
+			deleter := mocks2.NewMockDeleteLockCommand()
+			client := vcsmocks.NewMockClient()
+			canceled, cancel := context.WithCancel(context.Background())
+			cancel()
+			request := mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/locks", nil), map[string]string{"id": "id"})
+			coordinator := events.NewPublicationCoordinator(storage, context.Background())
+			expected := http.StatusRequestTimeout
+			if shutdown {
+				coordinator.Shutdown = canceled
+				expected = http.StatusServiceUnavailable
+			} else {
+				request = mux.SetURLVars(request.WithContext(canceled), map[string]string{"id": "id"})
+			}
+			controller := controllers.LocksController{Publication: coordinator, Locker: locker, DeleteLockCommand: deleter, VCSClient: client, Logger: logging.NewNoopLogger(t)}
+			response := httptest.NewRecorder()
+			controller.DeleteLock(response, request)
+			Equals(t, expected, response.Code)
+			deleter.VerifyWasCalled(Never()).DeleteLock(Any[logging.SimpleLogging](), Any[string](), Any[command.PublicationWriteMode]())
+			client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			lease, err := storage.GetPublicationLease(context.Background(), pull)
+			Ok(t, err)
+			Assert(t, lease == nil, "canceled discard must not acquire ownership")
+		})
+	}
 }

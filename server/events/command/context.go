@@ -4,6 +4,8 @@
 package command
 
 import (
+	"context"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
@@ -23,6 +25,14 @@ const (
 // Context represents the context of a command that should be executed
 // for a pull request.
 type Context struct {
+	// CommandContext is the lifetime of synchronous requests or queued commands.
+	// Asynchronous webhook commands receive a server-lifetime context.
+	CommandContext context.Context
+	// PublicationRequired prevents success publication after a lease section exits.
+	PublicationRequired bool
+	PublicationFence    *PublicationFence
+	TerminalPublisher   interface{ Publish(func() error) error }
+
 	// HeadRepo is the repository that is getting merged into the BaseRepo.
 	// If the pull request branch is from the same repository then HeadRepo will
 	// be the same as BaseRepo.
@@ -108,4 +118,13 @@ type Context struct {
 	// cloned repo config before falling back to VCS content. This is used after
 	// pre-workflow hooks may have generated or updated atlantis.yaml.
 	PreferLocalRepoCfgForTargetedIgnore bool
+}
+
+// PublicationMode explicitly selects unfenced access outside a publication
+// section. The backend still rejects it while any owner holds a live lease.
+func (c *Context) PublicationMode() PublicationWriteMode {
+	if c.PublicationFence != nil {
+		return *c.PublicationFence
+	}
+	return NoClaim{}
 }

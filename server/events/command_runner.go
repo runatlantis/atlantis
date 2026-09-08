@@ -5,6 +5,7 @@
 package events
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -100,6 +101,7 @@ func preWorkflowHooksConfigured(runner PreWorkflowHooksCommandRunner, ctx *comma
 
 // DefaultCommandRunner is the first step when processing a comment command.
 type DefaultCommandRunner struct {
+	CommandContext           context.Context
 	VCSClient                vcs.Client `validate:"required"`
 	GithubPullGetter         GithubPullGetter
 	AzureDevopsPullGetter    AzureDevopsPullGetter
@@ -184,13 +186,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	ctx := &command.Context{
-		User:       user,
-		Log:        log,
-		Scope:      scope,
-		Pull:       pull,
-		HeadRepo:   headRepo,
-		PullStatus: status,
-		Trigger:    command.AutoTrigger,
+		CommandContext: c.CommandContext,
+		User:           user,
+		Log:            log,
+		Scope:          scope,
+		Pull:           pull,
+		HeadRepo:       headRepo,
+		PullStatus:     status,
+		Trigger:        command.AutoTrigger,
 	}
 	if !c.validateCtxAndComment(ctx, command.Autoplan, true) {
 		return
@@ -493,6 +496,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	ctx := &command.Context{
+		CommandContext:       c.CommandContext,
 		User:                 user,
 		Log:                  log,
 		Pull:                 pull,
