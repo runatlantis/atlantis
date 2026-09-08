@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
@@ -1027,6 +1028,15 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+
+	// A workspace becomes a Terraform command argument, which Atlantis runs
+	// through `sh -c`, and a path component of the files it writes. Validate it
+	// the same way as a workspace named in a pull request comment.
+	for _, path := range request.Paths {
+		if err = valid.ValidateWorkspaceName(path.Workspace); err != nil {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", path.Workspace, err)
+		}
 	}
 
 	VCSHostType, err := models.NewVCSHostType(request.Type)

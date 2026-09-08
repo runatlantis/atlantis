@@ -935,22 +935,35 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", "", err
 	}
 
-	if p.ApplyPlanValidator != nil {
-		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
-			return "", "", "", err
-		}
-	}
+	// Workflows assembled only from custom run steps manage their own plan
+	// artifact, so Atlantis cannot require or hash a convention plan file for
+	// them. Their durable plan state is still validated.
+	managedPlanFile := requiresManagedPlanFileForApply(ctx)
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
+	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
 		planPath, err := safePlanFilePath(ctx, absPath)
 		if err != nil {
 			return "", "", "", err
 		}
-		planHash, err := hashFile(absPath, planPath)
+		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
 		if err != nil {
-			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+			if !os.IsNotExist(err) {
+				return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+			}
+		} else {
+			// Overwrite builder hash. Load may have replaced leftover disk.
+			ctx.ExpectedPlanHash = planHash
 		}
-		ctx.ExpectedPlanHash = planHash
+	}
+
+	if p.ApplyPlanValidator != nil {
+		if managedPlanFile {
+			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+				return "", "", "", err
+			}
+		} else if err := p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx); err != nil {
+			return "", "", "", err
+		}
 	}
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
@@ -1200,4 +1213,13 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 		missing = append(missing, policySets[i].Name)
 	}
 	return missing
+}
+
+// requiresManagedPlanFileForApply reports whether this apply must consume the
+// Atlantis convention plan artifact. It fails closed: the steps being executed
+// are authoritative, so a context that never had
+// RequiresAtlantisManagedPlanFile populated still validates the plan file when a
+// built-in apply step will read it.
+func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
+	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
 }

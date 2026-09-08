@@ -50,6 +50,12 @@ func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution te
 }
 
 func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	// extra_args comes from configuration, so environment variable references
+	// in it may be expanded. Marked on this copy of the context; everything
+	// else, including comment args, stays literal.
+	if len(extraArgs) > 0 {
+		ctx.ExpandableArgs = extraArgs
+	}
 	tfDistribution := p.DefaultTFDistribution
 	tfVersion := p.DefaultTFVersion
 	if ctx.TerraformDistribution != nil {
@@ -59,7 +65,10 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 		tfVersion = ctx.TerraformVersion
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planFile := GetPlanFilePath(ctx, path)
+	if err := EnsurePlanFileDir(ctx, path); err != nil {
+		return "", err
+	}
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
@@ -90,7 +99,7 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
-		ctx.EscapedCommentArgs,
+		ctx.CommentArgs,
 	}
 	args := p.flatten(argList)
 	output, err := p.runRemotePlan(ctx, args, path, tfDistribution, tfVersion, envs)
@@ -135,12 +144,13 @@ func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []st
 	}
 
 	argList := [][]string{
-		// NOTE: we need to quote the plan filename because Bitbucket Server can
-		// have spaces in its repo owner names.
-		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", planFile)},
+		// The plan filename is passed as its own argument, so a path containing
+		// a space (Bitbucket Server allows spaces in repo owner names) needs no
+		// quoting. Quoting it here would make the quotes part of the filename.
+		{"plan", "-input=false", "-refresh", "-out", planFile},
 		tfVars,
 		extraArgs,
-		ctx.EscapedCommentArgs,
+		ctx.CommentArgs,
 		envFileArgs,
 	}
 
@@ -162,17 +172,18 @@ func (p *planStepRunner) tfVars(ctx command.ProjectContext, tfVersion *version.V
 
 	// NOTE: not using maps and looping here because we need to keep the
 	// ordering for testing purposes.
-	// NOTE: quoting the values because in Bitbucket the owner can have
-	// spaces, ex -var atlantis_repo_owner="bitbucket owner".
+	// Each -var value is passed as its own argument, so a value containing a
+	// space (in Bitbucket the owner can have one) needs no quoting. Quoting it
+	// here would make the quotes part of the variable's value.
 	return []string{
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_user", ctx.User.Username),
+		fmt.Sprintf("%s=%s", "atlantis_user", ctx.User.Username),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo", ctx.BaseRepo.FullName),
+		fmt.Sprintf("%s=%s", "atlantis_repo", ctx.BaseRepo.FullName),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo_name", ctx.BaseRepo.Name),
+		fmt.Sprintf("%s=%s", "atlantis_repo_name", ctx.BaseRepo.Name),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo_owner", ctx.BaseRepo.Owner),
+		fmt.Sprintf("%s=%s", "atlantis_repo_owner", ctx.BaseRepo.Owner),
 		"-var",
 		fmt.Sprintf("%s=%d", "atlantis_pull_num", ctx.Pull.Num),
 	}

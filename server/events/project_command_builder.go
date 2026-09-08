@@ -22,6 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics"
+	"github.com/runatlantis/atlantis/server/utils"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -95,6 +96,7 @@ func NewInstrumentedProjectCommandBuilder(
 	scope tally.Scope,
 	terraformClient tfclient.Client,
 	planStore runtime.PlanStore,
+	localSharePlanDir string,
 ) *InstrumentedProjectCommandBuilder {
 	scope = scope.SubScope("builder")
 
@@ -102,35 +104,38 @@ func NewInstrumentedProjectCommandBuilder(
 		metrics.InitCounter(scope, m)
 	}
 
+	builder := NewProjectCommandBuilder(
+		policyChecksSupported,
+		parserValidator,
+		projectFinder,
+		vcsClient,
+		workingDir,
+		workingDirLocker,
+		globalCfg,
+		pendingPlanFinder,
+		commentBuilder,
+		skipCloneNoChanges,
+		EnableRegExpCmd,
+		EnableAutoMerge,
+		EnableParallelPlan,
+		EnableParallelApply,
+		AutoDetectModuleFiles,
+		AutoplanFileList,
+		RestrictFileList,
+		DefaultTFDistribution,
+		SilenceNoProjects,
+		IncludeGitUntrackedFiles,
+		AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+	builder.LocalSharePlanDir = localSharePlanDir
+
 	return &InstrumentedProjectCommandBuilder{
-		ProjectCommandBuilder: NewProjectCommandBuilder(
-			policyChecksSupported,
-			parserValidator,
-			projectFinder,
-			vcsClient,
-			workingDir,
-			workingDirLocker,
-			globalCfg,
-			pendingPlanFinder,
-			commentBuilder,
-			skipCloneNoChanges,
-			EnableRegExpCmd,
-			EnableAutoMerge,
-			EnableParallelPlan,
-			EnableParallelApply,
-			AutoDetectModuleFiles,
-			AutoplanFileList,
-			RestrictFileList,
-			DefaultTFDistribution,
-			SilenceNoProjects,
-			IncludeGitUntrackedFiles,
-			AutoDiscoverMode,
-			scope,
-			terraformClient,
-			planStore,
-		),
-		Logger: logger,
-		scope:  scope,
+		ProjectCommandBuilder: builder,
+		Logger:                logger,
+		scope:                 scope,
 	}
 }
 
@@ -305,6 +310,40 @@ type DefaultProjectCommandBuilder struct {
 	AutoDiscoverMode string
 	// Handles the actual running of Terraform commands.
 	TerraformExecutor tfclient.Client
+	// Root directory for local Terraform plan files.
+	LocalSharePlanDir string
+}
+
+func (p *DefaultProjectCommandBuilder) withLocalSharePlanDir(projCtxs []command.ProjectContext) []command.ProjectContext {
+	for i := range projCtxs {
+		projCtxs[i].LocalSharePlanDir = p.LocalSharePlanDir
+	}
+	return projCtxs
+}
+
+// restorePullDir returns the directory an external plan store must restore into.
+// Restored plans are read back by PendingPlanFinder, which looks under
+// LocalSharePlanDir, so restoring into the clone pull dir would leave them
+// undiscoverable. When LocalSharePlanDir resolves to the data dir this is the
+// clone pull dir, so the default on-disk layout is unchanged.
+func (p *DefaultProjectCommandBuilder) restorePullDir(pullDir string, r models.Repo, pull models.PullRequest) (string, error) {
+	if p.LocalSharePlanDir == "" {
+		return pullDir, nil
+	}
+	planPullDir := runtime.GetPlanPullDir(p.LocalSharePlanDir, r, pull)
+	if err := utils.EnsureSubPath(filepath.Join(p.LocalSharePlanDir, workingDirPrefix), planPullDir); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return planPullDir, nil
+}
+
+// withDefaultWorkspace appends DefaultWorkspace to workspaces if it isn't
+// already present, preserving the original order.
+func withDefaultWorkspace(workspaces []string) []string {
+	if slices.Contains(workspaces, DefaultWorkspace) {
+		return workspaces
+	}
+	return append(slices.Clone(workspaces), DefaultWorkspace)
 }
 
 // See ProjectCommandBuilder.BuildAutoplanCommands.
@@ -844,7 +883,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
 	})
 
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildAllCommandsByCfg builds init contexts for all projects we determine were
@@ -946,7 +985,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 // buildProjectPlanCommand builds a plan context for a single project.
@@ -1226,7 +1265,9 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 		// Clone every workspace before restoring; this ensures each workspace
 		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
-		for _, workspace := range workspaces {
+		// The default workspace is always cloned because it is read below as
+		// the source of truth for atlantis.yaml, even when it holds no plans.
+		for _, workspace := range withDefaultWorkspace(workspaces) {
 			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
 				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
 			}
@@ -1235,7 +1276,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		if err != nil {
 			return nil, err
 		}
-		if restoreErr := p.PlanStore.RestorePlans(pullDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
+		restoreDir, err := p.restorePullDir(pullDir, ctx.Pull.BaseRepo, ctx.Pull)
+		if err != nil {
+			return nil, err
+		}
+		if restoreErr := p.PlanStore.RestorePlans(restoreDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
 			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
 		}
 	}
@@ -1307,7 +1352,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, fmt.Errorf("building command for dir '%s': %w", plan.RepoRelDir, err)
 		}
 		if commentCmd.Name == command.Apply {
-			planBasePath := filepath.Join(plan.RepoDir, plan.RepoRelDir)
+			planBasePath := filepath.Join(plan.planRepoDir(), plan.RepoRelDir)
 			planPath, err := pendingPlanFilePath(plan)
 			if err != nil {
 				return nil, fmt.Errorf("validating plan path for dir %q: %w", plan.RepoRelDir, err)
@@ -1551,6 +1596,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	recloned := false
 	if errors.Is(err, os.ErrNotExist) {
 		// Re-clone only if the plan store can recover plans externally.
 		// LocalPlanStore signals this via ErrRestoreNotSupported; external
@@ -1560,10 +1606,11 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 			return projCtx, errors.New("no working directory found–did you run plan?")
 		}
 		ctx.Log.Info("working directory missing, re-cloning repo for apply")
-		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 		if err != nil {
 			return projCtx, fmt.Errorf("re-cloning repo for apply: %w", err)
 		}
+		recloned = true
 	} else if err != nil {
 		return projCtx, err
 	}
@@ -1595,12 +1642,38 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	if err != nil {
 		return projCtx, err
 	}
+	if recloned {
+		if err := p.cloneMissingWorkspaces(ctx, projCtx); err != nil {
+			return nil, err
+		}
+	}
 	if cmd.Name == command.Apply {
 		if err := p.setExpectedPlanHashes(ctx, projCtx); err != nil {
 			return nil, err
 		}
 	}
 	return projCtx, nil
+}
+
+// cloneMissingWorkspaces checks out any workspace a resolved project needs that
+// isn't on disk yet. Recovering from a lost clone can only restore the default
+// workspace up front, since a project's workspace comes from atlantis.yaml and
+// that file is only readable once the default checkout exists. A targeted
+// command addressing a project by name (`-p`) supplies no workspace at all, so
+// a project pinned to a non-default workspace would otherwise never be cloned.
+func (p *DefaultProjectCommandBuilder) cloneMissingWorkspaces(ctx *command.Context, projCtxs []command.ProjectContext) error {
+	cloned := map[string]bool{DefaultWorkspace: true}
+	for _, projCtx := range projCtxs {
+		workspace := projCtx.Workspace
+		if workspace == "" || cloned[workspace] {
+			continue
+		}
+		cloned[workspace] = true
+		if _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); err != nil {
+			return fmt.Errorf("re-cloning workspace %q for apply: %w", workspace, err)
+		}
+	}
+	return nil
 }
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
@@ -1614,7 +1687,7 @@ func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Contex
 		if err != nil {
 			return fmt.Errorf("validating plan path for dir %q: %w", projCtxs[i].RepoRelDir, err)
 		}
-		planHash, err := hashFile(absPath, planPath)
+		planHash, err := hashFile(runtime.GetPlanFileDir(projCtxs[i], absPath), planPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				continue
@@ -1732,7 +1805,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommandCtxWithCfg(ctx *comman
 	}
 
 	// Filter projects to only include ones the user is authorized for
-	return filterProjectContextsByTeamAllowlist(projCtxs, repoDir, ctx.FailOnTeamAllowlistDenied)
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 
 func filterProjectContextsByTeamAllowlist(projCtxs []command.ProjectContext, repoDir string, failOnDenied bool) ([]command.ProjectContext, error) {

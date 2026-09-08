@@ -5431,3 +5431,32 @@ func TestAPIController_DetectDrift_PreWorkflowHooksFailure(t *testing.T) {
 	apiErr := parseAPIError(t, response)
 	Equals(t, controllers.ErrCodeInternal, apiErr.Code)
 }
+
+func TestAPIController_RejectsWorkspaceUnsafeForPaths(t *testing.T) {
+	// paths[].workspace becomes a path component of the files Atlantis writes
+	// and a Terraform command argument. Commands are run as argument vectors,
+	// so shell metacharacters carry no meaning and are allowed; what is
+	// rejected is what is unsafe as a path or would be read as a flag.
+	for _, workspace := range []string{"../evil", "sub/dir", "-chdir", "~root", "a b", "a$HOME"} {
+		t.Run(workspace, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Paths: []controllers.APIRequestPath{
+					{Directory: ".", Workspace: workspace},
+				},
+			})
+
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			ResponseContains(t, w, http.StatusBadRequest, "invalid workspace")
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+			projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		})
+	}
+}

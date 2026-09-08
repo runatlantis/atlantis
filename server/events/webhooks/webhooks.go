@@ -18,6 +18,11 @@ const SlackKind = "slack"
 const HttpKind = "http"
 const ApplyEvent = "apply"
 
+// isSuccessStatus returns true if the given HTTP status code is a 2xx.
+func isSuccessStatus(code int) bool {
+	return code/100 == 2
+}
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_sender.go Sender
 
 // Sender sends webhooks.

@@ -53,7 +53,7 @@ func (h *HttpWebhook) doSend(applyResult ApplyResult) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !isSuccessStatus(resp.StatusCode) {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("returned status code %d with response %q", resp.StatusCode, respBody)
 	}
