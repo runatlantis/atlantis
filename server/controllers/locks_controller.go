@@ -4,6 +4,7 @@
 package controllers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -22,6 +24,7 @@ import (
 
 // LocksController handles all requests relating to Atlantis locks.
 type LocksController struct {
+	Publication        *events.PublicationCoordinator
 	AtlantisVersion    string                       `validate:"required"`
 	AtlantisURL        *url.URL                     `validate:"required"`
 	Locker             locking.Locker               `validate:"required"`
@@ -116,11 +119,38 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lock, discarded, err := l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
+	ctx := &command.Context{CommandContext: r.Context(), Log: l.Logger}
+	if l.Publication != nil {
+		// Resolve the pull before waiting. DeleteLock reads the lock again and
+		// the required fence prevents changing a replacement pull's status.
+		lock, err := l.Locker.GetLock(idUnencoded)
+		if err != nil {
+			l.respond(w, logging.Error, http.StatusInternalServerError, "reading lock failed: %s", err)
+			return
+		}
+		if lock == nil {
+			l.respond(w, logging.Info, http.StatusNotFound, "No lock found at id '%s'", idUnencoded)
+			return
+		}
+		ctx.Pull = lock.Pull
+	}
+	var lock *models.ProjectLock
+	var discarded bool
+	err = l.Publication.RunCommand(ctx, func() error {
+		var err error
+		lock, discarded, err = l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded, ctx.PublicationMode())
+		return err
+	})
 	if err != nil {
 		code := http.StatusInternalServerError
-		if errors.Is(err, db.ErrPlanStatusNotFound) || errors.Is(err, db.ErrPlanGenerationSuperseded) {
+		if errors.Is(err, db.ErrPlanStatusNotFound) || errors.Is(err, db.ErrPlanGenerationSuperseded) || errors.Is(err, db.ErrPublicationBusy) || errors.Is(err, db.ErrPublicationOwnerLost) || errors.Is(err, db.ErrPublicationAmbiguous) || errors.Is(err, events.ErrPublicationWaitLimit) {
 			code = http.StatusConflict
+			w.Header().Set("Retry-After", "1")
+		} else if errors.Is(err, events.ErrPublicationShutdown) {
+			code = http.StatusServiceUnavailable
+			w.Header().Set("Retry-After", "1")
+		} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			code = http.StatusRequestTimeout
 		}
 		l.respond(w, logging.Error, code, "deleting lock failed with: '%s'", err)
 		return
@@ -136,7 +166,8 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// this field on PullRequest. We skip commenting in this case.
 	if discarded && lock.Pull.BaseRepo != (models.Repo{}) {
 
-		// Once the lock has been deleted, comment back on the pull request.
+		// This courtesy comment reports a completed discard. It is outside the
+		// lease and does not authorize a plan or publish a reusable success check.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
 			"To `apply` this plan you must run `plan` again.", lock.Project.Path, lock.Workspace)
 		if err = l.VCSClient.CreateComment(l.Logger, lock.Pull.BaseRepo, lock.Pull.Num, comment, ""); err != nil {

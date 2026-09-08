@@ -5,6 +5,7 @@ package mocks
 
 import (
 	pegomock "github.com/petergtz/pegomock/v4"
+	command "github.com/runatlantis/atlantis/server/events/command"
 	models "github.com/runatlantis/atlantis/server/events/models"
 	logging "github.com/runatlantis/atlantis/server/logging"
 	"reflect"
@@ -26,11 +27,11 @@ func NewMockDeleteLockCommand(options ...pegomock.Option) *MockDeleteLockCommand
 func (mock *MockDeleteLockCommand) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockDeleteLockCommand) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string) (*models.ProjectLock, bool, error) {
+func (mock *MockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string, mode command.PublicationWriteMode) (*models.ProjectLock, bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
-	_params := []pegomock.Param{logger, id}
+	_params := []pegomock.Param{logger, id, mode}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLock", _params, []reflect.Type{reflect.TypeOf((**models.ProjectLock)(nil)).Elem(), reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 *models.ProjectLock
 	var _ret1 bool
@@ -49,11 +50,11 @@ func (mock *MockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 	return _ret0, _ret1, _ret2
 }
 
-func (mock *MockDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest) (int, error) {
+func (mock *MockDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest, mode command.PublicationWriteMode) (int, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
 	}
-	_params := []pegomock.Param{logger, pull}
+	_params := []pegomock.Param{logger, pull, mode}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByPull", _params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 int
 	var _ret1 error
@@ -105,8 +106,8 @@ type VerifierMockDeleteLockCommand struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string) *MockDeleteLockCommand_DeleteLock_OngoingVerification {
-	_params := []pegomock.Param{logger, id}
+func (verifier *VerifierMockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id string, mode command.PublicationWriteMode) *MockDeleteLockCommand_DeleteLock_OngoingVerification {
+	_params := []pegomock.Param{logger, id, mode}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteLock", _params, verifier.timeout)
 	return &MockDeleteLockCommand_DeleteLock_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -116,12 +117,12 @@ type MockDeleteLockCommand_DeleteLock_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string) {
-	logger, id := c.GetAllCapturedArguments()
-	return logger[len(logger)-1], id[len(id)-1]
+func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, command.PublicationWriteMode) {
+	logger, id, mode := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], id[len(id)-1], mode[len(mode)-1]
 }
 
-func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string) {
+func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []command.PublicationWriteMode) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -136,12 +137,18 @@ func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArg
 				_param1[u] = param.(string)
 			}
 		}
+		if len(_params) > 2 {
+			_param2 = make([]command.PublicationWriteMode, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.PublicationWriteMode)
+			}
+		}
 	}
 	return
 }
 
-func (verifier *VerifierMockDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest) *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification {
-	_params := []pegomock.Param{logger, pull}
+func (verifier *VerifierMockDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, pull models.PullRequest, mode command.PublicationWriteMode) *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification {
+	_params := []pegomock.Param{logger, pull, mode}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteLocksByPull", _params, verifier.timeout)
 	return &MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -151,12 +158,12 @@ type MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.PullRequest) {
-	logger, pull := c.GetAllCapturedArguments()
-	return logger[len(logger)-1], pull[len(pull)-1]
+func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.PullRequest, command.PublicationWriteMode) {
+	logger, pull, mode := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], pull[len(pull)-1], mode[len(mode)-1]
 }
 
-func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest) {
+func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.PullRequest, _param2 []command.PublicationWriteMode) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -169,6 +176,12 @@ func (c *MockDeleteLockCommand_DeleteLocksByPull_OngoingVerification) GetAllCapt
 			_param1 = make([]models.PullRequest, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(models.PullRequest)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]command.PublicationWriteMode, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.PublicationWriteMode)
 			}
 		}
 	}

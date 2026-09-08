@@ -17,12 +17,12 @@ type AutoMerger struct {
 	GlobalAutomergeMethod string
 }
 
-func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
+func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) error {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
 			ctx.Log.Info("not automerging because project at dir %q, workspace %q has status %q", p.RepoRelDir, p.Workspace, p.Status.String())
-			return
+			return nil
 		}
 	}
 
@@ -43,7 +43,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
 	pullOptions.MergeMethod = mergeMethod
-	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
+	err := publishTerminal(ctx, func() error { return c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions) })
 
 	if err != nil {
 		ctx.Log.Err("automerging failed: %s", err)
@@ -53,6 +53,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 			ctx.Log.Err("failed to comment about automerge failing: %s", err)
 		}
 	}
+	return err
 }
 
 // automergeEnabled returns true if automerging is enabled in this context.

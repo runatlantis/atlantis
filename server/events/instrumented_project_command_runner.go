@@ -50,12 +50,12 @@ func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) com
 	return RunAndEmitStats(ctx, p.projectCommandRunner.Apply, p.scope)
 }
 
-func (p *InstrumentedProjectCommandRunner) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *InstrumentedProjectCommandRunner) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
 	publisher, ok := p.projectCommandRunner.(DeferredApplyStatusPublisher)
 	if !ok {
-		return
+		return nil
 	}
-	publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
+	return publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
 }
 
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
@@ -104,8 +104,16 @@ func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.Projec
 
 }
 
-func (p *InstrumentedProjectCommandRunner) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+func (p *InstrumentedProjectCommandRunner) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) error {
 	if publisher, ok := p.projectCommandRunner.(DeferredPlanStatusPublisher); ok {
-		publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+		return publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
 	}
+	return nil
+}
+
+func (p *InstrumentedProjectCommandRunner) PublishPendingProjectStatuses(projects []command.ProjectContext) error {
+	if publisher, ok := p.projectCommandRunner.(PendingProjectStatusPublisher); ok {
+		return publisher.PublishPendingProjectStatuses(projects)
+	}
+	return nil
 }

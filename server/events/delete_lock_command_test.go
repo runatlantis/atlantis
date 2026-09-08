@@ -31,7 +31,7 @@ func TestDeleteLock_LockerErr(t *testing.T) {
 	l := lockmocks.NewMockLocker(ctrl)
 	l.EXPECT().GetLock("id").Return(nil, errors.New("err"))
 	dlc := events.DefaultDeleteLockCommand{Locker: l}
-	_, _, err := dlc.DeleteLock(logger, "id")
+	_, _, err := dlc.DeleteLock(logger, "id", command.NoClaim{})
 	ErrEquals(t, "err", err)
 }
 
@@ -42,7 +42,7 @@ func TestDeleteLock_None(t *testing.T) {
 	l := lockmocks.NewMockLocker(ctrl)
 	l.EXPECT().GetLock("id").Return(nil, nil)
 	dlc := events.DefaultDeleteLockCommand{Locker: l}
-	lock, discarded, err := dlc.DeleteLock(logger, "id")
+	lock, discarded, err := dlc.DeleteLock(logger, "id", command.NoClaim{})
 	Ok(t, err)
 	Assert(t, lock == nil, "lock was not nil")
 	Assert(t, !discarded, "missing lock must not report discard")
@@ -86,7 +86,7 @@ func TestDeleteLock_Success(t *testing.T) {
 		WorkingDirLocker: workingDirLocker,
 		WorkingDir:       workingDir,
 	}
-	lock, discarded, err := dlc.DeleteLock(logger, "id")
+	lock, discarded, err := dlc.DeleteLock(logger, "id", command.NoClaim{})
 	Ok(t, err)
 	Assert(t, lock != nil, "lock was nil")
 	Assert(t, discarded, "successful plan must be durably discarded")
@@ -108,7 +108,7 @@ func TestDeleteLocksByPull_LockerErr(t *testing.T) {
 		Locker:     l,
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum})
+	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum}, command.NoClaim{})
 	ErrEquals(t, "err", err)
 	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string](), Any[string](), Any[string]())
@@ -128,7 +128,7 @@ func TestDeleteLocksByPull_None(t *testing.T) {
 		Locker:     l,
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum})
+	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum}, command.NoClaim{})
 	Ok(t, err)
 	workingDir.VerifyWasCalled(Never()).DeletePlan(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 		Any[string](), Any[string](), Any[string]())
@@ -167,7 +167,7 @@ func TestDeleteLocksByPull_SingleSuccess(t *testing.T) {
 		Locker:     l,
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum})
+	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum}, command.NoClaim{})
 	Ok(t, err)
 	workingDir.VerifyWasCalled(Once()).DeletePlan(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull), Eq(workspace),
 		Eq(path), Eq(projectName))
@@ -214,7 +214,7 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 		Locker:     l,
 		WorkingDir: workingDir,
 	}
-	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum})
+	_, err := dlc.DeleteLocksByPull(logger, models.PullRequest{BaseRepo: models.Repo{FullName: repoName}, Num: pullNum}, command.NoClaim{})
 	Ok(t, err)
 	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path1, projectName)
 	workingDir.VerifyWasCalled(Once()).DeletePlan(logger, pull.BaseRepo, pull, workspace, path2, projectName)
@@ -222,7 +222,7 @@ func TestDeleteLocksByPull_MultipleSuccess(t *testing.T) {
 
 type rejectDiscardDatabase struct{ db.Database }
 
-func (d rejectDiscardDatabase) DiscardPlanStatus(_ models.PullRequest, _ models.ProjectStatus, _ command.PublicationWriteMode) (bool, error) {
+func (d rejectDiscardDatabase) DiscardPlanStatus(models.PullRequest, models.ProjectStatus, command.PublicationWriteMode) (bool, error) {
 	return false, errors.New("durable discard write failed")
 }
 
@@ -256,7 +256,7 @@ func TestDeleteLock_DurableStatusRequiredBeforeUnlock(t *testing.T) {
 			}
 			workingDir := events.NewMockWorkingDir()
 			deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: database, WorkingDir: workingDir}
-			_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey)
+			_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey, command.NoClaim{})
 			Assert(t, !discarded, "no scenario should report a plan discard")
 			actualLock, readErr := locker.GetLock(held.LockKey)
 			Ok(t, readErr)
@@ -298,7 +298,7 @@ func TestDeleteLock_ReapsExactAcceptedGeneration(t *testing.T) {
 	held, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.Workspace, oldLockPull, models.User{})
 	Ok(t, err)
 	deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: storage, WorkingDir: events.NewMockWorkingDir(), PlanStore: store, DataDir: root}
-	_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey)
+	_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey, command.NoClaim{})
 	Ok(t, err)
 	Assert(t, discarded, "exact current status may be discarded even if lock metadata is older")
 	ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash = "G1", *ctx.SavedPlanHash
@@ -326,7 +326,7 @@ func TestDeleteLocksByPull_ReapsHostedPlanWithoutLocalLock(t *testing.T) {
 	Ok(t, err)
 	locker := locking.NewClient(storage)
 	deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: storage, WorkingDir: events.NewMockWorkingDir(), PlanStore: store, DataDir: root}
-	numLocks, err := deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull)
+	numLocks, err := deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull, command.NoClaim{})
 	Ok(t, err)
 	Equals(t, 0, numLocks)
 	status, err := storage.GetPullStatus(pull)
@@ -363,7 +363,7 @@ func TestDeleteLock_ReapsSeparatePlanDirectory(t *testing.T) {
 	held, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.Workspace, oldLockPull, models.User{})
 	Ok(t, err)
 	deleter := events.DefaultDeleteLockCommand{Locker: locker, Database: storage, WorkingDir: events.NewMockWorkingDir(), PlanStore: store, DataDir: root, LocalSharePlanDir: shared}
-	_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey)
+	_, discarded, err := deleter.DeleteLock(logging.NewNoopLogger(t), held.LockKey, command.NoClaim{})
 	Ok(t, err)
 	Assert(t, discarded, "exact current status may be discarded even if lock metadata is older")
 	ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash = "G1", *ctx.SavedPlanHash

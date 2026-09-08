@@ -6,6 +6,7 @@ package events
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"slices"
@@ -43,6 +44,7 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
+	Publication              *PublicationCoordinator
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
@@ -75,6 +77,20 @@ func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	if p.Publication == nil {
+		return p.cleanUpPull(logger, repo, pull, func() error { return p.Database.DeletePullStatus(pull, command.NoClaim{}) })
+	}
+	// Closing a cancelled pull still needs cleanup, so use the server lifetime
+	// rather than the user command cancellation tracker.
+	return p.Publication.Run(context.Background(), pull, func(held *HeldPublicationLease) error {
+		logger.Info("acquired cleanup publication lease %q", held.Fence().Owner)
+		return p.cleanUpPull(logger, repo, pull, func() error {
+			return held.DeleteStatus(func() error { return p.Database.DeletePullStatus(pull, held.Fence()) })
+		})
+	})
+}
+
+func (p *PullClosedExecutor) cleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, deleteStatus func() error) error {
 	pullStatus, err := p.Database.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
@@ -120,14 +136,16 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
-	// Delete pull from DB.
-	if err := p.Database.DeletePullStatus(pull, command.NoClaim{}); err != nil {
-		logger.Err("deleting pull from db: %s", err)
+	// Workspace and lock cleanup is complete. Release process-local cancellation
+	// bookkeeping even if durable deletion fails; redelivery can retry the DB.
+	// Earlier cleanup failures retain cancellation for unfinished local work.
+	if p.CancellationTracker != nil {
+		defer p.CancellationTracker.Clear(pull)
 	}
 
-	// Clear any operations to avoid unbounded growth.
-	if p.CancellationTracker != nil {
-		p.CancellationTracker.Clear(pull)
+	// Delete pull from DB.
+	if err := deleteStatus(); err != nil {
+		return fmt.Errorf("deleting pull from db: %w", err)
 	}
 
 	// If there are no locks then there's no need to comment.
