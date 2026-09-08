@@ -136,14 +136,16 @@ func (p *PullClosedExecutor) cleanUpPull(logger logging.SimpleLogging, repo mode
 		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
+	// Workspace and lock cleanup is complete. Release process-local cancellation
+	// bookkeeping even if durable deletion fails; redelivery can retry the DB.
+	// Earlier cleanup failures retain cancellation for unfinished local work.
+	if p.CancellationTracker != nil {
+		defer p.CancellationTracker.Clear(pull)
+	}
+
 	// Delete pull from DB.
 	if err := deleteStatus(); err != nil {
 		return fmt.Errorf("deleting pull from db: %w", err)
-	}
-
-	// Clear any operations to avoid unbounded growth.
-	if p.CancellationTracker != nil {
-		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.
