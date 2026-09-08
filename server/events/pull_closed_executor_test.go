@@ -5,12 +5,14 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/stretchr/testify/assert"
@@ -432,4 +434,77 @@ func (s *countingPlanStore) DeleteForPull(string, string, int) error {
 }
 func (s *countingPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
 	return nil
+}
+
+// A failed durable deletion must be retryable without retaining process-local
+// cancellation state once workspace and lock cleanup have finished.
+func TestPullClosedCancellationCleanupBoundary(t *testing.T) {
+	for _, coordinated := range []bool{false, true} {
+		for _, failure := range []string{"workspace", "locks", "status"} {
+			t.Run(fmt.Sprintf("coordinated=%t/%s", coordinated, failure), func(t *testing.T) {
+				RegisterMockTestingT(t)
+				storage, err := boltdb.New(t.TempDir())
+				Ok(t, err)
+				t.Cleanup(func() { Ok(t, storage.Close()) })
+				failureErr := errors.New("cleanup unavailable")
+				database := &closedPullStatusDatabase{Database: storage}
+				tracker := events.NewCancellationTracker()
+				operation, unregister := tracker.CommandContext(context.Background(), testdata.Pull)
+				defer unregister()
+				tracker.Cancel(testdata.Pull)
+				workingDir := mocks.NewMockWorkingDir()
+				locker := lockmocks.NewMockLocker(gomock.NewController(t))
+				client := vcsmocks.NewMockClient()
+				store := &countingPlanStore{}
+				logger := logging.NewNoopLogger(t)
+				executor := events.PullClosedExecutor{WorkingDir: workingDir, Locker: locker, Database: database, CancellationTracker: tracker, VCSClient: client, PlanStore: store}
+				if coordinated {
+					executor.Publication = events.NewPublicationCoordinator(storage, context.Background())
+				}
+				switch failure {
+				case "workspace":
+					When(workingDir.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(failureErr)
+				case "locks":
+					locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, failureErr)
+				case "status":
+					database.deleteErr = failureErr
+					locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return([]models.ProjectLock{{Pull: testdata.Pull}}, nil)
+				}
+				err = executor.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+				Assert(t, errors.Is(err, failureErr), "original cleanup error must be returned")
+				Equals(t, 1, store.deleteForPullCalls)
+				client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				if failure != "status" {
+					Assert(t, tracker.IsCancelled(testdata.Pull), "keep cancellation while workspace or lock cleanup is incomplete")
+					Equals(t, 0, database.deletes)
+					return
+				}
+				Assert(t, !tracker.IsCancelled(testdata.Pull), "durable deletion failure must not retain local cancellation state")
+				Equals(t, context.Canceled, operation.Err())
+				Equals(t, 1, database.deletes)
+				// Redelivery retries durable cleanup even though local bookkeeping
+				// is gone. The first attempt already removed the old locks.
+				database.deleteErr = nil
+				locker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+				Ok(t, executor.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull))
+				Equals(t, 2, database.deletes)
+				Equals(t, 2, store.deleteForPullCalls)
+				client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+			})
+		}
+	}
+}
+
+type closedPullStatusDatabase struct {
+	db.Database
+	deleteErr error
+	deletes   int
+}
+
+func (d *closedPullStatusDatabase) DeletePullStatus(pull models.PullRequest, mode command.PublicationWriteMode) error {
+	d.deletes++
+	if d.deleteErr != nil {
+		return d.deleteErr
+	}
+	return d.Database.DeletePullStatus(pull, mode)
 }
