@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -451,4 +452,70 @@ func TestDeleteLock_PublicationCancellationDoesNotDiscard(t *testing.T) {
 			Assert(t, lease == nil, "canceled discard must not acquire ownership")
 		})
 	}
+}
+
+func TestDeleteLock_OptionalPublication(t *testing.T) {
+	for _, mode := range []string{"nil", "coordinated", "nil conflict", "coordinated conflict", "nil busy", "nil ambiguous"} {
+		t.Run(mode, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			storage, err := boltdb.New(t.TempDir())
+			Ok(t, err)
+			t.Cleanup(func() { Ok(t, storage.Close()) })
+			pull := models.PullRequest{Num: 42, BaseRepo: models.Repo{FullName: "owner/repo"}}
+			project := models.NewProject(pull.BaseRepo.FullName, "path", "")
+			locker := locking.NewClient(storage)
+			lock, err := locker.TryLock(project, "workspace", pull, models.User{})
+			Ok(t, err)
+			if !strings.Contains(mode, "conflict") {
+				_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: "path", Workspace: "workspace", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
+				Ok(t, err)
+			}
+			if mode == "nil busy" || mode == "nil ambiguous" {
+				_, err = storage.AcquirePublicationLease(context.Background(), pull, "other-owner", time.Minute)
+				Ok(t, err)
+				if mode == "nil ambiguous" {
+					Ok(t, storage.BeginPublication(context.Background(), pull, command.PublicationFence{Owner: "other-owner"}))
+				}
+			}
+			database := &publicationDiscardDatabase{Database: storage}
+			client := vcsmocks.NewMockClient()
+			controller := controllers.LocksController{Locker: locker, Database: database, Logger: logging.NewNoopLogger(t), VCSClient: client,
+				DeleteLockCommand: &events.DefaultDeleteLockCommand{Locker: locker, Database: database, WorkingDir: mocks2.NewMockWorkingDir()}}
+			if strings.HasPrefix(mode, "coordinated") {
+				controller.Publication = events.NewPublicationCoordinator(storage, context.Background())
+			}
+			request := mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/locks", nil), map[string]string{"id": lock.LockKey})
+			response := httptest.NewRecorder()
+			controller.DeleteLock(response, request)
+			if mode != "nil" && mode != "coordinated" {
+				Equals(t, http.StatusConflict, response.Code)
+				remaining, err := locker.GetLock(lock.LockKey)
+				Ok(t, err)
+				Assert(t, remaining != nil, "rejected durable transition must preserve the lock")
+				client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				return
+			}
+			Equals(t, http.StatusOK, response.Code)
+			status, err := storage.GetPullStatus(pull)
+			Ok(t, err)
+			Equals(t, models.DiscardedPlanStatus, status.Projects[0].Status)
+			if mode == "nil" {
+				Equals(t, command.PublicationWriteMode(command.NoClaim{}), database.mode)
+			} else {
+				fence, ok := database.mode.(command.PublicationFence)
+				Assert(t, ok && fence.Owner != "", "coordinated discard must use the acquired fence")
+			}
+			client.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq(""))
+		})
+	}
+}
+
+type publicationDiscardDatabase struct {
+	db.Database
+	mode command.PublicationWriteMode
+}
+
+func (d *publicationDiscardDatabase) DiscardPlanStatus(pull models.PullRequest, project models.ProjectStatus, mode command.PublicationWriteMode) (bool, error) {
+	d.mode = mode
+	return d.Database.DiscardPlanStatus(pull, project, mode)
 }
