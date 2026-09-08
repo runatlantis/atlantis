@@ -266,6 +266,8 @@ func (p *PublicationCoordinator) Run(ctx context.Context, pull models.PullReques
 
 // RunCommand binds required write ownership only for this short section. The
 // synthetic API remains explicitly unfenced; it does not publish PR results.
+// A nil receiver executes operation directly for callers without server wiring.
+// Their explicit NoClaim writes still obey the backend publication checks.
 func (p *PublicationCoordinator) RunCommand(ctx *command.Context, operation func() error) error {
 	if p == nil || ctx.Pull.Num <= 0 {
 		return operation()
@@ -310,6 +312,7 @@ func publishTerminal(ctx *command.Context, remote func() error) error {
 // RunWithObservedStatus fences commands which do not install their own plan
 // generation. Compare the durable status observed at command start before
 // publishing an early failure, policy approval, or remediation result.
+// Like RunCommand, a nil receiver preserves the uncoordinated caller contract.
 func (p *PublicationCoordinator) RunWithObservedStatus(ctx *command.Context, database db.Database, fetcher LivePullHeadFetcher, operation func() error) error {
 	expected := ctx.PullStatus
 	return p.RunCommand(ctx, func() error {
