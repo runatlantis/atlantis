@@ -11,6 +11,11 @@ ships (see `--language` and `server/i18n/locales/`).
 
 `.github/workflows/translate-docs.yml` runs when English docs change on `main`:
 
+The pages under `docs/`, `guide/`, `blog/`, `contributing/` and the top-level
+pages are all translated. Images, Terraform samples and other assets are not
+copied into a locale; a translated page links back to the English copy of its
+assets.
+
 1. Stages a throwaway copy of the English pages under `.lingo-src/en/`. The
    translator finds sources by substituting the source locale into a `[locale]`
    path, and staging keeps the real English tree exactly where it is.

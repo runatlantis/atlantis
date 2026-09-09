@@ -16,6 +16,8 @@ on:
     paths:
       - 'runatlantis.io/docs/**/*.md'
       - 'runatlantis.io/guide/**/*.md'
+      - 'runatlantis.io/blog/**/*.md'
+      - 'runatlantis.io/contributing/**/*.md'
       - 'runatlantis.io/*.md'
       - 'i18n.json'
       - 'scripts/localize-links.mjs'
@@ -66,7 +68,13 @@ jobs:
         run: |
           rm -rf .lingo-src
           mkdir -p .lingo-src/en
-          cp -r runatlantis.io/docs runatlantis.io/guide .lingo-src/en/
+          # Markdown only. The blog keeps its images and Terraform samples in
+          # per-post directories; those are not translated, and the link
+          # localizer already points a translated post back at the English
+          # copy of its assets.
+          rsync -a --include='*/' --include='*.md' --exclude='*' --prune-empty-dirs \
+            runatlantis.io/docs runatlantis.io/guide runatlantis.io/blog runatlantis.io/contributing \
+            .lingo-src/en/
           cp runatlantis.io/*.md .lingo-src/en/
 
           # Stage the translations already on the branch too. Without them the
