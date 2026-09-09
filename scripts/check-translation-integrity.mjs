@@ -23,6 +23,8 @@ const SITE_DIR = 'runatlantis.io';
 const TRANSLATED_DIRS = [
   { dir: 'docs', recursive: true },
   { dir: 'guide', recursive: true },
+  { dir: 'blog', recursive: true },
+  { dir: 'contributing', recursive: true },
   { dir: '.', recursive: false },
 ];
 

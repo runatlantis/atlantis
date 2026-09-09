@@ -202,8 +202,9 @@ const localizeSidebar = (
     ...(item.items ? { items: localizeSidebar(item.items, locale, labels) } : {}),
   }));
 
-// Section labels only. Blog post titles are left in English on purpose: the
-// posts themselves are not translated.
+// Every entry the sidebar renders. Blog post titles reuse the wording already
+// used for the same posts in runatlantis.io/es/blog.md, so a reader sees one
+// title for a post rather than two.
 const esLabels: Record<string, string> = {
   "Guide": "Guía",
   "Test Drive": "Prueba rápida",
@@ -250,6 +251,19 @@ const esLabels: Record<string, string> = {
   "Events Controller": "Controlador de eventos",
   "Glossary": "Glosario",
   "Blog": "Blog",
+  "Atlantis on Google Cloud Run": "Atlantis en Google Cloud Run",
+  "Integrating Atlantis with OpenTofu": "Integrar Atlantis con OpenTofu",
+  "Atlantis User Survey Results": "Resultados de la encuesta de usuarios de Atlantis",
+  "4 Reasons To Try HashiCorp's (New) Free Terraform Remote State Storage":
+    "4 razones para probar el nuevo almacenamiento gratuito de estado remoto de Terraform de HashiCorp",
+  "I'm Joining HashiCorp!": "\u00a1Me uno a HashiCorp!",
+  "Putting The Dev Into DevOps: Why Your Developers Should Write Terraform Too":
+    "Llevar el Dev a DevOps: por qu\u00e9 tus desarrolladores tambi\u00e9n deber\u00edan escribir Terraform",
+  "Atlantis 0.4.4 Now Supports Bitbucket": "Atlantis 0.4.4 ahora es compatible con Bitbucket",
+  "Terraform And The Dangers Of Applying Locally": "Terraform y los peligros de aplicar localmente",
+  "Hosting Our Static Site over SSL with S3, ACM, CloudFront and Terraform":
+    "Alojar nuestro sitio est\u00e1tico sobre SSL con S3, ACM, CloudFront y Terraform",
+  "Introducing Atlantis": "Presentando Atlantis",
 };
 
 const es: SidebarItem[] = localizeSidebar(en, "es", esLabels);
