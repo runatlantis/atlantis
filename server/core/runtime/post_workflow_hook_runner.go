@@ -78,7 +78,7 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		var customStatusErr error
 		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
 		if customStatusErr != nil {
-			err = fmt.Errorf("%s: running '%s' in '%s': \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+			err = fmt.Errorf("reading workflow hook status file %q after running %q in %q: %w\n%s", outputFilePath, shell+" "+shellArgs+" "+command, path, customStatusErr, out)
 			ctx.Log.Debug("error: %s", err)
 			return string(out), "", err
 		}
