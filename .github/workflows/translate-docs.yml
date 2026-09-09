@@ -13,11 +13,6 @@ on:
   push:
     branches:
       - 'main'
-      # TEMPORARY: lets this pipeline be exercised before it reaches main.
-      # workflow_dispatch is only available for workflows that already exist on
-      # the default branch, so a push trigger is the only way to test the real
-      # job on a branch. Remove this line before merging.
-      - 'feat/docs-i18n-pilot'
     paths:
       - 'runatlantis.io/docs/**/*.md'
       - 'runatlantis.io/guide/**/*.md'
@@ -25,6 +20,7 @@ on:
       - 'i18n.json'
       - 'scripts/localize-links.mjs'
       - 'scripts/check-translation-integrity.mjs'
+      - 'scripts/align-tables.mjs'
       - '.github/workflows/translate-docs.yml'
   workflow_dispatch:
     inputs:
@@ -121,6 +117,18 @@ jobs:
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
           node scripts/localize-links.mjs $locales
 
+      - name: Lint translated markdown
+        # Website Check runs markdownlint on every locale. Translated tables
+        # rarely keep the source's column widths, which fails MD060, and the
+        # model occasionally leaves a stray space inside link text or doubles
+        # a blank line. Both are mechanical to repair.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/align-tables.mjs $locales
+          globs=""
+          for locale in $locales; do globs="$globs runatlantis.io/${locale}/**/*.md"; done
+          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml $globs
+
       - name: Upload translated output
         # Kept even when the integrity check fails: when a page trips a check,
         # the generated file is the only way to see what actually happened, and
@@ -144,15 +152,25 @@ jobs:
           set -o pipefail
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
 
-          if node scripts/check-translation-integrity.mjs $locales | tee /tmp/integrity.txt; then
+          # The checker reports failures on stderr, so merge the streams or the
+          # log file has nothing to quarantine. `grep` exits 1 when nothing
+          # matches, which under `set -e` + pipefail would abort the step, so
+          # the match list is built separately and allowed to be empty.
+          if node scripts/check-translation-integrity.mjs $locales 2>&1 | tee /tmp/integrity.txt; then
             exit 0
           fi
 
-          grep '^✗' /tmp/integrity.txt | sed 's/^✗ //' | while read -r file; do
+          { grep '^✗' /tmp/integrity.txt || true; } | sed 's/^✗ //' > /tmp/failed.txt
+          if [ ! -s /tmp/failed.txt ]; then
+            echo "::error::Integrity check failed but reported no files; see output above."
+            exit 1
+          fi
+
+          while read -r file; do
             git checkout HEAD -- "$file" 2>/dev/null || rm -f "$file"
             echo "- \`${file}\`" >> /tmp/quarantined.txt
             echo "::warning file=${file}::Quarantined: failed translation integrity checks"
-          done
+          done < /tmp/failed.txt
 
           node scripts/localize-links.mjs $locales
           node scripts/check-translation-integrity.mjs $locales
