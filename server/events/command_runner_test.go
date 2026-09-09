@@ -68,6 +68,7 @@ var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
+	planRunnerWrapper          func(events.ProjectCommandRunner) events.ProjectPlanCommandRunner
 	parallelPoolSize           int
 	SilenceNoProjects          bool
 	silenceVCSStatusNoPlans    bool
@@ -177,6 +178,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	if workingDirLocker == nil {
 		workingDirLocker = events.NewDefaultWorkingDirLocker()
 	}
+	var planRunner events.ProjectPlanCommandRunner = projectCommandRunner
+	if testConfig.planRunnerWrapper != nil {
+		planRunner = testConfig.planRunnerWrapper(projectCommandRunner)
+	}
 	planCommandRunner = events.NewPlanCommandRunner(
 		testConfig.silenceVCSStatusNoPlans,
 		testConfig.silenceVCSStatusNoProjects,
@@ -186,7 +191,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		workingDirLocker,
 		commitUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		planRunner,
 		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
@@ -824,7 +829,7 @@ func TestPlanCommandRunner_HoldsPlanInFlightLockAcrossCleanupPlanAndDBWrite(t *t
 		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock during command build")
 		return ReturnValues{[]command.ProjectContext{projectCtx}, nil}
 	})
-	When(projectCommandRunner.Plan(projectCtx)).Then(func(args []Param) ReturnValues {
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).Then(func(args []Param) ReturnValues {
 		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock during project plan")
 		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
 	})
@@ -859,7 +864,7 @@ func TestPlanCommandRunner_HoldsPlanLockDuringStalePlanCleanup(t *testing.T) {
 		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected plan lock during stale plan cleanup")
 		return ReturnValues{[]events.PendingPlan{}, nil}
 	})
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
@@ -899,7 +904,7 @@ func TestPlanCommandRunner_HoldsPlanLockDuringPullStatusWrite(t *testing.T) {
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
@@ -927,7 +932,7 @@ func TestPlanCommandRunner_AutoplanHoldsPlanLockDuringStalePlanCleanup(t *testin
 		Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "expected autoplan lock during stale plan cleanup")
 		return ReturnValues{[]events.PendingPlan{}, nil}
 	})
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
@@ -963,7 +968,7 @@ func TestPlanCommandRunner_AutoplanHoldsPlanLockDuringPullStatusWrite(t *testing
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{projectCtx}, nil)
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	When(pendingPlanFinder.Find(tmp)).ThenReturn([]events.PendingPlan{}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
 
@@ -1218,13 +1223,13 @@ func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t
 		return ReturnValues{ignoreChecks == 1}
 	})
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
 	Equals(t, 1, configuredPreHooks.calls)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
-	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+	projectCommandRunner.VerifyWasCalledOnce().Plan(matchPlanInvocation(projectCtx))
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExplicitConfig(t *testing.T) {
@@ -1251,14 +1256,14 @@ func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExpl
 		return ReturnValues{ignoreChecks == 1}
 	})
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Eq(cmd))).ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
 
 	Equals(t, 1, configuredPreHooks.calls)
 	Equals(t, 2, ignoreChecks)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
-	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+	projectCommandRunner.VerifyWasCalledOnce().Plan(matchPlanInvocation(projectCtx))
 }
 
 func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) {
@@ -2076,7 +2081,7 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 				&events.CommentCommand{Name: command.Unlock})
 
 			deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(Any[logging.SimpleLogging](),
-				Eq(testdata.GithubRepo.FullName), Eq(testdata.Pull.Num))
+				Eq(modelPull))
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num),
 				Eq("All Atlantis locks for this PR have been unlocked and plans discarded"), Eq("unlock"))
@@ -2097,8 +2102,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(0, errors.New("err"))
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num,
 		&events.CommentCommand{Name: command.Unlock})
@@ -2121,8 +2125,7 @@ func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
 		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
 
@@ -2145,8 +2148,7 @@ func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
 		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn(nil, errors.New("err"))
 
@@ -2171,8 +2173,7 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 		Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
 		testdata.GithubRepo, nil)
-	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo.FullName),
-		Eq(testdata.Pull.Num))).ThenReturn(0, errors.New("err"))
+	When(deleteLockCommand.DeleteLocksByPull(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(0, errors.New("err"))
 	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 		Eq(modelPull))).ThenReturn([]string{doNotUnlock, "need-help"}, nil)
 	unlockCommandRunner.DisableUnlockLabel = ""
@@ -2200,9 +2201,11 @@ func TestRunAutoplanCommand_DeletePlans(t *testing.T) {
 		ThenReturn([]command.ProjectContext{
 			{
 				CommandName: command.Plan,
+				ProjectName: "first",
 			},
 			{
 				CommandName: command.Plan,
+				ProjectName: "second",
 			},
 		}, nil)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
@@ -2472,7 +2475,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	}
 	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
 		ThenReturn([]command.ProjectContext{projectCtx}, nil)
-	When(projectCommandRunner.Plan(projectCtx)).ThenReturn(command.ProjectCommandOutput{
+	When(projectCommandRunner.Plan(matchPlanInvocation(projectCtx))).ThenReturn(command.ProjectCommandOutput{
 		PlanSuccess: &models.PlanSuccess{
 			TerraformOutput: "true",
 		},
@@ -2526,10 +2529,12 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		ThenReturn([]command.ProjectContext{
 			{
 				CommandName:      command.Plan,
+				ProjectName:      "first",
 				AutomergeEnabled: true, // Setting this manually, since this tests bypasses automerge param reconciliation logic and otherwise defaults to false.
 			},
 			{
 				CommandName:      command.Plan,
+				ProjectName:      "second",
 				AutomergeEnabled: true, // Setting this manually, since this tests bypasses automerge param reconciliation logic and otherwise defaults to false.
 			},
 		}, nil)
@@ -2556,6 +2561,13 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
+	stored, err := boltDB.GetPullStatus(testdata.Pull)
+	Ok(t, err)
+	for _, project := range stored.Projects {
+		Equals(t, "", project.AcceptedPlanGeneration)
+		Assert(t, !project.PlanGenerationActive, "discarded automerge plan must not remain active")
+		Equals(t, models.ErroredPlanStatus, project.Status)
+	}
 	// gets called twice: the first time before the plan starts, the second time after the plan errors
 	pendingPlanFinder.VerifyWasCalled(Times(2)).Find(tmp)
 
@@ -2849,4 +2861,38 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
+}
+
+func TestRunAutoplan_NoProjectsReapsAcceptedPlanAndLostCheckoutLock(t *testing.T) {
+	storage := newTestBoltDB(t)
+	client := setup(t, func(config *TestConfig) { config.database = storage })
+	locker := locking.NewClient(storage)
+	installPlanCommandRunnerLocker(client, locker, false)
+	dataRoot, planRoot := t.TempDir(), t.TempDir()
+	store := &runtime.LocalPlanStore{SeparatePlanDir: planRoot}
+	planCommandRunner.PlanReaper = &events.DefaultDeleteLockCommand{WorkingDir: workingDir, PlanStore: store, DataDir: dataRoot, LocalSharePlanDir: planRoot}
+	pull := models.PullRequest{Num: 1, HeadCommit: "head", BaseRepo: testdata.GithubRepo}
+	project := command.ProjectContext{CommandName: command.Plan, BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "removed", PlanGeneration: "G1", RequiresAtlantisManagedPlanFile: true, SavedPlanHash: new(string), LocalSharePlanDir: planRoot}
+	_, err := storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{project}, true)
+	Ok(t, err)
+	path := runtime.GetPlanFilePath(project, filepath.Join(dataRoot, "removed"))
+	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	Ok(t, os.WriteFile(path, []byte("old accepted plan"), 0o600))
+	Ok(t, store.Save(project, path))
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G1", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	Ok(t, err)
+	held, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, project.RepoRelDir, ""), project.Workspace, pull, models.User{})
+	Ok(t, err)
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn("", os.ErrNotExist)
+	ctx := &command.Context{Pull: pull, HeadRepo: pull.BaseRepo, Trigger: command.AutoTrigger, Log: logging.NewNoopLogger(t)}
+	planCommandRunner.Run(ctx, nil)
+	status, err := storage.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, 0, len(status.Projects))
+	remaining, err := locker.GetLock(held.LockKey)
+	Ok(t, err)
+	Assert(t, remaining == nil, "removed projects must release locks even without a checkout")
+	project.AcceptedPlanGeneration, project.ExpectedPlanHash = "G1", *project.SavedPlanHash
+	Assert(t, store.Load(project, path) != nil, "accepted artifact must be reaped")
 }

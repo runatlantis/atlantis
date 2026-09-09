@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -162,6 +163,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredPlanStatusPublisher interface {
+	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus)
+}
+
 type DeferredApplyStatusPublisher interface {
 	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
 }
@@ -211,6 +216,13 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 	// ensures we are differentiating between project level command and overall command
 	result := execute(ctx)
 
+	// A generation can become obsolete while Terraform fails. Defer every
+	// terminal plan status until completion has checked durable identity.
+	if commandName == command.Plan && ctx.PlanGeneration != "" {
+		p.streamFailureToJob(ctx, result)
+		return result
+	}
+
 	if result.Error != nil || result.Failure != "" {
 		if err := p.JobURLSetter.SetJobURLWithStatus(ctx, commandName, models.FailedCommitStatus, &result); err != nil {
 			ctx.Log.Err("updating project PR status: %s", err)
@@ -221,7 +233,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
-	if commandName == command.Apply {
+	if commandName == command.Apply || (commandName == command.Plan && !ctx.API) {
 		return result
 	}
 
@@ -234,7 +246,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 
 func (p *ProjectOutputWrapper) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
 	for _, projectResult := range result.ProjectResults {
-		if projectResult.Command != command.Apply || projectResult.ApplySuccess == "" || projectResult.Error != nil || projectResult.Failure != "" {
+		if projectResult.Command != command.Apply || (projectResult.ApplySuccess == "" && !projectResult.ApplyExecuted) || projectResult.Error != nil || projectResult.Failure != "" {
 			continue
 		}
 		ctx, ok := deferredApplyProjectContext(projectCmds, projectResult)
@@ -381,10 +393,15 @@ func (p *DefaultProjectCommandRunner) PolicyCheck(ctx command.ProjectContext) co
 
 // Apply runs terraform apply for the project described by ctx.
 func (p *DefaultProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
+	var executed bool
+	if ctx.PlanGeneration != "" {
+		ctx.ApplyExecutionSucceeded = &executed
+	}
 	applyOut, applyURL, failure, err := p.doApply(ctx)
 	return command.ProjectCommandOutput{
 		Failure:         failure,
 		Error:           err,
+		ApplyExecuted:   executed,
 		ApplySuccess:    applyOut,
 		ApplySuccessURL: applyURL,
 	}
@@ -869,6 +886,19 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
+	if ctx.PlanGeneration != "" && ctx.RequiresAtlantisManagedPlanFile && (ctx.SavedPlanHash == nil || *ctx.SavedPlanHash == "") {
+		// A custom plan stage followed by a built-in apply already uses the
+		// convention PLANFILE on main. Capture its final bytes for managed
+		// consumption without claiming arbitrary custom scripts are isolated.
+		store := p.PlanStore
+		if store == nil {
+			store = &runtime.LocalPlanStore{}
+		}
+		if err := store.Save(ctx, runtime.GetPlanFilePath(ctx, projAbsPath)); err != nil {
+			return nil, "", fmt.Errorf("saving managed custom plan: %w", err)
+		}
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
@@ -939,8 +969,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// artifact, so Atlantis cannot require or hash a convention plan file for
 	// them. Their durable plan state is still validated.
 	managedPlanFile := requiresManagedPlanFileForApply(ctx)
+	if ctx.CommandName == command.Apply && ctx.PlanGeneration != "" && (ctx.AcceptedPlanGeneration != ctx.PlanGeneration || (managedPlanFile && ctx.ExpectedPlanHash == "")) {
+		return "", "", "", fmt.Errorf("no accepted plan for dir %q workspace %q project %q; run `atlantis plan` again", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+	}
 	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
+	if ctx.CommandName == command.Apply && ctx.PlanGeneration == "" && managedPlanFile && usingDefaultApplyPlanValidator {
 		planPath, err := safePlanFilePath(ctx, absPath)
 		if err != nil {
 			return "", "", "", err
@@ -974,12 +1007,24 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		ctx.RemoteApplyRunURL = &remoteApplyRunURL
 	}
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err == nil && ctx.ApplyExecutionSucceeded != nil {
+		*ctx.ApplyExecutionSucceeded = true
+	}
 	if err == nil {
 		err = ValidateNonPRAPIRefUnchanged(ctx, repoDir)
 	}
 	if err == nil {
 		if validator, ok := p.ApplyPlanValidator.(ApplyCommandStartValidator); ok {
 			err = validator.ValidateCommandStartHead(ctx)
+		}
+	}
+
+	if ctx.PlanGeneration != "" && ctx.ApplyExecutionSucceeded != nil && *ctx.ApplyExecutionSucceeded {
+		if err == nil && p.ApplyPlanValidator != nil {
+			err = p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx)
+		}
+		if err != nil {
+			err = fmt.Errorf("%w: %w", db.ErrApplyExecutionAmbiguous, err)
 		}
 	}
 
@@ -1222,4 +1267,33 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 // built-in apply step will read it.
 func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, res := range result.ProjectResults {
+		if res.Command != command.Plan {
+			continue
+		}
+		if res.PlanGeneration == "" && (res.PlanSuccess == nil || res.Error != nil || res.Failure != "") {
+			continue
+		}
+		projectStatus := status
+		if res.Error != nil || res.Failure != "" {
+			projectStatus = models.FailedCommitStatus
+		}
+
+		for _, ctx := range projectCmds {
+			if ctx.CommandName != command.Plan || ctx.RepoRelDir != res.RepoRelDir || ctx.Workspace != res.Workspace || ctx.ProjectName != res.ProjectName || ctx.SuppressVCSStatus {
+				continue
+			}
+			output := res.ProjectCommandOutput
+			if result.Error != nil {
+				output = command.ProjectCommandOutput{Error: result.Error}
+			}
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, projectStatus, &output); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+			}
+			break
+		}
+	}
 }

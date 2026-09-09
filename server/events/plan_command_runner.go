@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -77,7 +79,8 @@ func NewPlanCommandRunner(
 }
 
 type PlanCommandRunner struct {
-	vcsClient vcs.Client
+	PlanReaper PlanArtifactReaper
+	vcsClient  vcs.Client
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -165,6 +168,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		}
 		return
 	}
+	if !p.beginGeneration(ctx, AutoplanCommand{}, projectCmds, false) {
+		return
+	}
 	p.updatePendingCommitStatus(ctx, command.Plan)
 
 	// discard previous plans that might not be relevant anymore
@@ -185,15 +191,25 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 			ctx.Log.Err("deleting pending plans: %s", err)
 		}
 		result.PlansDeleted = true
+		for i := range result.ProjectResults {
+			project := &result.ProjectResults[i]
+			if project.PlanGeneration != "" && project.Error == nil && project.Failure == "" {
+				project.Failure = "plan discarded because automerge requires all plans to succeed; run `atlantis plan` again"
+			}
+		}
 	}
-
-	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 
 	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		if p.obsoletePlan(ctx, err) {
+			return
+		}
+		p.planPersistenceFailed(ctx, AutoplanCommand{}, projectCmds, result, err)
+		return
 	}
 
+	p.publishPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
+	p.pullUpdater.updatePull(ctx, AutoplanCommand{}, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -208,7 +224,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		// however, policy checking is weird since it's called within the plan command itself
 		// we need to better structure how this command works.
 		ctx.PullStatus = &pullStatus
-
+		bindAcceptedGenerations(policyCheckCmds, &pullStatus)
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	}
 }
@@ -306,6 +322,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 	projectCmds, policyCheckCmds := p.partitionProjectCmds(ctx, projectCmds)
+	if !p.beginGeneration(ctx, cmd, projectCmds, false) {
+		return
+	}
 	if len(projectCmds) > 0 {
 		p.updatePendingCommitStatus(ctx, command.Plan)
 	}
@@ -332,12 +351,13 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 			ctx.Log.Err("deleting pending plans: %s", err)
 		}
 		result.PlansDeleted = true
+		for i := range result.ProjectResults {
+			project := &result.ProjectResults[i]
+			if project.PlanGeneration != "" && project.Error == nil && project.Failure == "" {
+				project.Failure = "plan discarded because automerge requires all plans to succeed; run `atlantis plan` again"
+			}
+		}
 	}
-
-	p.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
 
 	var pullStatus models.PullStatus
 	if noProjectPullStatus != nil {
@@ -348,10 +368,15 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		pullStatus, err = p.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	}
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		if p.obsoletePlan(ctx, err) {
+			return
+		}
+		p.planPersistenceFailed(ctx, cmd, projectCmds, result, err)
 		return
 	}
 
+	p.publishPlanStatuses(projectCmds, result, models.SuccessCommitStatus)
+	p.pullUpdater.updatePull(ctx, cmd, result)
 	p.updateCommitStatus(ctx, pullStatus, command.Plan)
 	p.updateCommitStatus(ctx, pullStatus, command.Apply)
 
@@ -360,6 +385,8 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	if len(result.ProjectResults) > 0 &&
 		(!result.HasErrors() && !result.PlansDeleted) {
 		ctx.Log.Info("Running policy check for '%s'", cmd.CommandName())
+		ctx.PullStatus = &pullStatus
+		bindAcceptedGenerations(policyCheckCmds, &pullStatus)
 		p.policyCheckCommandRunner.Run(ctx, policyCheckCmds)
 	} else if len(projectCmds) == 0 && !cmd.IsForSpecificProject() {
 		// If there were no projects modified, we set successful commit statuses
@@ -381,14 +408,29 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 }
 
 func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) (models.PullStatus, error) {
-	if _, err := p.deletePlansAndPendingPlanLocks(ctx); err != nil {
-		return models.PullStatus{}, err
-	}
-	pullStatus, err := p.dbUpdater.replaceDB(ctx, pull, nil)
+	// One atomic replacement supersedes old generations. Delete + an ordinary
+	// empty update could otherwise erase a generation admitted in between.
+	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(pull, uuid.NewString(), nil, true)
 	if err != nil {
 		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
-	return pullStatus, nil
+	if _, err := p.deletePlansAndPendingPlanLocks(ctx); err != nil {
+		return models.PullStatus{}, err
+	}
+	// A replica can have durable project locks even after losing its checkout.
+	// Release the captured old projects as well as locally discovered plans.
+	for _, old := range admitted.Previous {
+		if p.PlanReaper != nil {
+			if err := p.PlanReaper.ReapPlan(ctx.Log, pull, old); err != nil {
+				return models.PullStatus{}, err
+			}
+		}
+		project := models.NewProject(pull.BaseRepo.FullName, old.RepoRelDir, old.ProjectName)
+		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, old.Workspace, models.GenerateLockKey(project, old.Workspace)); err != nil {
+			return models.PullStatus{}, err
+		}
+	}
+	return admitted.PullStatus, nil
 }
 
 func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullCommand) (func(), bool) {
@@ -603,4 +645,80 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// Successful project checks are deferred until the command's results are durable.
+func (p *PlanCommandRunner) publishPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	if publisher, ok := p.prjCmdRunner.(DeferredPlanStatusPublisher); ok {
+		publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+	}
+}
+
+func (p *PlanCommandRunner) planPersistenceFailed(ctx *command.Context, cmd PullCommand, projectCmds []command.ProjectContext, result command.Result, err error) {
+	ctx.CommandHasErrors = true
+	result.Error = fmt.Errorf("persisting plan results: %w; restore database connectivity and run `atlantis plan` again before applying", err)
+	p.publishPlanStatuses(projectCmds, result, models.FailedCommitStatus)
+	for _, name := range []command.Name{command.Plan, command.Apply} {
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, name); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+	}
+	p.pullUpdater.updatePull(ctx, cmd, result)
+}
+
+// beginGeneration makes every selected project non-applyable before a plan step
+// can replace its artifact. Synthetic non-PR API operations remain legacy; their
+// Pull.Num == 0 storage collision is a separate API contract issue.
+func (p *PlanCommandRunner) beginGeneration(ctx *command.Context, cmd PullCommand, projects []command.ProjectContext, replace bool) bool {
+	if ctx.Pull.Num == 0 || len(projects) == 0 {
+		return true
+	}
+	generation := uuid.NewString()
+	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(ctx.Pull, generation, projects, replace)
+	if err != nil {
+		p.planPersistenceFailed(ctx, cmd, projects, command.Result{}, fmt.Errorf("admitting plan generation: %w", err))
+		return false
+	}
+	ctx.PullStatus = &admitted.PullStatus
+	for i := range projects {
+		projects[i].PlanGeneration = generation
+		projects[i].AcceptedPlanGeneration = ""
+		projects[i].ExpectedPlanHash = ""
+		projects[i].SavedPlanHash = new(string)
+		projects[i].PullStatus = &admitted.PullStatus
+	}
+	if p.PlanReaper != nil {
+		for _, old := range admitted.Previous {
+			current := findProjectInPullStatus(&admitted.PullStatus, old.Workspace, old.RepoRelDir, old.ProjectName)
+			if current != nil && current.PlanGeneration == old.PlanGeneration {
+				continue
+			}
+			if err := p.PlanReaper.ReapPlan(ctx.Log, ctx.Pull, old); err != nil {
+				p.planPersistenceFailed(ctx, cmd, projects, command.Result{}, fmt.Errorf("reaping superseded plan: %w", err))
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func bindAcceptedGenerations(projects []command.ProjectContext, status *models.PullStatus) {
+	for i := range projects {
+		project := findProjectInPullStatus(status, projects[i].Workspace, projects[i].RepoRelDir, projects[i].ProjectName)
+		if project != nil {
+			projects[i].PlanGeneration = project.PlanGeneration
+			projects[i].AcceptedPlanGeneration = project.AcceptedPlanGeneration
+			projects[i].ExpectedPlanHash = project.ManagedPlanHash
+			projects[i].PullStatus = status
+		}
+	}
+}
+
+func (p *PlanCommandRunner) obsoletePlan(ctx *command.Context, err error) bool {
+	if !errors.Is(err, db.ErrPlanGenerationSuperseded) {
+		return false
+	}
+	ctx.CommandHasErrors = true
+	ctx.Log.Warn("suppressing obsolete plan publication %v", err)
+	return true
 }

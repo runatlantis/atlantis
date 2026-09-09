@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -67,6 +68,12 @@ type PlanStore interface {
 	DeletePlanForProject(owner, repo string, pullNum int, workspace, repoRelDir, projectName string) error
 }
 
+// LegacyPlanCleaner retains broad cleanup of legacy discovery objects while
+// generation artifacts are reaped only by their captured accepted identity.
+type LegacyPlanCleaner interface {
+	DeleteLegacyForPull(owner, repo string, pullNum int) error
+}
+
 // LocalPlanStore implements PlanStore using the local filesystem.
 // Save and Load are no-ops because terraform already reads/writes locally.
 type LocalPlanStore struct {
@@ -78,15 +85,33 @@ type LocalPlanStore struct {
 	SeparatePlanDir string
 }
 
-func (s *LocalPlanStore) Save(_ command.ProjectContext, _ string) error {
+func (s *LocalPlanStore) Save(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" {
+		return saveLocalGeneration(ctx, planPath)
+	}
 	return nil
 }
 
-func (s *LocalPlanStore) Load(_ command.ProjectContext, _ string) error {
+func (s *LocalPlanStore) Load(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" {
+		return loadLocalGeneration(ctx, planPath)
+	}
 	return nil
 }
 
-func (s *LocalPlanStore) Remove(_ command.ProjectContext, planPath string) error {
+func (s *LocalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
+	if ctx.PlanGeneration != "" && ctx.AcceptedPlanGeneration != "" {
+		identityPath, err := generationPath(planPath, ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash)
+		if err != nil {
+			return err
+		}
+		if err := removePlanWithinRoot(planPath, identityPath); err != nil {
+			return err
+		}
+	}
+	if ctx.PlanGeneration != "" {
+		return removePlanWithinRoot(planPath, planPath)
+	}
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 
@@ -142,7 +167,7 @@ func containsPlanFile(dir string) (bool, error) {
 			return err
 		}
 		if entry.IsDir() {
-			if entry.Name() == ".terragrunt-cache" {
+			if entry.Name() == ".terragrunt-cache" || strings.HasSuffix(entry.Name(), generationSuffix) {
 				return fs.SkipDir
 			}
 			return nil
@@ -165,4 +190,8 @@ func (s *LocalPlanStore) DeleteForPull(_, _ string, _ int) error {
 
 func (s *LocalPlanStore) DeletePlanForProject(_, _ string, _ int, _, _, _ string) error {
 	return nil // no-op: local plan deleted by WorkingDir.DeletePlan
+}
+
+func (s *LocalPlanStore) DeleteLegacyForPull(owner, repo string, pullNum int) error {
+	return s.DeleteForPull(owner, repo, pullNum)
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -403,36 +404,13 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 // UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
 func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
-	key, err := r.pullKey(pull)
-	if err != nil {
-		return err
-	}
-
-	currStatusPtr, err := r.getPull(key)
-	if err != nil {
-		return err
-	}
-	if currStatusPtr == nil {
+	_, err := r.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.UpdateLegacyProjectStatus(current, pull, workspace, repoRelDir, newStatus)
+	})
+	if errors.Is(err, db.ErrPlanStatusNotFound) {
 		return nil
 	}
-	currStatus := *currStatusPtr
-
-	// Update the status.
-	for i := range currStatus.Projects {
-		// NOTE: We're using a reference here because we are
-		// in-place updating its Status field.
-		proj := &currStatus.Projects[i]
-		if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
-			proj.Status = newStatus
-			break
-		}
-	}
-
-	err = r.writePull(key, currStatus)
-	if err != nil {
-		return fmt.Errorf("db transaction failed: %w", err)
-	}
-	return nil
+	return err
 }
 
 func (r *RedisDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
@@ -461,111 +439,9 @@ func (r *RedisDB) DeletePullStatus(pull models.PullRequest) error {
 }
 
 func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
-	key, err := r.pullKey(pull)
-	if err != nil {
-		return models.PullStatus{}, err
-	}
-
-	var newStatus models.PullStatus
-	currStatus, err := r.getPull(key)
-	if err != nil {
-		// Tolerate an unreadable prior entry (e.g. after a PullStatus schema
-		// change). It will be overwritten with fresh data below; in-flight
-		// policy approvals captured in the old blob are lost.
-		log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
-		currStatus = nil
-	}
-
-	// If there is no pull OR if the pull we have is out of date, we
-	// just write a new pull.
-	if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
-		var statuses []models.ProjectStatus
-		for _, res := range newResults {
-			statuses = append(statuses, r.projectResultToProject(res))
-		}
-		// Preserve policy status from the previous commit so approvals
-		// survive between the plan DB write and the subsequent policy
-		// check DB write. doPolicyCheck applies sticky filtering and
-		// overwrites these when it writes its own results.
-		if currStatus != nil {
-			for i := range statuses {
-				for _, old := range currStatus.Projects {
-					if statuses[i].Workspace == old.Workspace &&
-						statuses[i].RepoRelDir == old.RepoRelDir &&
-						statuses[i].ProjectName == old.ProjectName &&
-						len(old.PolicyStatus) > 0 {
-						statuses[i].PolicyStatus = old.PolicyStatus
-						break
-					}
-				}
-			}
-		}
-		newStatus = models.PullStatus{
-			Pull:     pull,
-			Projects: statuses,
-		}
-	} else {
-		// If there's an existing pull at the right commit then we have to
-		// merge our project results with the existing ones. We do a merge
-		// because it's possible a user is just applying a single project
-		// in this command and so we don't want to delete our data about
-		// other projects that aren't affected by this command.
-		newStatus = *currStatus
-		for _, res := range newResults {
-			// First, check if we should update any existing projects.
-			updatedExisting := false
-			for i := range newStatus.Projects {
-				// NOTE: We're using a reference here because we are
-				// in-place updating its Status field.
-				proj := &newStatus.Projects[i]
-				if res.Workspace == proj.Workspace &&
-					res.RepoRelDir == proj.RepoRelDir &&
-					res.ProjectName == proj.ProjectName {
-
-					proj.Status = res.PlanStatus()
-
-					// Updating only policy sets which are included in results; keeping the rest.
-					if len(proj.PolicyStatus) > 0 {
-						for i, oldPolicySet := range proj.PolicyStatus {
-							for _, newPolicySet := range res.PolicyStatus() {
-								if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
-									proj.PolicyStatus[i] = newPolicySet
-								}
-							}
-						}
-					} else {
-						proj.PolicyStatus = res.PolicyStatus()
-					}
-
-					updatedExisting = true
-					break
-				}
-			}
-
-			if !updatedExisting {
-				// If we didn't update an existing project, then we need to
-				// add this because it's a new one.
-				newStatus.Projects = append(newStatus.Projects, r.projectResultToProject(res))
-			}
-		}
-	}
-
-	// Now, we overwrite the key with our new status.
-	err = r.writePull(key, newStatus)
-	if err != nil {
-		return models.PullStatus{}, fmt.Errorf("db transaction failed: %w", err)
-	}
-	return newStatus, nil
-}
-
-func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
-	if statusPull.HeadCommit != pull.HeadCommit {
-		return true
-	}
-	if pull.BaseBranch == "" {
-		return false
-	}
-	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
+	return r.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.MergePullResults(current, pull, newResults)
+	})
 }
 
 func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
@@ -581,18 +457,6 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, val, err)
 	}
 	return &p, nil
-}
-
-func (r *RedisDB) writePull(key string, pull models.PullStatus) error {
-	serialized, err := json.Marshal(pull)
-	if err != nil {
-		return fmt.Errorf("serializing: %w", err)
-	}
-	err = r.client.Set(ctx, key, serialized, 0).Err()
-	if err != nil {
-		return fmt.Errorf("DB Transaction failed: %w", err)
-	}
-	return nil
 }
 
 func (r *RedisDB) deletePull(key string) error {
@@ -624,17 +488,6 @@ func (r *RedisDB) pullKey(pull models.PullRequest) (string, error) {
 	return fmt.Sprintf("%s::%s::%d", hostname, repo, pull.Num), nil
 }
 
-func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
-	return models.ProjectStatus{
-		Workspace:    p.Workspace,
-		RepoRelDir:   p.RepoRelDir,
-		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyStatus(),
-		Status:       p.PlanStatus(),
-	}
-}
-
-// Ping checks the Redis connection health.
 func (r *RedisDB) Ping() error {
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

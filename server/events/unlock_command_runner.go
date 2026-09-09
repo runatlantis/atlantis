@@ -59,7 +59,7 @@ func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 
 	var numLocks int
 	if err == nil && !hasLabel {
-		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, baseRepo.FullName, pullNum)
+		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, ctx.Pull)
 		if err != nil {
 			vcsMessage = "Failed to delete PR locks"
 			ctx.Log.Err("failed to delete locks by pull %s", err.Error())
