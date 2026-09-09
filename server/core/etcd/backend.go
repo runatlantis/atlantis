@@ -45,8 +45,31 @@ type backend struct {
 	// closed. It is nil in external mode. Set by the embedded runtime (Phase 5).
 	embeddedClose func() error
 
+	// monitorStop stops the embedded-server error monitor on Close (nil in
+	// external mode). fatalErr records a fatal embedded-server error observed
+	// after startup so Ready fails closed for the rest of the process lifetime
+	// (design §740, §783).
+	monitorStop chan struct{}
+	fatalMu     sync.Mutex
+	fatalErr    error
+
 	closeOnce sync.Once
 	closeErr  error
+}
+
+// setFatal records the first fatal embedded-server error.
+func (b *backend) setFatal(err error) {
+	b.fatalMu.Lock()
+	defer b.fatalMu.Unlock()
+	if b.fatalErr == nil {
+		b.fatalErr = err
+	}
+}
+
+func (b *backend) fatal() error {
+	b.fatalMu.Lock()
+	defer b.fatalMu.Unlock()
+	return b.fatalErr
 }
 
 // Client implements Backend.
@@ -56,6 +79,11 @@ func (b *backend) Client() *clientv3.Client { return b.client }
 // so successful client construction is not connectivity proof; a real
 // linearizable operation is required (design §187, §303 "Ping").
 func (b *backend) Ready(ctx context.Context) error {
+	// A fatal embedded-server error at any point after startup makes the backend
+	// permanently unready (design §783); it is not recoverable by a probe.
+	if err := b.fatal(); err != nil {
+		return fmt.Errorf("embedded etcd server failed: %w", err)
+	}
 	rctx, cancel := context.WithTimeout(ctx, b.requestTimeout)
 	defer cancel()
 	// A linearizable Get (the clientv3 default, no WithSerializable) forces a
@@ -71,6 +99,9 @@ func (b *backend) Ready(ctx context.Context) error {
 func (b *backend) Close() error {
 	b.closeOnce.Do(func() {
 		var errs []error
+		if b.monitorStop != nil {
+			close(b.monitorStop)
+		}
 		if b.client != nil {
 			if err := b.client.Close(); err != nil {
 				errs = append(errs, fmt.Errorf("closing etcd client: %w", err))

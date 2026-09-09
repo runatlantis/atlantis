@@ -36,6 +36,7 @@ type fakeCoordinator struct {
 	executed    *etcd.Command
 	ran         bool
 	reopened    int
+	reopenGen   int64 // lifecycle generation ReopenPull returns
 	done        chan struct{}
 }
 
@@ -71,11 +72,12 @@ func (f *fakeCoordinator) Execute(cmd etcd.Command, run func() bool) etcd.Execut
 	return f.execOutcome
 }
 
-func (f *fakeCoordinator) ReopenPull(_ context.Context, _, _ string, _ int) error {
+func (f *fakeCoordinator) ReopenPull(_ context.Context, _, _ string, _ int) (int64, error) {
 	f.mu.Lock()
 	f.reopened++
+	g := f.reopenGen
 	f.mu.Unlock()
-	return nil
+	return g, nil
 }
 
 func (f *fakeCoordinator) waitExecuted(t *testing.T) {
@@ -209,6 +211,28 @@ func TestEtcdCommandRouter_CommentDedupIdentity(t *testing.T) {
 	a := coord.routedDeliveryID()
 	router.RunCommentCommand(repo, nil, nil, user, 7, noID)
 	Assert(t, a != coord.routedDeliveryID(), "absent comment id must not deduplicate")
+}
+
+// TestEtcdCommandRouter_AutoplanReopenBumpsIdentity proves the lifecycle
+// generation is folded into the autoplan identity, so a close+reopen at the same
+// head commit (which bumps the generation) is NOT suppressed by the still-cached
+// admission record from before the close.
+func TestEtcdCommandRouter_AutoplanReopenBumpsIdentity(t *testing.T) {
+	coord := newFakeCoordinator()
+	router := events.NewEtcdCommandRouter(&recordingRunner{}, coord, &commentRecordingVCS{}, logging.NewNoopLogger(t))
+	repo := testRepo()
+	user := models.User{Username: "u"}
+	pull := models.PullRequest{Num: 7, HeadCommit: "abc123"}
+
+	coord.reopenGen = 0
+	router.RunAutoplanCommand(repo, repo, pull, user)
+	gen0 := coord.routedDeliveryID()
+
+	// A reopen bumps the lifecycle generation; the same head commit must now map
+	// to a distinct identity so the autoplan runs again.
+	coord.reopenGen = 1
+	router.RunAutoplanCommand(repo, repo, pull, user)
+	Assert(t, coord.routedDeliveryID() != gen0, "a reopen (new generation) must not reuse the pre-close autoplan identity")
 }
 
 // TestEtcdCommandRouter_AutoplanDedupIdentity proves autoplan identity is derived

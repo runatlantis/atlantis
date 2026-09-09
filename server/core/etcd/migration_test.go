@@ -95,6 +95,24 @@ func TestMigration_ChecksumMismatchRefusesComplete(t *testing.T) {
 	ErrContains(t, "checksum mismatch", err) // ...but the checksum gate still refuses
 }
 
+// TestMigration_SecondMigrationRefused proves a second migration cannot begin
+// while one is already in progress: the migration-active sentinel (and the
+// non-empty namespace) serialize migrations, closing the concurrent
+// empty-namespace TOCTOU (design §895).
+func TestMigration_SecondMigrationRefused(t *testing.T) {
+	backend := startEmbeddedEtcd(t)
+	kv := backend.Client().KV
+	keys := etcd.NewKeyspace("/atlantis")
+	ctx := context.Background()
+
+	_, err := etcd.BeginMigration(ctx, kv, keys, "dep-1", "src", 1, "")
+	Ok(t, err)
+
+	// A second BeginMigration must be refused rather than writing a parallel manifest.
+	_, err = etcd.BeginMigration(ctx, kv, keys, "dep-1", "src", 1, "")
+	Assert(t, err != nil, "a second concurrent migration must be refused")
+}
+
 // TestQuarantine_SetBlocksThenClear proves quarantine is set once, reported
 // active, and cleared only with the exact recovery ID (design §864).
 func TestQuarantine_SetBlocksThenClear(t *testing.T) {

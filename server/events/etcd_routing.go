@@ -60,8 +60,10 @@ type EtcdCoordinator interface {
 	// run to perform the actual work (owner side).
 	Execute(cmd etcd.Command, run func() bool) etcd.ExecuteOutcome
 	// ReopenPull clears a closed pull's lifecycle so a reopened pull request
-	// accepts new locks again. It is a no-op when the pull is not closed.
-	ReopenPull(ctx context.Context, vcsHostname, repoFullName string, pullNum int) error
+	// accepts new locks again, returning the effective lifecycle generation (folded
+	// into the autoplan dedup identity so a reopen is not suppressed by a stale
+	// admission record). It is a no-op transition when the pull is not closed.
+	ReopenPull(ctx context.Context, vcsHostname, repoFullName string, pullNum int) (int64, error)
 }
 
 // routedPayload is the serialized command body forwarded between replicas. It
@@ -103,7 +105,8 @@ func (r *EtcdCommandRouter) RunAutoplanCommand(baseRepo models.Repo, headRepo mo
 	// signal that a previously-closed pull is live again: clear any closed
 	// lifecycle before routing so the pull accepts new locks (design §450).
 	reopenCtx, cancel := context.WithTimeout(context.Background(), routeIngressTimeout)
-	if err := r.coordinator.ReopenPull(reopenCtx, baseRepo.VCSHost.Hostname, baseRepo.FullName, pull.Num); err != nil {
+	generation, err := r.coordinator.ReopenPull(reopenCtx, baseRepo.VCSHost.Hostname, baseRepo.FullName, pull.Num)
+	if err != nil {
 		r.logger.Warn("etcd routing: reopening pull %s#%d lifecycle: %s", baseRepo.FullName, pull.Num, err)
 	}
 	cancel()
@@ -120,10 +123,12 @@ func (r *EtcdCommandRouter) RunAutoplanCommand(baseRepo models.Repo, headRepo mo
 	}
 	// Autoplan has no provider comment id; the head commit is its stable identity,
 	// so a redelivered push event for the same commit deduplicates while a new push
-	// (new commit) runs (design §509).
+	// (new commit) runs (design §509). The lifecycle generation is folded in so a
+	// close+reopen at the same commit (which bumps the generation) is NOT suppressed
+	// by the still-cached admission record from before the close.
 	dedupKey := ""
 	if pull.HeadCommit != "" {
-		dedupKey = fmt.Sprintf("%s#%d/autoplan/%s", baseRepo.FullName, pull.Num, pull.HeadCommit)
+		dedupKey = fmt.Sprintf("%s#%d/autoplan/g%d/%s", baseRepo.FullName, pull.Num, generation, pull.HeadCommit)
 	}
 	r.dispatch("autoplan", baseRepo, pull.Num, dedupKey, payload)
 }

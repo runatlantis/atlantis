@@ -84,6 +84,7 @@ func NewEmbedded(ctx context.Context, cfg *Config) (Backend, error) {
 		client:         client,
 		requestTimeout: cfg.RequestTimeout,
 		probeKey:       NewKeyspace(cfg.Namespace).Root(),
+		monitorStop:    make(chan struct{}),
 		embeddedClose: func() error {
 			e.Close()
 			select {
@@ -94,6 +95,19 @@ func NewEmbedded(ctx context.Context, cfg *Config) (Backend, error) {
 			return nil
 		},
 	}
+
+	// Monitor the embedded server for the full process lifetime: a fatal error
+	// after serving begins must make Atlantis unready, not go unobserved
+	// (design §740, §783). Close stops this via monitorStop.
+	go func() {
+		select {
+		case err := <-e.Err():
+			if err != nil {
+				b.setFatal(err)
+			}
+		case <-b.monitorStop:
+		}
+	}()
 
 	pctx, cancel := context.WithTimeout(ctx, cfg.StartupTimeout)
 	defer cancel()

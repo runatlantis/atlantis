@@ -188,8 +188,29 @@ func (a *APIController) maybeProxyToOwner(w http.ResponseWriter, r *http.Request
 	return true
 }
 
+// maxAPIRequestBody bounds an API request body. Plan/apply payloads are small
+// JSON; this cap prevents an oversized body from being buffered into memory.
+const maxAPIRequestBody = 5 << 20 // 5 MiB
+
+// authenticateAPI validates the API secret header. It reads no request body, so
+// it can gate a handler before the body is buffered — an unauthenticated caller
+// must not be able to make the server read an arbitrarily large body. Returns a
+// zero code and nil error when authenticated.
+func (a *APIController) authenticateAPI(r *http.Request) (int, error) {
+	if len(a.APISecret) == 0 {
+		return http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
+	}
+	// Constant-time comparison to prevent timing attacks.
+	secret := r.Header.Get(atlantisTokenHeader)
+	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
+		return http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
+	}
+	return 0, nil
+}
+
 // bufferBody reads and restores the request body so it can be both parsed and
-// replayed when proxying.
+// replayed when proxying. Callers must authenticate and bound the body (via
+// http.MaxBytesReader) before calling this.
 func bufferBody(r *http.Request) ([]byte, error) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -394,6 +415,13 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
+	// Authenticate before reading the body so an unauthenticated caller cannot
+	// make the server buffer an oversized request; then bound the body.
+	if code, err := a.authenticateAPI(r); err != nil {
+		a.apiReportLegacyError(w, code, err)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAPIRequestBody)
 	bodyBytes, err := bufferBody(r)
 	if err != nil {
 		a.apiReportLegacyError(w, http.StatusBadRequest, fmt.Errorf("failed to read request"))
@@ -440,6 +468,13 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
+	// Authenticate before reading the body so an unauthenticated caller cannot
+	// make the server buffer an oversized request; then bound the body.
+	if code, err := a.authenticateAPI(r); err != nil {
+		a.apiReportLegacyError(w, code, err)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxAPIRequestBody)
 	bodyBytes, err := bufferBody(r)
 	if err != nil {
 		a.apiReportLegacyError(w, http.StatusBadRequest, fmt.Errorf("failed to read request"))
@@ -1144,14 +1179,8 @@ func mergePolicyStatuses(existing []models.PolicySetStatus, incoming []models.Po
 }
 
 func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
-	if len(a.APISecret) == 0 {
-		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
-	}
-
-	// Validate the secret token using constant-time comparison to prevent timing attacks
-	secret := r.Header.Get(atlantisTokenHeader)
-	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
-		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
+	if code, err := a.authenticateAPI(r); err != nil {
+		return nil, nil, code, err
 	}
 
 	// Parse the JSON payload

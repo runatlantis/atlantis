@@ -81,6 +81,13 @@ func (k Keyspace) RecoveryQuarantineKey() string {
 func (k Keyspace) MigrationKey(id string) string {
 	return k.root + "/meta/migrations/" + encodeSegment(id)
 }
+
+// MigrationActiveKey is a single well-known sentinel that serializes migrations:
+// a create-only write of it admits exactly one concurrent migrator, closing the
+// empty-namespace TOCTOU between BeginMigration and the manifest write.
+func (k Keyspace) MigrationActiveKey() string {
+	return k.root + "/meta/migration-active"
+}
 func (k Keyspace) RecoveryKey(id string) string {
 	return k.root + "/meta/recoveries/" + encodeSegment(id)
 }

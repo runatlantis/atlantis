@@ -112,13 +112,19 @@ func TestLifecycle_ClosedBlocksAcquireUntilReopen(t *testing.T) {
 	Assert(t, err != nil, "acquire on a closed pull must fail closed")
 
 	// Reopen the pull, then acquisition works again.
-	Ok(t, d.Scoped().ReopenProjectPull(ctx, pull))
+	{
+		_, rerr := d.Scoped().ReopenProjectPull(ctx, pull)
+		Ok(t, rerr)
+	}
 	ok, _, err = d.TryLock(lock)
 	Ok(t, err)
 	Assert(t, ok, "acquire after reopen should succeed")
 
 	// ReopenProjectPull is a no-op on an already-open pull.
-	Ok(t, d.Scoped().ReopenProjectPull(ctx, pull))
+	{
+		_, rerr := d.Scoped().ReopenProjectPull(ctx, pull)
+		Ok(t, rerr)
+	}
 	got, err := d.Scoped().GetProjectLock(ctx, scope)
 	Ok(t, err)
 	Assert(t, got != nil, "lock should still be present after a no-op reopen")
@@ -144,7 +150,10 @@ func TestLifecycle_RepeatedCloseReopenCycles(t *testing.T) {
 		ok, _, err = d.TryLock(lock)
 		Assert(t, !ok && err != nil, "acquire on a closed pull must fail closed")
 
-		Ok(t, d.Scoped().ReopenProjectPull(ctx, pull))
+		{
+			_, rerr := d.Scoped().ReopenProjectPull(ctx, pull)
+			Ok(t, rerr)
+		}
 	}
 
 	ok, _, err := d.TryLock(lock)
@@ -170,12 +179,15 @@ func TestLifecycle_ConcurrentCloseReopen_NoWedge(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		wg.Add(2)
 		go func() { defer wg.Done(); _, _ = d.UnlockByPullForClose("o/r", "github.com", 1) }()
-		go func() { defer wg.Done(); _ = d.Scoped().ReopenProjectPull(ctx, pull) }()
+		go func() { defer wg.Done(); _, _ = d.Scoped().ReopenProjectPull(ctx, pull) }()
 	}
 	wg.Wait()
 
 	// A final reopen must always restore acquisition, regardless of the race order.
-	Ok(t, d.Scoped().ReopenProjectPull(ctx, pull))
+	{
+		_, rerr := d.Scoped().ReopenProjectPull(ctx, pull)
+		Ok(t, rerr)
+	}
 	ok, _, err = d.TryLock(lock)
 	Ok(t, err)
 	Assert(t, ok, "pull must be acquirable after a final reopen; the lifecycle was not wedged")

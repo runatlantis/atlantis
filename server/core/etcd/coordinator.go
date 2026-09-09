@@ -87,9 +87,9 @@ func (c *RuntimeCoordinator) Route(ctx context.Context, cmd Command) (Result, er
 // new project locks again (design §450). It is called on autoplan ingress — the
 // reopen signal, since Atlantis handles a reopened PR as an open event — and is a
 // cheap no-op when the pull is not closed.
-func (c *RuntimeCoordinator) ReopenPull(ctx context.Context, vcsHostname, repoFullName string, pullNum int) error {
+func (c *RuntimeCoordinator) ReopenPull(ctx context.Context, vcsHostname, repoFullName string, pullNum int) (int64, error) {
 	if c.rt.database == nil {
-		return nil
+		return 0, nil
 	}
 	return c.rt.database.Scoped().ReopenProjectPull(ctx, PullScope{
 		VCSHostname: vcsHostname,

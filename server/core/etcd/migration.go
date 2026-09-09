@@ -85,16 +85,26 @@ func BeginMigration(ctx context.Context, kv clientv3.KV, keys Keyspace, deployme
 	if err != nil {
 		return nil, err
 	}
+	// Write the manifest and claim the single migration-active sentinel atomically.
+	// The create-only sentinel guard admits exactly one migrator even if two both
+	// observed an empty namespace, closing the TOCTOU race.
 	key := keys.MigrationKey(m.manifest.MigrationID)
+	activeKey := keys.MigrationActiveKey()
 	resp, err := kv.Txn(ctx).
-		If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
-		Then(clientv3.OpPut(key, string(val))).
+		If(
+			clientv3.Compare(clientv3.CreateRevision(key), "=", 0),
+			clientv3.Compare(clientv3.CreateRevision(activeKey), "=", 0),
+		).
+		Then(
+			clientv3.OpPut(activeKey, m.manifest.MigrationID),
+			clientv3.OpPut(key, string(val)),
+		).
 		Commit()
 	if err != nil {
 		return nil, fmt.Errorf("writing migration manifest: %w", err)
 	}
 	if !resp.Succeeded {
-		return nil, errors.New("migration manifest already exists")
+		return nil, errors.New("another migration is already in progress for this namespace")
 	}
 	return m, nil
 }
@@ -215,6 +225,10 @@ func (m *Migrator) Complete(ctx context.Context) (string, error) {
 			clientv3.OpPut(migKey, string(migVal)),
 			clientv3.OpPut(m.keys.SchemaKey(), string(schemaVal)),
 			clientv3.OpPut(m.keys.DeploymentKey(), string(deployVal)),
+			// Release the migration-active sentinel now that the namespace is
+			// initialized; a future migration would anyway be refused by the
+			// non-empty namespace check.
+			clientv3.OpDelete(m.keys.MigrationActiveKey()),
 		).
 		Commit()
 	if err != nil {

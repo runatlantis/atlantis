@@ -81,7 +81,7 @@ type ScopedProjectLockStore interface {
 	UnlockIfOwnedByPull(ctx context.Context, scope ProjectScope, pullNum int) (*models.ProjectLock, error)
 	ListProjectLocks(ctx context.Context) ([]models.ProjectLock, error)
 	UnlockByPullScope(ctx context.Context, scope PullScope, closeGen bool) ([]models.ProjectLock, error)
-	ReopenProjectPull(ctx context.Context, scope PullScope) error
+	ReopenProjectPull(ctx context.Context, scope PullScope) (int64, error)
 	UILockID(scope ProjectScope) string
 	DecodeUILockID(id string) (ProjectScope, error)
 }
@@ -195,32 +195,41 @@ func (s *scopedLockStore) readLifecycle(ctx context.Context, lifecycleKey string
 // ReopenProjectPull advances a closed pull's lifecycle back to open, bumping its
 // generation, so a reopened pull request accepts new project locks again. It is a
 // no-op (and cheap) when the pull is not closed (design §450). The transition is
-// compare-and-swap on the lifecycle record's revision.
-func (s *scopedLockStore) ReopenProjectPull(ctx context.Context, scope PullScope) error {
+// compare-and-swap on the lifecycle record's revision. It returns the effective
+// lifecycle generation after the operation, which callers fold into the autoplan
+// dedup identity so a reopen (a new generation) is not suppressed by a stale
+// admission record from before the close.
+func (s *scopedLockStore) ReopenProjectPull(ctx context.Context, scope PullScope) (int64, error) {
 	lifecycleKey := s.keys.PullLifecycleKey(scope)
 	rec, state, rev, err := s.readLifecycle(ctx, lifecycleKey)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if state != LifecycleClosed {
-		return nil
+		return rec.Generation, nil
 	}
 	next := lifecycleRecord{State: LifecycleOpen, Generation: rec.Generation + 1}
 	val, err := encodeValue(lifecycleRecordKind, lifecycleRecordV1, next)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	resp, err := s.kv.Txn(ctx).
 		If(clientv3.Compare(clientv3.ModRevision(lifecycleKey), "=", rev)).
 		Then(clientv3.OpPut(lifecycleKey, string(val))).
 		Commit()
 	if err != nil {
-		return fmt.Errorf("reopening pull lifecycle: %w", err)
+		return 0, fmt.Errorf("reopening pull lifecycle: %w", err)
 	}
-	// A lost CAS means another writer transitioned it concurrently; that writer's
-	// state stands (open on reopen, or a fresh close). Either way, no error.
-	_ = resp
-	return nil
+	if resp.Succeeded {
+		return next.Generation, nil
+	}
+	// A lost CAS means another writer transitioned it concurrently; re-read the
+	// generation that now stands.
+	fresh, _, _, err := s.readLifecycle(ctx, lifecycleKey)
+	if err != nil {
+		return 0, err
+	}
+	return fresh.Generation, nil
 }
 
 // GetProjectLock returns the lock at scope, or nil if absent.
@@ -428,6 +437,17 @@ func (s *scopedLockStore) finishCleaning(ctx context.Context, scope PullScope, c
 		if closeGen && curState == LifecycleOpen && curRev != startRev {
 			if _, err := s.kv.Delete(ctx, cleaningKey); err != nil {
 				return fmt.Errorf("clearing cleaning marker after superseding reopen: %w", err)
+			}
+			return nil
+		}
+
+		// A manual cleanup (closeGen=false, e.g. an admin unlock) removes the
+		// pull's locks but must NOT reopen a pull the VCS has closed. Only an
+		// autoplan-driven reopen advances a closed lifecycle back to open; here we
+		// just drop the cleaning marker and leave the closed record standing.
+		if !closeGen && curState == LifecycleClosed {
+			if _, err := s.kv.Delete(ctx, cleaningKey); err != nil {
+				return fmt.Errorf("clearing cleaning marker on closed pull: %w", err)
 			}
 			return nil
 		}
