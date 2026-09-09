@@ -38,3 +38,6 @@ test-results/
 
 #Cursor dirs
 .cursor
+
+# lingo.dev staging dir for docs translation
+.lingo-src/
