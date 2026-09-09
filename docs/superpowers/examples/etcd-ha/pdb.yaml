@@ -1,0 +1,13 @@
+# Preserve etcd quorum: at most one member may be voluntarily disrupted at a
+# time, for every supported voter count (3/5/7). The membership runbook likewise
+# permits only one manual member deletion at a time (design §324).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: atlantis-member
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlantis
+      atlantis.runatlantis.io/role: member

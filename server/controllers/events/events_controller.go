@@ -690,6 +690,13 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 	}
 	if parseResult.Command != nil {
 		logger.Info("Handling '%s' comment", parseResult.Command.Name)
+		// Carry the provider's stable comment ID so etcd active-active mode can
+		// deduplicate a redelivered comment webhook (design §509). Providers that do
+		// not expose a comment ID pass a non-positive value; those fall back to a
+		// fresh dedup id, matching non-HA behavior.
+		if commentID > 0 {
+			parseResult.Command.DeliveryID = strconv.FormatInt(commentID, 10)
+		}
 	}
 
 	// At this point we know it's a command we're not supposed to ignore, so now

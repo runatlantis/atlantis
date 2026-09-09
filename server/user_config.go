@@ -89,6 +89,33 @@ type UserConfig struct {
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
+	EtcdMode                        string `mapstructure:"etcd-mode"`
+	EtcdDeploymentID                string `mapstructure:"etcd-deployment-id"`
+	EtcdNamespace                   string `mapstructure:"etcd-namespace"`
+	EtcdEndpoints                   string `mapstructure:"etcd-endpoints"`
+	EtcdCAFile                      string `mapstructure:"etcd-ca-file"`
+	EtcdCertFile                    string `mapstructure:"etcd-cert-file"`
+	EtcdKeyFile                     string `mapstructure:"etcd-key-file"`
+	EtcdServerName                  string `mapstructure:"etcd-server-name"`
+	EtcdUsername                    string `mapstructure:"etcd-username"`
+	EtcdPasswordFile                string `mapstructure:"etcd-password-file"`
+	EtcdRequestTimeout              string `mapstructure:"etcd-request-timeout"`
+	EtcdStartupTimeout              string `mapstructure:"etcd-startup-timeout"`
+	EtcdAllowInsecureDev            bool   `mapstructure:"etcd-allow-insecure-dev"`
+	EtcdEmbeddedConfigFile          string `mapstructure:"etcd-embedded-config-file"`
+	EtcdEmbeddedVoterCount          int    `mapstructure:"etcd-embedded-voter-count"`
+	EtcdEmbeddedLifecycle           string `mapstructure:"etcd-embedded-lifecycle"`
+	EtcdEmbeddedStartupPurpose      string `mapstructure:"etcd-embedded-startup-purpose"`
+	EtcdEmbeddedIdentityFile        string `mapstructure:"etcd-embedded-identity-file"`
+	EtcdEmbeddedJoinEndpoints       string `mapstructure:"etcd-embedded-join-endpoints"`
+	EtcdEmbeddedMembershipTicket    string `mapstructure:"etcd-embedded-membership-ticket-file"`
+	EtcdEmbeddedRestoreManifest     string `mapstructure:"etcd-embedded-restore-manifest-file"`
+	ReplicaID                       string `mapstructure:"replica-id"`
+	ReplicaAdvertiseURL             string `mapstructure:"replica-advertise-url"`
+	ReplicaAdvertiseAllowlist       string `mapstructure:"replica-advertise-allowlist"`
+	InternalCommandTokenFile        string `mapstructure:"internal-command-token-file"`
+	InternalCommandCAFile           string `mapstructure:"internal-command-ca-file"`
+	OwnershipTTLSeconds             int    `mapstructure:"ownership-ttl-seconds"`
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
 	MaxCommentsPerCommand           int    `mapstructure:"max-comments-per-command"`
