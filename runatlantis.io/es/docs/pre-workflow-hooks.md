@@ -86,12 +86,12 @@ command](custom-workflows.md#custom-run-command).
 - run: custom-command
 ```
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| run | string | none | no | Ejecuta un comando personalizado |
-| description | string | none | no | Descripción del pre hook |
-| shell | string | 'sh' | no | El shell que se usará para ejecutar el comando |
-| shellArgs | string | '-c' | no | Los argumentos del shell que se usarán para ejecutar el comando |
+| Key         | Type   | Default | Required | Description                                                     |
+| ----------- | ------ | ------- | -------- | --------------------------------------------------------------- |
+| run         | string | none    | no       | Ejecuta un comando personalizado                                |
+| description | string | none    | no       | Descripción del pre hook                                        |
+| shell       | string | 'sh'    | no       | El shell que se usará para ejecutar el comando                  |
+| shellArgs   | string | '-c'    | no       | Los argumentos del shell que se usarán para ejecutar el comando |
 
 ::: tip Notas
 

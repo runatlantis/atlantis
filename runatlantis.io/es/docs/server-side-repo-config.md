@@ -485,13 +485,13 @@ Cada servidor maneja diferentes archivos de config del repositorio.
 
 ### Claves de nivel superior
 
-| Key        | Type                                                  | Default   | Required | Description                                                                           |
-|------------|-------------------------------------------------------|-----------|----------|---------------------------------------------------------------------------------------|
-| repos      | array[[Repo](#repo)]                                  | see below | no       | Lista de repos a los que aplicar la configuración.                                    |
+| Key        | Type                                                  | Default   | Required | Description                                                                                                    |
+| ---------- | ----------------------------------------------------- | --------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| repos      | array[[Repo](#repo)]                                  | see below | no       | Lista de repos a los que aplicar la configuración.                                                             |
 | workflows  | map[string: [Workflow](custom-workflows.md#workflow)] | see below | no       | Mapa desde nombre de workflow a workflow. Los workflows sobrescriben los comandos predeterminados de Atlantis. |
-| policies   | Policies.                                             | none      | no       | Lista de policy sets a ejecutar y metadatos asociados                                 |
-| metrics    | Metrics.                                              | none      | no       | Mapa de configuración de métricas                                                     |
-| team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuración de la verificación de permisos de equipo                                |
+| policies   | Policies.                                             | none      | no       | Lista de policy sets a ejecutar y metadatos asociados                                                          |
+| metrics    | Metrics.                                              | none      | no       | Mapa de configuración de métricas                                                                              |
+| team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuración de la verificación de permisos de equipo                                                         |
 
 ::: tip Una nota sobre los valores predeterminados
 
@@ -530,25 +530,25 @@ Si establece un workflow con la clave `default`, esto lo sobrescribirá.
 
 ### Repo
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| id | string | none | yes | El valor puede ser una expresión regular cuando se especifica como /&lt;regex&gt;/ o una coincidencia exacta de string. Los ID de repo son de la forma `{vcs hostname}/{org}/{name}`, p. ej. `github.com/owner/repo`. El hostname se especifica sin scheme ni port. Para Bitbucket Server, {org} es el **nombre** del proyecto, no la clave. |
-| branch | string | none | no | Una regex que coincide con pull requests por rama base (la rama en la que se está haciendo merge del pull request). Por defecto, coinciden todas las ramas |
-| repo_config_file | string | none | no | Ruta del archivo de config del repo en este repo. Por defecto, use `atlantis.yaml` que está ubicado en la raíz del repositorio. Cuando múltiples servidores atlantis trabajan con el mismo repo, establezca diferentes nombres de archivo. |
-| workflow | string | none | no | Un workflow personalizado. |
-| plan_requirements | []string | none | no | Requisitos que deben satisfacerse antes de que `atlantis plan` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles. |
-| apply_requirements | []string | none | no | Requisitos que deben satisfacerse antes de que `atlantis apply` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles. |
-| import_requirements | []string | none | no | Requisitos que deben satisfacerse antes de que `atlantis import` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles. |
-| allowed_overrides | []string | none | no | Una lista de claves restringidas que los archivos `atlantis.yaml` pueden sobrescribir. Las únicas claves soportadas son `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks` y `custom_policy_check` |
-| allowed_workflows | []string | none | no | Una lista de workflows entre los que los archivos `atlantis.yaml` pueden seleccionar. |
-| allow_custom_workflows | bool | false | no | Si se permite o no [Custom Workflows](custom-workflows.md). |
-| delete_source_branch_on_merge | bool | false | no | Si se elimina o no la rama de origen al hacer merge. |
-| repo_locking | bool | false | no | (obsoleto) Si se obtiene o no un lock. |
-| repo_locks | [RepoLocks](#repolocks) | `mode: on_plan` | no | Si los locks del repositorio están habilitados o no para este proyecto en plan o apply. Vea [RepoLocks](#repolocks) para más detalles. |
-| policy_check | bool | false | no | Si se ejecutan o no policy checks en este repositorio. |
-| custom_policy_check | bool | false | no | Si se habilitan o no herramientas personalizadas de policy check fuera de Conftest en este repositorio. |
-| autodiscover | AutoDiscover | none | no | Configuración de auto discover para este repo |
-| silence_pr_comments | []string | none | no | Silencia los comentarios del PR de las etapas definidas mientras preserva las verificaciones de estado del PR. Útil en entornos grandes con muchas instancias de Atlantis y/o proyectos, cuando los comentarios son demasiado grandes y demasiados, por lo tanto es preferible depender únicamente de las verificaciones de estado del PR. Los valores soportados son: `plan`, `apply`. |
+| Key                           | Type                    | Default         | Required | Description                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ----------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                            | string                  | none            | yes      | El valor puede ser una expresión regular cuando se especifica como /&lt;regex&gt;/ o una coincidencia exacta de string. Los ID de repo son de la forma `{vcs hostname}/{org}/{name}`, p. ej. `github.com/owner/repo`. El hostname se especifica sin scheme ni port. Para Bitbucket Server, {org} es el **nombre** del proyecto, no la clave.                                            |
+| branch                        | string                  | none            | no       | Una regex que coincide con pull requests por rama base (la rama en la que se está haciendo merge del pull request). Por defecto, coinciden todas las ramas                                                                                                                                                                                                                              |
+| repo_config_file              | string                  | none            | no       | Ruta del archivo de config del repo en este repo. Por defecto, use `atlantis.yaml` que está ubicado en la raíz del repositorio. Cuando múltiples servidores atlantis trabajan con el mismo repo, establezca diferentes nombres de archivo.                                                                                                                                              |
+| workflow                      | string                  | none            | no       | Un workflow personalizado.                                                                                                                                                                                                                                                                                                                                                              |
+| plan_requirements             | []string                | none            | no       | Requisitos que deben satisfacerse antes de que `atlantis plan` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles.                                                                                                                                        |
+| apply_requirements            | []string                | none            | no       | Requisitos que deben satisfacerse antes de que `atlantis apply` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles.                                                                                                                                       |
+| import_requirements           | []string                | none            | no       | Requisitos que deben satisfacerse antes de que `atlantis import` pueda ejecutarse. Actualmente los únicos requisitos soportados son `approved`, `mergeable` y `undiverged`. Vea [Command Requirements](command-requirements.md) para más detalles.                                                                                                                                      |
+| allowed_overrides             | []string                | none            | no       | Una lista de claves restringidas que los archivos `atlantis.yaml` pueden sobrescribir. Las únicas claves soportadas son `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks` y `custom_policy_check`                                                                                                                                          |
+| allowed_workflows             | []string                | none            | no       | Una lista de workflows entre los que los archivos `atlantis.yaml` pueden seleccionar.                                                                                                                                                                                                                                                                                                   |
+| allow_custom_workflows        | bool                    | false           | no       | Si se permite o no [Custom Workflows](custom-workflows.md).                                                                                                                                                                                                                                                                                                                             |
+| delete_source_branch_on_merge | bool                    | false           | no       | Si se elimina o no la rama de origen al hacer merge.                                                                                                                                                                                                                                                                                                                                    |
+| repo_locking                  | bool                    | false           | no       | (obsoleto) Si se obtiene o no un lock.                                                                                                                                                                                                                                                                                                                                                  |
+| repo_locks                    | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Si los locks del repositorio están habilitados o no para este proyecto en plan o apply. Vea [RepoLocks](#repolocks) para más detalles.                                                                                                                                                                                                                                                  |
+| policy_check                  | bool                    | false           | no       | Si se ejecutan o no policy checks en este repositorio.                                                                                                                                                                                                                                                                                                                                  |
+| custom_policy_check           | bool                    | false           | no       | Si se habilitan o no herramientas personalizadas de policy check fuera de Conftest en este repositorio.                                                                                                                                                                                                                                                                                 |
+| autodiscover                  | AutoDiscover            | none            | no       | Configuración de auto discover para este repo                                                                                                                                                                                                                                                                                                                                           |
+| silence_pr_comments           | []string                | none            | no       | Silencia los comentarios del PR de las etapas definidas mientras preserva las verificaciones de estado del PR. Útil en entornos grandes con muchas instancias de Atlantis y/o proyectos, cuando los comentarios son demasiado grandes y demasiados, por lo tanto es preferible depender únicamente de las verificaciones de estado del PR. Los valores soportados son: `plan`, `apply`. |
 
 :::tip Notas
 
@@ -591,66 +591,64 @@ Si establece un workflow con la clave `default`, esto lo sobrescribirá.
 mode: on_apply
 ```
 
-| Key  | Type   | Default   | Required | Description                                                                                                                           |
-|------|--------|-----------|----------|---------------------------------------------------------------------------------------------------------------------------------------|
+| Key  | Type   | Default   | Required | Description                                                                                                                                         |
+| ---- | ------ | --------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | mode | `Mode` | `on_plan` | no       | Si los locks del repositorio están habilitados o no para este proyecto en plan o apply. Los valores válidos son `disabled`, `on_plan` e `on_apply`. |
 
 ### Policies
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| conftest_version | string | none | no | versión de conftest para ejecutar todos los policy sets |
-| owners | Owners(#Owners) | none | yes | owners que pueden aprobar policies fallidas |
-| approve_count | int | 1 | no | número de aprobaciones requeridas para omitir policies fallidas. |
-| sticky_policy_approvals | bool | false | no | cuando es true, las aprobaciones de policy sobreviven a re-plans siempre que no se introduzcan nuevos elementos de salida de policy (por `policy_item_regex`). Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
-| policy_item_regex | string | `(?s).+` | no | regex para extraer elementos comparables de la salida de policy para el seguimiento de aprobación sticky. El valor predeterminado coincide con toda la salida como un solo elemento. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
-| policy_sets | []PolicySet | none | yes | conjunto de policies a ejecutar sobre una salida de plan |
+| Key                     | Type            | Default  | Required | Description                                                                                                                                                                                                                                                     |
+| ----------------------- | --------------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| conftest_version        | string          | none     | no       | versión de conftest para ejecutar todos los policy sets                                                                                                                                                                                                         |
+| owners                  | Owners(#Owners) | none     | yes      | owners que pueden aprobar policies fallidas                                                                                                                                                                                                                     |
+| approve_count           | int             | 1        | no       | número de aprobaciones requeridas para omitir policies fallidas.                                                                                                                                                                                                |
+| sticky_policy_approvals | bool            | false    | no       | cuando es true, las aprobaciones de policy sobreviven a re-plans siempre que no se introduzcan nuevos elementos de salida de policy (por `policy_item_regex`). Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals).                       |
+| policy_item_regex       | string          | `(?s).+` | no       | regex para extraer elementos comparables de la salida de policy para el seguimiento de aprobación sticky. El valor predeterminado coincide con toda la salida como un solo elemento. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
+| policy_sets             | []PolicySet     | none     | yes      | conjunto de policies a ejecutar sobre una salida de plan                                                                                                                                                                                                        |
 
 ### Owners
 
-| Key         | Type              | Default | Required   | Description                                             |
-|-------------|-------------------|---------|------------|---------------------------------------------------------|
-| users       | []string          | none    | no         | lista de usuarios de GitHub que pueden aprobar policies fallidas |
-| teams       | []string          | none    | no         | lista de equipos de GitHub que pueden aprobar policies fallidas |
-
+| Key   | Type     | Default | Required | Description                                                      |
+| ----- | -------- | ------- | -------- | ---------------------------------------------------------------- |
+| users | []string | none    | no       | lista de usuarios de GitHub que pueden aprobar policies fallidas |
+| teams | []string | none    | no       | lista de equipos de GitHub que pueden aprobar policies fallidas  |
 
 ### PolicySet
 
-| Key                      | Type   | Default   | Required | Description                                                                                                                                               |
-|--------------------------|--------|-----------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| name                     | string | none      | yes      | nombre único para el policy set                                                                                                                           |
-| path                     | string | none      | yes      | ruta al directorio de policies rego                                                                                                                       |
-| source                   | string | none      | yes      | solo `local` está soportado en este momento                                                                                                                 |
-| owners                   | Owners | none      | no       | owners que pueden aprobar este policy set específico (fusionado con los owners de nivel superior)                                                        |
-| approve_count            | int    | inherited | no       | número de aprobaciones requeridas. Por defecto toma el valor de nivel superior `approve_count`                            |
-| prevent_self_approve     | bool   | false     | no       | si el autor del PR puede aprobar policies. Por defecto es `false` (el autor también debe estar en owners)         |
-| sticky_policy_approvals  | bool   | inherited | no       | sobrescribe `sticky_policy_approvals` de nivel superior para este policy set. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
-| policy_item_regex        | string | inherited | no       | sobrescribe `policy_item_regex` de nivel superior para este policy set. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
-
+| Key                     | Type   | Default   | Required | Description                                                                                                                                              |
+| ----------------------- | ------ | --------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                    | string | none      | yes      | nombre único para el policy set                                                                                                                          |
+| path                    | string | none      | yes      | ruta al directorio de policies rego                                                                                                                      |
+| source                  | string | none      | yes      | solo `local` está soportado en este momento                                                                                                              |
+| owners                  | Owners | none      | no       | owners que pueden aprobar este policy set específico (fusionado con los owners de nivel superior)                                                        |
+| approve_count           | int    | inherited | no       | número de aprobaciones requeridas. Por defecto toma el valor de nivel superior `approve_count`                                                           |
+| prevent_self_approve    | bool   | false     | no       | si el autor del PR puede aprobar policies. Por defecto es `false` (el autor también debe estar en owners)                                                |
+| sticky_policy_approvals | bool   | inherited | no       | sobrescribe `sticky_policy_approvals` de nivel superior para este policy set. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals). |
+| policy_item_regex       | string | inherited | no       | sobrescribe `policy_item_regex` de nivel superior para este policy set. Vea [Sticky Policy Approvals](policy-checking.md#sticky-policy-approvals).       |
 
 ### Metrics
 
-| Key                    | Type                      | Default | Required  | Description                              |
-|------------------------|---------------------------|---------|-----------|------------------------------------------|
-| statsd                 | [Statsd](#statsd)         | none    | no        | proveedor de métricas Statsd             |
-| prometheus             | [Prometheus](#prometheus) | none    | no        | proveedor de métricas Prometheus         |
+| Key        | Type                      | Default | Required | Description                      |
+| ---------- | ------------------------- | ------- | -------- | -------------------------------- |
+| statsd     | [Statsd](#statsd)         | none    | no       | proveedor de métricas Statsd     |
+| prometheus | [Prometheus](#prometheus) | none    | no       | proveedor de métricas Prometheus |
 
 ### Statsd
 
-| Key    | Type   | Default | Required | Description                            |
-| ------ | ------ | ------- | -------- | -------------------------------------- |
-| host   | string | none    | yes      | dirección IP del host de statsd        |
-| port   | string | none    | yes      | puerto de statsd                       |
+| Key  | Type   | Default | Required | Description                     |
+| ---- | ------ | ------- | -------- | ------------------------------- |
+| host | string | none    | yes      | dirección IP del host de statsd |
+| port | string | none    | yes      | puerto de statsd                |
 
 ### Prometheus
 
-| Key      | Type   | Default | Required | Description                            |
-| -------- | ------ | ------- | -------- | -------------------------------------- |
-| endpoint | string | none    | yes      | ruta al endpoint de métricas           |
+| Key      | Type   | Default | Required | Description                  |
+| -------- | ------ | ------- | -------- | ---------------------------- |
+| endpoint | string | none    | yes      | ruta al endpoint de métricas |
 
 ### TeamAuthz
 
-| Key     | Type     | Default | Required | Description                                 |
-|---------|----------|---------|----------|---------------------------------------------|
+| Key     | Type     | Default | Required | Description                                      |
+| ------- | -------- | ------- | -------- | ------------------------------------------------ |
 | command | string   | none    | yes      | ruta completa al comando externo de autorización |
 | args    | []string | none    | no       | argumentos opcionales para pasar a `command`     |

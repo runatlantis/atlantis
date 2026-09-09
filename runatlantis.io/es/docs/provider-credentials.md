@@ -59,13 +59,13 @@ provider "aws" {
 
 Atlantis ejecuta `terraform` con las siguientes variables:
 
-| `-var` Argumento                    | Descripción                                                                                                                            |
-|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `atlantis_user=lkysow`               | El nombre de usuario del VCS de quien está ejecutando el comando plan.                                                                 |
+| `-var` Argumento                     | Descripción                                                                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `atlantis_user=lkysow`               | El nombre de usuario del VCS de quien está ejecutando el comando plan.                                                                                |
 | `atlantis_repo=runatlantis/atlantis` | El nombre completo del repo en el que está el pull request. NOTA: Esta variable no puede usarse en el nombre de sesión de AWS porque contiene un `/`. |
-| `atlantis_repo_owner=runatlantis`    | El nombre del **owner** del repo en el que está el pull request.                                                                       |
-| `atlantis_repo_name=atlantis`        | El nombre del repo en el que está el pull request.                                                                                     |
-| `atlantis_pull_num=200`              | El número del pull request.                                                                                                            |
+| `atlantis_repo_owner=runatlantis`    | El nombre del **owner** del repo en el que está el pull request.                                                                                      |
+| `atlantis_repo_name=atlantis`        | El nombre del repo en el que está el pull request.                                                                                                    |
+| `atlantis_pull_num=200`              | El número del pull request.                                                                                                                           |
 
 Si quieres usar `assume_role` con Atlantis y también estás usando el [S3 Backend](https://developer.hashicorp.com/terraform/language/settings/backends/s3),
 asegúrate de agregar la opción `role_arn`:

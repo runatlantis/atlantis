@@ -26,11 +26,7 @@ ejecutará `terraform apply` y responderá con la salida.
 
 Mira el video a continuación para verlo en acción:
 
-[
-
-![Atlantis Walkthrough](../guide/images/atlantis-walkthrough-icon.png)
-
-](https://www.youtube.com/watch?v=TmIPWda0IKg)
+[![Atlantis Walkthrough](../guide/images/atlantis-walkthrough-icon.png)](https://www.youtube.com/watch?v=TmIPWda0IKg)
 
 ## ¿Por qué ejecutarías Atlantis?
 

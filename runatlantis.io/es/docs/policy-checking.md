@@ -233,15 +233,15 @@ Cuando se ejecuta el workflow de verificación de políticas, se crea un archivo
 ]
 ```
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `PolicySetName` | string | Nombre del conjunto de políticas. |
-| `PolicyOutput` | string | Salida sin procesar de la verificación de políticas. |
-| `Passed` | bool | Si la verificación de políticas pasó. |
-| `ReqApprovalCount` | int | Número de aprobaciones requeridas para omitir la política fallida. |
-| `Approvals` | []PolicySetApproval | Lista de aprobaciones, cada una con un nombre de usuario `Approver` y una instantánea `Hashes`. |
-| `Hashes` | []string | Resúmenes hex SHA-256 de elementos extraídos de la salida de políticas usando `policy_item_regex`. |
-| `PolicyItemRegex` | string | La regex usada para extraer elementos de la salida de políticas para hashing. |
+| Field              | Type                | Description                                                                                        |
+| ------------------ | ------------------- | -------------------------------------------------------------------------------------------------- |
+| `PolicySetName`    | string              | Nombre del conjunto de políticas.                                                                  |
+| `PolicyOutput`     | string              | Salida sin procesar de la verificación de políticas.                                               |
+| `Passed`           | bool                | Si la verificación de políticas pasó.                                                              |
+| `ReqApprovalCount` | int                 | Número de aprobaciones requeridas para omitir la política fallida.                                 |
+| `Approvals`        | []PolicySetApproval | Lista de aprobaciones, cada una con un nombre de usuario `Approver` y una instantánea `Hashes`.    |
+| `Hashes`           | []string            | Resúmenes hex SHA-256 de elementos extraídos de la salida de políticas usando `policy_item_regex`. |
+| `PolicyItemRegex`  | string              | La regex usada para extraer elementos de la salida de políticas para hashing.                      |
 
 ## Sticky Policy Approvals
 

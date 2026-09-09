@@ -632,10 +632,10 @@ Atlantis tiene una [Docker image](https://ghcr.io/runatlantis/atlantis) oficial:
 
 Cada release se publica en cuatro variantes. El tag sin sufijo (por ejemplo `v0.47.1` o `latest`) es la imagen Alpine.
 
-| Sufijo de tag     | Base   | Terraform y OpenTofu incluidos |
-|----------------|--------|--------------------------------|
-| `-alpine`      | Alpine | sí                            |
-| `-debian`      | Debian | sí                            |
+| Sufijo de tag  | Base   | Terraform y OpenTofu incluidos |
+| -------------- | ------ | ------------------------------ |
+| `-alpine`      | Alpine | sí                             |
+| `-debian`      | Debian | sí                             |
 | `-alpine-slim` | Alpine | no                             |
 | `-debian-slim` | Debian | no                             |
 

@@ -52,13 +52,13 @@ La salida mostrada arriba está recortada, ya que con cada nueva versión public
 
 Las métricas importantes para monitorear son
 
-| Nombre de la métrica                           | Tipo de métrica                                                      | Propósito                                                                           |
-|------------------------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que [autoplan](autoplanning.md#autoplanning) ha producido un error. |
-| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis plan` se ha producido un error. |
+| Nombre de la métrica                           | Tipo de métrica                                                      | Propósito                                                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que [autoplan](autoplanning.md#autoplanning) ha producido un error.         |
+| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis plan` se ha producido un error.                   |
 | `atlantis_cmd_autoplan_execution_success`      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que [autoplan](autoplanning.md#autoplanning) se ha ejecutado correctamente. |
-| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis apply` se ha producido un error. |
-| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis apply` se ha ejecutado correctamente. |
+| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis apply` se ha producido un error.                  |
+| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | número de veces que al comentar `atlantis apply` se ha ejecutado correctamente.             |
 
 ::: tip NOTE
 Hay muchas métricas adicionales expuestas por atlantis que no se describen arriba.

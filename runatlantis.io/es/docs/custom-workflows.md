@@ -537,11 +537,11 @@ import:
 state_rm:
 ```
 
-| Key      | Type            | Default                   | Required | Description                           |
-|----------|-----------------|---------------------------|----------|---------------------------------------|
-| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | Cómo hacer plan para este proyecto.         |
-| apply    | [Stage](#stage) | `steps: [apply]`          | no       | Cómo hacer apply para este proyecto.        |
-| import   | [Stage](#stage) | `steps: [init, import]`   | no       | Cómo hacer import para este proyecto.       |
+| Key      | Type            | Default                   | Required | Description                                |
+| -------- | --------------- | ------------------------- | -------- | ------------------------------------------ |
+| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | Cómo hacer plan para este proyecto.        |
+| apply    | [Stage](#stage) | `steps: [apply]`          | no       | Cómo hacer apply para este proyecto.       |
+| import   | [Stage](#stage) | `steps: [init, import]`   | no       | Cómo hacer import para este proyecto.      |
 | state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | Cómo ejecutar state rm para este proyecto. |
 
 ### Stage
@@ -554,8 +554,8 @@ steps:
     extra_args: [-lock=false]
 ```
 
-| Key   | Type                 | Default | Required | Description                                                                                   |
-|-------|----------------------|---------|----------|-----------------------------------------------------------------------------------------------|
+| Key   | Type                 | Default | Required | Description                                                                                           |
+| ----- | -------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------- |
 | steps | array[[Step](#step)] | `[]`    | no       | Lista de pasos para esta etapa. Si la clave steps está vacía, no se ejecutarán pasos para esta etapa. |
 
 ### Step
@@ -572,8 +572,8 @@ Los pasos pueden ser una sola cadena para un comando integrado.
 - state_rm
 ```
 
-| Key                             | Type   | Default | Required | Description                                                                                                                  |
-|---------------------------------|--------|---------|----------|------------------------------------------------------------------------------------------------------------------------------|
+| Key                             | Type   | Default | Required | Description                                                                                                               |
+| ------------------------------- | ------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
 | init/plan/apply/import/state_rm | string | none    | no       | Usa un comando integrado sin configuración adicional. Solo `init`, `plan`, `apply`, `import` y `state_rm` son compatibles |
 
 #### Comando integrado con args extra
@@ -593,9 +593,9 @@ Un mapa de string a `extra_args` para un comando integrado con argumentos extra.
     extra_args: [arg1, arg2]
 ```
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none | no | Usa un comando integrado y anexa `extra_args`. Solo `init`, `plan`, `apply`, `import` y `state_rm` son compatibles como claves y solo `extra_args` es compatible como valor |
+| Key                             | Type                                   | Default | Required | Description                                                                                                                                                                 |
+| ------------------------------- | -------------------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Usa un comando integrado y anexa `extra_args`. Solo `init`, `plan`, `apply`, `import` y `state_rm` son compatibles como claves y solo `extra_args` es compatible como valor |
 
 #### Comando personalizado `run`
 
@@ -607,8 +607,8 @@ Compacto:
 - run: custom-command arg1 arg2
 ```
 
-| Key | Type   | Default | Required | Description          |
-|-----|--------|---------|----------|----------------------|
+| Key | Type   | Default | Required | Description                      |
+| --- | ------ | ------- | -------- | -------------------------------- |
 | run | string | none    | no       | Ejecuta un comando personalizado |
 
 Ejemplo completo:
@@ -637,13 +637,13 @@ Ejemplo completo, filtrando la salida y enmascarando el texto coincidente (`mySe
       - filter_regex: "((?i)secret:\\s\")[^\"]*"
 ```
 
-| Key | Type | Default | Required | Description |
-| ----- | ----- | ----- | ----- | ----- |
-| run | map\[string -> string\] | none | no | Ejecuta un comando personalizado |
-| run.command | string | none | yes | Comando de shell a ejecutar |
-| run.shell | string | "sh" | no | Nombre del shell que se usará para la ejecución del comando |
-| run.shellArgs | string or []string | "-c" | no | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell` |
-| run.output | string or []string or []any | "show" | no | Cómo postprocesar la salida de este comando cuando se publique en el comentario del PR. Las opciones son:<br/>*`show` - conservar la salida completa<br/>* `hide` - ocultar la salida del comentario (sigue siendo visible en la salida de streaming en tiempo real)<br/> `strip_refreshing` - ocultar toda la salida hasta e incluyendo la última línea que contiene "Refreshing...". Esto coincide con el comportamiento del comando integrado `plan` <br/> `filter_regex: "<regex_pattern>"` - enmascara texto sensible en los comentarios de Atlantis reemplazando coincidencias de regex con &lt;redacted&gt;. Se puede usar varias veces (se procesa en orden). Solo filtra comentarios inline - los enlaces al plan completo aún muestran resultados sin filtrar. |
+| Key           | Type                        | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------- | --------------------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| run           | map\[string -> string\]     | none    | no       | Ejecuta un comando personalizado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| run.command   | string                      | none    | yes      | Comando de shell a ejecutar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| run.shell     | string                      | "sh"    | no       | Nombre del shell que se usará para la ejecución del comando                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| run.shellArgs | string or []string          | "-c"    | no       | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| run.output    | string or []string or []any | "show"  | no       | Cómo postprocesar la salida de este comando cuando se publique en el comentario del PR. Las opciones son:<br/>*`show` - conservar la salida completa<br/>* `hide` - ocultar la salida del comentario (sigue siendo visible en la salida de streaming en tiempo real)<br/> `strip_refreshing` - ocultar toda la salida hasta e incluyendo la última línea que contiene "Refreshing...". Esto coincide con el comportamiento del comando integrado `plan` <br/> `filter_regex: "<regex_pattern>"` - enmascara texto sensible en los comentarios de Atlantis reemplazando coincidencias de regex con &lt;redacted&gt;. Se puede usar varias veces (se procesa en orden). Solo filtra comentarios inline - los enlaces al plan completo aún muestran resultados sin filtrar. |
 
 #### Variables de entorno nativas
 
@@ -718,14 +718,14 @@ como el valor de la variable de entorno.
       - "-c"
 ```
 
-| Key | Type | Default | Required | Description |
-| ----------------- | ----------------------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| env | map\[string -> string\] | none | no | Establece variables de entorno para pasos posteriores |
-| env.name | string | none | yes | Nombre de la variable de entorno |
-| env.value | string | none | no | Establece el valor de la variable de entorno en una cadena codificada de forma fija. No se puede establecer al mismo tiempo que `command` |
-| env.command | string | none | no | Establece el valor de la variable de entorno a la salida de un comando. No se puede establecer al mismo tiempo que `value` |
-| env.shell | string | "sh" | no | Nombre del shell que se usará para la ejecución del comando. No se puede establecer sin `command` |
-| env.shellArgs | string or []string | "-c" | no | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell` |
+| Key           | Type                    | Default | Required | Description                                                                                                                               |
+| ------------- | ----------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| env           | map\[string -> string\] | none    | no       | Establece variables de entorno para pasos posteriores                                                                                     |
+| env.name      | string                  | none    | yes      | Nombre de la variable de entorno                                                                                                          |
+| env.value     | string                  | none    | no       | Establece el valor de la variable de entorno en una cadena codificada de forma fija. No se puede establecer al mismo tiempo que `command` |
+| env.command   | string                  | none    | no       | Establece el valor de la variable de entorno a la salida de un comando. No se puede establecer al mismo tiempo que `value`                |
+| env.shell     | string                  | "sh"    | no       | Nombre del shell que se usará para la ejecución del comando. No se puede establecer sin `command`                                         |
+| env.shellArgs | string or []string      | "-c"    | no       | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell`                                               |
 
 ::: tip Notas
 
@@ -744,8 +744,8 @@ Compacto:
 - multienv: custom-command
 ```
 
-| Key      | Type   | Default | Required | Description                                                |
-|----------|--------|---------|----------|------------------------------------------------------------|
+| Key      | Type   | Default | Required | Description                                                             |
+| -------- | ------ | ------- | -------- | ----------------------------------------------------------------------- |
 | multienv | string | none    | no       | Ejecuta un comando personalizado y agrega variables de entorno impresas |
 
 Completo:
@@ -760,13 +760,13 @@ Completo:
     output: show
 ```
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| multienv | map[string -> string] | none | no | Ejecuta un comando personalizado y agrega variables de entorno impresas |
-| multienv.command | string | none | yes | Nombre del script personalizado a ejecutar |
-| multienv.shell | string | "sh" | no | Nombre del shell que se usará para la ejecución del comando |
-| multienv.shellArgs | string or []string | "-c" | no | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell` |
-| multienv.output | string | "show" | no | Establecer output en "hide" suprimirá el mensaje sobre las variables de entorno agregadas |
+| Key                | Type                  | Default | Required | Description                                                                                 |
+| ------------------ | --------------------- | ------- | -------- | ------------------------------------------------------------------------------------------- |
+| multienv           | map[string -> string] | none    | no       | Ejecuta un comando personalizado y agrega variables de entorno impresas                     |
+| multienv.command   | string                | none    | yes      | Nombre del script personalizado a ejecutar                                                  |
+| multienv.shell     | string                | "sh"    | no       | Nombre del shell que se usará para la ejecución del comando                                 |
+| multienv.shellArgs | string or []string    | "-c"    | no       | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell` |
+| multienv.output    | string                | "show"  | no       | Establecer output en "hide" suprimirá el mensaje sobre las variables de entorno agregadas   |
 
 La salida de la ejecución del comando debe tener el siguiente formato:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`

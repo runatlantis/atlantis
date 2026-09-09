@@ -26,13 +26,13 @@ Los endpoints de comando y lock actualmente devuelven sus cuerpos originales de 
 
 ### Campos de la respuesta de envoltura
 
-| Field      | Type    | Description                                                    |
-|------------|---------|----------------------------------------------------------------|
-| success    | boolean | `true` si la solicitud tuvo éxito, `false` en caso contrario             |
-| data       | object  | La carga útil de la respuesta (presente en caso de éxito)      |
-| error      | object  | Detalles del error (presente en caso de fallo, `null` en caso de éxito)          |
-| request_id | string  | Identificador único para el rastreo de solicitudes             |
-| timestamp  | string  | Marca de tiempo ISO 8601 de cuándo se generó la respuesta      |
+| Field      | Type    | Description                                                             |
+| ---------- | ------- | ----------------------------------------------------------------------- |
+| success    | boolean | `true` si la solicitud tuvo éxito, `false` en caso contrario            |
+| data       | object  | La carga útil de la respuesta (presente en caso de éxito)               |
+| error      | object  | Detalles del error (presente en caso de fallo, `null` en caso de éxito) |
+| request_id | string  | Identificador único para el rastreo de solicitudes                      |
+| timestamp  | string  | Marca de tiempo ISO 8601 de cuándo se generó la respuesta               |
 
 ### Formato de respuesta de error de envoltura
 
@@ -53,14 +53,14 @@ Cuando ocurre un error en un endpoint que usa la envoltura, la respuesta incluye
 
 ### Códigos de error
 
-| Code                 | HTTP Status | Description                                      |
-|----------------------|-------------|--------------------------------------------------|
-| VALIDATION_ERROR     | 400         | Parámetros o cuerpo de solicitud no válidos      |
-| UNAUTHORIZED         | 401         | Token de autenticación no válido o faltante      |
-| FORBIDDEN            | 403         | Acceso denegado (p. ej., repositorio no permitido)     |
-| NOT_FOUND            | 404         | Recurso solicitado no encontrado                 |
-| INTERNAL_ERROR       | 500         | Error interno del servidor                       |
-| SERVICE_UNAVAILABLE  | 503         | Función no habilitada o servicio no disponible   |
+| Code                | HTTP Status | Description                                        |
+| ------------------- | ----------- | -------------------------------------------------- |
+| VALIDATION_ERROR    | 400         | Parámetros o cuerpo de solicitud no válidos        |
+| UNAUTHORIZED        | 401         | Token de autenticación no válido o faltante        |
+| FORBIDDEN           | 403         | Acceso denegado (p. ej., repositorio no permitido) |
+| NOT_FOUND           | 404         | Recurso solicitado no encontrado                   |
+| INTERNAL_ERROR      | 500         | Error interno del servidor                         |
+| SERVICE_UNAVAILABLE | 503         | Función no habilitada o servicio no disponible     |
 
 ## Endpoints principales
 
@@ -81,14 +81,14 @@ Ejecute [atlantis plan](using-atlantis.md#atlantis-plan) en el repositorio espec
 
 #### Parámetros
 
-| Name       | Type     | Required | Description                              |
-|------------|----------|----------|------------------------------------------|
-| Repository | string   | Yes      | Nombre del repositorio de Terraform      |
-| Ref        | string   | Yes      | Referencia Git, como un nombre de rama   |
-| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)   |
-| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el plan    |
-| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el plan    |
-| PR         | int      | No       | Número de Pull Request                   |
+| Name       | Type     | Required | Description                                        |
+| ---------- | -------- | -------- | -------------------------------------------------- |
+| Repository | string   | Yes      | Nombre del repositorio de Terraform                |
+| Ref        | string   | Yes      | Referencia Git, como un nombre de rama             |
+| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)             |
+| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el plan |
+| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el plan        |
+| PR         | int      | No       | Número de Pull Request                             |
 
 ::: tip NOTE
 Se debe especificar al menos uno de `Projects` o `Paths`.
@@ -114,9 +114,9 @@ Similar a las [Options](using-atlantis.md#options) de `atlantis plan`. Path espe
 dentro del repositorio ejecutar el plan.
 Se debe especificar al menos uno de `Directory` o `Workspace`.
 
-| Name      | Type   | Required | Description                                                                                                                                               |
-|-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | En qué directorio ejecutar plan relativo a la raíz del repo                                                                                               |
+| Name      | Type   | Required | Description                                                                                                                                            |
+| --------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Directory | string | No       | En qué directorio ejecutar plan relativo a la raíz del repo                                                                                            |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces. |
 
 #### Solicitud de ejemplo (con PR)
@@ -225,14 +225,14 @@ Ejecute [atlantis apply](using-atlantis.md#atlantis-apply) en el repositorio esp
 
 #### Parámetros
 
-| Name       | Type     | Required | Description                              |
-|------------|----------|----------|------------------------------------------|
-| Repository | string   | Yes      | Nombre del repositorio de Terraform      |
-| Ref        | string   | Yes      | Referencia Git, como un nombre de rama   |
-| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)   |
-| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el apply   |
-| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el apply   |
-| PR         | int      | No       | Número de Pull Request                   |
+| Name       | Type     | Required | Description                                         |
+| ---------- | -------- | -------- | --------------------------------------------------- |
+| Repository | string   | Yes      | Nombre del repositorio de Terraform                 |
+| Ref        | string   | Yes      | Referencia Git, como un nombre de rama              |
+| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)              |
+| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el apply |
+| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el apply        |
+| PR         | int      | No       | Número de Pull Request                              |
 
 ::: tip NOTE
 Se debe especificar al menos uno de `Projects` o `Paths`.
@@ -244,9 +244,9 @@ Similar a las [Options](using-atlantis.md#options-1) de `atlantis apply`. Path e
 dentro del repositorio ejecutar el apply.
 Se debe especificar al menos uno de `Directory` o `Workspace`.
 
-| Name      | Type   | Required | Description                                                                                                                                               |
-|-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | En qué directorio ejecutar apply relativo a la raíz del repo                                                                                              |
+| Name      | Type   | Required | Description                                                                                                                                            |
+| --------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Directory | string | No       | En qué directorio ejecutar apply relativo a la raíz del repo                                                                                           |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces. |
 
 #### Solicitud de ejemplo
@@ -318,17 +318,17 @@ Ejecute remediación de drift en el repositorio especificado. Este endpoint le p
 
 #### Parámetros
 
-| Name        | Type                 | Required    | Description                                                             |
-|-------------|----------------------|-------------|-------------------------------------------------------------------------|
-| repository  | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                               |
-| ref         | string               | Yes         | Referencia Git (branch/tag/commit) a usar para la remediación                |
-| base_branch | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia     |
-| type        | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                    |
-| action      | string               | No          | Acción de remediación: `plan` (predeterminado) o `apply`                         |
+| Name        | Type                 | Required    | Description                                                                             |
+| ----------- | -------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| repository  | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                  |
+| ref         | string               | Yes         | Referencia Git (branch/tag/commit) a usar para la remediación                           |
+| base_branch | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia |
+| type        | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                      |
+| action      | string               | No          | Acción de remediación: `plan` (predeterminado) o `apply`                                |
 | projects    | []string             | No          | Lista de nombres de proyecto a remediar. Si está vacía, usa datos de detección de drift |
-| paths       | []DriftDetectionPath | No          | Lista de directorios/workspaces relativos al repo a remediar               |
-| workspaces  | []string             | No          | Filtra la remediación a workspaces específicos                               |
-| drift_only  | boolean              | No          | Si es true, remedia solo proyectos con drift detectado                    |
+| paths       | []DriftDetectionPath | No          | Lista de directorios/workspaces relativos al repo a remediar                            |
+| workspaces  | []string             | No          | Filtra la remediación a workspaces específicos                                          |
+| drift_only  | boolean              | No          | Si es true, remedia solo proyectos con drift detectado                                  |
 
 El campo `paths` usa el mismo objeto `DriftDetectionPath` descrito en `POST /api/drift/detect`.
 Para la remediación, un selector path sin `workspace` apunta solo al workspace predeterminado de Terraform.
@@ -575,24 +575,24 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 #### Valores de estado
 
-| Status    | Description                                                    |
-|-----------|----------------------------------------------------------------|
-| `pending` | La remediación está en cola pero aún no ha comenzado                      |
-| `running` | La remediación está actualmente en progreso                           |
-| `success` | Todos los proyectos fueron remediados con éxito                      |
-| `failed`  | Todos los proyectos fallaron la remediación                                |
-| `partial` | Algunos proyectos tuvieron éxito, algunos fallaron                           |
+| Status    | Description                                          |
+| --------- | ---------------------------------------------------- |
+| `pending` | La remediación está en cola pero aún no ha comenzado |
+| `running` | La remediación está actualmente en progreso          |
+| `success` | Todos los proyectos fueron remediados con éxito      |
+| `failed`  | Todos los proyectos fallaron la remediación          |
+| `partial` | Algunos proyectos tuvieron éxito, algunos fallaron   |
 
 #### Respuestas de error
 
-| Status Code | Description                                                                |
-|-------------|----------------------------------------------------------------------------|
-| 400         | Solicitud no válida (faltan campos requeridos o acción no válida)                |
-| 401         | Encabezado `X-Atlantis-Token` no válido o faltante                               |
-| 403         | Repositorio no está en la lista permitida                                             |
-| 409         | La remediación se ejecutó pero todos los proyectos objetivo fallaron                           |
-| 503         | API, remediación de drift o remediation apply no está habilitado en el servidor  |
-| 500         | Error interno durante la remediación                                          |
+| Status Code | Description                                                                     |
+| ----------- | ------------------------------------------------------------------------------- |
+| 400         | Solicitud no válida (faltan campos requeridos o acción no válida)               |
+| 401         | Encabezado `X-Atlantis-Token` no válido o faltante                              |
+| 403         | Repositorio no está en la lista permitida                                       |
+| 409         | La remediación se ejecutó pero todos los proyectos objetivo fallaron            |
+| 503         | API, remediación de drift o remediation apply no está habilitado en el servidor |
+| 500         | Error interno durante la remediación                                            |
 
 ### POST /api/drift/detect
 
@@ -610,21 +610,21 @@ Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detectio
 
 #### Parámetros
 
-| Name                 | Type                 | Required    | Description                                                                          |
-|----------------------|----------------------|-------------|--------------------------------------------------------------------------------------|
-| repository           | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                            |
-| ref                  | string               | Yes         | Referencia Git (branch/tag/commit) para verificar drift                                 |
-| base_branch          | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia                  |
-| type                 | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                 |
-| projects             | []string             | No          | Lista de nombres de proyecto a verificar. Si está vacía, se verifican todos                            |
-| paths                | []DriftDetectionPath | No          | Lista de paths a verificar. Si está vacía, se usan nombres de proyecto                             |
-| include_plan_output  | boolean              | No          | Si es true, incluye `plan_output` para cada proyecto en la respuesta. El valor predeterminado es `false` |
+| Name                | Type                 | Required    | Description                                                                                              |
+| ------------------- | -------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| repository          | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                                   |
+| ref                 | string               | Yes         | Referencia Git (branch/tag/commit) para verificar drift                                                  |
+| base_branch         | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia                  |
+| type                | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                                       |
+| projects            | []string             | No          | Lista de nombres de proyecto a verificar. Si está vacía, se verifican todos                              |
+| paths               | []DriftDetectionPath | No          | Lista de paths a verificar. Si está vacía, se usan nombres de proyecto                                   |
+| include_plan_output | boolean              | No          | Si es true, incluye `plan_output` para cada proyecto en la respuesta. El valor predeterminado es `false` |
 
 #### DriftDetectionPath
 
-| Name      | Type   | Required | Description                                                     |
-|-----------|--------|----------|-----------------------------------------------------------------|
-| directory | string | Yes      | Ruta relativa al directorio Terraform                        |
+| Name      | Type   | Required | Description                                                           |
+| --------- | ------ | -------- | --------------------------------------------------------------------- |
+| directory | string | Yes      | Ruta relativa al directorio Terraform                                 |
 | workspace | string | No       | Terraform workspace. Si se omite, se usa el workspace predeterminado. |
 
 Los selectores path son rutas literales normalizadas relativas al repo. Los patrones glob como `envs/*` no son compatibles.
@@ -740,12 +740,12 @@ Antes de que este campo existiera, `POST /api/drift/detect` solo devolvía conte
 
 #### Respuestas de error
 
-| Status Code | Error Code          | Description                                          |
-|-------------|---------------------|------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Solicitud no válida (faltan campos requeridos)            |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante         |
+| Status Code | Error Code          | Description                                                               |
+| ----------- | ------------------- | ------------------------------------------------------------------------- |
+| 400         | VALIDATION_ERROR    | Solicitud no válida (faltan campos requeridos)                            |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
 | 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
-| 500         | INTERNAL_ERROR      | Error interno durante la detección de drift                |
+| 500         | INTERNAL_ERROR      | Error interno durante la detección de drift                               |
 
 ### GET /api/drift/remediate
 
@@ -759,11 +759,11 @@ La detección de drift debe estar habilitada en el servidor Atlantis. El apply d
 
 #### Parámetros de consulta
 
-| Name       | Type   | Required | Description                                                  |
-|------------|--------|----------|--------------------------------------------------------------|
-| repository | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`)                    |
-| type       | string | Yes      | Tipo del proveedor VCS (p. ej., `Github`, `Gitlab`, `Gitea`)        |
-| limit      | int    | No       | Número máximo de resultados a devolver (predeterminado: 10, máximo: 100)  |
+| Name       | Type   | Required | Description                                                              |
+| ---------- | ------ | -------- | ------------------------------------------------------------------------ |
+| repository | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`)                   |
+| type       | string | Yes      | Tipo del proveedor VCS (p. ej., `Github`, `Gitlab`, `Gitea`)             |
+| limit      | int    | No       | Número máximo de resultados a devolver (predeterminado: 10, máximo: 100) |
 
 #### Solicitud de ejemplo
 
@@ -844,12 +844,12 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 
 #### Respuestas de error
 
-| Status Code | Error Code          | Description                                             |
-|-------------|---------------------|---------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`                 |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante            |
-| 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor    |
-| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación              |
+| Status Code | Error Code          | Description                                                               |
+| ----------- | ------------------- | ------------------------------------------------------------------------- |
+| 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`                                 |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
+| 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
+| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación                           |
 
 ### GET /api/drift/remediate/{id}
 
@@ -863,9 +863,9 @@ La detección de drift debe estar habilitada en el servidor Atlantis. El apply d
 
 #### Parámetros de ruta
 
-| Name | Type   | Required | Description                                |
-|------|--------|----------|--------------------------------------------|
-| id   | string | Yes      | El identificador único de la remediación   |
+| Name | Type   | Required | Description                              |
+| ---- | ------ | -------- | ---------------------------------------- |
+| id   | string | Yes      | El identificador único de la remediación |
 
 ::: tip ¿Qué ID?
 El `id` aquí es el campo `id` devuelto por una llamada previa a `POST /api/drift/remediate` — no el `detection_id`/`id` devuelto por `POST /api/drift/detect`. Las ejecuciones de detección y remediación se rastrean por separado, cada una con su propio espacio de ID. Para inspeccionar la salida de plan para una remediación, llame primero a `POST /api/drift/remediate` y use el `id` de su respuesta.
@@ -873,10 +873,10 @@ El `id` aquí es el campo `id` devuelto por una llamada previa a `POST /api/drif
 
 #### Parámetros de consulta
 
-| Name       | Type   | Required | Description                                                 |
-|------------|--------|----------|-------------------------------------------------------------|
-| repository | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`)                   |
-| type       | string | Yes      | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)        |
+| Name       | Type   | Required | Description                                            |
+| ---------- | ------ | -------- | ------------------------------------------------------ |
+| repository | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`) |
+| type       | string | Yes      | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)     |
 
 #### Solicitud de ejemplo
 
@@ -938,14 +938,14 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 #### Respuestas de error
 
-| Status Code | Error Code          | Description                                                  |
-|-------------|---------------------|--------------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Falta un parámetro requerido                                   |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                 |
-| 403         | FORBIDDEN           | El repositorio no está en la allowlist                           |
-| 404         | NOT_FOUND           | Resultado de remediación no encontrado                                 |
-| 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor         |
-| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación                   |
+| Status Code | Error Code          | Description                                                               |
+| ----------- | ------------------- | ------------------------------------------------------------------------- |
+| 400         | VALIDATION_ERROR    | Falta un parámetro requerido                                              |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
+| 403         | FORBIDDEN           | El repositorio no está en la allowlist                                    |
+| 404         | NOT_FOUND           | Resultado de remediación no encontrado                                    |
+| 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
+| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación                           |
 
 ## Otros endpoints
 
@@ -1003,15 +1003,15 @@ El almacenamiento de detección de drift debe estar habilitado en el servidor At
 
 #### Parámetros de consulta
 
-| Name        | Type   | Required | Description                                                   |
-|-------------|--------|----------|---------------------------------------------------------------|
-| repository  | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`)                     |
-| type        | string | Yes      | Tipo del proveedor VCS (p. ej., `Github`, `Gitlab`, `Gitea`)         |
-| project     | string | No       | Filtrar por nombre de proyecto                                        |
+| Name        | Type   | Required | Description                                                               |
+| ----------- | ------ | -------- | ------------------------------------------------------------------------- |
+| repository  | string | Yes      | Nombre completo del repositorio (p. ej., `owner/repo`)                    |
+| type        | string | Yes      | Tipo del proveedor VCS (p. ej., `Github`, `Gitlab`, `Gitea`)              |
+| project     | string | No       | Filtrar por nombre de proyecto                                            |
 | path        | string | No       | Filtrar por ruta literal normalizada del proyecto relativa al repositorio |
-| workspace   | string | No       | Filtrar por Terraform workspace                                 |
-| ref         | string | No       | Filtrar por referencia git                                       |
-| base_branch | string | No       | Filtrar por el contexto de rama usado cuando se detectó drift         |
+| workspace   | string | No       | Filtrar por Terraform workspace                                           |
+| ref         | string | No       | Filtrar por referencia git                                                |
+| base_branch | string | No       | Filtrar por el contexto de rama usado cuando se detectó drift             |
 
 #### Solicitud de ejemplo
 
@@ -1100,13 +1100,13 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 
 #### Respuestas de error
 
-| Status Code | Error Code          | Description                                  |
-|-------------|---------------------|----------------------------------------------|
-| 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`      |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante |
-| 403         | FORBIDDEN           | El repositorio no está en la allowlist           |
+| Status Code | Error Code          | Description                                             |
+| ----------- | ------------------- | ------------------------------------------------------- |
+| 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`               |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante      |
+| 403         | FORBIDDEN           | El repositorio no está en la allowlist                  |
 | 503         | SERVICE_UNAVAILABLE | La detección de drift no está habilitada en el servidor |
-| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de drift         |
+| 500         | INTERNAL_ERROR      | Error interno al recuperar datos de drift               |
 
 ### GET /status
 

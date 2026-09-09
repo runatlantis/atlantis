@@ -52,8 +52,7 @@ Si está usando [policy checking](policy-checking.md), también debe permitir en
 ### Comando externo
 
 Para administradores que requieren definiciones de permisos más granulares y específicas,
-se puede definir un comando externo en la [configuración de repo del lado del servidor
-](server-side-repo-config.md#teamauthz). Este comando recibirá
+se puede definir un comando externo en la [configuración de repo del lado del servidor](server-side-repo-config.md#teamauthz). Este comando recibirá
 información sobre el comando, repo, project, y equipos de GitHub de los que el usuario es
 miembro, permitiendo a los administradores integrar la validación de permisos
 con otros sistemas o requisitos de negocio. Un ejemplo sería permitir a los
@@ -126,39 +125,39 @@ comando se ejecuta usando el siguiente formato:
 external_command [external_args...] atlantis_command repo [teams...]
 ```
 
-| Key                | Optional | Description                                                                               |
-|--------------------|----------|-------------------------------------------------------------------------------------------|
-| `external_command` | no       | Comando definido en [server side repo configuration](server-side-repo-config.md)           |
+| Key                | Optional | Description                                                                                      |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------ |
+| `external_command` | no       | Comando definido en [server side repo configuration](server-side-repo-config.md)                 |
 | `external_args`    | yes      | Argumentos del comando definidos en [server side repo configuration](server-side-repo-config.md) |
-| `atlantis_command` | no       | El comando de atlantis que se está ejecutando (`plan`, `apply`, etc)                                     |
-| `repo`             | no       | El nombre completo del repo que se está ejecutando (formato: `owner/repo_name`)                      |
-| `teams`            | yes      | Una lista de cero o más equipos del usuario que ejecuta el comando                            |
+| `atlantis_command` | no       | El comando de atlantis que se está ejecutando (`plan`, `apply`, etc)                             |
+| `repo`             | no       | El nombre completo del repo que se está ejecutando (formato: `owner/repo_name`)                  |
+| `teams`            | yes      | Una lista de cero o más equipos del usuario que ejecuta el comando                               |
 
 Las siguientes variables de entorno se pasan al comando en cada ejecución:
 
-| Key                  | Description                                                                                                                                                                                                                           |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `BASE_REPO_NAME`     | Nombre del repositorio en el que se hará merge del pull request, ej. `atlantis`.                                                                                                                                                     |
-| `BASE_REPO_OWNER`    | Propietario del repositorio en el que se hará merge del pull request, ej. `runatlantis`.                                                                                                                                                 |
-| `COMMAND_NAME`       | El nombre del comando que se está ejecutando, es decir `plan`, `apply` etc.                                                                                                                                                             |
-| `USER_NAME`          | Nombre de usuario del usuario de VCS que ejecuta el comando, ej. `acme-user`. Durante un autoplan, el usuario será el usuario API de Atlantis, ej. `atlantis`.                                                                                                |
+| Key               | Description                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BASE_REPO_NAME`  | Nombre del repositorio en el que se hará merge del pull request, ej. `atlantis`.                                                                               |
+| `BASE_REPO_OWNER` | Propietario del repositorio en el que se hará merge del pull request, ej. `runatlantis`.                                                                       |
+| `COMMAND_NAME`    | El nombre del comando que se está ejecutando, es decir `plan`, `apply` etc.                                                                                    |
+| `USER_NAME`       | Nombre de usuario del usuario de VCS que ejecuta el comando, ej. `acme-user`. Durante un autoplan, el usuario será el usuario API de Atlantis, ej. `atlantis`. |
 
 Las siguientes variables de entorno también se pasan al comando cuando se verifica la autorización del project:
 
-| Key                  | Description                                                                                                                                                                                                                           |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `BASE_BRANCH_NAME`   | Nombre de la rama base del pull request (la rama en la que se está haciendo merge del pull request)                                                                                                                                 |
-| `COMMENT_ARGS`       | Cualquier flag adicional pasado en el comentario del pull request. Los flags están separados por comas y cada carácter está escapado, ej. `atlantis plan -- arg1 arg2` resultará en `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.                       |
-| `HEAD_REPO_NAME`     | Nombre del repositorio que se está haciendo merge en el repositorio base, ej. `atlantis`.                                                                                                                                               |
-| `HEAD_REPO_OWNER`    | Propietario del repositorio que se está haciendo merge en el repositorio base, ej. `acme-corp`.                                                                                                                                             |
-| `HEAD_BRANCH_NAME`   | Nombre de la rama head del pull request (la rama que se está haciendo merge en la base)                                                                                                                                         |
-| `HEAD_COMMIT`        | El sha256 que apunta al head de la rama que está siendo enviada en pull request hacia la base. Si el pull request es de Bitbucket Cloud la cadena solo tendrá 12 caracteres porque Bitbucket Cloud trunca sus IDs de commit. |
-| `PROJECT_NAME`       | Nombre del project en el que se está ejecutando el comando                                                                                                                                                                                  |
-| `PULL_NUM`           | Número o ID del pull request, ej. `2`.                                                                                                                                                                                                   |
-| `PULL_URL`           | URL del pull request, ej. `https://github.com/runatlantis/atlantis/pull/2`.                                                                                                                                                               |
-| `PULL_AUTHOR`        | Nombre de usuario del autor del pull request, ej. `acme-user`.                                                                                                                                                                                 |
-| `REPO_ROOT`          | La ruta absoluta a la raíz del repositorio clonado.                                                                                                                                                                               |
-| `REPO_REL_PATH`      | Ruta al project relativa a `REPO_ROOT`                                                                                                                                                                                           |
+| Key                | Description                                                                                                                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BASE_BRANCH_NAME` | Nombre de la rama base del pull request (la rama en la que se está haciendo merge del pull request)                                                                                                                          |
+| `COMMENT_ARGS`     | Cualquier flag adicional pasado en el comentario del pull request. Los flags están separados por comas y cada carácter está escapado, ej. `atlantis plan -- arg1 arg2` resultará en `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.        |
+| `HEAD_REPO_NAME`   | Nombre del repositorio que se está haciendo merge en el repositorio base, ej. `atlantis`.                                                                                                                                    |
+| `HEAD_REPO_OWNER`  | Propietario del repositorio que se está haciendo merge en el repositorio base, ej. `acme-corp`.                                                                                                                              |
+| `HEAD_BRANCH_NAME` | Nombre de la rama head del pull request (la rama que se está haciendo merge en la base)                                                                                                                                      |
+| `HEAD_COMMIT`      | El sha256 que apunta al head de la rama que está siendo enviada en pull request hacia la base. Si el pull request es de Bitbucket Cloud la cadena solo tendrá 12 caracteres porque Bitbucket Cloud trunca sus IDs de commit. |
+| `PROJECT_NAME`     | Nombre del project en el que se está ejecutando el comando                                                                                                                                                                   |
+| `PULL_NUM`         | Número o ID del pull request, ej. `2`.                                                                                                                                                                                       |
+| `PULL_URL`         | URL del pull request, ej. `https://github.com/runatlantis/atlantis/pull/2`.                                                                                                                                                  |
+| `PULL_AUTHOR`      | Nombre de usuario del autor del pull request, ej. `acme-user`.                                                                                                                                                               |
+| `REPO_ROOT`        | La ruta absoluta a la raíz del repositorio clonado.                                                                                                                                                                          |
+| `REPO_REL_PATH`    | Ruta al project relativa a `REPO_ROOT`                                                                                                                                                                                       |
 
 ### Manejo del resultado de comando externo
 
