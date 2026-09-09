@@ -133,13 +133,27 @@ jobs:
         # a blank line. Both are mechanical to repair.
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+
+          # The translator's markdown serializer writes a link whose only
+          # content is an image as five lines: "[", blank, the image, blank,
+          # "](url)". That trips MD034 and renders a stray bracket. Fold it
+          # back onto one line, which is how the English source writes it.
+          for locale in $locales; do
+            find "runatlantis.io/${locale}" -name '*.md' -print0 \
+              | xargs -0 perl -0pi -e 's/\[\n\n(!\[[^\]]*\]\([^)]*\))\n\n\]\(/[$1](/g'
+          done
+
           node scripts/align-tables.mjs $locales
-          globs=""
-          for locale in $locales; do globs="$globs runatlantis.io/${locale}/**/*.md"; done
+
+          # Quoted so markdownlint-cli2 expands `**` itself. Unquoted, bash
+          # treats `**` as `*` and the top-level <locale>/*.md pages are
+          # never linted.
+          globs=()
+          for locale in $locales; do globs+=("runatlantis.io/${locale}/**/*.md"); done
           # `--fix` exits non-zero when findings remain. Those are caught by
           # the integrity step below, which quarantines the page instead of
           # failing the run.
-          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml $globs || true
+          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml "${globs[@]}" || true
 
       - name: Upload translated output
         # Kept even when the integrity check fails: when a page trips a check,
@@ -167,13 +181,13 @@ jobs:
         # split across lines).
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
-          globs=""
-          for locale in $locales; do globs="$globs runatlantis.io/${locale}/**/*.md"; done
+          globs=()
+          for locale in $locales; do globs+=("runatlantis.io/${locale}/**/*.md"); done
 
           run_checks() {
             local ok=0
             node scripts/check-translation-integrity.mjs $locales > /tmp/integrity.txt 2>&1 || ok=1
-            npx --yes markdownlint-cli2@0.20.0 --config .markdownlint.yaml $globs > /tmp/lint.txt 2>&1 || ok=1
+            npx --yes markdownlint-cli2@0.20.0 --config .markdownlint.yaml "${globs[@]}" > /tmp/lint.txt 2>&1 || ok=1
             cat /tmp/integrity.txt /tmp/lint.txt
             return $ok
           }
