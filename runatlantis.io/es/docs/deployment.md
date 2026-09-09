@@ -1,41 +1,41 @@
-# Deployment
+# Despliegue
 
-This page covers getting Atlantis up and running in your infrastructure.
+Esta página cubre poner Atlantis en funcionamiento en tu infraestructura.
 
-::: tip Prerequisites
+::: tip Requisitos previos
 
-* You have created [access credentials](access-credentials.md) for your Atlantis user
-* You have created a [webhook secret](webhook-secrets.md)
+* Has creado [access credentials](access-credentials.md) para tu usuario de Atlantis
+* Has creado un [webhook secret](webhook-secrets.md)
 :::
 
-## Architecture Overview
+## Resumen de arquitectura
 
 ### Runtime
 
-Atlantis is a simple [Go](https://golang.org/) app. It receives webhooks from
-your Git host and executes Terraform commands locally. There is an official
-Atlantis [Docker image](https://ghcr.io/runatlantis/atlantis).
+Atlantis es una aplicación simple de [Go](https://golang.org/). Recibe webhooks de
+tu host de Git y ejecuta comandos de Terraform localmente. Hay una [Docker image](https://ghcr.io/runatlantis/atlantis) oficial de
+Atlantis.
 
-### Routing
+### Enrutamiento
 
-Atlantis and your Git host need to be able to route and communicate with one another. Your Git host needs to be able to send webhooks to Atlantis and Atlantis needs to be able to make API calls to your Git host.
-If you're using
-a public Git host like github.com, gitlab.com, gitea.com, bitbucket.org, or dev.azure.com then you'll need to
-expose Atlantis to the internet.
+Atlantis y tu host de Git necesitan poder enrutar y comunicarse entre sí. Tu host de Git necesita poder enviar webhooks a Atlantis y Atlantis necesita poder hacer llamadas API a tu host de Git.
+Si estás usando
+un host de Git público como github.com, gitlab.com, gitea.com, bitbucket.org o dev.azure.com, entonces necesitarás
+exponer Atlantis a internet.
 
-If you're using a private Git host like GitHub Enterprise, GitLab Enterprise, self-hosted Gitea or
-Bitbucket Server, then Atlantis needs to be routable from the private host and Atlantis will need to be able to route to the private host.
+Si estás usando un host de Git privado como GitHub Enterprise, GitLab Enterprise, Gitea autohospedado o
+Bitbucket Server, entonces Atlantis necesita ser enrutable desde el host privado y Atlantis necesitará poder enrutar hacia el host privado.
 
-### Data
+### Datos
 
-Atlantis has no external database. Atlantis stores Terraform plan files on disk.
-If Atlantis loses that data in between a `plan` and `apply` cycle, then users will have
-to re-run `plan`. Because of this, you may want to provision a persistent disk
-for Atlantis.
+Atlantis no tiene una base de datos externa. Atlantis almacena archivos de plan de Terraform en disco.
+Si Atlantis pierde esos datos entre un ciclo de `plan` y `apply`, entonces los usuarios
+tendrán que volver a ejecutar `plan`. Debido a esto, puede que quieras aprovisionar un disco persistente
+para Atlantis.
 
-## Deployment
+## Despliegue
 
-Pick your deployment type:
+Elige tu tipo de despliegue:
 
 * [Kubernetes Helm Chart](#kubernetes-helm-chart)
 * [Kubernetes Manifests](#kubernetes-manifests)
@@ -48,24 +48,24 @@ Pick your deployment type:
 
 ### Kubernetes Helm Chart
 
-Atlantis has an [official Helm chart](https://github.com/runatlantis/helm-charts/tree/main/charts/atlantis)
+Atlantis tiene un [Helm chart oficial](https://github.com/runatlantis/helm-charts/tree/main/charts/atlantis)
 
-To install:
+Para instalar:
 
-1. Add the runatlantis helm chart repository to helm
+1. Agrega el repositorio del helm chart de runatlantis a helm
 
     ```bash
     helm repo add runatlantis https://runatlantis.github.io/helm-charts
     ```
 
-1. `cd` into a directory where you're going to configure your Atlantis Helm chart
-1. Create a `values.yaml` file by running
+1. Haz `cd` en un directorio donde vas a configurar tu Atlantis Helm chart
+1. Crea un archivo `values.yaml` ejecutando
 
     ```bash
     helm inspect values runatlantis/atlantis > values.yaml
     ```
 
-1. Edit `values.yaml` and add your access credentials and webhook secret
+1. Edita `values.yaml` y agrega tus access credentials y webhook secret
 
     ```yaml
     # for example
@@ -75,41 +75,41 @@ To install:
       secret: baz
     ```
 
-1. Edit `values.yaml` and set your `orgAllowlist` (see [Repo Allowlist](server-configuration.md#repo-allowlist) for more information)
+1. Edita `values.yaml` y establece tu `orgAllowlist` (consulta [Repo Allowlist](server-configuration.md#repo-allowlist) para más información)
 
     ```yaml
     orgAllowlist: github.com/runatlantis/*
     ```
 
-    **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead.
-1. Configure any other variables (see [Atlantis Helm Chart: Customization](https://github.com/runatlantis/helm-charts#customization)
-    for documentation)
-1. Run
+    **Nota**: Para la versión del helm chart < `4.0.2`, debe usarse `orgWhitelist` en su lugar.
+1. Configura cualquier otra variable (consulta [Atlantis Helm Chart: Customization](https://github.com/runatlantis/helm-charts#customization)
+    para la documentación)
+1. Ejecuta
 
     ```sh
     helm install atlantis runatlantis/atlantis -f values.yaml
     ```
 
-    If you are using helm v2, run:
+    Si estás usando helm v2, ejecuta:
 
     ```sh
     helm install -f values.yaml runatlantis/atlantis
     ```
 
-Atlantis should be up and running in minutes! See [Next Steps](#next-steps) for
-what to do next.
+¡Atlantis debería estar en funcionamiento en minutos! Consulta [Next Steps](#next-steps) para
+qué hacer después.
 
 ### Kubernetes Manifests
 
-If you'd like to use a raw Kubernetes manifest, we offer either a
+Si te gustaría usar un manifest de Kubernetes sin procesar, ofrecemos ya sea un
 [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
-or a [Statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) with persistent storage.
+o un [Statefulset](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) con almacenamiento persistente.
 
-StatefulSet is recommended because Atlantis stores its data on disk and so if your Pod dies
-or you upgrade Atlantis, you won't lose plans that haven't been applied. If
-you do lose that data, you just need to run `atlantis plan` again so it's not the end of the world.
+Se recomienda StatefulSet porque Atlantis almacena sus datos en disco y por lo tanto si tu Pod muere
+o actualizas Atlantis, no perderás los plans que no se han aplicado. Si
+sí pierdes esos datos, solo necesitas ejecutar `atlantis plan` de nuevo, así que no es el fin del mundo.
 
-Regardless of whether you choose a Deployment or StatefulSet, first create a Secret with the webhook secret and access token:
+Independientemente de si eliges un Deployment o StatefulSet, primero crea un Secret con el webhook secret y el access token:
 
 ```bash
 echo -n "yourtoken" > token
@@ -117,33 +117,33 @@ echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
 ```
 
-Next, edit the manifests below as follows:
+A continuación, edita los manifests de abajo de la siguiente manera:
 
-1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [GitHub: Atlantis latest release](https://github.com/runatlantis/atlantis/releases/latest).
-    * NOTE: You never want to run with `:latest` because if your Pod moves to a new node, Kubernetes will pull the latest image and you might end
-up upgrading Atlantis by accident!
-2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
-for your Terraform repos. See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
-3. If you're using GitHub:
-    1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
-    2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-4. If you're using GitLab:
-    1. Replace `<YOUR_GITLAB_USER>` with the username of your Atlantis GitLab user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-5. If you're using Gitea:
-    1. Replace `<YOUR_GITEA_USER>` with the username of your Atlantis Gitea user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-6. If you're using Bitbucket:
-    1. Replace `<YOUR_BITBUCKET_USER>` with the username of your Atlantis Bitbucket user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
-7. If you're using Azure DevOps:
-    1. Replace `<YOUR_AZUREDEVOPS_USER>` with the username of your Atlantis Azure DevOps user without the `@`.
-    2. Delete all the `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, and `ATLANTIS_BITBUCKET_*` environment variables.
+1. Reemplaza `<VERSION>` en `image: ghcr.io/runatlantis/atlantis:<VERSION>` con la versión más reciente de [GitHub: Atlantis latest release](https://github.com/runatlantis/atlantis/releases/latest).
+    * NOTA: Nunca querrás ejecutar con `:latest` porque si tu Pod se mueve a un nodo nuevo, Kubernetes extraerá la imagen más reciente y podrías terminar
+actualizando Atlantis por accidente.
+2. Reemplaza `value: github.com/yourorg/*` bajo `name: ATLANTIS_REPO_ALLOWLIST` con el patrón de allowlist
+para tus repos de Terraform. Consulta [--repo-allowlist](server-configuration.md#repo-allowlist) para más detalles.
+3. Si estás usando GitHub:
+    1. Reemplaza `<YOUR_GITHUB_USER>` con el nombre de usuario de tu usuario de Atlantis de GitHub sin el `@`.
+    2. Elimina todas las variables de entorno `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*` y `ATLANTIS_AZUREDEVOPS_*`.
+4. Si estás usando GitLab:
+    1. Reemplaza `<YOUR_GITLAB_USER>` con el nombre de usuario de tu usuario de Atlantis de GitLab sin el `@`.
+    2. Elimina todas las variables de entorno `ATLANTIS_GH_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*` y `ATLANTIS_AZUREDEVOPS_*`.
+5. Si estás usando Gitea:
+    1. Reemplaza `<YOUR_GITEA_USER>` con el nombre de usuario de tu usuario de Atlantis de Gitea sin el `@`.
+    2. Elimina todas las variables de entorno `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_BITBUCKET_*` y `ATLANTIS_AZUREDEVOPS_*`.
+6. Si estás usando Bitbucket:
+    1. Reemplaza `<YOUR_BITBUCKET_USER>` con el nombre de usuario de tu usuario de Atlantis de Bitbucket sin el `@`.
+    2. Elimina todas las variables de entorno `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*` y `ATLANTIS_AZUREDEVOPS_*`.
+7. Si estás usando Azure DevOps:
+    1. Reemplaza `<YOUR_AZUREDEVOPS_USER>` con el nombre de usuario de tu usuario de Atlantis de Azure DevOps sin el `@`.
+    2. Elimina todas las variables de entorno `ATLANTIS_GH_*`, `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*` y `ATLANTIS_BITBUCKET_*`.
 
-#### StatefulSet Manifest
+#### Manifest de StatefulSet
 
 <details>
- <summary>Show...</summary>
+ <summary>Mostrar...</summary>
 
 ```yaml
 apiVersion: apps/v1
@@ -314,10 +314,10 @@ spec:
 
 </details>
 
-#### Deployment Manifest
+#### Manifest de Deployment
 
 <details>
- <summary>Show...</summary>
+ <summary>Mostrar...</summary>
 
 ```yaml
 apiVersion: apps/v1
@@ -463,25 +463,25 @@ spec:
 
 </details>
 
-#### Routing and SSL
+#### Enrutamiento y SSL
 
-The manifests above create a Kubernetes `Service` of `type: ClusterIP` which isn't accessible outside your cluster.
-Depending on how you're doing routing into Kubernetes, you may want to use a Service of `type: LoadBalancer` so that Atlantis is accessible
-to GitHub/GitLab and your internal users.
+Los manifests anteriores crean un `Service` de Kubernetes de tipo `type: ClusterIP` que no es accesible fuera de tu clúster.
+Dependiendo de cómo estés haciendo el enrutamiento hacia Kubernetes, puede que quieras usar un Service de tipo `type: LoadBalancer` para que Atlantis sea accesible
+para GitHub/GitLab y tus usuarios internos.
 
-If you want to add SSL you can use something like [cert-manager](https://github.com/cert-manager/cert-manager) to generate SSL
-certs and mount them into the Pod. Then set the `ATLANTIS_SSL_CERT_FILE` and `ATLANTIS_SSL_KEY_FILE` environment variables to enable SSL.
-You could also set up SSL at your LoadBalancer.
+Si quieres agregar SSL, puedes usar algo como [cert-manager](https://github.com/cert-manager/cert-manager) para generar certificados SSL
+y montarlos en el Pod. Luego establece las variables de entorno `ATLANTIS_SSL_CERT_FILE` e `ATLANTIS_SSL_KEY_FILE` para habilitar SSL.
+También podrías configurar SSL en tu LoadBalancer.
 
-**You're done! See [Next Steps](#next-steps) for what to do next.**
+**¡Ya terminaste! Consulta [Next Steps](#next-steps) para qué hacer después.**
 
 ### Kubernetes Kustomize
 
-A `kustomization.yaml` file is provided in the directory `kustomize/`, so you may use this repository as a remote base for deploying Atlantis with Kustomize.
+Se proporciona un archivo `kustomization.yaml` en el directorio `kustomize/`, por lo que puedes usar este repositorio como una base remota para desplegar Atlantis con Kustomize.
 
-You will need to provide a secret (with the default name of `atlantis-vcs`) to configure Atlantis with access credentials for your remote repositories.
+Necesitarás proporcionar un secret (con el nombre predeterminado `atlantis-vcs`) para configurar Atlantis con access credentials para tus repositorios remotos.
 
-Example:
+Ejemplo:
 
 ```yaml
 bases:
@@ -491,7 +491,7 @@ resources:
 - secrets.yaml
 ```
 
-**Important:** You must ensure you patch the provided manifests with the correct environment variables for your installation. You can create inline patches from your `kustomization.yaml` file such as below:
+**Importante:** Debes asegurarte de aplicar parches a los manifests proporcionados con las variables de entorno correctas para tu instalación. Puedes crear parches inline desde tu archivo `kustomization.yaml` como se muestra abajo:
 
 ```yaml
 patchesStrategicMerge:
@@ -506,7 +506,7 @@ patchesStrategicMerge:
         ...
 ```
 
-#### Required
+#### Requerido
 
 ```yaml
 ...
@@ -597,62 +597,62 @@ containers:
 
 ### OpenShift
 
-The Helm chart and Kubernetes manifests above are compatible with OpenShift, however you need to run
-with an additional environment variable: `HOME=/home/atlantis`. This is required because
-OpenShift runs Docker images with random user id's that use `/` as their home directory.
+El Helm chart y los manifests de Kubernetes de arriba son compatibles con OpenShift, sin embargo necesitas ejecutar
+con una variable de entorno adicional: `HOME=/home/atlantis`. Esto es requerido porque
+OpenShift ejecuta imágenes de Docker con ID de usuario aleatorios que usan `/` como su directorio home.
 
 ### AWS Fargate
 
-If you'd like to run Atlantis on [AWS Fargate](https://aws.amazon.com/fargate/)
- check out the Atlantis module on the [Terraform Module Registry](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws/latest)
- and then check out the [Next Steps](#next-steps).
+Si te gustaría ejecutar Atlantis en [AWS Fargate](https://aws.amazon.com/fargate/)
+ revisa el módulo de Atlantis en el [Terraform Module Registry](https://registry.terraform.io/modules/terraform-aws-modules/atlantis/aws/latest)
+ y luego consulta [Next Steps](#next-steps).
 
 ### Google Kubernetes Engine (GKE)
 
-You can run Atlantis on GKE using the [Helm chart](#kubernetes-helm-chart) or the [manifests](#kubernetes-manifests).
+Puedes ejecutar Atlantis en GKE usando el [Helm chart](#kubernetes-helm-chart) o los [manifests](#kubernetes-manifests).
 
-There is also a set of full Terraform configurations that create a GKE Cluster,
-Cloud Storage Backend and TLS certs: [sethvargo atlantis-on-gke](https://github.com/sethvargo/atlantis-on-gke).
+También hay un conjunto de configuraciones completas de Terraform que crean un clúster de GKE,
+Cloud Storage Backend y certificados TLS: [sethvargo atlantis-on-gke](https://github.com/sethvargo/atlantis-on-gke).
 
-Once you're done, see [Next Steps](#next-steps).
+Una vez que termines, consulta [Next Steps](#next-steps).
 
 ### Google Compute Engine (GCE)
 
-Atlantis can be run on Google Compute Engine using a Terraform module that deploys it as a Docker container on a managed Compute Engine instance.
+Atlantis puede ejecutarse en Google Compute Engine usando un módulo de Terraform que lo despliega como un contenedor Docker en una instancia administrada de Compute Engine.
 
-This [Terraform module](https://registry.terraform.io/modules/runatlantis/atlantis/gce/latest) features the creation of a Cloud load balancer, a Container-Optimized OS-based VM, a persistent data disk, and a managed instance group.
+Este [Terraform module](https://registry.terraform.io/modules/runatlantis/atlantis/gce/latest) incluye la creación de un balanceador de carga de Cloud, una VM basada en Container-Optimized OS, un disco de datos persistente y un grupo de instancias administrado.
 
-After it is deployed, see [Next Steps](#next-steps).
+Después de que esté desplegado, consulta [Next Steps](#next-steps).
 
 ### Docker
 
-Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
+Atlantis tiene una [Docker image](https://ghcr.io/runatlantis/atlantis) oficial: `ghcr.io/runatlantis/atlantis`.
 
-#### Image variants
+#### Variantes de imagen
 
-Every release is published in four variants. The unsuffixed tag (for example `v0.47.1` or `latest`) is the Alpine image.
+Cada release se publica en cuatro variantes. El tag sin sufijo (por ejemplo `v0.47.1` o `latest`) es la imagen Alpine.
 
-| Tag suffix     | Base   | Bundled Terraform and OpenTofu |
-|----------------|--------|--------------------------------|
-| `-alpine`      | Alpine | yes                            |
-| `-debian`      | Debian | yes                            |
+| Sufijo de tag  | Base   | Terraform y OpenTofu incluidos |
+| -------------- | ------ | ------------------------------ |
+| `-alpine`      | Alpine | sí                             |
+| `-debian`      | Debian | sí                             |
 | `-alpine-slim` | Alpine | no                             |
 | `-debian-slim` | Debian | no                             |
 
-The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
+Las imágenes completas incluyen las últimas pocas releases menores de Terraform y la release actual de OpenTofu, y `terraform` en `PATH` apunta a la más nueva de ellas.
 
-The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to be told which version that is:
+Las imágenes slim se entregan sin ninguno de los dos binarios, por lo que los escáneres de vulnerabilidades no informan avisos contra versiones de Terraform u OpenTofu que quizá ni siquiera uses. Todo lo demás (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) es igual que en la imagen completa. Atlantis descarga la versión de Terraform que necesita en el primer uso, por lo que a la imagen slim se le debe indicar cuál es esa versión:
 
-* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The slim image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
-* Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
-* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and give an OpenTofu version as the default.
-* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
+* Establece [`--default-tf-version`](server-configuration.md#default-tf-version) como un flag, como `ATLANTIS_DEFAULT_TF_VERSION`, o en el archivo de configuración del servidor. Sin eso, el servidor se niega a iniciar con `terraform not found in $PATH`. La imagen slim deliberadamente no establece ningún valor predeterminado propio, porque una variable de entorno incorporada en la imagen tendría precedencia sobre una versión fijada en tu archivo de configuración.
+* `terraform_version` por proyecto en `atlantis.yaml` e `--tf-download-url` funcionan como siempre.
+* Para OpenTofu, establece `ATLANTIS_TF_DISTRIBUTION=opentofu` y proporciona una versión de OpenTofu como predeterminada.
+* Si las descargas salientes no están permitidas desde tu host de Atlantis (`--tf-download=false`), monta o copia en la imagen los binarios que necesitas en su lugar. Consulta [Customization](#customization) abajo.
 
 #### Customization
 
-If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
+Si necesitas modificar la imagen Docker que proporcionamos, por ejemplo para agregar el binario de terragrunt, puedes hacer algo como esto:
 
-1. Create a custom docker file
+1. Crea un archivo docker personalizado
 
     ```dockerfile
     FROM ghcr.io/runatlantis/atlantis:{latest version}
@@ -663,17 +663,17 @@ If you need to modify the Docker image that we provide, for instance to add the 
     USER atlantis
     ```
 
-Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.
-Additionally, the /docker-entrypoint.d/ directory offers a flexible option for introducing extra scripts to be executed prior to the launch of the Atlantis server. This feature is particularly beneficial for users seeking to customize their Atlantis instance without the need to develop a dedicated pipeline.
-**Important Notice**: There is a critical update regarding the data directory in Atlantis. In versions prior to 0.26.0, the directory was configured to be accessible by the root user. However, with the transition to the atlantis user in newer versions, it is imperative to update the directory permissions accordingly in your current deployment when upgrading to a version later than 0.26.0. This step ensures seamless access and functionality for the atlantis user.
+A partir de la versión 0.26.0, la imagen de Atlantis se ha actualizado para ejecutarse bajo el usuario atlantis, reemplazando la configuración anterior del usuario root. Este cambio requiere ajustes en las definiciones de contenedor y scripts existentes para adaptarse a la nueva configuración de usuario. En escenarios donde se requieran paquetes adicionales de otras imágenes, los usuarios pueden cambiar temporalmente al usuario root insertando USER root en el Dockerfile. Después de la instalación de los paquetes necesarios, es aconsejable volver al usuario atlantis para iniciar el servicio de Atlantis.
+Además, el directorio /docker-entrypoint.d/ ofrece una opción flexible para introducir scripts extra que se ejecuten antes del inicio del servidor Atlantis. Esta característica es particularmente beneficiosa para usuarios que buscan personalizar su instancia de Atlantis sin la necesidad de desarrollar un pipeline dedicado.
+**Aviso importante**: Hay una actualización crítica con respecto al directorio de datos en Atlantis. En las versiones anteriores a 0.26.0, el directorio estaba configurado para ser accesible por el usuario root. Sin embargo, con la transición al usuario atlantis en las versiones más nuevas, es imperativo actualizar los permisos del directorio en tu despliegue actual al actualizar a una versión posterior a 0.26.0. Este paso asegura acceso y funcionalidad sin problemas para el usuario atlantis.
 
-1. Build your Docker image
+1. Construye tu imagen Docker
 
     ```bash
     docker build -t {YOUR_DOCKER_ORG}/atlantis-custom .
     ```
 
-1. Run your image
+1. Ejecuta tu imagen
 
     ```bash
     docker run {YOUR_DOCKER_ORG}/atlantis-custom server --gh-user=GITHUB_USERNAME --gh-token=GITHUB_TOKEN
@@ -681,21 +681,21 @@ Additionally, the /docker-entrypoint.d/ directory offers a flexible option for i
 
 ### Microsoft Azure
 
-The standard [Kubernetes Helm Chart](#kubernetes-helm-chart) should work fine on [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/intro-kubernetes).
+El [Kubernetes Helm Chart](#kubernetes-helm-chart) estándar debería funcionar bien en [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/intro-kubernetes).
 
-Another option is [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). See this community member's [repo](https://github.com/jplane/atlantis-on-aci) or the new and more up-to-date [Terraform module](https://github.com/getindata/terraform-azurerm-atlantis) for install scripts and more information on running Atlantis on ACI.
+Otra opción es [Azure Container Instances](https://docs.microsoft.com/en-us/azure/container-instances/). Consulta el [repo](https://github.com/jplane/atlantis-on-aci) de este miembro de la comunidad o el [Terraform module](https://github.com/getindata/terraform-azurerm-atlantis) nuevo y más actualizado para scripts de instalación y más información sobre ejecutar Atlantis en ACI.
 
-**Note on ACI Deployment:** Due to a bug in earlier Docker releases, Docker v23.0.0 or later is required for straightforward deployment. Alternatively, the Atlantis Docker image can be pushed to a private registry such as ACR and then used.
+**Nota sobre el despliegue en ACI:** Debido a un bug en releases anteriores de Docker, se requiere Docker v23.0.0 o posterior para un despliegue sencillo. Como alternativa, la imagen Docker de Atlantis puede subirse a un registro privado como ACR y luego usarse.
 
 ### Roll Your Own
 
-If you want to roll your own Atlantis installation, you can get the `atlantis`
-binary from [GitHub](https://github.com/runatlantis/atlantis/releases)
-or use the [official Docker image](https://ghcr.io/runatlantis/atlantis).
+Si quieres hacer tu propia instalación de Atlantis, puedes obtener el binario `atlantis`
+desde [GitHub](https://github.com/runatlantis/atlantis/releases)
+o usar la [Docker image oficial](https://ghcr.io/runatlantis/atlantis).
 
-#### Startup Command
+#### Comando de inicio
 
-The exact flags to `atlantis server` depends on your Git host:
+Los flags exactos para `atlantis server` dependen de tu host de Git:
 
 ##### GitHub
 
@@ -721,7 +721,7 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-For GitHub Enterprise Cloud, set `--gh-hostname` to the tenant hostname, such as `tenant.ghe.com`, without `https://` or an `api.` prefix.
+Para GitHub Enterprise Cloud, establece `--gh-hostname` con el hostname del tenant, como `tenant.ghe.com`, sin `https://` ni un prefijo `api.`.
 
 ##### GitLab
 
@@ -787,7 +787,7 @@ atlantis server \
 
 ##### Azure DevOps
 
-A certificate and private key are required if using Basic authentication for webhooks.
+Se requieren un certificado y una clave privada si se usa autenticación Basic para webhooks.
 
 ```bash
 atlantis server \
@@ -801,32 +801,32 @@ atlantis server \
 --ssl-key-file=file.key
 ```
 
-Where
+Donde
 
-* `$URL` is the URL that Atlantis can be reached at
-* `$USERNAME` is the GitHub/GitLab/Gitea/Bitbucket/AzureDevops username you generated the token for
-* `$TOKEN` is the access token you created. If you don't want this to be passed
-  in as an argument for security reasons you can specify it in a config file
-   (see [Configuration](server-configuration.md#environment-variables))
-    or as an environment variable: `ATLANTIS_GH_TOKEN` or `ATLANTIS_GITLAB_TOKEN` or `ATLANTIS_GITEA_TOKEN`
-     or `ATLANTIS_BITBUCKET_TOKEN` or `ATLANTIS_AZUREDEVOPS_TOKEN`
-* `$SECRET` is the random key you used for the webhook secret.
-   If you don't want this to be passed in as an argument for security reasons
-    you can specify it in a config file
-     (see [Configuration](server-configuration.md#environment-variables))
-      or as an environment variable: `ATLANTIS_GH_WEBHOOK_SECRET` or `ATLANTIS_GITLAB_WEBHOOK_SECRET` or
+* `$URL` es la URL en la que se puede acceder a Atlantis
+* `$USERNAME` es el nombre de usuario de GitHub/GitLab/Gitea/Bitbucket/AzureDevops para el que generaste el token
+* `$TOKEN` es el access token que creaste. Si no quieres que esto se pase
+  como argumento por razones de seguridad, puedes especificarlo en un archivo de configuración
+   (consulta [Configuration](server-configuration.md#environment-variables))
+    o como una variable de entorno: `ATLANTIS_GH_TOKEN` o `ATLANTIS_GITLAB_TOKEN` o `ATLANTIS_GITEA_TOKEN`
+     o `ATLANTIS_BITBUCKET_TOKEN` o `ATLANTIS_AZUREDEVOPS_TOKEN`
+* `$SECRET` es la clave aleatoria que usaste para el webhook secret.
+   Si no quieres que esto se pase como argumento por razones de seguridad,
+    puedes especificarlo en un archivo de configuración
+     (consulta [Configuration](server-configuration.md#environment-variables))
+      o como una variable de entorno: `ATLANTIS_GH_WEBHOOK_SECRET` o `ATLANTIS_GITLAB_WEBHOOK_SECRET` o
   `ATLANTIS_GITEA_WEBHOOK_SECRET`
-* `$REPO_ALLOWLIST` is which repos Atlantis can run on, ex.
- `github.com/runatlantis/*` or `github.enterprise.corp.com/*`.
-  See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
+* `$REPO_ALLOWLIST` es en qué repos puede ejecutarse Atlantis, por ej.
+ `github.com/runatlantis/*` o `github.enterprise.corp.com/*`.
+  Consulta [--repo-allowlist](server-configuration.md#repo-allowlist) para más detalles.
 
-Atlantis is now running!
+¡Atlantis ahora se está ejecutando!
 ::: tip
-We recommend running it under something like Systemd or Supervisord that will
-restart it in case of failure.
+Recomendamos ejecutarlo bajo algo como Systemd o Supervisord que lo
+reiniciará en caso de fallo.
 :::
 
 ## Next Steps
 
-* To ensure Atlantis is running, load its UI. By default Atlantis runs on port `4141`.
-* Now you're ready to add Webhooks to your repos. See [Configuring Webhooks](configuring-webhooks.md).
+* Para asegurar que Atlantis se está ejecutando, carga su UI. De forma predeterminada Atlantis se ejecuta en el puerto `4141`.
+* Ahora estás listo para agregar Webhooks a tus repos. Consulta [Configuring Webhooks](configuring-webhooks.md).

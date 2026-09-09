@@ -939,6 +939,23 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// artifact, so Atlantis cannot require or hash a convention plan file for
 	// them. Their durable plan state is still validated.
 	managedPlanFile := requiresManagedPlanFileForApply(ctx)
+	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
+	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
+		planPath, err := safePlanFilePath(ctx, absPath)
+		if err != nil {
+			return "", "", "", err
+		}
+		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+			}
+		} else {
+			// Overwrite builder hash. Load may have replaced leftover disk.
+			ctx.ExpectedPlanHash = planHash
+		}
+	}
+
 	if p.ApplyPlanValidator != nil {
 		if managedPlanFile {
 			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
@@ -947,18 +964,6 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		} else if err := p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx); err != nil {
 			return "", "", "", err
 		}
-	}
-	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && managedPlanFile && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
-		planPath, err := safePlanFilePath(ctx, absPath)
-		if err != nil {
-			return "", "", "", err
-		}
-		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
-		if err != nil {
-			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
-		}
-		ctx.ExpectedPlanHash = planHash
 	}
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
