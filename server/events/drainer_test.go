@@ -4,9 +4,9 @@
 package events_test
 
 import (
-	"context"
+	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/runatlantis/atlantis/server/events"
 	. "github.com/runatlantis/atlantis/testing"
@@ -38,35 +38,65 @@ func TestDrainer(t *testing.T) {
 }
 
 func TestDrainer_Shutdown(t *testing.T) {
-	d := events.Drainer{}
-	d.StartOp()
+	synctest.Test(t, func(t *testing.T) {
+		d := events.Drainer{}
+		Assert(t, d.StartOp(), "operation should start before shutdown")
+		finishOp := sync.OnceFunc(d.OpDone)
+		defer finishOp()
 
-	shutdown := make(chan bool)
-	go func() {
-		d.ShutdownBlocking()
-		close(shutdown)
-	}()
+		shutdown := make(chan struct{})
+		go func() {
+			d.ShutdownBlocking()
+			close(shutdown)
+		}()
 
-	// Sleep to ensure that ShutdownBlocking has been called.
-	time.Sleep(300 * time.Millisecond)
+		// Wait until shutdown is blocked on the outstanding operation.
+		synctest.Wait()
+		Equals(t, false, d.StartOp())
+		Equals(t, events.DrainStatus{
+			ShuttingDown:  true,
+			InProgressOps: 1,
+		}, d.GetStatus())
+		select {
+		case <-shutdown:
+			t.Error("shutdown returned before the outstanding operation completed")
+		default:
+		}
 
-	// Starting another op should fail.
-	Equals(t, false, d.StartOp())
+		finishOp()
+		<-shutdown
+		Equals(t, events.DrainStatus{ShuttingDown: true}, d.GetStatus())
+		Equals(t, false, d.StartOp())
+	})
+}
 
-	// Status should be shutting down.
-	Equals(t, events.DrainStatus{
-		ShuttingDown:  true,
-		InProgressOps: 1,
-	}, d.GetStatus())
-
-	// Stop the final operation and wait for shutdown to exit.
-	d.OpDone()
-	timer, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	select {
-	case <-shutdown:
-	case <-timer.Done():
-		Assert(t, false, "Timer reached without shutdown")
-
+func TestDrainer_ConcurrentStatus(t *testing.T) {
+	var d events.Drainer
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	const workers = 4
+	for range workers {
+		wg.Go(func() {
+			<-start
+			for range 1000 {
+				if !d.StartOp() {
+					t.Error("operation rejected before shutdown")
+					return
+				}
+				d.OpDone()
+			}
+		})
 	}
+	wg.Go(func() {
+		<-start
+		for range 1000 {
+			status := d.GetStatus()
+			if status.ShuttingDown || status.InProgressOps < 0 || status.InProgressOps > workers {
+				t.Errorf("invalid concurrent status: %+v", status)
+			}
+		}
+	})
+	close(start)
+	wg.Wait()
+	Equals(t, events.DrainStatus{}, d.GetStatus())
 }
