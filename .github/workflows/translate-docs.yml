@@ -69,6 +69,15 @@ jobs:
           cp -r runatlantis.io/docs runatlantis.io/guide .lingo-src/en/
           cp runatlantis.io/*.md .lingo-src/en/
 
+          # Stage the translations already on the branch too. Without them the
+          # translator sees no target files and re-translates every page on
+          # every run, which costs the full token budget and rewrites pages
+          # whose source did not change.
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          for locale in $locales; do
+            [ -d "runatlantis.io/${locale}" ] && cp -r "runatlantis.io/${locale}" ".lingo-src/${locale}"
+          done
+
       - name: Translate
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -127,7 +136,10 @@ jobs:
           node scripts/align-tables.mjs $locales
           globs=""
           for locale in $locales; do globs="$globs runatlantis.io/${locale}/**/*.md"; done
-          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml $globs
+          # `--fix` exits non-zero when findings remain. Those are caught by
+          # the integrity step below, which quarantines the page instead of
+          # failing the run.
+          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml $globs || true
 
       - name: Upload translated output
         # Kept even when the integrity check fails: when a page trips a check,
@@ -148,32 +160,49 @@ jobs:
         # not discard thirty-nine good ones, and a missing page is already a
         # supported state - the link localizer and the sidebar fall back to
         # English. The second run must pass, so nothing unverified is shipped.
+        #
+        # markdownlint counts as a check here too: Website Check lints every
+        # locale on the resulting PR, and the model sometimes leaves findings
+        # that `--fix` cannot repair (whitespace inside link text, a table row
+        # split across lines).
         run: |
-          set -o pipefail
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          globs=""
+          for locale in $locales; do globs="$globs runatlantis.io/${locale}/**/*.md"; done
 
-          # The checker reports failures on stderr, so merge the streams or the
-          # log file has nothing to quarantine. `grep` exits 1 when nothing
-          # matches, which under `set -e` + pipefail would abort the step, so
-          # the match list is built separately and allowed to be empty.
-          if node scripts/check-translation-integrity.mjs $locales 2>&1 | tee /tmp/integrity.txt; then
+          run_checks() {
+            local ok=0
+            node scripts/check-translation-integrity.mjs $locales > /tmp/integrity.txt 2>&1 || ok=1
+            npx --yes markdownlint-cli2@0.20.0 --config .markdownlint.yaml $globs > /tmp/lint.txt 2>&1 || ok=1
+            cat /tmp/integrity.txt /tmp/lint.txt
+            return $ok
+          }
+
+          if run_checks; then
             exit 0
           fi
 
-          { grep '^✗' /tmp/integrity.txt || true; } | sed 's/^✗ //' > /tmp/failed.txt
+          # Integrity failures are reported as "✗ <file>"; markdownlint
+          # findings start with "<file>:<line>". `grep` exits 1 on no match,
+          # which under `set -e` would abort the step, hence the `|| true`.
+          {
+            grep '^✗' /tmp/integrity.txt | sed 's/^✗ //' || true
+            grep -oE '^runatlantis\.io/[^:]+\.md' /tmp/lint.txt || true
+          } | sort -u > /tmp/failed.txt
+
           if [ ! -s /tmp/failed.txt ]; then
-            echo "::error::Integrity check failed but reported no files; see output above."
+            echo "::error::Checks failed but reported no files; see output above."
             exit 1
           fi
 
           while read -r file; do
             git checkout HEAD -- "$file" 2>/dev/null || rm -f "$file"
             echo "- \`${file}\`" >> /tmp/quarantined.txt
-            echo "::warning file=${file}::Quarantined: failed translation integrity checks"
+            echo "::warning file=${file}::Quarantined: failed translation checks"
           done < /tmp/failed.txt
 
           node scripts/localize-links.mjs $locales
-          node scripts/check-translation-integrity.mjs $locales
+          run_checks
 
       - name: Build the site
         # VitePress fails the build on dead relative links, so this is the real
@@ -208,7 +237,7 @@ jobs:
 
           ### Quarantined pages
 
-          These pages failed the integrity checks and were left at their previous version (or omitted). They need a rerun or a look at the source:
+          These pages failed the translation checks (integrity or markdownlint) and were left at their previous version (or omitted). They need a rerun or a look at the source:
 
           $(cat /tmp/quarantined.txt)"
           fi
