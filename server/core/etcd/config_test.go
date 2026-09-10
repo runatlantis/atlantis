@@ -34,27 +34,16 @@ func validExternal() *etcd.Config {
 	}
 }
 
-// validEmbedded returns a production-valid embedded restart/serve config.
-func validEmbedded() *etcd.Config {
-	c := validExternal()
-	c.Mode = etcd.ModeEmbedded
-	c.Endpoints = nil
-	c.Embedded = etcd.EmbeddedConfig{
-		ConfigFile:     "embed.yaml",
-		VoterCount:     3,
-		Lifecycle:      etcd.LifecycleRestart,
-		StartupPurpose: etcd.PurposeServe,
-		IdentityFile:   "identity.json",
-	}
-	return c
-}
-
 func TestValidate_External_OK(t *testing.T) {
 	Ok(t, validExternal().Validate())
 }
 
-func TestValidate_Embedded_OK(t *testing.T) {
-	Ok(t, validEmbedded().Validate())
+// TestValidate_Embedded_Deferred proves embedded mode is rejected in this phase
+// with a message pointing operators at external mode.
+func TestValidate_Embedded_Deferred(t *testing.T) {
+	c := validExternal()
+	c.Mode = etcd.ModeEmbedded
+	ErrContains(t, "not available in this release", c.Validate())
 }
 
 func TestValidate_CommonFailures(t *testing.T) {
@@ -89,7 +78,6 @@ func TestValidate_ExternalFailures(t *testing.T) {
 	}{
 		{"no endpoints", func(c *etcd.Config) { c.Endpoints = nil }, "requires etcd-endpoints"},
 		{"http endpoint in prod", func(c *etcd.Config) { c.Endpoints = []string{"http://member-0:2379"} }, "must use https"},
-		{"embedded field leaks in", func(c *etcd.Config) { c.Embedded.ConfigFile = "x" }, "not valid in external mode"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -98,57 +86,6 @@ func TestValidate_ExternalFailures(t *testing.T) {
 			ErrContains(t, tc.substr, c.Validate())
 		})
 	}
-}
-
-func TestValidate_EmbeddedFailures(t *testing.T) {
-	cases := []struct {
-		name   string
-		mutate func(*etcd.Config)
-		substr string
-	}{
-		{"endpoints not allowed", func(c *etcd.Config) { c.Endpoints = []string{"https://x:2379"} }, "not valid in embedded mode"},
-		{"no config file", func(c *etcd.Config) { c.Embedded.ConfigFile = "" }, "etcd-embedded-config-file"},
-		{"no identity file", func(c *etcd.Config) { c.Embedded.IdentityFile = "" }, "etcd-embedded-identity-file"},
-		{"even voter count", func(c *etcd.Config) { c.Embedded.VoterCount = 4 }, "must be 3, 5, or 7"},
-		{"voter count too high", func(c *etcd.Config) { c.Embedded.VoterCount = 9 }, "must be 3, 5, or 7"},
-		{"bootstrap requires maintenance", func(c *etcd.Config) {
-			c.Embedded.Lifecycle = etcd.LifecycleBootstrap
-			c.Embedded.StartupPurpose = etcd.PurposeServe
-		}, "requires startup-purpose"},
-		{"restart requires serve", func(c *etcd.Config) {
-			c.Embedded.StartupPurpose = etcd.PurposeMaintenance
-		}, "requires startup-purpose"},
-		{"join fields outside join mode", func(c *etcd.Config) {
-			c.Embedded.MembershipTicketFile = "t"
-		}, "only valid in join-existing mode"},
-		{"restore field outside restore mode", func(c *etcd.Config) {
-			c.Embedded.RestoreManifestFile = "m"
-		}, "only valid in restore mode"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			c := validEmbedded()
-			tc.mutate(c)
-			ErrContains(t, tc.substr, c.Validate())
-		})
-	}
-}
-
-func TestValidate_JoinExisting_OK(t *testing.T) {
-	c := validEmbedded()
-	c.Embedded.Lifecycle = etcd.LifecycleJoinExisting
-	c.Embedded.StartupPurpose = etcd.PurposeServe
-	c.Embedded.JoinEndpoints = []string{"https://member-0:2379"}
-	c.Embedded.MembershipTicketFile = "ticket"
-	Ok(t, c.Validate())
-}
-
-func TestValidate_Restore_OK(t *testing.T) {
-	c := validEmbedded()
-	c.Embedded.Lifecycle = etcd.LifecycleRestore
-	c.Embedded.StartupPurpose = etcd.PurposeMaintenance
-	c.Embedded.RestoreManifestFile = "manifest"
-	Ok(t, c.Validate())
 }
 
 func TestValidate_OwnershipFailures(t *testing.T) {

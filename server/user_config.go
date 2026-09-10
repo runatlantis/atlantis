@@ -102,14 +102,6 @@ type UserConfig struct {
 	EtcdRequestTimeout              string `mapstructure:"etcd-request-timeout"`
 	EtcdStartupTimeout              string `mapstructure:"etcd-startup-timeout"`
 	EtcdAllowInsecureDev            bool   `mapstructure:"etcd-allow-insecure-dev"`
-	EtcdEmbeddedConfigFile          string `mapstructure:"etcd-embedded-config-file"`
-	EtcdEmbeddedVoterCount          int    `mapstructure:"etcd-embedded-voter-count"`
-	EtcdEmbeddedLifecycle           string `mapstructure:"etcd-embedded-lifecycle"`
-	EtcdEmbeddedStartupPurpose      string `mapstructure:"etcd-embedded-startup-purpose"`
-	EtcdEmbeddedIdentityFile        string `mapstructure:"etcd-embedded-identity-file"`
-	EtcdEmbeddedJoinEndpoints       string `mapstructure:"etcd-embedded-join-endpoints"`
-	EtcdEmbeddedMembershipTicket    string `mapstructure:"etcd-embedded-membership-ticket-file"`
-	EtcdEmbeddedRestoreManifest     string `mapstructure:"etcd-embedded-restore-manifest-file"`
 	ReplicaID                       string `mapstructure:"replica-id"`
 	ReplicaAdvertiseURL             string `mapstructure:"replica-advertise-url"`
 	ReplicaAdvertiseAllowlist       string `mapstructure:"replica-advertise-allowlist"`

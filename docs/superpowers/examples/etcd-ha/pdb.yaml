@@ -1,13 +1,14 @@
-# Preserve etcd quorum: at most one member may be voluntarily disrupted at a
-# time, for every supported voter count (3/5/7). The membership runbook likewise
-# permits only one manual member deletion at a time (design §324).
+# Keep at least one Atlantis replica available during voluntary disruptions so
+# ingress and owner-routing stay up. (etcd quorum is provided by the separate
+# external etcd cluster and has its own PDB; the embedded-voter quorum PDB is a
+# phase-2 concern.)
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: atlantis-member
+  name: atlantis
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: atlantis
-      atlantis.runatlantis.io/role: member
+      atlantis.runatlantis.io/role: client

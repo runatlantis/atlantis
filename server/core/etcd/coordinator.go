@@ -69,9 +69,7 @@ type RuntimeCoordinator struct {
 	rt *Runtime
 }
 
-// NewRuntimeCoordinator wraps a serving runtime. It panics if the runtime has no
-// coordination adapters (maintenance mode), which never reaches the command
-// pipeline.
+// NewRuntimeCoordinator wraps a serving runtime.
 func NewRuntimeCoordinator(rt *Runtime) *RuntimeCoordinator {
 	return &RuntimeCoordinator{rt: rt}
 }

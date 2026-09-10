@@ -3,7 +3,7 @@
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // This file assembles the full etcd runtime (design §"Startup and readiness").
-// It constructs the shared backend (external or embedded), initializes or
+// It constructs the shared external backend, initializes or
 // validates the namespace and coordination epoch, and builds the database,
 // ownership, admission, barrier, and quarantine adapters over one client. The
 // owner-routing dispatch layer is attached once the command executor exists.
@@ -27,10 +27,6 @@ type Runtime struct {
 	cfg     *Config
 	keys    Keyspace
 	backend Backend
-
-	// maintenance is true for an embedded maintenance-purpose start: the server
-	// is up for operator tooling but no adapters exist and readiness stays false.
-	maintenance bool
 
 	database  *EtcdDatabase
 	ownership *OwnershipStore
@@ -57,43 +53,25 @@ type Runtime struct {
 // sweeping hourly keeps the keyspace bounded without frequent full scans.
 const admissionCleanupInterval = time.Hour
 
-// NewRuntime builds the backend and, for a serving process, the full
-// coordination stack. In embedded maintenance mode it returns a runtime that
-// exposes only the backend and never becomes ready (design §731 step 6).
+// NewRuntime builds the external backend and the full coordination stack.
 func NewRuntime(ctx context.Context, cfg *Config) (*Runtime, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 	keys := NewKeyspace(cfg.Namespace)
 
-	backend, err := buildBackend(ctx, cfg)
+	backend, err := NewExternal(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	rt := &Runtime{cfg: cfg, keys: keys, backend: backend}
 
-	if cfg.Mode == ModeEmbedded && cfg.Embedded.StartupPurpose == PurposeMaintenance {
-		rt.maintenance = true
-		return rt, nil
-	}
-
 	if err := rt.buildAdapters(ctx); err != nil {
 		_ = backend.Close()
 		return nil, err
 	}
 	return rt, nil
-}
-
-func buildBackend(ctx context.Context, cfg *Config) (Backend, error) {
-	switch cfg.Mode {
-	case ModeExternal:
-		return NewExternal(ctx, cfg)
-	case ModeEmbedded:
-		return NewEmbedded(ctx, cfg)
-	default:
-		return nil, fmt.Errorf("unknown etcd mode %q", cfg.Mode)
-	}
 }
 
 // buildAdapters initializes the namespace and constructs the coordination stores
@@ -205,7 +183,7 @@ func (rt *Runtime) Route(ctx context.Context, cmd Command) (Result, error) {
 	return rt.router.Route(ctx, cmd), nil
 }
 
-// Database returns the db.Database adapter, or nil in maintenance mode.
+// Database returns the db.Database adapter.
 func (rt *Runtime) Database() db.Database {
 	if rt.database == nil {
 		return nil
@@ -231,12 +209,9 @@ func (rt *Runtime) Admission() *AdmissionStore { return rt.admission }
 // executor for its fence and admission-lifecycle transactions.
 func (rt *Runtime) RequestTimeout() time.Duration { return rt.cfg.RequestTimeout }
 
-// Ready reports readiness: backend authority plus a live ownership session. In
-// maintenance mode it is never ready (design §714, §731).
+// Ready reports readiness: backend authority plus a live ownership session
+// (design §714).
 func (rt *Runtime) Ready(ctx context.Context) error {
-	if rt.maintenance {
-		return errors.New("embedded etcd is in maintenance mode; not serving")
-	}
 	if err := rt.backend.Ready(ctx); err != nil {
 		return err
 	}
@@ -250,7 +225,7 @@ func (rt *Runtime) Ready(ctx context.Context) error {
 
 // Close performs the fixed shutdown order: release ownership while the client is
 // available, then close the database, which idempotently closes the backend. In
-// maintenance or partial-startup paths it closes the backend directly (design §751).
+// partial-startup paths it closes the backend directly (design §751).
 func (rt *Runtime) Close() error {
 	var errs []error
 	// Stop the background cleaner before closing the shared client it uses.

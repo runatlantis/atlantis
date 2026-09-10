@@ -32,16 +32,6 @@ type Settings struct {
 	AllowInsecureDev bool
 	Endpoints        string // comma-separated
 
-	// Embedded mode.
-	EmbeddedConfigFile       string
-	EmbeddedVoterCount       int
-	EmbeddedLifecycle        string
-	EmbeddedStartupPurpose   string
-	EmbeddedIdentityFile     string
-	EmbeddedJoinEndpoints    string // comma-separated
-	EmbeddedMembershipTicket string
-	EmbeddedRestoreManifest  string
-
 	// Ownership and routing.
 	ReplicaID                 string
 	ReplicaAdvertiseURL       string
@@ -84,16 +74,6 @@ func BuildConfig(s Settings) (*Config, error) {
 		StartupTimeout:   startTimeout,
 		AllowInsecureDev: s.AllowInsecureDev,
 		Endpoints:        splitCSV(s.Endpoints),
-		Embedded: EmbeddedConfig{
-			ConfigFile:           s.EmbeddedConfigFile,
-			VoterCount:           s.EmbeddedVoterCount,
-			Lifecycle:            Lifecycle(s.EmbeddedLifecycle),
-			StartupPurpose:       StartupPurpose(s.EmbeddedStartupPurpose),
-			IdentityFile:         s.EmbeddedIdentityFile,
-			JoinEndpoints:        splitCSV(s.EmbeddedJoinEndpoints),
-			MembershipTicketFile: s.EmbeddedMembershipTicket,
-			RestoreManifestFile:  s.EmbeddedRestoreManifest,
-		},
 		Ownership: OwnershipConfig{
 			ReplicaID:                 s.ReplicaID,
 			ReplicaAdvertiseURL:       s.ReplicaAdvertiseURL,

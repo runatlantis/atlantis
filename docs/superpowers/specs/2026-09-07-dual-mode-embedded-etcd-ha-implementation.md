@@ -3,7 +3,13 @@
 Companion to [`2026-09-07-dual-mode-embedded-etcd-ha-design.md`](./2026-09-07-dual-mode-embedded-etcd-ha-design.md).
 Section references (§) point into that design document.
 
-Status legend: `[ ]` not started · `[~]` in progress · `[x]` done
+> **Branch scope (phase 1 — external etcd only).** This branch delivers the
+> external-mode stack (phases 0–4, 6). **Phase 5 (embedded runtime)** and the
+> embedded-only manifests are **out of scope** and deferred to a later phase;
+> `--etcd-mode=embedded` is rejected at validation. The Phase 5 items below are
+> retained for the phase-2 plan of record.
+
+Status legend: `[ ]` not started · `[~]` in progress · `[x]` done · `[deferred]` phase 2
 
 ## Sequencing
 

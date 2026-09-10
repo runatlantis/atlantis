@@ -3,9 +3,9 @@
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // This file implements the runtime boundary between Atlantis and etcd (design
-// §"Etcd runtime/backend"). The Backend owns the long-lived client and, in
-// embedded mode, the embedded server. Consumers borrow the client and never
-// close it directly; the database is the designated close delegate.
+// §"Etcd runtime/backend"). The Backend owns the long-lived client. Consumers
+// borrow the client and never close it directly; the database is the designated
+// close delegate.
 package etcd
 
 import (
@@ -20,56 +20,28 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
-// Backend is the runtime boundary. The backend owns the client and embedded
-// runtime; the database is its designated close delegate and the ownership
-// adapter borrows the client (design §394).
+// Backend is the runtime boundary. The backend owns the client; the database is
+// its designated close delegate and the ownership adapter borrows the client
+// (design §394).
 type Backend interface {
 	// Client returns the shared long-lived client. Callers must not close it.
 	Client() *clientv3.Client
 	// Ready performs a bounded linearizable probe proving cluster authority.
 	Ready(context.Context) error
-	// Close is idempotent; it closes the client and, in embedded mode, the
-	// embedded server.
+	// Close is idempotent; it closes the client.
 	Close() error
 }
 
-// backend is the shared object returned by both external and embedded runtimes.
-// A single close guard makes every shutdown and partial-startup path mutually
-// idempotent (design §99, §751).
+// backend is the shared object returned by the external runtime. A single close
+// guard makes every shutdown and partial-startup path mutually idempotent
+// (design §99, §751).
 type backend struct {
 	client         *clientv3.Client
 	requestTimeout time.Duration
 	probeKey       string
 
-	// embeddedClose, when set, stops the embedded server after the client has
-	// closed. It is nil in external mode. Set by the embedded runtime (Phase 5).
-	embeddedClose func() error
-
-	// monitorStop stops the embedded-server error monitor on Close (nil in
-	// external mode). fatalErr records a fatal embedded-server error observed
-	// after startup so Ready fails closed for the rest of the process lifetime
-	// (design §740, §783).
-	monitorStop chan struct{}
-	fatalMu     sync.Mutex
-	fatalErr    error
-
 	closeOnce sync.Once
 	closeErr  error
-}
-
-// setFatal records the first fatal embedded-server error.
-func (b *backend) setFatal(err error) {
-	b.fatalMu.Lock()
-	defer b.fatalMu.Unlock()
-	if b.fatalErr == nil {
-		b.fatalErr = err
-	}
-}
-
-func (b *backend) fatal() error {
-	b.fatalMu.Lock()
-	defer b.fatalMu.Unlock()
-	return b.fatalErr
 }
 
 // Client implements Backend.
@@ -79,11 +51,6 @@ func (b *backend) Client() *clientv3.Client { return b.client }
 // so successful client construction is not connectivity proof; a real
 // linearizable operation is required (design §187, §303 "Ping").
 func (b *backend) Ready(ctx context.Context) error {
-	// A fatal embedded-server error at any point after startup makes the backend
-	// permanently unready (design §783); it is not recoverable by a probe.
-	if err := b.fatal(); err != nil {
-		return fmt.Errorf("embedded etcd server failed: %w", err)
-	}
 	rctx, cancel := context.WithTimeout(ctx, b.requestTimeout)
 	defer cancel()
 	// A linearizable Get (the clientv3 default, no WithSerializable) forces a
@@ -99,17 +66,9 @@ func (b *backend) Ready(ctx context.Context) error {
 func (b *backend) Close() error {
 	b.closeOnce.Do(func() {
 		var errs []error
-		if b.monitorStop != nil {
-			close(b.monitorStop)
-		}
 		if b.client != nil {
 			if err := b.client.Close(); err != nil {
 				errs = append(errs, fmt.Errorf("closing etcd client: %w", err))
-			}
-		}
-		if b.embeddedClose != nil {
-			if err := b.embeddedClose(); err != nil {
-				errs = append(errs, fmt.Errorf("closing embedded etcd server: %w", err))
 			}
 		}
 		b.closeErr = errors.Join(errs...)

@@ -2,7 +2,17 @@
 
 Date: 2026-09-07
 
-Status: approved architecture; implementation not started
+Status: approved architecture
+
+> **Scope of this branch (phase 1 — external etcd only).** This branch ships the
+> **external** runtime mode: active-active HA (ownership, owner-routing, execution
+> fencing, migration, and recovery) against an operator-provided external etcd
+> cluster, selected with `--locking-db-type=etcd --etcd-mode=external`. The
+> **embedded** in-process etcd voter described throughout this document (embedded
+> lifecycle, membership tickets, restore manifests, the member StatefulSet
+> topology) is **deferred to a later phase** and is rejected at configuration
+> validation. This document is retained as the full north-star design; sections
+> describing embedded mode are forward-looking until phase 2.
 
 ## Summary
 

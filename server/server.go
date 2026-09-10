@@ -555,14 +555,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			RequestTimeout:            userConfig.EtcdRequestTimeout,
 			StartupTimeout:            userConfig.EtcdStartupTimeout,
 			AllowInsecureDev:          userConfig.EtcdAllowInsecureDev,
-			EmbeddedConfigFile:        userConfig.EtcdEmbeddedConfigFile,
-			EmbeddedVoterCount:        userConfig.EtcdEmbeddedVoterCount,
-			EmbeddedLifecycle:         userConfig.EtcdEmbeddedLifecycle,
-			EmbeddedStartupPurpose:    userConfig.EtcdEmbeddedStartupPurpose,
-			EmbeddedIdentityFile:      userConfig.EtcdEmbeddedIdentityFile,
-			EmbeddedJoinEndpoints:     userConfig.EtcdEmbeddedJoinEndpoints,
-			EmbeddedMembershipTicket:  userConfig.EtcdEmbeddedMembershipTicket,
-			EmbeddedRestoreManifest:   userConfig.EtcdEmbeddedRestoreManifest,
 			ReplicaID:                 userConfig.ReplicaID,
 			ReplicaAdvertiseURL:       userConfig.ReplicaAdvertiseURL,
 			ReplicaAdvertiseAllowlist: userConfig.ReplicaAdvertiseAllowlist,
@@ -572,12 +564,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		})
 		if buildErr != nil {
 			return nil, buildErr
-		}
-		if etcdCfg.Mode == etcd.ModeEmbedded && userConfig.EtcdEmbeddedStartupPurpose == "maintenance" {
-			// Maintenance is an operator-tooling bring-up (bootstrap/restore) that
-			// does not serve Atlantis traffic; the main server serve path requires
-			// a serving runtime.
-			return nil, errors.New("etcd-embedded-startup-purpose=maintenance does not serve Atlantis; use operator tooling")
 		}
 		logger.Info("Utilizing etcd (%s mode) for locking and coordination", etcdCfg.Mode)
 		rt, rtErr := etcd.NewRuntime(context.Background(), etcdCfg)

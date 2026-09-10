@@ -128,14 +128,6 @@ const (
 	EtcdRequestTimeoutFlag           = "etcd-request-timeout"
 	EtcdStartupTimeoutFlag           = "etcd-startup-timeout"
 	EtcdAllowInsecureDevFlag         = "etcd-allow-insecure-dev"
-	EtcdEmbeddedConfigFileFlag       = "etcd-embedded-config-file"
-	EtcdEmbeddedVoterCountFlag       = "etcd-embedded-voter-count"
-	EtcdEmbeddedLifecycleFlag        = "etcd-embedded-lifecycle"
-	EtcdEmbeddedStartupPurposeFlag   = "etcd-embedded-startup-purpose"
-	EtcdEmbeddedIdentityFileFlag     = "etcd-embedded-identity-file"
-	EtcdEmbeddedJoinEndpointsFlag    = "etcd-embedded-join-endpoints"
-	EtcdEmbeddedMembershipTicketFile = "etcd-embedded-membership-ticket-file" // nolint: gosec
-	EtcdEmbeddedRestoreManifestFile  = "etcd-embedded-restore-manifest-file"
 	ReplicaIDFlag                    = "replica-id"
 	ReplicaAdvertiseURLFlag          = "replica-advertise-url"
 	ReplicaAdvertiseAllowlistFlag    = "replica-advertise-allowlist"
@@ -216,32 +208,31 @@ const (
 	DefaultLockingDBType                = "boltdb"
 	// LockingDBTypeEtcd is the --locking-db-type value that selects the
 	// active-active etcd coordination backend.
-	LockingDBTypeEtcd                 = "etcd"
-	DefaultEtcdNamespace              = "/atlantis"
-	DefaultEtcdRequestTimeout         = "5s"
-	DefaultEtcdStartupTimeout         = "5m"
-	DefaultEtcdEmbeddedVoterCount     = 3
-	DefaultEtcdEmbeddedStartupPurpose = "serve"
-	DefaultOwnershipTTLSeconds        = 30
-	DefaultLanguage                   = i18n.DefaultLanguage
-	DefaultLogLevel                   = "info"
-	DefaultIgnoreVCSStatusNames       = ""
-	DefaultMaxCommentsPerCommand      = 100
-	DefaultParallelPoolSize           = 15
-	DefaultStatsNamespace             = "atlantis"
-	DefaultPort                       = 4141
-	DefaultRedisDB                    = 0
-	DefaultRedisPort                  = 6379
-	DefaultRedisTLSEnabled            = false
-	DefaultRedisInsecureSkipVerify    = false
-	DefaultTFDistribution             = TFDistributionTerraform
-	DefaultTFDownloadURL              = "https://releases.hashicorp.com"
-	DefaultTFDownload                 = true
-	DefaultTFEHostname                = "app.terraform.io"
-	DefaultVCSStatusName              = "atlantis"
-	DefaultWebBasicAuth               = false
-	DefaultWebUsername                = "atlantis"
-	DefaultWebPassword                = "atlantis"
+	LockingDBTypeEtcd              = "etcd"
+	DefaultEtcdMode                = "external"
+	DefaultEtcdNamespace           = "/atlantis"
+	DefaultEtcdRequestTimeout      = "5s"
+	DefaultEtcdStartupTimeout      = "5m"
+	DefaultOwnershipTTLSeconds     = 30
+	DefaultLanguage                = i18n.DefaultLanguage
+	DefaultLogLevel                = "info"
+	DefaultIgnoreVCSStatusNames    = ""
+	DefaultMaxCommentsPerCommand   = 100
+	DefaultParallelPoolSize        = 15
+	DefaultStatsNamespace          = "atlantis"
+	DefaultPort                    = 4141
+	DefaultRedisDB                 = 0
+	DefaultRedisPort               = 6379
+	DefaultRedisTLSEnabled         = false
+	DefaultRedisInsecureSkipVerify = false
+	DefaultTFDistribution          = TFDistributionTerraform
+	DefaultTFDownloadURL           = "https://releases.hashicorp.com"
+	DefaultTFDownload              = true
+	DefaultTFEHostname             = "app.terraform.io"
+	DefaultVCSStatusName           = "atlantis"
+	DefaultWebBasicAuth            = false
+	DefaultWebUsername             = "atlantis"
+	DefaultWebPassword             = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -459,9 +450,9 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultLockingDBType,
 	},
 	EtcdModeFlag: {
-		description: "etcd runtime mode when --locking-db-type=etcd. Either 'external' " +
-			"(connect to an existing etcd cluster) or 'embedded' (run an embedded etcd voter). " +
-			"Embedded mode is not yet implemented.",
+		description: "etcd runtime mode when --locking-db-type=etcd. Must be 'external' " +
+			"(connect to an existing etcd cluster). Embedded mode is planned for a later phase.",
+		defaultValue: DefaultEtcdMode,
 	},
 	EtcdDeploymentIDFlag: {
 		description: "Stable unique identifier for this logical Atlantis installation, used to " +
@@ -498,30 +489,8 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultEtcdRequestTimeout,
 	},
 	EtcdStartupTimeoutFlag: {
-		description:  "Timeout bounding initial etcd connectivity and embedded quorum formation, ex. 5m.",
+		description:  "Timeout bounding initial etcd connectivity and quorum formation, ex. 5m.",
 		defaultValue: DefaultEtcdStartupTimeout,
-	},
-	EtcdEmbeddedConfigFileFlag: {
-		description: "Path to the embedded etcd configuration file (embedded mode).",
-	},
-	EtcdEmbeddedLifecycleFlag: {
-		description: "Embedded etcd lifecycle: bootstrap, restart, join-existing, or restore.",
-	},
-	EtcdEmbeddedStartupPurposeFlag: {
-		description:  "Embedded etcd startup purpose: serve or maintenance.",
-		defaultValue: DefaultEtcdEmbeddedStartupPurpose,
-	},
-	EtcdEmbeddedIdentityFileFlag: {
-		description: "Path to the embedded etcd identity manifest (embedded mode).",
-	},
-	EtcdEmbeddedJoinEndpointsFlag: {
-		description: "Comma-separated existing-cluster endpoints used only in join-existing mode.",
-	},
-	EtcdEmbeddedMembershipTicketFile: {
-		description: "Path to the one-time membership ticket file used only in join-existing mode.",
-	},
-	EtcdEmbeddedRestoreManifestFile: {
-		description: "Path to the pending recovery manifest used only in restore mode.",
 	},
 	ReplicaIDFlag: {
 		description: "Stable, unique replica identity for etcd active-active ownership. Defaults to the pod hostname.",
@@ -828,10 +797,6 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
-	EtcdEmbeddedVoterCountFlag: {
-		description:  "Desired final number of embedded etcd voting members. One of 3, 5, or 7.",
-		defaultValue: DefaultEtcdEmbeddedVoterCount,
-	},
 	OwnershipTTLSecondsFlag: {
 		description:  "TTL in seconds of the etcd ownership session lease. Minimum 10.",
 		defaultValue: DefaultOwnershipTTLSeconds,
@@ -1147,6 +1112,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
 	}
+	if c.EtcdMode == "" {
+		c.EtcdMode = DefaultEtcdMode
+	}
 	if c.EtcdNamespace == "" {
 		c.EtcdNamespace = DefaultEtcdNamespace
 	}
@@ -1155,12 +1123,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.EtcdStartupTimeout == "" {
 		c.EtcdStartupTimeout = DefaultEtcdStartupTimeout
-	}
-	if c.EtcdEmbeddedVoterCount == 0 {
-		c.EtcdEmbeddedVoterCount = DefaultEtcdEmbeddedVoterCount
-	}
-	if c.EtcdEmbeddedStartupPurpose == "" {
-		c.EtcdEmbeddedStartupPurpose = DefaultEtcdEmbeddedStartupPurpose
 	}
 	if c.OwnershipTTLSeconds == 0 {
 		c.OwnershipTTLSeconds = DefaultOwnershipTTLSeconds

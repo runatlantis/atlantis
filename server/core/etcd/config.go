@@ -3,9 +3,10 @@
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package etcd implements an opt-in etcd locking and coordination backend for
-// Atlantis with two runtime modes, external and embedded. See
-// docs/superpowers/specs/2026-09-07-dual-mode-embedded-etcd-ha-design.md for
-// the architecture this package implements.
+// Atlantis. This phase supports the external runtime mode (connecting to an
+// existing etcd cluster); the embedded in-process voter is deferred to a later
+// phase. See docs/superpowers/specs/2026-09-07-dual-mode-embedded-etcd-ha-design.md
+// for the architecture this package implements.
 //
 // This file defines the configuration contract (design §"Configuration
 // contract") and its validation. Validation is a pure function over Config so
@@ -20,37 +21,15 @@ import (
 	"time"
 )
 
-// Mode selects the etcd runtime: an external cluster or an embedded voter.
+// Mode selects the etcd runtime. This phase supports external only; the embedded
+// in-process voter (ModeEmbedded) is deferred to a later phase and rejected at
+// validation.
 type Mode string
 
 const (
 	ModeExternal Mode = "external"
 	ModeEmbedded Mode = "embedded"
 )
-
-// Lifecycle is the mandatory embedded startup lifecycle (design §215). Atlantis
-// never derives it from network reachability or directory emptiness.
-type Lifecycle string
-
-const (
-	LifecycleBootstrap    Lifecycle = "bootstrap"
-	LifecycleRestart      Lifecycle = "restart"
-	LifecycleJoinExisting Lifecycle = "join-existing"
-	LifecycleRestore      Lifecycle = "restore"
-)
-
-// StartupPurpose gates whether a started embedded process serves Atlantis
-// traffic or only exposes the cluster to operator tooling (design §251).
-type StartupPurpose string
-
-const (
-	PurposeServe       StartupPurpose = "serve"
-	PurposeMaintenance StartupPurpose = "maintenance"
-)
-
-// supportedVoterCounts is the closed set of allowed embedded voter counts
-// (design §206). Even values and values above 7 are rejected.
-var supportedVoterCounts = map[int]struct{}{3: {}, 5: {}, 7: {}}
 
 const (
 	// MinOwnershipTTL is the floor for the ownership session TTL (design §314).
@@ -61,8 +40,6 @@ const (
 	DefaultRequestTimeout = 5 * time.Second
 	// DefaultStartupTimeout bounds initial connectivity and quorum formation.
 	DefaultStartupTimeout = 5 * time.Minute
-	// DefaultVoterCount is the default embedded voter count (design §208).
-	DefaultVoterCount = 3
 	// DefaultNamespace is the default Atlantis key namespace.
 	DefaultNamespace = "/atlantis"
 )
@@ -84,18 +61,6 @@ func (t TLSConfig) configured() bool {
 // complete reports whether a full client identity (CA + cert + key) is present.
 func (t TLSConfig) complete() bool {
 	return t.CAFile != "" && t.CertFile != "" && t.KeyFile != ""
-}
-
-// EmbeddedConfig holds embedded-only settings (design §192).
-type EmbeddedConfig struct {
-	ConfigFile           string
-	VoterCount           int
-	Lifecycle            Lifecycle
-	StartupPurpose       StartupPurpose
-	IdentityFile         string
-	JoinEndpoints        []string // join-existing only
-	MembershipTicketFile string   // join-existing only
-	RestoreManifestFile  string   // restore only
 }
 
 // OwnershipConfig holds active-active PR ownership and routing settings
@@ -126,10 +91,7 @@ type Config struct {
 	// External mode.
 	Endpoints []string
 
-	// Embedded mode.
-	Embedded EmbeddedConfig
-
-	// Ownership and routing (both modes).
+	// Ownership and routing.
 	Ownership OwnershipConfig
 }
 
@@ -156,9 +118,9 @@ func (c *Config) ValidateDatabase() error {
 	case ModeExternal:
 		return c.validateExternal()
 	case ModeEmbedded:
-		return c.validateEmbedded()
+		return errors.New("embedded etcd mode is not available in this release; it is planned for a later phase. Use --etcd-mode=external with an external etcd cluster")
 	default:
-		return fmt.Errorf("etcd-mode must be %q or %q, got %q", ModeExternal, ModeEmbedded, c.Mode)
+		return fmt.Errorf("etcd-mode must be %q, got %q", ModeExternal, c.Mode)
 	}
 }
 
@@ -203,102 +165,10 @@ func (c *Config) validateExternal() error {
 	if len(c.Endpoints) == 0 {
 		return errors.New("external etcd mode requires etcd-endpoints")
 	}
-	if err := c.rejectEmbeddedFields(); err != nil {
-		return err
-	}
 	for _, ep := range c.Endpoints {
 		if err := c.validateURL("etcd-endpoints", ep); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// rejectEmbeddedFields refuses embedded-only settings in external mode (design §186).
-func (c *Config) rejectEmbeddedFields() error {
-	e := c.Embedded
-	switch {
-	case e.ConfigFile != "":
-		return errors.New("etcd-embedded-config-file is not valid in external mode")
-	case e.Lifecycle != "":
-		return errors.New("etcd-embedded-lifecycle is not valid in external mode")
-	case e.IdentityFile != "":
-		return errors.New("etcd-embedded-identity-file is not valid in external mode")
-	case len(e.JoinEndpoints) > 0:
-		return errors.New("etcd-embedded-join-endpoints is not valid in external mode")
-	case e.MembershipTicketFile != "":
-		return errors.New("etcd-embedded-membership-ticket-file is not valid in external mode")
-	case e.RestoreManifestFile != "":
-		return errors.New("etcd-embedded-restore-manifest-file is not valid in external mode")
-	}
-	return nil
-}
-
-func (c *Config) validateEmbedded() error {
-	if len(c.Endpoints) > 0 {
-		return errors.New("etcd-endpoints is not valid in embedded mode")
-	}
-	e := c.Embedded
-	if e.ConfigFile == "" {
-		return errors.New("embedded etcd mode requires etcd-embedded-config-file")
-	}
-	if e.IdentityFile == "" {
-		return errors.New("embedded etcd mode requires etcd-embedded-identity-file")
-	}
-	if _, ok := supportedVoterCounts[e.VoterCount]; !ok {
-		return fmt.Errorf("etcd-embedded-voter-count must be 3, 5, or 7, got %d", e.VoterCount)
-	}
-	if err := validateLifecyclePurpose(e.Lifecycle, e.StartupPurpose); err != nil {
-		return err
-	}
-	return validateLifecycleFields(e)
-}
-
-// validateLifecyclePurpose enforces the production lifecycle/purpose matrix
-// (design §251): bootstrap/maintenance, restore/maintenance, restart/serve,
-// join-existing/serve.
-func validateLifecyclePurpose(l Lifecycle, p StartupPurpose) error {
-	switch p {
-	case PurposeServe, PurposeMaintenance:
-	default:
-		return fmt.Errorf("etcd-embedded-startup-purpose must be %q or %q, got %q", PurposeServe, PurposeMaintenance, p)
-	}
-	var want StartupPurpose
-	switch l {
-	case LifecycleBootstrap, LifecycleRestore:
-		want = PurposeMaintenance
-	case LifecycleRestart, LifecycleJoinExisting:
-		want = PurposeServe
-	default:
-		return fmt.Errorf("etcd-embedded-lifecycle must be one of bootstrap|restart|join-existing|restore, got %q", l)
-	}
-	if p != want {
-		return fmt.Errorf("lifecycle %q requires startup-purpose %q, got %q", l, want, p)
-	}
-	return nil
-}
-
-// validateLifecycleFields enforces that join/restore-only fields appear only in
-// their own lifecycle and are otherwise rejected (design §236).
-func validateLifecycleFields(e EmbeddedConfig) error {
-	joinFieldsSet := len(e.JoinEndpoints) > 0 || e.MembershipTicketFile != ""
-	if e.Lifecycle == LifecycleJoinExisting {
-		if len(e.JoinEndpoints) == 0 {
-			return errors.New("join-existing mode requires etcd-embedded-join-endpoints")
-		}
-		if e.MembershipTicketFile == "" {
-			return errors.New("join-existing mode requires etcd-embedded-membership-ticket-file")
-		}
-	} else if joinFieldsSet {
-		return fmt.Errorf("etcd-embedded-join-endpoints and etcd-embedded-membership-ticket-file are only valid in join-existing mode, not %q", e.Lifecycle)
-	}
-
-	if e.Lifecycle == LifecycleRestore {
-		if e.RestoreManifestFile == "" {
-			return errors.New("restore mode requires etcd-embedded-restore-manifest-file")
-		}
-	} else if e.RestoreManifestFile != "" {
-		return fmt.Errorf("etcd-embedded-restore-manifest-file is only valid in restore mode, not %q", e.Lifecycle)
 	}
 	return nil
 }

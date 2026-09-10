@@ -16,9 +16,10 @@ import (
 	"go.etcd.io/etcd/server/v3/embed"
 )
 
-// startEmbeddedEtcd starts a single-node in-process etcd on loopback for tests
-// and returns a probed external backend pointed at it. It doubles as an early
-// exercise of the embed package used by the Phase 5 embedded runtime.
+// startEmbeddedEtcd starts a single-node in-process etcd on loopback purely as a
+// test fixture and returns a probed external backend pointed at it. The embed
+// package is a test-only dependency here; the shipped binary connects to an
+// external etcd cluster and does not link it.
 func startEmbeddedEtcd(t *testing.T) etcd.Backend {
 	t.Helper()
 	cfg := embed.NewConfig()

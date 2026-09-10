@@ -736,86 +736,6 @@ ATLANTIS_ETCD_DEPLOYMENT_ID="<stable-uuid>"
 
 Stable unique identifier for this logical Atlantis installation, used to guard the etcd namespace. Generate it once and keep it stable across process restarts and database migrations.
 
-### `--etcd-embedded-config-file`
-
-```bash
-atlantis server --etcd-embedded-config-file="/etc/atlantis/etcd/embedded.json"
-# or
-ATLANTIS_ETCD_EMBEDDED_CONFIG_FILE="/etc/atlantis/etcd/embedded.json"
-```
-
-Path to the embedded etcd configuration file. Required when `--etcd-mode=embedded`.
-
-### `--etcd-embedded-identity-file`
-
-```bash
-atlantis server --etcd-embedded-identity-file="/etc/atlantis/etcd/identity.json"
-# or
-ATLANTIS_ETCD_EMBEDDED_IDENTITY_FILE="/etc/atlantis/etcd/identity.json"
-```
-
-Path to the embedded etcd identity manifest, retained outside the member PVC. Required in embedded mode.
-
-### `--etcd-embedded-join-endpoints`
-
-```bash
-atlantis server --etcd-embedded-join-endpoints="https://member-0:2379"
-# or
-ATLANTIS_ETCD_EMBEDDED_JOIN_ENDPOINTS="https://member-0:2379"
-```
-
-Comma-separated endpoints of the existing cluster, used only in `join-existing` lifecycle.
-
-### `--etcd-embedded-lifecycle`
-
-```bash
-atlantis server --etcd-embedded-lifecycle="restart"
-# or
-ATLANTIS_ETCD_EMBEDDED_LIFECYCLE="restart"
-```
-
-Mandatory embedded etcd lifecycle: `bootstrap`, `restart`, `join-existing`, or `restore`. Atlantis never derives it from directory emptiness.
-
-### `--etcd-embedded-membership-ticket-file`
-
-```bash
-atlantis server --etcd-embedded-membership-ticket-file="/etc/atlantis/etcd/ticket"
-# or
-ATLANTIS_ETCD_EMBEDDED_MEMBERSHIP_TICKET_FILE="/etc/atlantis/etcd/ticket"
-```
-
-Path to the one-time membership ticket file, used only in `join-existing` lifecycle.
-
-### `--etcd-embedded-restore-manifest-file`
-
-```bash
-atlantis server --etcd-embedded-restore-manifest-file="/etc/atlantis/etcd/restore.json"
-# or
-ATLANTIS_ETCD_EMBEDDED_RESTORE_MANIFEST_FILE="/etc/atlantis/etcd/restore.json"
-```
-
-Path to the pending recovery manifest, used only in `restore` lifecycle.
-
-### `--etcd-embedded-startup-purpose`
-
-```bash
-atlantis server --etcd-embedded-startup-purpose="serve"
-# or
-ATLANTIS_ETCD_EMBEDDED_STARTUP_PURPOSE="serve"
-```
-
-Embedded etcd startup purpose: `serve` (default) or `maintenance`. Maintenance forms and probes the cluster without serving Atlantis traffic.
-
-### `--etcd-embedded-voter-count`
-
-```bash
-atlantis server --etcd-embedded-voter-count=3
-# or
-ATLANTIS_ETCD_EMBEDDED_VOTER_COUNT=3
-```
-
-Desired final number of embedded etcd voting members. One of 3, 5, or 7. Defaults to 3.
-
 ### `--etcd-endpoints`
 
 ```bash
@@ -844,7 +764,7 @@ atlantis server --etcd-mode="external"
 ATLANTIS_ETCD_MODE="external"
 ```
 
-etcd runtime mode when `--locking-db-type=etcd`. Either `external` (connect to an existing etcd cluster) or `embedded` (run an embedded etcd voter).
+etcd runtime mode when `--locking-db-type=etcd`. Must be `external` (connect to an existing etcd cluster). Defaults to `external`. The embedded in-process etcd voter is planned for a later phase and is rejected at startup.
 
 ::: warning Active-active coverage
 `--locking-db-type=etcd` runs Atlantis active-active: every replica accepts webhooks, but each pull request has exactly one owner replica, and requests are forwarded to the owner so a given pull request's work never runs on two replicas at once. Owner-routed today: comment commands and autoplan (asynchronously, over the internal command transport), and positive-PR `/api/plan` and `/api/apply` (synchronously proxied to the owner). Pull-close cleanup uses a host-exact, close-generation unlock. Still **not owner-routed**: web lock deletion that affects owner-local plan state (the lock delete itself is a safe cluster-wide operation; only best-effort local plan cleanup is affected). Embedded mode validates the member identity manifest (including the on-disk cluster/member identity on `restart`) and the restore/join manifests before starting; atomic single-use consumption of a join membership ticket against the live cluster is still pending, so prefer `external` mode for production. Execution is fenced at whole-command granularity, and a command whose owner loses its lease mid-run is left fenced and marked uncertain (a "verify the actual state" comment) rather than assumed done; finer per-project-step barriers, in-flight subprocess reaping, and plan takeover are follow-ups. Drift detection is rejected in etcd mode because it has no distributed exclusion yet.

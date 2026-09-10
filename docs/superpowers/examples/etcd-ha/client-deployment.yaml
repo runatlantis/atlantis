@@ -1,10 +1,13 @@
-# Client replicas: the same Atlantis image in EXTERNAL etcd mode, connecting to
-# the member cluster. Independently autoscalable (0..N); they do not participate
-# in Raft and adding/removing them never changes etcd membership (design §342).
+# Atlantis in EXTERNAL etcd mode (phase 1). Every replica accepts ingress and
+# owner-routes internally; replicas are independently autoscalable (0..N) and do
+# not participate in Raft, so scaling them never changes etcd membership
+# (design §342). Point --etcd-endpoints at your own external etcd cluster
+# (bring-your-own, or a separate etcd StatefulSet); the embedded in-process
+# voter topology is deferred to phase 2.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: atlantis-client
+  name: atlantis
   labels:
     app.kubernetes.io/name: atlantis
     atlantis.runatlantis.io/role: client
@@ -22,14 +25,15 @@ spec:
     spec:
       containers:
         - name: atlantis
-          image: ghcr.io/runatlantis/atlantis:latest # same image as members
+          image: ghcr.io/runatlantis/atlantis:latest
           args:
             - server
             - --locking-db-type=etcd
             - --etcd-mode=external
             - --etcd-deployment-id=$(ETCD_DEPLOYMENT_ID)
             - --etcd-namespace=/atlantis
-            - --etcd-endpoints=https://atlantis-member-0.atlantis-peer:2379,https://atlantis-member-1.atlantis-peer:2379,https://atlantis-member-2.atlantis-peer:2379
+            # Replace with your external etcd client endpoints (all https, hostname-verified).
+            - --etcd-endpoints=https://etcd-0.etcd:2379,https://etcd-1.etcd:2379,https://etcd-2.etcd:2379
             - --etcd-ca-file=/etc/atlantis/tls/ca.pem
             - --etcd-cert-file=/etc/atlantis/tls/client.pem
             - --etcd-key-file=/etc/atlantis/tls/client-key.pem
