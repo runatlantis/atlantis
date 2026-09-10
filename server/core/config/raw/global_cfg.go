@@ -41,6 +41,7 @@ type Repo struct {
 	RepoLocking               *bool          `yaml:"repo_locking,omitempty" json:"repo_locking,omitempty"`
 	RepoLocks                 *RepoLocks     `yaml:"repo_locks,omitempty" json:"repo_locks,omitempty"`
 	PolicyCheck               *bool          `yaml:"policy_check,omitempty" json:"policy_check,omitempty"`
+	DraftPlanPolicyCheck      *bool          `yaml:"draft_plan_policy_check,omitempty" json:"draft_plan_policy_check,omitempty"`
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
 	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
 	SilencePRComments         []string       `yaml:"silence_pr_comments,omitempty" json:"silence_pr_comments,omitempty"`
@@ -394,6 +395,7 @@ OuterGlobalImportReqs:
 		RepoLocking:               r.RepoLocking,
 		RepoLocks:                 repoLocks,
 		PolicyCheck:               r.PolicyCheck,
+		DraftPlanPolicyCheck:      r.DraftPlanPolicyCheck,
 		CustomPolicyCheck:         r.CustomPolicyCheck,
 		AutoDiscover:              autoDiscover,
 		SilencePRComments:         r.SilencePRComments,
