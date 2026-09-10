@@ -812,6 +812,19 @@ func nonPRTargetRef(p models.PullRequest) string {
 // There is a new upstream update that we need, and we want to update to it
 // without deleting any existing plans
 func (w *FileWorkspace) mergeAgain(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// The base branch can change after the checkout was created, e.g. when a
+	// stacked pull request is retargeted because its original base branch was
+	// merged and deleted. forceClone clones with --single-branch, so the
+	// checkout only has a remote-tracking ref for the *old* base branch and the
+	// reset below would fail with "unknown revision or path not in the working
+	// tree". Re-clone instead, the same way Clone does when it notices the base
+	// branch changed. This discards existing plans, but that is unavoidable:
+	// the checkout cannot be updated to a base branch it never fetched.
+	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("base branch %q is not in the checkout, must reclone", c.pr.BaseBranch)
+		return w.forceClone(logger, c)
+	}
+
 	// Reset branch as if it was cloned again
 	if err := w.wrappedGit(logger, c, "reset", "--hard", fmt.Sprintf("refs/remotes/origin/%s", c.pr.BaseBranch)); err != nil {
 		return err
