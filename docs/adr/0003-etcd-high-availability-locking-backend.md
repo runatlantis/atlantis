@@ -27,10 +27,9 @@ Supersedes nothing. Relates to
 Companion documents:
 
 - Proposal / RFC: [`../proposals/2026-09-etcd-ha-locking.md`](../proposals/2026-09-etcd-ha-locking.md)
-- The detailed design, implementation plan, and reference deployment manifests
-  are provided in the implementation pull request (under `docs/superpowers/`),
-  per the ADR process: this record captures the decision; implementation detail
-  lives with the code.
+- The detailed design and implementation live with the code in the
+  implementation pull request, per the ADR process: this record captures the
+  decision; implementation detail lives with the code.
 
 ## Context
 

@@ -4,9 +4,8 @@
 - **Date:** 2026-09-09
 - **Authors:** Atlantis maintainers
 - **Decision record:** [ADR 0003](../adr/0003-etcd-high-availability-locking-backend.md)
-- **Detailed design, implementation plan, and reference deployment manifests:**
-  provided in the implementation pull request under `docs/superpowers/`
-  (design spec, implementation/status checklist, and `examples/etcd-ha/`).
+- **Detailed design and implementation:** provided with the code in the
+  implementation pull request.
 
 ## 1. Summary
 
