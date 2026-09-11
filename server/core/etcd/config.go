@@ -5,7 +5,7 @@
 // Package etcd implements an opt-in etcd locking and coordination backend for
 // Atlantis. This phase supports the external runtime mode (connecting to an
 // existing etcd cluster); the embedded in-process voter is deferred to a later
-// phase. See docs/superpowers/specs/2026-09-07-dual-mode-embedded-etcd-ha-design.md
+// phase. See ADR 0003 (docs/adr/0003-etcd-high-availability-locking-backend.md)
 // for the architecture this package implements.
 //
 // This file defines the configuration contract (design §"Configuration
