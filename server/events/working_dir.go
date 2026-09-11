@@ -222,7 +222,19 @@ func (w *FileWorkspace) MergeAgain(
 	}
 	c := wrappedGitContext{cloneDir, headRepo, p}
 
-	if !w.recheckDiverged(logger, p, headRepo, cloneDir) {
+	// A base branch the checkout does not have means the pull request was
+	// retargeted onto a branch that was never fetched, e.g. a user changed the
+	// target branch by hand. recheckDiverged compares the working tree against
+	// its *old* base branch, so when that branch still exists and has not moved
+	// it reports no divergence and we would leave the checkout merged into the
+	// wrong base. Detect the missing ref up front so that case refreshes too.
+	// git show-ref only reads, so the read lock is enough here; mergeAgain
+	// repeats the check under the write lock before acting on it.
+	gitReadUnlockFn := w.gitReadLock(cloneDir)
+	baseRefMissing := !w.remoteHasBranch(logger, c, p.BaseBranch)
+	gitReadUnlockFn()
+
+	if !baseRefMissing && !w.recheckDiverged(logger, p, headRepo, cloneDir) {
 		return false, nil
 	}
 
@@ -820,6 +832,10 @@ func (w *FileWorkspace) mergeAgain(logger logging.SimpleLogging, c wrappedGitCon
 	// tree". Re-clone instead, the same way Clone does when it notices the base
 	// branch changed. This discards existing plans, but that is unavoidable:
 	// the checkout cannot be updated to a base branch it never fetched.
+	//
+	// MergeAgain performs this check too, to decide whether to refresh at all.
+	// It is repeated here under the write lock so a concurrent re-clone between
+	// the two cannot leave us resetting to a ref that is missing.
 	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
 		logger.Info("base branch %q is not in the checkout, must reclone", c.pr.BaseBranch)
 		return w.forceClone(logger, c)
