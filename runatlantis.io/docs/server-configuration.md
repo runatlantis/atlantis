@@ -767,7 +767,7 @@ ATLANTIS_ETCD_MODE="external"
 etcd runtime mode when `--locking-db-type=etcd`. Must be `external` (connect to an existing etcd cluster). Defaults to `external`. The embedded in-process etcd voter is planned for a later phase and is rejected at startup.
 
 ::: warning Active-active coverage
-`--locking-db-type=etcd` runs Atlantis active-active: every replica accepts webhooks, but each pull request has exactly one owner replica, and requests are forwarded to the owner so a given pull request's work never runs on two replicas at once. Owner-routed today: comment commands and autoplan (asynchronously, over the internal command transport), and positive-PR `/api/plan` and `/api/apply` (synchronously proxied to the owner). Pull-close cleanup uses a host-exact, close-generation unlock. Still **not owner-routed**: web lock deletion that affects owner-local plan state (the lock delete itself is a safe cluster-wide operation; only best-effort local plan cleanup is affected). Embedded mode validates the member identity manifest (including the on-disk cluster/member identity on `restart`) and the restore/join manifests before starting; atomic single-use consumption of a join membership ticket against the live cluster is still pending, so prefer `external` mode for production. Execution is fenced at whole-command granularity, and a command whose owner loses its lease mid-run is left fenced and marked uncertain (a "verify the actual state" comment) rather than assumed done; finer per-project-step barriers, in-flight subprocess reaping, and plan takeover are follow-ups. Drift detection is rejected in etcd mode because it has no distributed exclusion yet.
+`--locking-db-type=etcd` runs Atlantis active-active: every replica accepts webhooks, but each pull request has exactly one owner replica, and requests are forwarded to the owner so a given pull request's work never runs on two replicas at once. Owner-routed today: comment commands and autoplan (asynchronously, over the internal command transport), and positive-PR `/api/plan` and `/api/apply` (synchronously proxied to the owner). Pull-close cleanup uses a host-exact, close-generation unlock. Still **not owner-routed**: web lock deletion that affects owner-local plan state (the lock delete itself is a safe cluster-wide operation; only best-effort local plan cleanup is affected). Execution is fenced at whole-command granularity, and a command whose owner loses its lease mid-run is left fenced and marked uncertain (a "verify the actual state" comment) rather than assumed done; finer per-project-step barriers, in-flight subprocess reaping, and plan takeover are follow-ups. Drift detection is rejected in etcd mode because it has no distributed exclusion yet.
 :::
 
 ### `--etcd-namespace`
@@ -818,7 +818,7 @@ atlantis server --etcd-startup-timeout="5m"
 ATLANTIS_ETCD_STARTUP_TIMEOUT="5m"
 ```
 
-Timeout bounding initial etcd connectivity and embedded quorum formation. Defaults to `5m`. Deployment startup probes must allow at least the same interval.
+Timeout bounding initial etcd connectivity. Defaults to `5m`. Deployment startup probes must allow at least the same interval.
 
 ### `--etcd-username`
 
