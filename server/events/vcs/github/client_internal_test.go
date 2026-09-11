@@ -68,7 +68,7 @@ func TestNewSecondaryRateLimitHTTPClientDoesNotApplyPrimaryLimits(t *testing.T) 
 		Transport: baseTransport,
 		Timeout:   time.Minute,
 	}
-	client := newSecondaryRateLimitHTTPClient(baseClient)
+	client := newSecondaryRateLimitHTTPClient(baseClient, logging.NewNoopLogger(t))
 
 	restReq, err := http.NewRequest(http.MethodGet, "https://example.com/api/v3/repos/example/repo", nil)
 	Ok(t, err)
