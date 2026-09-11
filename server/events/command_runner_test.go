@@ -445,6 +445,20 @@ func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
+func TestRunCommentCommand_ClosedPRDisabled_SilenceEnabled(t *testing.T) {
+	t.Log("if a command is run on a closed pull request and we are silencing errors do not comment with error")
+	vcsClient := setup(t)
+	ch.SilenceClosedPRErrors = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+	vcsClient.VerifyWasCalled(Never()).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
 func TestRunCommentCommandPlan_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if a plan command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)

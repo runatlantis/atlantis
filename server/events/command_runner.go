@@ -129,6 +129,10 @@ type DefaultCommandRunner struct {
 	// this in our error message back to the user on a forked PR so they know
 	// how to disable error comment
 	SilenceForkPRErrorsFlag string
+	// SilenceClosedPRErrors controls whether to post the "commands can't be run
+	// on closed pull requests" error comment. Useful for multi-server setups
+	// where several Atlantis servers watch one repo and would each comment.
+	SilenceClosedPRErrors bool
 	// SilenceVCSStatusNoProjects is whether to set commit status if no projects are found
 	SilenceVCSStatusNoProjects     bool
 	CommentCommandRunnerByCmd      map[command.Name]CommentCommandRunner `validate:"required"`
@@ -697,7 +701,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 
 	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
-		if shouldComment {
+		if shouldComment && !c.SilenceClosedPRErrors {
 			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
 				ctx.Log.Err("unable to comment: %s", err)
 			}
