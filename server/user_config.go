@@ -88,6 +88,7 @@ type UserConfig struct {
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
+	LockAllProjectsBeforePlan       bool   `mapstructure:"lock-all-projects-before-plan"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
 	LogLevel                        string `mapstructure:"log-level"`
 	MarkdownTemplateOverridesDir    string `mapstructure:"markdown-template-overrides-dir"`
