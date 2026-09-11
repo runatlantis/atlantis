@@ -6,6 +6,21 @@ Date: 2026-09-09
 
 Proposed
 
+**Delivered in phases.** This decision is accepted as the target architecture, but
+ships incrementally to reduce risk:
+
+- **Phase 1 — external etcd only (current).** Atlantis connects to an
+  operator-provided external etcd cluster (`--etcd-mode=external`). The full
+  active-active coordination stack — leased PR ownership, owner-routing, execution
+  fencing, migration, and recovery — is delivered against that external cluster.
+- **Phase 2 — embedded etcd (future).** The embedded in-process etcd voter, the
+  member StatefulSet topology, and the embedded lifecycle/membership/restore
+  machinery (decisions 7 and 9 below) are deferred. Until phase 2 lands,
+  `--etcd-mode=embedded` is rejected at configuration validation.
+
+The remaining decisions below hold for both phases; the embedded-specific parts
+apply when phase 2 is delivered.
+
 Supersedes nothing. Relates to
 [ADR 0002 (API Enhancement and Drift Detection)](0002-api-enhancement-drift-detection.md).
 
@@ -56,12 +71,15 @@ decisions are locked:
    behavior are unchanged. When etcd is selected and unavailable, Atlantis fails
    closed rather than falling back to another backend.
 
-2. **Two runtime modes, one client path.** `--etcd-mode=external` connects to an
-   existing etcd cluster; `--etcd-mode=embedded` runs one embedded etcd voter
-   inside the Atlantis process. Both construct the same long-lived `clientv3`
-   client and use the same database, ownership, routing, and fencing code. A
-   `Backend` owns the client (and, in embedded mode, the server); the database is
-   its designated idempotent close delegate.
+2. **Two runtime modes, one client path — delivered in phases.**
+   `--etcd-mode=external` connects to an existing etcd cluster; `--etcd-mode=embedded`
+   runs one embedded etcd voter inside the Atlantis process. Both construct the same
+   long-lived `clientv3` client and use the same database, ownership, routing, and
+   fencing code. A `Backend` owns the client (and, in embedded mode, the server); the
+   database is its designated idempotent close delegate. **Phase 1 ships external mode
+   only; embedded mode (the in-process server path) is deferred to phase 2 and rejected
+   at validation until then.** The single-client-path design keeps embedded an additive
+   change: no ownership, routing, or fencing code differs between the two modes.
 
 3. **Active-active with fenced PR ownership — no leader role.** Every replica
    accepts ingress and can execute Terraform. For each pull request, exactly one
@@ -92,8 +110,8 @@ decisions are locked:
    command logs remain in the existing `PlanStore`. etcd stores only locks,
    statuses, ownership, admission records, and execution barriers.
 
-7. **Fixed voting membership, independently scalable compute.** Production
-   embedded deployments run a fixed StatefulSet of 3/5/7 **member replicas**
+7. **Fixed voting membership, independently scalable compute.** *(Phase 2 — embedded.)*
+   Production embedded deployments run a fixed StatefulSet of 3/5/7 **member replicas**
    (Atlantis + one etcd voter each, stable identity + PVC) plus zero-or-more
    independently autoscaled **client replicas** (Atlantis in external mode).
    Voter count is a quorum setting, never an HPA target. Membership changes are a
@@ -109,7 +127,8 @@ decisions are locked:
    restore, a **recovery-quarantine** marker rejects every executable command
    until an operator reconciles and explicitly clears it.
 
-9. **Explicit embedded lifecycle; unsafe options rejected.** The embedded server
+9. **Explicit embedded lifecycle; unsafe options rejected.** *(Phase 2 — embedded.)*
+   The embedded server
    requires an explicit lifecycle (`bootstrap|restart|join-existing|restore`) and
    startup purpose (`serve|maintenance`); it never derives lifecycle from
    directory emptiness or reachability. Unsafe native etcd options
@@ -166,6 +185,11 @@ alternatives analysis.
 
 ### Neutral / scope boundaries
 
+- **Embedded etcd (decisions 7 and 9) is a phase-2 deliverable.** Phase 1 supports
+  external etcd only and rejects `--etcd-mode=embedded` at validation; the embedded
+  runtime, member StatefulSet topology, and lifecycle/membership/restore tooling land
+  in a later phase. The dependency surface is correspondingly smaller in phase 1: the
+  shipped binary does not link the embedded etcd server.
 - Some capabilities are deferred behind the same fail-closed contract: drift
   detection is rejected in combination with active-active etcd until it gets a
   distributed exclusion design; per-project-step barriers, in-flight subprocess

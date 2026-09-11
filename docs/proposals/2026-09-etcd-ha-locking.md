@@ -15,6 +15,11 @@ fault-tolerant, active-active service without weakening its single-writer safety
 guarantees. etcd can be embedded in the Atlantis binary or connected to as an
 external cluster. BoltDB remains the default and is untouched.
 
+**Delivered in phases.** Phase 1 (current) ships **external etcd only** — the full
+active-active coordination stack against an operator-provided external cluster;
+`--etcd-mode=embedded` is rejected until phase 2. Phase 2 (future) adds the embedded
+in-process voter and its lifecycle/topology tooling.
+
 ## 2. Motivation
 
 Atlantis today is effectively a singleton for the pull requests it manages:
@@ -113,12 +118,14 @@ decisions; the shape is:
 
 ## 7. Rollout and migration
 
-1. Ship external mode first (validates schema/consistency without embedded
-   lifecycle risk). Single-replica external etcd is usable as a drop-in backend.
-2. Add ownership/transport, execution fencing, and complete entry-point coverage
-   (a route-inventory is the production release gate).
-3. Add the embedded runtime, then migration/operations and Helm/deployment
-   integration.
+1. **Phase 1:** Ship external mode first (validates schema/consistency without
+   embedded lifecycle risk). Single-replica external etcd is usable as a drop-in
+   backend.
+2. **Phase 1:** Add ownership/transport, execution fencing, and complete entry-point
+   coverage (a route-inventory is the production release gate).
+3. **Phase 2 (future):** Add the embedded runtime, then migration/operations and
+   Helm/deployment integration. `--etcd-mode=embedded` is rejected at validation
+   until this phase lands.
 
 **Cutover** (per the design's runbook): stop executable ingress and drain; back up
 the source; export locks/statuses/global locks; form the target cluster in
