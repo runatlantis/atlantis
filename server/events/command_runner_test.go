@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -82,6 +83,7 @@ type TestConfig struct {
 	applyLockCheckerErr        error
 	workingDirLocker           events.WorkingDirLocker
 	livePullHeadFetcher        events.LivePullHeadFetcher
+	projectApplyCommandBuilder events.ProjectApplyCommandBuilder
 }
 
 type configuredPreWorkflowHooksCommandRunner struct {
@@ -201,12 +203,16 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.PendingApplyStatus,
 	)
 
+	projectApplyCommandBuilder := testConfig.projectApplyCommandBuilder
+	if projectApplyCommandBuilder == nil {
+		projectApplyCommandBuilder = projectCommandBuilder
+	}
 	applyCommandRunner = events.NewApplyCommandRunner(
 		vcsClient,
 		false,
 		applyLockChecker,
 		commitUpdater,
-		projectCommandBuilder,
+		projectApplyCommandBuilder,
 		projectCommandRunner,
 		cancellationTracker,
 		autoMerger,
@@ -1225,6 +1231,116 @@ func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t
 	Equals(t, 1, configuredPreHooks.calls)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Eq(cmd))
 	projectCommandRunner.VerifyWasCalledOnce().Plan(projectCtx)
+}
+
+func TestRunCommentCommand_NamedApplyUsesPreHookGeneratedConfig(t *testing.T) {
+	const repoConfigFile = "atlantis-a.yaml"
+	const repoConfigTemplate = `
+version: 3
+projects:
+- name: %s
+  dir: .
+`
+	cases := []struct {
+		Description    string
+		InitialProject string
+		HookProject    string
+		ExpSkipped     bool
+	}{
+		{
+			Description:    "generated config excludes target and skips post hooks",
+			InitialProject: "target",
+			HookProject:    "other",
+			ExpSkipped:     true,
+		},
+		{
+			Description:    "generated config includes target and preserves lock error",
+			InitialProject: "other",
+			HookProject:    "target",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			repoDir := DirStructure(t, map[string]any{
+				repoConfigFile: fmt.Sprintf(repoConfigTemplate, c.InitialProject),
+			})
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+			locker := events.NewDefaultWorkingDirLocker()
+			builder := &countingApplyCommandBuilder{
+				ProjectApplyCommandBuilder: &events.DefaultProjectCommandBuilder{
+					ParserValidator:  &config.ParserValidator{},
+					WorkingDir:       workingDir,
+					WorkingDirLocker: locker,
+					GlobalCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+						RepoConfigFile: repoConfigFile,
+					}),
+					SilenceNoProjects: true,
+				},
+			}
+			database := newTestBoltDB(t)
+			modelPull := models.PullRequest{
+				BaseRepo:   testdata.GithubRepo,
+				State:      models.OpenPullState,
+				Num:        testdata.Pull.Num,
+				HeadCommit: "abc123",
+				BaseBranch: "main",
+			}
+			_, err := database.UpdatePullWithResults(modelPull, nil)
+			Ok(t, err)
+			vcsClient := setup(t, func(tc *TestConfig) {
+				tc.SilenceNoProjects = true
+				tc.database = database
+				tc.workingDirLocker = locker
+				tc.projectApplyCommandBuilder = builder
+			})
+			unlock, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Apply, events.WorkingDirLockMetadataForPull(modelPull))
+			Ok(t, err)
+			defer unlock()
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "target"}
+			var hookCtx *command.Context
+			When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Eq(cmd))).Then(func(args []Param) ReturnValues {
+				hookCtx = args[0].(*command.Context)
+				Ok(t, os.WriteFile(filepath.Join(repoDir, repoConfigFile), []byte(fmt.Sprintf(repoConfigTemplate, c.HookProject)), 0600))
+				return ReturnValues{nil}
+			})
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, modelPull.Num, cmd)
+
+			preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Eq(cmd))
+			Assert(t, hookCtx != nil, "expected pre hooks to capture the command context")
+			Equals(t, c.ExpSkipped, hookCtx.CommandSkipped)
+			Equals(t, !c.ExpSkipped, hookCtx.CommandHasErrors)
+			Equals(t, 0, builder.buildCalls)
+			Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, command.Apply), "expected existing apply lock to remain held")
+			workingDir.VerifyWasCalled(Never()).Clone(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+			projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+			commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+
+			if c.ExpSkipped {
+				postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+				vcsClient.VerifyWasCalled(Never()).CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+				return
+			}
+
+			postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPostHooks(Eq(hookCtx), Eq(cmd))
+			commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+				Any[logging.SimpleLogging](), Eq(modelPull.BaseRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+			_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+			Assert(t, strings.Contains(comment, "currently locked by \"apply\""), "got comment: %s", comment)
+		})
+	}
 }
 
 func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExplicitConfig(t *testing.T) {
