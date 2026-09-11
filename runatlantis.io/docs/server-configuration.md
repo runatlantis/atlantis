@@ -1151,6 +1151,30 @@ command_titles:
 For complete markdown wording customization, keep using
 `--markdown-template-overrides-dir`.
 
+### `--lock-all-projects-before-plan`
+
+```bash
+atlantis server --lock-all-projects-before-plan
+# or
+ATLANTIS_LOCK_ALL_PROJECTS_BEFORE_PLAN=true
+```
+
+Acquire the Atlantis lock for every project in a plan run *before* running any
+plan, instead of locking each project immediately before it is planned. If any
+project cannot be locked — for example because another pull request holds its
+lock — no plans are run and the locks this run already acquired are released
+again.
+
+This helps on busy repositories with large pull requests, for example a provider
+version bump touching every project, where a competing pull request can otherwise
+take a lock partway through a long run and invalidate the plans that already
+completed.
+
+Projects configured with `repo_locks: {mode: on_apply}` or `mode: disabled` are
+not pre-locked. Projects that end up producing no plan have their locks released
+when the run finishes. See [Locking](locking.md#locking-all-projects-before-planning)
+for details.
+
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
