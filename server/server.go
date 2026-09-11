@@ -906,6 +906,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.DiscardApprovalOnPlanFlag,
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
+		projectLocker,
+		userConfig.LockAllProjectsBeforePlan,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
