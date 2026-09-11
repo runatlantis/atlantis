@@ -6,55 +6,60 @@ package etcd_test
 
 import (
 	"context"
-	"fmt"
-	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/etcd"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/server/v3/embed"
 )
 
-// startEmbeddedEtcd starts a single-node in-process etcd on loopback purely as a
-// test fixture and returns a probed external backend pointed at it. The embed
-// package is a test-only dependency here; the shipped binary connects to an
-// external etcd cluster and does not link it.
-func startEmbeddedEtcd(t *testing.T) etcd.Backend {
+// testNamespace is the fixed key namespace the integration suite uses. Every
+// helper wipes it before a test runs, so a shared external etcd behaves like a
+// dedicated one (tests in this package run sequentially, no t.Parallel).
+const testNamespace = "/atlantis"
+
+// testEtcdEndpointsEnv names the environment variable that points the etcd
+// integration suite at a running external etcd cluster.
+const testEtcdEndpointsEnv = "ATLANTIS_ETCD_TEST_ENDPOINTS"
+
+// testEndpoints returns the configured external etcd endpoints, or skips the test
+// when none are set. The suite runs against a real (external) etcd — the shipped
+// binary connects to one too, and keeping the tests client-only avoids linking
+// the embedded etcd server. Provide a comma-separated list, e.g.
+// ATLANTIS_ETCD_TEST_ENDPOINTS=http://127.0.0.1:2379. CI runs an etcd service;
+// locally, `docker run --rm -p 2379:2379 quay.io/coreos/etcd:v3.6.5 \
+// /usr/local/bin/etcd --advertise-client-urls http://0.0.0.0:2379 \
+// --listen-client-urls http://0.0.0.0:2379` works.
+func testEndpoints(t *testing.T) []string {
 	t.Helper()
-	cfg := embed.NewConfig()
-	cfg.Dir = t.TempDir()
-	cfg.LogLevel = "error"
-	clientURL := mustURL(t, "http://127.0.0.1:0")
-	peerURL := mustURL(t, "http://127.0.0.1:0")
-	cfg.ListenClientUrls = []url.URL{clientURL}
-	cfg.AdvertiseClientUrls = []url.URL{clientURL}
-	cfg.ListenPeerUrls = []url.URL{peerURL}
-	cfg.AdvertisePeerUrls = []url.URL{peerURL}
-	cfg.InitialCluster = fmt.Sprintf("%s=%s", cfg.Name, peerURL.String())
-
-	e, err := embed.StartEtcd(cfg)
-	if err != nil {
-		t.Fatalf("starting embedded etcd: %v", err)
+	raw := strings.TrimSpace(os.Getenv(testEtcdEndpointsEnv))
+	if raw == "" {
+		t.Skipf("%s not set; skipping etcd integration test (point it at a running etcd, e.g. http://127.0.0.1:2379)", testEtcdEndpointsEnv)
 	}
-	select {
-	case <-e.Server.ReadyNotify():
-	case <-time.After(30 * time.Second):
-		e.Close()
-		t.Fatal("embedded etcd did not become ready")
+	var eps []string
+	for _, p := range strings.Split(raw, ",") {
+		if s := strings.TrimSpace(p); s != "" {
+			eps = append(eps, s)
+		}
 	}
-	t.Cleanup(e.Close)
+	return eps
+}
 
-	// The listener chose a real port; read it back for the client endpoint.
-	endpoint := e.Clients[0].Addr().String()
-	cfgEtcd := &etcd.Config{
+// newTestBackend returns a probed external backend against the configured etcd,
+// with the test namespace wiped clean so the test sees a fresh keyspace. It skips
+// the test when no external etcd is configured (see testEndpoints).
+func newTestBackend(t *testing.T) etcd.Backend {
+	t.Helper()
+	cfg := &etcd.Config{
 		Mode:             etcd.ModeExternal,
 		DeploymentID:     "test",
-		Namespace:        "/atlantis",
+		Namespace:        testNamespace,
 		RequestTimeout:   5 * time.Second,
 		StartupTimeout:   30 * time.Second,
 		AllowInsecureDev: true,
-		Endpoints:        []string{"http://" + endpoint},
+		Endpoints:        testEndpoints(t),
 		Ownership: etcd.OwnershipConfig{
 			ReplicaID:                 "test-replica",
 			ReplicaAdvertiseURL:       "http://127.0.0.1:4141",
@@ -62,34 +67,24 @@ func startEmbeddedEtcd(t *testing.T) etcd.Backend {
 			TTL:                       30 * time.Second,
 		},
 	}
-	backend, err := etcd.NewExternal(context.Background(), cfgEtcd)
+	backend, err := etcd.NewExternal(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("constructing external backend: %v", err)
 	}
+	// Register Close first so it runs last (t.Cleanup is LIFO); wipe before the
+	// test for a clean slate — the client must still be open when it runs.
 	t.Cleanup(func() { _ = backend.Close() })
+	wipeNamespace(t, backend)
 	return backend
 }
 
-func mustURL(t *testing.T, raw string) url.URL {
+// wipeNamespace deletes every key under the test namespace so each test starts
+// from an empty keyspace on the shared external cluster.
+func wipeNamespace(t *testing.T, backend etcd.Backend) {
 	t.Helper()
-	u, err := url.Parse(raw)
-	if err != nil {
-		t.Fatalf("parsing url %q: %v", raw, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := backend.Client().Delete(ctx, testNamespace, clientv3.WithPrefix()); err != nil {
+		t.Fatalf("wiping test namespace %q: %v", testNamespace, err)
 	}
-	return *u
-}
-
-// newRawClient returns a second independent client against the same cluster, to
-// simulate contention from a different Atlantis process.
-func newRawClient(t *testing.T, backend etcd.Backend) *clientv3.Client {
-	t.Helper()
-	// Reuse the backend's endpoints via a fresh client so operations race as
-	// they would across processes.
-	eps := backend.Client().Endpoints()
-	c, err := clientv3.New(clientv3.Config{Endpoints: eps, DialTimeout: 5 * time.Second})
-	if err != nil {
-		t.Fatalf("second client: %v", err)
-	}
-	t.Cleanup(func() { _ = c.Close() })
-	return c
 }

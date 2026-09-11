@@ -41,7 +41,7 @@ func runtimeConfig(t *testing.T, backend etcd.Backend, replicaID, advertiseURL s
 // TestRuntime_AssemblesAndServesDatabase proves NewRuntime builds a working
 // db.Database over the full stack and becomes ready.
 func TestRuntime_AssemblesAndServesDatabase(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
@@ -64,7 +64,7 @@ func TestRuntime_AssemblesAndServesDatabase(t *testing.T) {
 // TestRuntime_EndToEndDispatch wires two runtimes over real HTTP and proves a
 // command routed at a non-owner forwards to and executes on the owner.
 func TestRuntime_EndToEndDispatch(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 
 	// Two runtimes share the same cluster; each mounts its internal handler.
@@ -101,7 +101,7 @@ func TestRuntime_EndToEndDispatch(t *testing.T) {
 // TestRuntime_MigratedNamespaceReady proves a runtime validates a namespace that
 // was populated by the offline migrator and serves it.
 func TestRuntime_MigratedNamespaceReady(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 

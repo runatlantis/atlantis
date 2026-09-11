@@ -17,7 +17,7 @@ import (
 // imports records, completes atomically with schema+deployment, and that normal
 // namespace validation then succeeds against the migrated namespace (design §895).
 func TestMigration_ImportCompleteThenStartupValidates(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -48,7 +48,7 @@ func TestMigration_ImportCompleteThenStartupValidates(t *testing.T) {
 // TestMigration_CountMismatchRefusesComplete proves completion refuses when the
 // imported count does not match the manifest (design §895 step 8).
 func TestMigration_CountMismatchRefusesComplete(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -64,7 +64,7 @@ func TestMigration_CountMismatchRefusesComplete(t *testing.T) {
 
 // TestMigration_NonEmptyTargetRefused proves migration refuses a non-empty target.
 func TestMigration_NonEmptyTargetRefused(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -80,7 +80,7 @@ func TestMigration_NonEmptyTargetRefused(t *testing.T) {
 // checksum does not match the pinned expected value even if the count matches
 // (design §897 step 8).
 func TestMigration_ChecksumMismatchRefusesComplete(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -100,7 +100,7 @@ func TestMigration_ChecksumMismatchRefusesComplete(t *testing.T) {
 // non-empty namespace) serialize migrations, closing the concurrent
 // empty-namespace TOCTOU (design §895).
 func TestMigration_SecondMigrationRefused(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -116,7 +116,7 @@ func TestMigration_SecondMigrationRefused(t *testing.T) {
 // TestQuarantine_SetBlocksThenClear proves quarantine is set once, reported
 // active, and cleared only with the exact recovery ID (design §864).
 func TestQuarantine_SetBlocksThenClear(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	q := etcd.NewQuarantineStore(backend, keys)
 	ctx := context.Background()

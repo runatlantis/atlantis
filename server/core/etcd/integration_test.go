@@ -20,7 +20,7 @@ import (
 )
 
 func newDB(t *testing.T) *etcd.EtcdDatabase {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	return etcd.NewDatabase(backend, "/atlantis", 5*time.Second)
 }
 

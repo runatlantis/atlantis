@@ -15,7 +15,7 @@ import (
 
 func barrierFixture(t *testing.T) (*etcd.ExecutionBarrierStore, *etcd.OwnershipStore, etcd.Claim) {
 	t.Helper()
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	epoch, err := etcd.InitOrValidateNamespace(context.Background(), backend.Client().KV, keys, "dep-1")
 	Ok(t, err)

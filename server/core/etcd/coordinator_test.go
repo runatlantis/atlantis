@@ -20,7 +20,7 @@ import (
 // gate rejects execution while recovery quarantine is active and permits it
 // otherwise (design §788).
 func TestCoordinator_CheckAdmissible_Quarantine(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)
@@ -41,7 +41,7 @@ func TestCoordinator_CheckAdmissible_Quarantine(t *testing.T) {
 // advances the admission record to uncertain (terminal) rather than stranding it
 // in scheduled, so a later redelivery is not silently short-circuited.
 func TestCoordinator_ExecuteUnderQuarantineMarksUncertain(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)
@@ -150,7 +150,7 @@ func (e *coordExecutor) outcomeFor(d string) etcd.ExecuteOutcome {
 // TestCoordinator_ExecuteRunsAndCompletes proves that a locally-admitted command
 // is fenced, run exactly once, and its admission record reaches a terminal state.
 func TestCoordinator_ExecuteRunsAndCompletes(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)
@@ -190,7 +190,7 @@ func TestCoordinator_ExecuteRunsAndCompletes(t *testing.T) {
 // TestCoordinator_ExecuteRecordsFailure proves a run returning false lands the
 // admission record in the failed terminal state.
 func TestCoordinator_ExecuteRecordsFailure(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)
@@ -226,7 +226,7 @@ func TestCoordinator_ExecuteRecordsFailure(t *testing.T) {
 // barrier from an earlier owner generation blocks a new generation's execution:
 // the run function is never invoked and the outcome is ExecuteBlocked.
 func TestCoordinator_ExecuteBlockedByOlderGeneration(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 	epoch, err := etcd.InitOrValidateNamespace(ctx, backend.Client().KV, keys, "dep-1")
@@ -269,7 +269,7 @@ func TestCoordinator_ExecuteBlockedByOlderGeneration(t *testing.T) {
 // (blocking a new owner generation) and marks the command uncertain rather than
 // clearing the fence.
 func TestCoordinator_LeaseLostDuringRunFencesUncertain(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 	epoch, err := etcd.InitOrValidateNamespace(ctx, backend.Client().KV, keys, "dep-1")

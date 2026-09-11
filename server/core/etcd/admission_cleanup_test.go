@@ -17,7 +17,7 @@ import (
 // removes terminal records past the window, keeps terminal records within the
 // window, and never removes a non-terminal record.
 func TestAdmissionCleanup_DeletesOnlyExpiredTerminal(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 	epoch, err := etcd.InitOrValidateNamespace(ctx, backend.Client().KV, keys, "dep-1")

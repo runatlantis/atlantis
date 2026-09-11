@@ -18,7 +18,7 @@ import (
 // session leases and instance IDs) against the same cluster.
 func ownershipFixture(t *testing.T) (*etcd.OwnershipStore, *etcd.OwnershipStore) {
 	t.Helper()
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	epoch, err := etcd.InitOrValidateNamespace(context.Background(), backend.Client().KV, keys, "dep-1")
 	Ok(t, err)

@@ -13,7 +13,7 @@ import (
 )
 
 func TestInitOrValidateNamespace_FreshThenValidate(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -29,7 +29,7 @@ func TestInitOrValidateNamespace_FreshThenValidate(t *testing.T) {
 }
 
 func TestInitOrValidateNamespace_WrongDeploymentID(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
@@ -43,7 +43,7 @@ func TestInitOrValidateNamespace_WrongDeploymentID(t *testing.T) {
 // TestInitOrValidateNamespace_DataWithoutSchema proves startup refuses a
 // namespace holding data but no schema marker (design §635).
 func TestInitOrValidateNamespace_DataWithoutSchema(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	kv := backend.Client().KV
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()

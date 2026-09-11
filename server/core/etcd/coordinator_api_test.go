@@ -20,7 +20,7 @@ import (
 // execution on the owner is fenced by an execution barrier and released cleanly,
 // so a subsequent fence for the same pull is permitted again (design §534).
 func TestCoordinator_BeginAPIFence_FencesAndReleases(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)
@@ -47,7 +47,7 @@ func TestCoordinator_BeginAPIFence_FencesAndReleases(t *testing.T) {
 // fenced: it refuses to run while an unresolved barrier from an older owner
 // generation exists for the pull (design §558).
 func TestCoordinator_BeginAPIFence_BlockedByOlderGeneration(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 	epoch, err := etcd.InitOrValidateNamespace(ctx, backend.Client().KV, keys, "dep-1")
@@ -83,7 +83,7 @@ func TestCoordinator_BeginAPIFence_BlockedByOlderGeneration(t *testing.T) {
 // TestCoordinator_BeginAPIFence_OwnershipMoved proves the API fence fails closed
 // when this replica no longer owns the pull (design §490 step 4).
 func TestCoordinator_BeginAPIFence_OwnershipMoved(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	ctx := context.Background()
 	epoch, err := etcd.InitOrValidateNamespace(ctx, backend.Client().KV, keys, "dep-1")
@@ -109,7 +109,7 @@ func TestCoordinator_BeginAPIFence_OwnershipMoved(t *testing.T) {
 // TestCoordinator_ResolveOwner proves the first replica to resolve a pull claims
 // it (local), and a second replica resolves to the first's advertise URL.
 func TestCoordinator_ResolveOwner(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 
 	rtA, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "https://replica-a:4142"))
@@ -137,7 +137,7 @@ func TestCoordinator_ResolveOwner(t *testing.T) {
 // advertiseURL+path with the API token and loop-guard header, and returns the
 // owner's status and body.
 func TestCoordinator_ForwardAPIRequest(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 
 	var gotToken, gotProxied, gotPath, gotBody string
@@ -170,7 +170,7 @@ func TestCoordinator_ForwardAPIRequest(t *testing.T) {
 // TestCoordinator_ForwardAPIRequest_AllowlistRejects proves a non-allowlisted
 // destination host is refused before dialing.
 func TestCoordinator_ForwardAPIRequest_AllowlistRejects(t *testing.T) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	ctx := context.Background()
 	rt, err := etcd.NewRuntime(ctx, runtimeConfig(t, backend, "A", "http://127.0.0.1:4142"))
 	Ok(t, err)

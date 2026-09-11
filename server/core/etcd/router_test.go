@@ -90,7 +90,7 @@ func newNode(t *testing.T, backend etcd.Backend, keys etcd.Keyspace, epoch, id s
 }
 
 func routerFixture(t *testing.T) (*node, *node) {
-	backend := startEmbeddedEtcd(t)
+	backend := newTestBackend(t)
 	keys := etcd.NewKeyspace("/atlantis")
 	epoch, err := etcd.InitOrValidateNamespace(context.Background(), backend.Client().KV, keys, "dep-1")
 	Ok(t, err)
