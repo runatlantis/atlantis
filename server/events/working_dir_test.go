@@ -1277,11 +1277,10 @@ func TestMergeAgain_BaseBranchRetargetedAfterParentMerged(t *testing.T) {
 		HeadCommit: childHeadCommit,
 	}
 
-	// Clone reuses the existing directory because the head commit is unchanged,
-	// so it is MergeAgain that has to notice the base branch is unusable.
-	_, err = wd.Clone(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
-	Ok(t, err)
-
+	// MergeAgain is exercised directly here, without a preceding Clone. Clone
+	// also repairs this now (see TestClone_RetargetedBaseBranchWithUnchangedHead),
+	// so going through it would leave nothing for MergeAgain to do and this guard
+	// would not be covered.
 	mergedAgain, err := wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
 	Ok(t, err)
 	Assert(t, mergedAgain == true, "expected the working tree to be refreshed after the base branch changed")
@@ -1354,9 +1353,8 @@ func TestMergeAgain_RetargetedWhileOldBaseStillExists(t *testing.T) {
 		HeadCommit: prHeadCommit,
 	}
 
-	_, err := wd.Clone(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
-	Ok(t, err)
-
+	// As above, MergeAgain is exercised directly so that its own handling of the
+	// retarget is covered rather than Clone's.
 	mergedAgain, err := wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
 	Ok(t, err)
 	Assert(t, mergedAgain == true, "expected the working tree to be refreshed after the retarget")
@@ -1369,6 +1367,65 @@ func TestMergeAgain_RetargetedWhileOldBaseStillExists(t *testing.T) {
 	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
 
 	actCommit := strings.TrimSpace(runCmd(t, workspaceDir, "git", "rev-parse", "HEAD^2"))
+	Equals(t, prHeadCommit, actCommit)
+}
+
+// TestClone_RetargetedBaseBranchWithUnchangedHead covers the callers that use a
+// checkout without ever calling MergeAgain — pre-workflow hooks and project
+// discovery among them. Clone's reuse checks are driven by the head commit, so
+// a pull request retargeted onto a branch the checkout never fetched would be
+// reused as-is and those callers would run against the old base branch.
+func TestClone_RetargetedBaseBranchWithUnchangedHead(t *testing.T) {
+	repoDir := initRepo(t)
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "old-base")
+	runCmd(t, repoDir, "touch", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "add", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "old base change")
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "pr change")
+	prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-only.txt")
+	runCmd(t, repoDir, "git", "add", "main-only.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "main only change")
+
+	workspaceDir := filepath.Join(repoDir, "repos", "1", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "1", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "old-base", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Clone only, with the head commit unchanged: no MergeAgain to fall back on.
+	cloneDir, err := wd.Clone(logger, models.Repo{CloneURL: repoDir}, models.PullRequest{
+		Num:        1,
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+		HeadCommit: prHeadCommit,
+	}, "default")
+	Ok(t, err)
+
+	assert.FileExists(t, filepath.Join(cloneDir, "main-only.txt"), "new base branch content should be present")
+	assert.FileExists(t, filepath.Join(cloneDir, "pr-file.txt"))
+
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
 	Equals(t, prHeadCommit, actCommit)
 }
 
