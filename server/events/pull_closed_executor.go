@@ -31,6 +31,14 @@ type ResourceCleaner interface {
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_pull_cleaner.go PullCleaner
 
+// pullCloseUnlocker is implemented by a database that supports a host-exact,
+// close-generation pull unlock (the etcd HA backend). When the configured
+// database implements it, pull-close cleanup uses it so the pull's lifecycle is
+// closed and the exact VCS host is targeted instead of the host-less scan.
+type pullCloseUnlocker interface {
+	UnlockByPullForClose(repoFullName, vcsHostname string, pullNum int) ([]models.ProjectLock, error)
+}
+
 // PullCleaner cleans up pull requests after they're closed/merged.
 type PullCleaner interface {
 	// CleanUpPull deletes the workspaces used by the pull request on disk
@@ -113,7 +121,16 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Finally, delete locks. We do this last because when someone
 	// unlocks a project, right now we don't actually delete the plan
 	// so we might have plans laying around but no locks.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
+	//
+	// In etcd (active-active HA) mode use the host-exact, close-generation unlock
+	// so the pull's lifecycle advances to closed and the exact VCS host is
+	// targeted (no cross-host ambiguity); other backends use the legacy unlock.
+	var locks []models.ProjectLock
+	if closer, ok := p.Database.(pullCloseUnlocker); ok {
+		locks, err = closer.UnlockByPullForClose(repo.FullName, repo.VCSHost.Hostname, pull.Num)
+	} else {
+		locks, err = p.Locker.UnlockByPull(repo.FullName, pull.Num)
+	}
 	if err != nil {
 		return fmt.Errorf("cleaning up locks: %w", err)
 	}

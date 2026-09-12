@@ -1,0 +1,79 @@
+# Client replicas: the same Atlantis image in EXTERNAL etcd mode, connecting to
+# the member cluster. Independently autoscalable (0..N); they do not participate
+# in Raft and adding/removing them never changes etcd membership (design §342).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlantis-client
+  labels:
+    app.kubernetes.io/name: atlantis
+    atlantis.runatlantis.io/role: client
+spec:
+  replicas: 2 # HPA target; free to scale.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlantis
+      atlantis.runatlantis.io/role: client
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: atlantis
+        atlantis.runatlantis.io/role: client
+    spec:
+      containers:
+        - name: atlantis
+          image: ghcr.io/runatlantis/atlantis:latest # same image as members
+          args:
+            - server
+            - --locking-db-type=etcd
+            - --etcd-mode=external
+            - --etcd-deployment-id=$(ETCD_DEPLOYMENT_ID)
+            - --etcd-namespace=/atlantis
+            - --etcd-endpoints=https://atlantis-member-0.atlantis-peer:2379,https://atlantis-member-1.atlantis-peer:2379,https://atlantis-member-2.atlantis-peer:2379
+            - --etcd-ca-file=/etc/atlantis/tls/ca.pem
+            - --etcd-cert-file=/etc/atlantis/tls/client.pem
+            - --etcd-key-file=/etc/atlantis/tls/client-key.pem
+            - --replica-id=$(POD_NAME)
+            - --replica-advertise-url=https://$(POD_IP):4141
+            - --replica-advertise-allowlist=$(POD_NAMESPACE_CIDR)
+            - --internal-command-token-file=/etc/atlantis/internal/token
+            - --internal-command-ca-file=/etc/atlantis/internal/ca.pem
+          env:
+            - name: POD_NAME
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+            - name: POD_IP
+              valueFrom: { fieldRef: { fieldPath: status.podIP } }
+          ports:
+            - { name: http, containerPort: 4141 }
+            - { name: internal, containerPort: 4142 }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http, scheme: HTTPS }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http, scheme: HTTPS }
+            periodSeconds: 15
+          volumeMounts:
+            - { name: tls, mountPath: /etc/atlantis/tls, readOnly: true }
+            - { name: internal, mountPath: /etc/atlantis/internal, readOnly: true }
+      volumes:
+        - name: tls
+          secret: { secretName: atlantis-etcd-tls }
+        - name: internal
+          secret: { secretName: atlantis-internal-transport }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: atlantis-client
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: atlantis-client
+  minReplicas: 0
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
