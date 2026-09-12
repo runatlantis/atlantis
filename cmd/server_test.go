@@ -112,6 +112,25 @@ var testFlags = map[string]any{
 	LanguageFlag:                     "es",
 	LanguageConfigFileFlag:           "",
 	LockingDBType:                    "boltdb",
+	EtcdModeFlag:                     "external",
+	EtcdDeploymentIDFlag:             "dep-uuid",
+	EtcdNamespaceFlag:                "/atlantis",
+	EtcdEndpointsFlag:                "https://member-0:2379",
+	EtcdCAFileFlag:                   "etcd-ca",
+	EtcdCertFileFlag:                 "etcd-cert",
+	EtcdKeyFileFlag:                  "etcd-key",
+	EtcdServerNameFlag:               "etcd-server",
+	EtcdUsernameFlag:                 "etcd-user",
+	EtcdPasswordFileFlag:             "etcd-pass-file",
+	EtcdRequestTimeoutFlag:           "5s",
+	EtcdStartupTimeoutFlag:           "5m",
+	EtcdAllowInsecureDevFlag:         false,
+	ReplicaIDFlag:                    "replica-0",
+	ReplicaAdvertiseURLFlag:          "https://replica-0:4142",
+	ReplicaAdvertiseAllowlistFlag:    "10.0.0.0/8",
+	InternalCommandTokenFileFlag:     "internal-token",
+	InternalCommandCAFileFlag:        "internal-ca.pem",
+	OwnershipTTLSecondsFlag:          30,
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
 	MaxCommentsPerCommand:            10,
@@ -608,6 +627,33 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 			Ok(t, err)
 		}
 	}
+}
+
+func TestExecute_ValidateEtcdDriftDetection(t *testing.T) {
+	t.Run("drift detection rejected with etcd locking", func(t *testing.T) {
+		c := setupWithDefaults(map[string]any{
+			LockingDBType:            LockingDBTypeEtcd,
+			EnableDriftDetectionFlag: true,
+		}, t)
+		err := c.Execute()
+		ErrEquals(t, "--enable-drift-detection cannot be combined with --locking-db-type=etcd; drift detection has no distributed exclusion for active-active etcd yet", err)
+	})
+
+	t.Run("drift detection allowed with default locking", func(t *testing.T) {
+		c := setupWithDefaults(map[string]any{
+			EnableDriftDetectionFlag: true,
+		}, t)
+		err := c.Execute()
+		Ok(t, err)
+	})
+
+	t.Run("etcd locking without drift detection passes validation", func(t *testing.T) {
+		c := setupWithDefaults(map[string]any{
+			LockingDBType: LockingDBTypeEtcd,
+		}, t)
+		err := c.Execute()
+		Ok(t, err)
+	})
 }
 
 func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
