@@ -5,15 +5,20 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
+	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 	. "github.com/runatlantis/atlantis/testing"
@@ -1146,4 +1151,610 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+// prelockProject builds a plan ProjectContext for the pre-locking tests. The
+// project name doubles as its directory so lock keys stay easy to read.
+func prelockProject(name string, mode valid.RepoLocksMode) command.ProjectContext {
+	return command.ProjectContext{
+		CommandName:   command.Plan,
+		BaseRepo:      testdata.GithubRepo,
+		RepoRelDir:    name,
+		Workspace:     "default",
+		ProjectName:   name,
+		RepoLocksMode: mode,
+	}
+}
+
+// prelockCommandContext returns a plan command context for the pre-locking
+// tests, with the VCS lookups the command runner performs already stubbed.
+func prelockCommandContext(t *testing.T, logger logging.SimpleLogging) (*command.Context, *events.CommentCommand) {
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	return &command.Context{
+		User:     testdata.User,
+		Log:      logger,
+		Scope:    metricstest.NewLoggingScope(t, logger, "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}, &events.CommentCommand{Name: command.Plan}
+}
+
+// TestPlanCommandRunner_PreLockOrdering asserts that with
+// --lock-all-projects-before-plan every lock is acquired before the first plan
+// runs, and that projects which do not lock on plan are left alone.
+func TestPlanCommandRunner_PreLockOrdering(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	cases := []struct {
+		Description string
+		Enabled     bool
+		Projects    []command.ProjectContext
+		ExpSequence []string
+	}{
+		{
+			Description: "every lock is taken before the first plan runs",
+			Enabled:     true,
+			Projects: []command.ProjectContext{
+				prelockProject("a", valid.RepoLocksOnPlanMode),
+				prelockProject("b", valid.RepoLocksOnPlanMode),
+			},
+			ExpSequence: []string{"lock a", "lock b", "plan a", "plan b"},
+		},
+		{
+			Description: "projects that do not lock on plan are not pre-locked",
+			Enabled:     true,
+			Projects: []command.ProjectContext{
+				prelockProject("a", valid.RepoLocksOnPlanMode),
+				prelockProject("b", valid.RepoLocksOnApplyMode),
+				prelockProject("c", valid.RepoLocksDisabledMode),
+			},
+			ExpSequence: []string{"lock a", "plan a", "plan b", "plan c"},
+		},
+		{
+			Description: "duplicate lock keys are only locked once",
+			Enabled:     true,
+			Projects: []command.ProjectContext{
+				prelockProject("a", valid.RepoLocksOnPlanMode),
+				prelockProject("a", valid.RepoLocksOnPlanMode),
+			},
+			ExpSequence: []string{"lock a", "plan a", "plan a"},
+		},
+		{
+			Description: "locking stays interleaved when the flag is off",
+			Enabled:     false,
+			Projects: []command.ProjectContext{
+				prelockProject("a", valid.RepoLocksOnPlanMode),
+				prelockProject("b", valid.RepoLocksOnPlanMode),
+			},
+			ExpSequence: []string{"plan a", "plan b"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			tmp := t.TempDir()
+			database, err := boltdb.New(tmp)
+			t.Cleanup(func() { database.Close() })
+			Ok(t, err)
+
+			setup(t, func(tc *TestConfig) {
+				tc.database = database
+				tc.lockAllProjectsBeforePlan = c.Enabled
+			})
+
+			var sequence []string
+
+			When(projectLocker.TryLock(
+				Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+				Any[string](), Any[models.Project](), Any[bool](),
+			)).Then(func(params []Param) ReturnValues {
+				project := params[4].(models.Project)
+				workspace := params[3].(string)
+				sequence = append(sequence, "lock "+project.ProjectName)
+				return ReturnValues{
+					&events.TryLockResponse{
+						LockAcquired: true,
+						UnlockFn:     func() error { return nil },
+						LockKey:      models.GenerateLockKey(project, workspace),
+					},
+					nil,
+				}
+			})
+
+			// Register one stub per distinct project. Two equal ProjectContext
+			// values (the "duplicate lock keys" case) must only be stubbed once:
+			// pegomock matches the second `When` call against the first project's
+			// already-registered stub and invokes it right there, polluting
+			// `sequence` before the run even starts.
+			registeredPlanStubs := make(map[string]bool)
+			for i := range c.Projects {
+				projCtx := c.Projects[i]
+				stubKey := fmt.Sprintf("%s/%s/%s", projCtx.RepoRelDir, projCtx.Workspace, projCtx.ProjectName)
+				if registeredPlanStubs[stubKey] {
+					continue
+				}
+				registeredPlanStubs[stubKey] = true
+				When(projectCommandRunner.Plan(projCtx)).Then(func(_ []Param) ReturnValues {
+					sequence = append(sequence, "plan "+projCtx.ProjectName)
+					return ReturnValues{command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{TerraformOutput: "no changes"},
+					}}
+				})
+			}
+
+			ctx, cmd := prelockCommandContext(t, logger)
+			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.Projects, nil)
+
+			planCommandRunner.Run(ctx, cmd)
+
+			require.Equal(t, c.ExpSequence, sequence)
+		})
+	}
+}
+
+// TestPlanCommandRunner_PreLockAbortsWhenLockUnavailable asserts that a single
+// unavailable lock stops the whole run before any plan starts, and that the
+// locks this run had already taken are released again.
+func TestPlanCommandRunner_PreLockAbortsWhenLockUnavailable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	t.Cleanup(func() { database.Close() })
+	Ok(t, err)
+
+	lockingClient := locking.NewClient(database)
+
+	// A competing pull request already holds the lock on project b.
+	competitor := models.PullRequest{
+		BaseRepo: testdata.GithubRepo,
+		State:    models.OpenPullState,
+		Num:      testdata.Pull.Num + 1,
+	}
+	blockedProject := models.NewProject(testdata.GithubRepo.FullName, "b", "b")
+	held, err := lockingClient.TryLock(blockedProject, "default", competitor, testdata.User)
+	Ok(t, err)
+	require.True(t, held.LockAcquired, "the competing pull request should hold the lock")
+
+	// The project locker renders the failure message, so it needs its own VCS
+	// client to build the link to the blocking pull request.
+	lockVCSClient := vcsmocks.NewMockClient()
+	When(lockVCSClient.MarkdownPullLink(Any[models.PullRequest]())).ThenReturn("competing-pull", nil)
+
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &events.DefaultProjectLocker{
+			Locker:         lockingClient,
+			NoOpLocker:     locking.NewNoOpLocker(),
+			VCSClient:      lockVCSClient,
+			ExecutableName: "atlantis",
+		}
+		tc.planLockingLocker = lockingClient
+	})
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+	projectB := prelockProject("b", valid.RepoLocksOnPlanMode)
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectA, projectB}, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	// Nothing planned -- not even project a, whose lock was free.
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectA)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectB)
+	require.True(t, ctx.CommandHasErrors)
+
+	// The lock this run took for project a is released, and the competing pull
+	// request keeps the one it already had.
+	locks, err := lockingClient.List()
+	Ok(t, err)
+	require.Len(t, locks, 1)
+	remaining, ok := locks[models.GenerateLockKey(blockedProject, "default")]
+	require.True(t, ok, "the competing pull request should keep its lock")
+	require.Equal(t, competitor.Num, remaining.Pull.Num)
+
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Eq(ctx.Pull.Num), Any[string](), Eq("plan"),
+	)
+}
+
+// TestPlanCommandRunner_PreLockReleasesUnplannedProjects covers the clean-up
+// that makes pre-locking safe: when a run stops part way through, the projects
+// that never produced a plan must not stay locked. Here an execution order
+// group fails with abort_on_execution_order_fail, so the second group never
+// runs at all -- the same shape as a run stopped by `atlantis cancel`.
+func TestPlanCommandRunner_PreLockReleasesUnplannedProjects(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	t.Cleanup(func() { database.Close() })
+	Ok(t, err)
+
+	lockingClient := locking.NewClient(database)
+	lockVCSClient := vcsmocks.NewMockClient()
+
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &events.DefaultProjectLocker{
+			Locker:         lockingClient,
+			NoOpLocker:     locking.NewNoOpLocker(),
+			VCSClient:      lockVCSClient,
+			ExecutableName: "atlantis",
+		}
+		tc.planLockingLocker = lockingClient
+	})
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+	projectA.ParallelPlanEnabled = true
+	projectA.AbortOnExecutionOrderFail = true
+	projectA.ExecutionOrderGroup = 0
+
+	projectB := prelockProject("b", valid.RepoLocksOnPlanMode)
+	projectB.ParallelPlanEnabled = true
+	projectB.AbortOnExecutionOrderFail = true
+	projectB.ExecutionOrderGroup = 1
+
+	When(projectCommandRunner.Plan(projectA)).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("terraform init failed"),
+	})
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectA, projectB}, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	// Group 1 was skipped because group 0 failed.
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectB)
+
+	// Neither project produced a plan, so neither may still hold a lock.
+	locks, err := lockingClient.List()
+	Ok(t, err)
+	require.Empty(t, locks, "projects that produced no plan must not stay locked")
+}
+
+// TestPlanCommandRunner_PreLockOrderingAutoplan asserts that pre-locking also
+// takes effect on the autoplan (auto-triggered) path, not just the
+// comment-triggered one covered by TestPlanCommandRunner_PreLockOrdering.
+func TestPlanCommandRunner_PreLockOrderingAutoplan(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	setup(t, func(tc *TestConfig) {
+		tc.lockAllProjectsBeforePlan = true
+	})
+
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logger,
+		Scope:    metricstest.NewLoggingScope(t, logger, "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.AutoTrigger,
+	}
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+	projectB := prelockProject("b", valid.RepoLocksOnPlanMode)
+
+	When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(models.PullReqStatus{}, nil)
+	When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{projectA, projectB}, nil)
+
+	var sequence []string
+	When(projectLocker.TryLock(
+		Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), Any[bool](),
+	)).Then(func(params []Param) ReturnValues {
+		project := params[4].(models.Project)
+		workspace := params[3].(string)
+		sequence = append(sequence, "lock "+project.ProjectName)
+		return ReturnValues{
+			&events.TryLockResponse{
+				LockAcquired: true,
+				UnlockFn:     func() error { return nil },
+				LockKey:      models.GenerateLockKey(project, workspace),
+			},
+			nil,
+		}
+	})
+
+	for _, projCtx := range []command.ProjectContext{projectA, projectB} {
+		When(projectCommandRunner.Plan(projCtx)).Then(func(_ []Param) ReturnValues {
+			sequence = append(sequence, "plan "+projCtx.ProjectName)
+			return ReturnValues{command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "no changes"},
+			}}
+		})
+	}
+
+	planCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Plan})
+
+	require.Equal(t, []string{"lock a", "lock b", "plan a", "plan b"}, sequence)
+}
+
+// TestPlanCommandRunner_PreLockAbortMessageUsesWorkspaceForUnnamedProjects
+// covers projectDisplayName's fallback branch: a project with no configured
+// name is identified by directory + workspace instead of a bare name.
+func TestPlanCommandRunner_PreLockAbortMessageUsesWorkspaceForUnnamedProjects(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	t.Cleanup(func() { database.Close() })
+	Ok(t, err)
+
+	lockingClient := locking.NewClient(database)
+
+	// A competing pull request already holds the lock, so pre-locking aborts
+	// immediately and the failure message must name this (unnamed) project.
+	competitor := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num + 1}
+	blockedProject := models.NewProject(testdata.GithubRepo.FullName, "unnamed-dir", "")
+	held, err := lockingClient.TryLock(blockedProject, "default", competitor, testdata.User)
+	Ok(t, err)
+	require.True(t, held.LockAcquired)
+
+	lockVCSClient := vcsmocks.NewMockClient()
+	When(lockVCSClient.MarkdownPullLink(Any[models.PullRequest]())).ThenReturn("competing-pull", nil)
+
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &events.DefaultProjectLocker{
+			Locker:         lockingClient,
+			NoOpLocker:     locking.NewNoOpLocker(),
+			VCSClient:      lockVCSClient,
+			ExecutableName: "atlantis",
+		}
+		tc.planLockingLocker = lockingClient
+	})
+
+	unnamedProject := command.ProjectContext{
+		CommandName:   command.Plan,
+		BaseRepo:      testdata.GithubRepo,
+		RepoRelDir:    "unnamed-dir",
+		Workspace:     "default",
+		RepoLocksMode: valid.RepoLocksOnPlanMode,
+	}
+	// A second project whose lock is never even attempted (unnamedProject
+	// fails first): its result becomes the "skipped" message, which embeds
+	// projectDisplayName(unnamedProject) -- the branch under test.
+	otherProject := prelockProject("other", valid.RepoLocksOnPlanMode)
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(
+		[]command.ProjectContext{unnamedProject, otherProject}, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Eq(ctx.Pull.Num), Any[string](), Eq("plan"),
+	).GetCapturedArguments()
+	require.Contains(t, comment, "`unnamed-dir` (workspace `default`)")
+}
+
+// failingDatabase wraps a real db.Database, forcing TryLock and
+// UpdatePullWithResults to fail. This lets a test exercise both
+// preLockProjects' TryLock-error branch and handlePreLockAbort's DB-write
+// failure branch, without disturbing any other database operation (like the
+// unlock calls deletePlansAndPlanLocks makes before pre-locking even starts).
+type failingDatabase struct {
+	db.Database
+}
+
+func (f *failingDatabase) TryLock(models.ProjectLock) (bool, models.ProjectLock, error) {
+	return false, models.ProjectLock{}, errors.New("simulated lock backend failure")
+}
+
+func (f *failingDatabase) UpdatePullWithResults(models.PullRequest, []command.ProjectResult) (models.PullStatus, error) {
+	return models.PullStatus{}, errors.New("simulated database write failure")
+}
+
+// TestPlanCommandRunner_PreLockAcquireErrorUpdatesCommitStatusEvenIfDBWriteFails
+// covers two paths TestPlanCommandRunner_PreLockAbortsWhenLockUnavailable
+// doesn't: TryLock returning a real error (not just LockAcquired: false), and
+// handlePreLockAbort's fallback when writing the aborted result to the DB
+// itself also fails -- the commit status must still move off Pending instead
+// of being left stuck there forever.
+func TestPlanCommandRunner_PreLockAcquireErrorUpdatesCommitStatusEvenIfDBWriteFails(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() { boltDB.Close() })
+	Ok(t, err)
+
+	failingDB := &failingDatabase{Database: boltDB}
+	lockingClient := locking.NewClient(failingDB)
+	lockVCSClient := vcsmocks.NewMockClient()
+
+	setup(t, func(tc *TestConfig) {
+		tc.database = failingDB
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &events.DefaultProjectLocker{
+			Locker:         lockingClient,
+			NoOpLocker:     locking.NewNoOpLocker(),
+			VCSClient:      lockVCSClient,
+			ExecutableName: "atlantis",
+		}
+		tc.planLockingLocker = lockingClient
+	})
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectA}, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectA)
+	require.True(t, ctx.CommandHasErrors)
+
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(ctx.Pull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(ctx.Pull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+}
+
+// panicOnLockLocker wraps a ProjectLocker and panics instead of delegating
+// when asked to lock panicForProject, to test panic recovery in
+// preLockProjects.
+type panicOnLockLocker struct {
+	inner           events.ProjectLocker
+	panicForProject string
+}
+
+func (p *panicOnLockLocker) TryLock(log logging.SimpleLogging, pull models.PullRequest, user models.User, workspace string, project models.Project, repoLocking bool) (*events.TryLockResponse, error) {
+	if project.ProjectName == p.panicForProject {
+		panic("simulated backend panic")
+	}
+	return p.inner.TryLock(log, pull, user, workspace, project, repoLocking)
+}
+
+// TestPlanCommandRunner_PreLockPanicReleasesAcquiredLocks asserts that a panic
+// partway through preLockProjects still releases every lock already acquired
+// in that run before the panic propagates.
+func TestPlanCommandRunner_PreLockPanicReleasesAcquiredLocks(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	t.Cleanup(func() { database.Close() })
+	Ok(t, err)
+
+	lockingClient := locking.NewClient(database)
+	lockVCSClient := vcsmocks.NewMockClient()
+
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &panicOnLockLocker{
+			inner: &events.DefaultProjectLocker{
+				Locker:         lockingClient,
+				NoOpLocker:     locking.NewNoOpLocker(),
+				VCSClient:      lockVCSClient,
+				ExecutableName: "atlantis",
+			},
+			panicForProject: "b",
+		}
+		tc.planLockingLocker = lockingClient
+	})
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+	projectB := prelockProject("b", valid.RepoLocksOnPlanMode)
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectA, projectB}, nil)
+
+	require.Panics(t, func() {
+		planCommandRunner.Run(ctx, cmd)
+	})
+
+	locks, err := lockingClient.List()
+	Ok(t, err)
+	require.Empty(t, locks, "the lock acquired before the panic must be released, not left behind")
+}
+
+// failingUnlockLocker wraps a real locking.Locker and forces
+// UnlockIfOwnedByPull to fail for one specific project, but only once that
+// project is actually locked -- otherwise the run's pre-existing "clean up
+// any stale locks from a previous run" step (which happens before pre-locking
+// even starts, and unlocks nothing yet) would itself spuriously fail.
+type failingUnlockLocker struct {
+	locking.Locker
+	failProjectName string
+}
+
+func (f *failingUnlockLocker) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
+	if project.ProjectName == f.failProjectName {
+		if lock, err := f.GetLock(models.GenerateLockKey(project, workspace)); err == nil && lock != nil {
+			return nil, errors.New("simulated unlock failure")
+		}
+	}
+	return f.Locker.UnlockIfOwnedByPull(project, workspace, pullNum)
+}
+
+// TestPlanCommandRunner_ReleaseUnplannedLocksContinuesPastUnlockFailure
+// asserts that when releasing the locks of projects that produced no plan,
+// one project's unlock failure doesn't stop the others from being released.
+func TestPlanCommandRunner_ReleaseUnplannedLocksContinuesPastUnlockFailure(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	t.Cleanup(func() { database.Close() })
+	Ok(t, err)
+
+	lockingClient := locking.NewClient(database)
+	lockVCSClient := vcsmocks.NewMockClient()
+
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.lockAllProjectsBeforePlan = true
+		tc.projectLocker = &events.DefaultProjectLocker{
+			Locker:         lockingClient,
+			NoOpLocker:     locking.NewNoOpLocker(),
+			VCSClient:      lockVCSClient,
+			ExecutableName: "atlantis",
+		}
+		tc.planLockingLocker = &failingUnlockLocker{Locker: lockingClient, failProjectName: "b"}
+	})
+
+	projectZ := prelockProject("z", valid.RepoLocksOnPlanMode)
+	projectZ.ParallelPlanEnabled = true
+	projectZ.AbortOnExecutionOrderFail = true
+	projectZ.ExecutionOrderGroup = 0
+
+	projectA := prelockProject("a", valid.RepoLocksOnPlanMode)
+	projectA.ParallelPlanEnabled = true
+	projectA.AbortOnExecutionOrderFail = true
+	projectA.ExecutionOrderGroup = 1
+
+	projectB := prelockProject("b", valid.RepoLocksOnPlanMode)
+	projectB.ParallelPlanEnabled = true
+	projectB.AbortOnExecutionOrderFail = true
+	projectB.ExecutionOrderGroup = 1
+
+	projectC := prelockProject("c", valid.RepoLocksOnPlanMode)
+	projectC.ParallelPlanEnabled = true
+	projectC.AbortOnExecutionOrderFail = true
+	projectC.ExecutionOrderGroup = 1
+
+	When(projectCommandRunner.Plan(projectZ)).ThenReturn(command.ProjectCommandOutput{
+		Error: errors.New("terraform init failed"),
+	})
+
+	ctx, cmd := prelockCommandContext(t, logger)
+	When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(
+		[]command.ProjectContext{projectZ, projectA, projectB, projectC}, nil)
+
+	planCommandRunner.Run(ctx, cmd)
+
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectA)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectB)
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(projectC)
+
+	locks, err := lockingClient.List()
+	Ok(t, err)
+	_, aLocked := locks[models.GenerateLockKey(models.NewProject(testdata.GithubRepo.FullName, "a", "a"), "default")]
+	_, bLocked := locks[models.GenerateLockKey(models.NewProject(testdata.GithubRepo.FullName, "b", "b"), "default")]
+	_, cLocked := locks[models.GenerateLockKey(models.NewProject(testdata.GithubRepo.FullName, "c", "c"), "default")]
+	require.False(t, aLocked, "project a must be released despite project b's simulated unlock failure")
+	require.True(t, bLocked, "project b's lock remains because its unlock was simulated to fail")
+	require.False(t, cLocked, "project c must be released despite project b's simulated unlock failure")
 }

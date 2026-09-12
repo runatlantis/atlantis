@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -49,6 +50,8 @@ func NewPlanCommandRunner(
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
+	projectLocker ProjectLocker,
+	lockAllProjectsBeforePlan bool,
 
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
@@ -73,6 +76,8 @@ func NewPlanCommandRunner(
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
+		projectLocker:              projectLocker,
+		LockAllProjectsBeforePlan:  lockAllProjectsBeforePlan,
 	}
 }
 
@@ -107,6 +112,201 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	// projectLocker acquires the Atlantis repo lock for a single project. It is
+	// the same locker the project command runner uses, so pre-acquired locks are
+	// transparently reused when each plan runs.
+	projectLocker ProjectLocker
+	// LockAllProjectsBeforePlan makes Atlantis acquire the repo lock for every
+	// project in the run before any plan starts, aborting the whole run if any
+	// lock cannot be acquired.
+	LockAllProjectsBeforePlan bool
+}
+
+// dedupeOnPlanProjects filters projectCmds down to the projects whose
+// repo_locks mode is on_plan, in order, collapsing duplicate lock keys to
+// their first occurrence. It is the single source of truth for "which
+// projects does pre-locking/its cleanup touch", shared by preLockProjects,
+// releaseUnplannedLocks and deletePlanLocks.
+func dedupeOnPlanProjects(projectCmds []command.ProjectContext) []command.ProjectContext {
+	seen := make(map[string]bool, len(projectCmds))
+	deduped := make([]command.ProjectContext, 0, len(projectCmds))
+	for _, projCtx := range projectCmds {
+		if projCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
+			continue
+		}
+		lockKey := GenerateLockID(projCtx)
+		if seen[lockKey] {
+			continue
+		}
+		seen[lockKey] = true
+		deduped = append(deduped, projCtx)
+	}
+	return deduped
+}
+
+// unlockProjects releases the repo lock for each of projectCmds (already
+// deduped by the caller, e.g. via dedupeOnPlanProjects) if this pull owns it.
+// It attempts every project even if some fail, and joins their errors, so a
+// failure partway through never strands the ones that come after it.
+func (p *PlanCommandRunner) unlockProjects(ctx *command.Context, projectCmds []command.ProjectContext) error {
+	var errs []error
+	for _, projCtx := range projectCmds {
+		lockKey := GenerateLockID(projCtx)
+		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
+		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// preLockProjects acquires the Atlantis repo lock for every project that is
+// about to be planned, before any plan runs. If any lock cannot be acquired the
+// locks taken by this pull are released again and the run is aborted.
+//
+// This is safe to combine with the per-project TryLock in doPlan: when the lock
+// is already held by this same pull, ProjectLocker.TryLock reports it as
+// acquired, so the second attempt is a no-op.
+func (p *PlanCommandRunner) preLockProjects(ctx *command.Context, projectCmds []command.ProjectContext) (result command.Result, ok bool) {
+	var locked []command.ProjectContext
+	defer func() {
+		if r := recover(); r != nil {
+			if unlockErr := p.unlockProjects(ctx, locked); unlockErr != nil {
+				ctx.Log.Err("releasing locks after panic during pre-lock: %s", unlockErr)
+			}
+			panic(r)
+		}
+	}()
+
+	for _, projCtx := range dedupeOnPlanProjects(projectCmds) {
+		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
+		lockAttempt, err := p.projectLocker.TryLock(ctx.Log, ctx.Pull, ctx.User, projCtx.Workspace, project, projCtx.RepoLocksMode == valid.RepoLocksOnPlanMode)
+		if err != nil {
+			return p.abortPreLock(ctx, projectCmds, locked, projCtx, "", fmt.Errorf("acquiring lock: %w", err)), false
+		}
+		if !lockAttempt.LockAcquired {
+			return p.abortPreLock(ctx, projectCmds, locked, projCtx, lockAttempt.LockFailureReason, nil), false
+		}
+		locked = append(locked, projCtx)
+	}
+	return command.Result{}, true
+}
+
+// abortPreLock releases every lock preLockProjects acquired before hitting
+// failed, and builds a result that marks failed with its lock failure and
+// every other project in projectCmds as skipped.
+func (p *PlanCommandRunner) abortPreLock(ctx *command.Context, projectCmds []command.ProjectContext, locked []command.ProjectContext, failed command.ProjectContext, failure string, err error) command.Result {
+	ctx.Log.Info("could not acquire locks for all projects, aborting plan run")
+	if unlockErr := p.unlockProjects(ctx, locked); unlockErr != nil {
+		ctx.Log.Err("releasing locks after aborted run: %s", unlockErr)
+	}
+
+	failedKey := GenerateLockID(failed)
+	skippedMsg := fmt.Sprintf(
+		"Plan aborted: the lock for project %s could not be acquired, and this Atlantis is configured to lock every project before planning any of them. No plans were run.",
+		projectDisplayName(failed))
+
+	var results []command.ProjectResult
+	for _, projCtx := range projectCmds {
+		res := command.ProjectResult{
+			Command:           projCtx.CommandName,
+			RepoRelDir:        projCtx.RepoRelDir,
+			Workspace:         projCtx.Workspace,
+			ProjectName:       projCtx.ProjectName,
+			SilencePRComments: projCtx.SilencePRComments,
+		}
+		if GenerateLockID(projCtx) == failedKey {
+			res.Failure = failure
+			res.Error = err
+		} else {
+			res.Failure = skippedMsg
+		}
+		results = append(results, res)
+	}
+	return command.Result{ProjectResults: results}
+}
+
+// projectDisplayName returns a human readable identifier for a project, for use
+// in messages posted back to the pull request. Backticks are stripped from the
+// interpolated values so a project/directory/workspace name can't break out of
+// the surrounding markdown code span.
+func projectDisplayName(projCtx command.ProjectContext) string {
+	if name := stripBackticks(projCtx.ProjectName); name != "" {
+		return fmt.Sprintf("`%s`", name)
+	}
+	return fmt.Sprintf("`%s` (workspace `%s`)", stripBackticks(projCtx.RepoRelDir), stripBackticks(projCtx.Workspace))
+}
+
+func stripBackticks(s string) string {
+	return strings.ReplaceAll(s, "`", "")
+}
+
+// handlePreLockAbort writes the aborted result back to the pull request and
+// updates commit statuses, mirroring the normal end-of-run bookkeeping.
+func (p *PlanCommandRunner) handlePreLockAbort(ctx *command.Context, cmd PullCommand, result command.Result) {
+	ctx.CommandHasErrors = true
+	p.pullUpdater.updatePull(ctx, cmd, result)
+	pullStatus, err := p.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
+	if err != nil {
+		ctx.Log.Err("writing results: %s", err)
+		// updateCommitStatus needs pullStatus from the DB to compute per-project
+		// counts, which we don't have here. But the commit status was already
+		// set to Pending before pre-locking started, and we know for certain
+		// this run aborted, so set it directly rather than leaving it stuck on
+		// Pending forever.
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		if statusErr := p.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		return
+	}
+	p.updateCommitStatus(ctx, pullStatus, command.Plan)
+	p.updateCommitStatus(ctx, pullStatus, command.Apply)
+}
+
+// releaseUnplannedLocks releases the locks this run pre-acquired for any project
+// that did not end up producing a plan.
+//
+// Without it, a run stopped part way through would leave projects locked with no
+// plan to apply. That happens when `atlantis cancel` is used, which only
+// releases working directory locks, not repo locks. It also happens when an
+// execution order group fails with abort_on_execution_order_fail, which drops
+// every later group without running it.
+//
+// Projects whose plan itself failed have already been unlocked by doPlan;
+// UnlockIfOwnedByPull is idempotent, so releasing them a second time is a no-op.
+// A plan that succeeded with no changes still holds its lock, which matches the
+// behaviour when pre-locking is off.
+func (p *PlanCommandRunner) releaseUnplannedLocks(ctx *command.Context, projectCmds []command.ProjectContext, result command.Result) {
+	planned := make(map[string]bool, len(result.ProjectResults))
+	for _, res := range result.ProjectResults {
+		if res.PlanSuccess == nil {
+			continue
+		}
+		project := models.NewProject(ctx.Pull.BaseRepo.FullName, res.RepoRelDir, res.ProjectName)
+		planned[models.GenerateLockKey(project, res.Workspace)] = true
+	}
+
+	var unplanned []command.ProjectContext
+	for _, projCtx := range dedupeOnPlanProjects(projectCmds) {
+		if planned[GenerateLockID(projCtx)] {
+			continue
+		}
+		unplanned = append(unplanned, projCtx)
+	}
+	if len(unplanned) == 0 {
+		return
+	}
+
+	ctx.Log.Debug("releasing %d lock(s) for projects that produced no plan", len(unplanned))
+	if err := p.unlockProjects(ctx, unplanned); err != nil {
+		// Best effort: the run is already over, and `atlantis unlock` remains
+		// available. Failing the command here would be more confusing than
+		// the leftover lock.
+		ctx.Log.Err("releasing locks for projects that produced no plan: %s", err)
+	}
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -177,7 +377,18 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
+	if p.LockAllProjectsBeforePlan {
+		if abortResult, ok := p.preLockProjects(ctx, projectCmds); !ok {
+			p.handlePreLockAbort(ctx, AutoplanCommand{}, abortResult)
+			return
+		}
+	}
+
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+
+	if p.LockAllProjectsBeforePlan {
+		p.releaseUnplannedLocks(ctx, projectCmds, result)
+	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -323,8 +534,19 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
+	if p.LockAllProjectsBeforePlan && len(projectCmds) > 0 {
+		if abortResult, ok := p.preLockProjects(ctx, projectCmds); !ok {
+			p.handlePreLockAbort(ctx, cmd, abortResult)
+			return
+		}
+	}
+
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
+
+	if p.LockAllProjectsBeforePlan {
+		p.releaseUnplannedLocks(ctx, projectCmds, result)
+	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -538,24 +760,7 @@ func (p *PlanCommandRunner) deletePlansAndPlanLocks(ctx *command.Context, projec
 }
 
 func (p *PlanCommandRunner) deletePlanLocks(ctx *command.Context, projectCmds []command.ProjectContext) error {
-	unlocked := make(map[string]bool)
-	for _, projCtx := range projectCmds {
-		if projCtx.RepoLocksMode != valid.RepoLocksOnPlanMode {
-			continue
-		}
-
-		lockKey := GenerateLockID(projCtx)
-		if unlocked[lockKey] {
-			continue
-		}
-		unlocked[lockKey] = true
-
-		project := models.NewProject(projCtx.BaseRepo.FullName, projCtx.RepoRelDir, projCtx.ProjectName)
-		if err := p.unlockPlanLockIfOwnedByPull(ctx, project, projCtx.Workspace, lockKey); err != nil {
-			return err
-		}
-	}
-	return nil
+	return p.unlockProjects(ctx, dedupeOnPlanProjects(projectCmds))
 }
 
 func (p *PlanCommandRunner) deletePlanLocksForPendingPlans(ctx *command.Context, plans []PendingPlan) error {
