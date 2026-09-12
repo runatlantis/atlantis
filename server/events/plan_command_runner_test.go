@@ -1558,7 +1558,6 @@ func TestPlanCommandRunner_PreLockOrderingAutoplan(t *testing.T) {
 	})
 
 	for _, projCtx := range []command.ProjectContext{projectA, projectB} {
-		projCtx := projCtx
 		When(projectCommandRunner.Plan(projCtx)).Then(func(_ []Param) ReturnValues {
 			sequence = append(sequence, "plan "+projCtx.ProjectName)
 			return ReturnValues{command.ProjectCommandOutput{
@@ -1769,7 +1768,7 @@ type failingUnlockLocker struct {
 
 func (f *failingUnlockLocker) UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error) {
 	if project.ProjectName == f.failProjectName {
-		if lock, err := f.Locker.GetLock(models.GenerateLockKey(project, workspace)); err == nil && lock != nil {
+		if lock, err := f.GetLock(models.GenerateLockKey(project, workspace)); err == nil && lock != nil {
 			return nil, errors.New("simulated unlock failure")
 		}
 	}
