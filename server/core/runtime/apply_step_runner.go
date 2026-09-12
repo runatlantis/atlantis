@@ -4,6 +4,8 @@
 package runtime
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -51,6 +53,16 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 		return "", fmt.Errorf("unable to read planfile: %w", err)
 	}
 
+	// This runner is itself a built-in apply step, irrespective of the
+	// context's managed-plan classification. Never fall back to mutable bytes.
+	if ctx.ExpectedPlanHash == "" {
+		return "", fmt.Errorf("expected plan hash is missing for dir %q workspace %q project %q; run `atlantis plan` before apply", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+	}
+	digest := sha256.Sum256(contents)
+	if hex.EncodeToString(digest[:]) != ctx.ExpectedPlanHash {
+		return "", fmt.Errorf("plan file changed for dir %q workspace %q project %q; run `atlantis plan` before apply", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+	}
+
 	ctx.Log.Info("starting apply")
 	var out string
 	tfDistribution := a.DefaultTFDistribution
@@ -65,16 +77,21 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 	// TODO: Leverage PlanTypeStepRunnerDelegate here
 	if IsRemotePlan(contents) {
 		args := append(append([]string{"apply", "-input=false", "-no-color"}, extraArgs...), ctx.CommentArgs...)
-		out, err = a.runRemoteApply(ctx, args, path, planPath, tfDistribution, tfVersion, envs)
+		out, err = a.runRemoteApply(ctx, args, path, contents, tfDistribution, tfVersion, envs)
 		if err == nil {
 			out = a.cleanRemoteApplyOutput(out)
 		}
 	} else {
+		executionPlanPath, cleanup, snapshotErr := writeValidatedPlanSnapshot(contents)
+		if snapshotErr != nil {
+			return "", snapshotErr
+		}
+		defer cleanup()
 		// NOTE: we need to quote the plan path because Bitbucket Server can
 		// have spaces in its repo owner names which is part of the path.
 		// planPath is passed as its own argument, so a path containing a space
 		// needs no quoting; quoting it would make the quotes part of the path.
-		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.CommentArgs...), planPath)
+		args := append(append(append([]string{"apply", "-input=false"}, extraArgs...), ctx.CommentArgs...), executionPlanPath)
 		out, err = a.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, tfDistribution, tfVersion, ctx.Workspace)
 	}
 
@@ -133,16 +150,11 @@ func (a *ApplyStepRunner) runRemoteApply(
 	ctx command.ProjectContext,
 	applyArgs []string,
 	path string,
-	absPlanPath string,
+	planfileBytes []byte,
 	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
-	// The planfile contents are needed to ensure that the plan didn't change
-	// between plan and apply phases.
-	planfileBytes, err := os.ReadFile(absPlanPath)
-	if err != nil {
-		return "", fmt.Errorf("reading planfile: %w", err)
-	}
+	var err error
 
 	// updateStatusF will update the commit status and log any error.
 	updateStatusF := func(status models.CommitStatus, url string) {
@@ -274,3 +286,27 @@ To resolve, re-run plan.`
 // terraform is waiting for confirmation to apply the plan.
 var waitingForConfirmation = `  Terraform will perform the actions described above.
   Only 'yes' will be accepted to approve.`
+
+// Keep execution copies in a private temporary directory without changing the
+// convention PLANFILE exposed to custom steps. The system temporary directory
+// is normally outside the checkout, but operators can override it with TMPDIR.
+// Terraform consumes only these verified bytes.
+func writeValidatedPlanSnapshot(contents []byte) (string, func(), error) {
+	dir, err := os.MkdirTemp("", "atlantis-validated-plan-")
+	if err != nil {
+		return "", nil, fmt.Errorf("creating validated plan directory: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("opening validated plan directory: %w", err)
+	}
+	defer root.Close()
+	path := filepath.Join(dir, "plan.tfplan")
+	if err := root.WriteFile("plan.tfplan", contents, 0400); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("writing validated plan snapshot: %w", err)
+	}
+	return path, cleanup, nil
+}
