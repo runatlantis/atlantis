@@ -270,10 +270,10 @@ func (p *PlanCommandRunner) handlePreLockAbort(ctx *command.Context, cmd PullCom
 // that did not end up producing a plan.
 //
 // Without it, a run stopped part way through would leave projects locked with no
-// plan to apply. That happens when `atlantis cancel` is used — which only
-// releases working directory locks, not repo locks — and when an execution order
-// group fails with abort_on_execution_order_fail, which drops every later group
-// without running it.
+// plan to apply. That happens when `atlantis cancel` is used, which only
+// releases working directory locks, not repo locks. It also happens when an
+// execution order group fails with abort_on_execution_order_fail, which drops
+// every later group without running it.
 //
 // Projects whose plan itself failed have already been unlocked by doPlan;
 // UnlockIfOwnedByPull is idempotent, so releasing them a second time is a no-op.

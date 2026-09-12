@@ -1159,11 +1159,10 @@ atlantis server --lock-all-projects-before-plan
 ATLANTIS_LOCK_ALL_PROJECTS_BEFORE_PLAN=true
 ```
 
-Acquire the Atlantis lock for every project in a plan run *before* running any
-plan, instead of locking each project immediately before it is planned. If any
-project cannot be locked — for example because another pull request holds its
-lock — no plans are run and the locks this run already acquired are released
-again.
+Acquire the Atlantis lock for every project in a plan run _before_ running any
+plan, instead of locking each project immediately before it is planned. If a
+project cannot be locked, for example because another pull request holds its
+lock, no plans run. This run releases the locks it already acquired.
 
 This helps on busy repositories with large pull requests, for example a provider
 version bump touching every project, where a competing pull request can otherwise
