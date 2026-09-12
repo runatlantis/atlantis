@@ -4,11 +4,14 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
 
+	"github.com/google/shlex"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -73,6 +76,175 @@ func (r staticProjectApplyRunner) Apply(command.ProjectContext) command.ProjectC
 	return r.output
 }
 
+func TestSelectApplyExecutionOrderGroup(t *testing.T) {
+	tests := []struct {
+		name             string
+		projectCmds      []command.ProjectContext
+		targeted         bool
+		wantProjects     []string
+		wantCompleted    int
+		wantRemaining    []int
+		wantContinuation bool
+	}{
+		{
+			name: "disabled preserves every group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "later", ExecutionOrderGroup: 5},
+				{ProjectName: "first", ExecutionOrderGroup: 1},
+			},
+			wantProjects: []string{"later", "first"},
+		},
+		{
+			name: "enabled selects every project in the lowest group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "later", ExecutionOrderGroup: 5, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "first-a", ExecutionOrderGroup: -2, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "middle", ExecutionOrderGroup: 3, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "first-b", ExecutionOrderGroup: -2, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects:     []string{"first-a", "first-b"},
+			wantCompleted:    -2,
+			wantRemaining:    []int{3, 5},
+			wantContinuation: true,
+		},
+		{
+			name: "unset group zero is selected before a positive group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "explicit", ExecutionOrderGroup: 2, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "unset", PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects:     []string{"unset"},
+			wantCompleted:    0,
+			wantRemaining:    []int{2},
+			wantContinuation: true,
+		},
+		{
+			name: "targeted apply preserves every group",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "first", ExecutionOrderGroup: 1, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "later", ExecutionOrderGroup: 2, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			targeted:     true,
+			wantProjects: []string{"first", "later"},
+		},
+		{
+			name: "final group does not advertise a continuation",
+			projectCmds: []command.ProjectContext{
+				{ProjectName: "only-a", ExecutionOrderGroup: 4, PauseApplyBetweenExecutionOrderGroups: true},
+				{ProjectName: "only-b", ExecutionOrderGroup: 4, PauseApplyBetweenExecutionOrderGroups: true},
+			},
+			wantProjects: []string{"only-a", "only-b"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			selected, continuation := selectApplyExecutionOrderGroup(test.projectCmds, test.targeted)
+			gotProjects := make([]string, 0, len(selected))
+			for _, projectCmd := range selected {
+				gotProjects = append(gotProjects, projectCmd.ProjectName)
+			}
+			if !slices.Equal(gotProjects, test.wantProjects) {
+				t.Fatalf("selected projects = %v, want %v", gotProjects, test.wantProjects)
+			}
+			if !test.wantContinuation {
+				if continuation != nil {
+					t.Fatalf("continuation = %#v, want nil", continuation)
+				}
+				return
+			}
+			if continuation == nil {
+				t.Fatal("continuation = nil, want continuation")
+			}
+			if continuation.CompletedExecutionOrderGroup != test.wantCompleted {
+				t.Fatalf("completed group = %d, want %d", continuation.CompletedExecutionOrderGroup, test.wantCompleted)
+			}
+			if !slices.Equal(continuation.RemainingExecutionOrderGroups, test.wantRemaining) {
+				t.Fatalf("remaining groups = %v, want %v", continuation.RemainingExecutionOrderGroups, test.wantRemaining)
+			}
+		})
+	}
+}
+
+func TestBuildApplyContinuationCommandArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  *CommentCommand
+		want []string
+	}{
+		{
+			name: "no options",
+			cmd:  &CommentCommand{Name: command.Apply},
+			want: []string{"atlantis", "apply"},
+		},
+		{
+			name: "automerge disabled verbose and terraform flags",
+			cmd: &CommentCommand{
+				Name:              command.Apply,
+				AutoMergeDisabled: true,
+				Verbose:           true,
+				Flags:             []string{"-lock-timeout=10m", "value with spaces", "it's", ""},
+			},
+			want: []string{"atlantis", "apply", "--auto-merge-disabled", "--verbose", "--", "-lock-timeout=10m", "value with spaces", "it's", ""},
+		},
+		{
+			name: "automerge method",
+			cmd:  &CommentCommand{Name: command.Apply, AutoMergeMethod: "rebase"},
+			want: []string{"atlantis", "apply", "--auto-merge-method", "rebase"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			commandLine := "atlantis apply"
+			if args := buildApplyContinuationCommandArgs(test.cmd); args != "" {
+				commandLine += " " + args
+			}
+			got, err := shlex.Split(commandLine)
+			if err != nil {
+				t.Fatalf("parsing continuation command %q: %v", commandLine, err)
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("parsed continuation command = %q, want %q; command was %q", got, test.want, commandLine)
+			}
+		})
+	}
+}
+
+func TestStagedApplyDeleteSourceBranchError(t *testing.T) {
+	mixed := []command.ProjectContext{
+		{ProjectName: "dev", DeleteSourceBranchOnMerge: false},
+		{ProjectName: "production", DeleteSourceBranchOnMerge: true},
+	}
+	consistent := []command.ProjectContext{
+		{ProjectName: "dev", DeleteSourceBranchOnMerge: true},
+		{ProjectName: "production", DeleteSourceBranchOnMerge: true},
+	}
+
+	tests := []struct {
+		name              string
+		projectCmds       []command.ProjectContext
+		automergeEnabled  bool
+		automergeDisabled bool
+		wantError         bool
+	}{
+		{name: "mixed settings with automerge", projectCmds: mixed, automergeEnabled: true, wantError: true},
+		{name: "consistent settings with automerge", projectCmds: consistent, automergeEnabled: true},
+		{name: "mixed settings without automerge", projectCmds: mixed},
+		{name: "mixed settings with command override", projectCmds: mixed, automergeEnabled: true, automergeDisabled: true},
+		{name: "no projects", automergeEnabled: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := stagedApplyDeleteSourceBranchError(test.projectCmds, test.automergeEnabled, test.automergeDisabled)
+			if (err != nil) != test.wantError {
+				t.Fatalf("error = %v, wantError = %t", err, test.wantError)
+			}
+		})
+	}
+}
+
 type recordingDeferredApplyRunner struct {
 	output   command.ProjectCommandOutput
 	statuses []models.CommitStatus
@@ -84,6 +256,15 @@ func (r *recordingDeferredApplyRunner) Apply(command.ProjectContext) command.Pro
 
 func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) {
 	r.statuses = append(r.statuses, status)
+}
+
+type failingApplyResultDatabase struct {
+	db.Database
+	err error
+}
+
+func (d failingApplyResultDatabase) UpdatePullWithResults(models.PullRequest, []command.ProjectResult) (models.PullStatus, error) {
+	return models.PullStatus{}, d.err
 }
 
 type sequenceApplyIdentityFetcher struct {
@@ -101,6 +282,20 @@ func (f *sequenceApplyIdentityFetcher) GetLivePullIdentity(command.ProjectContex
 	}
 	f.calls++
 	return f.identities[idx], nil
+}
+
+type failingFinalApplyIdentityFetcher struct {
+	pull  models.PullRequest
+	calls int
+	err   error
+}
+
+func (f *failingFinalApplyIdentityFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	f.calls++
+	if f.calls == 1 {
+		return f.pull, nil
+	}
+	return models.PullRequest{}, f.err
 }
 
 func TestApplyCommandRunner_DeferredApplySuccessPublishesAfterFinalFreshness(t *testing.T) {
@@ -193,7 +388,101 @@ func TestApplyCommandRunner_DeferredApplySuccessFailsWhenFinalFreshnessFails(t *
 	}
 }
 
-func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
+func TestApplyCommandRunner_DeferredApplyFailsWhenFinalIdentityFetchFails(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+	}
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredRunner := &recordingDeferredApplyRunner{output: command.ProjectCommandOutput{
+		ApplySuccess: "applied",
+	}}
+	runner := newInternalApplyCommandRunner(t, database, staticApplyCommandBuilder{commands: []command.ProjectContext{{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dirA",
+		Workspace:         DefaultWorkspace,
+		ProjectName:       "projA",
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              pull,
+	}}}, deferredRunner, &failingFinalApplyIdentityFetcher{
+		pull: pull,
+		err:  errors.New("github unavailable"),
+	})
+	ctx := newInternalApplyContext(t, pull)
+
+	runner.Run(ctx, &CommentCommand{Name: command.Apply, ProjectName: "projA"})
+
+	if !ctx.CommandHasErrors {
+		t.Fatal("expected final identity fetch failure to mark the command as errored")
+	}
+	if containsCommitStatus(deferredRunner.statuses, models.SuccessCommitStatus) {
+		t.Fatalf("expected no deferred project apply success after final identity fetch failure, got %v", deferredRunner.statuses)
+	}
+	if !containsCommitStatus(deferredRunner.statuses, models.FailedCommitStatus) {
+		t.Fatalf("expected deferred project apply failure after final identity fetch failure, got %v", deferredRunner.statuses)
+	}
+}
+
+func TestApplyCommandRunner_DeferredApplyFailsWhenPersistenceFails(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { database.Close() })
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+	}
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		internalPlannedProjectResult("dev", DefaultWorkspace, "dev"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deferredRunner := &recordingDeferredApplyRunner{output: command.ProjectCommandOutput{
+		ApplySuccess: "applied",
+	}}
+	runner := newInternalApplyCommandRunner(t, failingApplyResultDatabase{
+		Database: database,
+		err:      errors.New("database unavailable"),
+	}, staticApplyCommandBuilder{commands: []command.ProjectContext{{
+		CommandName:       command.Apply,
+		RepoRelDir:        "dev",
+		Workspace:         DefaultWorkspace,
+		ProjectName:       "dev",
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              pull,
+	}}}, deferredRunner, &sequenceApplyIdentityFetcher{identities: []models.PullRequest{pull, pull}})
+	ctx := newInternalApplyContext(t, pull)
+
+	runner.Run(ctx, &CommentCommand{Name: command.Apply})
+
+	if !ctx.CommandHasErrors {
+		t.Fatal("expected persistence failure to mark the command as errored")
+	}
+	if containsCommitStatus(deferredRunner.statuses, models.SuccessCommitStatus) {
+		t.Fatalf("expected no deferred project apply success after persistence failure, got %v", deferredRunner.statuses)
+	}
+	if !containsCommitStatus(deferredRunner.statuses, models.FailedCommitStatus) {
+		t.Fatalf("expected deferred project apply failure after persistence failure, got %v", deferredRunner.statuses)
+	}
+}
+
+func newInternalApplyCommandRunner(t *testing.T, database db.Database, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
 	t.Helper()
 	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
 	pullUpdater := &PullUpdater{
