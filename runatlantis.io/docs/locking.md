@@ -67,12 +67,12 @@ Once a plan is discarded, you'll need to run `plan` again prior to running `appl
 By default Atlantis locks each project immediately before it plans that project,
 so a run over many projects interleaves locking and planning:
 
-```
+```plain
 lock project A -> plan project A -> lock project B -> plan project B
 ```
 
-On busy repositories with large pull requests — a provider version bump touching
-every project, for example — this leaves a window open. Another pull request can
+On busy repositories with large pull requests, such as a provider version bump
+touching every project, this leaves a window open. Another pull request can
 take the lock for a project that has not been reached yet, halfway through a long
 run. Atlantis then fails on that lock and discards the plans it had already
 produced.
@@ -82,14 +82,14 @@ does not solve this: it removes locking from planning altogether, so two pull
 requests can plan the same project at the same time and only discover they
 disagree when one of them applies. `--lock-all-projects-before-plan` keeps the
 default guarantee that only one pull request can be planning a given project at
-a time — it only changes *when* the lock for each project is taken, not
+a time. It only changes _when_ the lock for each project is taken, not
 whether one is taken.
 
 Starting Atlantis with
 [`--lock-all-projects-before-plan`](server-configuration.md#-lock-all-projects-before-plan)
 acquires every lock up front instead:
 
-```
+```plain
 lock project A -> lock project B -> plan project A -> plan project B
 ```
 
@@ -102,10 +102,10 @@ Notes:
 
 * Projects configured with `repo_locks: {mode: on_apply}` or `mode: disabled` are
   not pre-locked.
-* Projects that end up producing no plan — because the run was stopped with
-  `atlantis cancel`, or because an earlier execution order group failed with
-  `abort_on_execution_order_fail` — have their locks released when the run
-  finishes, so pre-locking never leaves a project locked with no plan to apply.
+* Projects that end up producing no plan have their locks released when the
+  run finishes, so pre-locking never leaves a project locked with no plan to
+  apply. This covers a run stopped with `atlantis cancel`, and an earlier
+  execution order group that failed with `abort_on_execution_order_fail`.
 * If the Atlantis server itself dies mid-run, the pre-acquired locks stay behind
   until the pull request is closed or someone runs `atlantis unlock`. That is the
   same recovery path as any other interrupted run, but pre-locking makes it
