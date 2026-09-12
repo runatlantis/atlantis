@@ -62,6 +62,55 @@ para eliminar el bloqueo.
 
 Una vez que se descarta un plan, necesitarás ejecutar `plan` de nuevo antes de ejecutar `apply` cuando regreses a ese pull request.
 
+## Bloqueo de todos los proyectos antes de planificar {#locking-all-projects-before-planning}
+
+Por defecto, Atlantis bloquea cada proyecto justo antes de planificarlo, por lo que una
+ejecución sobre muchos proyectos intercala bloqueo y planificación:
+
+```plain
+lock project A -> plan project A -> lock project B -> plan project B
+```
+
+En repositorios con mucha actividad y pull requests grandes, como un cambio de versión
+de provider que afecta a todos los proyectos, esto deja una ventana abierta. Otro pull
+request puede tomar el bloqueo de un proyecto al que aún no se ha llegado, a mitad de
+una ejecución larga. Atlantis entonces falla en ese bloqueo y descarta los planes que ya
+había producido.
+
+Configurar [`repo_locks: {mode: on_apply}`](repo-level-atlantis-yaml.md#repolocks)
+no resuelve esto: elimina el bloqueo de la planificación por completo, por lo que dos
+pull requests pueden planificar el mismo proyecto al mismo tiempo, y solo descubren que
+están en desacuerdo cuando uno de ellos aplica. `--lock-all-projects-before-plan`
+mantiene la garantía por defecto de que solo un pull request puede estar planificando un
+proyecto dado a la vez. Solo cambia _cuándo_ se toma el bloqueo de cada proyecto, no si
+se toma.
+
+Iniciar Atlantis con
+[`--lock-all-projects-before-plan`](server-configuration.md#-lock-all-projects-before-plan)
+adquiere todos los bloqueos por adelantado en su lugar:
+
+```plain
+lock project A -> lock project B -> plan project A -> plan project B
+```
+
+Si no se puede adquirir algún bloqueo, no se ejecuta ningún plan, y los bloqueos que esta
+ejecución ya había tomado se liberan de nuevo, de modo que un pull request competidor
+nunca queda bloqueado por una ejecución que se rindió. El comentario del pull request
+nombra el proyecto que quedó bloqueado y quién tiene su bloqueo, igual que hoy.
+
+Notas:
+
+* Los proyectos configurados con `repo_locks: {mode: on_apply}` o `mode: disabled` no
+  se bloquean por adelantado.
+* Los proyectos que terminan sin producir un plan tienen su bloqueo liberado cuando la
+  ejecución termina, de modo que el bloqueo por adelantado nunca deja un proyecto
+  bloqueado sin nada que aplicar. Esto cubre una ejecución detenida con `atlantis cancel`,
+  y un grupo de orden de ejecución anterior que falló con `abort_on_execution_order_fail`.
+* Si el propio servidor de Atlantis muere a mitad de la ejecución, los bloqueos ya
+  adquiridos permanecen hasta que se cierra el pull request o alguien ejecuta
+  `atlantis unlock`. Esa es la misma vía de recuperación que cualquier otra ejecución
+  interrumpida, pero el bloqueo por adelantado hace que afecte a más proyectos a la vez.
+
 ## Relación con Terraform State Locking
 
 Atlantis no entra en conflicto con [Terraform State Locking](https://developer.hashicorp.com/terraform/language/state/locking). Internamente, todo lo que
