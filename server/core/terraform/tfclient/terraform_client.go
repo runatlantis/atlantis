@@ -111,6 +111,7 @@ func NewClientWithDefaultVersion(
 	tfDownloadURL string,
 	tfDownloadAllowed bool,
 	usePluginCache bool,
+	providerCache *ProviderCacheConfig,
 	fetchAsync bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
@@ -161,13 +162,14 @@ func NewClientWithDefaultVersion(
 		}
 	}
 
-	// If tfeToken is set, we try to create a ~/.terraformrc file.
-	if tfeToken != "" {
+	// If tfeToken and/or the provider cache proxy are set, we try to create a
+	// ~/.terraformrc file with the corresponding credentials and host blocks.
+	if tfeToken != "" || providerCache != nil {
 		home, err := homedir.Dir()
 		if err != nil {
 			return nil, fmt.Errorf("getting home dir to write ~/.terraformrc file: %w", err)
 		}
-		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
+		if err := generateRCFile(tfeToken, tfeHostname, providerCache, home); err != nil {
 			return nil, err
 		}
 	}
@@ -214,6 +216,7 @@ func NewTestClient(
 		tfDownloadURL,
 		tfDownloadAllowed,
 		usePluginCache,
+		nil,
 		false,
 		projectCmdOutputHandler,
 	)
@@ -252,6 +255,7 @@ func NewClient(
 		tfDownloadURL,
 		tfDownloadAllowed,
 		usePluginCache,
+		nil,
 		true,
 		projectCmdOutputHandler,
 	)
@@ -791,13 +795,33 @@ func deleteVersionBinaryPath(versions map[string]string, versionsLock *sync.Mute
 	}
 }
 
-// generateRCFile generates a .terraformrc file containing config for tfeToken
-// and hostname tfeHostname.
-// It will create the file in home/.terraformrc.
-func generateRCFile(tfeToken string, tfeHostname string, home string) error {
+// ProviderCacheConfig describes how the generated CLI config file should point
+// Terraform at the local provider cache proxy. It is nil when the proxy is
+// disabled.
+type ProviderCacheConfig struct {
+	// MirrorBaseURL is the proxy base URL, ending in a trailing slash, e.g.
+	// "http://127.0.0.1:47021/".
+	MirrorBaseURL string
+	// RegistryHosts are the registry hostnames whose service discovery should be
+	// redirected through the proxy, e.g. ["registry.terraform.io"].
+	RegistryHosts []string
+}
+
+// generateRCFile generates the Terraform CLI configuration file
+// (home/.terraformrc). It writes a credentials block when tfeToken is set and a
+// host block per registry when providerCache is set, so that Terraform Cloud/
+// Enterprise auth and the provider cache proxy can coexist in the single CLI
+// config file Terraform reads.
+//
+// If neither is configured there is nothing to write and it is a no-op.
+func generateRCFile(tfeToken string, tfeHostname string, providerCache *ProviderCacheConfig, home string) error {
+	config := cliConfigContents(tfeToken, tfeHostname, providerCache)
+	if config == "" {
+		return nil
+	}
+
 	const rcFilename = ".terraformrc"
 	rcFile := filepath.Join(home, rcFilename)
-	config := fmt.Sprintf(rcFileContents, tfeHostname, tfeToken)
 
 	// If there is already a .terraformrc file and its contents aren't exactly
 	// what we would have written to it, then we error out because we don't
@@ -808,7 +832,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 			return fmt.Errorf("trying to read %s to ensure we're not overwriting it: %w", rcFile, err)
 		}
 		if config != string(currContents) {
-			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
+			return fmt.Errorf("can't write Terraform CLI config to %s because that file has contents that would be overwritten", rcFile)
 		}
 		// Otherwise we don't need to write the file because it already has
 		// what we need.
@@ -816,9 +840,25 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	}
 
 	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
-		return fmt.Errorf("writing generated %s file with TFE token to %s: %w", rcFilename, rcFile, err)
+		return fmt.Errorf("writing generated %s file to %s: %w", rcFilename, rcFile, err)
 	}
 	return nil
+}
+
+// cliConfigContents builds the contents of the CLI config file from the
+// optional TFE credentials and optional provider cache proxy configuration.
+func cliConfigContents(tfeToken string, tfeHostname string, providerCache *ProviderCacheConfig) string {
+	var blocks []string
+	if tfeToken != "" {
+		blocks = append(blocks, fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken))
+	}
+	if providerCache != nil {
+		for _, host := range providerCache.RegistryHosts {
+			providersV1 := providerCache.MirrorBaseURL + host + "/v1/providers/"
+			blocks = append(blocks, fmt.Sprintf(hostBlock, host, providersV1))
+		}
+	}
+	return strings.Join(blocks, "\n\n")
 }
 
 func isAsyncEligibleCommand(cmd string) bool {
@@ -862,9 +902,18 @@ func terraformVersionEnv(env []string) []string {
 	return append(out, "CHECKPOINT_DISABLE=1", "TF_CLI_ARGS=", "TF_CLI_ARGS_version=")
 }
 
-// rcFileContents is a format string to be used with Sprintf that can be used
-// to generate the contents of a ~/.terraformrc file for authenticating with
-// Terraform Enterprise.
-var rcFileContents = `credentials "%s" {
+// credentialsBlock is a format string to be used with Sprintf that generates a
+// credentials block for authenticating with Terraform Enterprise.
+var credentialsBlock = `credentials "%s" {
   token = %q
+}`
+
+// hostBlock is a format string to be used with Sprintf that generates a host
+// block redirecting a registry's provider service discovery through the local
+// provider cache proxy. The first %s is the registry hostname; the second is
+// the proxy's providers.v1 base URL.
+var hostBlock = `host "%s" {
+  services = {
+    "providers.v1" = "%s"
+  }
 }`
