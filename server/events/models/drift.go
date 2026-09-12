@@ -385,6 +385,8 @@ type DriftDetectionRequest struct {
 	Type string `json:"type"`
 	// Projects is a list of project names to check. If empty, all projects are checked.
 	Projects []string `json:"projects,omitempty"`
+	// ExcludeProjects is a list of project names to skip during full detection. Cannot be combined with projects or paths.
+	ExcludeProjects []string `json:"exclude_projects,omitempty"`
 	// Paths is a list of paths to check. If empty, project names are used.
 	Paths []DriftDetectionPath `json:"paths,omitempty"`
 	// IncludePlanOutput controls whether the response includes the
@@ -422,9 +424,18 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	if len(r.Projects) > 0 && len(r.Paths) > 0 {
 		errors = append(errors, FieldError{Field: "paths", Message: "projects and paths cannot both be set"})
 	}
+	if len(r.ExcludeProjects) > 0 && (len(r.Projects) > 0 || len(r.Paths) > 0) {
+		errors = append(errors, FieldError{Field: "exclude_projects", Message: "exclude_projects cannot be combined with projects or paths"})
+	}
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})
+			break
+		}
+	}
+	for _, project := range r.ExcludeProjects {
+		if strings.TrimSpace(project) == "" {
+			errors = append(errors, FieldError{Field: "exclude_projects", Message: "project names cannot be empty"})
 			break
 		}
 	}
