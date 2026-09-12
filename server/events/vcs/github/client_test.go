@@ -1312,7 +1312,7 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 			allowSquash:       true,
 			mergeMethodOption: "unknown",
 			expMethod:         "",
-			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, rebase, squash'",
+			expErr:            "merge method 'unknown' is unknown. Specify one of the valid values: 'merge, merge-queue, rebase, squash'",
 		},
 	}
 
@@ -1396,6 +1396,92 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 			} else {
 				ErrContains(t, c.expErr, err)
 			}
+		})
+	}
+}
+
+// Test that the merge-queue merge method hands the pull request off to GitHub's
+// merge queue over GraphQL rather than merging it over REST.
+func TestClient_MergePullMergeQueue(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := map[string]struct {
+		enqueueResp string
+		expErr      string
+	}{
+		"queued": {
+			enqueueResp: `{"data":{"enqueuePullRequest":{"mergeQueueEntry":{"position":3,"state":"QUEUED"}}}}`,
+		},
+		"merge queue not enabled": {
+			enqueueResp: `{"errors":[{"message":"Merge queue is not enabled on the base branch"}]}`,
+			expErr:      "adding pull request to the merge queue: Merge queue is not enabled on the base branch",
+		},
+		"head moved on": {
+			enqueueResp: `{"errors":[{"message":"Expected head OID does not match the pull request head"}]}`,
+			expErr:      "adding pull request to the merge queue: Expected head OID does not match the pull request head",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			var gotMutationBody string
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.RequestURI != "/api/graphql" {
+						// The REST merge endpoint must never be hit for this
+						// merge method.
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+					body, err := io.ReadAll(r.Body)
+					Ok(t, err)
+					defer r.Body.Close() // nolint: errcheck
+
+					if strings.Contains(string(body), "enqueuePullRequest") {
+						gotMutationBody = string(body)
+						w.Write([]byte(c.enqueueResp)) // nolint: errcheck
+						return
+					}
+					// The node ID lookup that the mutation input needs.
+					w.Write([]byte(`{"data":{"repository":{"pullRequest":{"id":"PR_kwDOABCD"}}}}`)) // nolint: errcheck
+				}))
+			defer testServer.Close()
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logger)
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			err = client.MergePull(
+				logger,
+				models.PullRequest{
+					BaseRepo: models.Repo{
+						FullName: "runatlantis/atlantis",
+						Owner:    "runatlantis",
+						Name:     "atlantis",
+						VCSHost: models.VCSHost{
+							Type:     models.Github,
+							Hostname: "github.com",
+						},
+					},
+					Num:        1,
+					HeadCommit: "6dcb09b5b57875f334f61aebed695e2e4193db5e",
+				}, models.PullRequestOptions{
+					MergeMethod: github.MergeQueueMergeMethod,
+				})
+
+			if c.expErr == "" {
+				Ok(t, err)
+			} else {
+				ErrContains(t, c.expErr, err)
+			}
+
+			// Whether or not the enqueue succeeded, we should have asked GitHub
+			// to enqueue the id we looked up, pinned to the head we applied.
+			Assert(t, strings.Contains(gotMutationBody, `"pullRequestId":"PR_kwDOABCD"`),
+				"expected mutation to carry the pull request node id, got %q", gotMutationBody)
+			Assert(t, strings.Contains(gotMutationBody, `"expectedHeadOid":"6dcb09b5b57875f334f61aebed695e2e4193db5e"`),
+				"expected mutation to pin the head commit, got %q", gotMutationBody)
 		})
 	}
 }
