@@ -103,3 +103,9 @@ func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.Projec
 	return result
 
 }
+
+func (p *InstrumentedProjectCommandRunner) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	if publisher, ok := p.projectCommandRunner.(DeferredPlanStatusPublisher); ok {
+		publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+	}
+}

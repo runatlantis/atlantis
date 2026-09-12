@@ -162,6 +162,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredPlanStatusPublisher interface {
+	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus)
+}
+
 type DeferredApplyStatusPublisher interface {
 	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
 }
@@ -221,7 +225,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
-	if commandName == command.Apply {
+	if commandName == command.Apply || (commandName == command.Plan && !ctx.API) {
 		return result
 	}
 
@@ -1222,4 +1226,25 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 // built-in apply step will read it.
 func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, res := range result.ProjectResults {
+		if res.Command != command.Plan || res.PlanSuccess == nil || res.Error != nil || res.Failure != "" {
+			continue
+		}
+		for _, ctx := range projectCmds {
+			if ctx.CommandName != command.Plan || ctx.RepoRelDir != res.RepoRelDir || ctx.Workspace != res.Workspace || ctx.ProjectName != res.ProjectName || ctx.SuppressVCSStatus {
+				continue
+			}
+			output := res.ProjectCommandOutput
+			if result.Error != nil {
+				output = command.ProjectCommandOutput{Error: result.Error}
+			}
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &output); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+			}
+			break
+		}
+	}
 }
