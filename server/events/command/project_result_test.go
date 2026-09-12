@@ -20,6 +20,7 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 	}{
 		"plan success": {
 			command.ProjectResult{
+				Command: command.Plan,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					PlanSuccess: &models.PlanSuccess{},
 				},
@@ -28,6 +29,16 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		},
 		"policy_check success": {
 			command.ProjectResult{
+				Command: command.PolicyCheck,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{},
+				},
+			},
+			true,
+		},
+		"approve_policies success": {
+			command.ProjectResult{
+				Command: command.ApprovePolicies,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					PolicyCheckResults: &models.PolicyCheckResults{},
 				},
@@ -36,14 +47,55 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		},
 		"apply success": {
 			command.ProjectResult{
+				Command: command.Apply,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					ApplySuccess: "success",
 				},
 			},
 			true,
 		},
+		"apply success with empty output": {
+			command.ProjectResult{
+				Command: command.Apply,
+			},
+			true,
+		},
+		"apply output with error": {
+			command.ProjectResult{
+				Command: command.Apply,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "partial output",
+					Error:        errors.New("error"),
+				},
+			},
+			false,
+		},
+		"plan without success payload": {
+			command.ProjectResult{Command: command.Plan},
+			false,
+		},
+		"plan does not use apply output as success": {
+			command.ProjectResult{
+				Command: command.Plan,
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "unexpected apply output",
+				},
+			},
+			false,
+		},
+		"policy check without result payload": {
+			command.ProjectResult{Command: command.PolicyCheck},
+			false,
+		},
+		"unsupported command": {
+			command.ProjectResult{
+				Command: command.Unlock,
+			},
+			false,
+		},
 		"failure": {
 			command.ProjectResult{
+				Command: command.Apply,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Failure: "failure",
 				},
@@ -52,6 +104,7 @@ func TestProjectResult_IsSuccessful(t *testing.T) {
 		},
 		"error": {
 			command.ProjectResult{
+				Command: command.Apply,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: errors.New("error"),
 				},
