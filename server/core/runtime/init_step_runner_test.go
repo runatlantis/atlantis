@@ -9,7 +9,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	version "github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
@@ -447,6 +450,110 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 
 	expectedArgs := []string{"init", "-input=false", "-upgrade", "extra", "args"}
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+}
+
+// concurrencyTFExec records how many invocations ran concurrently and can
+// block each invocation until released to force overlap between goroutines.
+type concurrencyTFExec struct {
+	// barrier blocks every invocation until release is closed.
+	barrier bool
+	release chan struct{}
+	active  atomic.Int64
+	max     atomic.Int64
+	total   atomic.Int64
+}
+
+func (c *concurrencyTFExec) RunCommandWithVersion(ctx command.ProjectContext, path string, args []string, envs map[string]string, d tf.Distribution, v *version.Version, workspace string) (string, error) {
+	cur := c.active.Add(1)
+	c.total.Add(1)
+	for {
+		max := c.max.Load()
+		if cur <= max || c.max.CompareAndSwap(max, cur) {
+			break
+		}
+	}
+	if c.barrier {
+		<-c.release
+	} else {
+		time.Sleep(25 * time.Millisecond)
+	}
+	c.active.Add(-1)
+	return "", nil
+}
+
+func (c *concurrencyTFExec) EnsureVersion(log logging.SimpleLogging, d tf.Distribution, v *version.Version) error {
+	return nil
+}
+
+func TestRun_InitSerializedWhenPluginCacheEnabled(t *testing.T) {
+	RegisterMockTestingT(t)
+	exec := &concurrencyTFExec{release: make(chan struct{})}
+	logger := logging.NewNoopLogger(t)
+	tfVersion, _ := version.NewVersion("1.5.0")
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     exec,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+		PluginCache:           true,
+	}
+
+	const n = 5
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			_, err := iso.Run(command.ProjectContext{
+				Workspace:  "workspace",
+				RepoRelDir: ".",
+				Log:        logger,
+			}, nil, "/path", map[string]string(nil))
+			Ok(t, err)
+		})
+	}
+	wg.Wait()
+
+	Equals(t, int64(n), exec.total.Load())
+	Equals(t, int64(1), exec.max.Load())
+}
+
+func TestRun_InitParallelByDefault(t *testing.T) {
+	RegisterMockTestingT(t)
+	exec := &concurrencyTFExec{barrier: true, release: make(chan struct{})}
+	logger := logging.NewNoopLogger(t)
+	tfVersion, _ := version.NewVersion("1.5.0")
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     exec,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+	}
+
+	const n = 5
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			_, err := iso.Run(command.ProjectContext{
+				Workspace:  "workspace",
+				RepoRelDir: ".",
+				Log:        logger,
+			}, nil, "/path", map[string]string(nil))
+			Ok(t, err)
+		})
+	}
+
+	// Wait until all runs have entered the executor. If they were serialized
+	// this would time out because later runs only start after earlier ones.
+	deadline := time.Now().Add(10 * time.Second)
+	for exec.total.Load() < n && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+
+	Equals(t, int64(n), exec.max.Load())
+	close(exec.release)
+	wg.Wait()
+	Equals(t, int64(n), exec.total.Load())
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
