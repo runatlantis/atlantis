@@ -66,7 +66,7 @@ ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u4"
 # renovate: datasource=repology depName=debian_13/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=repology depName=debian_13/unzip versioning=loose
-ENV DEBIAN_UNZIP_VERSION="6.0-29"
+ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
 # renovate: datasource=repology depName=debian_13/openssh-server versioning=loose
 ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
 # renovate: datasource=repology depName=debian_13/dumb-init versioning=loose
