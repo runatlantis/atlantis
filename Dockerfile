@@ -74,7 +74,7 @@ ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
 # renovate: datasource=repology depName=debian_13/gnupg versioning=loose
 ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
 # renovate: datasource=repology depName=debian_13/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.5.6-1~deb13u2"
+ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u2"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
