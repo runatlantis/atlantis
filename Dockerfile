@@ -62,7 +62,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 # renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
 # renovate: datasource=repology depName=debian_13/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u4"
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u5"
 # renovate: datasource=repology depName=debian_13/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=repology depName=debian_13/unzip versioning=loose
