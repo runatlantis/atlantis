@@ -1002,7 +1002,20 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	return err
 }
 
-// MergePull merges the pull request.
+// MergePull merges the pull request. If the base branch enforces a merge
+// queue and merge-queue support is enabled (--gh-merge-queue-enabled),
+// Atlantis cannot merge directly via the REST API (GitHub returns 405); in
+// that case it enables auto-merge via GraphQL so GitHub will enqueue the PR
+// and merge it once the queue's checks pass.
+//
+// Detection works in two layers:
+//  1. Pre-flight: query both `branchProtectionRule.requiresMergeQueue` (classic
+//     branch protection) and `BaseRef.Rules` for any active `MERGE_QUEUE`
+//     ruleset rule via GraphQL.
+//  2. Post-flight: if the REST merge call returns 405 with a "merge queue"
+//     hint in the body, fall back to auto-merge. Safety net for edge cases
+//     such as a token without ruleset read scope or a base ref with >100
+//     ruleset rules.
 func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging GitHub pull request %d", pull.Num)
 	// Users can set their repo to disallow certain types of merging.
@@ -1053,6 +1066,25 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		}
 	}
 
+	// Pre-flight detection (only when the operator has opted in). Skipping
+	// the GraphQL call when the flag is off keeps the no-feature path on its
+	// existing single REST request.
+	var pullNodeID githubv4.ID
+	if g.config.MergeQueueEnabled {
+		nodeID, requiresMergeQueue, statusErr := g.getPullMergeQueueStatus(pull)
+		if statusErr != nil {
+			// Non-fatal: fall through to direct merge, with the post-flight
+			// 405 fallback as a second line of defense.
+			logger.Warn("Failed to determine merge queue status for PR %d: %s — attempting direct merge", pull.Num, statusErr)
+		} else {
+			pullNodeID = nodeID
+			if requiresMergeQueue {
+				logger.Info("Base branch of PR %d requires merge queue; enabling auto-merge", pull.Num)
+				return g.enablePullAutoMerge(logger, pull, pullNodeID, method)
+			}
+		}
+	}
+
 	// Now we're ready to make our API call to merge the pull request.
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
@@ -1070,11 +1102,131 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	if resp != nil {
 		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
 	}
+
+	if err != nil && isMergeQueueRejection(resp, err) {
+		if !g.config.MergeQueueEnabled {
+			return fmt.Errorf("merging pull request: base branch enforces a merge queue (e.g. via a ruleset) but --gh-merge-queue-enabled is off; enable the flag to route this PR through the queue: %w", err)
+		}
+		// Likely a ruleset-enforced merge queue. Fetch the PR node ID if we
+		// don't already have it, then auto-merge.
+		if pullNodeID == nil {
+			nodeID, _, idErr := g.getPullMergeQueueStatus(pull)
+			if idErr != nil {
+				return fmt.Errorf("merging pull request: base branch enforces a merge queue but couldn't fetch PR node ID for enqueue: %w", idErr)
+			}
+			pullNodeID = nodeID
+		}
+		logger.Info("Direct merge rejected with merge-queue indication (likely ruleset-enforced); enabling auto-merge for PR %d", pull.Num)
+		return g.enablePullAutoMerge(logger, pull, pullNodeID, method)
+	}
+
 	if err != nil {
 		return fmt.Errorf("merging pull request: %w", err)
 	}
 	if !mergeResult.GetMerged() {
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
+	}
+	return nil
+}
+
+// isMergeQueueRejection reports whether a failed merge response indicates the
+// base branch requires a merge queue. GitHub returns 405 Method Not Allowed
+// with a body whose `message` mentions the merge queue when the branch is
+// protected by either a classic rule or a ruleset.
+func isMergeQueueRejection(resp *github.Response, err error) bool {
+	if err == nil || resp == nil || resp.StatusCode != http.StatusMethodNotAllowed {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "merge queue") || strings.Contains(msg, "merge_queue")
+}
+
+// getPullMergeQueueStatus returns the PR's GraphQL node ID and whether its
+// base branch requires a merge queue. Both classic branch protection
+// (branchProtectionRule.requiresMergeQueue) and modern rulesets (a rule of
+// type MERGE_QUEUE with Enforcement == "ACTIVE") are inspected in a single
+// GraphQL request.
+//
+// Limitation: only the first 100 ruleset rules are inspected. If a base ref
+// has more than 100 rules and the MERGE_QUEUE rule sits past that boundary,
+// the post-flight 405 fallback in MergePull still routes the PR to
+// enablePullRequestAutoMerge.
+func (g *Client) getPullMergeQueueStatus(pull models.PullRequest) (githubv4.ID, bool, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				ID      githubv4.ID
+				BaseRef struct {
+					BranchProtectionRule struct {
+						RequiresMergeQueue githubv4.Boolean
+					}
+					Rules struct {
+						Nodes []struct {
+							Type              githubv4.String
+							RepositoryRuleset struct {
+								Enforcement githubv4.String
+							}
+						}
+					} `graphql:"rules(first: 100)"`
+				}
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]any{
+		"owner":  githubv4.String(pull.BaseRepo.Owner),
+		"name":   githubv4.String(pull.BaseRepo.Name),
+		"number": githubv4.Int(pull.Num), // #nosec G115: PR numbers fit in int32.
+	}
+	if err := g.v4Client.Query(g.ctx, &query, variables); err != nil {
+		return nil, false, fmt.Errorf("querying PR merge queue status: %w", err)
+	}
+
+	pr := query.Repository.PullRequest
+	if bool(pr.BaseRef.BranchProtectionRule.RequiresMergeQueue) {
+		return pr.ID, true, nil
+	}
+	for _, rule := range pr.BaseRef.Rules.Nodes {
+		if rule.Type == "MERGE_QUEUE" && rule.RepositoryRuleset.Enforcement == "ACTIVE" {
+			return pr.ID, true, nil
+		}
+	}
+	return pr.ID, false, nil
+}
+
+// enablePullAutoMerge enables auto-merge on the PR via GraphQL. For branches
+// that require a merge queue, GitHub enqueues the PR and merges it once the
+// queue's checks pass. The merge method is honored for non-queue branches; for
+// merge-queue branches GitHub ignores it and uses the queue's configured method.
+func (g *Client) enablePullAutoMerge(logger logging.SimpleLogging, pull models.PullRequest, pullNodeID githubv4.ID, method string) error {
+	var mutation struct {
+		EnablePullRequestAutoMerge struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"enablePullRequestAutoMerge(input: $input)"`
+	}
+
+	var ghMethod githubv4.PullRequestMergeMethod
+	switch method {
+	case "merge":
+		ghMethod = githubv4.PullRequestMergeMethodMerge
+	case "rebase":
+		ghMethod = githubv4.PullRequestMergeMethodRebase
+	case "squash":
+		ghMethod = githubv4.PullRequestMergeMethodSquash
+	default:
+		logger.Warn("Unknown merge method %q; defaulting to MERGE for auto-merge mutation", method)
+		ghMethod = githubv4.PullRequestMergeMethodMerge
+	}
+
+	input := githubv4.EnablePullRequestAutoMergeInput{
+		PullRequestID:    pullNodeID,
+		MergeMethod:      &ghMethod,
+		ClientMutationID: clientMutationID,
+	}
+	logger.Debug("enablePullRequestAutoMerge for PR %d", pull.Num)
+	if err := g.v4Client.Mutate(g.ctx, &mutation, input, nil); err != nil {
+		return fmt.Errorf("enabling auto-merge for pull request: %w", err)
 	}
 	return nil
 }
