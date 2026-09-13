@@ -1,0 +1,227 @@
+// Copyright 2024 contributors to runatlantis/atlantis.
+// SPDX-License-Identifier: Apache-2.0
+
+package providercache
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
+)
+
+// registryHost is a stand-in registry label. The real upstream is an httptest
+// server whose base URL we pre-seed into the discovery cache, so the label never
+// needs to resolve.
+const registryHost = "registry.example.com"
+
+// zipBody is the fake provider archive returned by the upstream server.
+const zipBody = "PK\x03\x04 fake provider archive"
+
+// newUpstream returns a fake registry server implementing the subset of the
+// provider registry protocol the proxy uses, plus an artifact endpoint. The
+// returned counter tracks how many times the archive itself was downloaded.
+func newUpstream(t *testing.T) (*httptest.Server, *int32) {
+	t.Helper()
+	var archiveHits int32
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/v1/providers/hashicorp/null/versions", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"versions":[{"version":"3.2.1","protocols":["5.0"],"platforms":[{"os":"linux","arch":"amd64"}]}]}`)
+	})
+
+	var self *httptest.Server
+	mux.HandleFunc("/v1/providers/hashicorp/null/3.2.1/download/linux/amd64", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"protocols":             []string{"5.0"},
+			"os":                    "linux",
+			"arch":                  "amd64",
+			"filename":              "terraform-provider-null_3.2.1_linux_amd64.zip",
+			"download_url":          self.URL + "/archives/terraform-provider-null_3.2.1_linux_amd64.zip",
+			"shasums_url":           self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS",
+			"shasums_signature_url": self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS.sig",
+			"shasum":                "abc123",
+			"signing_keys":          map[string]any{"gpg_public_keys": []any{}},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	mux.HandleFunc("/archives/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, ".zip") {
+			atomic.AddInt32(&archiveHits, 1)
+		}
+		_, _ = io.WriteString(w, zipBody)
+	})
+
+	self = httptest.NewServer(mux)
+	t.Cleanup(self.Close)
+	return self, &archiveHits
+}
+
+// newProxy starts a proxy pointed (via a pre-seeded discovery entry) at upstream.
+func newProxy(t *testing.T, upstream *httptest.Server) *Server {
+	t.Helper()
+	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0)
+	Ok(t, err)
+	// Bypass real (https) service discovery by seeding the resolved base URL.
+	s.disco[registryHost] = upstream.URL + "/v1/providers/"
+	s.Start()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = s.Stop(ctx)
+	})
+	return s
+}
+
+func mustGet(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	resp, err := http.Get(url) //nolint:gosec // test-controlled URL
+	Ok(t, err)
+	body, err := io.ReadAll(resp.Body)
+	Ok(t, err)
+	resp.Body.Close()
+	return resp, string(body)
+}
+
+func TestProxy_VersionsPassThrough(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	resp, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/versions")
+	Equals(t, http.StatusOK, resp.StatusCode)
+	Assert(t, strings.Contains(body, `"version":"3.2.1"`), "versions body should be passed through, got %q", body)
+}
+
+func TestProxy_DownloadRewritesURLsThroughArtifactEndpoint(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	resp, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/3.2.1/download/linux/amd64")
+	Equals(t, http.StatusOK, resp.StatusCode)
+
+	var meta map[string]any
+	Ok(t, json.Unmarshal([]byte(body), &meta))
+
+	artifactBase := s.MirrorBaseURL() + "artifact/" + registryHost + "/hashicorp/null/3.2.1/linux/amd64/"
+	expected := map[string]string{
+		"download_url":          artifactBase + "archive",
+		"shasums_url":           artifactBase + "shasums",
+		"shasums_signature_url": artifactBase + "signature",
+	}
+	for field, want := range expected {
+		v, _ := meta[field].(string)
+		Equals(t, want, v)
+		Assert(t, !strings.Contains(v, upstream.URL), "%s should not leak the upstream URL, got %q", field, v)
+	}
+	// Fields that must survive untouched.
+	Equals(t, "terraform-provider-null_3.2.1_linux_amd64.zip", meta["filename"])
+	Equals(t, "abc123", meta["shasum"])
+}
+
+func TestProxy_ArtifactCachesAndDedupes(t *testing.T) {
+	upstream, archiveHits := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	// Get the rewritten (coordinate-addressed) download URL from the metadata
+	// endpoint.
+	_, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/3.2.1/download/linux/amd64")
+	var meta map[string]any
+	Ok(t, json.Unmarshal([]byte(body), &meta))
+	artifactURL := meta["download_url"].(string)
+
+	// Fire many concurrent requests, as a burst of parallel `terraform init`
+	// runs would. Only a single upstream download should happen.
+	const n = 15
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			resp, got := mustGet(t, artifactURL)
+			Equals(t, http.StatusOK, resp.StatusCode)
+			Equals(t, zipBody, got)
+			Equals(t, "application/zip", resp.Header.Get("Content-Type"))
+		})
+	}
+	wg.Wait()
+
+	Equals(t, int32(1), atomic.LoadInt32(archiveHits))
+}
+
+func TestProxy_ArtifactServesShasumsAndSignature(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	base := s.MirrorBaseURL() + "artifact/" + registryHost + "/hashicorp/null/3.2.1/linux/amd64/"
+	for kind, wantCT := range map[string]string{
+		"shasums":   "text/plain; charset=utf-8",
+		"signature": "application/octet-stream",
+	} {
+		resp, body := mustGet(t, base+kind)
+		Equals(t, http.StatusOK, resp.StatusCode)
+		Equals(t, zipBody, body)
+		Equals(t, wantCT, resp.Header.Get("Content-Type"))
+	}
+}
+
+func TestProxy_ArtifactRejectsUnknownKind(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"artifact/"+registryHost+"/hashicorp/null/3.2.1/linux/amd64/bogus")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestProxy_ArtifactRejectsUnconfiguredRegistryHost(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	// The artifact endpoint is also bound to the configured registry allowlist.
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"artifact/evil.example.com/hashicorp/null/3.2.1/linux/amd64/archive")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestSegmentPattern(t *testing.T) {
+	for _, v := range []string{"hashicorp", "null", "3.2.1", "1.0.0-rc1", "linux", "amd64", "aws_v2"} {
+		Assert(t, segmentPattern.MatchString(v), "%q should be a valid segment", v)
+	}
+	for _, v := range []string{"", "..", "a/b", "a b", "-x", ".x", "a?b", strings.Repeat("a", 200)} {
+		Assert(t, !segmentPattern.MatchString(v), "%q should be an invalid segment", v)
+	}
+}
+
+func TestProxy_RejectsUnconfiguredRegistryHost(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	// A host that is not in the configured registry allowlist must be refused
+	// so the proxy cannot be used to reach arbitrary hosts (SSRF).
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"evil.example.com/v1/providers/hashicorp/null/versions")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestAllowedArtifactURL(t *testing.T) {
+	cases := map[string]bool{
+		"https://releases.hashicorp.com/x.zip": true,
+		"http://127.0.0.1:8080/x.zip":          true,
+		"http://localhost:8080/x.zip":          true,
+		"http://example.com/x.zip":             false,
+		"ftp://example.com/x.zip":              false,
+	}
+	for raw, want := range cases {
+		u, err := url.Parse(raw)
+		Ok(t, err)
+		Equals(t, want, allowedArtifactURL(u))
+	}
+}
