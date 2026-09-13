@@ -6,6 +6,7 @@ package websocket
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -42,7 +43,17 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 		}
 	}
 
-	// close ws conn after input channel is closed
+	// Send WebSocket Close Frame (RFC 6455) before closing the TCP connection.
+	// GCP HTTP(S) LB workaround: the GFE prematurely terminates the connection
+	// when WebSocket FIN and TCP FIN arrive together. Separating them with a
+	// short delay prevents the client from receiving a TCP FIN before it has
+	// finished reading all buffered data.
+	closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	if err = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second)); err != nil {
+		w.log.Warn("Failed to send ws close frame: %s", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
 	if err = conn.Close(); err != nil {
 		w.log.Warn("Failed to close ws connection: %s", err)
 	}
