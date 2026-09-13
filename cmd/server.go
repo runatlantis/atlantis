@@ -115,6 +115,33 @@ const (
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
 	LockingDBType                    = "locking-db-type"
+	EtcdModeFlag                     = "etcd-mode"
+	EtcdDeploymentIDFlag             = "etcd-deployment-id"
+	EtcdNamespaceFlag                = "etcd-namespace"
+	EtcdEndpointsFlag                = "etcd-endpoints"
+	EtcdCAFileFlag                   = "etcd-ca-file"
+	EtcdCertFileFlag                 = "etcd-cert-file"
+	EtcdKeyFileFlag                  = "etcd-key-file"
+	EtcdServerNameFlag               = "etcd-server-name"
+	EtcdUsernameFlag                 = "etcd-username"
+	EtcdPasswordFileFlag             = "etcd-password-file" // nolint: gosec
+	EtcdRequestTimeoutFlag           = "etcd-request-timeout"
+	EtcdStartupTimeoutFlag           = "etcd-startup-timeout"
+	EtcdAllowInsecureDevFlag         = "etcd-allow-insecure-dev"
+	EtcdEmbeddedConfigFileFlag       = "etcd-embedded-config-file"
+	EtcdEmbeddedVoterCountFlag       = "etcd-embedded-voter-count"
+	EtcdEmbeddedLifecycleFlag        = "etcd-embedded-lifecycle"
+	EtcdEmbeddedStartupPurposeFlag   = "etcd-embedded-startup-purpose"
+	EtcdEmbeddedIdentityFileFlag     = "etcd-embedded-identity-file"
+	EtcdEmbeddedJoinEndpointsFlag    = "etcd-embedded-join-endpoints"
+	EtcdEmbeddedMembershipTicketFile = "etcd-embedded-membership-ticket-file" // nolint: gosec
+	EtcdEmbeddedRestoreManifestFile  = "etcd-embedded-restore-manifest-file"
+	ReplicaIDFlag                    = "replica-id"
+	ReplicaAdvertiseURLFlag          = "replica-advertise-url"
+	ReplicaAdvertiseAllowlistFlag    = "replica-advertise-allowlist"
+	InternalCommandTokenFileFlag     = "internal-command-token-file" // nolint: gosec
+	InternalCommandCAFileFlag        = "internal-command-ca-file"
+	OwnershipTTLSecondsFlag          = "ownership-ttl-seconds"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
@@ -187,25 +214,34 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
-	DefaultLanguage                     = i18n.DefaultLanguage
-	DefaultLogLevel                     = "info"
-	DefaultIgnoreVCSStatusNames         = ""
-	DefaultMaxCommentsPerCommand        = 100
-	DefaultParallelPoolSize             = 15
-	DefaultStatsNamespace               = "atlantis"
-	DefaultPort                         = 4141
-	DefaultRedisDB                      = 0
-	DefaultRedisPort                    = 6379
-	DefaultRedisTLSEnabled              = false
-	DefaultRedisInsecureSkipVerify      = false
-	DefaultTFDistribution               = TFDistributionTerraform
-	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
-	DefaultTFDownload                   = true
-	DefaultTFEHostname                  = "app.terraform.io"
-	DefaultVCSStatusName                = "atlantis"
-	DefaultWebBasicAuth                 = false
-	DefaultWebUsername                  = "atlantis"
-	DefaultWebPassword                  = "atlantis"
+	// LockingDBTypeEtcd is the --locking-db-type value that selects the
+	// active-active etcd coordination backend.
+	LockingDBTypeEtcd                 = "etcd"
+	DefaultEtcdNamespace              = "/atlantis"
+	DefaultEtcdRequestTimeout         = "5s"
+	DefaultEtcdStartupTimeout         = "5m"
+	DefaultEtcdEmbeddedVoterCount     = 3
+	DefaultEtcdEmbeddedStartupPurpose = "serve"
+	DefaultOwnershipTTLSeconds        = 30
+	DefaultLanguage                   = i18n.DefaultLanguage
+	DefaultLogLevel                   = "info"
+	DefaultIgnoreVCSStatusNames       = ""
+	DefaultMaxCommentsPerCommand      = 100
+	DefaultParallelPoolSize           = 15
+	DefaultStatsNamespace             = "atlantis"
+	DefaultPort                       = 4141
+	DefaultRedisDB                    = 0
+	DefaultRedisPort                  = 6379
+	DefaultRedisTLSEnabled            = false
+	DefaultRedisInsecureSkipVerify    = false
+	DefaultTFDistribution             = TFDistributionTerraform
+	DefaultTFDownloadURL              = "https://releases.hashicorp.com"
+	DefaultTFDownload                 = true
+	DefaultTFEHostname                = "app.terraform.io"
+	DefaultVCSStatusName              = "atlantis"
+	DefaultWebBasicAuth               = false
+	DefaultWebUsername                = "atlantis"
+	DefaultWebPassword                = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -422,6 +458,86 @@ var stringFlags = map[string]stringFlag{
 		description:  "The locking database type to use for storing plan and apply locks.",
 		defaultValue: DefaultLockingDBType,
 	},
+	EtcdModeFlag: {
+		description: "etcd runtime mode when --locking-db-type=etcd. Either 'external' " +
+			"(connect to an existing etcd cluster) or 'embedded' (run an embedded etcd voter). " +
+			"Embedded mode is not yet implemented.",
+	},
+	EtcdDeploymentIDFlag: {
+		description: "Stable unique identifier for this logical Atlantis installation, used to " +
+			"guard the etcd namespace. Generated once and kept stable across restarts and migrations.",
+	},
+	EtcdNamespaceFlag: {
+		description:  "etcd key namespace under which all Atlantis keys are written.",
+		defaultValue: DefaultEtcdNamespace,
+	},
+	EtcdEndpointsFlag: {
+		description: "Comma-separated https etcd client endpoints for external mode, " +
+			"ex. https://member-0:2379,https://member-1:2379.",
+	},
+	EtcdCAFileFlag: {
+		description: "Path to the trusted CA certificate for verifying the etcd client listener.",
+	},
+	EtcdCertFileFlag: {
+		description: "Path to the Atlantis client certificate presented to etcd.",
+	},
+	EtcdKeyFileFlag: {
+		description: "Path to the private key for the Atlantis etcd client certificate.",
+	},
+	EtcdServerNameFlag: {
+		description: "Expected server name for etcd TLS hostname verification.",
+	},
+	EtcdUsernameFlag: {
+		description: "etcd RBAC username. When set, requires --etcd-password-file; mTLS remains mandatory.",
+	},
+	EtcdPasswordFileFlag: {
+		description: "Path to a file containing the etcd RBAC password. Required when --etcd-username is set.",
+	},
+	EtcdRequestTimeoutFlag: {
+		description:  "Timeout bounding individual etcd database, ownership, and readiness RPCs, ex. 5s.",
+		defaultValue: DefaultEtcdRequestTimeout,
+	},
+	EtcdStartupTimeoutFlag: {
+		description:  "Timeout bounding initial etcd connectivity and embedded quorum formation, ex. 5m.",
+		defaultValue: DefaultEtcdStartupTimeout,
+	},
+	EtcdEmbeddedConfigFileFlag: {
+		description: "Path to the embedded etcd configuration file (embedded mode).",
+	},
+	EtcdEmbeddedLifecycleFlag: {
+		description: "Embedded etcd lifecycle: bootstrap, restart, join-existing, or restore.",
+	},
+	EtcdEmbeddedStartupPurposeFlag: {
+		description:  "Embedded etcd startup purpose: serve or maintenance.",
+		defaultValue: DefaultEtcdEmbeddedStartupPurpose,
+	},
+	EtcdEmbeddedIdentityFileFlag: {
+		description: "Path to the embedded etcd identity manifest (embedded mode).",
+	},
+	EtcdEmbeddedJoinEndpointsFlag: {
+		description: "Comma-separated existing-cluster endpoints used only in join-existing mode.",
+	},
+	EtcdEmbeddedMembershipTicketFile: {
+		description: "Path to the one-time membership ticket file used only in join-existing mode.",
+	},
+	EtcdEmbeddedRestoreManifestFile: {
+		description: "Path to the pending recovery manifest used only in restore mode.",
+	},
+	ReplicaIDFlag: {
+		description: "Stable, unique replica identity for etcd active-active ownership. Defaults to the pod hostname.",
+	},
+	ReplicaAdvertiseURLFlag: {
+		description: "Internal https URL other replicas use to forward owner-routed commands to this replica.",
+	},
+	ReplicaAdvertiseAllowlistFlag: {
+		description: "Comma-separated host-or-CIDR allowlist of permitted internal forwarding destinations (SSRF guard).",
+	},
+	InternalCommandTokenFileFlag: {
+		description: "Path to a file containing the shared internal command transport token.",
+	},
+	InternalCommandCAFileFlag: {
+		description: "Path to the CA certificate that validates the internal command transport.",
+	},
 	LogLevelFlag: {
 		description:  "Log level. Either debug, info, warn, or error.",
 		defaultValue: DefaultLogLevel,
@@ -538,6 +654,11 @@ var stringFlags = map[string]stringFlag{
 var boolFlags = map[string]boolFlag{
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
+	},
+	EtcdAllowInsecureDevFlag: {
+		description: "Permit insecure (HTTP, no TLS) etcd connections for local development only. " +
+			"HTTP is accepted only for loopback addresses. Never enable in production.",
 		defaultValue: false,
 	},
 	AutoplanModules: {
@@ -707,6 +828,14 @@ var boolFlags = map[string]boolFlag{
 	},
 }
 var intFlags = map[string]intFlag{
+	EtcdEmbeddedVoterCountFlag: {
+		description:  "Desired final number of embedded etcd voting members. One of 3, 5, or 7.",
+		defaultValue: DefaultEtcdEmbeddedVoterCount,
+	},
+	OwnershipTTLSecondsFlag: {
+		description:  "TTL in seconds of the etcd ownership session lease. Minimum 10.",
+		defaultValue: DefaultOwnershipTTLSeconds,
+	},
 	CheckoutDepthFlag: {
 		description: fmt.Sprintf("Used only if --%s=%s.", CheckoutStrategyFlag, CheckoutStrategyMerge) +
 			" How many commits to include in each of base and feature branches when cloning repository." +
@@ -1018,6 +1147,24 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
 	}
+	if c.EtcdNamespace == "" {
+		c.EtcdNamespace = DefaultEtcdNamespace
+	}
+	if c.EtcdRequestTimeout == "" {
+		c.EtcdRequestTimeout = DefaultEtcdRequestTimeout
+	}
+	if c.EtcdStartupTimeout == "" {
+		c.EtcdStartupTimeout = DefaultEtcdStartupTimeout
+	}
+	if c.EtcdEmbeddedVoterCount == 0 {
+		c.EtcdEmbeddedVoterCount = DefaultEtcdEmbeddedVoterCount
+	}
+	if c.EtcdEmbeddedStartupPurpose == "" {
+		c.EtcdEmbeddedStartupPurpose = DefaultEtcdEmbeddedStartupPurpose
+	}
+	if c.OwnershipTTLSeconds == 0 {
+		c.OwnershipTTLSeconds = DefaultOwnershipTTLSeconds
+	}
 	if c.Language == "" {
 		c.Language = DefaultLanguage
 	}
@@ -1212,6 +1359,16 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
+	}
+
+	if userConfig.LockingDBType == LockingDBTypeEtcd && userConfig.EnableDriftDetection {
+		// Drift detection uses repository/ref identities and process-local
+		// storage, which has no distributed exclusion under active-active etcd
+		// routing; two replicas could remediate the same drift. Reject the
+		// combination rather than silently permitting duplicate remediation
+		// (design §594). This restriction lifts when drift gets its own
+		// distributed exclusion and storage design.
+		return fmt.Errorf("--%s cannot be combined with --%s=%s; drift detection has no distributed exclusion for active-active etcd yet", EnableDriftDetectionFlag, LockingDBType, LockingDBTypeEtcd)
 	}
 
 	return nil
