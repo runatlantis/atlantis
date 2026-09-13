@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
+ARG GOLANG_TAG=1.27.1-alpine3.24@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG TERRAFORM_1_15_VERSION=1.15.9
