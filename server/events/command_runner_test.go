@@ -59,6 +59,7 @@ var approvePoliciesCommandRunner *events.ApprovePoliciesCommandRunner
 var planCommandRunner *events.PlanCommandRunner
 var applyLockChecker *lockingmocks.MockApplyLockChecker
 var lockingLocker *lockingmocks.MockLocker
+var projectLocker *mocks.MockProjectLocker
 var applyCommandRunner *events.ApplyCommandRunner
 var unlockCommandRunner *events.UnlockCommandRunner
 var importCommandRunner *events.ImportCommandRunner
@@ -82,6 +83,13 @@ type TestConfig struct {
 	applyLockCheckerErr        error
 	workingDirLocker           events.WorkingDirLocker
 	livePullHeadFetcher        events.LivePullHeadFetcher
+	lockAllProjectsBeforePlan  bool
+	// projectLocker replaces the default MockProjectLocker. Set it to a real
+	// events.DefaultProjectLocker to assert on lock state instead of mock calls.
+	projectLocker events.ProjectLocker
+	// planLockingLocker replaces the default MockLocker passed to the plan
+	// command runner, for the same reason.
+	planLockingLocker locking.Locker
 }
 
 type configuredPreWorkflowHooksCommandRunner struct {
@@ -136,6 +144,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	commitUpdater = mocks.NewMockCommitStatusUpdater()
 	pullReqStatusFetcher = vcsmocks.NewMockPullReqStatusFetcher()
 	cancellationTracker = mocks.NewMockCancellationTracker()
+	projectLocker = mocks.NewMockProjectLocker()
 
 	drainer = &events.Drainer{}
 	deleteLockCommand = mocks.NewMockDeleteLockCommand()
@@ -177,6 +186,16 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	if workingDirLocker == nil {
 		workingDirLocker = events.NewDefaultWorkingDirLocker()
 	}
+
+	planProjectLocker := events.ProjectLocker(projectLocker)
+	if testConfig.projectLocker != nil {
+		planProjectLocker = testConfig.projectLocker
+	}
+	planLockingLocker := locking.Locker(lockingLocker)
+	if testConfig.planLockingLocker != nil {
+		planLockingLocker = testConfig.planLockingLocker
+	}
+
 	planCommandRunner = events.NewPlanCommandRunner(
 		testConfig.silenceVCSStatusNoPlans,
 		testConfig.silenceVCSStatusNoProjects,
@@ -195,10 +214,12 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.parallelPoolSize,
 		testConfig.SilenceNoProjects,
 		testConfig.database,
-		lockingLocker,
+		planLockingLocker,
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
 		testConfig.PendingApplyStatus,
+		planProjectLocker,
+		testConfig.lockAllProjectsBeforePlan,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -1896,6 +1917,8 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		locker,
 		false,
 		pullReqStatusFetcher,
+		false,
+		projectLocker,
 		false,
 	)
 	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
