@@ -1,6 +1,6 @@
 module github.com/runatlantis/atlantis
 
-go 1.26.6
+go 1.26.8
 
 require (
 	code.gitea.io/sdk/gitea v0.23.2
@@ -26,7 +26,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/hashicorp/go-getter/v2 v2.2.3
+	github.com/hashicorp/go-getter/v2 v2.2.4
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/hc-install v0.9.5
