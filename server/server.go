@@ -39,6 +39,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/drift"
+	"github.com/runatlantis/atlantis/server/core/etcd"
 	"github.com/runatlantis/atlantis/server/core/redis"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -128,6 +129,11 @@ type Server struct {
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
 	database                       db.Database
+	// etcdRuntime is non-nil only in etcd (active-active HA) mode. It owns
+	// coordination readiness and the ownership-releasing shutdown path.
+	etcdRuntime *etcd.Runtime
+	// etcdInternalHandler serves forwarded internal commands in etcd mode.
+	etcdInternalHandler http.Handler
 }
 
 // Config holds config for server that isn't passed in by the user.
@@ -493,6 +499,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
 	var database db.Database
+	// etcdRuntime is non-nil only in etcd (active-active HA) mode. It owns the
+	// coordination stack and drives owner routing, readiness, and shutdown.
+	var etcdRuntime *etcd.Runtime
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
@@ -531,6 +540,43 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+	case "etcd":
+		etcdCfg, buildErr := etcd.BuildConfig(etcd.Settings{
+			Mode:                      userConfig.EtcdMode,
+			DeploymentID:              userConfig.EtcdDeploymentID,
+			Namespace:                 userConfig.EtcdNamespace,
+			Endpoints:                 userConfig.EtcdEndpoints,
+			CAFile:                    userConfig.EtcdCAFile,
+			CertFile:                  userConfig.EtcdCertFile,
+			KeyFile:                   userConfig.EtcdKeyFile,
+			ServerName:                userConfig.EtcdServerName,
+			Username:                  userConfig.EtcdUsername,
+			PasswordFile:              userConfig.EtcdPasswordFile,
+			RequestTimeout:            userConfig.EtcdRequestTimeout,
+			StartupTimeout:            userConfig.EtcdStartupTimeout,
+			AllowInsecureDev:          userConfig.EtcdAllowInsecureDev,
+			ReplicaID:                 userConfig.ReplicaID,
+			ReplicaAdvertiseURL:       userConfig.ReplicaAdvertiseURL,
+			ReplicaAdvertiseAllowlist: userConfig.ReplicaAdvertiseAllowlist,
+			InternalCommandTokenFile:  userConfig.InternalCommandTokenFile,
+			InternalCommandCAFile:     userConfig.InternalCommandCAFile,
+			OwnershipTTLSeconds:       userConfig.OwnershipTTLSeconds,
+		})
+		if buildErr != nil {
+			return nil, buildErr
+		}
+		logger.Info("Utilizing etcd (%s mode) for locking and coordination", etcdCfg.Mode)
+		rt, rtErr := etcd.NewRuntime(context.Background(), etcdCfg)
+		if rtErr != nil {
+			return nil, rtErr
+		}
+		etcdRuntime = rt
+		// The database adapter serves locks/status; owner routing, readiness, and
+		// ownership-session shutdown are wired below once the command runner exists
+		// (AttachExecutor, SetupRoutes, Readyz, and the shutdown path).
+		database = etcdRuntime.Database()
+	default:
+		return nil, fmt.Errorf("unsupported locking-db-type %q; supported values are boltdb, redis, etcd", dbtype)
 	}
 
 	noOpLocker := locking.NewNoOpLocker()
@@ -1041,6 +1087,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
 	}
+
+	// In etcd (active-active HA) mode, decorate the command runner with owner
+	// routing so exactly one replica executes each pull request's commands, and
+	// mount the internal command transport that receives forwarded commands. The
+	// non-etcd path is unchanged: eventsCommandRunner stays the plain runner.
+	var eventsCommandRunner events.CommandRunner = commandRunner
+	var etcdInternalHandler http.Handler
+	if etcdRuntime != nil {
+		coordinator := etcd.NewRuntimeCoordinator(etcdRuntime)
+		router := events.NewEtcdCommandRouter(commandRunner, coordinator, vcsClient, logger)
+		etcdInternalHandler = etcdRuntime.AttachExecutor(router)
+		eventsCommandRunner = router
+	}
+
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
 		return nil, err
@@ -1104,6 +1164,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 	}
 
+	if etcdRuntime != nil {
+		// Positive-PR API plan/apply requests are proxied to the owning replica in
+		// etcd (active-active HA) mode.
+		apiController.OwnerProxy = etcd.NewRuntimeCoordinator(etcdRuntime)
+	}
+
 	if userConfig.EnableDriftDetection {
 		logger.Info("Drift detection is enabled")
 		driftStorage := drift.NewInMemoryStorage()
@@ -1118,7 +1184,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	}
 
 	eventsController := &events_controllers.VCSEventsController{
-		CommandRunner:                   commandRunner,
+		CommandRunner:                   eventsCommandRunner,
 		PullCleaner:                     pullClosedExecutor,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
@@ -1184,6 +1250,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
 		database:                       database,
+		etcdRuntime:                    etcdRuntime,
+		etcdInternalHandler:            etcdInternalHandler,
 	}
 
 	validate := validator.New(validator.WithRequiredStructEnabled())
@@ -1207,6 +1275,11 @@ func (s *Server) SetupRoutes() {
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
+	if s.etcdInternalHandler != nil {
+		// Internal command transport: receives credential-free commands forwarded
+		// from peer replicas to the owning replica (etcd active-active HA mode).
+		s.Router.Handle(etcd.InternalCommandPath, s.etcdInternalHandler).Methods("POST")
+	}
 	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
 	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
@@ -1297,8 +1370,14 @@ func (s *Server) Start() error {
 		s.Logger.Err("%s", err.Error())
 	}
 
-	// Attempt to close the database
-	if err := s.closeDatabase(1 * time.Second); err != nil {
+	// Attempt to close the database. etcd mode releases ownership and (in embedded
+	// mode) waits for the server to stop, so it needs a longer bound than the
+	// single-node boltdb/redis close.
+	dbCloseTimeout := 1 * time.Second
+	if s.etcdRuntime != nil {
+		dbCloseTimeout = 35 * time.Second
+	}
+	if err := s.closeDatabase(dbCloseTimeout); err != nil {
 		s.Logger.Err("while closing database: %v", err)
 	}
 
@@ -1330,14 +1409,25 @@ func (s *Server) waitForDrain() {
 }
 
 // closeDatabase attempts to close the database, waiting up to the given timeout.
+// In etcd (active-active HA) mode it closes the whole coordination runtime, which
+// first releases this process's ownership claims and stops session renewal before
+// closing the shared client (design §751), so a graceful restart hands off owned
+// pull requests immediately rather than waiting for the ownership lease to expire.
 func (s *Server) closeDatabase(timeout time.Duration) error {
-	if s.database == nil {
+	var closeFn func() error
+	switch {
+	case s.etcdRuntime != nil:
+		s.Logger.Info("Releasing etcd ownership and shutting down coordination runtime")
+		closeFn = s.etcdRuntime.Close
+	case s.database != nil:
+		s.Logger.Info("Shutting down database")
+		closeFn = s.database.Close
+	default:
 		return nil
 	}
-	s.Logger.Info("Shutting down database")
 
 	done := make(chan error, 1)
-	go func() { done <- s.database.Close() }()
+	go func() { done <- closeFn() }()
 	select {
 	case err := <-done:
 		return err
@@ -1455,8 +1545,22 @@ func (s *Server) Healthz(w http.ResponseWriter, _ *http.Request) {
 // Readyz checks whether the server is ready to handle requests by verifying
 // connectivity to external dependencies (e.g. Redis). Returns 503 if any
 // dependency is unreachable. Suitable for K8s readiness probes.
-func (s *Server) Readyz(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) Readyz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	// In etcd (active-active HA) mode readiness is backend authority plus a live
+	// ownership session: a replica that has lost its lease must be marked unready
+	// so it stops receiving traffic (design §714, §776).
+	if s.etcdRuntime != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if err := s.etcdRuntime.Ready(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write(fmt.Appendf(nil, `{"status":"error","error":%q}`, err.Error())) // nolint: errcheck
+			return
+		}
+		w.Write(healthzData) // nolint: errcheck
+		return
+	}
 	if s.database != nil {
 		if err := s.database.Ping(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
