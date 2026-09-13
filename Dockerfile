@@ -13,7 +13,7 @@ ARG DEFAULT_TERRAFORM_VERSION=${TERRAFORM_1_16_VERSION}
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.12.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.66.0
+ARG DEFAULT_CONFTEST_VERSION=0.69.0
 
 # Stage 1: build artifact and download deps
 
