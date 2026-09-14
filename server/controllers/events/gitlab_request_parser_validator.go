@@ -54,7 +54,7 @@ func (d *DefaultGitlabRequestParserValidator) ParseAndValidate(r *http.Request, 
 	// Validate secret if specified.
 	headerSecret := r.Header.Get(secretHeader)
 	if len(secret) != 0 && subtle.ConstantTimeCompare(secret, []byte(headerSecret)) != 1 {
-		return nil, fmt.Errorf("header %s=%s did not match expected secret", secretHeader, headerSecret)
+		return nil, fmt.Errorf("header %s did not match expected secret", secretHeader)
 	}
 
 	// Parse request into a gitlab object based on the object type specified

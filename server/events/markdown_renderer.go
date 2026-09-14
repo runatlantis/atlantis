@@ -437,8 +437,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 
 func newErrData(err error, renderedContext string, common commonData) errData {
 	data := errData{Error: err.Error(), RenderedContext: renderedContext, commonData: common}
-	var lockErr *workingDirLockError
-	if errors.As(err, &lockErr) {
+	if lockErr, ok := errors.AsType[*workingDirLockError](err); ok {
 		data.HeadCommit = lockErr.metadata.HeadCommit
 		data.CommitURL = lockErr.metadata.CommitURL
 		data.JobURL = lockErr.metadata.JobURL
