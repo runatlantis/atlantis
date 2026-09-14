@@ -416,8 +416,11 @@ func (p *DefaultProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context
 	return p.buildProjectCommand(ctx, cmd)
 }
 
-// shouldSkipClone determines whether we should skip cloning for a given context
-func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, modifiedFiles []string) (bool, error) {
+// shouldSkipClone determines whether we should skip cloning for a given context.
+// group, when set, is validated before reporting a skip: the caller returns no
+// commands without cloning, so this is the only chance to reject an unknown
+// group on that path.
+func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, modifiedFiles []string, group string) (bool, error) {
 	// NOTE: We discard this work here and end up doing it again after
 	// cloning to ensure all the return values are set properly with
 	// the actual clone directory.
@@ -459,6 +462,13 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 
 	ctx.Log.Info("%d projects are changed on MR %d based on their when_modified config", len(matchingProjects), ctx.Pull.Num)
 	if len(matchingProjects) == 0 {
+		// The caller returns no commands from here without cloning, so the
+		// post-clone ValidateGroupAllowed never runs. Without this, `-g typo`
+		// is indistinguishable from a legitimate no-op, while the same comment
+		// on a PR that does touch a project reports the error.
+		if err := repoCfg.ValidateGroupAllowed(group); err != nil {
+			return false, err
+		}
 		ctx.Log.Info("skipping repo clone since no project was modified")
 		return true, nil
 	}
@@ -904,7 +914,7 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 
 	// If we're not including git untracked files, we can skip the clone if there are no modified files.
 	if !p.IncludeGitUntrackedFiles {
-		shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles)
+		shouldSkipClone, err := p.shouldSkipClone(ctx, modifiedFiles, group)
 		if err != nil {
 			return nil, err
 		}

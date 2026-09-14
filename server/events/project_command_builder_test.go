@@ -4565,6 +4565,116 @@ projects:
 	}
 }
 
+// When --skip-clone-no-changes short-circuits before the clone, the group has
+// to be validated on that path too. Otherwise `plan -g typo` returns no
+// commands and no error, which is indistinguishable from a legitimate no-op --
+// while the same comment on a PR that does touch a project reports the error.
+func TestDefaultProjectCommandBuilder_SkipCloneNoChangesValidatesGroup(t *testing.T) {
+	atlantisYAML := `
+version: 3
+projects:
+- dir: dir1
+  group: infra`
+
+	cases := []struct {
+		description string
+		group       string
+		expErr      string
+	}{
+		{
+			description: "unknown group is reported instead of silently skipping",
+			group:       "typo",
+			expErr:      "running commands for group \"typo\" is not allowed because this repo is only configured for the following groups: default, infra",
+		},
+		{
+			description: "configured group still skips the clone",
+			group:       "infra",
+			expErr:      "",
+		},
+		{
+			description: "no group still skips the clone",
+			group:       "",
+			expErr:      "",
+		},
+	}
+
+	userConfig := defaultUserConfig
+	userConfig.SkipCloneNoChanges = true
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn([]string{"dir2/main.tf"}, nil)
+			When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
+			When(vcsClient.GetFileContent(
+				Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(atlantisYAML), nil)
+			workingDir := mocks.NewMockWorkingDir()
+
+			logger := logging.NewNoopLogger(t)
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+			globalCfgArgs := valid.GlobalCfgArgs{
+				AllowAllRepoSettings: true,
+			}
+			terraformClient := tfclientmocks.NewMockClient()
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(globalCfgArgs),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				userConfig.SkipCloneNoChanges,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
+				userConfig.SilenceNoProjects,
+				false,
+				userConfig.AutoDiscoverMode,
+				scope,
+				terraformClient, &runtime.LocalPlanStore{},
+			)
+
+			baseRepo := models.Repo{Owner: "owner"}
+			ctxs, err := builder.BuildPlanCommands(&command.Context{
+				HeadRepo: baseRepo,
+				Pull: models.PullRequest{
+					BaseRepo: baseRepo,
+				},
+				User:  models.User{},
+				Log:   logger,
+				Scope: scope,
+				PullRequestStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
+				},
+			}, &events.CommentCommand{
+				Name:  command.Plan,
+				Group: c.group,
+			})
+
+			if c.expErr != "" {
+				ErrEquals(t, c.expErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, 0, len(ctxs))
+			// The whole point of the skip path: still no clone.
+			workingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest](), Any[string]())
+		})
+	}
+}
+
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
 	RegisterMockTestingT(t)
 	tmpDir := DirStructure(t, map[string]any{
