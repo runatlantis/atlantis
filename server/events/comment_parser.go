@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -356,11 +355,13 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err, cmd, flagSet)}
 	}
 
-	// The group is used to match against the group configured in the repo
-	// config file so apply the same character restrictions we apply to project
-	// names.
-	if group != "" && group != url.QueryEscape(group) {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid group: %q", group), cmd, flagSet)}
+	// The group is matched verbatim against the group configured in the repo
+	// config file, so it has to satisfy the same rule that file is validated
+	// with.
+	if group != "" {
+		if err := valid.ValidateGroupName(group); err != nil {
+			return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid group %q: %s", group, err), cmd, flagSet)}
+		}
 	}
 
 	if autoMergeMethod != "" {

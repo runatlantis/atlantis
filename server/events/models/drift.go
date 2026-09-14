@@ -4,13 +4,13 @@
 package models
 
 import (
-	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 // DriftSummary represents detected infrastructure drift from a plan output.
@@ -191,13 +191,11 @@ func NormalizeAPIPath(directory string) (string, bool) {
 	return cleaned, true
 }
 
-// IsValidAPIWorkspace reports whether an explicit drift/remediation workspace
-// selector is safe to use for plan-file path construction.
 // IsValidAPIGroup returns true if group is usable as a drift API group
-// selector. Groups are matched against the group key in the repo config, so we
-// apply the same character restrictions Atlantis applies to project names.
+// selector. Groups are matched verbatim against the group key in the repo
+// config, so the same rule that file is validated with applies here.
 func IsValidAPIGroup(group string) bool {
-	return group != "" && group == url.QueryEscape(group)
+	return valid.ValidateGroupName(group) == nil
 }
 
 // validateAPIGroupSelector validates a group selector shared by the drift
@@ -217,6 +215,8 @@ func validateAPIGroupSelector(group string, hasProjectSelectors bool) []FieldErr
 	return errors
 }
 
+// IsValidAPIWorkspace reports whether an explicit drift/remediation workspace
+// selector is safe to use for plan-file path construction.
 func IsValidAPIWorkspace(workspace string) bool {
 	trimmed := strings.TrimSpace(workspace)
 	if trimmed == "" || trimmed != workspace {

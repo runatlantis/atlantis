@@ -150,16 +150,9 @@ func (p Project) Validate() error {
 		if strPtr == nil {
 			return nil
 		}
-		if *strPtr == "" {
-			return errors.New("if set cannot be empty")
-		}
-		if ContainsGlobPattern(*strPtr) {
-			return errors.New("cannot contain glob pattern characters ('*', '?', '[')")
-		}
-		if !validProjectName(*strPtr) {
-			return fmt.Errorf("%q is not allowed: must contain only URL safe characters", *strPtr)
-		}
-		return nil
+		// Not validProjectName: that replaces '/' before checking, which would
+		// accept a group no selector can name. See valid.ValidateGroupName.
+		return valid.ValidateGroupName(*strPtr)
 	}
 
 	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'

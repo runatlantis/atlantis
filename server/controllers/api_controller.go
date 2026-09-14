@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -271,8 +270,8 @@ func validateAPIRequestGroup(request *APIRequest) error {
 	if len(request.Projects) > 0 || len(request.Paths) > 0 {
 		return fmt.Errorf("cannot use 'group' at the same time as 'projects' or 'paths'")
 	}
-	if request.Group != url.QueryEscape(request.Group) {
-		return fmt.Errorf("invalid group %q: must contain only URL safe characters", request.Group)
+	if err := valid.ValidateGroupName(request.Group); err != nil {
+		return fmt.Errorf("invalid group %q: %s", request.Group, err)
 	}
 	return nil
 }

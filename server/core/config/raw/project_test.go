@@ -570,7 +570,7 @@ func TestProject_Validate(t *testing.T) {
 				Dir:   String("."),
 				Group: String(""),
 			},
-			expErr: "group: if set cannot be empty.",
+			expErr: "group: cannot be empty.",
 		},
 		{
 			description: "group with glob pattern",
@@ -586,7 +586,18 @@ func TestProject_Validate(t *testing.T) {
 				Dir:   String("."),
 				Group: String("my group"),
 			},
-			expErr: "group: \"my group\" is not allowed: must contain only URL safe characters.",
+			expErr: "group: must contain only URL safe characters.",
+		},
+		{
+			// Regression: validProjectName replaces '/' before checking, so
+			// this parsed while every selector rejected it verbatim, leaving
+			// the group unreachable with no error raised anywhere.
+			description: "group with a slash is unreachable by selectors",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("infra/prod"),
+			},
+			expErr: "group: must contain only URL safe characters.",
 		},
 	}
 	validation.ErrorTag = "yaml"
