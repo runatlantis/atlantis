@@ -789,6 +789,16 @@ func TestRequirements_ValidateProjectDependencies(t *testing.T) {
 			wantErr:     assert.NoError,
 		},
 		{
+			name: "Pass missing dependency by default, since fail-on-missing-dependencies is off",
+			ctx: command.ProjectContext{
+				DependsOn: []string{"project1"},
+				PullStatus: &models.PullStatus{
+					Projects: []models.ProjectStatus{},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
 			name: "Fail missing dependency when strict dependency status is required",
 			ctx: command.ProjectContext{
 				DependsOn:                 []string{"project1"},

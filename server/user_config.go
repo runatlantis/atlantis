@@ -58,6 +58,10 @@ type UserConfig struct {
 	EnableDriftDetection        bool   `mapstructure:"enable-drift-detection"`
 	EnableDriftRemediation      bool   `mapstructure:"enable-drift-remediation"`
 	ExecutableName              string `mapstructure:"executable-name"`
+	// Fail an apply when a project depends_on a project that has no recorded
+	// plan status in the pull request, instead of treating the dependency as
+	// satisfied.
+	FailOnMissingDependencies bool `mapstructure:"fail-on-missing-dependencies"`
 	// Fail and do not run the Atlantis command request if any of the pre workflow hooks error.
 	FailOnPreWorkflowHookError      bool   `mapstructure:"fail-on-pre-workflow-hook-error"`
 	HideUnchangedPlanComments       bool   `mapstructure:"hide-unchanged-plan-comments"`
