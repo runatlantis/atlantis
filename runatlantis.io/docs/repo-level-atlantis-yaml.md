@@ -385,7 +385,7 @@ Names are checked before projects are filtered by the pull request's base branch
 exists on another branch is allowed.
 
 Dependencies are evaluated at **apply** time, against the plan statuses recorded for that pull request. A dependency that
-was planned but not applied blocks its dependents. A dependency with **no recorded status at all** — because its
+A dependency whose recorded status is neither applied nor `no changes` blocks its dependents. A dependency with **no recorded status at all** — because its
 `when_modified` didn't match this pull request — is treated as satisfied by default; set
 [`--fail-on-missing-dependencies`](server-configuration.md#fail-on-missing-dependencies) to block instead.
 
