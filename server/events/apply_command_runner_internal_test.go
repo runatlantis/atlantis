@@ -65,6 +65,10 @@ func (staticApplyCommandBuilder) ShouldIgnoreTargetedDir(*command.Context, *Comm
 	return false
 }
 
+func (staticApplyCommandBuilder) ShouldSilenceTargetedApply(*command.Context, *CommentCommand) bool {
+	return false
+}
+
 type staticProjectApplyRunner struct {
 	output command.ProjectCommandOutput
 }

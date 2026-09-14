@@ -13,11 +13,14 @@ import (
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
@@ -35,6 +38,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 		Description    string
 		ApplyLocked    bool
 		ApplyLockError error
+		SilenceTarget  bool
 		ExpComment     string
 		ExpFailStatus  bool
 		ExpHasErrors   bool
@@ -59,6 +63,20 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			ExpFailStatus:  true,
 			ExpHasErrors:   true,
 		},
+		{
+			Description:   "unowned targeted apply still reports a global apply lock",
+			ApplyLocked:   true,
+			SilenceTarget: true,
+			ExpComment:    "**Error:** Running `atlantis apply` is disabled.",
+		},
+		{
+			Description:    "unowned targeted apply still fails when the global lock check fails",
+			ApplyLockError: errors.New("error"),
+			SilenceTarget:  true,
+			ExpComment:     "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable.",
+			ExpFailStatus:  true,
+			ExpHasErrors:   true,
+		},
 	}
 
 	for _, c := range cases {
@@ -66,6 +84,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			vcsClient := setup(t, func(tc *TestConfig) {
 				tc.applyLockCheckerReturn = locking.ApplyCommandLock{Locked: c.ApplyLocked}
 				tc.applyLockCheckerErr = c.ApplyLockError
+				tc.SilenceNoProjects = c.SilenceTarget
 			})
 
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
@@ -88,8 +107,14 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 				Trigger:  command.CommentTrigger,
 			}
 
-			applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+			cmd := &events.CommentCommand{Name: command.Apply}
+			if c.SilenceTarget {
+				cmd.ProjectName = "unowned"
+				When(projectCommandBuilder.ShouldSilenceTargetedApply(Any[*command.Context](), Eq(cmd))).ThenReturn(true)
+			}
+			applyCommandRunner.Run(ctx, cmd)
 			Equals(t, c.ExpHasErrors, ctx.CommandHasErrors)
+			Assert(t, !ctx.CommandSkipped, "global lock checks must not be silenced")
 
 			vcsClient.VerifyWasCalledOnce().CreateComment(
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(c.ExpComment), Eq("apply"))
@@ -404,6 +429,126 @@ func assertBuildIgnoredTargetedDirSkipsBeforeApplyLock(t *testing.T, locker even
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+}
+
+func TestApplyCommandRunner_NamedProjectOwnershipBeforePullLock(t *testing.T) {
+	cases := []struct {
+		Description       string
+		ProjectName       string
+		SilenceNoProjects bool
+		StalePullStatus   bool
+		ExpSkipped        bool
+	}{
+		{
+			Description:       "unowned project",
+			ProjectName:       "unowned",
+			SilenceNoProjects: true,
+			ExpSkipped:        true,
+		},
+		{
+			Description:       "owned project still reports lock conflict",
+			ProjectName:       "owned",
+			SilenceNoProjects: true,
+		},
+		{
+			Description: "unowned project without silence still reports lock conflict",
+			ProjectName: "unowned",
+		},
+		{
+			Description:       "project absent from the previous head still reports lock conflict",
+			ProjectName:       "unowned",
+			SilenceNoProjects: true,
+			StalePullStatus:   true,
+		},
+	}
+
+	for _, c := range cases {
+		for _, lockedCommand := range []command.Name{command.Apply, command.Plan} {
+			t.Run(c.Description+"_"+lockedCommand.String(), func(t *testing.T) {
+				RegisterMockTestingT(t)
+				repoDir := DirStructure(t, map[string]any{
+					"atlantis-a.yaml": `
+version: 3
+projects:
+- name: owned
+  dir: .
+`,
+					valid.DefaultAtlantisFile: `
+version: 3
+projects:
+- name: unowned
+  dir: .
+`,
+				})
+				workingDir := mocks.NewMockWorkingDir()
+				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
+				builder := &countingApplyCommandBuilder{
+					ProjectApplyCommandBuilder: &events.DefaultProjectCommandBuilder{
+						ParserValidator: &config.ParserValidator{},
+						WorkingDir:      checkoutMergeWorkingDir{WorkingDir: workingDir},
+						GlobalCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+							RepoConfigFile: "atlantis-a.yaml",
+						}),
+						SilenceNoProjects: c.SilenceNoProjects,
+					},
+				}
+				locker := events.NewDefaultWorkingDirLocker()
+				vcsClient := setup(t, func(tc *TestConfig) {
+					tc.SilenceNoProjects = c.SilenceNoProjects
+					tc.workingDirLocker = locker
+					tc.projectApplyCommandBuilder = builder
+				})
+				modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
+				statusPull := modelPull
+				if c.StalePullStatus {
+					statusPull.HeadCommit = "previous-head"
+				}
+				unlock, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, lockedCommand, events.WorkingDirLockMetadataForPull(modelPull))
+				Ok(t, err)
+				defer unlock()
+				logger := logging.NewNoopLogger(t)
+				ctx := &command.Context{
+					User:       testdata.User,
+					Log:        logger,
+					Scope:      metricstest.NewLoggingScope(t, logger, "atlantis"),
+					Pull:       modelPull,
+					PullStatus: &models.PullStatus{Pull: statusPull},
+					HeadRepo:   testdata.GithubRepo,
+					Trigger:    command.CommentTrigger,
+				}
+				cmd := &events.CommentCommand{Name: command.Apply, ProjectName: c.ProjectName}
+
+				applyCommandRunner.Run(ctx, cmd)
+
+				Equals(t, 0, builder.buildCalls)
+				Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, lockedCommand), "expected existing pull lock to remain held")
+				projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+				workingDir.VerifyWasCalled(Never()).Clone(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+				expSkipped := c.ExpSkipped && lockedCommand == command.Apply
+				Equals(t, expSkipped, ctx.CommandSkipped)
+				Equals(t, !expSkipped, ctx.CommandHasErrors)
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+
+				if expSkipped {
+					vcsClient.VerifyWasCalled(Never()).CreateComment(
+						Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+					vcsClient.VerifyWasCalled(Never()).UpdateStatus(
+						Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[string](), Any[string](), Any[string]())
+					commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+						Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+					return
+				}
+
+				commitUpdater.VerifyWasCalledOnce().UpdateCombined(
+					Any[logging.SimpleLogging](), Eq(modelPull.BaseRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Apply))
+				_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+					Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+				Assert(t, strings.Contains(comment, "currently locked by \""+lockedCommand.String()+"\""), "got comment: %s", comment)
+			})
+		}
+	}
 }
 
 func TestApplyCommandRunner_TargetedApplyBlocksWhenPlanInFlight(t *testing.T) {
@@ -1817,6 +1962,16 @@ func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
 		Eq[command.Name](command.Apply),
 		Eq(models.ProjectCounts{Success: 2, Total: 2, NoChanges: 1}),
 	)
+}
+
+type countingApplyCommandBuilder struct {
+	events.ProjectApplyCommandBuilder
+	buildCalls int
+}
+
+func (b *countingApplyCommandBuilder) BuildApplyCommands(_ *command.Context, _ *events.CommentCommand) ([]command.ProjectContext, error) {
+	b.buildCalls++
+	return nil, errors.New("unexpected apply command build while pull is locked")
 }
 
 type failingGetPullStatusDB struct {
