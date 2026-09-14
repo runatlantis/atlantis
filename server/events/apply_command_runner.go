@@ -121,8 +121,15 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	if a.DisableApplyAll && !cmd.IsForSpecificProject() {
-		ctx.Log.Info("ignoring apply command without flags since apply all is disabled")
-		if err := a.vcsClient.CreateComment(ctx.Log, baseRepo, pull.Num, applyAllDisabledComment, command.Apply.String()); err != nil {
+		// A group names a set of projects rather than one, so it is disabled by
+		// the same flag -- but it is not the flagless `atlantis apply`, and
+		// saying so would send the user looking for a flag they already passed.
+		disabledComment := applyAllDisabledComment
+		if cmd.Group != "" {
+			disabledComment = applyGroupDisabledComment
+		}
+		ctx.Log.Info("ignoring apply command without a project, workspace or dir since apply all is disabled")
+		if err := a.vcsClient.CreateComment(ctx.Log, baseRepo, pull.Num, disabledComment, command.Apply.String()); err != nil {
 			ctx.Log.Err("unable to comment on pull request: %s", err)
 		}
 
@@ -495,6 +502,12 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")
 // are disabled and an apply all command is issued.
 var applyAllDisabledComment = "**Error:** Running `atlantis apply` without flags is disabled." +
+	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
+
+// applyGroupDisabledComment is posted when apply all commands are disabled and
+// an apply is issued for a group. --disable-apply-all requires a specific
+// project, workspace or dir, and a group is a set of projects rather than one.
+var applyGroupDisabledComment = "**Error:** Running `atlantis apply -g <group>` is disabled because a group applies more than one project." +
 	" You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."
 
 // applyDisabledComment is posted when apply commands are disabled globally and an apply command is issued.

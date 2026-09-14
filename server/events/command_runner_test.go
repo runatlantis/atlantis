@@ -1933,9 +1933,11 @@ func TestRunCommentCommand_DisableApplyAllDisabledForGroup(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, modelPull.Num, &events.CommentCommand{Name: command.Apply, Group: "infra"})
+	// Not the flagless-apply message: the user did pass a flag, so telling them
+	// to pass one sends them looking for something they already did.
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num),
-		Eq("**Error:** Running `atlantis apply` without flags is disabled. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."), Eq("apply"))
+		Eq("**Error:** Running `atlantis apply -g <group>` is disabled because a group applies more than one project. You must specify which project to apply via the `-d <dir>`, `-w <workspace>` or `-p <project name>` flags."), Eq("apply"))
 }
 
 func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
