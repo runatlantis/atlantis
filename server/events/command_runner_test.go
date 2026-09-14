@@ -29,6 +29,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/models/testdata"
+	vcsgithub "github.com/runatlantis/atlantis/server/events/vcs/github"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 	"go.uber.org/mock/gomock"
@@ -2697,6 +2698,27 @@ func TestApplyWithAutoMerge_CommentFlagOverridesGlobalMergeMethod(t *testing.T) 
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply, AutoMergeMethod: "rebase"})
 	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+}
+
+func TestApplyWithAutoMerge_MergeQueueMethodCommentsThatItIsQueueing(t *testing.T) {
+	t.Log("if \"atlantis apply\" is run with automerge and the merge-queue merge" +
+		" method, the comment says we're queueing rather than merging")
+
+	vcsClient, modelPull := setupApplyWithAutoMerge(t)
+	autoMerger.GlobalAutomergeMethod = vcsgithub.MergeQueueMergeMethod
+	t.Cleanup(func() { autoMerger.GlobalAutomergeMethod = "" })
+
+	pullOptions := models.PullRequestOptions{
+		DeleteSourceBranchOnMerge: false,
+		MergeMethod:               vcsgithub.MergeQueueMergeMethod,
+	}
+
+	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Apply})
+	vcsClient.VerifyWasCalledOnce().MergePull(Any[logging.SimpleLogging](), Eq(modelPull), Eq(pullOptions))
+	vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num),
+		Eq("Automatically adding to the merge queue because all plans have been successfully applied."),
+		Eq("apply"))
 }
 
 func TestApplyWithAutoMerge_DisableAutomergeLabelStillMergesWhenLabelMissing(t *testing.T) {
