@@ -463,7 +463,11 @@ func (c *DefaultCommandRunner) validateCommentCommand(ctx *command.Context, base
 // wasteful) call to get the necessary data.
 func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, cmd *CommentCommand) {
 	if opStarted := c.Drainer.StartOp(); !opStarted {
-		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, ShutdownComment, ""); commentErr != nil {
+		commandName := ""
+		if cmd != nil {
+			commandName = cmd.Name.String()
+		}
+		if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, ShutdownComment, commandName); commentErr != nil {
 			c.Logger.Log(logging.Error, "unable to comment that Atlantis is shutting down: %s", commentErr)
 		}
 		return
