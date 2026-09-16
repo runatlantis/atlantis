@@ -1,0 +1,58 @@
+# Goss tests for the *-slim image targets.
+# See: https://github.com/goss-org/goss/blob/master/docs/gossfile.md
+#
+# The slim images ship without Terraform and OpenTofu. Everything else the full
+# image carries must still be there, and the two binaries must be absent.
+
+command:
+  # ensure atlantis is available
+  atlantis-available:
+    exec: "atlantis version"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure conftest is available
+  conftest-available:
+    exec: "conftest -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure git-lfs is available
+  git-lfs-available:
+    exec: "git-lfs -v"
+    exit-status: 0
+    stdout: []
+    stderr: []
+
+  # ensure terraform is NOT on PATH (127 is "command not found" from sh)
+  terraform-absent:
+    exec: "terraform version"
+    exit-status: 127
+
+  # ensure tofu is NOT on PATH
+  tofu-absent:
+    exec: "tofu version"
+    exit-status: 127
+
+  # ensure no default Terraform version is baked into the image: an env var
+  # would override a version pinned in the server config file
+  default-tf-version-unset:
+    exec: "printenv ATLANTIS_DEFAULT_TF_VERSION"
+    exit-status: 1
+
+  # ensure the server refuses to start, with a message that says what to set,
+  # rather than failing later in a less obvious way
+  server-fails-fast-without-tf-version:
+    exec: "atlantis server --gh-user=u --gh-token=t --repo-allowlist='github.com/*'"
+    exit-status: 1
+    stderr:
+      - "terraform not found in"
+      - "Set --default-tf-version"
+
+file:
+  /usr/local/bin/terraform:
+    exists: false
+  /usr/local/bin/tofu:
+    exists: false

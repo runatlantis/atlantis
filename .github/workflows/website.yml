@@ -35,7 +35,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
         id: changes
         with:
@@ -61,10 +61,10 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Spell check
-        uses: crate-ci/typos@7b04f660f4ee4f048d18fd341887cf28dfbedfe2 # v1.46.3
+        uses: crate-ci/typos@d43b6c087ac471e2ea7b8af622ff15f05c0c365b # v1.50.1
         with:
           files: ./runatlantis.io/docs
 
@@ -85,6 +85,15 @@ jobs:
         with:
           config: .markdownlint.yaml
           globs: 'runatlantis.io/**/*.md'
+
+      - name: Translation integrity
+        # Translated pages must keep their source's code samples, flag names,
+        # link targets and VitePress container markers. Runs on every website
+        # PR so hand-edits to a locale are checked too, not just the output of
+        # the translate-docs workflow.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/check-translation-integrity.mjs $locales
 
       - name: Link Checker
         id: lychee

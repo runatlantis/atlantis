@@ -6,6 +6,7 @@
 
 - [Reporting Issues](#reporting-issues)
 - [Reporting Security Issues](#reporting-security-issues)
+- [Proposing Changes](#proposing-changes)
 - [Creating a Pull Request](#creating-a-pull-request)
   - [Resolving Comments](#resolving-comments)
 - [Developing](#developing)
@@ -19,6 +20,10 @@
 
 # Reporting Security Issues
 We take security issues seriously. Please report a security vulnerability to the maintainers using [private vulnerability reporting](https://github.com/runatlantis/atlantis/security/advisories/new).
+
+# Proposing Changes
+
+Before starting a large change, check whether it needs an [issue or ADR](docs/adr/README.md#which-process-should-i-use).
 
 # Creating a Pull Request
 * Fork the [Atlantis repo](https://github.com/runatlantis/atlantis)

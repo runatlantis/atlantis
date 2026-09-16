@@ -141,8 +141,7 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 	}
 
 	if err := v.validateProjectPlanStatus(ctx); err != nil {
-		var rejection planRejectionError
-		if errors.As(err, &rejection) {
+		if rejection, ok := errors.AsType[planRejectionError](err); ok {
 			return rejectProjectPlan(planPath, "%s", rejection.err)
 		}
 		return err
