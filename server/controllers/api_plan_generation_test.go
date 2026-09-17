@@ -71,6 +71,9 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			When(runner.Apply(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 				applied = true
 				ctx := args[0].(command.ProjectContext)
+				Assert(t, ctx.ApplyExecutionID != "", "API apply must own a durable execution reservation")
+				_, admissionErr := storage.BeginApplyExecution(ctx.Pull, []command.ProjectContext{ctx}, "another-api-worker", command.NoClaim{})
+				Assert(t, errors.Is(admissionErr, db.ErrApplyAlreadyStarted), "concurrent API apply must be rejected")
 				if ctx.ExpectedPlanHash != strings.Repeat("b", 64) || ctx.PlanGeneration == "previous-plan" {
 					return ReturnValues{command.ProjectCommandOutput{Error: fmt.Errorf("API apply selected the previous PR plan instead of the plan it just created")}}
 				}

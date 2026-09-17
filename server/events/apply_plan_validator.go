@@ -118,6 +118,9 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 		)
 	}
+	if proj.ApplyExecutionID != ctx.ApplyExecutionID {
+		return db.ErrApplyAlreadyStarted
+	}
 	if proj.PlanGeneration != "" || ctx.PlanGeneration != "" {
 		if proj.PlanGenerationActive || proj.PlanGeneration != ctx.PlanGeneration || proj.AcceptedPlanGeneration == "" || proj.AcceptedPlanGeneration != ctx.AcceptedPlanGeneration || proj.AcceptedPlanGeneration != proj.PlanGeneration || (requiresManagedPlanFileForApply(ctx) && (proj.ManagedPlanHash == "" || proj.ManagedPlanHash != ctx.ExpectedPlanHash)) {
 			return fmt.Errorf("%w for dir %q workspace %q project %q", db.ErrPlanGenerationSuperseded, ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)

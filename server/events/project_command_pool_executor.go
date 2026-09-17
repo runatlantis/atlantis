@@ -27,6 +27,7 @@ func RunOneProjectCmd(
 
 	return command.ProjectResult{
 		PlanGeneration:       cmd.PlanGeneration,
+		ApplyExecutionID:     cmd.ApplyExecutionID,
 		ManagedPlanHash:      savedHash,
 		ProjectCommandOutput: projectCommandOutput,
 		Command:              cmd.CommandName,
@@ -85,8 +86,9 @@ func runProjectCmdsParallel(
 	if cancelledAt != -1 {
 		for _, pCmd := range cmds[cancelledAt:] {
 			results = append(results, command.ProjectResult{
-				Command:        pCmd.CommandName,
-				PlanGeneration: pCmd.PlanGeneration,
+				Command:          pCmd.CommandName,
+				PlanGeneration:   pCmd.PlanGeneration,
+				ApplyExecutionID: pCmd.ApplyExecutionID,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},
@@ -246,8 +248,9 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 	for _, group := range remainingGroups {
 		for _, cmd := range group {
 			cancelledResults = append(cancelledResults, command.ProjectResult{
-				Command:        cmd.CommandName,
-				PlanGeneration: cmd.PlanGeneration,
+				Command:          cmd.CommandName,
+				PlanGeneration:   cmd.PlanGeneration,
+				ApplyExecutionID: cmd.ApplyExecutionID,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},

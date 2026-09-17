@@ -829,6 +829,10 @@ type ProjectCounts struct {
 
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
+	// ApplyExecutionID marks a consumed plan while its infrastructure outcome is
+	// unresolved. Replanning preserves it; only a known completion or exact discard clears it.
+	ApplyExecutionID string
+
 	// PlanGeneration identifies the most recently admitted plan operation.
 	// It remains present after failure so ordinary writers cannot erase it.
 	PlanGeneration string
