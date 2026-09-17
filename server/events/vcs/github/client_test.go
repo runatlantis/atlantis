@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -288,7 +289,12 @@ func TestClient_HideOldComments(t *testing.T) {
 	{"node_id": "7", "body": "Ran Apply for 2 projects:", "user": {"login": "AtlantisUser"}},
 	{"node_id": "8", "body": "Ran Plan for dir: 'stack1' workspace: 'default'", "user": {"login": "AtlantisUser"}},
 	{"node_id": "9", "body": "Ran Plan for dir: 'stack2' workspace: 'default'", "user": {"login": "AtlantisUser"}},
-	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}}
+	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}},
+	{"node_id": "11", "body": "Ran Plan for dir: 'stack1' workspace: 'default'\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "12", "body": "Ran Plan for dir: 'stack2' workspace: 'default'\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "13", "body": "Continued Plan output from previous comment.\nasd\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "14", "body": "Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command= -->", "user": {"login": "AtlantisUser"}},
+	{"node_id": "15", "body": "Ran Plan for 2 projects:\n<!-- atlantis-comment:v1 namespace=instance-a command=apply -->", "user": {"login": "AtlantisUser"}}
 ]`, "'", "`")
 	minimizeResp := "{}"
 	type graphQLCall struct {
@@ -298,32 +304,45 @@ func TestClient_HideOldComments(t *testing.T) {
 	}
 
 	cases := []struct {
+		name                string
+		namespace           string
 		dir                 string
 		processedComments   int
 		processedCommentIds []string
 	}{
 		{
-			// With no dir specified, comments 6, 8, 9 and 10 should be minimized.
-			"",
-			4,
-			[]string{"6", "8", "9", "10"},
+			name:                "legacy matching",
+			processedComments:   9,
+			processedCommentIds: []string{"6", "8", "9", "10", "11", "12", "13", "14", "15"},
 		},
 		{
-			// With a dir of "stack1", comment 8 should be minimized.
-			"stack1",
-			1,
-			[]string{"8"},
+			name:                "legacy matching with stack1",
+			dir:                 "stack1",
+			processedComments:   2,
+			processedCommentIds: []string{"8", "11"},
 		},
 		{
-			// With a dir of "stack2", comment 9 should be minimized.
-			"stack2",
-			1,
-			[]string{"9"},
+			name:                "legacy matching with stack2",
+			dir:                 "stack2",
+			processedComments:   2,
+			processedCommentIds: []string{"9", "12"},
+		},
+		{
+			name:                "instance A owns only its comments",
+			namespace:           "instance-a",
+			processedComments:   3,
+			processedCommentIds: []string{"11", "13", "14"},
+		},
+		{
+			name:                "instance B owns only its comments",
+			namespace:           "instance-b",
+			processedComments:   1,
+			processedCommentIds: []string{"12"},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.dir, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			gotMinimizeCalls := make([]graphQLCall, 0, 1)
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -361,8 +380,9 @@ func TestClient_HideOldComments(t *testing.T) {
 			testServerURL, err := url.Parse(testServer.URL)
 			Ok(t, err)
 
-			client, err := github.New(testServerURL.Host, &github.UserCredentials{atlantisUser, "pass", ""}, github.Config{}, 0,
-				logging.NewNoopLogger(t))
+			client, err := github.New(testServerURL.Host, &github.UserCredentials{atlantisUser, "pass", ""}, github.Config{
+				CommentNamespace: common.NewCommentNamespace(c.namespace),
+			}, 0, logging.NewNoopLogger(t))
 			Ok(t, err)
 			defer disableSSLVerification()()
 
@@ -1606,7 +1626,9 @@ func TestClient_SplitComments(t *testing.T) {
 
 	testServerURL, err := url.Parse(testServer.URL)
 	Ok(t, err)
-	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{
+		CommentNamespace: common.NewCommentNamespace("instance-a"),
+	}, 0, logging.NewNoopLogger(t))
 	Ok(t, err)
 	defer disableSSLVerification()()
 	pull := models.PullRequest{Num: 1}
@@ -1634,6 +1656,10 @@ func TestClient_SplitComments(t *testing.T) {
 	secondSplit := strings.ToLower(body[0])
 
 	Equals(t, 4, len(githubComments))
+	for _, comment := range githubComments {
+		Assert(t, len(comment.Body) <= 65536, "comment should stay within GitHub's size limit")
+		Assert(t, strings.Contains(comment.Body, "namespace=instance-a"), "every split comment should contain the namespace marker")
+	}
 	Assert(t, strings.Contains(firstSplit, command.Plan.String()), fmt.Sprintf("comment should contain the command name but was %q", firstSplit))
 	Assert(t, strings.Contains(secondSplit, "continued from previous comment"), fmt.Sprintf("comment should contain no reference to the command name but was %q", secondSplit))
 }
