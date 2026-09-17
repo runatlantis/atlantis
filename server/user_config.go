@@ -44,6 +44,7 @@ type UserConfig struct {
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
+	EnableAutoplanLabel         string `mapstructure:"enable-autoplan-label"`
 	DisableAutomergeLabel       string `mapstructure:"disable-automerge-label"`
 	DisableMarkdownFolding      bool   `mapstructure:"disable-markdown-folding"`
 	DisableRepoLocking          bool   `mapstructure:"disable-repo-locking"`
