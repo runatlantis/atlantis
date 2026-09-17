@@ -356,7 +356,7 @@ func TestProjectOutputWrapper(t *testing.T) {
 			}
 
 			mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, models.PendingCommitStatus, nil)
-			if c.CommandName == command.Apply && c.Success {
+			if c.Success {
 				mockJobURLSetter.VerifyWasCalled(Never()).SetJobURLWithStatus(ctx, c.CommandName, models.SuccessCommitStatus, &prjResult)
 			} else {
 				mockJobURLSetter.VerifyWasCalled(Once()).SetJobURLWithStatus(ctx, c.CommandName, expCommitStatus, &prjResult)
