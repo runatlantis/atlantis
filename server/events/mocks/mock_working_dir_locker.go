@@ -52,6 +52,25 @@ func (mock *MockWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 	pegomock.GetGenericMockFrom(mock).Invoke("UnlockByPull", _params, []reflect.Type{})
 }
 
+func (mock *MockWorkingDirLocker) CurrentLockHolder(repoFullName string, pullNum int, workspace string, path string, projectName string) (command.Name, bool) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("CurrentLockHolder", _params, []reflect.Type{reflect.TypeOf((*command.Name)(nil)).Elem(), reflect.TypeOf((*bool)(nil)).Elem()})
+	var _ret0 command.Name
+	var _ret1 bool
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(command.Name)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(bool)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockWorkingDirLocker) VerifyWasCalledOnce() *VerifierMockWorkingDirLocker {
 	return &VerifierMockWorkingDirLocker{
 		mock:                   mock,
@@ -142,6 +161,59 @@ func (c *MockWorkingDirLocker_TryLock_OngoingVerification) GetAllCapturedArgumen
 			_param5 = make([]command.Name, len(c.methodInvocations))
 			for u, param := range _params[5] {
 				_param5[u] = param.(command.Name)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) CurrentLockHolder(repoFullName string, pullNum int, workspace string, path string, projectName string) *MockWorkingDirLocker_CurrentLockHolder_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CurrentLockHolder", _params, verifier.timeout)
+	return &MockWorkingDirLocker_CurrentLockHolder_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_CurrentLockHolder_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_CurrentLockHolder_OngoingVerification) GetCapturedArguments() (string, int, string, string, string) {
+	repoFullName, pullNum, workspace, path, projectName := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], workspace[len(workspace)-1], path[len(path)-1], projectName[len(projectName)-1]
+}
+
+func (c *MockWorkingDirLocker_CurrentLockHolder_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []string, _param3 []string, _param4 []string) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(string)
+			}
+		}
+		if len(_params) > 4 {
+			_param4 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(string)
 			}
 		}
 	}

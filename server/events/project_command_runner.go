@@ -431,11 +431,24 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	// Acquire internal lock for the directory we're going to operate in.
 	// We should refactor this to keep the lock for the duration of plan and policy check since as of now
 	// there is a small gap where we don't have the lock and if we can't get this here, we should just unlock the PR.
-	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck)
-	if err != nil {
-		return nil, "", err
+	//
+	// Draftplan policy checks can take a long time on large projects, and holding the within-PR
+	// working dir lock for that whole duration blocks users from getting quick feedback on a follow-up
+	// push. So for draftplans we deliberately don't hold this lock while running the policy check.
+	// Instead, we just check that nothing else (in particular, a newer draftplan) currently holds it;
+	// if something does, we skip the policy check rather than block waiting for it.
+	if ctx.IsDraftPlan {
+		if holder, locked := p.WorkingDirLocker.CurrentLockHolder(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName); locked {
+			ctx.Log.Debug("draftplan: skipping policy check because %q currently holds the working dir lock", holder)
+			return nil, fmt.Sprintf("Skipping draft plan policy check: %q is currently running for this workspace. Push again once it finishes to re-check policies.", holder), nil
+		}
+	} else {
+		unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.PolicyCheck)
+		if err != nil {
+			return nil, "", err
+		}
+		defer unlockFn()
 	}
-	defer unlockFn()
 
 	// we shouldn't attempt to clone this again. If changes occur to the pull request while the plan is happening
 	// that shouldn't affect this particular operation.

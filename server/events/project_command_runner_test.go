@@ -953,6 +953,94 @@ func TestDefaultProjectCommandRunner_PolicyCheck_LockAcquisitionFails(t *testing
 	)
 }
 
+// Test that a draftplan's policy check does not itself hold the within-PR working dir
+// lock, and that it skips running entirely (rather than blocking) if something else
+// (e.g. a newer draftplan) currently holds that lock.
+func TestDefaultProjectCommandRunner_PolicyCheck_DraftPlanDoesNotHoldWorkingDirLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	mockPolicyCheck := mocks.NewMockStepRunner()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                mockLocker,
+		LockURLGenerator:      mockURLGenerator{},
+		PolicyCheckStepRunner: mockPolicyCheck,
+		WorkingDir:            mockWorkingDir,
+		WorkingDirLocker:      workingDirLocker,
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string](),
+	)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+
+	When(mockLocker.TryLock(
+		Any[logging.SimpleLogging](),
+		Any[models.PullRequest](),
+		Any[models.User](),
+		Any[string](),
+		Any[models.Project](),
+		AnyBool(),
+	)).ThenReturn(&events.TryLockResponse{
+		LockAcquired: true,
+		LockKey:      "lock-key",
+	}, nil)
+
+	When(mockPolicyCheck.Run(
+		Any[command.ProjectContext](),
+		Any[[]string](),
+		Any[string](),
+		Any[map[string]string](),
+	)).ThenReturn("Policy check passed", nil)
+
+	ctx := command.ProjectContext{
+		Log:               logging.NewNoopLogger(t),
+		Pull:              models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}},
+		Workspace:         "default",
+		RepoRelDir:        ".",
+		IsDraftPlan:       true,
+		RepoLocksMode:     valid.RepoLocksOnPlanMode,
+		CustomPolicyCheck: true,
+		Steps:             []valid.Step{{StepName: "policy_check"}},
+	}
+
+	res := runner.PolicyCheck(ctx)
+	Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+	Assert(t, res.PolicyCheckResults != nil, "expecting policy check results")
+
+	// The working dir lock should not be held once the policy check has finished, since a
+	// draftplan's policy check never took it in the first place.
+	_, locked := workingDirLocker.CurrentLockHolder("owner/repo", 1, "default", ".", "")
+	Assert(t, !locked, "working dir lock should not be held by draftplan policy check")
+
+	// Now simulate a newer draftplan holding the working dir lock (e.g. because it's
+	// actively running a plan) and confirm the policy check skips rather than running.
+	unlockFn, err := workingDirLocker.TryLock("owner/repo", 1, "default", ".", "", command.DraftPlan)
+	Ok(t, err)
+	defer unlockFn()
+
+	mockPolicyCheck2 := mocks.NewMockStepRunner()
+	runner.PolicyCheckStepRunner = mockPolicyCheck2
+
+	res = runner.PolicyCheck(ctx)
+	Assert(t, res.Error == nil, "not expecting error: %v", res.Error)
+	Assert(t, res.PolicyCheckResults == nil, "not expecting policy check results when skipped")
+	Assert(t, res.Failure != "", "expecting a failure message explaining the skip")
+
+	mockPolicyCheck2.VerifyWasCalled(Never()).Run(
+		Any[command.ProjectContext](),
+		Any[[]string](),
+		Any[string](),
+		Any[map[string]string](),
+	)
+}
+
 // Test that custom policy checks use configured policy set names instead of defaulting to "Custom".
 // This is a regression test for https://github.com/runatlantis/atlantis/pull/5331
 // where custom policy sets defaulting to "Custom" allowed any user to approve policies.
