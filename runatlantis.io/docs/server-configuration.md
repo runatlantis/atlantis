@@ -696,6 +696,140 @@ It's not supposed to be used with `--disable-apply-all`.
 The command `atlantis apply -p .*` will bypass the restriction and run apply on every project.
 :::
 
+### `--etcd-allow-insecure-dev`
+
+```bash
+atlantis server --etcd-allow-insecure-dev
+# or
+ATLANTIS_ETCD_ALLOW_INSECURE_DEV=true
+```
+
+Permit insecure (HTTP, no TLS) etcd connections for local development only. HTTP is accepted only for loopback addresses. Never enable in production. Only used when `--locking-db-type=etcd`.
+
+### `--etcd-ca-file`
+
+```bash
+atlantis server --etcd-ca-file="/path/to/ca.pem"
+# or
+ATLANTIS_ETCD_CA_FILE="/path/to/ca.pem"
+```
+
+Path to the trusted CA certificate for verifying the etcd client listener. Required in production etcd mode.
+
+### `--etcd-cert-file`
+
+```bash
+atlantis server --etcd-cert-file="/path/to/client.pem"
+# or
+ATLANTIS_ETCD_CERT_FILE="/path/to/client.pem"
+```
+
+Path to the Atlantis client certificate presented to etcd. Required in production etcd mode.
+
+### `--etcd-deployment-id`
+
+```bash
+atlantis server --etcd-deployment-id="<stable-uuid>"
+# or
+ATLANTIS_ETCD_DEPLOYMENT_ID="<stable-uuid>"
+```
+
+Stable unique identifier for this logical Atlantis installation, used to guard the etcd namespace. Generate it once and keep it stable across process restarts and database migrations.
+
+### `--etcd-endpoints`
+
+```bash
+atlantis server --etcd-endpoints="https://member-0:2379,https://member-1:2379"
+# or
+ATLANTIS_ETCD_ENDPOINTS="https://member-0:2379,https://member-1:2379"
+```
+
+Comma-separated https etcd client endpoints for external mode. Every production endpoint must use https and pass hostname verification.
+
+### `--etcd-key-file`
+
+```bash
+atlantis server --etcd-key-file="/path/to/client-key.pem"
+# or
+ATLANTIS_ETCD_KEY_FILE="/path/to/client-key.pem"
+```
+
+Path to the private key for the Atlantis etcd client certificate. Required in production etcd mode.
+
+### `--etcd-mode`
+
+```bash
+atlantis server --etcd-mode="external"
+# or
+ATLANTIS_ETCD_MODE="external"
+```
+
+etcd runtime mode when `--locking-db-type=etcd`. Must be `external` (connect to an existing etcd cluster). Defaults to `external`. The embedded in-process etcd voter is planned for a later phase and is rejected at startup.
+
+::: warning Active-active coverage
+`--locking-db-type=etcd` runs Atlantis active-active: every replica accepts webhooks, but each pull request has exactly one owner replica, and requests are forwarded to the owner so a given pull request's work never runs on two replicas at once. Owner-routed today: comment commands and autoplan (asynchronously, over the internal command transport), and positive-PR `/api/plan` and `/api/apply` (synchronously proxied to the owner). Pull-close cleanup uses a host-exact, close-generation unlock. Still **not owner-routed**: web lock deletion that affects owner-local plan state (the lock delete itself is a safe cluster-wide operation; only best-effort local plan cleanup is affected). Execution is fenced at whole-command granularity, and a command whose owner loses its lease mid-run is left fenced and marked uncertain (a "verify the actual state" comment) rather than assumed done; finer per-project-step barriers, in-flight subprocess reaping, and plan takeover are follow-ups. Drift detection is rejected in etcd mode because it has no distributed exclusion yet.
+:::
+
+### `--etcd-namespace`
+
+```bash
+atlantis server --etcd-namespace="/atlantis"
+# or
+ATLANTIS_ETCD_NAMESPACE="/atlantis"
+```
+
+etcd key namespace under which all Atlantis keys are written. Defaults to `/atlantis`. Assign a distinct namespace to each logical Atlantis deployment.
+
+### `--etcd-password-file`
+
+```bash
+atlantis server --etcd-password-file="/path/to/password"
+# or
+ATLANTIS_ETCD_PASSWORD_FILE="/path/to/password"
+```
+
+Path to a file containing the etcd RBAC password. Required when `--etcd-username` is set. mTLS remains mandatory even with username authentication.
+
+### `--etcd-request-timeout`
+
+```bash
+atlantis server --etcd-request-timeout="5s"
+# or
+ATLANTIS_ETCD_REQUEST_TIMEOUT="5s"
+```
+
+Timeout bounding individual etcd database, ownership, and readiness RPCs. Defaults to `5s`.
+
+### `--etcd-server-name`
+
+```bash
+atlantis server --etcd-server-name="etcd"
+# or
+ATLANTIS_ETCD_SERVER_NAME="etcd"
+```
+
+Expected server name for etcd TLS hostname verification.
+
+### `--etcd-startup-timeout`
+
+```bash
+atlantis server --etcd-startup-timeout="5m"
+# or
+ATLANTIS_ETCD_STARTUP_TIMEOUT="5m"
+```
+
+Timeout bounding initial etcd connectivity. Defaults to `5m`. Deployment startup probes must allow at least the same interval.
+
+### `--etcd-username`
+
+```bash
+atlantis server --etcd-username="atlantis"
+# or
+ATLANTIS_ETCD_USERNAME="atlantis"
+```
+
+etcd RBAC username. When set, requires `--etcd-password-file`; mTLS remains mandatory.
+
 ### `--executable-name` <Badge text="v0.42.0+" type="info"/>
 
 ```bash
@@ -1100,6 +1234,26 @@ Include git untracked files in the Atlantis modified file list.
 Used for example with CDKTF pre-workflow hooks that dynamically generate
 Terraform files.
 
+### `--internal-command-ca-file`
+
+```bash
+atlantis server --internal-command-ca-file="/etc/atlantis/internal/ca.pem"
+# or
+ATLANTIS_INTERNAL_COMMAND_CA_FILE="/etc/atlantis/internal/ca.pem"
+```
+
+Path to the CA certificate that validates the internal command transport used for owner-routed forwarding in etcd mode.
+
+### `--internal-command-token-file`
+
+```bash
+atlantis server --internal-command-token-file="/etc/atlantis/internal/token"
+# or
+ATLANTIS_INTERNAL_COMMAND_TOKEN_FILE="/etc/atlantis/internal/token"
+```
+
+Path to a file containing the shared token authenticating the internal command transport. Required in production etcd mode.
+
 ### `--language` <Badge text="v0.45.0+" type="info"/>
 
 ```bash
@@ -1208,6 +1362,16 @@ ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 Limit the number of comments published after a command is executed, to prevent spamming your VCS and Atlantis to get throttled as a result. Defaults to `100`. Set this option to `0` to disable log truncation. Note that the truncation will happen on the top of the command output, to preserve the most important parts of the output, often displayed at the end.
 
 When command output exceeds the VCS comment size limit (or when this limit applies), Atlantis splits the output into multiple comments using **intelligent comment splitting**. Split points are chosen so that markdown structure is preserved: the splitter detects whether it is inside a code block (`` ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
+
+### `--ownership-ttl-seconds`
+
+```bash
+atlantis server --ownership-ttl-seconds=30
+# or
+ATLANTIS_OWNERSHIP_TTL_SECONDS=30
+```
+
+TTL in seconds of the etcd ownership session lease that backs active-active PR ownership. Defaults to 30, minimum 10.
 
 ### `--parallel-apply` <Badge text="v0.22.0+" type="info"/>
 
@@ -1363,6 +1527,36 @@ ATLANTIS_REDIS_USERNAME="myuser"
 ```
 
 The Redis Username for when using a Locking DB type of `redis`. Useful when Redis is configured with ACL-based authentication.
+
+### `--replica-advertise-allowlist`
+
+```bash
+atlantis server --replica-advertise-allowlist="10.0.0.0/8"
+# or
+ATLANTIS_REPLICA_ADVERTISE_ALLOWLIST="10.0.0.0/8"
+```
+
+Comma-separated host-or-CIDR allowlist of permitted internal forwarding destinations, preventing SSRF and token disclosure. Required in etcd mode.
+
+### `--replica-advertise-url`
+
+```bash
+atlantis server --replica-advertise-url="https://pod-0.atlantis-peer:4142"
+# or
+ATLANTIS_REPLICA_ADVERTISE_URL="https://pod-0.atlantis-peer:4142"
+```
+
+Internal https URL other replicas use to forward owner-routed commands to this replica. Required in etcd mode.
+
+### `--replica-id`
+
+```bash
+atlantis server --replica-id="atlantis-member-0"
+# or
+ATLANTIS_REPLICA_ID="atlantis-member-0"
+```
+
+Stable, unique replica identity for etcd active-active ownership. Defaults to the pod hostname; must resolve to a stable, unique value.
 
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 
