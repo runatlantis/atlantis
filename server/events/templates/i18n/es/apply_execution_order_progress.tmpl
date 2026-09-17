@@ -1,0 +1,15 @@
+{{ define "atlantis.applyExecutionOrderProgress" -}}
+{{ with .ApplyExecutionOrderProgress -}}
+{{ if .RemainingExecutionOrderGroups }}
+Atlantis se detuvo después de `execution_order_group` {{ .CompletedExecutionOrderGroup }}.
+
+Grupos de orden de ejecución restantes: {{ join ", " .RemainingExecutionOrderGroups }}.
+
+Ejecuta el siguiente comando para aplicar el próximo `execution_order_group`:
+
+```shell
+{{ $.ExecutableName }} apply{{ with .ContinuationCommandArgs }} {{ . }}{{ end }}
+```
+{{ end -}}
+{{ end -}}
+{{ end -}}
