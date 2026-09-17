@@ -149,6 +149,10 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+	ProviderCache              bool            `mapstructure:"provider-cache"`
+	ProviderCacheDir           string          `mapstructure:"provider-cache-dir"`
+	ProviderCachePort          int             `mapstructure:"provider-cache-port"`
+	ProviderCacheRegistryHosts string          `mapstructure:"provider-cache-registry-hosts"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
