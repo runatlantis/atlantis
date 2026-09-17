@@ -1071,7 +1071,7 @@ func TestApplyPlanValidator_RejectsWhenLivePullHeadChanged(t *testing.T) {
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -1107,7 +1107,7 @@ func TestApplyPlanValidator_StaleCommandHeadDoesNotDeleteCurrentLivePlan(t *test
 			BaseRepo:   currentPull.BaseRepo,
 		},
 	}
-	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
@@ -1140,7 +1140,7 @@ func TestApplyPlanValidator_RejectsPullStatusFromDifferentBaseBranch(t *testing.
 	}
 	statusPull := ctx.Pull
 	statusPull.BaseBranch = "release"
-	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -1173,7 +1173,7 @@ func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyBaseWhenLiveBaseKn
 	}
 	statusPull := ctx.Pull
 	statusPull.BaseBranch = ""
-	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("legacy-base plan"), 0600))
@@ -1208,7 +1208,7 @@ func TestApplyPlanValidator_RejectsRecordedPlanStatusWithEmptyHeadWhenLiveHeadKn
 	}
 	statusPull := ctx.Pull
 	statusPull.HeadCommit = ""
-	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(statusPull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("legacy-head plan"), 0600))
@@ -1242,7 +1242,7 @@ func TestApplyPlanValidator_RejectsWhenLiveBaseChangedSinceCommandStart(t *testi
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("old-base plan"), 0600))
@@ -1271,7 +1271,7 @@ func TestApplyPlanValidator_TargetedApplySameHeadDifferentBaseReturnsStaleComman
 	}
 	livePull := commandStartPull
 	livePull.BaseBranch = "release"
-	_, err := db.UpdatePullWithResults(livePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	_, err := db.UpdatePullWithResults(livePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename("default", "projA"))
 	Ok(t, os.WriteFile(planPath, []byte("current-base plan"), 0600))
@@ -1520,7 +1520,7 @@ func TestValidatePlansForApply_CurrentPlanStillApplyableAfterStaleTargetedApplyF
 			BaseRepo:   currentPull.BaseRepo,
 		},
 	}
-	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(project.RepoRelDir, project.Workspace, project.ProjectName)})
+	_, err := db.UpdatePullWithResults(currentPull, []command.ProjectResult{plannedProjectResult(project.RepoRelDir, project.Workspace, project.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(project.Workspace, project.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("current plan"), 0600))
@@ -1561,7 +1561,7 @@ func TestApplyPlanValidator_FailsClosedWhenLiveHeadFetchFails(t *testing.T) {
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -1718,7 +1718,7 @@ func TestApplyPlanValidator_APIApplyPrefersSeededPullStatusOverStaleDB(t *testin
 		HeadCommit: staleHead,
 		BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 	}
-	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")})
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(".", "default", "projA")}, command.NoClaim{})
 	Ok(t, err)
 	ctx := command.ProjectContext{
 		Log:              logging.NewNoopLogger(t),
@@ -1815,7 +1815,7 @@ func TestApplyPlanValidator_APIApplyUsesDBWhenNoSeededPullStatusExists(t *testin
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, planContents, 0600))
@@ -1967,7 +1967,7 @@ func TestApplyPlanValidator_HashesOnlyContainedPlanPath(t *testing.T) {
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, planContents, 0600))
@@ -1994,7 +1994,7 @@ func TestApplyPlanValidator_HashMismatchDoesNotDeleteNewerCurrentPlan(t *testing
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("new plan"), 0600))
@@ -2054,7 +2054,7 @@ func TestProjectCommandRunner_ApplyRejectsPlanDeletedAfterBuilderValidation(t *t
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
 	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
@@ -2107,7 +2107,7 @@ func TestProjectCommandRunner_ApplyLoadsPlanFromStoreBeforeValidation(t *testing
 			},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	// Simulate post-reclone state: working dir exists, plan file does not.
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
@@ -2173,7 +2173,7 @@ func TestProjectCommandRunner_ApplyUsesLoadedPlanHashWhenLocalFileDiffers(t *tes
 			},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, leftoverContents, 0600))
@@ -2227,7 +2227,7 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenLiveHeadChangedAfterCo
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -2282,7 +2282,7 @@ func TestProjectCommandRunner_ApplyRejectsPlanMutatedByPreApplyRunStep(t *testin
 			},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -2352,7 +2352,7 @@ func testProjectCommandRunnerRejectsPlanContentMutation(t *testing.T, newContent
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("original plan"), 0600))
@@ -2408,7 +2408,7 @@ func TestProjectCommandRunner_ApplyUsesExpectedPlanHash(t *testing.T) {
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, planContents, 0600))
@@ -2567,9 +2567,9 @@ func TestProjectCommandRunner_ApplyRejectsFreshErroredPolicyCheckStatus(t *testi
 			BaseRepo:   models.Repo{FullName: "runatlantis/atlantis"},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
-	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+	_, err = db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -2624,14 +2624,14 @@ func TestProjectCommandRunner_ApplyDoesNotRunTerraformWhenPolicyStatusChangesAft
 			},
 		},
 	}
-	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
 	runner.RunStepRunner = &mutatingCustomStepRunner{
 		calls: &calls,
 		mutate: func() error {
-			_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)})
+			_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{erroredPolicyProjectResult(ctx)}, command.NoClaim{})
 			return err
 		},
 	}
@@ -2694,7 +2694,7 @@ func TestProjectCommandRunner_ApplyRejectsStalePullStatusAfterBuilderValidation(
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -2742,7 +2742,7 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 	}
 	stalePull := ctx.Pull
 	stalePull.HeadCommit = "old123"
-	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)})
+	_, err := db.UpdatePullWithResults(stalePull, []command.ProjectResult{plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)}, command.NoClaim{})
 	Ok(t, err)
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	Ok(t, os.WriteFile(planPath, []byte("plan"), 0600))
@@ -2765,7 +2765,7 @@ func TestProjectCommandRunner_ApplyValidationFailureDoesNotLaunderStalePlanAsErr
 				Error: errors.New("validation rejected plan"),
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 	pullStatus, err := db.GetPullStatus(ctx.Pull)
 	Ok(t, err)
@@ -5396,7 +5396,7 @@ func TestDefaultProjectCommandRunner_ApplyCustomPlanPathWorkflow(t *testing.T) {
 
 	_, err = boltDB.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
 		plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName),
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	When(mockRun.Run(
@@ -5479,7 +5479,7 @@ func TestDefaultProjectCommandRunner_ApplyManagedPlanFileStillRequired(t *testin
 
 	_, err := boltDB.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
 		plannedProjectResult(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName),
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	res := runner.Apply(ctx)
@@ -5503,14 +5503,14 @@ func TestProjectCommandRunner_ObsoleteExecutedApplyInvalidatesNewAcceptance(t *t
 	runner.PlanStore = store
 	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
 	accept := func(generation, contents string) string {
-		_, err := storage.BeginPlanGeneration(ctx.Pull, generation, []command.ProjectContext{ctx}, false)
+		_, err := storage.BeginPlanGeneration(ctx.Pull, generation, []command.ProjectContext{ctx}, false, command.NoClaim{})
 		Ok(t, err)
 		writeCtx := ctx
 		writeCtx.PlanGeneration = generation
 		writeCtx.SavedPlanHash = new(string)
 		Ok(t, os.WriteFile(planPath, []byte(contents), 0o600))
 		Ok(t, store.Save(writeCtx, planPath))
-		_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: generation, ManagedPlanHash: *writeCtx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+		_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: generation, ManagedPlanHash: *writeCtx.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 		Ok(t, err)
 		return *writeCtx.SavedPlanHash
 	}
@@ -5523,7 +5523,7 @@ func TestProjectCommandRunner_ObsoleteExecutedApplyInvalidatesNewAcceptance(t *t
 	output := runner.Apply(ctx)
 	Assert(t, output.ApplyExecuted, "successful execution must survive the final validation error")
 	Assert(t, errors.Is(output.Error, db.ErrApplyExecutionAmbiguous), "expected explicit reconciliation error: %v", output.Error)
-	_, err := storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Apply, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ProjectCommandOutput: output}})
+	_, err := storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Apply, RepoRelDir: ctx.RepoRelDir, Workspace: ctx.Workspace, ProjectName: ctx.ProjectName, PlanGeneration: "G1", ProjectCommandOutput: output}}, command.NoClaim{})
 	Assert(t, errors.Is(err, db.ErrApplyExecutionAmbiguous), "obsolete execution must invalidate acceptance: %v", err)
 	status, err := storage.GetPullStatus(ctx.Pull)
 	Ok(t, err)

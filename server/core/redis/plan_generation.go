@@ -19,7 +19,7 @@ import (
 // All pull-status mutations use the same compare-and-swap primitive. The
 // existence flag distinguishes a missing record from an existing empty blob.
 // This operates on one key and is also safe on Redis Cluster.
-const compareAndSwapPullStatus = `
+const compareAndSwapPullStatus = publicationWriteGuardLua + `
 local current = redis.call("GET", KEYS[1])
 if ARGV[1] == "0" then
  if current then return 0 end
@@ -30,9 +30,9 @@ redis.call("SET", KEYS[1], ARGV[3])
 return 1
 `
 
-func (r *RedisDB) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool) (db.PlanGenerationBeginResult, error) {
+func (r *RedisDB) BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool, mode command.PublicationWriteMode) (db.PlanGenerationBeginResult, error) {
 	var result db.PlanGenerationBeginResult
-	_, err := r.mutatePullStatus(pull, true, func(current *models.PullStatus) (models.PullStatus, error) {
+	_, err := r.mutatePullStatus(pull, mode, true, func(current *models.PullStatus) (models.PullStatus, error) {
 		var transitionErr error
 		result, transitionErr = db.BeginPlanGeneration(current, pull, generation, projects, replace)
 		return result.PullStatus, transitionErr
@@ -40,8 +40,16 @@ func (r *RedisDB) BeginPlanGeneration(pull models.PullRequest, generation string
 	return result, err
 }
 
-func (r *RedisDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool, transition func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
+func (r *RedisDB) mutatePullStatus(pull models.PullRequest, mode command.PublicationWriteMode, allowUnreadable bool, transition func(*models.PullStatus) (models.PullStatus, error)) (models.PullStatus, error) {
 	key, err := r.pullKey(pull)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	leaseKey, err := publicationLeaseKey(key)
+	if err != nil {
+		return models.PullStatus{}, err
+	}
+	owner, err := publicationWriteOwner(mode)
 	if err != nil {
 		return models.PullStatus{}, err
 	}
@@ -77,9 +85,12 @@ func (r *RedisDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool
 		if err != nil {
 			return models.PullStatus{}, fmt.Errorf("encoding pull status: %w", err)
 		}
-		changed, err := r.client.Eval(opCtx, compareAndSwapPullStatus, []string{key}, exists, raw, encoded).Int()
+		changed, err := r.client.Eval(opCtx, compareAndSwapPullStatus, []string{key, leaseKey}, exists, raw, encoded, owner).Int()
 		if err != nil {
 			return models.PullStatus{}, fmt.Errorf("updating pull status: %w", err)
+		}
+		if changed < 0 {
+			return models.PullStatus{}, publicationWriteError(changed)
 		}
 		if changed == 1 {
 			return next, transitionErr
@@ -88,9 +99,9 @@ func (r *RedisDB) mutatePullStatus(pull models.PullRequest, allowUnreadable bool
 	return models.PullStatus{}, fmt.Errorf("pull status changed concurrently; retry the command")
 }
 
-func (r *RedisDB) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus) (bool, error) {
+func (r *RedisDB) DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus, mode command.PublicationWriteMode) (bool, error) {
 	var discarded bool
-	_, err := r.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+	_, err := r.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		next, changed, transitionErr := db.DiscardPlanStatus(current, pull, expected)
 		discarded = changed
 		return next, transitionErr

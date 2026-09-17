@@ -34,9 +34,9 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 			t.Cleanup(func() { Ok(t, storage.Close()) })
 			pull := models.PullRequest{Num: 42, HeadBranch: "current-head", HeadCommit: "current-head", BaseBranch: "main", BaseRepo: models.Repo{FullName: "owner/repo", VCSHost: models.VCSHost{Hostname: "gitlab.com", Type: models.Gitlab}}}
 			project := command.ProjectContext{Workspace: events.DefaultWorkspace, RepoRelDir: ".", ProjectName: "app", RequiresAtlantisManagedPlanFile: true}
-			_, err = storage.BeginPlanGeneration(pull, "previous-plan", []command.ProjectContext{project}, true)
+			_, err = storage.BeginPlanGeneration(pull, "previous-plan", []command.ProjectContext{project}, true, command.NoClaim{})
 			Ok(t, err)
-			_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, PlanGeneration: "previous-plan", ManagedPlanHash: strings.Repeat("a", 64), Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, ProjectName: project.ProjectName, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+			_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, PlanGeneration: "previous-plan", ManagedPlanHash: strings.Repeat("a", 64), Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, ProjectName: project.ProjectName, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 			Ok(t, err)
 			ac.PullStatusFetcher = storage
 			ac.PlanGenerationDB = storage
@@ -108,7 +108,7 @@ func TestAPIController_PRApplyAfterDurablePlan(t *testing.T) {
 
 type rejectingAPIResultDatabase struct{ db.Database }
 
-func (r rejectingAPIResultDatabase) UpdatePullWithResults(models.PullRequest, []command.ProjectResult) (models.PullStatus, error) {
+func (r rejectingAPIResultDatabase) UpdatePullWithResults(models.PullRequest, []command.ProjectResult, command.PublicationWriteMode) (models.PullStatus, error) {
 	return models.PullStatus{}, errors.New("database write unavailable")
 }
 

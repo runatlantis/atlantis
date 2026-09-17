@@ -405,8 +405,8 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
-	return b.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult, mode command.PublicationWriteMode) (models.PullStatus, error) {
+	return b.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		return db.MergePullResults(current, pull, newResults)
 	})
 }
@@ -430,12 +430,20 @@ func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, err
 }
 
 // DeletePullStatus deletes the status for pull.
-func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
+func (b *BoltDB) DeletePullStatus(pull models.PullRequest, mode command.PublicationWriteMode) error {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return err
 	}
 	err = b.db.Update(func(tx *bolt.Tx) error {
+		if err := checkPublicationWrite(tx, key, mode); err != nil {
+			return err
+		}
+		if leases := tx.Bucket(publicationLeasesBucket); leases != nil {
+			if err := leases.Delete(key); err != nil {
+				return err
+			}
+		}
 		bucket := tx.Bucket(b.pullsBucketName)
 		return bucket.Delete(key)
 	})
@@ -446,8 +454,8 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 }
 
 // UpdateProjectStatus updates project status.
-func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
-	_, err := b.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus, mode command.PublicationWriteMode) error {
+	_, err := b.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
 		return db.UpdateLegacyProjectStatus(current, pull, workspace, repoRelDir, newStatus)
 	})
 	if errors.Is(err, db.ErrPlanStatusNotFound) {

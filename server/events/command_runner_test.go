@@ -487,7 +487,7 @@ func TestRunCommentCommandPlan_NoProjectsWritesCurrentEmptyPullStatus(t *testing
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	var pull github.PullRequest
@@ -543,7 +543,7 @@ func TestRunCommentCommandPlan_NoProjectsClearsOldPlanFilesAndPullStatus(t *test
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	var pull github.PullRequest
@@ -584,7 +584,7 @@ func TestRunCommentCommandPlan_NoProjectsNonSilencedUsesSafeCleanup(t *testing.T
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	var pull github.PullRequest
@@ -700,7 +700,7 @@ func TestRunCommentCommandApply_NoProjects_SilenceEnabled(t *testing.T) {
 	applyCommandRunner.SilenceNoProjects = true
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123", BaseBranch: "main"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 	Ok(t, err)
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -724,7 +724,7 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusNoOpsSafely(t *testing.T) {
 
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 	Ok(t, err)
 
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
@@ -757,7 +757,7 @@ func TestRunApply_NoProjectsAfterEmptyPullStatusDoesNotSucceedWhilePlanInFlight(
 
 	var pull github.PullRequest
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 	Ok(t, err)
 
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
@@ -1355,7 +1355,7 @@ func TestImportOrStateRm_DiscardedPlanStatusAllowsLaterGenericApply(t *testing.T
 						PlanSuccess: &models.PlanSuccess{},
 					},
 				},
-			})
+			}, command.NoClaim{})
 			Ok(t, err)
 
 			ctx := &command.Context{
@@ -1543,7 +1543,7 @@ func TestImportOrStateRm_DoesNotDiscardPlanStatusOnErrorOrFailure(t *testing.T) 
 						PlanSuccess: &models.PlanSuccess{},
 					},
 				},
-			})
+			}, command.NoClaim{})
 			Ok(t, err)
 
 			ctx := &command.Context{
@@ -1619,7 +1619,7 @@ func TestImportOrStateRm_DiscardsOnlyExistingPullStatusProject(t *testing.T) {
 			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projB"),
-			})
+			}, command.NoClaim{})
 			Ok(t, err)
 
 			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
@@ -1716,7 +1716,7 @@ func TestImportOrStateRm_DoesNotCreateDiscardedStatusForMissingProject(t *testin
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 			_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
-			})
+			}, command.NoClaim{})
 			Ok(t, err)
 
 			runImportOrStateRmResult(t, modelPull, tc.cmd, tc.projectCmd, tc.output)
@@ -1769,7 +1769,7 @@ func TestImportOrStateRm_DoesNotDiscardStaleHeadPullStatus(t *testing.T) {
 			currentPull.HeadCommit = "new123"
 			_, err := dbUpdater.Database.UpdatePullWithResults(stalePull, []command.ProjectResult{
 				plannedProjectResult("dir1", events.DefaultWorkspace, "projA"),
-			})
+			}, command.NoClaim{})
 			Ok(t, err)
 
 			runImportOrStateRmResult(t, currentPull, tc.cmd, tc.projectCmd, tc.output)
@@ -1833,10 +1833,10 @@ type assertPlanLockDB struct {
 	called       *bool
 }
 
-func (a assertPlanLockDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+func (a assertPlanLockDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult, mode command.PublicationWriteMode) (models.PullStatus, error) {
 	*a.called = true
 	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Plan), "expected plan lock during pull status write")
-	return a.Database.UpdatePullWithResults(pull, results)
+	return a.Database.UpdatePullWithResults(pull, results, mode)
 }
 
 func projectStatus(t *testing.T, pullStatus *models.PullStatus, workspace, repoRelDir, projectName string) models.ProjectStatus {
@@ -2228,7 +2228,7 @@ func TestRunAutoplan_NoProjectsWritesCurrentEmptyPullStatus(t *testing.T) {
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
@@ -2279,7 +2279,7 @@ func TestRunAutoplan_NoProjectsClearsOldPlanFilesAndPullStatus(t *testing.T) {
 				PlanSuccess: &models.PlanSuccess{},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
 
 	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
@@ -2639,7 +2639,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 			Workspace:   "default",
 			RepoRelDir:  ".",
 		},
-	})
+	}, command.NoClaim{})
 
 	When(ch.VCSClient.PullIsMergeable(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq("atlantis-test"), Eq([]string{}))).ThenReturn(models.MergeableStatus{
 		IsMergeable: true,
@@ -2770,7 +2770,7 @@ func setupApplyWithAutoMerge(t *testing.T, options ...func(testConfig *TestConfi
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
-	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, nil, command.NoClaim{})
 	Ok(t, err)
 	autoMerger.GlobalAutomerge = true
 	autoMerger.GlobalAutomergeMethod = ""
@@ -2810,9 +2810,9 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, command.NoClaim{})
 	Ok(t, err)
-	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
+	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus, command.NoClaim{}))
 	ghPull := &github.PullRequest{
 		State: github.Ptr("open"),
 	}
@@ -2873,13 +2873,13 @@ func TestRunAutoplan_NoProjectsReapsAcceptedPlanAndLostCheckoutLock(t *testing.T
 	planCommandRunner.PlanReaper = &events.DefaultDeleteLockCommand{WorkingDir: workingDir, PlanStore: store, DataDir: dataRoot, LocalSharePlanDir: planRoot}
 	pull := models.PullRequest{Num: 1, HeadCommit: "head", BaseRepo: testdata.GithubRepo}
 	project := command.ProjectContext{CommandName: command.Plan, BaseRepo: pull.BaseRepo, Pull: pull, Workspace: "default", RepoRelDir: "removed", PlanGeneration: "G1", RequiresAtlantisManagedPlanFile: true, SavedPlanHash: new(string), LocalSharePlanDir: planRoot}
-	_, err := storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{project}, true)
+	_, err := storage.BeginPlanGeneration(pull, "G1", []command.ProjectContext{project}, true, command.NoClaim{})
 	Ok(t, err)
 	path := runtime.GetPlanFilePath(project, filepath.Join(dataRoot, "removed"))
 	Ok(t, os.MkdirAll(filepath.Dir(path), 0o700))
 	Ok(t, os.WriteFile(path, []byte("old accepted plan"), 0o600))
 	Ok(t, store.Save(project, path))
-	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G1", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+	_, err = storage.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: "G1", ManagedPlanHash: *project.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}}, command.NoClaim{})
 	Ok(t, err)
 	held, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, project.RepoRelDir, ""), project.Workspace, pull, models.User{})
 	Ok(t, err)

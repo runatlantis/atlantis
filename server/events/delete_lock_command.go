@@ -65,7 +65,7 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 	if project == nil {
 		return nil, false, db.ErrPlanStatusNotFound
 	}
-	discarded, err := l.Database.DiscardPlanStatus(status.Pull, *project)
+	discarded, err := l.Database.DiscardPlanStatus(status.Pull, *project, command.NoClaim{})
 	if err != nil {
 		return nil, false, err
 	}
@@ -99,7 +99,7 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 			pull = status.Pull
 			captured = status.Projects
 			for _, project := range captured {
-				if _, err := l.Database.DiscardPlanStatus(pull, project); err != nil {
+				if _, err := l.Database.DiscardPlanStatus(pull, project, command.NoClaim{}); err != nil {
 					return 0, err
 				}
 			}

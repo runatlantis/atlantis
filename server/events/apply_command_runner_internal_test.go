@@ -116,7 +116,7 @@ func TestApplyCommandRunner_DeferredApplySuccessPublishesAfterFinalFreshness(t *
 		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		BaseBranch: "main",
 	}
-	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")})
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestApplyCommandRunner_DeferredApplySuccessFailsWhenFinalFreshnessFails(t *
 	}
 	finalPull := initialPull
 	finalPull.BaseBranch = "release"
-	_, err = database.UpdatePullWithResults(initialPull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")})
+	_, err = database.UpdatePullWithResults(initialPull, []command.ProjectResult{internalPlannedProjectResult("dirA", DefaultWorkspace, "projA")}, command.NoClaim{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func TestApplyCommandRunner_NoPlanLegacyEmptyIdentityDoesNotPublishZeroZeroSucce
 		State:    models.OpenPullState,
 		Num:      testdata.Pull.Num,
 	}
-	if _, err := database.UpdatePullWithResults(legacyPull, nil); err != nil {
+	if _, err := database.UpdatePullWithResults(legacyPull, nil, command.NoClaim{}); err != nil {
 		t.Fatal(err)
 	}
 	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
@@ -408,7 +408,7 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 		State:    models.OpenPullState,
 		Num:      testdata.Pull.Num,
 	}
-	if _, err := database.UpdatePullWithResults(legacyPull, nil); err != nil {
+	if _, err := database.UpdatePullWithResults(legacyPull, nil, command.NoClaim{}); err != nil {
 		t.Fatal(err)
 	}
 	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}

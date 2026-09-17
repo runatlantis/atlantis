@@ -410,7 +410,7 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 func (p *PlanCommandRunner) clearPlansAndPullStatusForNoProjects(ctx *command.Context, pull models.PullRequest) (models.PullStatus, error) {
 	// One atomic replacement supersedes old generations. Delete + an ordinary
 	// empty update could otherwise erase a generation admitted in between.
-	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(pull, uuid.NewString(), nil, true)
+	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(pull, uuid.NewString(), nil, true, command.NoClaim{})
 	if err != nil {
 		return models.PullStatus{}, fmt.Errorf("writing empty plan status: %w", err)
 	}
@@ -674,7 +674,7 @@ func (p *PlanCommandRunner) beginGeneration(ctx *command.Context, cmd PullComman
 		return true
 	}
 	generation := uuid.NewString()
-	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(ctx.Pull, generation, projects, replace)
+	admitted, err := p.dbUpdater.Database.BeginPlanGeneration(ctx.Pull, generation, projects, replace, command.NoClaim{})
 	if err != nil {
 		p.planPersistenceFailed(ctx, cmd, projects, command.Result{}, fmt.Errorf("admitting plan generation: %w", err))
 		return false
