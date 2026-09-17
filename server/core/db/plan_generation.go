@@ -397,6 +397,27 @@ func DiscardPlanStatus(current *models.PullStatus, pull models.PullRequest, expe
 	return next, true, nil
 }
 
+// DiscardPullPlans invalidates the complete observed set before bulk cleanup.
+// Missing status becomes an empty durable status so even zero-project cleanup
+// passes through the same fenced write as a discard with project rows.
+func DiscardPullPlans(current *models.PullStatus, pull models.PullRequest, expected *models.PullStatus) (models.PullStatus, error) {
+	if current == nil && expected == nil {
+		return models.PullStatus{Pull: pull}, nil
+	}
+	if current == nil || expected == nil || !samePullIdentity(current.Pull, pull) || len(current.Projects) != len(expected.Projects) {
+		return models.PullStatus{}, ErrPlanGenerationSuperseded
+	}
+	next := *current
+	for _, project := range expected.Projects {
+		var err error
+		next, _, err = DiscardPlanStatus(&next, pull, project)
+		if err != nil {
+			return models.PullStatus{}, err
+		}
+	}
+	return next, nil
+}
+
 // BeginApplyExecution consumes the right to start this plan before Terraform
 // runs. A crash requires reconciliation and exact discard before replanning,
 // not automatic replay of an operation that may have changed infrastructure.

@@ -288,3 +288,21 @@ func TestApplyExecution_PreservesPolicyRequirementFailure(t *testing.T) {
 	Equals(t, "", completed.Projects[0].ApplyExecutionID)
 	Equals(t, models.ErroredApplyStatus, completed.Projects[0].Status)
 }
+
+func TestDiscardPullPlans_AtomicObservedSet(t *testing.T) {
+	pull := models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}, HeadCommit: "head"}
+	current := models.PullStatus{Pull: pull, Projects: []models.ProjectStatus{
+		{Workspace: "default", RepoRelDir: "a", Status: models.PlannedPlanStatus, PlanGeneration: "G1", AcceptedPlanGeneration: "G1"},
+		{Workspace: "default", RepoRelDir: "b", Status: models.AppliedPlanStatus, PlanGeneration: "G1", AcceptedPlanGeneration: "G1"},
+	}}
+	observed := current
+	observed.Projects = append([]models.ProjectStatus(nil), current.Projects...)
+	observed.Projects[1].PlanGeneration = "stale"
+	_, err := db.DiscardPullPlans(&current, pull, &observed)
+	Assert(t, errors.Is(err, db.ErrPlanGenerationSuperseded), "stale project accepted: %v", err)
+	Equals(t, models.PlannedPlanStatus, current.Projects[0].Status)
+	next, err := db.DiscardPullPlans(&current, pull, &current)
+	Ok(t, err)
+	Equals(t, models.DiscardedPlanStatus, next.Projects[0].Status)
+	Equals(t, current.Projects[1], next.Projects[1])
+}

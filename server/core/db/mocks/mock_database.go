@@ -175,6 +175,20 @@ func (mr *MockDatabaseMockRecorder) DiscardPlanStatus(pull, expected, mode any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardPlanStatus", reflect.TypeOf((*MockDatabase)(nil).DiscardPlanStatus), pull, expected, mode)
 }
 
+// DiscardPullPlans mocks base method.
+func (m *MockDatabase) DiscardPullPlans(pull models.PullRequest, expected *models.PullStatus, mode command.PublicationWriteMode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DiscardPullPlans", pull, expected, mode)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DiscardPullPlans indicates an expected call of DiscardPullPlans.
+func (mr *MockDatabaseMockRecorder) DiscardPullPlans(pull, expected, mode any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DiscardPullPlans", reflect.TypeOf((*MockDatabase)(nil).DiscardPullPlans), pull, expected, mode)
+}
+
 // GetLock mocks base method.
 func (m *MockDatabase) GetLock(project models.Project, workspace string) (*models.ProjectLock, error) {
 	m.ctrl.T.Helper()

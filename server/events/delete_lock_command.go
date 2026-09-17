@@ -98,11 +98,9 @@ func (l *DefaultDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLoggin
 		if status != nil {
 			pull = status.Pull
 			captured = status.Projects
-			for _, project := range captured {
-				if _, err := l.Database.DiscardPlanStatus(pull, project, command.NoClaim{}); err != nil {
-					return 0, err
-				}
-			}
+		}
+		if err := l.Database.DiscardPullPlans(pull, status, command.NoClaim{}); err != nil {
+			return 0, err
 		}
 	}
 

@@ -114,3 +114,11 @@ func (r *RedisDB) BeginApplyExecution(pull models.PullRequest, projects []comman
 		return db.BeginApplyExecution(current, pull, projects, executionID)
 	})
 }
+
+// DiscardPullPlans checks publication ownership even when no project status exists.
+func (r *RedisDB) DiscardPullPlans(pull models.PullRequest, expected *models.PullStatus, mode command.PublicationWriteMode) error {
+	_, err := r.mutatePullStatus(pull, mode, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.DiscardPullPlans(current, pull, expected)
+	})
+	return err
+}
