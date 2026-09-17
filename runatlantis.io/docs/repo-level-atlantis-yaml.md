@@ -63,6 +63,7 @@ delete_source_branch_on_merge: true # Available since v0.15.0
 parallel_plan: true # Available since v0.17.0
 parallel_apply: true # Available since v0.17.0
 abort_on_execution_order_fail: true # Available since v0.17.0
+replan_between_execution_order_groups: true
 projects:
 - name: my-project-name # Available since v0.1.0
   branch: /main/ # Available since v0.21.0
@@ -335,6 +336,48 @@ in each group one by one.
 If any plan/apply fails and `abort_on_execution_order_fail` is set to true on a repo level, all the
 following groups will be aborted. For this example, if project2 fails then project1 will not run.
 
+#### Replanning between execution order groups
+
+By default Atlantis applies the planfiles that were created during `atlantis plan`. That is intentional:
+reviewers approve the exact plan that will be applied.
+
+For Terragrunt (and similar) stacks that plan later projects with `mock_outputs` while earlier
+projects do not exist yet, those saved planfiles become stale after the earlier group is applied.
+Enable this opt-in setting to refresh later groups during a single `atlantis apply`:
+
+```yaml
+version: 3
+replan_between_execution_order_groups: true
+abort_on_execution_order_fail: true
+projects:
+   - name: network
+     dir: network
+     execution_order_group: 1
+   - name: cluster
+     dir: cluster
+     depends_on: [network]
+     execution_order_group: 2
+```
+
+When enabled:
+
+1. Atlantis applies `execution_order_group` 1 with the reviewed planfiles.
+2. Before applying group 2, Atlantis re-runs plan (and `policy_check` when configured) for those projects.
+3. Atlantis applies group 2 using the refreshed planfiles.
+
+Default is `false`. Use this only when you accept that later groups may apply a plan that was not the
+one originally commented on the PR (the refreshed plan is produced mid-apply). Pair with
+`execution_order_group` and/or `depends_on`. See [#2243](https://github.com/runatlantis/atlantis/issues/2243).
+
+Notes:
+
+- Mid-apply replans reuse the existing pull working tree and do **not** re-clone or merge-again, so sibling planfiles stay intact.
+- Mid-apply replans suppress project plan commit statuses and are not posted as separate plan comments.
+- Prefer distinct `execution_order_group` values for dependency layers. If every project shares group `0`
+  and `parallel_apply: true`, Atlantis still applies them as one wave and cannot replan between them.
+- With this setting enabled, a failed earlier group stops later groups (they must not refresh against
+  incomplete dependencies).
+
 Execution order groups are useful when you have dependencies between projects. However, they are only applicable in the case where
 you initiate a global apply for all of your projects, i.e `atlantis apply`. If you initiate an apply on a single project, then the execution order groups are ignored.
 Thus, the `depends_on` key is more useful in this case. and can be used in conjunction with execution order groups.
@@ -441,19 +484,21 @@ See [Custom Workflow Use Cases: Custom Backend Config](custom-workflows.md#custo
 version: 3
 automerge: false
 delete_source_branch_on_merge: false
+replan_between_execution_order_groups: false
 projects:
 workflows:
 allowed_regexp_prefixes:
 ```
 
-| Key                           | Type                                                   | Default | Required | Description                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------ | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| version                       | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                       |
-| automerge                     | bool                                                   | `false` | no       | Automatically merges pull request when all plans are applied.                                                                      |
-| delete_source_branch_on_merge | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                  |
-| projects                      | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                   |
-| workflows<br />_(restricted)_ | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                  |
-| allowed_regexp_prefixes       | array\[string\]                                        | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used. |
+| Key                                   | Type                                                   | Default | Required | Description                                                                                                                                                                                                                                                        |
+| ------------------------------------- | ------------------------------------------------------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| version                               | int                                                    | none    | **yes**  | This key is required and must be set to `3`.                                                                                                                                                                                                                       |
+| automerge                             | bool                                                   | `false` | no       | Automatically merges pull request when all plans are applied.                                                                                                                                                                                                      |
+| delete_source_branch_on_merge         | bool                                                   | `false` | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                                                  |
+| replan_between_execution_order_groups | bool                                                   | `false` | no       | During apply, re-run plan for later execution order groups after earlier groups have applied, so planfiles built from dependency placeholders (for example Terragrunt `mock_outputs`) are refreshed. See [Order of planning/applying](#order-of-planningapplying). |
+| projects                              | array[[Project](repo-level-atlantis-yaml.md#project)]  | `[]`    | no       | Lists the projects in this repo.                                                                                                                                                                                                                                   |
+| workflows<br />_(restricted)_         | map[string: [Workflow](custom-workflows.md#reference)] | `{}`    | no       | Custom workflows.                                                                                                                                                                                                                                                  |
+| allowed_regexp_prefixes               | array\[string\]                                        | `[]`    | no       | Lists the allowed regexp prefixes to use when the [`--enable-regexp-cmd`](server-configuration.md#enable-regexp-cmd) flag is used.                                                                                                                                 |
 
 ### Project
 

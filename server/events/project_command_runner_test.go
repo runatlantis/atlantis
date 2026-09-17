@@ -217,6 +217,54 @@ func TestDefaultProjectCommandRunner_PlanSuppressesCustomRunStepStreaming(t *tes
 	mockRun.VerifyWasCalledOnce().Run(ctx, nil, "", repoDir, map[string]string{}, false, nil, nil)
 }
 
+func TestDefaultProjectCommandRunner_MidApplyReplanUsesGetWorkingDirNotClone(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	mockRequirementHandler := mocks.NewMockCommandRequirementHandler()
+	mockInit := mocks.NewMockStepRunner()
+	mockPlan := mocks.NewMockStepRunner()
+
+	runner := events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		InitStepRunner:            mockInit,
+		PlanStepRunner:            mockPlan,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mockRequirementHandler,
+	}
+
+	repoDir := t.TempDir()
+	When(mockWorkingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	When(mockInit.Run(Any[command.ProjectContext](), Any[[]string](), Eq(repoDir), Any[map[string]string]())).ThenReturn("init", nil)
+	When(mockPlan.Run(Any[command.ProjectContext](), Any[[]string](), Eq(repoDir), Any[map[string]string]())).ThenReturn("plan", nil)
+
+	ctx := command.ProjectContext{
+		Log:            logging.NewNoopLogger(t),
+		Steps:          []valid.Step{{StepName: "init"}, {StepName: "plan"}},
+		Workspace:      "default",
+		RepoRelDir:     ".",
+		MidApplyReplan: true,
+		Pull:           models.PullRequest{BaseRepo: models.Repo{FullName: "owner/repo"}},
+		BaseRepo:       models.Repo{FullName: "owner/repo"},
+	}
+
+	res := runner.Plan(ctx)
+
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Equals(t, "", res.Failure)
+	Assert(t, res.Error == nil, "exp no error")
+	mockWorkingDir.VerifyWasCalledOnce().GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockWorkingDir.VerifyWasCalled(Never()).MergeAgain(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+	mockRequirementHandler.VerifyWasCalled(Never()).ValidatePlanProject(Any[string](), Any[command.ProjectContext]())
+}
+
 func TestProjectOutputWrapper(t *testing.T) {
 	RegisterMockTestingT(t)
 	ctx := command.ProjectContext{
