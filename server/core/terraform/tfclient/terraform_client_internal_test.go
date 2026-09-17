@@ -92,6 +92,8 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 
 // Test that it executes with the expected env vars.
 func TestDefaultClient_RunCommandWithVersion_EnvVars(t *testing.T) {
+	unsetTFPluginCacheDirEnv(t)
+
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
 	tmp := t.TempDir()
@@ -182,6 +184,8 @@ func TestDefaultClient_RunCommandWithVersion_Error(t *testing.T) {
 }
 
 func TestDefaultClient_RunCommandAsync_Success(t *testing.T) {
+	unsetTFPluginCacheDirEnv(t)
+
 	RegisterMockTestingT(t)
 	v, err := version.NewVersion("0.11.11")
 	Ok(t, err)
@@ -700,4 +704,16 @@ func TestDefaultClient_PrepCmd_ExpandsConfiguredExtraArgs(t *testing.T) {
 	// not reach the logs or a pull request comment.
 	Assert(t, strings.Contains(display, "$WORKSPACE"),
 		"display should keep the unexpanded reference, got %q", display)
+}
+
+func unsetTFPluginCacheDirEnv(t *testing.T) {
+	t.Helper()
+
+	tfpd, ok := os.LookupEnv("TF_PLUGIN_CACHE_DIR")
+	if ok {
+		t.Cleanup(func() {
+			os.Setenv("TF_PLUGIN_CACHE_DIR", tfpd)
+		})
+	}
+	os.Unsetenv("TF_PLUGIN_CACHE_DIR")
 }
