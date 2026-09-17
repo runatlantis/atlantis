@@ -12,6 +12,7 @@ import (
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
+	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -79,6 +80,54 @@ func TestUnlockCommandRunner_OptionalPublication(t *testing.T) {
 				Assert(t, ctx.CommandHasErrors, "discard/fencing errors must be visible")
 				client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Eq(success), Any[string]())
 				client.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Any[string](), Eq("unlock"))
+			}
+		})
+	}
+}
+
+// Exercise the real bulk cleanup helper: a mock which writes a project result
+// cannot expose the missing-status path that used to skip publication fencing.
+func TestUnlockCommandRunner_RealCleanupWithoutStatus(t *testing.T) {
+	for _, mode := range []string{"nil", "coordinated", "nil busy", "nil ambiguous"} {
+		t.Run(mode, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			storage, err := boltdb.New(t.TempDir())
+			Ok(t, err)
+			t.Cleanup(func() { Ok(t, storage.Close()) })
+			pull := models.PullRequest{Num: 42, BaseRepo: models.Repo{FullName: "owner/repo"}}
+			locker := locking.NewClient(storage)
+			lock, err := locker.TryLock(models.NewProject(pull.BaseRepo.FullName, "path", ""), "default", pull, models.User{})
+			Ok(t, err)
+			if mode == "nil busy" || mode == "nil ambiguous" {
+				_, err = storage.AcquirePublicationLease(context.Background(), pull, "other-owner", time.Minute)
+				Ok(t, err)
+				if mode == "nil ambiguous" {
+					Ok(t, storage.BeginPublication(context.Background(), pull, command.PublicationFence{Owner: "other-owner"}))
+				}
+			}
+			workingDir := &publicationCleanupWorkingDir{}
+			deleter := &events.DefaultDeleteLockCommand{Database: storage, Locker: locker, WorkingDir: workingDir}
+			client := vcsmocks.NewMockClient()
+			runner := events.NewUnlockCommandRunner(deleter, client, false, "")
+			if mode == "coordinated" {
+				runner.Publication = events.NewPublicationCoordinator(storage, context.Background())
+			}
+			ctx := &command.Context{Log: logging.NewNoopLogger(t), Pull: pull}
+			runner.Run(ctx, &events.CommentCommand{Name: command.Unlock})
+			remaining, err := locker.GetLock(lock.LockKey)
+			Ok(t, err)
+			success := "All Atlantis locks for this PR have been unlocked and plans discarded"
+			if mode == "nil" || mode == "coordinated" {
+				Assert(t, !ctx.CommandHasErrors, "usable constructor/injected coordinator must permit cleanup")
+				Assert(t, remaining == nil, "successful cleanup must remove the lock")
+				Equals(t, 1, workingDir.deleted)
+				client.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Eq(success), Eq("unlock"))
+			} else {
+				Assert(t, ctx.CommandHasErrors, "publication conflict must remain visible")
+				Assert(t, remaining != nil, "conflicting command must retain the lock")
+				Equals(t, 0, workingDir.deleted)
+				client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Eq(success), Any[string]())
+				client.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Eq(pull.BaseRepo), Eq(pull.Num), Eq("Failed to delete PR locks"), Eq("unlock"))
 			}
 		})
 	}
