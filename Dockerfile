@@ -315,7 +315,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
 # renovate: datasource=repology depName=debian_13/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b1"
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b3"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \
