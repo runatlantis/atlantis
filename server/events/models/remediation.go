@@ -91,6 +91,9 @@ type RemediationRequest struct {
 	Paths []DriftDetectionPath `json:"paths,omitempty"`
 	// Workspaces filters remediation to specific workspaces. If empty, all workspaces.
 	Workspaces []string `json:"workspaces,omitempty"`
+	// Group restricts remediation to stored drift records whose project belongs
+	// to that group. Cannot be combined with Projects or Paths.
+	Group string `json:"group,omitempty"`
 	// DriftOnly if true, only remediates projects that have detected drift.
 	DriftOnly bool `json:"drift_only"`
 }
@@ -130,6 +133,7 @@ func (r *RemediationRequest) Validate() []FieldError {
 	if !r.Action.IsValid() {
 		errors = append(errors, FieldError{Field: "action", Message: "action must be 'plan' or 'apply'"})
 	}
+	errors = append(errors, validateAPIGroupSelector(r.Group, len(r.Projects) > 0 || len(r.Paths) > 0)...)
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})

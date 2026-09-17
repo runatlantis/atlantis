@@ -573,3 +573,39 @@ func TestInMemoryStorage_GetAllEmpty(t *testing.T) {
 	Ok(t, err)
 	Equals(t, 0, len(results))
 }
+
+func TestInMemoryStorage_GetByGroup(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+
+	storage.Store("owner/repo", models.ProjectDrift{ //nolint:errcheck
+		ProjectName: "network",
+		Path:        "network",
+		Workspace:   "default",
+		Group:       "infra",
+		LastChecked: time.Now(),
+	})
+	storage.Store("owner/repo", models.ProjectDrift{ //nolint:errcheck
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   "default",
+		Group:       "apps",
+		LastChecked: time.Now(),
+	})
+	// Stored before groups existed, so its membership is unknown.
+	storage.Store("owner/repo", models.ProjectDrift{ //nolint:errcheck
+		ProjectName: "legacy",
+		Path:        "legacy",
+		Workspace:   "default",
+		LastChecked: time.Now(),
+	})
+
+	results, err := storage.Get("owner/repo", drift.GetOptions{Group: "infra"})
+	Ok(t, err)
+	Equals(t, 1, len(results))
+	Equals(t, "network", results[0].ProjectName)
+
+	// No group filter returns every record, including the ungrouped one.
+	results, err = storage.Get("owner/repo", drift.GetOptions{})
+	Ok(t, err)
+	Equals(t, 3, len(results))
+}

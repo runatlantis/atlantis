@@ -52,6 +52,7 @@ type Project struct {
 	Branch                    *string    `yaml:"branch,omitempty"`
 	Dir                       *string    `yaml:"dir,omitempty"`
 	Workspace                 *string    `yaml:"workspace,omitempty"`
+	Group                     *string    `yaml:"group,omitempty"`
 	Workflow                  *string    `yaml:"workflow,omitempty"`
 	TerraformDistribution     *string    `yaml:"terraform_distribution,omitempty"`
 	TerraformVersion          *string    `yaml:"terraform_version,omitempty"`
@@ -144,6 +145,16 @@ func (p Project) Validate() error {
 		return valid.ValidateWorkspaceName(*strPtr)
 	}
 
+	validGroup := func(value any) error {
+		strPtr := value.(*string)
+		if strPtr == nil {
+			return nil
+		}
+		// Not validProjectName: that replaces '/' before checking, which would
+		// accept a group no selector can name. See valid.ValidateGroupName.
+		return valid.ValidateGroupName(*strPtr)
+	}
+
 	// Validate that name doesn't contain glob patterns - glob expansion only works for 'dir'
 	if p.Name != nil && ContainsGlobPattern(*p.Name) {
 		return errors.New("name: cannot contain glob pattern characters ('*', '?', '['); glob expansion is only supported in the 'dir' field")
@@ -158,6 +169,7 @@ func (p Project) Validate() error {
 	return validation.ValidateStruct(&p,
 		validation.Field(&p.Dir, validation.Required, validation.By(validDir)),
 		validation.Field(&p.Workspace, validation.By(validWorkspace)),
+		validation.Field(&p.Group, validation.By(validGroup)),
 		validation.Field(&p.PlanRequirements, validation.By(validPlanReq)),
 		validation.Field(&p.ApplyRequirements, validation.By(validApplyReq)),
 		validation.Field(&p.ImportRequirements, validation.By(validImportReq)),
@@ -188,6 +200,12 @@ func (p Project) ToValid() valid.Project {
 		v.Workspace = DefaultWorkspace
 	} else {
 		v.Workspace = *p.Workspace
+	}
+
+	if p.Group == nil || *p.Group == "" {
+		v.Group = valid.DefaultGroup
+	} else {
+		v.Group = *p.Group
 	}
 
 	v.WorkflowName = p.Workflow
