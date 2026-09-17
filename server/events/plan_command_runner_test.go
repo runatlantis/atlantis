@@ -4,12 +4,14 @@
 package events_test
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/planstore"
@@ -1276,6 +1278,8 @@ func TestPlanCommandRunner_GenerationAdmissionAndObsoleteCompletion(t *testing.T
 			t.Run(name, func(t *testing.T) {
 				storage := newTestBoltDB(t)
 				vcsClient := setup(t, func(tc *TestConfig) { tc.database = storage })
+				planCommandRunner.Publication = events.NewPublicationCoordinator(storage, context.Background())
+				policyCheckCommandRunner.Publication = planCommandRunner.Publication
 				ctx := &command.Context{Log: logging.NewNoopLogger(t), Pull: testdata.Pull, HeadRepo: testdata.GithubRepo, Scope: metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")}
 				if auto {
 					ctx.Trigger = command.AutoTrigger
@@ -1291,6 +1295,11 @@ func TestPlanCommandRunner_GenerationAdmissionAndObsoleteCompletion(t *testing.T
 				var expectedGeneration string
 				When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
 					admitted := args[0].(command.ProjectContext)
+					// Terraform execution must not own the publication lease.
+					_, leaseErr := storage.AcquirePublicationLease(context.Background(), ctx.Pull, "during-terraform", time.Minute)
+					require.NoError(t, leaseErr)
+					require.NoError(t, storage.ReleasePublicationLease(context.Background(), ctx.Pull, db.PublicationFence{Owner: "during-terraform"}))
+
 					status, err := storage.GetPullStatus(ctx.Pull)
 					require.NoError(t, err)
 					require.NotEmpty(t, admitted.PlanGeneration)

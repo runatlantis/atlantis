@@ -56,7 +56,7 @@ func TestDeleteLocksByPull_PublicationWithoutProjects(t *testing.T) {
 					}
 					workingDir := &publicationCleanupWorkingDir{}
 					deleter := &events.DefaultDeleteLockCommand{Database: storage, Locker: locker, WorkingDir: workingDir}
-					count, err := deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull)
+					count, err := deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull, command.NoClaim{})
 					expected := db.ErrPublicationBusy
 					if publishing {
 						expected = db.ErrPublicationAmbiguous
@@ -71,7 +71,7 @@ func TestDeleteLocksByPull_PublicationWithoutProjects(t *testing.T) {
 						require.NoError(t, storage.CompletePublication(context.Background(), pull, fence))
 					}
 					require.NoError(t, storage.ReleasePublicationLease(context.Background(), pull, fence))
-					count, err = deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull)
+					count, err = deleter.DeleteLocksByPull(logging.NewNoopLogger(t), pull, command.NoClaim{})
 					require.NoError(t, err)
 					require.Equal(t, 1, count)
 					require.Equal(t, 1, workingDir.deleted)
