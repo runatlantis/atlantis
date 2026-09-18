@@ -176,3 +176,8 @@ tool (
 	github.com/petergtz/pegomock/v4/pegomock
 	go.uber.org/mock/mockgen
 )
+
+// Pin to local hc-install until a release includes the Transport interceptor
+// hook used for --tf-download-username/-password/-token. Remove after
+// upgrading to that version.
+replace github.com/hashicorp/hc-install => ../hc-install

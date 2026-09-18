@@ -6,13 +6,51 @@ package terraform
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/opentofu/tofudl"
 )
+
+// APIAuth holds optional HTTP credentials for a custom tf-download-url mirror.
+type APIAuth struct {
+	Username    string
+	Password    string
+	BearerToken string
+}
+
+// transport builds an http.RoundTripper wrapper that injects these
+// credentials into every outgoing request, suitable for
+// releases.Versions.Transport / releases.ExactVersion.Transport. It returns
+// nil when no credentials are configured, so hc-install's default transport
+// is used unmodified.
+func (a APIAuth) transport() func(http.RoundTripper) http.RoundTripper {
+	if a.BearerToken == "" && a.Username == "" {
+		return nil
+	}
+	return func(next http.RoundTripper) http.RoundTripper {
+		return &apiAuthRoundTripper{next: next, auth: a}
+	}
+}
+
+type apiAuthRoundTripper struct {
+	next http.RoundTripper
+	auth APIAuth
+}
+
+func (rt *apiAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	switch {
+	case rt.auth.BearerToken != "":
+		req.Header.Set("Authorization", "Bearer "+rt.auth.BearerToken)
+	case rt.auth.Username != "":
+		req.SetBasicAuth(rt.auth.Username, rt.auth.Password)
+	}
+	return rt.next.RoundTrip(req)
+}
 
 type Distribution interface {
 	BinName() string
@@ -21,12 +59,20 @@ type Distribution interface {
 	ResolveConstraint(context.Context, string) (*version.Version, error)
 }
 
-func NewDistribution(distribution string) Distribution {
-	tfDistribution := NewDistributionTerraform()
+// NewDistribution returns the distribution implementation for Atlantis.
+// tfDownloadBaseURL is used for Terraform release listing and installs when
+// distribution is terraform (e.g. --tf-download-url); it is ignored for OpenTofu.
+// apiAuth carries optional credentials for a custom mirror; a zero value
+// means no auth (the hc-install default).
+func NewDistribution(distribution string, tfDownloadBaseURL string, apiAuth APIAuth) Distribution {
 	if distribution == "opentofu" {
-		tfDistribution = NewDistributionOpenTofu()
+		return NewDistributionOpenTofu()
 	}
-	return tfDistribution
+	return &DistributionTerraform{
+		downloader:      &TerraformDownloader{apiAuth: apiAuth},
+		downloadBaseURL: strings.TrimSpace(tfDownloadBaseURL),
+		apiAuth:         apiAuth,
+	}
 }
 
 type DistributionOpenTofu struct {
@@ -94,7 +140,9 @@ func (*DistributionOpenTofu) ResolveConstraint(ctx context.Context, constraintSt
 }
 
 type DistributionTerraform struct {
-	downloader Downloader
+	downloader      Downloader
+	downloadBaseURL string
+	apiAuth         APIAuth
 }
 
 func NewDistributionTerraform() Distribution {
@@ -117,7 +165,7 @@ func (d *DistributionTerraform) Downloader() Downloader {
 	return d.downloader
 }
 
-func (*DistributionTerraform) ResolveConstraint(ctx context.Context, constraintStr string) (*version.Version, error) {
+func (d *DistributionTerraform) ResolveConstraint(ctx context.Context, constraintStr string) (*version.Version, error) {
 	vc, err := version.NewConstraint(constraintStr)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing constraint string: %s", err)
@@ -126,6 +174,10 @@ func (*DistributionTerraform) ResolveConstraint(ctx context.Context, constraintS
 	constrainedVersions := &releases.Versions{
 		Product:     product.Terraform,
 		Constraints: vc,
+		Transport:   d.apiAuth.transport(),
+	}
+	if d.downloadBaseURL != "" {
+		constrainedVersions.ApiBaseURL = d.downloadBaseURL
 	}
 
 	installCandidates, err := constrainedVersions.List(ctx)
