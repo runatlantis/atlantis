@@ -24,6 +24,7 @@ type UserConfig struct {
 	AutoDiscoverModeFlag        string `mapstructure:"autodiscover-mode"`
 	Automerge                   bool   `mapstructure:"automerge"`
 	AutomergeMethod             string `mapstructure:"automerge-method"`
+	AutomergeRetryCount         int    `mapstructure:"automerge-retry-count"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`

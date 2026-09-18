@@ -54,6 +54,25 @@ The `method` must be one of:
 
 This is currently only implemented for the GitHub VCS.
 
+## How to retry a failed automerge
+
+Some VCS providers can briefly reject a merge right after Atlantis applies. With
+GitHub branch protection or repository rulesets, the required status checks
+(including `atlantis/apply`) are not always registered as passing by the time
+Atlantis calls the merge API, so the merge fails with an error such as
+`required status checks are expected`. These failures are transient and clear
+within a few seconds.
+
+Set the `--automerge-retry-count` server flag (or `ATLANTIS_AUTOMERGE_RETRY_COUNT`
+environment variable) to retry the merge, with an exponential backoff, before
+giving up.
+
+```shell
+atlantis server --automerge-retry-count 3
+```
+
+Defaults to `0`, which attempts the merge exactly once.
+
 ## Requirements
 
 ### All Plans Must Succeed
