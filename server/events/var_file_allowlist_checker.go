@@ -37,15 +37,13 @@ func NewVarFileAllowlistChecker(allowlist string) (*VarFileAllowlistChecker, err
 func (p *VarFileAllowlistChecker) Check(flags []string) error {
 	for i, flag := range flags {
 		var path string
-		if i < len(flags)-1 && flag == "-var-file" {
+		if i < len(flags)-1 && isVarFileFlag(flag) {
 			// Flags are in the format of []{"-var-file", "my-file.tfvars"}
 			path = flags[i+1]
-		} else {
-			flagSplit := strings.Split(flag, "=")
-			// Flags are in the format of []{"-var-file=my-file.tfvars"}
-			if len(flagSplit) == 2 && flagSplit[0] == "-var-file" {
-				path = flagSplit[1]
-			}
+		} else if name, value, found := strings.Cut(flag, "="); found && isVarFileFlag(name) {
+			// Flags are in the format of []{"-var-file=my-file.tfvars"}. Cut on
+			// the first '=' so a path that itself contains '=' is still checked.
+			path = value
 		}
 
 		if path != "" && !p.isAllowedPath(path) {
@@ -54,6 +52,13 @@ func (p *VarFileAllowlistChecker) Check(flags []string) error {
 		}
 	}
 	return nil
+}
+
+// isVarFileFlag reports whether flag is terraform's var-file option. Terraform
+// accepts it with either a single or a double leading dash, so both forms must
+// be matched here.
+func isVarFileFlag(flag string) bool {
+	return flag == "-var-file" || flag == "--var-file"
 }
 
 func (p *VarFileAllowlistChecker) isAllowedPath(path string) bool {

@@ -48,6 +48,24 @@ func TestVarFileAllowlistChecker_IsAllowlisted(t *testing.T) {
 			"var file path /path/to/file is not allowed by the current allowlist: []",
 		},
 		{
+			"Empty Allowlist, double-dash var file outside the repo directory",
+			"",
+			[]string{"--var-file=/path/to/file"},
+			"var file path /path/to/file is not allowed by the current allowlist: []",
+		},
+		{
+			"Empty Allowlist, double-dash var file outside the repo directory, specified in separate flags",
+			"",
+			[]string{"--var-file", "/path/to/file"},
+			"var file path /path/to/file is not allowed by the current allowlist: []",
+		},
+		{
+			"Empty Allowlist, var file whose path contains an equals sign, outside the repo directory",
+			"",
+			[]string{"-var-file=/path/to/file=x"},
+			"var file path /path/to/file=x is not allowed by the current allowlist: []",
+		},
+		{
 			"Empty Allowlist, single var file under the parent directory of the repo directory",
 			"",
 			[]string{"-var-file=../test.tfvars"},
