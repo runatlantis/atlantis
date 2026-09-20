@@ -138,6 +138,13 @@ type CommentCommand struct {
 	PolicySet string
 	// ClearPolicyApproval is true if approvals should be cleared out for specified policies.
 	ClearPolicyApproval bool
+	// DeliveryID is the VCS provider's stable per-comment identifier (e.g. the
+	// comment/note ID), set on webhook ingress. In etcd active-active mode it is the
+	// idempotency key that deduplicates a redelivered comment webhook so the command
+	// executes once. Empty when the provider exposes no stable comment ID (dedup then
+	// falls back to a fresh id, matching non-HA behavior). It is JSON-serialized so it
+	// survives an owner-forward hop.
+	DeliveryID string `json:"delivery_id,omitempty"`
 }
 
 // IsForSpecificProject returns true if the command is for a specific dir, workspace
