@@ -4,20 +4,53 @@
 package runtime
 
 import (
+	"fmt"
+	"maps"
 	"path/filepath"
+	"strings"
+	"time"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/runtime/common"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/utils"
 )
+
+// defaultProviderCacheMirrorWaitTimeout is used when
+// InitStepRunner.ProviderCacheMirrorWaitTimeout is unset.
+const defaultProviderCacheMirrorWaitTimeout = 5 * time.Minute
+
+// mirrorRetryBackoff is the fixed backoff schedule between phase-2
+// (filesystem_mirror) retries: short at first, since installing a single
+// provider typically finishes well under a second, capped so a run needing
+// many providers still gets checked reasonably often without hammering the
+// filesystem.
+var mirrorRetryBackoff = []time.Duration{
+	1 * time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 15 * time.Second,
+}
 
 // InitStep runs `terraform init`.
 type InitStepRunner struct {
 	TerraformExecutor     TerraformExec
 	DefaultTFDistribution terraform.Distribution
 	DefaultTFVersion      *version.Version
+
+	// ProviderCache is set when the provider cache proxy (see the
+	// providercache package) is enabled. When set, Run follows its
+	// two-phase discovery/mirror protocol instead of running `terraform
+	// init` once - see runWithProviderCache.
+	ProviderCache *tfclient.ProviderCacheConfig
+	// TFEToken/TFEHostname are threaded through to the per-invocation CLI
+	// config files runWithProviderCache writes, so Terraform Cloud/
+	// Enterprise auth keeps working alongside the provider cache proxy.
+	TFEToken, TFEHostname string
+	// ProviderCacheMirrorWaitTimeout bounds how long the phase-2 retry loop
+	// waits for the proxy to finish installing into the mirror before
+	// giving up and surfacing the last error. Defaults to
+	// defaultProviderCacheMirrorWaitTimeout when zero.
+	ProviderCacheMirrorWaitTimeout time.Duration
 }
 
 func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -75,11 +108,108 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	var out string
+	if i.ProviderCache != nil {
+		out, err = i.runWithProviderCache(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	} else {
+		out, err = i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	}
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {
 		return out, err
 	}
 	return "", nil
+}
+
+// runWithProviderCache runs `terraform init` against the provider cache
+// proxy's two-phase protocol (see the providercache package doc comment):
+//  1. A discovery pass, routed through the proxy via a `host` block. The
+//     proxy never lets Terraform install a provider itself, so this pass is
+//     expected to fail whenever a required provider isn't already warm in
+//     the mirror - that's how the proxy learns what's needed and starts
+//     installing it, not a fatal error.
+//  2. If phase 1 failed for a provider-cache-related reason, retries
+//     `terraform init` against the proxy's filesystem mirror (read-only,
+//     safe to retry concurrently) until it succeeds or
+//     ProviderCacheMirrorWaitTimeout is exhausted.
+func (i *InitStepRunner) runWithProviderCache(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
+	discoveryFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheDiscoveryPhase, i.TFEToken, i.TFEHostname, i.ProviderCache)
+	if err != nil {
+		return "", fmt.Errorf("writing provider cache discovery CLI config: %w", err)
+	}
+
+	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envWith(envs, "TF_CLI_CONFIG_FILE", discoveryFile), d, v, workspace)
+	if err == nil {
+		// Nothing needed installing (e.g. no providers required at all).
+		return out, nil
+	}
+	if !mentionsAnyHost(out, i.ProviderCache.RegistryHosts) {
+		// A failure unrelated to the provider cache (bad config, a version
+		// constraint nothing satisfies, ...): retrying against the mirror
+		// would just fail the same way, so surface it as-is rather than
+		// wasting the retry budget.
+		return out, err
+	}
+	ctx.Log.Info("terraform init needs providers the cache proxy is installing; retrying against its filesystem mirror")
+
+	mirrorFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheMirrorPhase, i.TFEToken, i.TFEHostname, i.ProviderCache)
+	if err != nil {
+		return "", fmt.Errorf("writing provider cache mirror CLI config: %w", err)
+	}
+
+	return i.runWithMirrorRetries(ctx, path, args, envWith(envs, "TF_CLI_CONFIG_FILE", mirrorFile), d, v, workspace)
+}
+
+// runWithMirrorRetries reruns `terraform init` (phase 2, already pointed at
+// the proxy's filesystem mirror by the caller) with a short backoff until it
+// succeeds or the retry budget is exhausted, returning the last attempt's
+// result either way so a genuine failure is still surfaced clearly once the
+// budget runs out.
+func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
+	timeout := i.ProviderCacheMirrorWaitTimeout
+	if timeout <= 0 {
+		timeout = defaultProviderCacheMirrorWaitTimeout
+	}
+	deadline := time.Now().Add(timeout)
+
+	for attempt := 0; ; attempt++ {
+		out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, envs, d, v, workspace)
+		if err == nil {
+			return out, nil
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return out, err
+		}
+
+		wait := mirrorRetryBackoff[min(attempt, len(mirrorRetryBackoff)-1)]
+		if remaining < wait {
+			wait = remaining
+		}
+		ctx.Log.Debug("provider mirror not ready yet, retrying terraform init in %s", wait)
+		time.Sleep(wait)
+	}
+}
+
+// envWith returns a copy of envs with key set to value. envs itself is left
+// untouched, since the caller may reuse it (e.g. for a later phase-2 retry
+// against a different CLI config file).
+func envWith(envs map[string]string, key, value string) map[string]string {
+	out := make(map[string]string, len(envs)+1)
+	maps.Copy(out, envs)
+	out[key] = value
+	return out
+}
+
+// mentionsAnyHost reports whether output names one of hosts, used to tell a
+// provider-cache-related init failure (Terraform's error names the registry
+// host it couldn't install a provider from) apart from an unrelated one.
+func mentionsAnyHost(output string, hosts []string) bool {
+	for _, h := range hosts {
+		if h != "" && strings.Contains(output, h) {
+			return true
+		}
+	}
+	return false
 }

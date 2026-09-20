@@ -480,6 +480,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	// instead of each downloading providers from the upstream registry.
 	var providerCacheServer *providercache.Server
 	var providerCacheConfig *tfclient.ProviderCacheConfig
+	// providerCacheMirrorWaitTimeout bounds InitStepRunner's phase-2 retry
+	// loop against the provider cache proxy's filesystem mirror; parsed here
+	// (rather than at InitStepRunner construction time) so a bad value fails
+	// server startup the same way other invalid config does.
+	var providerCacheMirrorWaitTimeout time.Duration
 	if userConfig.ProviderCache {
 		providerCacheDir := userConfig.ProviderCacheDir
 		if providerCacheDir == "" {
@@ -504,6 +509,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		providerCacheConfig = &tfclient.ProviderCacheConfig{
 			MirrorBaseURL: providerCacheServer.MirrorBaseURL(),
 			RegistryHosts: registries,
+			MirrorDir:     providerCacheServer.MirrorDir(),
+		}
+
+		providerCacheMirrorWaitTimeout, err = time.ParseDuration(userConfig.ProviderCacheMirrorWaitTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("invalid provider-cache-mirror-wait-timeout %q: %w", userConfig.ProviderCacheMirrorWaitTimeout, err)
 		}
 	}
 
@@ -519,7 +530,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.TFDownloadURL,
 		userConfig.TFDownload,
 		userConfig.UseTFPluginCache,
-		providerCacheConfig,
 		true,
 		projectCmdOutputHandler)
 	// The flag.Lookup call is to detect if we're running in a unit test. If we
@@ -863,9 +873,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LockURLGenerator: router,
 		Logger:           logger,
 		InitStepRunner: &runtime.InitStepRunner{
-			TerraformExecutor:     terraformClient,
-			DefaultTFDistribution: defaultTfDistribution,
-			DefaultTFVersion:      defaultTfVersion,
+			TerraformExecutor:              terraformClient,
+			DefaultTFDistribution:          defaultTfDistribution,
+			DefaultTFVersion:               defaultTfVersion,
+			ProviderCache:                  providerCacheConfig,
+			TFEToken:                       userConfig.TFEToken,
+			TFEHostname:                    userConfig.TFEHostname,
+			ProviderCacheMirrorWaitTimeout: providerCacheMirrorWaitTimeout,
 		},
 		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, planStore),
 		ShowStepRunner:        showStepRunner,

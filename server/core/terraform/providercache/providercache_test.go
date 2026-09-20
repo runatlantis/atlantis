@@ -4,17 +4,26 @@
 package providercache
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -25,15 +34,76 @@ import (
 // needs to resolve.
 const registryHost = "registry.example.com"
 
-// zipBody is the fake provider archive returned by the upstream server.
-const zipBody = "PK\x03\x04 fake provider archive"
+const (
+	archiveFilename    = "terraform-provider-null_3.2.1_linux_amd64.zip"
+	providerBinaryName = "terraform-provider-null_v3.2.1_x5"
+)
+
+// testSigningKey lazily creates one ephemeral PGP keypair, shared by every
+// test in this package, and returns its entity (for signing) and its
+// ASCII-armored public key (for the fake registry's signing_keys metadata).
+// Using a real keypair - rather than stubbing signature verification out -
+// means these tests exercise the installer's actual verification path.
+var testSigningKey = sync.OnceValues(func() (*openpgp.Entity, string) {
+	entity, err := openpgp.NewEntity("Test Registry", "", "test@example.com", nil)
+	if err != nil {
+		panic(err)
+	}
+	var buf bytes.Buffer
+	w, err := armor.Encode(&buf, openpgp.PublicKeyType, nil)
+	if err != nil {
+		panic(err)
+	}
+	if err := entity.Serialize(w); err != nil {
+		panic(err)
+	}
+	if err := w.Close(); err != nil {
+		panic(err)
+	}
+	return entity, buf.String()
+})
+
+// validArchive builds a real zip archive containing a single (fake) provider
+// binary. It has to be a genuine zip: the installer really unpacks it.
+func validArchive(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	fw, err := zw.CreateHeader(&zip.FileHeader{Name: providerBinaryName, Method: zip.Deflate})
+	Ok(t, err)
+	_, err = fw.Write([]byte("#!/bin/sh\necho fake provider\n"))
+	Ok(t, err)
+	Ok(t, zw.Close())
+	return buf.Bytes()
+}
+
+// signedShasums returns a SHA256SUMS file listing archive's real digest under
+// archiveFilename, and a binary (non-armored) detached signature of it from
+// testSigningKey - matching what the archive/shasums/shasums_signature
+// endpoints of a real registry return.
+func signedShasums(t *testing.T, archive []byte) (shasums, signature []byte) {
+	t.Helper()
+	sum := sha256.Sum256(archive)
+	shasums = []byte(hex.EncodeToString(sum[:]) + "  " + archiveFilename + "\n")
+
+	entity, _ := testSigningKey()
+	var sigBuf bytes.Buffer
+	Ok(t, openpgp.DetachSign(&sigBuf, entity, bytes.NewReader(shasums), nil))
+	return shasums, sigBuf.Bytes()
+}
 
 // newUpstream returns a fake registry server implementing the subset of the
-// provider registry protocol the proxy uses, plus an artifact endpoint. The
-// returned counter tracks how many times the archive itself was downloaded.
+// provider registry protocol the proxy uses, plus an artifact endpoint,
+// serving a real, correctly-signed provider archive. The returned counter
+// tracks how many times the archive itself was downloaded from upstream.
 func newUpstream(t *testing.T) (*httptest.Server, *int32) {
 	t.Helper()
 	var archiveHits int32
+	archive := validArchive(t)
+	shasums, signature := signedShasums(t, archive)
+	sum := sha256.Sum256(archive)
+	_, publicKeyArmor := testSigningKey()
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/v1/providers/hashicorp/null/versions", func(w http.ResponseWriter, _ *http.Request) {
@@ -48,26 +118,104 @@ func newUpstream(t *testing.T) (*httptest.Server, *int32) {
 			"protocols":             []string{"5.0"},
 			"os":                    "linux",
 			"arch":                  "amd64",
-			"filename":              "terraform-provider-null_3.2.1_linux_amd64.zip",
-			"download_url":          self.URL + "/archives/terraform-provider-null_3.2.1_linux_amd64.zip",
+			"filename":              archiveFilename,
+			"download_url":          self.URL + "/archives/" + archiveFilename,
 			"shasums_url":           self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS",
 			"shasums_signature_url": self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS.sig",
-			"shasum":                "abc123",
+			"shasum":                hex.EncodeToString(sum[:]),
+			"signing_keys": map[string]any{
+				"gpg_public_keys": []any{
+					map[string]any{"ascii_armor": publicKeyArmor},
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	mux.HandleFunc("/archives/", func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".zip"):
+			atomic.AddInt32(&archiveHits, 1)
+			_, _ = w.Write(archive)
+		case strings.HasSuffix(r.URL.Path, ".sig"):
+			_, _ = w.Write(signature)
+		default:
+			_, _ = w.Write(shasums)
+		}
+	})
+
+	self = httptest.NewServer(mux)
+	t.Cleanup(self.Close)
+	return self, &archiveHits
+}
+
+// newUpstreamWithoutSigningKeys is like newUpstream, except the registry
+// offers no signing keys for the provider - as a misconfigured or malicious
+// registry might - so any signature the installer receives can never be
+// verified against anything.
+func newUpstreamWithoutSigningKeys(t *testing.T) (*httptest.Server, *int32) {
+	t.Helper()
+	var archiveHits int32
+	archive := validArchive(t)
+	shasums, signature := signedShasums(t, archive)
+	sum := sha256.Sum256(archive)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/providers/hashicorp/null/versions", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"versions":[{"version":"3.2.1","protocols":["5.0"],"platforms":[{"os":"linux","arch":"amd64"}]}]}`)
+	})
+
+	var self *httptest.Server
+	mux.HandleFunc("/v1/providers/hashicorp/null/3.2.1/download/linux/amd64", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"protocols":             []string{"5.0"},
+			"os":                    "linux",
+			"arch":                  "amd64",
+			"filename":              archiveFilename,
+			"download_url":          self.URL + "/archives/" + archiveFilename,
+			"shasums_url":           self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS",
+			"shasums_signature_url": self.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS.sig",
+			"shasum":                hex.EncodeToString(sum[:]),
 			"signing_keys":          map[string]any{"gpg_public_keys": []any{}},
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 	})
 
 	mux.HandleFunc("/archives/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, ".zip") {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".zip"):
 			atomic.AddInt32(&archiveHits, 1)
+			_, _ = w.Write(archive)
+		case strings.HasSuffix(r.URL.Path, ".sig"):
+			_, _ = w.Write(signature)
+		default:
+			_, _ = w.Write(shasums)
 		}
-		_, _ = io.WriteString(w, zipBody)
 	})
 
 	self = httptest.NewServer(mux)
 	t.Cleanup(self.Close)
 	return self, &archiveHits
+}
+
+// waitFor polls cond until it returns true or timeout elapses, failing the
+// test with msg (formatted with args) if it never does. Used for asserting
+// on the installer's background work, which has no synchronous completion
+// signal from the caller's perspective by design (see handleArtifact).
+func waitFor(t *testing.T, timeout time.Duration, cond func() bool, msg string, args ...any) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		if cond() {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf(msg, args...)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // newProxy starts a proxy pointed (via a pre-seeded discovery entry) at upstream.
@@ -127,36 +275,72 @@ func TestProxy_DownloadRewritesURLsThroughArtifactEndpoint(t *testing.T) {
 		Assert(t, !strings.Contains(v, upstream.URL), "%s should not leak the upstream URL, got %q", field, v)
 	}
 	// Fields that must survive untouched.
-	Equals(t, "terraform-provider-null_3.2.1_linux_amd64.zip", meta["filename"])
-	Equals(t, "abc123", meta["shasum"])
+	Equals(t, archiveFilename, meta["filename"])
+	wantSum := sha256.Sum256(validArchive(t))
+	Equals(t, hex.EncodeToString(wantSum[:]), meta["shasum"])
 }
 
-func TestProxy_ArtifactCachesAndDedupes(t *testing.T) {
+// Test that an archive request never serves bytes to the caller (that would
+// let Terraform install it itself, which is exactly the race this proxy
+// exists to avoid - see the package doc comment): it always answers 423 and,
+// in the background, verifies and installs the provider into the mirror
+// directory in Terraform's own provider_installation.filesystem_mirror
+// layout. A burst of concurrent requests, as parallel `terraform init` runs
+// would produce, collapses to a single upstream download.
+func TestProxy_ArtifactInstallsIntoMirrorAndDedupes(t *testing.T) {
 	upstream, archiveHits := newUpstream(t)
 	s := newProxy(t, upstream)
 
-	// Get the rewritten (coordinate-addressed) download URL from the metadata
-	// endpoint.
 	_, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/3.2.1/download/linux/amd64")
 	var meta map[string]any
 	Ok(t, json.Unmarshal([]byte(body), &meta))
 	artifactURL := meta["download_url"].(string)
 
-	// Fire many concurrent requests, as a burst of parallel `terraform init`
-	// runs would. Only a single upstream download should happen.
 	const n = 15
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			resp, got := mustGet(t, artifactURL)
-			Equals(t, http.StatusOK, resp.StatusCode)
-			Equals(t, zipBody, got)
-			Equals(t, "application/zip", resp.Header.Get("Content-Type"))
+			resp, _ := mustGet(t, artifactURL)
+			Equals(t, http.StatusLocked, resp.StatusCode)
 		})
 	}
 	wg.Wait()
 
+	mirrorPath := filepath.Join(s.MirrorDir(), registryHost, "hashicorp", "null", "3.2.1", "linux_amd64")
+	waitFor(t, 2*time.Second, func() bool {
+		info, err := os.Stat(mirrorPath)
+		return err == nil && info.IsDir()
+	}, "provider was not installed into the mirror at %s", mirrorPath)
+
+	installed, err := os.ReadFile(filepath.Join(mirrorPath, providerBinaryName))
+	Ok(t, err)
+	Equals(t, "#!/bin/sh\necho fake provider\n", string(installed))
+
 	Equals(t, int32(1), atomic.LoadInt32(archiveHits))
+}
+
+// Test that a provider whose signature the proxy cannot verify (here: the
+// registry offers no signing keys at all) is never published to the mirror -
+// the installer fails closed rather than installing something it can't
+// verify.
+func TestProxy_ArtifactRefusesUnverifiableProvider(t *testing.T) {
+	upstream, _ := newUpstreamWithoutSigningKeys(t)
+	s := newProxy(t, upstream)
+
+	_, body := mustGet(t, s.MirrorBaseURL()+registryHost+"/v1/providers/hashicorp/null/3.2.1/download/linux/amd64")
+	var meta map[string]any
+	Ok(t, json.Unmarshal([]byte(body), &meta))
+	artifactURL := meta["download_url"].(string)
+
+	resp, _ := mustGet(t, artifactURL)
+	Equals(t, http.StatusLocked, resp.StatusCode)
+
+	mirrorPath := filepath.Join(s.MirrorDir(), registryHost, "hashicorp", "null", "3.2.1", "linux_amd64")
+	// Give the (expected to fail) background install every chance to
+	// (wrongly) publish before asserting it never did.
+	time.Sleep(200 * time.Millisecond)
+	_, err := os.Stat(mirrorPath)
+	Assert(t, os.IsNotExist(err), "an unverifiable provider must never be published to the mirror")
 }
 
 func TestProxy_ArtifactServesShasumsAndSignature(t *testing.T) {
@@ -164,15 +348,17 @@ func TestProxy_ArtifactServesShasumsAndSignature(t *testing.T) {
 	s := newProxy(t, upstream)
 
 	base := s.MirrorBaseURL() + "artifact/" + registryHost + "/hashicorp/null/3.2.1/linux/amd64/"
-	for kind, wantCT := range map[string]string{
-		"shasums":   "text/plain; charset=utf-8",
-		"signature": "application/octet-stream",
-	} {
-		resp, body := mustGet(t, base+kind)
-		Equals(t, http.StatusOK, resp.StatusCode)
-		Equals(t, zipBody, body)
-		Equals(t, wantCT, resp.Header.Get("Content-Type"))
-	}
+
+	resp, body := mustGet(t, base+"shasums")
+	Equals(t, http.StatusOK, resp.StatusCode)
+	Equals(t, "text/plain; charset=utf-8", resp.Header.Get("Content-Type"))
+	wantSum := sha256.Sum256(validArchive(t))
+	Equals(t, hex.EncodeToString(wantSum[:])+"  "+archiveFilename+"\n", body)
+
+	resp, body = mustGet(t, base+"signature")
+	Equals(t, http.StatusOK, resp.StatusCode)
+	Equals(t, "application/octet-stream", resp.Header.Get("Content-Type"))
+	Assert(t, len(body) > 0, "signature artifact should not be empty")
 }
 
 func TestProxy_ArtifactRejectsUnknownKind(t *testing.T) {

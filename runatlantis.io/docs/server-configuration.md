@@ -1278,21 +1278,37 @@ atlantis server --provider-cache
 ATLANTIS_PROVIDER_CACHE=true
 ```
 
-Run a local caching proxy for Terraform providers and point Terraform at it via
-a generated CLI configuration file (`~/.terraformrc`). When enabled, the many
-parallel `terraform init` commands Atlantis runs across workspaces and pull
-requests fetch providers through the proxy, which downloads each provider
-archive from the upstream registry once, caches it on disk, and serves the
-cached copy to every subsequent (including concurrent) request. This mirrors the
-provider cache server that Terragrunt ships.
+Run a local caching proxy for Terraform providers, and have each `terraform
+init` install providers through it in two passes instead of installing them
+directly. This is not just about avoiding redundant downloads: Terraform's own
+provider installer is
+[not safe against concurrent writers sharing a plugin cache directory](https://github.com/hashicorp/terraform/issues/25849),
+so letting every parallel `terraform init` install into a shared directory
+itself risks `text file busy` errors and corrupted installs. This mirrors how
+Terragrunt's own provider cache server avoids the same problem.
 
-The archive bytes are served unchanged, so Terraform's normal checksum and
-signature verification is unaffected. Defaults to `false`.
+1. A first `terraform init` pass is pointed at the proxy via a generated CLI
+   configuration file, which tells the proxy what's needed. The proxy is the
+   only thing that ever installs a provider: it downloads the archive
+   (de-duplicating concurrent requests for the same one), verifies it
+   (SHA256SUMS + GPG signature against the registry's own signing keys, so
+   Terraform's normal verification is preserved even though Terraform itself
+   never does the download), and unpacks it into a
+   `provider_installation.filesystem_mirror`-formatted directory. This pass is
+   expected to fail whenever a required provider isn't already cached - that's
+   by design, not an error to worry about.
+2. Atlantis reruns `terraform init` against that mirror directory, with a
+   short backoff, until it succeeds. A `filesystem_mirror` is read-only from
+   Terraform's side, so this second pass never writes to a directory anything
+   else could be writing to concurrently.
+
+Defaults to `false`.
 
 ::: tip
-This complements `--use-tf-plugin-cache`: the plugin cache lets a single
-Terraform process reuse an already-installed provider, while the provider cache
-proxy de-duplicates the _downloads_ across many parallel processes.
+This complements `--use-tf-plugin-cache`: the plugin cache still speeds up a
+single Terraform process reusing a provider across runs, while the provider
+cache proxy is what makes the shared provider directory safe (and fast) under
+Atlantis's own parallelism.
 :::
 
 ### `--provider-cache-dir`
@@ -1306,6 +1322,23 @@ ATLANTIS_PROVIDER_CACHE_DIR="/path/to/cache"
 Directory the provider cache proxy stores downloaded provider archives in. Only
 used when `--provider-cache` is set. Defaults to the `provider-cache`
 subdirectory of the data directory.
+
+This directory also holds the `mirror` subdirectory the proxy installs
+verified providers into - the directory the second `terraform init` pass reads
+from (see `--provider-cache` above).
+
+### `--provider-cache-mirror-wait-timeout`
+
+```bash
+atlantis server --provider-cache-mirror-wait-timeout=5m
+# or
+ATLANTIS_PROVIDER_CACHE_MIRROR_WAIT_TIMEOUT=5m
+```
+
+Go duration string (e.g. `5m`, `90s`) bounding how long `terraform init`
+retries against the provider cache proxy's filesystem mirror while the proxy
+finishes installing a provider, before giving up and surfacing the underlying
+error. Only used when `--provider-cache` is set. Defaults to `5m`.
 
 ### `--provider-cache-port`
 

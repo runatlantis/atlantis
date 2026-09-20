@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -152,6 +153,7 @@ const (
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	ProviderCacheFlag                = "provider-cache"
 	ProviderCacheDirFlag             = "provider-cache-dir"
+	ProviderCacheMirrorWaitTimeout   = "provider-cache-mirror-wait-timeout"
 	ProviderCachePortFlag            = "provider-cache-port"
 	ProviderCacheRegistryHostsFlag   = "provider-cache-registry-hosts"
 	VarFileAllowlistFlag             = "var-file-allowlist"
@@ -172,46 +174,47 @@ const (
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser                  = ""
-	DefaultADBasicPassword              = ""
-	DefaultADHostname                   = "dev.azure.com"
-	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
-	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
-	DefaultCheckoutStrategy             = CheckoutStrategyBranch
-	DefaultCheckoutDepth                = 0
-	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
-	DefaultDataDir                      = "~/.atlantis"
-	DefaultEmojiReaction                = ""
-	DefaultExecutableName               = "atlantis"
-	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
-	DefaultGHHostname                   = "github.com"
-	DefaultGiteaBaseURL                 = "https://gitea.com"
-	DefaultGiteaPageSize                = 30
-	DefaultGitlabHostname               = "gitlab.com"
-	DefaultLockingDBType                = "boltdb"
-	DefaultLanguage                     = i18n.DefaultLanguage
-	DefaultLogLevel                     = "info"
-	DefaultIgnoreVCSStatusNames         = ""
-	DefaultMaxCommentsPerCommand        = 100
-	DefaultParallelPoolSize             = 15
-	DefaultStatsNamespace               = "atlantis"
-	DefaultPort                         = 4141
-	DefaultProviderCachePort            = 0
-	DefaultProviderCacheRegistryHosts   = "registry.terraform.io"
-	DefaultRedisDB                      = 0
-	DefaultRedisPort                    = 6379
-	DefaultRedisTLSEnabled              = false
-	DefaultRedisInsecureSkipVerify      = false
-	DefaultTFDistribution               = TFDistributionTerraform
-	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
-	DefaultTFDownload                   = true
-	DefaultTFEHostname                  = "app.terraform.io"
-	DefaultVCSStatusName                = "atlantis"
-	DefaultWebBasicAuth                 = false
-	DefaultWebUsername                  = "atlantis"
-	DefaultWebPassword                  = "atlantis"
+	DefaultADBasicUser                    = ""
+	DefaultADBasicPassword                = ""
+	DefaultADHostname                     = "dev.azure.com"
+	DefaultAutoDiscoverMode               = "auto"
+	DefaultAutoplanFileList               = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowCommands                  = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs               = "-chdir,--chdir,-plugin-dir,--plugin-dir"
+	DefaultCheckoutStrategy               = CheckoutStrategyBranch
+	DefaultCheckoutDepth                  = 0
+	DefaultBitbucketBaseURL               = bitbucketcloud.BaseURL
+	DefaultDataDir                        = "~/.atlantis"
+	DefaultEmojiReaction                  = ""
+	DefaultExecutableName                 = "atlantis"
+	DefaultMarkdownTemplateOverridesDir   = "~/.markdown_templates"
+	DefaultGHHostname                     = "github.com"
+	DefaultGiteaBaseURL                   = "https://gitea.com"
+	DefaultGiteaPageSize                  = 30
+	DefaultGitlabHostname                 = "gitlab.com"
+	DefaultLockingDBType                  = "boltdb"
+	DefaultLanguage                       = i18n.DefaultLanguage
+	DefaultLogLevel                       = "info"
+	DefaultIgnoreVCSStatusNames           = ""
+	DefaultMaxCommentsPerCommand          = 100
+	DefaultParallelPoolSize               = 15
+	DefaultStatsNamespace                 = "atlantis"
+	DefaultPort                           = 4141
+	DefaultProviderCacheMirrorWaitTimeout = "5m"
+	DefaultProviderCachePort              = 0
+	DefaultProviderCacheRegistryHosts     = "registry.terraform.io"
+	DefaultRedisDB                        = 0
+	DefaultRedisPort                      = 6379
+	DefaultRedisTLSEnabled                = false
+	DefaultRedisInsecureSkipVerify        = false
+	DefaultTFDistribution                 = TFDistributionTerraform
+	DefaultTFDownloadURL                  = "https://releases.hashicorp.com"
+	DefaultTFDownload                     = true
+	DefaultTFEHostname                    = "app.terraform.io"
+	DefaultVCSStatusName                  = "atlantis"
+	DefaultWebBasicAuth                   = false
+	DefaultWebUsername                    = "atlantis"
+	DefaultWebPassword                    = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -515,6 +518,12 @@ var stringFlags = map[string]stringFlag{
 		description: "Comma-separated list of provider registry hostnames whose provider downloads are routed through the provider cache proxy." +
 			" Only used when --" + ProviderCacheFlag + " is set.",
 		defaultValue: DefaultProviderCacheRegistryHosts,
+	},
+	ProviderCacheMirrorWaitTimeout: {
+		description: "Go duration string (e.g. '5m', '90s') bounding how long `terraform init` retries against the provider cache proxy's" +
+			" filesystem mirror while the proxy finishes installing a provider, before giving up and surfacing the underlying error." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheMirrorWaitTimeout,
 	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
@@ -1074,6 +1083,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.ProviderCacheRegistryHosts == "" {
 		c.ProviderCacheRegistryHosts = DefaultProviderCacheRegistryHosts
 	}
+	if c.ProviderCacheMirrorWaitTimeout == "" {
+		c.ProviderCacheMirrorWaitTimeout = DefaultProviderCacheMirrorWaitTimeout
+	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution
 	}
@@ -1241,6 +1253,12 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
+	}
+
+	if userConfig.ProviderCache {
+		if _, err := time.ParseDuration(userConfig.ProviderCacheMirrorWaitTimeout); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheMirrorWaitTimeout, userConfig.ProviderCacheMirrorWaitTimeout, err)
+		}
 	}
 
 	return nil

@@ -111,7 +111,6 @@ func NewClientWithDefaultVersion(
 	tfDownloadURL string,
 	tfDownloadAllowed bool,
 	usePluginCache bool,
-	providerCache *ProviderCacheConfig,
 	fetchAsync bool,
 	projectCmdOutputHandler jobs.ProjectCommandOutputHandler,
 ) (*DefaultClient, error) {
@@ -162,14 +161,19 @@ func NewClientWithDefaultVersion(
 		}
 	}
 
-	// If tfeToken and/or the provider cache proxy are set, we try to create a
-	// ~/.terraformrc file with the corresponding credentials and host blocks.
-	if tfeToken != "" || providerCache != nil {
+	// If tfeToken is set, we try to create a ~/.terraformrc file with a
+	// credentials block. The provider cache proxy's CLI config, when
+	// enabled, is generated per terraform-init-invocation instead (see
+	// WriteProviderCacheCLIConfig and InitStepRunner): unlike TFE
+	// credentials it needs to change between the discovery and mirror
+	// phases of a single init, and a single global file shared by every
+	// concurrent terraform process can't do that safely.
+	if tfeToken != "" {
 		home, err := homedir.Dir()
 		if err != nil {
 			return nil, fmt.Errorf("getting home dir to write ~/.terraformrc file: %w", err)
 		}
-		if err := generateRCFile(tfeToken, tfeHostname, providerCache, home); err != nil {
+		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
 			return nil, err
 		}
 	}
@@ -216,7 +220,6 @@ func NewTestClient(
 		tfDownloadURL,
 		tfDownloadAllowed,
 		usePluginCache,
-		nil,
 		false,
 		projectCmdOutputHandler,
 	)
@@ -255,7 +258,6 @@ func NewClient(
 		tfDownloadURL,
 		tfDownloadAllowed,
 		usePluginCache,
-		nil,
 		true,
 		projectCmdOutputHandler,
 	)
@@ -795,30 +797,77 @@ func deleteVersionBinaryPath(versions map[string]string, versionsLock *sync.Mute
 	}
 }
 
-// ProviderCacheConfig describes how the generated CLI config file should point
-// Terraform at the local provider cache proxy. It is nil when the proxy is
-// disabled.
+// ProviderCacheConfig describes how the generated CLI config files should
+// point Terraform at the local provider cache proxy. It is nil when the
+// proxy is disabled.
 type ProviderCacheConfig struct {
 	// MirrorBaseURL is the proxy base URL, ending in a trailing slash, e.g.
 	// "http://127.0.0.1:47021/".
 	MirrorBaseURL string
-	// RegistryHosts are the registry hostnames whose service discovery should be
-	// redirected through the proxy, e.g. ["registry.terraform.io"].
+	// RegistryHosts are the registry hostnames whose provider installation is
+	// routed through the proxy, e.g. ["registry.terraform.io"].
 	RegistryHosts []string
+	// MirrorDir is the proxy's provider_installation.filesystem_mirror
+	// directory (providercache.Server.MirrorDir), which the proxy - and only
+	// the proxy - installs verified providers into.
+	MirrorDir string
+}
+
+// ProviderCachePhase selects which of the two CLI configs
+// WriteProviderCacheCLIConfig writes for one `terraform init` invocation.
+// See the providercache package doc comment for the two-phase protocol this
+// implements: init is expected to be run once per phase, in order.
+type ProviderCachePhase int
+
+const (
+	// ProviderCacheDiscoveryPhase routes provider installation through the
+	// proxy via a `host` block, so it learns what's needed and starts
+	// installing it. Terraform is expected to fail to install one or more
+	// providers on this phase by design - the proxy never lets Terraform
+	// install a provider itself - so the caller should treat that as a
+	// signal to retry with ProviderCacheMirrorPhase, not as a fatal error.
+	ProviderCacheDiscoveryPhase ProviderCachePhase = iota
+	// ProviderCacheMirrorPhase points Terraform at the proxy's mirror
+	// directory via provider_installation.filesystem_mirror, which is
+	// read-only from Terraform's side: it installs (symlinks) straight from
+	// it, with no network call and no write to a shared directory, so
+	// running it concurrently/retrying it is safe.
+	ProviderCacheMirrorPhase
+)
+
+// WriteProviderCacheCLIConfig writes the CLI config for one phase of a
+// provider-cache-enabled `terraform init` invocation to a fixed filename
+// under dir (the project's working directory) and returns its path, meant to
+// be set as TF_CLI_CONFIG_FILE for that invocation.
+//
+// This is a per-invocation file, not the shared ~/.terraformrc: unlike TFE
+// credentials, this config must differ between the two phases of a single
+// init and across concurrent init invocations for different projects, which
+// a single global file written once at server startup can't do safely.
+func WriteProviderCacheCLIConfig(dir string, phase ProviderCachePhase, tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) (string, error) {
+	filename := ".terraformrc-provider-cache-discovery"
+	config := discoveryCLIConfig(tfeToken, tfeHostname, providerCache)
+	if phase == ProviderCacheMirrorPhase {
+		filename = ".terraformrc-provider-cache-mirror"
+		config = mirrorCLIConfig(tfeToken, tfeHostname, providerCache)
+	}
+
+	path := filepath.Join(dir, filename)
+	if err := os.WriteFile(path, []byte(config), 0600); err != nil { // nolint: gosec
+		return "", fmt.Errorf("writing generated %s file to %s: %w", filename, path, err)
+	}
+	return path, nil
 }
 
 // generateRCFile generates the Terraform CLI configuration file
-// (home/.terraformrc). It writes a credentials block when tfeToken is set and a
-// host block per registry when providerCache is set, so that Terraform Cloud/
-// Enterprise auth and the provider cache proxy can coexist in the single CLI
-// config file Terraform reads.
-//
-// If neither is configured there is nothing to write and it is a no-op.
-func generateRCFile(tfeToken string, tfeHostname string, providerCache *ProviderCacheConfig, home string) error {
-	config := cliConfigContents(tfeToken, tfeHostname, providerCache)
-	if config == "" {
+// (home/.terraformrc) containing a credentials block, for authenticating
+// with Terraform Cloud/Enterprise. If tfeToken is empty there is nothing to
+// write and it is a no-op.
+func generateRCFile(tfeToken string, tfeHostname string, home string) error {
+	if tfeToken == "" {
 		return nil
 	}
+	config := fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken)
 
 	const rcFilename = ".terraformrc"
 	rcFile := filepath.Join(home, rcFilename)
@@ -832,7 +881,7 @@ func generateRCFile(tfeToken string, tfeHostname string, providerCache *Provider
 			return fmt.Errorf("trying to read %s to ensure we're not overwriting it: %w", rcFile, err)
 		}
 		if config != string(currContents) {
-			return fmt.Errorf("can't write Terraform CLI config to %s because that file has contents that would be overwritten", rcFile)
+			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
 		}
 		// Otherwise we don't need to write the file because it already has
 		// what we need.
@@ -840,14 +889,15 @@ func generateRCFile(tfeToken string, tfeHostname string, providerCache *Provider
 	}
 
 	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
-		return fmt.Errorf("writing generated %s file to %s: %w", rcFilename, rcFile, err)
+		return fmt.Errorf("writing generated %s file with TFE token to %s: %w", rcFilename, rcFile, err)
 	}
 	return nil
 }
 
-// cliConfigContents builds the contents of the CLI config file from the
-// optional TFE credentials and optional provider cache proxy configuration.
-func cliConfigContents(tfeToken string, tfeHostname string, providerCache *ProviderCacheConfig) string {
+// discoveryCLIConfig builds the phase-1 CLI config: TFE credentials (if any)
+// plus a host block per configured registry, redirecting provider
+// installation for it through the proxy.
+func discoveryCLIConfig(tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) string {
 	var blocks []string
 	if tfeToken != "" {
 		blocks = append(blocks, fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken))
@@ -857,6 +907,27 @@ func cliConfigContents(tfeToken string, tfeHostname string, providerCache *Provi
 			providersV1 := providerCache.MirrorBaseURL + host + "/v1/providers/"
 			blocks = append(blocks, fmt.Sprintf(hostBlock, host, providersV1))
 		}
+	}
+	return strings.Join(blocks, "\n\n")
+}
+
+// mirrorCLIConfig builds the phase-2 CLI config: TFE credentials (if any)
+// plus a provider_installation block that has Terraform install the
+// configured registries only from the proxy's filesystem mirror - which only
+// the proxy ever writes to - falling back to normal direct installation for
+// every other registry.
+func mirrorCLIConfig(tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) string {
+	var blocks []string
+	if tfeToken != "" {
+		blocks = append(blocks, fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken))
+	}
+	if providerCache != nil {
+		patterns := make([]string, len(providerCache.RegistryHosts))
+		for i, host := range providerCache.RegistryHosts {
+			patterns[i] = fmt.Sprintf("%q", host+"/*/*")
+		}
+		included := strings.Join(patterns, ", ")
+		blocks = append(blocks, fmt.Sprintf(providerInstallationBlock, providerCache.MirrorDir, included, included))
 	}
 	return strings.Join(blocks, "\n\n")
 }
@@ -915,5 +986,23 @@ var credentialsBlock = `credentials "%s" {
 var hostBlock = `host "%s" {
   services = {
     "providers.v1" = "%s"
+  }
+}`
+
+// providerInstallationBlock is a format string that generates a
+// provider_installation block installing the configured registries
+// exclusively from the proxy's filesystem mirror (never falling back to a
+// direct network install for them - a miss there means "not installed yet",
+// which InitStepRunner treats as a signal to retry, not as a green light to
+// bypass the proxy) while leaving every other registry to install normally.
+// %q consumes the mirror directory path; the two %s consume the same
+// pre-quoted, comma-joined list of "<host>/*/*" include/exclude patterns.
+var providerInstallationBlock = `provider_installation {
+  filesystem_mirror {
+    path    = %q
+    include = [%s]
+  }
+  direct {
+    exclude = [%s]
   }
 }`

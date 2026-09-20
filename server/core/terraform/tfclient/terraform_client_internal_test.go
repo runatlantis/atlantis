@@ -27,7 +27,7 @@ import (
 func TestGenerateRCFile_WritesFile(t *testing.T) {
 	tmp := t.TempDir()
 
-	err := generateRCFile("token", "hostname", nil, tmp)
+	err := generateRCFile("token", "hostname", tmp)
 	Ok(t, err)
 
 	expContents := `credentials "hostname" {
@@ -38,17 +38,85 @@ func TestGenerateRCFile_WritesFile(t *testing.T) {
 	Equals(t, expContents, string(actContents))
 }
 
-// Test that when the provider cache proxy is configured we write a host block
-// per registry, alongside the credentials block.
-func TestGenerateRCFile_WritesProviderCacheHostBlocks(t *testing.T) {
+// Test that with no TFE token there is nothing to write. The provider cache
+// proxy's CLI config, when enabled, is written separately per terraform-init
+// invocation by WriteProviderCacheCLIConfig, not through this file.
+func TestGenerateRCFile_NoopWhenNoToken(t *testing.T) {
+	tmp := t.TempDir()
+
+	err := generateRCFile("", "hostname", tmp)
+	Ok(t, err)
+
+	_, err = os.Stat(filepath.Join(tmp, ".terraformrc"))
+	Assert(t, os.IsNotExist(err), "expected no .terraformrc to be written")
+}
+
+// Test that if the file already exists and its contents will be modified if
+// we write our config that we error out.
+func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
+	tmp := t.TempDir()
+
+	rcFile := filepath.Join(tmp, ".terraformrc")
+	err := os.WriteFile(rcFile, []byte("contents"), 0600)
+	Ok(t, err)
+
+	actErr := generateRCFile("token", "hostname", tmp)
+	expErr := fmt.Sprintf("can't write TFE token to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
+	ErrEquals(t, expErr, actErr)
+}
+
+// Test that if the file already exists and its contents will NOT be modified if
+// we write our config that we don't error.
+func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
+	tmp := t.TempDir()
+
+	rcFile := filepath.Join(tmp, ".terraformrc")
+	contents := `credentials "app.terraform.io" {
+  token = "token"
+}`
+	err := os.WriteFile(rcFile, []byte(contents), 0600)
+	Ok(t, err)
+
+	err = generateRCFile("token", "app.terraform.io", tmp)
+	Ok(t, err)
+}
+
+// Test that if we can't read the existing file to see if the contents will be
+// the same that we just error out.
+func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
+	tmp := t.TempDir()
+
+	rcFile := filepath.Join(tmp, ".terraformrc")
+	err := os.WriteFile(rcFile, []byte("can't see me!"), 0000)
+	Ok(t, err)
+
+	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
+	actErr := generateRCFile("token", "hostname", tmp)
+	ErrEquals(t, expErr, actErr)
+}
+
+// Test that if we can't write, we error out.
+func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
+	rcFile := "/this/dir/does/not/exist/.terraformrc"
+	expErr := fmt.Sprintf("writing generated .terraformrc file with TFE token to %s: open %s: no such file or directory", rcFile, rcFile)
+	actErr := generateRCFile("token", "hostname", "/this/dir/does/not/exist")
+	ErrEquals(t, expErr, actErr)
+}
+
+// Test that WriteProviderCacheCLIConfig's discovery phase writes a host block
+// per registry, alongside the credentials block, to its own file distinct
+// from the global ~/.terraformrc.
+func TestWriteProviderCacheCLIConfig_Discovery(t *testing.T) {
 	tmp := t.TempDir()
 
 	pc := &ProviderCacheConfig{
 		MirrorBaseURL: "http://127.0.0.1:8080/",
 		RegistryHosts: []string{"registry.terraform.io", "registry.opentofu.org"},
+		MirrorDir:     filepath.Join(tmp, "mirror"),
 	}
-	err := generateRCFile("token", "hostname", pc, tmp)
+	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheDiscoveryPhase, "token", "hostname", pc)
 	Ok(t, err)
+	Equals(t, filepath.Join(tmp, ".terraformrc-provider-cache-discovery"), path)
 
 	expContents := `credentials "hostname" {
   token = "token"
@@ -65,93 +133,48 @@ host "registry.opentofu.org" {
     "providers.v1" = "http://127.0.0.1:8080/registry.opentofu.org/v1/providers/"
   }
 }`
-	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
+	actContents, err := os.ReadFile(path)
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
 }
 
-// Test that with no TFE token and no provider cache there is nothing to write.
-func TestGenerateRCFile_NoopWhenNothingConfigured(t *testing.T) {
-	tmp := t.TempDir()
-
-	err := generateRCFile("", "hostname", nil, tmp)
-	Ok(t, err)
-
-	_, err = os.Stat(filepath.Join(tmp, ".terraformrc"))
-	Assert(t, os.IsNotExist(err), "expected no .terraformrc to be written")
-}
-
-// Test that the provider cache host block can be written without a TFE token.
-func TestGenerateRCFile_ProviderCacheOnly(t *testing.T) {
+// Test that WriteProviderCacheCLIConfig's mirror phase writes a
+// provider_installation block pointing at the mirror directory, to a
+// different file than the discovery phase, and overwrites a stale copy of
+// itself without erroring (unlike the global ~/.terraformrc, which refuses
+// to be overwritten).
+func TestWriteProviderCacheCLIConfig_Mirror(t *testing.T) {
 	tmp := t.TempDir()
 
 	pc := &ProviderCacheConfig{
-		MirrorBaseURL: "http://127.0.0.1:9999/",
+		MirrorBaseURL: "http://127.0.0.1:8080/",
 		RegistryHosts: []string{"registry.terraform.io"},
+		MirrorDir:     filepath.Join(tmp, "mirror"),
 	}
-	err := generateRCFile("", "hostname", pc, tmp)
+	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, "token", "hostname", pc)
 	Ok(t, err)
+	Equals(t, filepath.Join(tmp, ".terraformrc-provider-cache-mirror"), path)
 
-	expContents := `host "registry.terraform.io" {
-  services = {
-    "providers.v1" = "http://127.0.0.1:9999/registry.terraform.io/v1/providers/"
+	expContents := fmt.Sprintf(`credentials "hostname" {
+  token = "token"
+}
+
+provider_installation {
+  filesystem_mirror {
+    path    = %q
+    include = ["registry.terraform.io/*/*"]
   }
-}`
-	actContents, err := os.ReadFile(filepath.Join(tmp, ".terraformrc"))
+  direct {
+    exclude = ["registry.terraform.io/*/*"]
+  }
+}`, pc.MirrorDir)
+	actContents, err := os.ReadFile(path)
 	Ok(t, err)
 	Equals(t, expContents, string(actContents))
-}
 
-// Test that if the file already exists and its contents will be modified if
-// we write our config that we error out.
-func TestGenerateRCFile_WillNotOverwrite(t *testing.T) {
-	tmp := t.TempDir()
-
-	rcFile := filepath.Join(tmp, ".terraformrc")
-	err := os.WriteFile(rcFile, []byte("contents"), 0600)
+	// Writing it again (as a retry would) overwrites cleanly.
+	_, err = WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, "token", "hostname", pc)
 	Ok(t, err)
-
-	actErr := generateRCFile("token", "hostname", nil, tmp)
-	expErr := fmt.Sprintf("can't write Terraform CLI config to %s because that file has contents that would be overwritten", tmp+"/.terraformrc")
-	ErrEquals(t, expErr, actErr)
-}
-
-// Test that if the file already exists and its contents will NOT be modified if
-// we write our config that we don't error.
-func TestGenerateRCFile_NoErrIfContentsSame(t *testing.T) {
-	tmp := t.TempDir()
-
-	rcFile := filepath.Join(tmp, ".terraformrc")
-	contents := `credentials "app.terraform.io" {
-  token = "token"
-}`
-	err := os.WriteFile(rcFile, []byte(contents), 0600)
-	Ok(t, err)
-
-	err = generateRCFile("token", "app.terraform.io", nil, tmp)
-	Ok(t, err)
-}
-
-// Test that if we can't read the existing file to see if the contents will be
-// the same that we just error out.
-func TestGenerateRCFile_ErrIfCannotRead(t *testing.T) {
-	tmp := t.TempDir()
-
-	rcFile := filepath.Join(tmp, ".terraformrc")
-	err := os.WriteFile(rcFile, []byte("can't see me!"), 0000)
-	Ok(t, err)
-
-	expErr := fmt.Sprintf("trying to read %s to ensure we're not overwriting it: open %s: permission denied", rcFile, rcFile)
-	actErr := generateRCFile("token", "hostname", nil, tmp)
-	ErrEquals(t, expErr, actErr)
-}
-
-// Test that if we can't write, we error out.
-func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
-	rcFile := "/this/dir/does/not/exist/.terraformrc"
-	expErr := fmt.Sprintf("writing generated .terraformrc file to %s: open %s: no such file or directory", rcFile, rcFile)
-	actErr := generateRCFile("token", "hostname", nil, "/this/dir/does/not/exist")
-	ErrEquals(t, expErr, actErr)
 }
 
 // Test that it executes with the expected env vars.

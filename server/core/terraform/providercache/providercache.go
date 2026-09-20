@@ -11,19 +11,30 @@
 //
 // This package runs a small HTTP server on localhost that speaks the Terraform
 // Provider Registry Protocol. Terraform is pointed at it via a `host` block in
-// the CLI configuration file (see the tfclient package), which redirects
-// service discovery for the configured registry hostnames to this proxy. The
-// proxy forwards provider metadata requests upstream and rewrites the archive
-// download URLs so that Terraform fetches the archives (and their SHA256SUMS /
-// signature files) back through the proxy. The proxy downloads each archive
-// from upstream exactly once, caches it on disk, and serves the cached copy to
-// every subsequent request — including the many concurrent requests a burst of
-// parallel `terraform init` runs produces, which are de-duplicated so only a
-// single upstream download happens per artifact.
+// the CLI configuration file (see the tfclient package) for an initial
+// "discovery" pass of `terraform init`, which redirects service discovery for
+// the configured registry hostnames to this proxy.
 //
-// The archive bytes are served verbatim, so Terraform's normal checksum and
-// GPG-signature verification of providers is unaffected: this proxy only
-// changes where the bytes come from, never what they are.
+// De-duplicating the download alone is not enough to make concurrent
+// `terraform init` safe: Terraform's own provider installer is not
+// concurrency-safe against a shared plugin cache directory
+// (hashicorp/terraform#25849) - even identical archive bytes, unpacked by two
+// processes into the same destination at once, can corrupt each other. So
+// this proxy never lets Terraform install a provider itself. Instead, on an
+// archive request it always responds 423 Locked and, in the background,
+// downloads, verifies (SHA256SUMS + GPG signature against the registry's own
+// signing keys) and unpacks the provider itself into a `provider_installation
+// filesystem_mirror`-formatted directory (see the installer type) - so it is
+// the mirror's only writer. Atlantis's InitStepRunner reruns `terraform init`
+// against that mirror (a second CLI config, with no `host` override) with a
+// short backoff until the provider is there; a filesystem_mirror is read-only
+// from Terraform's side, so no concurrent process ever writes to it and the
+// race is gone structurally, not just made less likely. This mirrors the
+// provider cache server that Terragrunt already ships.
+//
+// Only the archive endpoint behaves this way. Service discovery, version
+// listing, metadata and the SHA256SUMS/signature files themselves are simple,
+// harmless pass-through/caching, unchanged from a conventional caching proxy.
 //
 // # Trust boundaries
 //
@@ -38,8 +49,6 @@
 //     trusted registry itself returns in its download-metadata response, never
 //     from a URL supplied in the incoming request. Terraform only ever receives
 //     coordinate-based artifact URLs from this proxy.
-//
-// This mirrors the provider cache server that Terragrunt already ships.
 package providercache
 
 import (
@@ -125,6 +134,10 @@ type Server struct {
 	// parallel `terraform init` runs triggers a single upstream download.
 	sf singleflight.Group
 
+	// installer is the sole writer of the provider mirror directory; see its
+	// doc comment and the package doc comment above for why.
+	installer *installer
+
 	listener   net.Listener
 	httpServer *http.Server
 }
@@ -143,6 +156,17 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		return nil, fmt.Errorf("provider cache dir %q is not a directory", cacheDir)
 	}
 
+	// mirrorDir is a subdirectory of cacheDir, not cacheDir itself: cacheDir
+	// also holds the flat, hash-named raw artifact blobs downloadMetadata/
+	// ensureCached use internally (including on the installer's own behalf,
+	// via fetch below), which live alongside but are distinct from the
+	// verified, unpacked provider_installation.filesystem_mirror tree the
+	// installer publishes into.
+	mirrorDir := filepath.Join(cacheDir, "mirror")
+	if err := os.MkdirAll(mirrorDir, 0o700); err != nil {
+		return nil, fmt.Errorf("creating provider mirror dir %q: %w", mirrorDir, err)
+	}
+
 	listener, err := net.Listen("tcp", net.JoinHostPort(loopbackHost, fmt.Sprintf("%d", port)))
 	if err != nil {
 		return nil, fmt.Errorf("listening on %s: %w", loopbackHost, err)
@@ -157,6 +181,11 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		disco:          make(map[string]string),
 		meta:           make(map[string]map[string]any),
 		listener:       listener,
+	}
+	s.installer = &installer{
+		log:       log,
+		mirrorDir: mirrorDir,
+		fetch:     s.ensureCached,
 	}
 
 	router := mux.NewRouter()
@@ -208,6 +237,14 @@ func (s *Server) MirrorBaseURL() string {
 // Registries returns the registry hostnames this proxy serves.
 func (s *Server) Registries() []string {
 	return s.registries
+}
+
+// MirrorDir is the root of the provider_installation.filesystem_mirror-
+// formatted directory the installer publishes verified, unpacked providers
+// into. It is used to build the phase-2 CLI config (see
+// tfclient.ProviderCacheConfig.MirrorDir).
+func (s *Server) MirrorDir() string {
+	return s.installer.mirrorDir
 }
 
 // allowedRegistry reports whether host is one of the configured registries and,
@@ -299,9 +336,12 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleArtifact serves (and caches on first request) the archive, checksum or
-// signature file for a provider coordinate. The real download location is taken
-// from the trusted registry's metadata response, not from the incoming request.
+// handleArtifact serves the checksum/signature files for a provider
+// coordinate (caching them on first request) and, for the archive itself,
+// hands installation off to the installer instead of ever serving the bytes
+// to Terraform - see the package doc comment for why. The real download
+// location is taken from the trusted registry's metadata response, not from
+// the incoming request.
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	host, segs, ok := s.coordinates(w, vars, "namespace", "type", "version", "os", "arch")
@@ -323,6 +363,17 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "registry returned status "+fmt.Sprint(status), status)
 		return
 	}
+
+	if vars["kind"] == "archive" {
+		coordinate := Coordinate{
+			Host: host, Namespace: segs["namespace"], Type: segs["type"],
+			Version: segs["version"], OS: segs["os"], Arch: segs["arch"],
+		}
+		s.installer.EnsureInstalled(coordinate, body)
+		http.Error(w, "provider cache: installing into the shared mirror; retry terraform init against it", http.StatusLocked)
+		return
+	}
+
 	// target originates from the registry's response, so it is not attacker-
 	// controlled data from the incoming request.
 	target, _ := body[field].(string)
@@ -341,12 +392,10 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch vars["kind"] {
-	case "archive":
-		w.Header().Set("Content-Type", "application/zip")
-	case "signature":
+	// Only "shasums"/"signature" reach here - "archive" returns earlier above.
+	if vars["kind"] == "signature" {
 		w.Header().Set("Content-Type", "application/octet-stream")
-	default:
+	} else {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	// #nosec G703 -- cachePath is filepath.Join(cacheDir, hex-sha256(url)); the file name is a fixed-length [0-9a-f] hash with no separators, so it cannot escape cacheDir.
