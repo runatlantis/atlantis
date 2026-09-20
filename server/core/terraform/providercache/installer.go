@@ -387,7 +387,7 @@ func extractFile(f *zip.File, target string) error {
 	if mode == 0 {
 		mode = 0o600
 	}
-	// #nosec G304 -- target is validated to stay under destDir by unzip above.
+	// #nosec G304 G703 -- target is validated to stay under destDir by unzip above.
 	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err

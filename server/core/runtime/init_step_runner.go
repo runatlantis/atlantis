@@ -209,10 +209,7 @@ func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path s
 			return appendErrors(out, i.installerErrors()), err
 		}
 
-		wait := mirrorRetryBackoff[min(attempt, len(mirrorRetryBackoff)-1)]
-		if remaining < wait {
-			wait = remaining
-		}
+		wait := min(mirrorRetryBackoff[min(attempt, len(mirrorRetryBackoff)-1)], remaining)
 		ctx.Log.Debug("provider mirror not ready yet, retrying terraform init in %s", wait)
 		time.Sleep(wait)
 
