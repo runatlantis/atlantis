@@ -1362,6 +1362,13 @@ retries against the provider cache proxy's filesystem mirror while the proxy
 finishes installing a provider, before giving up and surfacing the underlying
 error. Only used when `--provider-cache` is set. Defaults to `5m`.
 
+Each retry cycle costs up to two `terraform init` invocations (a mirror check
+plus a discovery re-trigger - see `--provider-cache` above), so a long
+timeout under many concurrent parallel projects means more process churn
+while they wait, not just a longer worst-case delay. If the same failure is
+reported twice in a row, Atlantis gives up before the timeout rather than
+waiting it out in full.
+
 ### `--provider-cache-port`
 
 ```bash

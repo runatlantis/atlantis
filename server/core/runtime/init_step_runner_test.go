@@ -652,6 +652,62 @@ func TestRun_ProviderCache_SurfacesInstallerErrorOnTimeout(t *testing.T) {
 	Assert(t, strings.Contains(output, "refusing to install an unverifiable package"), "expected the provider cache proxy's real error to be appended, got %q", output)
 }
 
+// Test that Run gives up well before ProviderCacheMirrorWaitTimeout when the
+// provider cache proxy reports the exact same install failure on two
+// consecutive retry cycles - a stuck (not merely still-transient) install -
+// instead of waiting out the full (here: default, several-minute) budget.
+func TestRun_ProviderCache_ShortCircuitsOnRepeatedInstallerError(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	logger := logging.NewNoopLogger(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("1.14.0")
+
+	// Always reports the same, stable error.
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/status/registry.terraform.io" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"errors":["registry.terraform.io/hashicorp/null/3.2.1/linux/amd64: refusing to install an unverifiable package"]}`)
+	}))
+	t.Cleanup(proxy.Close)
+
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+		ProviderCache: &tfclient.ProviderCacheConfig{
+			MirrorBaseURL: proxy.URL + "/",
+			RegistryHosts: []string{"registry.terraform.io"},
+			MirrorDir:     t.TempDir(),
+		},
+		// Left at the (multi-minute) default: if this test passes quickly,
+		// it's because the repeated-error short-circuit fired, not because
+		// the budget ran out.
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("Error: failed to install provider from registry.terraform.io: 423 Locked", errors.New("exit status 1"))
+
+	path := t.TempDir()
+	start := time.Now()
+	output, err := iso.Run(command.ProjectContext{Workspace: "workspace", RepoRelDir: ".", Log: logger}, nil, path, nil)
+	elapsed := time.Since(start)
+
+	ErrEquals(t, "exit status 1", err)
+	Assert(t, strings.Contains(output, "refusing to install an unverifiable package"), "expected the provider cache proxy's real error to be appended, got %q", output)
+	// Two backoff cycles (1s + 2s) plus overhead, well under the multi-minute
+	// default budget the short-circuit is meant to avoid waiting out.
+	Assert(t, elapsed < 30*time.Second, "took %s; the repeated-error short-circuit does not appear to have fired", elapsed)
+
+	// Discovery, mirror(fail), discovery(retrigger), mirror(fail),
+	// discovery(retrigger) - short-circuits on the second repeat, without a
+	// third mirror check.
+	terraform.VerifyWasCalled(Times(5)).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
+}
+
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	t.Helper()
 	cpCmd := exec.Command(name, args...)

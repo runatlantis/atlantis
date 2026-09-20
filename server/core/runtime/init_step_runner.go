@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -193,6 +195,10 @@ func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path s
 	}
 	deadline := time.Now().Add(timeout)
 
+	// previousErrors is what installerErrors() returned after the previous
+	// cycle's discovery re-trigger, used below to recognize a stuck (not
+	// merely still-transient) install.
+	var previousErrors []string
 	for attempt := 0; ; attempt++ {
 		out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, mirrorEnvs, d, v, workspace)
 		if err == nil {
@@ -200,7 +206,7 @@ func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path s
 		}
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			return i.appendInstallerErrors(out), err
+			return appendErrors(out, i.installerErrors()), err
 		}
 
 		wait := mirrorRetryBackoff[min(attempt, len(mirrorRetryBackoff)-1)]
@@ -213,23 +219,38 @@ func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path s
 		// Re-trigger installation of whatever's still missing before the next
 		// mirror check. Its own result is not otherwise used here - success
 		// shows up as the mirror now having the provider on the next
-		// iteration; failure is picked up via appendInstallerErrors above if
-		// the budget then runs out.
+		// iteration; failure is picked up via installerErrors below.
 		_, _ = i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, discoveryEnvs, d, v, workspace)
+
+		// Bail out now, rather than waiting out the rest of the budget, if
+		// the proxy reported the exact same failure after both this cycle's
+		// re-trigger and the previous one. Two consecutive identical errors
+		// is a reasonable signal the install is stuck for good (e.g. a
+		// verification failure that will never resolve itself) rather than
+		// merely still in progress - one repeat is required (not zero)
+		// so a single still-transient failure always gets at least one real
+		// retry.
+		currentErrors := i.installerErrors()
+		if len(currentErrors) > 0 && slices.Equal(currentErrors, previousErrors) {
+			return appendErrors(out, currentErrors), err
+		}
+		previousErrors = currentErrors
 	}
 }
 
-// appendInstallerErrors queries the provider cache proxy directly (not
-// through Terraform) for the most recent install failure, if any, on each
-// configured registry host, and appends them to out. Best-effort: any
-// failure to reach the proxy is silently ignored, since out already carries
-// Terraform's own error and this is only meant to add context to it.
-func (i *InitStepRunner) appendInstallerErrors(out string) string {
+// installerErrors queries the provider cache proxy directly (not through
+// Terraform) for the most recent install failure, if any, on each configured
+// registry host - see installer.LastErrors. Best-effort: any failure to
+// reach the proxy is silently ignored (returns nil), since the caller
+// already has Terraform's own error and this is only meant to add context to
+// it. Sorted so two calls returning the same set of errors compare equal
+// regardless of the underlying map's iteration order.
+func (i *InitStepRunner) installerErrors() []string {
 	if i.ProviderCache == nil || i.ProviderCache.MirrorBaseURL == "" {
-		return out
+		return nil
 	}
 	client := http.Client{Timeout: 5 * time.Second}
-	var extra []string
+	var errs []string
 	for _, host := range i.ProviderCache.RegistryHosts {
 		resp, err := client.Get(i.ProviderCache.MirrorBaseURL + "status/" + url.PathEscape(host))
 		if err != nil {
@@ -241,13 +262,19 @@ func (i *InitStepRunner) appendInstallerErrors(out string) string {
 		decodeErr := json.NewDecoder(resp.Body).Decode(&body)
 		resp.Body.Close()
 		if decodeErr == nil {
-			extra = append(extra, body.Errors...)
+			errs = append(errs, body.Errors...)
 		}
 	}
-	if len(extra) == 0 {
+	sort.Strings(errs)
+	return errs
+}
+
+// appendErrors appends errs (from installerErrors), if any, to out.
+func appendErrors(out string, errs []string) string {
+	if len(errs) == 0 {
 		return out
 	}
-	return out + "\n\nprovider cache proxy reports:\n" + strings.Join(extra, "\n")
+	return out + "\n\nprovider cache proxy reports:\n" + strings.Join(errs, "\n")
 }
 
 // envWith returns a copy of envs with key set to value. envs itself is left
@@ -263,6 +290,18 @@ func envWith(envs map[string]string, key, value string) map[string]string {
 // mentionsAnyHost reports whether output names one of hosts, used to tell a
 // provider-cache-related init failure (Terraform's error names the registry
 // host it couldn't install a provider from) apart from an unrelated one.
+//
+// This is a plain substring match on Terraform's own error text, not a
+// structured signal - Terraform has no other way to tell us "this failure
+// was about installing from this registry". That makes it fragile in both
+// directions: a wording change in a future Terraform version could produce a
+// false negative (a real cache-related failure surfaced immediately instead
+// of retried), and a genuine user config error whose message happens to
+// name the host (e.g. "no available releases match the given constraints
+// (registry.terraform.io)") is a false positive that wastes the full mirror
+// retry budget - at up to two terraform init invocations per backoff cycle -
+// before the real, unrelated cause is surfaced. Deliberately accepted:
+// there's no structured alternative without Terraform itself exposing one.
 func mentionsAnyHost(output string, hosts []string) bool {
 	for _, h := range hosts {
 		if h != "" && strings.Contains(output, h) {
