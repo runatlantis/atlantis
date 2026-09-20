@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -143,6 +144,78 @@ func TestInstaller_EnsureInstalledDedupesConcurrentCalls(t *testing.T) {
 
 	waitForInstaller(t, in, testCoordinate)
 	Equals(t, int64(1), in.installs.Load())
+}
+
+// Test that a failed install is recorded per coordinate (grouped under its
+// host by LastErrors), and that a later successful install of that same
+// coordinate clears it - so a caller that gave up waiting only ever sees a
+// currently-true failure, not a stale one from an attempt that has since
+// succeeded.
+func TestInstaller_LastErrorsRecordsAndClearsOnSuccess(t *testing.T) {
+	// recordResult is called by EnsureInstalled around install, not by
+	// install itself, so drive this through EnsureInstalled (and poll for
+	// completion, same as the concurrency/timeout tests) rather than calling
+	// install directly.
+	meta, files := validMeta(t)
+	meta["signing_keys"] = map[string]any{"gpg_public_keys": []any{}} // fail closed
+	in := newTestInstaller(t, files)
+
+	in.EnsureInstalled(testCoordinate, meta)
+	waitForInstalls(t, in, 1)
+	errs := in.LastErrors(testCoordinate.Host)
+	Assert(t, len(errs) == 1, "expected exactly one recorded error, got %v", errs)
+	Assert(t, strings.Contains(errs[0], "refusing to install an unverifiable package"), "unexpected recorded error: %s", errs[0])
+	Equals(t, []string(nil), in.LastErrors("some.other.host"))
+
+	// A later successful install of the same coordinate clears the record.
+	okMeta, _ := validMeta(t)
+	in.EnsureInstalled(testCoordinate, okMeta)
+	waitForInstaller(t, in, testCoordinate)
+	Equals(t, []string(nil), in.LastErrors(testCoordinate.Host))
+}
+
+// waitForInstalls blocks until in.installs has reached at least n completed
+// attempts.
+func waitForInstalls(t *testing.T, in *installer, n int64) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for in.installs.Load() < n {
+		Assert(t, time.Now().Before(deadline), "installs never reached %d (at %d)", n, in.installs.Load())
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// Test that EnsureInstalled bounds a single install attempt with
+// installTimeout: a fetch that never returns on its own (simulating a
+// stalled upstream download, which downloadClient's own Timeout: 0 will not
+// catch - see the package doc comment) doesn't wedge the coordinate forever,
+// and it's left unpublished so a later attempt can retry it.
+func TestInstaller_EnsureInstalledRespectsInstallTimeout(t *testing.T) {
+	meta, _ := validMeta(t)
+	in := &installer{
+		log:            logging.NewNoopLogger(t),
+		mirrorDir:      filepath.Join(t.TempDir(), "mirror"),
+		installTimeout: 20 * time.Millisecond,
+		fetch: func(ctx context.Context, _ string) (string, error) {
+			<-ctx.Done() // never resolves on its own, like a stalled download.
+			return "", ctx.Err()
+		},
+	}
+
+	start := time.Now()
+	in.EnsureInstalled(testCoordinate, meta)
+	// EnsureInstalled itself must return immediately regardless of
+	// installTimeout - it never blocks the HTTP handler that calls it.
+	Assert(t, time.Since(start) < 100*time.Millisecond, "EnsureInstalled blocked its caller")
+
+	deadline := time.Now().Add(2 * time.Second)
+	for in.installs.Load() == 0 {
+		Assert(t, time.Now().Before(deadline), "the timed-out install never completed")
+		time.Sleep(5 * time.Millisecond)
+	}
+	Assert(t, !in.isPublished(testCoordinate), "a timed-out install must never be published")
+	errs := in.LastErrors(testCoordinate.Host)
+	Assert(t, len(errs) == 1, "expected the timeout to be recorded as this coordinate's last error, got %v", errs)
 }
 
 func waitForInstaller(t *testing.T, in *installer, c Coordinate) {

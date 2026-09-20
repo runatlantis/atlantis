@@ -5,6 +5,9 @@ package runtime_test
 
 import (
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -511,14 +514,17 @@ func TestRun_ProviderCache_RetriesAgainstMirrorUntilReady(t *testing.T) {
 			MirrorDir:     t.TempDir(),
 		},
 	}
-	// 1st call: phase-1 discovery, fails - the proxy is (by design) installing
-	// the provider in the background. 2nd call: phase-2 mirror retry, not
-	// ready yet. 3rd call: phase-2 mirror retry, ready.
+	// 1st call: initial discovery, fails - the proxy is (by design) installing
+	// the provider in the background. 2nd call: mirror check, not ready yet.
+	// 3rd call: re-triggered discovery (the retry loop asks the proxy again
+	// each cycle), still not ready. 4th call: mirror check, ready.
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn(
 			"Error: failed to install provider from registry.terraform.io: 423 Locked", errors.New("exit status 1"),
 		).ThenReturn(
 		"Error: no available releases match the given constraints (registry.terraform.io)", errors.New("exit status 1"),
+	).ThenReturn(
+		"Error: failed to install provider from registry.terraform.io: 423 Locked", errors.New("exit status 1"),
 	).ThenReturn("", nil)
 
 	path := t.TempDir()
@@ -526,7 +532,7 @@ func TestRun_ProviderCache_RetriesAgainstMirrorUntilReady(t *testing.T) {
 	Ok(t, err)
 	Equals(t, "", output)
 
-	terraform.VerifyWasCalled(Times(3)).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
+	terraform.VerifyWasCalled(Times(4)).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
 
 	mirrorFile, err := os.ReadFile(filepath.Join(path, ".terraformrc-provider-cache-mirror"))
 	Ok(t, err)
@@ -601,6 +607,49 @@ func TestRun_ProviderCache_MirrorPhaseTimesOutAndSurfacesError(t *testing.T) {
 	// phase-2 attempts fit inside a 1ms budget before the deadline check
 	// fires is a wall-clock race, not something worth pinning down exactly.
 	terraform.VerifyWasCalled(AtLeast(2)).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
+}
+
+// Test that once the mirror retry budget is exhausted, Run queries the
+// provider cache proxy directly (not through Terraform) for the real cause
+// and appends it to the output, instead of only ever surfacing Terraform's
+// generic "provider not found" error.
+func TestRun_ProviderCache_SurfacesInstallerErrorOnTimeout(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	logger := logging.NewNoopLogger(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("1.14.0")
+
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/status/registry.terraform.io" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"errors":["registry.terraform.io/hashicorp/null/3.2.1/linux/amd64: refusing to install an unverifiable package"]}`)
+	}))
+	t.Cleanup(proxy.Close)
+
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+		ProviderCache: &tfclient.ProviderCacheConfig{
+			MirrorBaseURL: proxy.URL + "/",
+			RegistryHosts: []string{"registry.terraform.io"},
+			MirrorDir:     t.TempDir(),
+		},
+		ProviderCacheMirrorWaitTimeout: 1 * time.Millisecond,
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("Error: failed to install provider from registry.terraform.io: 423 Locked", errors.New("exit status 1"))
+
+	path := t.TempDir()
+	output, err := iso.Run(command.ProjectContext{Workspace: "workspace", RepoRelDir: ".", Log: logger}, nil, path, nil)
+	ErrEquals(t, "exit status 1", err)
+	Assert(t, strings.Contains(output, "Error: failed to install provider"), "expected Terraform's own error to still be present, got %q", output)
+	Assert(t, strings.Contains(output, "refusing to install an unverifiable package"), "expected the provider cache proxy's real error to be appended, got %q", output)
 }
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {

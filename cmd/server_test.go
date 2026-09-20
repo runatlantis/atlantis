@@ -155,6 +155,8 @@ var testFlags = map[string]any{
 	UseTFPluginCache:                 true,
 	ProviderCacheFlag:                true,
 	ProviderCacheDirFlag:             "/provider-cache",
+	ProviderCacheInstallTimeout:      "2m",
+	ProviderCacheMirrorWaitTimeout:   "5m",
 	ProviderCachePortFlag:            1234,
 	ProviderCacheRegistryHostsFlag:   "registry.terraform.io,registry.opentofu.org",
 	VarFileAllowlistFlag:             "/path",

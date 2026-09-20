@@ -501,7 +501,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			registries = []string{DefaultProviderCacheRegistryHost}
 		}
 
-		providerCacheServer, err = providercache.New(logger, providerCacheDir, registries, userConfig.ProviderCachePort)
+		providerCacheInstallTimeout, err := time.ParseDuration(userConfig.ProviderCacheInstallTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("invalid provider-cache-install-timeout %q: %w", userConfig.ProviderCacheInstallTimeout, err)
+		}
+
+		providerCacheServer, err = providercache.New(logger, providerCacheDir, registries, userConfig.ProviderCachePort, providerCacheInstallTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("starting provider cache proxy: %w", err)
 		}

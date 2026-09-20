@@ -15,7 +15,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"golang.org/x/sync/singleflight"
@@ -55,6 +57,12 @@ type installer struct {
 	// mirrorDir is the root of the filesystem_mirror-formatted directory.
 	mirrorDir string
 
+	// installTimeout bounds a single install attempt (download + verify +
+	// unpack), so a stalled upstream (the download has no other timeout -
+	// provider archives can be large) can't wedge a coordinate's singleflight
+	// key forever. Falls back to defaultInstallTimeout when zero.
+	installTimeout time.Duration
+
 	// fetch resolves an artifact URL (archive/shasums/signature) to an
 	// on-disk path, reusing the proxy's existing download cache/dedup
 	// (Server.ensureCached) rather than re-implementing it.
@@ -62,12 +70,27 @@ type installer struct {
 
 	// sf ensures only one goroutine ever downloads+verifies+publishes a
 	// given coordinate at a time, regardless of how many concurrent archive
-	// requests name it.
+	// requests name it. A completed call (success or failure) is forgotten
+	// once done, so a later EnsureInstalled for the same still-unpublished
+	// coordinate starts a fresh attempt - that's what lets a transient
+	// failure be retried rather than being permanent for the process
+	// lifetime.
 	sf singleflight.Group
+
+	// errMu guards lastErr.
+	errMu sync.Mutex
+	// lastErr records the most recent install failure per coordinate (see
+	// Coordinate.key), so a caller stuck waiting on the mirror can surface
+	// the real cause instead of a generic "not found" once it gives up.
+	// Cleared on a subsequent successful install of that coordinate.
+	lastErr map[string]error
 
 	// installs counts completed install attempts, for tests.
 	installs atomic.Int64
 }
+
+// defaultInstallTimeout is used when installTimeout is unset.
+const defaultInstallTimeout = 2 * time.Minute
 
 // EnsureInstalled makes sure the provider archive for coordinate is (or soon
 // will be) verified and unpacked under mirrorDir. It never blocks the caller
@@ -93,8 +116,15 @@ func (in *installer) EnsureInstalled(coordinate Coordinate, meta map[string]any)
 			return nil, nil
 		}
 		in.log.Info("provider cache: installing %s into the mirror", coordinate.key())
-		err := in.install(context.Background(), coordinate, meta)
+		timeout := in.installTimeout
+		if timeout <= 0 {
+			timeout = defaultInstallTimeout
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		err := in.install(ctx, coordinate, meta)
 		in.installs.Add(1)
+		in.recordResult(coordinate, err)
 		return nil, err
 	})
 	go func() {
@@ -102,6 +132,38 @@ func (in *installer) EnsureInstalled(coordinate Coordinate, meta map[string]any)
 			in.log.Err("provider cache: installing %s: %s", coordinate.key(), res.Err)
 		}
 	}()
+}
+
+// recordResult remembers err (or forgets a prior failure, on success) as the
+// most recent install outcome for coordinate, so LastErrors can later surface
+// it to a caller that gave up waiting on the mirror.
+func (in *installer) recordResult(c Coordinate, err error) {
+	in.errMu.Lock()
+	defer in.errMu.Unlock()
+	if err == nil {
+		delete(in.lastErr, c.key())
+		return
+	}
+	if in.lastErr == nil {
+		in.lastErr = make(map[string]error)
+	}
+	in.lastErr[c.key()] = err
+}
+
+// LastErrors returns the most recent install failure message for every
+// coordinate on host with a currently-recorded error (i.e. one whose most
+// recent install attempt failed and has not since succeeded).
+func (in *installer) LastErrors(host string) []string {
+	in.errMu.Lock()
+	defer in.errMu.Unlock()
+	prefix := host + "/"
+	var out []string
+	for key, err := range in.lastErr {
+		if strings.HasPrefix(key, prefix) {
+			out = append(out, key+": "+err.Error())
+		}
+	}
+	return out
 }
 
 // isPublished reports whether coordinate is already fully installed in the

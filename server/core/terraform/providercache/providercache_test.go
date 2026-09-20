@@ -221,7 +221,7 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool, msg string, 
 // newProxy starts a proxy pointed (via a pre-seeded discovery entry) at upstream.
 func newProxy(t *testing.T, upstream *httptest.Server) *Server {
 	t.Helper()
-	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0)
+	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0, 0)
 	Ok(t, err)
 	// Bypass real (https) service discovery by seeding the resolved base URL.
 	s.disco[registryHost] = upstream.URL + "/v1/providers/"
@@ -341,6 +341,26 @@ func TestProxy_ArtifactRefusesUnverifiableProvider(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	_, err := os.Stat(mirrorPath)
 	Assert(t, os.IsNotExist(err), "an unverifiable provider must never be published to the mirror")
+
+	// And the failure is queryable via /status, not just logged server-side -
+	// this is what lets InitStepRunner surface the real cause once it gives
+	// up waiting on the mirror.
+	resp, body = mustGet(t, s.MirrorBaseURL()+"status/"+registryHost)
+	Equals(t, http.StatusOK, resp.StatusCode)
+	var status struct {
+		Errors []string `json:"errors"`
+	}
+	Ok(t, json.Unmarshal([]byte(body), &status))
+	Assert(t, len(status.Errors) == 1, "expected one recorded error, got %v", status.Errors)
+	Assert(t, strings.Contains(status.Errors[0], "refusing to install an unverifiable package"), "unexpected status error: %s", status.Errors[0])
+}
+
+func TestProxy_StatusRejectsUnconfiguredRegistryHost(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newProxy(t, upstream)
+
+	resp, _ := mustGet(t, s.MirrorBaseURL()+"status/evil.example.com")
+	Equals(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestProxy_ArtifactServesShasumsAndSignature(t *testing.T) {

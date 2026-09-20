@@ -153,6 +153,7 @@ const (
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	ProviderCacheFlag                = "provider-cache"
 	ProviderCacheDirFlag             = "provider-cache-dir"
+	ProviderCacheInstallTimeout      = "provider-cache-install-timeout"
 	ProviderCacheMirrorWaitTimeout   = "provider-cache-mirror-wait-timeout"
 	ProviderCachePortFlag            = "provider-cache-port"
 	ProviderCacheRegistryHostsFlag   = "provider-cache-registry-hosts"
@@ -200,6 +201,7 @@ const (
 	DefaultParallelPoolSize               = 15
 	DefaultStatsNamespace                 = "atlantis"
 	DefaultPort                           = 4141
+	DefaultProviderCacheInstallTimeout    = "2m"
 	DefaultProviderCacheMirrorWaitTimeout = "5m"
 	DefaultProviderCachePort              = 0
 	DefaultProviderCacheRegistryHosts     = "registry.terraform.io"
@@ -522,8 +524,15 @@ var stringFlags = map[string]stringFlag{
 	ProviderCacheMirrorWaitTimeout: {
 		description: "Go duration string (e.g. '5m', '90s') bounding how long `terraform init` retries against the provider cache proxy's" +
 			" filesystem mirror while the proxy finishes installing a provider, before giving up and surfacing the underlying error." +
+			" Should be comfortably longer than --" + ProviderCacheInstallTimeout + " so at least one retry can happen after a stalled install is abandoned." +
 			" Only used when --" + ProviderCacheFlag + " is set.",
 		defaultValue: DefaultProviderCacheMirrorWaitTimeout,
+	},
+	ProviderCacheInstallTimeout: {
+		description: "Go duration string (e.g. '2m', '30s') bounding a single provider install attempt by the provider cache proxy" +
+			" (download, verify and unpack), so a stalled upstream can't block that provider from ever being retried." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheInstallTimeout,
 	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
@@ -1086,6 +1095,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.ProviderCacheMirrorWaitTimeout == "" {
 		c.ProviderCacheMirrorWaitTimeout = DefaultProviderCacheMirrorWaitTimeout
 	}
+	if c.ProviderCacheInstallTimeout == "" {
+		c.ProviderCacheInstallTimeout = DefaultProviderCacheInstallTimeout
+	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution
 	}
@@ -1258,6 +1270,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if userConfig.ProviderCache {
 		if _, err := time.ParseDuration(userConfig.ProviderCacheMirrorWaitTimeout); err != nil {
 			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheMirrorWaitTimeout, userConfig.ProviderCacheMirrorWaitTimeout, err)
+		}
+		if _, err := time.ParseDuration(userConfig.ProviderCacheInstallTimeout); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheInstallTimeout, userConfig.ProviderCacheInstallTimeout, err)
 		}
 	}
 

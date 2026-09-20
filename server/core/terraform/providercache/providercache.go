@@ -145,8 +145,9 @@ type Server struct {
 // New constructs a provider cache proxy. cacheDir must already exist. registries
 // is the list of registry hostnames to serve; it must contain at least one
 // entry. port is the TCP port to listen on; pass 0 to let the OS choose a free
-// port (recommended).
-func New(log logging.SimpleLogging, cacheDir string, registries []string, port int) (*Server, error) {
+// port (recommended). installTimeout bounds a single provider install
+// attempt (see installer.installTimeout); pass 0 for the default.
+func New(log logging.SimpleLogging, cacheDir string, registries []string, port int, installTimeout time.Duration) (*Server, error) {
 	if len(registries) == 0 {
 		return nil, errors.New("at least one registry host is required")
 	}
@@ -183,9 +184,10 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		listener:       listener,
 	}
 	s.installer = &installer{
-		log:       log,
-		mirrorDir: mirrorDir,
-		fetch:     s.ensureCached,
+		log:            log,
+		mirrorDir:      mirrorDir,
+		installTimeout: installTimeout,
+		fetch:          s.ensureCached,
 	}
 
 	router := mux.NewRouter()
@@ -197,6 +199,10 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 	// no URL: the proxy re-resolves the real download location from the trusted
 	// registry's metadata response.
 	router.HandleFunc("/artifact/{host}/{namespace}/{type}/{version}/{os}/{arch}/{kind}", s.handleArtifact).Methods(http.MethodGet)
+	// status lets a caller that gave up waiting on the mirror (see
+	// InitStepRunner's retry loop) ask why, instead of only ever seeing
+	// Terraform's generic "provider not found" error.
+	router.HandleFunc("/status/{host}", s.handleStatus).Methods(http.MethodGet)
 	router.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }).Methods(http.MethodGet)
 
 	s.httpServer = &http.Server{
@@ -400,6 +406,20 @@ func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	// #nosec G703 -- cachePath is filepath.Join(cacheDir, hex-sha256(url)); the file name is a fixed-length [0-9a-f] hash with no separators, so it cannot escape cacheDir.
 	http.ServeFile(w, r, cachePath)
+}
+
+// handleStatus reports the most recent install failures, if any, for
+// coordinates on the given registry host - see installer.LastErrors. Called
+// by InitStepRunner directly (not by Terraform), once it gives up waiting on
+// the mirror, so it can surface the real cause instead of a generic error.
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	host, ok := s.allowedRegistry(mux.Vars(r)["host"])
+	if !ok {
+		http.Error(w, "unknown registry host", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"errors": s.installer.LastErrors(host)})
 }
 
 // artifactURL builds the coordinate-addressed, proxy-local URL Terraform should

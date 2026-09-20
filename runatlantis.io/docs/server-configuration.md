@@ -1300,7 +1300,14 @@ Terragrunt's own provider cache server avoids the same problem.
 2. Atlantis reruns `terraform init` against that mirror directory, with a
    short backoff, until it succeeds. A `filesystem_mirror` is read-only from
    Terraform's side, so this second pass never writes to a directory anything
-   else could be writing to concurrently.
+   else could be writing to concurrently. Each retry cycle also re-runs the
+   first pass, so a transient install failure (a network blip fetching the
+   archive, an upstream 5xx) gets retried instead of leaving the mirror
+   permanently empty for that provider. If the retry budget
+   (`--provider-cache-mirror-wait-timeout`) runs out, Atlantis queries the
+   proxy directly for the real cause of the most recent failure and appends
+   it to the error Terraform reports, rather than only logging it
+   server-side.
 
 Defaults to `false`.
 
@@ -1326,6 +1333,21 @@ subdirectory of the data directory.
 This directory also holds the `mirror` subdirectory the proxy installs
 verified providers into - the directory the second `terraform init` pass reads
 from (see `--provider-cache` above).
+
+### `--provider-cache-install-timeout`
+
+```bash
+atlantis server --provider-cache-install-timeout=2m
+# or
+ATLANTIS_PROVIDER_CACHE_INSTALL_TIMEOUT=2m
+```
+
+Go duration string (e.g. `2m`, `30s`) bounding a single provider install
+attempt by the provider cache proxy (download, verify and unpack), so a
+stalled upstream can't block that provider from ever being retried. Should be
+comfortably shorter than `--provider-cache-mirror-wait-timeout` so at least
+one retry can happen after a stalled install is abandoned. Only used when
+`--provider-cache` is set. Defaults to `2m`.
 
 ### `--provider-cache-mirror-wait-timeout`
 
