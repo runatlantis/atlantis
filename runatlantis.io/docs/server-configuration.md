@@ -1278,9 +1278,10 @@ atlantis server --provider-cache
 ATLANTIS_PROVIDER_CACHE=true
 ```
 
-Run a local caching proxy for Terraform providers, and have each `terraform
-init` install providers through it in two passes instead of installing them
-directly. This is not just about avoiding redundant downloads: Terraform's own
+Run a local caching proxy for Terraform providers, and have each
+`terraform init` install providers through it in two passes instead of
+installing them directly. This is not just about avoiding redundant
+downloads: Terraform's own
 provider installer is
 [not safe against concurrent writers sharing a plugin cache directory](https://github.com/hashicorp/terraform/issues/25849),
 so letting every parallel `terraform init` install into a shared directory

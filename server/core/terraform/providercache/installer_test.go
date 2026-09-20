@@ -144,6 +144,18 @@ func TestInstaller_EnsureInstalledDedupesConcurrentCalls(t *testing.T) {
 
 	waitForInstaller(t, in, testCoordinate)
 	Equals(t, int64(1), in.installs.Load())
+
+	// EnsureInstalled's outer isPublished check and singleflight's own
+	// "forget on completion" both make a second call for this coordinate a
+	// no-op once published - but only once that second call actually reaches
+	// its own isPublished re-check. Under heavy scheduler contention, a
+	// straggler among the 15 goroutines above can have read isPublished as
+	// false (correctly, at that moment) before being descheduled, and only
+	// resume - past the point where it would now see the coordinate as
+	// published - after this test would otherwise have already returned and
+	// torn down its t.TempDir()-backed files out from under it. Give any such
+	// straggler a generous window to reach its own safe early-return first.
+	time.Sleep(200 * time.Millisecond)
 }
 
 // Test that a failed install is recorded per coordinate (grouped under its
