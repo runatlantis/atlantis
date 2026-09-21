@@ -91,9 +91,10 @@ jobs:
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
+      uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
       with:
         dockerfile: "Dockerfile"
+        failure-threshold: error
 
     - name: Set up Go
       uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -280,4 +281,3 @@ jobs:
           egress-policy: audit
 
       - run: 'echo "No build required"'
-
