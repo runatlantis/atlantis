@@ -111,7 +111,9 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 			diverged, err := a.hasUndivergedImpact(repoDir, ctx, cmd)
 			if err != nil {
 				ctx.Log.Warn("evaluating undiverged requirement has failed, falling back to full divergence check: %s", err)
-				diverged = a.hasDiverged(repoDir, ctx, cmd, nil)
+				// Here it doesn't matter if diverged check has errored. If `true` is returned,
+				// diverged path will be followed which will ask the user to rebase
+				diverged, _ = a.hasDiverged(repoDir, ctx, cmd, nil)
 			}
 			if diverged {
 				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
@@ -179,7 +181,7 @@ func isAtlantisProjectPlanStatus(statusName, vcsStatusName string) bool {
 
 func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, ctx command.ProjectContext, cmd command.Name) (bool, error) {
 	if a.ProjectImpactResolver == nil {
-		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified), nil
+		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified)
 	}
 
 	var handled bool
@@ -194,12 +196,12 @@ func (a *DefaultCommandRequirementHandler) hasUndivergedImpact(repoDir string, c
 		return false, err
 	}
 	if !handled {
-		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified), nil
+		return a.hasDiverged(repoDir, ctx, cmd, ctx.AutoplanWhenModified)
 	}
 	return impacted, nil
 }
 
-func (a *DefaultCommandRequirementHandler) hasDiverged(repoDir string, ctx command.ProjectContext, cmd command.Name, autoplanWhenModified []string) bool {
+func (a *DefaultCommandRequirementHandler) hasDiverged(repoDir string, ctx command.ProjectContext, cmd command.Name, autoplanWhenModified []string) (bool, error) {
 	if cmd == command.Plan {
 		return a.WorkingDir.HasDivergedFromPullHead(ctx.Log, repoDir, ctx.RepoRelDir, autoplanWhenModified, ctx.Pull)
 	}
