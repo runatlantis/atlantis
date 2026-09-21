@@ -1,0 +1,21 @@
+package.json
+  s_6464c0fe3ad4be::t_53bc0b5a0ebd10 8
+package-lock.json
+  s_6464c0fe3ad4be::t_ad73e5c3e8e382 2,12,404-845,3230-3271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "862f6dc85df1ff1beeae27b33f8fd9b1153d86ac",
+  "prompts": {},
+  "sessions": {
+    "s_6464c0fe3ad4be": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c46e-63b5-7f73-a9b0-28a1ffa73ceb",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
