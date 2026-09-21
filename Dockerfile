@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.26.6-alpine3.24@sha256:3889b425f035be855a72fb4755265311293b6d414521f0a519d819df32222d83
+ARG GOLANG_TAG=1.27.1-alpine3.24@sha256:cf6fca6641884b8433441b2b0652976f975e1d0fdd26d177eaaf8596087f3125
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG TERRAFORM_1_15_VERSION=1.15.9
@@ -62,11 +62,11 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 # renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
 # renovate: datasource=repology depName=debian_13/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u4"
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u5"
 # renovate: datasource=repology depName=debian_13/git versioning=loose
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=repology depName=debian_13/unzip versioning=loose
-ENV DEBIAN_UNZIP_VERSION="6.0-29"
+ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
 # renovate: datasource=repology depName=debian_13/openssh-server versioning=loose
 ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
 # renovate: datasource=repology depName=debian_13/dumb-init versioning=loose
@@ -74,7 +74,7 @@ ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
 # renovate: datasource=repology depName=debian_13/gnupg versioning=loose
 ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
 # renovate: datasource=repology depName=debian_13/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.5.6-1~deb13u2"
+ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u2"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
