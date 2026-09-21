@@ -1,0 +1,19 @@
+.github/workflows/atlantis-image.yml
+  s_6464c0fe3ad4be::t_07feaafc3c40ab 97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c112a923a9efb651b3eb4bd6fa040b723dea2fce",
+  "prompts": {},
+  "sessions": {
+    "s_6464c0fe3ad4be": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c46e-63b5-7f73-a9b0-28a1ffa73ceb",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
