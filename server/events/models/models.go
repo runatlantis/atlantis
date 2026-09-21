@@ -10,6 +10,7 @@ package models
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -498,6 +499,44 @@ type PolicySetStatus struct {
 	Approvals       []PolicySetApproval
 	Hashes          []string
 	PolicyItemRegex string
+}
+
+// UnmarshalJSON provides backward compatibility for PullStatus records
+// persisted to BoltDB before v0.44.0 (#6271), where Approvals was a plain
+// int count rather than []PolicySetApproval. Without this, reading such a
+// record (e.g. on `apply`) fails outright with a JSON type error.
+//
+// Legacy int-shaped records can't be reconstructed with real approver
+// identities (that information was never stored), so they deserialize with
+// zero approvals rather than an invented/anonymous approval - the pull will
+// need a fresh approval after upgrading, same as if it had none before.
+func (pss *PolicySetStatus) UnmarshalJSON(data []byte) error {
+	type alias PolicySetStatus
+	aux := struct {
+		Approvals json.RawMessage
+		*alias
+	}{
+		alias: (*alias)(pss),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Approvals) == 0 {
+		return nil
+	}
+
+	var approvals []PolicySetApproval
+	if err := json.Unmarshal(aux.Approvals, &approvals); err == nil {
+		pss.Approvals = approvals
+		return nil
+	}
+
+	var legacyCount int
+	if err := json.Unmarshal(aux.Approvals, &legacyCount); err != nil {
+		return fmt.Errorf("unmarshaling PolicySetStatus.Approvals: not a []PolicySetApproval or legacy int: %w", err)
+	}
+	pss.Approvals = nil
+	return nil
 }
 
 // GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
