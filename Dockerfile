@@ -40,7 +40,7 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
+# renovate: datasource=apk depName=bash
 ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
@@ -59,21 +59,21 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
-# renovate: datasource=repology depName=debian_13/ca-certificates versioning=loose
+# renovate: datasource=deb depName=ca-certificates
 ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
-# renovate: datasource=repology depName=debian_13/curl versioning=loose
+# renovate: datasource=deb depName=curl
 ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u5"
-# renovate: datasource=repology depName=debian_13/git versioning=loose
+# renovate: datasource=deb depName=git
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
-# renovate: datasource=repology depName=debian_13/unzip versioning=loose
+# renovate: datasource=deb depName=unzip
 ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
-# renovate: datasource=repology depName=debian_13/openssh-server versioning=loose
+# renovate: datasource=deb depName=openssh-server
 ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
-# renovate: datasource=repology depName=debian_13/dumb-init versioning=loose
+# renovate: datasource=deb depName=dumb-init
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
-# renovate: datasource=repology depName=debian_13/gnupg versioning=loose
+# renovate: datasource=deb depName=gnupg
 ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
-# renovate: datasource=repology depName=debian_13/openssl versioning=loose
+# renovate: datasource=deb depName=openssl
 ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u2"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
@@ -207,23 +207,23 @@ COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_24/ca-certificates versioning=loose
+# renovate: datasource=apk depName=ca-certificates
 ENV CA_CERTIFICATES_VERSION="20260909-r0"
-# renovate: datasource=repology depName=alpine_3_24/curl versioning=loose
+# renovate: datasource=apk depName=curl
 ENV CURL_VERSION="8.22.0-r0"
-# renovate: datasource=repology depName=alpine_3_24/git versioning=loose
+# renovate: datasource=apk depName=git
 ENV GIT_VERSION="2.54.0-r0"
-# renovate: datasource=repology depName=alpine_3_24/unzip versioning=loose
+# renovate: datasource=apk depName=unzip
 ENV UNZIP_VERSION="6.0-r16"
-# renovate: datasource=repology depName=alpine_3_24/bash versioning=loose
+# renovate: datasource=apk depName=bash
 ENV BASH_VERSION="5.3.9-r1"
-# renovate: datasource=repology depName=alpine_3_24/openssh versioning=loose
+# renovate: datasource=apk depName=openssh
 ENV OPENSSH_VERSION="10.3_p1-r1"
-# renovate: datasource=repology depName=alpine_3_24/dumb-init versioning=loose
+# renovate: datasource=apk depName=dumb-init
 ENV DUMB_INIT_VERSION="1.2.5-r4"
-# renovate: datasource=repology depName=alpine_3_24/gcompat versioning=loose
+# renovate: datasource=apk depName=gcompat
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_24/coreutils versioning=loose
+# renovate: datasource=apk depName=coreutils-env
 ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
@@ -245,7 +245,7 @@ RUN apk add --no-cache \
 # etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
 # and verify share the same list; post-pass getcap|grep fails the build if
 # capabilities remain under that scope.
-# renovate: datasource=repology depName=alpine_3_24/libcap versioning=loose
+# renovate: datasource=apk depName=libcap
 ENV LIBCAP_VERSION="2.78-r0"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
@@ -314,7 +314,7 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # trees, not the entire image). Post-pass: if getcap still reports any
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
-# renovate: datasource=repology depName=debian_13/libcap2-bin versioning=loose
+# renovate: datasource=deb depName=libcap2-bin
 ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b3"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
