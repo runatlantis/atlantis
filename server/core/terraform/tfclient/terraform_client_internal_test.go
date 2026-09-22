@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	version "github.com/hashicorp/go-version"
+	homedir "github.com/mitchellh/go-homedir"
 	. "github.com/petergtz/pegomock/v4"
 	runtimemodels "github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -112,6 +113,8 @@ func TestWriteProviderCacheCLIConfig_Discovery(t *testing.T) {
 	tmp := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	homedir.Reset()
+	t.Cleanup(homedir.Reset)
 	Ok(t, os.WriteFile(filepath.Join(home, ".terraformrc"), []byte(`credentials "hostname" {
   token = "token"
 }`), 0600))
@@ -154,6 +157,8 @@ host "registry.opentofu.org" {
 func TestWriteProviderCacheCLIConfig_Mirror(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", t.TempDir()) // no ~/.terraformrc in this empty home.
+	homedir.Reset()
+	t.Cleanup(homedir.Reset)
 
 	pc := &ProviderCacheConfig{
 		MirrorBaseURL: "http://127.0.0.1:8080/",
@@ -190,6 +195,8 @@ func TestWriteProviderCacheCLIConfig_PreservesArbitraryExistingContent(t *testin
 	tmp := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	homedir.Reset()
+	t.Cleanup(homedir.Reset)
 	ownConfig := `host "other-registry.example.com" {
   services = {
     "providers.v1" = "https://other-registry.example.com/v1/providers/"
