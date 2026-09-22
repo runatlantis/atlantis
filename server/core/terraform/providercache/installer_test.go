@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -169,6 +171,60 @@ func TestInstaller_RejectsForgedSignature(t *testing.T) {
 	Assert(t, !in.isPublished(testCoordinate), "an unverifiably-signed archive must never be published")
 }
 
+// Test that a signature made validly by a key that has since expired (by
+// wall-clock time, at verification) is still accepted - this is a
+// regression test for a real bug found via local end-to-end testing against
+// the actual registry.terraform.io and HashiCorp's real (long-lived, and at
+// the time of that test, expired-by-this-sandbox's-clock) signing key:
+// go-crypto's CheckDetachedSignature checks key expiry against wall-clock
+// "now" by default, which would permanently break every future install the
+// moment any registry rotates its signing key, even for archives it validly
+// signed while the key was still current. install must instead verify as of
+// the signature's own creation time.
+func TestInstaller_AcceptsSignatureFromSinceExpiredKey(t *testing.T) {
+	// A key that's only valid for 1 second from creation.
+	signer, err := openpgp.NewEntity("Short-Lived Registry Key", "", "test@example.com", &packet.Config{KeyLifetimeSecs: 1})
+	Ok(t, err)
+	var pubKeyArmor bytes.Buffer
+	w, err := armor.Encode(&pubKeyArmor, openpgp.PublicKeyType, nil)
+	Ok(t, err)
+	Ok(t, signer.Serialize(w))
+	Ok(t, w.Close())
+
+	archive := validArchive(t)
+	sum := sha256.Sum256(archive)
+	shasums := []byte(hex.EncodeToString(sum[:]) + "  " + archiveFilename + "\n")
+	var sig bytes.Buffer
+	// Signed while the key is still comfortably valid.
+	Ok(t, openpgp.DetachSign(&sig, signer, bytes.NewReader(shasums), nil))
+
+	meta := map[string]any{
+		"filename":              archiveFilename,
+		"download_url":          "https://upstream.example/archive.zip",
+		"shasums_url":           "https://upstream.example/SHA256SUMS",
+		"shasums_signature_url": "https://upstream.example/SHA256SUMS.sig",
+		"shasum":                hex.EncodeToString(sum[:]),
+		"signing_keys": map[string]any{
+			"gpg_public_keys": []any{
+				map[string]any{"ascii_armor": pubKeyArmor.String()},
+			},
+		},
+	}
+	files := map[string][]byte{
+		"https://upstream.example/archive.zip":    archive,
+		"https://upstream.example/SHA256SUMS":     shasums,
+		"https://upstream.example/SHA256SUMS.sig": sig.Bytes(),
+	}
+	in := newTestInstaller(t, files)
+
+	// Let the key's 1-second lifetime lapse before verifying, so a
+	// wall-clock-based check would see it as expired.
+	time.Sleep(2 * time.Second)
+
+	Ok(t, in.install(context.Background(), testCoordinate, meta))
+	Assert(t, in.isPublished(testCoordinate), "a validly-signed archive must still install after its signing key's lifetime has since elapsed")
+}
+
 func TestInstaller_RejectsMissingSigningKeys(t *testing.T) {
 	meta, files := validMeta(t)
 	meta["signing_keys"] = map[string]any{"gpg_public_keys": []any{}}
@@ -177,6 +233,41 @@ func TestInstaller_RejectsMissingSigningKeys(t *testing.T) {
 	err := in.install(context.Background(), testCoordinate, meta)
 	Assert(t, err != nil, "expected an error when no signing keys are offered")
 	Assert(t, !in.isPublished(testCoordinate), "an unverifiable archive must never be published")
+}
+
+// Test that install refuses a registry-supplied artifact URL that isn't
+// https (or loopback http) - the same SSRF guard handleArtifact applies to
+// the shasums/signature artifact endpoint (allowedArtifactURL) - for all
+// three of the download/shasums/signature URLs, not just the archive one,
+// and never touches fetch for a rejected URL (a compromised or
+// misconfigured registry can't use any of the three fields to make the
+// server issue an arbitrary request, e.g. to a cloud metadata endpoint).
+func TestInstaller_RejectsUnsafeArtifactURLs(t *testing.T) {
+	fields := []string{"download_url", "shasums_url", "shasums_signature_url"}
+	unsafe := []string{
+		"http://169.254.169.254/latest/meta-data/",
+		"http://internal.example.com/secret",
+		"ftp://upstream.example/archive.zip",
+	}
+	for _, field := range fields {
+		for _, badURL := range unsafe {
+			t.Run(field+"="+badURL, func(t *testing.T) {
+				meta, _ := validMeta(t)
+				meta[field] = badURL
+				in := &installer{
+					log:       logging.NewNoopLogger(t),
+					mirrorDir: filepath.Join(t.TempDir(), "mirror"),
+					fetch: func(_ context.Context, rawURL string) (string, error) {
+						t.Fatalf("fetch must never be called for a rejected url, got %s", rawURL)
+						return "", nil
+					},
+				}
+				err := in.install(context.Background(), testCoordinate, meta)
+				Assert(t, err != nil, "expected an unsafe %s to be rejected", field)
+				Assert(t, !in.isPublished(testCoordinate), "must never publish when an artifact url is rejected")
+			})
+		}
+	}
 }
 
 func TestInstaller_EnsureInstalledDedupesConcurrentCalls(t *testing.T) {

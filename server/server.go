@@ -882,8 +882,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFDistribution:          defaultTfDistribution,
 			DefaultTFVersion:               defaultTfVersion,
 			ProviderCache:                  providerCacheConfig,
-			TFEToken:                       userConfig.TFEToken,
-			TFEHostname:                    userConfig.TFEHostname,
 			ProviderCacheMirrorWaitTimeout: providerCacheMirrorWaitTimeout,
 		},
 		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, planStore),

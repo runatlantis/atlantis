@@ -454,6 +454,45 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, repoDir, expectedArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 }
 
+// Test that when the caller (e.g. an atlantis.yaml `env` step) already set
+// TF_CLI_CONFIG_FILE, Run honors that explicit choice instead of silently
+// overwriting it with the provider cache proxy's own generated config -
+// even though that means this one init runs without the provider cache.
+func TestRun_ProviderCache_HonorsExplicitTFCLIConfigFile(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	logger := logging.NewNoopLogger(t)
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	tfVersion, _ := version.NewVersion("1.14.0")
+
+	iso := runtime.InitStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+		ProviderCache: &tfclient.ProviderCacheConfig{
+			MirrorBaseURL: "http://127.0.0.1:8080/",
+			RegistryHosts: []string{"registry.terraform.io"},
+			MirrorDir:     t.TempDir(),
+		},
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("output", nil)
+
+	path := t.TempDir()
+	explicitEnvs := map[string]string{"TF_CLI_CONFIG_FILE": "/custom/path/.terraformrc"}
+	output, err := iso.Run(command.ProjectContext{Workspace: "workspace", RepoRelDir: ".", Log: logger}, nil, path, explicitEnvs)
+	Ok(t, err)
+	Equals(t, "", output)
+
+	// The plain single-shot path ran with envs untouched, not the
+	// provider-cache-rewritten TF_CLI_CONFIG_FILE.
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Eq(explicitEnvs), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
+
+	_, err = os.Stat(filepath.Join(path, ".terraformrc-provider-cache-discovery"))
+	Assert(t, os.IsNotExist(err), "provider cache CLI config should not have been written when TF_CLI_CONFIG_FILE was already explicitly set")
+}
+
 // Test that when phase 1 (discovery, routed through the proxy via a host
 // block) succeeds outright - e.g. nothing needed installing - Run returns
 // immediately without ever running phase 2 against the mirror.

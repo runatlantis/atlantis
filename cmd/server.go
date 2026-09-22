@@ -992,6 +992,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setProviderCacheDir(&userConfig); err != nil {
+		return err
+	}
 	s.setVarFileAllowlist(&userConfig)
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
@@ -1343,6 +1346,35 @@ func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
 // setMarkdownTemplateOverridesDir checks if ~ was used in markdown-template-overrides-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
 // instead of actually using home. It also converts relative paths to absolute.
+// setProviderCacheDir expands a leading "~/" and makes the path absolute,
+// matching setDataDir/setSharePlanDir/setMarkdownTemplateOverridesDir. Left
+// alone when unset: server.NewServer falls back to a subdirectory of the
+// (already-expanded) data dir in that case.
+func (s *ServerCmd) setProviderCacheDir(userConfig *server.UserConfig) error {
+	if userConfig.ProviderCacheDir == "" {
+		return nil
+	}
+
+	finalPath := userConfig.ProviderCacheDir
+
+	// Convert ~ to the actual home dir.
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	// Convert relative paths to absolute.
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making provider-cache-dir absolute: %w", err)
+	}
+	userConfig.ProviderCacheDir = finalPath
+	return nil
+}
+
 func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfig) error {
 	finalPath := userConfig.MarkdownTemplateOverridesDir
 

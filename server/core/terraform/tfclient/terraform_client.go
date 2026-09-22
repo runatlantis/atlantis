@@ -843,13 +843,28 @@ const (
 // This is a per-invocation file, not the shared ~/.terraformrc: unlike TFE
 // credentials, this config must differ between the two phases of a single
 // init and across concurrent init invocations for different projects, which
-// a single global file written once at server startup can't do safely.
-func WriteProviderCacheCLIConfig(dir string, phase ProviderCachePhase, tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) (string, error) {
+// a single global file written once at server startup can't do safely. It
+// carries forward whatever is actually in ~/.terraformrc (TFE credentials
+// written there by generateRCFile, and anything else an operator has of
+// their own - credentials for other registries, their own
+// provider_installation overrides, ...) rather than replacing it outright,
+// so enabling the provider cache proxy doesn't silently break unrelated
+// config that file already held.
+func WriteProviderCacheCLIConfig(dir string, phase ProviderCachePhase, providerCache *ProviderCacheConfig) (string, error) {
 	filename := ".terraformrc-provider-cache-discovery"
-	config := discoveryCLIConfig(tfeToken, tfeHostname, providerCache)
+	block := discoveryCLIConfig(providerCache)
 	if phase == ProviderCacheMirrorPhase {
 		filename = ".terraformrc-provider-cache-mirror"
-		config = mirrorCLIConfig(tfeToken, tfeHostname, providerCache)
+		block = mirrorCLIConfig(providerCache)
+	}
+
+	existing, err := existingCLIConfigContents()
+	if err != nil {
+		return "", err
+	}
+	config := block
+	if existing != "" {
+		config = existing + "\n\n" + block
 	}
 
 	path := filepath.Join(dir, filename)
@@ -857,6 +872,25 @@ func WriteProviderCacheCLIConfig(dir string, phase ProviderCachePhase, tfeToken,
 		return "", fmt.Errorf("writing generated %s file to %s: %w", filename, path, err)
 	}
 	return path, nil
+}
+
+// existingCLIConfigContents returns the contents of the operator's own
+// ~/.terraformrc, if one exists, for WriteProviderCacheCLIConfig to carry
+// forward. Empty, without error, when there is no such file.
+func existingCLIConfigContents() (string, error) {
+	home, err := homedir.Dir()
+	if err != nil {
+		return "", fmt.Errorf("determining home directory: %w", err)
+	}
+	// #nosec G304 -- fixed path under the server's own home directory, not attacker-controlled.
+	contents, err := os.ReadFile(filepath.Join(home, ".terraformrc"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading existing ~/.terraformrc: %w", err)
+	}
+	return string(contents), nil
 }
 
 // generateRCFile generates the Terraform CLI configuration file
@@ -894,14 +928,12 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	return nil
 }
 
-// discoveryCLIConfig builds the phase-1 CLI config: TFE credentials (if any)
-// plus a host block per configured registry, redirecting provider
-// installation for it through the proxy.
-func discoveryCLIConfig(tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) string {
+// discoveryCLIConfig builds the phase-1 CLI config: a host block per
+// configured registry, redirecting provider installation for it through the
+// proxy. TFE credentials, if any, reach the caller via
+// existingCLIConfigContents instead of being regenerated here.
+func discoveryCLIConfig(providerCache *ProviderCacheConfig) string {
 	var blocks []string
-	if tfeToken != "" {
-		blocks = append(blocks, fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken))
-	}
 	if providerCache != nil {
 		for _, host := range providerCache.RegistryHosts {
 			providersV1 := providerCache.MirrorBaseURL + host + "/v1/providers/"
@@ -911,25 +943,22 @@ func discoveryCLIConfig(tfeToken, tfeHostname string, providerCache *ProviderCac
 	return strings.Join(blocks, "\n\n")
 }
 
-// mirrorCLIConfig builds the phase-2 CLI config: TFE credentials (if any)
-// plus a provider_installation block that has Terraform install the
-// configured registries only from the proxy's filesystem mirror - which only
-// the proxy ever writes to - falling back to normal direct installation for
-// every other registry.
-func mirrorCLIConfig(tfeToken, tfeHostname string, providerCache *ProviderCacheConfig) string {
-	var blocks []string
-	if tfeToken != "" {
-		blocks = append(blocks, fmt.Sprintf(credentialsBlock, tfeHostname, tfeToken))
+// mirrorCLIConfig builds the phase-2 CLI config: a provider_installation
+// block that has Terraform install the configured registries only from the
+// proxy's filesystem mirror - which only the proxy ever writes to - falling
+// back to normal direct installation for every other registry. TFE
+// credentials, if any, reach the caller via existingCLIConfigContents
+// instead of being regenerated here.
+func mirrorCLIConfig(providerCache *ProviderCacheConfig) string {
+	if providerCache == nil {
+		return ""
 	}
-	if providerCache != nil {
-		patterns := make([]string, len(providerCache.RegistryHosts))
-		for i, host := range providerCache.RegistryHosts {
-			patterns[i] = fmt.Sprintf("%q", host+"/*/*")
-		}
-		included := strings.Join(patterns, ", ")
-		blocks = append(blocks, fmt.Sprintf(providerInstallationBlock, providerCache.MirrorDir, included, included))
+	patterns := make([]string, len(providerCache.RegistryHosts))
+	for i, host := range providerCache.RegistryHosts {
+		patterns[i] = fmt.Sprintf("%q", host+"/*/*")
 	}
-	return strings.Join(blocks, "\n\n")
+	included := strings.Join(patterns, ", ")
+	return fmt.Sprintf(providerInstallationBlock, providerCache.MirrorDir, included, included)
 }
 
 func isAsyncEligibleCommand(cmd string) bool {

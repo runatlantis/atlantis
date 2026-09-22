@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/runatlantis/atlantis/server/logging"
@@ -187,6 +189,18 @@ func (in *installer) install(ctx context.Context, c Coordinate, meta map[string]
 	if archiveURL == "" || shasumsURL == "" || sigURL == "" || filename == "" || expectedSum == "" {
 		return errors.New("registry metadata is missing required fields")
 	}
+	// The registry is operator-trusted (allowedRegistry), but the URLs it
+	// hands back for these three files are not otherwise constrained - the
+	// same SSRF guard handleArtifact applies to the shasums/signature
+	// artifact endpoint (allowedArtifactURL) has to apply here too, since
+	// this is the only validation the archive ever gets before install
+	// fetches it.
+	for _, u := range []string{archiveURL, shasumsURL, sigURL} {
+		parsed, perr := url.Parse(u)
+		if perr != nil || !allowedArtifactURL(parsed) {
+			return fmt.Errorf("registry returned an unusable artifact url")
+		}
+	}
 
 	keyring, err := signingKeyRing(meta)
 	if err != nil {
@@ -223,7 +237,18 @@ func (in *installer) install(ctx context.Context, c Coordinate, meta map[string]
 	if err != nil {
 		return fmt.Errorf("reading cached SHA256SUMS signature: %w", err)
 	}
-	if _, err := openpgp.CheckDetachedSignature(keyring, bytes.NewReader(shasums), bytes.NewReader(sig), nil); err != nil {
+	// Verify as of the signature's own creation time, not wall-clock now: a
+	// signing key HashiCorp has since rotated out (its self-signature's
+	// expiry has passed) does not retroactively invalidate an archive it
+	// validly signed while still current - matching how `gpg --verify`
+	// treats an expired key on an old signature (a warning, not a hard
+	// failure), and avoiding every existing provider install permanently
+	// breaking the moment a key rotates.
+	verifyTime, err := signatureCreationTime(sig)
+	if err != nil {
+		return fmt.Errorf("reading SHA256SUMS signature: %w", err)
+	}
+	if _, err := openpgp.CheckDetachedSignature(keyring, bytes.NewReader(shasums), bytes.NewReader(sig), &packet.Config{Time: func() time.Time { return verifyTime }}); err != nil {
 		return fmt.Errorf("verifying SHA256SUMS signature: %w", err)
 	}
 
@@ -246,6 +271,24 @@ func (in *installer) install(ctx context.Context, c Coordinate, meta map[string]
 	}
 
 	return in.publish(c, archiveBytes)
+}
+
+// signatureCreationTime reads the timestamp the (binary, non-armored)
+// detached signature itself was created at, without verifying it - used to
+// verify the signature as of that time rather than wall-clock now.
+func signatureCreationTime(sig []byte) (time.Time, error) {
+	pkt, err := packet.Read(bytes.NewReader(sig))
+	if err != nil {
+		return time.Time{}, err
+	}
+	s, ok := pkt.(*packet.Signature)
+	if !ok {
+		return time.Time{}, fmt.Errorf("expected a signature packet, got %T", pkt)
+	}
+	if s.CreationTime.IsZero() {
+		return time.Time{}, errors.New("signature packet has no creation time")
+	}
+	return s.CreationTime, nil
 }
 
 // signingKeyRing collects every GPG public key the registry offered for this

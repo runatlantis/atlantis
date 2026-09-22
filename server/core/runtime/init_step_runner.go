@@ -47,10 +47,6 @@ type InitStepRunner struct {
 	// two-phase discovery/mirror protocol instead of running `terraform
 	// init` once - see runWithProviderCache.
 	ProviderCache *tfclient.ProviderCacheConfig
-	// TFEToken/TFEHostname are threaded through to the per-invocation CLI
-	// config files runWithProviderCache writes, so Terraform Cloud/
-	// Enterprise auth keeps working alongside the provider cache proxy.
-	TFEToken, TFEHostname string
 	// ProviderCacheMirrorWaitTimeout bounds how long the phase-2 retry loop
 	// waits for the proxy to finish installing into the mirror before
 	// giving up and surfacing the last error. Defaults to
@@ -113,8 +109,15 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
+	// If the project's own config (e.g. an `env` step) already set
+	// TF_CLI_CONFIG_FILE, that's an explicit, more specific choice than the
+	// provider cache proxy's own generated config - honor it rather than
+	// silently overwriting it, even though that means this one init runs
+	// without the provider cache.
+	_, explicitCLIConfig := envs["TF_CLI_CONFIG_FILE"]
+
 	var out string
-	if i.ProviderCache != nil {
+	if i.ProviderCache != nil && !explicitCLIConfig {
 		out, err = i.runWithProviderCache(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	} else {
 		out, err = i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
@@ -142,7 +145,7 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 //     install failure gets retried rather than leaving the mirror
 //     permanently empty for that provider.
 func (i *InitStepRunner) runWithProviderCache(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
-	discoveryFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheDiscoveryPhase, i.TFEToken, i.TFEHostname, i.ProviderCache)
+	discoveryFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheDiscoveryPhase, i.ProviderCache)
 	if err != nil {
 		return "", fmt.Errorf("writing provider cache discovery CLI config: %w", err)
 	}
@@ -164,7 +167,7 @@ func (i *InitStepRunner) runWithProviderCache(ctx command.ProjectContext, path s
 
 	// Only written once actually needed - phase 1 alone covers the common
 	// case where everything's already warm or nothing needs installing.
-	mirrorFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheMirrorPhase, i.TFEToken, i.TFEHostname, i.ProviderCache)
+	mirrorFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheMirrorPhase, i.ProviderCache)
 	if err != nil {
 		return "", fmt.Errorf("writing provider cache mirror CLI config: %w", err)
 	}

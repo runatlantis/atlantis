@@ -104,17 +104,24 @@ func TestGenerateRCFile_ErrIfCannotWrite(t *testing.T) {
 }
 
 // Test that WriteProviderCacheCLIConfig's discovery phase writes a host block
-// per registry, alongside the credentials block, to its own file distinct
-// from the global ~/.terraformrc.
+// per registry to its own file, distinct from the global ~/.terraformrc, and
+// carries forward whatever that file already holds (TFE credentials written
+// there by generateRCFile, or anything else an operator has of their own)
+// rather than dropping it.
 func TestWriteProviderCacheCLIConfig_Discovery(t *testing.T) {
 	tmp := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	Ok(t, os.WriteFile(filepath.Join(home, ".terraformrc"), []byte(`credentials "hostname" {
+  token = "token"
+}`), 0600))
 
 	pc := &ProviderCacheConfig{
 		MirrorBaseURL: "http://127.0.0.1:8080/",
 		RegistryHosts: []string{"registry.terraform.io", "registry.opentofu.org"},
 		MirrorDir:     filepath.Join(tmp, "mirror"),
 	}
-	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheDiscoveryPhase, "token", "hostname", pc)
+	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheDiscoveryPhase, pc)
 	Ok(t, err)
 	Equals(t, filepath.Join(tmp, ".terraformrc-provider-cache-discovery"), path)
 
@@ -140,26 +147,24 @@ host "registry.opentofu.org" {
 
 // Test that WriteProviderCacheCLIConfig's mirror phase writes a
 // provider_installation block pointing at the mirror directory, to a
-// different file than the discovery phase, and overwrites a stale copy of
-// itself without erroring (unlike the global ~/.terraformrc, which refuses
-// to be overwritten).
+// different file than the discovery phase, overwrites a stale copy of itself
+// without erroring (unlike the global ~/.terraformrc, which refuses to be
+// overwritten), and - with no ~/.terraformrc present at all - writes only
+// its own block, no empty leading credentials section.
 func TestWriteProviderCacheCLIConfig_Mirror(t *testing.T) {
 	tmp := t.TempDir()
+	t.Setenv("HOME", t.TempDir()) // no ~/.terraformrc in this empty home.
 
 	pc := &ProviderCacheConfig{
 		MirrorBaseURL: "http://127.0.0.1:8080/",
 		RegistryHosts: []string{"registry.terraform.io"},
 		MirrorDir:     filepath.Join(tmp, "mirror"),
 	}
-	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, "token", "hostname", pc)
+	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, pc)
 	Ok(t, err)
 	Equals(t, filepath.Join(tmp, ".terraformrc-provider-cache-mirror"), path)
 
-	expContents := fmt.Sprintf(`credentials "hostname" {
-  token = "token"
-}
-
-provider_installation {
+	expContents := fmt.Sprintf(`provider_installation {
   filesystem_mirror {
     path    = %q
     include = ["registry.terraform.io/*/*"]
@@ -173,8 +178,37 @@ provider_installation {
 	Equals(t, expContents, string(actContents))
 
 	// Writing it again (as a retry would) overwrites cleanly.
-	_, err = WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, "token", "hostname", pc)
+	_, err = WriteProviderCacheCLIConfig(tmp, ProviderCacheMirrorPhase, pc)
 	Ok(t, err)
+}
+
+// Test that arbitrary pre-existing ~/.terraformrc content an operator wrote
+// themselves (not just TFE credentials generateRCFile would write) survives
+// - enabling the provider cache proxy must not silently drop config for an
+// unrelated registry or override.
+func TestWriteProviderCacheCLIConfig_PreservesArbitraryExistingContent(t *testing.T) {
+	tmp := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ownConfig := `host "other-registry.example.com" {
+  services = {
+    "providers.v1" = "https://other-registry.example.com/v1/providers/"
+  }
+}`
+	Ok(t, os.WriteFile(filepath.Join(home, ".terraformrc"), []byte(ownConfig), 0600))
+
+	pc := &ProviderCacheConfig{
+		MirrorBaseURL: "http://127.0.0.1:8080/",
+		RegistryHosts: []string{"registry.terraform.io"},
+		MirrorDir:     filepath.Join(tmp, "mirror"),
+	}
+	path, err := WriteProviderCacheCLIConfig(tmp, ProviderCacheDiscoveryPhase, pc)
+	Ok(t, err)
+
+	actContents, err := os.ReadFile(path)
+	Ok(t, err)
+	Assert(t, strings.Contains(string(actContents), ownConfig), "expected the operator's own existing ~/.terraformrc content to be preserved, got %q", actContents)
+	Assert(t, strings.Contains(string(actContents), `host "registry.terraform.io"`), "expected the provider cache host block too, got %q", actContents)
 }
 
 // Test that it executes with the expected env vars.
