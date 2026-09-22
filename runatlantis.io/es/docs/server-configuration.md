@@ -1095,9 +1095,9 @@ atlantis server --include-git-untracked-files
 ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 ```
 
-Incluir archivos untracked de git en la lista de archivos modificados de Atlantis.
-Se usa por ejemplo con hooks pre-workflow de [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) que
-generan dinámicamente archivos Terraform.
+Incluir archivos git no rastreados en la lista de archivos modificados de Atlantis.
+Se usa, por ejemplo, con hooks pre-workflow de [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) que
+generan dinámicamente archivos de Terraform.
 
 ### `--language` <Badge text="v0.45.0+" type="info"/>
 
