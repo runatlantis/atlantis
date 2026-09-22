@@ -13,6 +13,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -410,8 +411,26 @@ func (c *Client) DiscardReviews(_ logging.SimpleLogging, repo models.Repo, pull 
 func (c *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	logger.Debug("Merging Gitea pull request %d", pull.Num)
 
+	// Translate the normalised merge method onto a Gitea merge style. An empty
+	// method keeps the historic default of a merge commit.
+	var style gitea.MergeStyle
+	switch pullOptions.MergeMethod {
+	case "", models.MergeMethodMerge:
+		style = gitea.MergeStyleMerge
+	case models.MergeMethodRebase:
+		style = gitea.MergeStyleRebase
+	case models.MergeMethodSquash:
+		style = gitea.MergeStyleSquash
+	case models.MergeMethodFastForward:
+		// Gitea's SDK predates this style, so the literal is used directly.
+		style = gitea.MergeStyle("fast-forward-only")
+	default:
+		return fmt.Errorf("merge method %q is not supported for Gitea, supported methods are: %s",
+			pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.Gitea)))
+	}
+
 	mergeOptions := gitea.MergePullRequestOption{
-		Style:                  gitea.MergeStyleMerge,
+		Style:                  style,
 		Title:                  "Atlantis merge",
 		Message:                "Automatic merge by Atlantis",
 		DeleteBranchAfterMerge: pullOptions.DeleteSourceBranchOnMerge,
