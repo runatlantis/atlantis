@@ -597,6 +597,22 @@ Each VCS provider supports a different list of emojis:
 
    :::
 
+### `--enable-autoplan-label` <Badge text="v0.48.0+" type="info"/>
+
+```bash
+atlantis server --enable-autoplan-label="atlantis-autoplan"
+# or
+ATLANTIS_ENABLE_AUTOPLAN_LABEL="atlantis-autoplan"
+```
+
+Enable atlantis auto planning only on pull requests with the specified label, when auto planning is otherwise
+disabled globally via `disable-autoplan`.
+
+If `disable-autoplan` property is not `true`, this flag has no effect (a warning is logged on startup in this case).
+
+This label does not override per-project `autoplan.enabled: false` settings in `atlantis.yaml`: projects that have
+autoplanning disabled in `atlantis.yaml` are still not planned, even when the label is present.
+
 ### `--enable-diff-markdown-format` <Badge text="v0.25.0+" type="info"/>
 
 ```bash
