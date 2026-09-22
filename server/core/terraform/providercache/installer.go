@@ -349,26 +349,49 @@ func unzip(data []byte, destDir string) error {
 	if err != nil {
 		return err
 	}
+	// cleanDest anchors every entry's resolved path check below. Cleaning it
+	// once, up front, is what lets a simple prefix comparison be a complete
+	// containment check for every entry (this is the standard Go zip-slip
+	// remediation: join into the destination, then require the result to
+	// still be prefixed by the cleaned destination).
+	cleanDest := filepath.Clean(destDir)
 	for _, f := range zr.File {
-		name := filepath.Clean(f.Name)
-		if name == "." || filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+		// Reject any ".." path segment outright before it ever reaches a
+		// filesystem call, in addition to the fuller containment check
+		// below (which alone correctly handles every case this does, but
+		// this is the simplest possible barrier against the archetypal
+		// zip-slip payload).
+		if strings.Contains(f.Name, "..") {
 			return fmt.Errorf("archive entry %q has an unsafe path", f.Name)
 		}
-		target := filepath.Join(destDir, name)
-		if target != destDir && !strings.HasPrefix(target, destDir+string(filepath.Separator)) {
-			return fmt.Errorf("archive entry %q escapes the destination directory", f.Name)
+		// #nosec G305 G703 -- target is validated to stay under cleanDest immediately below, before any use.
+		target := filepath.Join(cleanDest, f.Name)
+		if target != cleanDest && !strings.HasPrefix(target, cleanDest+string(filepath.Separator)) {
+			return fmt.Errorf("archive entry %q has an unsafe path", f.Name)
 		}
-		if f.FileInfo().IsDir() {
+		mode := f.Mode()
+		switch {
+		case mode&os.ModeSymlink != 0:
+			// Provider archives are plain files; refuse anything that isn't,
+			// rather than silently writing a symlink's target path as if it
+			// were file content.
+			return fmt.Errorf("archive entry %q is a symlink, which is not supported", f.Name)
+		case f.FileInfo().IsDir():
+			// #nosec G703 -- target is validated to stay under cleanDest above.
+			// codeql[go/zipslip]
 			if err := os.MkdirAll(target, 0o700); err != nil {
 				return err
 			}
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			return err
-		}
-		if err := extractFile(f, target); err != nil {
-			return err
+		default:
+			// filepath.Dir(target) stays under cleanDest whenever target itself does, per the containment check above.
+			// #nosec G703 -- see above.
+			// codeql[go/zipslip]
+			if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+				return err
+			}
+			if err := extractFile(f, target); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -388,6 +411,7 @@ func extractFile(f *zip.File, target string) error {
 		mode = 0o600
 	}
 	// #nosec G304 G703 -- target is validated to stay under destDir by unzip above.
+	// codeql[go/zipslip]
 	out, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err

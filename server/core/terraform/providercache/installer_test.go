@@ -4,6 +4,7 @@
 package providercache
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -85,6 +86,58 @@ func TestInstaller_PublishesVerifiedProvider(t *testing.T) {
 	installed, err := os.ReadFile(filepath.Join(testCoordinate.mirrorPath(in.mirrorDir), providerBinaryName))
 	Ok(t, err)
 	Equals(t, "#!/bin/sh\necho fake provider\n", string(installed))
+}
+
+// Test that unzip refuses every entry whose path would resolve outside the
+// destination directory ("zip slip"), across a range of payload shapes, and
+// that destDir is left empty in each case - nothing gets written before the
+// unsafe entry is rejected.
+func TestUnzip_RejectsPathTraversal(t *testing.T) {
+	malicious := []string{
+		"../outside.txt",
+		"../../../../etc/passwd",
+		"a/../../outside.txt",
+		"..",
+		"a/b/../../../outside.txt",
+	}
+	for _, name := range malicious {
+		t.Run(name, func(t *testing.T) {
+			var buf bytes.Buffer
+			zw := zip.NewWriter(&buf)
+			w, err := zw.Create(name)
+			Ok(t, err)
+			_, err = w.Write([]byte("pwned"))
+			Ok(t, err)
+			Ok(t, zw.Close())
+
+			destDir := t.TempDir()
+			err = unzip(buf.Bytes(), destDir)
+			Assert(t, err != nil, "expected entry %q to be rejected", name)
+
+			entries, err := os.ReadDir(destDir)
+			Ok(t, err)
+			Equals(t, 0, len(entries))
+		})
+	}
+}
+
+// Test that a symlink entry is refused outright, rather than having its
+// target path written as if it were the symlink's file content (which could
+// otherwise be used to stage a later entry writing through it).
+func TestUnzip_RejectsSymlinkEntry(t *testing.T) {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	hdr := &zip.FileHeader{Name: "link"}
+	hdr.SetMode(os.ModeSymlink | 0o777)
+	w, err := zw.CreateHeader(hdr)
+	Ok(t, err)
+	_, err = w.Write([]byte("/etc"))
+	Ok(t, err)
+	Ok(t, zw.Close())
+
+	destDir := t.TempDir()
+	err = unzip(buf.Bytes(), destDir)
+	Assert(t, err != nil, "expected the symlink entry to be rejected")
 }
 
 func TestInstaller_RejectsChecksumMismatch(t *testing.T) {
