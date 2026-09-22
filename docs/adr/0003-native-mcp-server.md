@@ -70,8 +70,12 @@ Relevant HTTP surface today (`server/server.go` on current `main`, post-#6360):
 | `GET /api/drift/remediate` | `APIController.ListRemediationResults` | JSON | `RequireAuth` |
 | `GET /api/drift/remediate/{id}` | `APIController.GetRemediationResult` | JSON | `RequireAuth` |
 | `DELETE /locks?id=` | `LocksController.DeleteLock` | text | None (optional web basic-auth only) |
+| `POST /apply/lock` | `LocksController.LockApply` | text | None (optional web basic-auth only) |
+| `DELETE /apply/unlock` | `LocksController.UnlockApply` | text | None (optional web basic-auth only) |
 | `GET /jobs/{job-id}` | `JobsController.GetProjectJobs` | **HTML** | Optional web basic-auth |
 | `GET /jobs/{job-id}/ws` | `JobsController.GetProjectJobsWS` | WebSocket | Optional web basic-auth |
+
+The global apply-lock routes are registered unless `--disable-global-apply-lock` is set. Setting `--api-secret` does not protect these UI routes; without web basic-auth or an ingress restriction, callers with network access can create or remove the global apply lock.
 
 Process and middleware facts:
 
@@ -83,7 +87,7 @@ Process and middleware facts:
   * `apiPlan` / `apiApply` return `(*command.Result, error)`.
   * `apiSetup` returns `error` only.
   * `apiParseAndValidate` returns `(*APIRequest, *command.Context, int /* HTTP status */, error)` — the status code is HTTP-layer coupling that **must be translated to domain errors** during service extraction (D3).
-* PR [#6360](https://github.com/runatlantis/atlantis/pull/6360) added `APIMiddleware.RequireAuth` in `server/controllers/api_response.go`: empty `--api-secret` → “API is disabled”; otherwise `crypto/subtle.ConstantTimeCompare` on `X-Atlantis-Token`. Drift endpoints use it; plan/apply validation also uses constant-time compare. **MCP and locks hardening must reuse this middleware** (optionally extended for `Authorization: Bearer`), not reimplement secret checks.
+* PR [#6360](https://github.com/runatlantis/atlantis/pull/6360) added `APIMiddleware.RequireAuth` in `server/controllers/api_response.go`: empty `--api-secret` → “API is disabled”; otherwise `crypto/subtle.ConstantTimeCompare` on `X-Atlantis-Token`. Drift endpoints use it; plan/apply validation also uses constant-time compare. **MCP and locks hardening must reuse this middleware**, with the shared Bearer extension specified in D4, not reimplement secret checks.
 * Typed lock response types already exist: `ListLocksResultAPI` / `LockDetailAPI` in `api_types.go`. `ListLocksResult` / `LockDetail` are **deprecated**. The live `ListLocks` handler still emits the legacy shape — MCP/service work should target the non-deprecated API types.
 * `CommandRunner` (webhook/comment path) uses `Drainer.StartOp()` / `OpDone()`. **`APIController` does not.**
 * `--allow-commands` is enforced by `CommentParser` for PR comments. **The HTTP API path does not consult it.**
@@ -133,9 +137,9 @@ MCP endpoints register on the **existing** Gorilla Mux router and `http.Server` 
 
 Rationale:
 
-* Matches all existing server lifecycle code in `Server.Start()`.
-* Shutdown, TLS, and request logging stay unified.
-* Aligns with how other streaming surfaces (for example job WebSockets) already share the main port.
+* Retains the existing listener and server construction in `Server.Start()`.
+* TLS, request logging, and shutdown coordination stay shared; MCP transport shutdown is explicitly integrated into that coordinator (D9).
+* Job WebSockets provide a precedent for sharing the port, but not for automatic stream shutdown. Go excludes hijacked WebSockets from `http.Server.Shutdown` tracking; an active SSE response remains an HTTP request that must finish before shutdown can complete.
 * Port isolation, if an operator wants it, is an **ingress / NetworkPolicy** concern, not an in-process dual-listener requirement.
 
 **Route prefix:** Use paths under `/api/mcp/...` (not bare `/mcp/...`) so that:
@@ -173,10 +177,10 @@ Extraction rules:
 2. Controllers become thin adapters: parse HTTP → call service → write status/body. Prefer existing `APIResponder` / typed API helpers from #6360 where they fit.
 3. Services return typed values and **domain errors**; they do not write to `http.ResponseWriter` and must not return raw HTTP status codes.
 4. `APIController` private helpers (`apiPlan`, `apiApply`, `apiSetup`, `apiParseAndValidate`) are the natural extraction starting point, with explicit translation work:
-   * Map validation/auth/allowlist failures from `apiParseAndValidate`’s `(…, int status, error)` pattern to typed domain errors (e.g. unauthorized, disabled, bad request, forbidden).
+   * Map request-validation and allowlist failures from `apiParseAndValidate`’s `(…, int status, error)` pattern to typed domain errors (e.g. invalid request, forbidden). Authentication and disabled-API responses move to the HTTP middleware (rule 6).
    * Keep `apiSetup`’s clone/lock steps as service methods that return `error` only.
 5. Align with post-#6360 typed responses: list locks should use **`ListLocksResultAPI` / `LockDetailAPI`** (not the deprecated `ListLocksResult`). Drift/remediation can remain in their existing controller/service shapes for MVP; MCP need not expose drift tools initially, but extraction must not regress drift’s auth/response patterns.
-6. Reuse **`APIMiddleware.RequireAuth`** at the HTTP edge for `/api/*` (and MCP under `/api/mcp`); do not duplicate secret comparison in each handler.
+6. Reuse **`APIMiddleware.RequireAuth`** at the HTTP edge for `/api/*` (and MCP under `/api/mcp`). As part of extraction, move plan/apply authentication out of `apiParseAndValidate` into this middleware and remove its independent `X-Atlantis-Token` check. Preserve disabled-API and invalid-token rejection; do not retain a second header-only check that would reject authenticated Bearer requests.
 
 Example shapes (illustrative):
 
@@ -202,14 +206,18 @@ func (s *JobService) GetStatus(ctx context.Context, jobID string) (*JobStatus, e
 1. **Do not add `--mcp-token`.**
 2. MCP authenticates with the existing `--api-secret` value.
 3. **Reuse `APIMiddleware.RequireAuth`** (`server/controllers/api_response.go`, added in #6360) for:
+   * Plan/apply HTTP endpoints as part of D3 extraction, alongside the drift endpoints that already use it,
    * MCP HTTP endpoints under `/api/mcp`, and
    * Hardening `GET /api/locks` (D4.8).
 
    Do **not** reimplement secret comparison in MCP or list-locks handlers. Plan/apply and drift already use constant-time comparison; #6360 fixed the historical plain-string compare path. This ADR does **not** propose re-adding constant-time compare as new work — it is already on `main`.
 
-4. Accept both (extend `RequireAuth` or a thin wrapper once if needed):
+4. Extend the shared middleware once to accept both header forms consistently on plan/apply, drift, hardened list-locks, the new jobs endpoint, and MCP:
    * `X-Atlantis-Token: <secret>` (existing API / `RequireAuth` convention), and
    * `Authorization: Bearer <secret>` (common for MCP / HTTP clients).
+
+   Centralizing plan/apply authentication in PR 1a is a prerequisite; extending `RequireAuth` alone does not reach their current validation path. Bearer support lands in PR 2 for all of these routes together, with the existing header still supported.
+
 5. **Bearer vs Basic:** `Authorization: Bearer` is only for the API/MCP token. It is not confused with `--web-basic-auth`, which uses the HTTP Basic scheme and is already **skipped** for all `/api/*` paths in `server/middleware.go`. MCP under `/api/mcp` therefore never requires web Basic credentials.
 6. Startup validation:
 
@@ -234,7 +242,7 @@ func (s *JobService) GetStatus(ctx context.Context, jobID string) (*JobStatus, e
    * Prefer migrating the response body to **`ListLocksResultAPI`** in the same series so MCP and HTTP share the non-deprecated schema.
    * Label the auth change as **breaking** in the PR description, changelog/release notes, and `runatlantis.io/docs/api-endpoints.md`.
    * Prefer landing auth hardening in a **dedicated commit or PR** adjacent to service extraction (see D10), not as an unmarked side effect of a “refactor only” PR.
-   * Optionally harden `DELETE /locks` in the same security-focused change for consistency (also currently unauthenticated beyond optional web basic-auth).
+   * Include `DELETE /locks`, `POST /apply/lock`, and `DELETE /apply/unlock` in the security review. These UI routes currently rely on optional web basic-auth. Any hardening must specify how browser callers authenticate and document the migration; simply adding `RequireAuth` would break UI requests, which do not send an API token. Do not expose the API secret to browser JavaScript to make those requests work. UI-route hardening may land in the same series with an explicit compatible auth design, or in a separate security change; it is not an implicit consequence of securing `/api/locks`.
 
    Migration for existing scrapers:
 
@@ -252,6 +260,8 @@ func (s *JobService) GetStatus(ctx context.Context, jobID string) (*JobStatus, e
 
 * When `--mcp-read-only=true` (default), write tools are **not registered** with the MCP server. They do not appear in tool discovery. This is preferred over “register but always reject” because undiscoverable tools reduce prompt-injection / mistaken tool-selection surface.
 * When `--mcp-read-only=false`, write tools are registered only if implemented (PR 3+).
+
+**Credential scope:** `--mcp-read-only` controls the MCP tool registry, not the authority of `--api-secret`. The same secret already authorizes HTTP plan/apply even when MCP write tools are absent. Treat MCP clients as holding that authority unless network controls limit them to `/api/mcp` and deny access to other API/UI write routes and the direct backend. Reusing the secret does not provide a read-only credential; scoped credentials are outside this MVP.
 
 **PR 2 interim behavior (write tools do not exist yet):**
 
@@ -303,9 +313,11 @@ MCP config must be stored on `Server` (or the MCP handler constructed in `NewSer
 |-------|---------|------------------------|
 | `running` | Job not finished | Poll again |
 | `succeeded` | Completed without error or project failure | Done |
-| `failed` | Command ran; Terraform/policy/project **failure** (aligns with `ProjectResult.Failure` / failed plan-apply outcome) | Investigate plan/state; blind retry may not help |
-| `error` | Atlantis-side or infrastructure **error** (clone failed, internal error, timeout — aligns with `ProjectResult.Error`) | Retry may help after infra recovery |
+| `failed` | Completed with a nonempty `ProjectResult.Failure` and no `ProjectResult.Error`; includes rejection before execution, such as lock contention or unmet requirements | Inspect the failure reason before deciding whether to retry |
+| `error` | Completed with a non-nil `ProjectResult.Error`; includes Terraform/configuration/provider errors as well as Atlantis/infrastructure errors | Inspect the error before deciding whether to retry |
 | `unknown` | Completion and/or outcome not recorded yet | Treat as incomplete bookkeeping; do not assume success |
+
+If both `Error` and `Failure` are present, `error` takes precedence. Neither status alone establishes retryability or whether Terraform started running. Finer categories require explicit error classification; do not infer them from the result field name or log text.
 
 **Target JSON schema for `GET /api/jobs/{job-id}` / `atlantis_get_job_status`** (field names may use Go/JSON conventions finalized in PR 1; semantics are normative):
 
@@ -362,7 +374,7 @@ Plan/apply tool inputs mirror `APIRequest`:
 | `repository` | yes | Repository identity understood by VCS client |
 | `ref` | yes | Git ref |
 | `type` | yes | VCS host type (`Github`, `Gitlab`, …) |
-| `pr` | no | Pull request number |
+| `pr` | no | Positive pull request number; omitted or non-positive values select non-PR API semantics and skip PR approval/mergeability requirements (D7) |
 | `projects` | no* | Project names |
 | `paths` | no* | `{directory, workspace}` pairs |
 
@@ -391,14 +403,18 @@ Plan/apply tool inputs mirror `APIRequest`:
 
 Today `APIController` plan/apply do **not** call `Drainer.StartOp()` / `OpDone()`. Folding Drainer into `APIService` means existing `POST /api/plan` and `POST /api/apply` clients will:
 
-* Be refused (or fail fast) when Atlantis is shutting down, and
-* Increment `/status` `in_progress_operations` while running.
+* Be refused (or fail fast) when Atlantis is shutting down,
+* Increment `/status` `in_progress_operations` while running, and
+* Hold shutdown open until admitted operations finish. `Drainer.ShutdownBlocking()` has no timeout; the existing five-second HTTP shutdown timeout begins only after draining and does not bound it.
+
+This extends the existing comment-command drain policy to API operations. An operation whose remaining runtime exceeds the deployment's termination grace period can still be killed by the supervisor; a hung operation can block draining indefinitely. The current API's lack of Drainer tracking does not protect it from interruption: it can instead be cut off during HTTP shutdown.
 
 That is a **behavior change for the current HTTP API**, not only an MCP concern. This ADR decides:
 
 1. **Implement Drainer in `APIService` in PR 1** (service extraction), so HTTP and future MCP share correct shutdown semantics and accurate status counts.
-2. Call it out in the PR description and **changelog/release notes** as an intentional API behavior change during graceful shutdown.
+2. Call it out in the PR description and **changelog/release notes**, including the unbounded drain wait and deployment termination-grace implications.
 3. Refuse new write operations (HTTP and MCP) when `Drainer` reports shutting down.
+4. Preserve the existing wait-for-completion policy for admitted operations. Document that operators must budget termination grace for expected plan/apply duration; it cannot guarantee completion of a hung operation. A bounded drain or forced Terraform cancellation requires a separate, explicit policy decision. MCP transport shutdown must not implicitly cancel admitted work (D9).
 
 If maintainers insist PR 1 be behavior-preserving for HTTP, Drainer may move to PR 3 — but then PR 1 must **not** claim shutdown safety, and PR 3 must restate the HTTP impact. Default plan: **PR 1**.
 
@@ -406,7 +422,7 @@ If maintainers insist PR 1 be behavior-preserving for HTTP, Drainer may move to 
 
 | Concern | Requirement |
 |---------|-------------|
-| Graceful shutdown | Use Drainer-wrapped service methods (see above). |
+| Graceful shutdown | Use Drainer-wrapped service methods; preserve admitted work independently of MCP connection lifetime and quiesce handlers before closing shared dependencies (D9). |
 | Git / workspace fencing | Use the same `WorkingDirLocker` and `Locker` paths as `APIController` today. |
 | Read-only mode | `--mcp-read-only=true` (default) → write tools **not registered**. |
 | Unlock completeness | Unlock must not call raw `Locker.Unlock` alone; use `DeleteLockCommand` plus controller side effects (status + PR comment). With `--enable-external-stores`, `DeleteLockCommand` also deletes the external plan-store object (#6312) — `LockService` must preserve that wiring. |
@@ -426,8 +442,10 @@ Today, **comment path** and **API path** enforce different policy stacks:
 | Global apply lock (`ApplyLocker.CheckApplyLock` / `IsLocked` in `ApplyCommandRunner`) | Yes | **No** |
 | `--disable-apply-all` | Yes | **No** |
 | `--disable-global-apply-lock` | Affects whether global apply lock UI/endpoints are offered | N/A to API apply logic directly |
-| `apply_requirements` / approval flow | Yes (command runners) | Partially via shared project runners once contexts are built — not identical to comment UX |
+| `apply_requirements` / approval flow | Yes (command runners) | PR approval/mergeability requirements are checked for positive PR numbers; omitted/non-positive `pr` sets `SkipPRRequirements` and skips these checks |
 | `Drainer` | Yes | **No** (becomes Yes after PR 1 per above) |
+
+The optional `pr` input deliberately retains the API's non-PR behavior. MCP callers must not assume approval or mergeability gates apply when no positive PR number is supplied. Other policy checks remain in the shared path. Requiring a PR for every MCP write would be a separate policy change, not an existing API guarantee.
 
 **There is no `--disable-apply` server flag.** Do not document or implement against that name.
 
@@ -469,7 +487,7 @@ Any async redesign should improve HTTP API and MCP together via the service laye
    * [`modelcontextprotocol/go-sdk`](https://github.com/modelcontextprotocol/go-sdk) — official
 3. **Decision criteria** for the pick (document the comparison in the PR):
    * Streamable HTTP and/or SSE **server** support matching current MCP remote transport guidance
-   * **Builds and tests with Atlantis’s pinned Go toolchain** (`go 1.26.x` / current `go.mod` version, presently 1.26.5). An SDK or transitive module that requires a newer Go blocks PR 2.
+   * **Builds and tests with Atlantis’s pinned Go toolchain**, using the repository's `go.mod` at implementation time as the source of truth. An SDK or transitive module that requires a newer Go blocks PR 2 until compatible versions are selected or Atlantis's toolchain is updated separately.
    * Active maintenance / release cadence
    * Stable Go module path (low rename risk)
    * Acceptable license and transitive dependency surface for Renovate/review
@@ -498,15 +516,19 @@ Lifecycle:
 
 1. `NewServer` constructs services and, if enabled, an MCP handler with injected services + secrets + read-only flag.
 2. `Start` registers MCP routes only when `--mcp-enabled`.
-3. On signal, existing drain + `http.Server.Shutdown` tear down MCP connections with all other HTTP traffic — no separate MCP server shutdown.
+3. On signal, mark the server as draining and reject new service operations and MCP sessions/requests. This admission gate must also prevent new read requests from racing shared-dependency teardown.
+4. Explicitly stop MCP transport streams/sessions through the SDK's shutdown mechanism or a handler-observed shutdown context. An open SSE response can otherwise exhaust the HTTP shutdown timeout; `http.Server.Shutdown` does not force-close an active handler when its deadline expires. Transport disconnection or session closure must not implicitly cancel an admitted plan/apply: its execution lifetime is owned by the service and tracked by the Drainer.
+5. Await admitted operations under D7's drain policy and finish HTTP shutdown, including any remaining read handlers, **before** closing the database and flushing/closing stats. This changes today's database-before-HTTP ordering. If using `RegisterOnShutdown`, it must trigger transport termination early enough to let handlers finish; merely adding a callback to the current shutdown sequence does not fix the dependency ordering.
+
+The implementation PR must document the chosen SDK shutdown hook and how handler completion is awaited. Single-port deployment retains one listener and one shutdown coordinator, but does not eliminate MCP lifecycle work. Test both an idle open stream and admitted work that outlives its client connection (D11).
 
 ### D10. Implementation PR stack
 
 | PR | Scope | Contains MCP protocol? | Merge value without later PRs |
 |----|-------|------------------------|-------------------------------|
-| **1a** | Extract services; thin controllers; domain-error translation from HTTP status helpers; Drainer in `APIService` (changelog); **reverse `jobID → metadata` index**; in-memory terminal outcome; `GET /api/jobs/{id}` JSON; optional locks filter; migrate list locks toward `ListLocksResultAPI`; tests | No | Yes — API quality (#6162) |
-| **1b** (same PR series or immediate follow-up) | **Breaking:** `RequireAuth` on `GET /api/locks` (+ optional unlock hardening); changelog + docs for **token required** and **no-secret deployments lose free lock listing** | No | Yes — security consistency |
-| **2** | `--mcp-enabled`, `--mcp-read-only`; reuse `RequireAuth` (+ Bearer if extended); pinned SDK (D8 incl. Go 1.26.x); `/api/mcp` routes; three read-only tools; audit log + metrics; untrusted-log docs; tests | Yes | Yes — useful observability |
+| **1a** | Extract services; thin controllers; domain-error translation from HTTP status helpers; move plan/apply auth to `RequireAuth`; Drainer in `APIService` (changelog includes unbounded drain); admission and dependency-close ordering (D9); **reverse `jobID → metadata` index**; in-memory terminal outcome; `GET /api/jobs/{id}` JSON; optional locks filter; migrate list locks toward `ListLocksResultAPI`; tests | No | Yes — API quality (#6162) |
+| **1b** (same PR series or immediate follow-up) | **Breaking:** `RequireAuth` on `GET /api/locks`; review project/global lock UI routes with an explicit browser-compatible hardening design (D4.8); changelog + docs for **token required** and **no-secret deployments lose free lock listing** | No | Yes — security consistency |
+| **2** | `--mcp-enabled`, `--mcp-read-only`; shared `RequireAuth` with Bearer support for HTTP API and MCP; pinned SDK compatible with `go.mod` (D8); `/api/mcp` routes; explicit transport shutdown (D9); three read-only tools; audit log + metrics; untrusted-log and credential-scope docs; tests | Yes | Yes — useful observability |
 | **3** | Write tools; **apply-policy hardening** (global apply lock + `--disable-apply-all` in `APIService` for HTTP+MCP); policy matrix docs; unlock `source` attribution; concurrency tests | Yes | Only after PR 2 ACK |
 | **4** | Full docs: server config, security, client examples (Cursor / Claude Code), ops notes | No | Yes |
 
@@ -516,12 +538,15 @@ PR 1 commit messages and descriptions should lead with API quality benefits and 
 
 Minimum bar:
 
-* Unit tests for each service method and each MCP tool handler (auth success/failure, missing job ID, empty locks, job schema fields including outcome).
+* Unit tests for each service method and each MCP tool handler (auth success/failure, missing job ID, empty locks, job schema fields including outcome). Cover Terraform execution errors, pre-execution failures, and `Error` precedence when both result fields are populated.
+* HTTP auth tests for both token headers across plan/apply, drift, hardened list-locks, jobs, and MCP; preserve missing-secret and invalid-token rejection. Any UI-route hardening must test existing browser workflows without exposing the API secret.
+* Lifecycle tests: an idle open SSE stream terminates cleanly; new work is rejected during draining; admitted operations balance `StartOp`/`OpDone` on success/error paths and survive client disconnection; shared dependencies remain open until operations and read handlers finish. Verify the operation-drain wait is independent of the HTTP shutdown timeout.
+* Write-tool tests distinguish PR and non-PR requests: approval/mergeability checks for a positive `pr`, and the documented `SkipPRRequirements` behavior otherwise, while preserving other policy checks.
 * Flag registration parity tests (`cmd/server_test.go` patterns).
 * Startup failure tests: `--mcp-enabled` without `--api-secret`; PR 2 `--mcp-read-only=false` when writes unavailable.
 * Default CI and Docker paths keep MCP **disabled**.
-* Docs: experimental banner; auth; flags; tool table; security considerations (including untrusted job logs / prompt injection); job polling guidance; locks auth migration (token + no-secret cases); no claim of stable MCP schema until status changes.
-* Changelog/release notes for: locks auth break (including no-secret loss of free listing), Drainer-on-API shutdown behavior, apply-policy hardening on `/api/apply` when PR 3 lands, new `/api/jobs/{id}`, experimental MCP.
+* Docs: experimental banner; auth and shared-secret write authority even with read-only MCP; flags; tool table; security considerations (including untrusted job logs / prompt injection); job polling guidance; non-PR approval/mergeability semantics; locks auth migration (token + no-secret cases); no claim of stable MCP schema until status changes.
+* Changelog/release notes for: locks auth break (including no-secret loss of free listing), Drainer-on-API's unbounded wait and deployment termination-grace implications, explicit MCP stream shutdown and dependency-close ordering, apply-policy hardening on `/api/apply` when PR 3 lands, new `/api/jobs/{id}`, experimental MCP.
 * If AI assistance is used to author PRs, follow `AI_USAGE_POLICY.md` and project contribution norms.
 
 ### D12. Non-goals (this ADR)
@@ -544,7 +569,7 @@ Minimum bar:
 * JSON job status with outcome + context fills a real gap for all automation, not only MCP.
 * Single-port design avoids novel process architecture and extra ops knobs.
 * Reusing `--api-secret` with a uniform MCP token gate avoids credential sprawl and auth special cases.
-* Read-only-first rollout and non-registration of write tools limit blast radius.
+* Read-only-first rollout limits operations exposed through MCP; its shared API credential still grants HTTP write authority (D5).
 * Explicit breaking-change notes for locks auth and Drainer-on-API reduce surprise for existing automation.
 * Experimental labeling sets correct stability expectations while the MCP ecosystem and Atlantis API both evolve.
 
@@ -556,7 +581,7 @@ Minimum bar:
 * Service extraction is non-trivial refactoring of `APIController` and related tests (~days of careful work).
 * Reverse job index + terminal outcome bookkeeping is new in-memory state (same lifetime as today’s buffers; not durable across restart).
 * Auth hardening on `GET /api/locks` breaks unauthenticated scrapers and no-secret lock listing (mitigated by alpha status + changelog); code change is small (`RequireAuth`) but behavior is not.
-* Drainer on HTTP API changes shutdown-time behavior for existing plan/apply callers.
+* Drainer extends the existing unbounded shutdown wait to HTTP API plan/apply; operations can outlast deployment termination grace and be killed externally. MCP streams need explicit termination, and HTTP handlers must finish before shared dependencies close (D7, D9).
 * Enforcing global apply lock / `--disable-apply-all` on `/api/apply` (with MCP) is a deliberate policy upgrade beyond today’s API path.
 * Auth and policy differences between comment path, HTTP API, and MCP must be documented carefully to avoid a false sense of identical security.
 * Same-port deployment means MCP shares availability and TLS config with webhooks; operators who wanted a firewalled-only AI port must enforce that at the mesh/ingress layer.
@@ -567,21 +592,24 @@ Minimum bar:
 
 | Risk | Mitigation |
 |------|------------|
-| AI agent triggers destructive apply | Write tools deferred; read-only default; token required; PR 3 apply lock + `--disable-apply-all` in `APIService` |
+| AI agent triggers destructive apply | Write tools deferred; read-only MCP default; shared token still authorizes HTTP writes, so restrict MCP clients' route access where read-only access is intended (D5); PR 3 apply lock + `--disable-apply-all` in `APIService` |
 | Indirect prompt injection via job logs | Document untrusted `lines`; tool descriptions; client discipline; truncation; optional lock filters; keep writes unregistered by default (D7) |
 | Job tool backed by HTML handler | Explicit JSON API + reverse index + interface extension (D6) |
 | Assistant cannot tell success vs mere completion | Persist `status` with error vs failed semantics; do not infer from logs alone (D6) |
 | Context fields missing for job_id | New reverse `jobID → metadata` index in PR 1 (D6) |
 | Schema drift between HTTP and MCP | Shared services; prefer `ListLocksResultAPI` and shared job types |
 | Duplicated/weak API auth | Reuse `APIMiddleware.RequireAuth` from #6360 (D4) |
-| Shutdown cuts in-flight API/MCP plans | Drainer in `APIService` (D7); document HTTP behavior change |
+| Shutdown cuts in-flight API/MCP plans | Drainer in `APIService`; admitted work survives transport disconnects; document unbounded draining and external termination-grace limits (D7, D9) |
+| Open MCP stream exhausts HTTP shutdown timeout | Explicit transport shutdown; await handlers before closing database/stats (D9) |
 | HTTP API semantics change unnoticed | Changelog for Drainer, locks auth, apply-policy hardening (D4, D7, D10) |
 | False “parity” with comment-path apply gates | Matrix documents gaps; PR 3 hardens apply explicitly (D7) |
 | Web basic-auth breaks MCP clients | Serve under `/api/mcp` (D2) |
 | Spec/transport churn in MCP | Pin SDK; experimental status; thin `server/mcp` adapter layer; SDK criteria (D8) |
-| SDK requires newer Go than repo pin | D8 criterion: must build on Go 1.26.x |
+| SDK requires newer Go than repo pin | D8 criterion: must build and test with the toolchain pinned in `go.mod` at implementation time |
 | Unlock leaves plans behind | Always go through `DeleteLockCommand` + status/comment side effects (incl. external plan-store cleanup from #6312) |
 | Unauthenticated lock listing on HTTP | `RequireAuth` + migration note (D4) |
+| UI caller can remove the global apply lock without an API token | Document optional web basic-auth/ingress protection; review project/global lock UI auth with browser-compatible migration (D4.8) |
+| Caller assumes every apply requires PR approval | Explicit non-PR `SkipPRRequirements` semantics in tool inputs and policy docs (D6, D7) |
 | No-secret deploy loses free lock listing | Documented in D4 migration; set `--api-secret` to restore |
 | Agent poll-storms job status | Documented backoff; metrics; hard rate limits only if needed later (D7) |
 | Huge lock list into LLM context | Optional repository filter on list locks (D6) |
@@ -624,7 +652,7 @@ Minimum bar:
 
 1. Set a strong `--api-secret`; rotate if previously exposed.
 2. Leave `--mcp-read-only=true` unless write tools are implemented **and** organizationally approved.
-3. Restrict network path to `/api/` (or `/api/mcp`) to trusted clients (VPN, mesh, IP allowlist, ingress auth).
+3. Restrict network access to trusted clients (VPN, mesh, IP allowlist, ingress auth). For clients intended to have read-only MCP access, allow only `/api/mcp` routes and block other API/UI write routes and direct backend access. Allowing all of `/api/` exposes HTTP plan/apply to the same secret, regardless of `--mcp-read-only`.
 4. Do not expose Atlantis to the public internet with only a static API secret.
 5. Monitor MCP structured logs and `mcp` metrics (and `/status`) for unexpected plan/apply when write tools exist.
 6. Treat job log output as potentially **sensitive** (secrets in Terraform output, plan diffs).
@@ -632,6 +660,8 @@ Minimum bar:
 8. After upgrading through locks-auth hardening:
    * Update scrapers that called `GET /api/locks` without a token to send the API secret.
    * If you never set `--api-secret` and relied on free lock listing, set a secret (and send it) — listing is no longer available with API disabled.
+9. Protect the project/global lock UI routes with web basic-auth or ingress controls; `--api-secret` alone does not protect them. Follow the documented browser-auth migration if these routes are hardened.
+10. When write tools ship, supply a positive `pr` to use PR approval/mergeability requirements. Non-PR requests skip those requirements under the existing API semantics.
 
 ## Appendix C — Open questions for maintainers
 
