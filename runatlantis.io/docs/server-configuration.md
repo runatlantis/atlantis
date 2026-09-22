@@ -1603,6 +1603,39 @@ ATLANTIS_TF_DOWNLOAD=false
 Defaults to `true`. Allow Atlantis to list and download additional versions of Terraform.
 Setting this to `false` can be useful in an air-gapped environment where a download mirror is not available.
 
+### `--tf-download-password` <Badge text="v0.42.0+" type="info"/>
+
+```bash
+atlantis server --tf-download-password="my-password"
+# or
+ATLANTIS_TF_DOWNLOAD_PASSWORD="my-password"
+```
+
+Password for HTTP basic auth when downloading Terraform from a custom `--tf-download-url` mirror.
+
+::: warning SECURITY WARNING
+Setting sensitive credentials via command line flags is insecure. Credentials could be exposed via
+shell history or process listings. Set this via the `ATLANTIS_TF_DOWNLOAD_PASSWORD` environment
+variable instead.
+:::
+
+### `--tf-download-token` <Badge text="v0.42.0+" type="info"/>
+
+```bash
+atlantis server --tf-download-token="my-token"
+# or
+ATLANTIS_TF_DOWNLOAD_TOKEN="my-token"
+```
+
+Bearer token for authenticating against a custom `--tf-download-url` mirror. Takes precedence over
+`--tf-download-username`/`--tf-download-password` when both are set.
+
+::: warning SECURITY WARNING
+Setting sensitive credentials via command line flags is insecure. Credentials could be exposed via
+shell history or process listings. Set this via the `ATLANTIS_TF_DOWNLOAD_TOKEN` environment
+variable instead.
+:::
+
 ### `--tf-download-url` <Badge text="v0.18.0+" type="info"/>
 
 ```bash
@@ -1618,6 +1651,17 @@ endpoint should match that of releases.hashicorp.com.
 This has no impact if `--tf-download` is set to `false`.
 
 This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
+
+### `--tf-download-username` <Badge text="v0.42.0+" type="info"/>
+
+```bash
+atlantis server --tf-download-username="my-username"
+# or
+ATLANTIS_TF_DOWNLOAD_USERNAME="my-username"
+```
+
+Username for HTTP basic auth when downloading Terraform from a custom `--tf-download-url` mirror.
+Has no effect if `--tf-download-token` is also set, since the bearer token takes precedence.
 
 ### `--tfe-hostname` <Badge text="v0.8.3+" type="info"/>
 
