@@ -1270,6 +1270,150 @@ ATLANTIS_PORT=4141
 
 Port to bind to. Defaults to `4141`.
 
+### `--provider-cache`
+
+```bash
+atlantis server --provider-cache
+# or
+ATLANTIS_PROVIDER_CACHE=true
+```
+
+Run a local caching proxy for Terraform providers, and have each
+`terraform init` install providers through it in two passes instead of
+installing them directly. This is not just about avoiding redundant
+downloads: Terraform's own
+provider installer is
+[not safe against concurrent writers sharing a plugin cache directory](https://github.com/hashicorp/terraform/issues/25849),
+so letting every parallel `terraform init` install into a shared directory
+itself risks `text file busy` errors and corrupted installs. This mirrors how
+Terragrunt's own provider cache server avoids the same problem.
+
+1. A first `terraform init` pass is pointed at the proxy via a generated CLI
+   configuration file, which tells the proxy what's needed. The proxy is the
+   only thing that ever installs a provider: it downloads the archive
+   (de-duplicating concurrent requests for the same one), verifies it
+   (SHA256SUMS + GPG signature against the registry's own signing keys, so
+   Terraform's normal verification is preserved even though Terraform itself
+   never does the download), and unpacks it into a
+   `provider_installation.filesystem_mirror`-formatted directory. This pass is
+   expected to fail whenever a required provider isn't already cached - that's
+   by design, not an error to worry about.
+2. Atlantis reruns `terraform init` against that mirror directory, with a
+   short backoff, until it succeeds. A `filesystem_mirror` is read-only from
+   Terraform's side, so this second pass never writes to a directory anything
+   else could be writing to concurrently. Each retry cycle also re-runs the
+   first pass, so a transient install failure (a network blip fetching the
+   archive, an upstream 5xx) gets retried instead of leaving the mirror
+   permanently empty for that provider. If the retry budget
+   (`--provider-cache-mirror-wait-timeout`) runs out, Atlantis queries the
+   proxy directly for the real cause of the most recent failure and appends
+   it to the error Terraform reports, rather than only logging it
+   server-side.
+
+Defaults to `false`.
+
+::: tip
+This complements `--use-tf-plugin-cache`: the plugin cache still speeds up a
+single Terraform process reusing a provider across runs, while the provider
+cache proxy is what makes the shared provider directory safe (and fast) under
+Atlantis's own parallelism.
+:::
+
+### `--provider-cache-dir`
+
+```bash
+atlantis server --provider-cache-dir="/path/to/cache"
+# or
+ATLANTIS_PROVIDER_CACHE_DIR="/path/to/cache"
+```
+
+Directory the provider cache proxy stores downloaded provider archives in. Only
+used when `--provider-cache` is set. Defaults to the `provider-cache`
+subdirectory of the data directory.
+
+This directory also holds the `mirror` subdirectory the proxy installs
+verified providers into - the directory the second `terraform init` pass reads
+from (see `--provider-cache` above).
+
+### `--provider-cache-install-timeout`
+
+```bash
+atlantis server --provider-cache-install-timeout=2m
+# or
+ATLANTIS_PROVIDER_CACHE_INSTALL_TIMEOUT=2m
+```
+
+Go duration string (e.g. `2m`, `30s`) bounding a single provider install
+attempt by the provider cache proxy (download, verify and unpack), so a
+stalled upstream can't block that provider from ever being retried. Should be
+comfortably shorter than `--provider-cache-mirror-wait-timeout` so at least
+one retry can happen after a stalled install is abandoned. Only used when
+`--provider-cache` is set. Defaults to `2m`.
+
+### `--provider-cache-max-age`
+
+```bash
+atlantis server --provider-cache-max-age=720h
+# or
+ATLANTIS_PROVIDER_CACHE_MAX_AGE=720h
+```
+
+Go duration string (e.g. `720h`, `24h`) bounding how long a cached artifact or
+installed provider version may sit unused before the provider cache proxy's
+background janitor removes it. An hourly sweep (plus one immediately on
+startup) removes any raw artifact blob or installed provider version whose
+mtime is older than this, then prunes any now-empty ancestor directory left
+behind - the same cleanup an operator would otherwise have to run by hand on
+the old shared plugin-cache dir. A provider that's still actively used stays
+fresh: every cache hit and every discovery-phase request for an
+already-installed provider bumps its mtime, so this only ever removes entries
+nothing has asked for in a long time. Set to `0` to disable this cleanup
+entirely and let the cache grow without bound. Only used when
+`--provider-cache` is set. Defaults to `720h` (30 days).
+
+### `--provider-cache-mirror-wait-timeout`
+
+```bash
+atlantis server --provider-cache-mirror-wait-timeout=5m
+# or
+ATLANTIS_PROVIDER_CACHE_MIRROR_WAIT_TIMEOUT=5m
+```
+
+Go duration string (e.g. `5m`, `90s`) bounding how long `terraform init`
+retries against the provider cache proxy's filesystem mirror while the proxy
+finishes installing a provider, before giving up and surfacing the underlying
+error. Only used when `--provider-cache` is set. Defaults to `5m`.
+
+Each retry cycle costs up to two `terraform init` invocations (a mirror check
+plus a discovery re-trigger - see `--provider-cache` above), so a long
+timeout under many concurrent parallel projects means more process churn
+while they wait, not just a longer worst-case delay. If the same failure is
+reported twice in a row, Atlantis gives up before the timeout rather than
+waiting it out in full.
+
+### `--provider-cache-port`
+
+```bash
+atlantis server --provider-cache-port=0
+# or
+ATLANTIS_PROVIDER_CACHE_PORT=0
+```
+
+Port the provider cache proxy binds to on localhost. Only used when
+`--provider-cache` is set. Defaults to `0`, which selects a random free port.
+
+### `--provider-cache-registry-hosts`
+
+```bash
+atlantis server --provider-cache-registry-hosts="registry.terraform.io,registry.opentofu.org"
+# or
+ATLANTIS_PROVIDER_CACHE_REGISTRY_HOSTS="registry.terraform.io,registry.opentofu.org"
+```
+
+Comma-separated list of provider registry hostnames whose provider downloads are
+routed through the provider cache proxy. Only used when `--provider-cache` is
+set. Defaults to `registry.terraform.io`.
+
 ### `--quiet-policy-checks` <Badge text="v0.32.0+" type="info"/>
 
 ```bash

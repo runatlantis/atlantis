@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -150,6 +151,13 @@ const (
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
+	ProviderCacheFlag                = "provider-cache"
+	ProviderCacheDirFlag             = "provider-cache-dir"
+	ProviderCacheInstallTimeout      = "provider-cache-install-timeout"
+	ProviderCacheMaxAge              = "provider-cache-max-age"
+	ProviderCacheMirrorWaitTimeout   = "provider-cache-mirror-wait-timeout"
+	ProviderCachePortFlag            = "provider-cache-port"
+	ProviderCacheRegistryHostsFlag   = "provider-cache-registry-hosts"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
@@ -168,44 +176,49 @@ const (
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
-	DefaultADBasicUser                  = ""
-	DefaultADBasicPassword              = ""
-	DefaultADHostname                   = "dev.azure.com"
-	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
-	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
-	DefaultCheckoutStrategy             = CheckoutStrategyBranch
-	DefaultCheckoutDepth                = 0
-	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
-	DefaultDataDir                      = "~/.atlantis"
-	DefaultEmojiReaction                = ""
-	DefaultExecutableName               = "atlantis"
-	DefaultMarkdownTemplateOverridesDir = "~/.markdown_templates"
-	DefaultGHHostname                   = "github.com"
-	DefaultGiteaBaseURL                 = "https://gitea.com"
-	DefaultGiteaPageSize                = 30
-	DefaultGitlabHostname               = "gitlab.com"
-	DefaultLockingDBType                = "boltdb"
-	DefaultLanguage                     = i18n.DefaultLanguage
-	DefaultLogLevel                     = "info"
-	DefaultIgnoreVCSStatusNames         = ""
-	DefaultMaxCommentsPerCommand        = 100
-	DefaultParallelPoolSize             = 15
-	DefaultStatsNamespace               = "atlantis"
-	DefaultPort                         = 4141
-	DefaultRedisDB                      = 0
-	DefaultRedisPort                    = 6379
-	DefaultRedisTLSEnabled              = false
-	DefaultRedisInsecureSkipVerify      = false
-	DefaultTFDistribution               = TFDistributionTerraform
-	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
-	DefaultTFDownload                   = true
-	DefaultTFEHostname                  = "app.terraform.io"
-	DefaultVCSStatusName                = "atlantis"
-	DefaultWebBasicAuth                 = false
-	DefaultWebUsername                  = "atlantis"
-	DefaultWebPassword                  = "atlantis"
+	DefaultADBasicUser                    = ""
+	DefaultADBasicPassword                = ""
+	DefaultADHostname                     = "dev.azure.com"
+	DefaultAutoDiscoverMode               = "auto"
+	DefaultAutoplanFileList               = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowCommands                  = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs               = "-chdir,--chdir,-plugin-dir,--plugin-dir"
+	DefaultCheckoutStrategy               = CheckoutStrategyBranch
+	DefaultCheckoutDepth                  = 0
+	DefaultBitbucketBaseURL               = bitbucketcloud.BaseURL
+	DefaultDataDir                        = "~/.atlantis"
+	DefaultEmojiReaction                  = ""
+	DefaultExecutableName                 = "atlantis"
+	DefaultMarkdownTemplateOverridesDir   = "~/.markdown_templates"
+	DefaultGHHostname                     = "github.com"
+	DefaultGiteaBaseURL                   = "https://gitea.com"
+	DefaultGiteaPageSize                  = 30
+	DefaultGitlabHostname                 = "gitlab.com"
+	DefaultLockingDBType                  = "boltdb"
+	DefaultLanguage                       = i18n.DefaultLanguage
+	DefaultLogLevel                       = "info"
+	DefaultIgnoreVCSStatusNames           = ""
+	DefaultMaxCommentsPerCommand          = 100
+	DefaultParallelPoolSize               = 15
+	DefaultStatsNamespace                 = "atlantis"
+	DefaultPort                           = 4141
+	DefaultProviderCacheInstallTimeout    = "2m"
+	DefaultProviderCacheMaxAge            = "720h"
+	DefaultProviderCacheMirrorWaitTimeout = "5m"
+	DefaultProviderCachePort              = 0
+	DefaultProviderCacheRegistryHosts     = "registry.terraform.io"
+	DefaultRedisDB                        = 0
+	DefaultRedisPort                      = 6379
+	DefaultRedisTLSEnabled                = false
+	DefaultRedisInsecureSkipVerify        = false
+	DefaultTFDistribution                 = TFDistributionTerraform
+	DefaultTFDownloadURL                  = "https://releases.hashicorp.com"
+	DefaultTFDownload                     = true
+	DefaultTFEHostname                    = "app.terraform.io"
+	DefaultVCSStatusName                  = "atlantis"
+	DefaultWebBasicAuth                   = false
+	DefaultWebUsername                    = "atlantis"
+	DefaultWebPassword                    = "atlantis"
 )
 
 var stringFlags = map[string]stringFlag{
@@ -501,6 +514,34 @@ var stringFlags = map[string]stringFlag{
 		description: "Comma-separated list of additional paths where variable definition files can be read from." +
 			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
 	},
+	ProviderCacheDirFlag: {
+		description: "Directory the provider cache proxy stores downloaded provider archives in." +
+			" Only used when --" + ProviderCacheFlag + " is set. Defaults to the 'provider-cache' subdirectory of the data directory.",
+	},
+	ProviderCacheRegistryHostsFlag: {
+		description: "Comma-separated list of provider registry hostnames whose provider downloads are routed through the provider cache proxy." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheRegistryHosts,
+	},
+	ProviderCacheMirrorWaitTimeout: {
+		description: "Go duration string (e.g. '5m', '90s') bounding how long `terraform init` retries against the provider cache proxy's" +
+			" filesystem mirror while the proxy finishes installing a provider, before giving up and surfacing the underlying error." +
+			" Should be comfortably longer than --" + ProviderCacheInstallTimeout + " so at least one retry can happen after a stalled install is abandoned." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheMirrorWaitTimeout,
+	},
+	ProviderCacheInstallTimeout: {
+		description: "Go duration string (e.g. '2m', '30s') bounding a single provider install attempt by the provider cache proxy" +
+			" (download, verify and unpack), so a stalled upstream can't block that provider from ever being retried." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheInstallTimeout,
+	},
+	ProviderCacheMaxAge: {
+		description: "Go duration string (e.g. '720h', '24h') bounding how long a cached artifact or installed provider version may sit unused" +
+			" before the provider cache proxy's background janitor removes it. Set to '0' to disable this cleanup entirely and let the cache grow without bound." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheMaxAge,
+	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
@@ -705,6 +746,12 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable the use of the Terraform plugin cache",
 		defaultValue: true,
 	},
+	ProviderCacheFlag: {
+		description: "Run a local caching proxy for Terraform providers and point terraform at it via a generated CLI config file." +
+			" Parallel `terraform init` runs then share a single on-disk provider cache instead of each downloading providers" +
+			" from the upstream registry.",
+		defaultValue: false,
+	},
 }
 var intFlags = map[string]intFlag{
 	CheckoutDepthFlag: {
@@ -728,6 +775,11 @@ var intFlags = map[string]intFlag{
 	PortFlag: {
 		description:  "Port to bind to.",
 		defaultValue: DefaultPort,
+	},
+	ProviderCachePortFlag: {
+		description: "Port the provider cache proxy binds to on localhost." +
+			" Only used when --" + ProviderCacheFlag + " is set. Defaults to 0, which selects a random free port.",
+		defaultValue: DefaultProviderCachePort,
 	},
 	RedisDB: {
 		description:  "The Redis Database to use when using a Locking DB type of 'redis'.",
@@ -948,6 +1000,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setProviderCacheDir(&userConfig); err != nil {
+		return err
+	}
 	s.setVarFileAllowlist(&userConfig)
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
@@ -1044,6 +1099,18 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
+	}
+	if c.ProviderCacheRegistryHosts == "" {
+		c.ProviderCacheRegistryHosts = DefaultProviderCacheRegistryHosts
+	}
+	if c.ProviderCacheMirrorWaitTimeout == "" {
+		c.ProviderCacheMirrorWaitTimeout = DefaultProviderCacheMirrorWaitTimeout
+	}
+	if c.ProviderCacheInstallTimeout == "" {
+		c.ProviderCacheInstallTimeout = DefaultProviderCacheInstallTimeout
+	}
+	if c.ProviderCacheMaxAge == "" {
+		c.ProviderCacheMaxAge = DefaultProviderCacheMaxAge
 	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution
@@ -1214,6 +1281,18 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
+	if userConfig.ProviderCache {
+		if _, err := time.ParseDuration(userConfig.ProviderCacheMirrorWaitTimeout); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheMirrorWaitTimeout, userConfig.ProviderCacheMirrorWaitTimeout, err)
+		}
+		if _, err := time.ParseDuration(userConfig.ProviderCacheInstallTimeout); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheInstallTimeout, userConfig.ProviderCacheInstallTimeout, err)
+		}
+		if _, err := time.ParseDuration(userConfig.ProviderCacheMaxAge); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheMaxAge, userConfig.ProviderCacheMaxAge, err)
+		}
+	}
+
 	return nil
 }
 
@@ -1281,6 +1360,35 @@ func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
 // setMarkdownTemplateOverridesDir checks if ~ was used in markdown-template-overrides-dir and converts it to the actual
 // home directory. If we don't do this, we'll create a directory called "~"
 // instead of actually using home. It also converts relative paths to absolute.
+// setProviderCacheDir expands a leading "~/" and makes the path absolute,
+// matching setDataDir/setSharePlanDir/setMarkdownTemplateOverridesDir. Left
+// alone when unset: server.NewServer falls back to a subdirectory of the
+// (already-expanded) data dir in that case.
+func (s *ServerCmd) setProviderCacheDir(userConfig *server.UserConfig) error {
+	if userConfig.ProviderCacheDir == "" {
+		return nil
+	}
+
+	finalPath := userConfig.ProviderCacheDir
+
+	// Convert ~ to the actual home dir.
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	// Convert relative paths to absolute.
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making provider-cache-dir absolute: %w", err)
+	}
+	userConfig.ProviderCacheDir = finalPath
+	return nil
+}
+
 func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfig) error {
 	finalPath := userConfig.MarkdownTemplateOverridesDir
 

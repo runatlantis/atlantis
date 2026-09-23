@@ -1271,6 +1271,163 @@ ATLANTIS_PORT=4141
 
 Puerto al que hacer bind. El valor predeterminado es `4141`.
 
+### `--provider-cache`
+
+```bash
+atlantis server --provider-cache
+# or
+ATLANTIS_PROVIDER_CACHE=true
+```
+
+Ejecuta un proxy de caché local para providers de Terraform, y hace que cada
+`terraform init` instale los providers a través de él en dos pasadas en lugar
+de instalarlos directamente. Esto no se trata solo de evitar descargas
+redundantes: el propio instalador de providers de Terraform
+[no es seguro frente a escritores concurrentes que comparten un directorio de caché de plugins](https://github.com/hashicorp/terraform/issues/25849),
+así que dejar que cada `terraform init` paralelo instale en un directorio
+compartido conlleva el riesgo de errores `text file busy` e instalaciones
+corruptas. Esto refleja cómo el propio servidor de caché de providers de
+Terragrunt evita el mismo problema.
+
+1. Una primera pasada de `terraform init` se apunta al proxy mediante un
+   archivo de configuración de CLI generado, que le indica al proxy qué se
+   necesita. El proxy es lo único que instala un provider: descarga el
+   archivo (deduplicando solicitudes concurrentes para el mismo), lo verifica
+   (SHA256SUMS + firma GPG contra las claves de firma del propio registry,
+   de modo que la verificación normal de Terraform se conserva aunque
+   Terraform mismo nunca haga la descarga), y lo descomprime en un
+   directorio con el formato `provider_installation.filesystem_mirror`. Se
+   espera que esta pasada falle siempre que un provider requerido aún no
+   esté en caché - eso es intencional, no un error del que preocuparse.
+2. Atlantis vuelve a ejecutar `terraform init` contra ese directorio espejo,
+   con un backoff corto, hasta que tiene éxito. Un `filesystem_mirror` es de
+   solo lectura desde el lado de Terraform, así que esta segunda pasada
+   nunca escribe en un directorio en el que algo más podría estar escribiendo
+   concurrentemente. Cada ciclo de reintento también vuelve a ejecutar la
+   primera pasada, de modo que un fallo de instalación transitorio (una
+   interrupción de red al descargar el archivo, un 5xx del origen) se
+   reintenta en lugar de dejar el espejo permanentemente vacío para ese
+   provider. Si se agota el presupuesto de reintentos
+   (`--provider-cache-mirror-wait-timeout`), Atlantis consulta al proxy
+   directamente la causa real del fallo más reciente y la agrega al error
+   que reporta Terraform, en lugar de solo registrarla del lado del
+   servidor.
+
+El valor predeterminado es `false`.
+
+::: tip
+Esto complementa a `--use-tf-plugin-cache`: la caché de plugins sigue
+acelerando a un único proceso de Terraform que reutiliza un provider entre
+ejecuciones, mientras que el proxy de caché de providers es lo que hace que
+el directorio de providers compartido sea seguro (y rápido) bajo el propio
+paralelismo de Atlantis.
+:::
+
+### `--provider-cache-dir`
+
+```bash
+atlantis server --provider-cache-dir="/path/to/cache"
+# or
+ATLANTIS_PROVIDER_CACHE_DIR="/path/to/cache"
+```
+
+Directorio en el que el proxy de caché de providers almacena los archivos de
+providers descargados. Solo se usa cuando `--provider-cache` está
+configurado. El valor predeterminado es el subdirectorio `provider-cache`
+del directorio de datos.
+
+Este directorio también contiene el subdirectorio `mirror` en el que el proxy
+instala los providers verificados - el directorio que lee la segunda pasada
+de `terraform init` (ver `--provider-cache` más arriba).
+
+### `--provider-cache-install-timeout`
+
+```bash
+atlantis server --provider-cache-install-timeout=2m
+# or
+ATLANTIS_PROVIDER_CACHE_INSTALL_TIMEOUT=2m
+```
+
+Cadena de duración de Go (p. ej. `2m`, `30s`) que limita un único intento de
+instalación de provider por parte del proxy de caché de providers (descarga,
+verificación y descompresión), de modo que un origen bloqueado no pueda
+impedir que ese provider se reintente nunca. Debería ser notablemente más
+corto que `--provider-cache-mirror-wait-timeout` para que al menos un
+reintento pueda ocurrir después de abandonar una instalación bloqueada. Solo
+se usa cuando `--provider-cache` está configurado. El valor predeterminado es
+`2m`.
+
+### `--provider-cache-max-age`
+
+```bash
+atlantis server --provider-cache-max-age=720h
+# or
+ATLANTIS_PROVIDER_CACHE_MAX_AGE=720h
+```
+
+Cadena de duración de Go (p. ej. `720h`, `24h`) que limita cuánto tiempo puede
+permanecer sin uso un artefacto en caché o una versión de provider instalada
+antes de que el limpiador en segundo plano del proxy de caché de providers lo
+elimine. Una limpieza cada hora (más una inmediata al iniciar) elimina
+cualquier artefacto sin procesar o versión de provider instalada cuya fecha de
+modificación sea más antigua que este valor, y luego elimina cualquier
+directorio ancestro que quede vacío como resultado - la misma limpieza que un
+operador tendría que hacer manualmente en el antiguo directorio de caché de
+plugins compartido. Un provider que sigue en uso activo se mantiene fresco:
+cada acierto de caché y cada solicitud de la fase de descubrimiento para un
+provider ya instalado actualiza su fecha de modificación, de modo que esto
+solo elimina entradas que nadie ha solicitado en mucho tiempo. Configúrelo en
+`0` para deshabilitar esta limpieza por completo y dejar que la caché crezca
+sin límite. Solo se usa cuando `--provider-cache` está configurado. El valor
+predeterminado es `720h` (30 días).
+
+### `--provider-cache-mirror-wait-timeout`
+
+```bash
+atlantis server --provider-cache-mirror-wait-timeout=5m
+# or
+ATLANTIS_PROVIDER_CACHE_MIRROR_WAIT_TIMEOUT=5m
+```
+
+Cadena de duración de Go (p. ej. `5m`, `90s`) que limita cuánto tiempo
+reintenta `terraform init` contra el espejo del sistema de archivos del
+proxy de caché de providers mientras el proxy termina de instalar un
+provider, antes de rendirse y mostrar el error subyacente. Solo se usa
+cuando `--provider-cache` está configurado. El valor predeterminado es `5m`.
+
+Cada ciclo de reintento cuesta hasta dos invocaciones de `terraform init`
+(una comprobación del espejo más un nuevo disparo de la pasada de
+descubrimiento - ver `--provider-cache` más arriba), así que un timeout
+largo con muchos proyectos paralelos concurrentes significa más rotación de
+procesos mientras esperan, no solo una demora máxima más larga. Si se
+reporta el mismo fallo dos veces seguidas, Atlantis se rinde antes del
+timeout en lugar de esperarlo por completo.
+
+### `--provider-cache-port`
+
+```bash
+atlantis server --provider-cache-port=0
+# or
+ATLANTIS_PROVIDER_CACHE_PORT=0
+```
+
+Puerto en el que el proxy de caché de providers escucha en localhost. Solo se
+usa cuando `--provider-cache` está configurado. El valor predeterminado es
+`0`, que selecciona un puerto libre al azar.
+
+### `--provider-cache-registry-hosts`
+
+```bash
+atlantis server --provider-cache-registry-hosts="registry.terraform.io,registry.opentofu.org"
+# or
+ATLANTIS_PROVIDER_CACHE_REGISTRY_HOSTS="registry.terraform.io,registry.opentofu.org"
+```
+
+Lista delimitada por comas de hostnames de registries de providers cuyas
+descargas de providers se enrutan a través del proxy de caché de providers.
+Solo se usa cuando `--provider-cache` está configurado. El valor
+predeterminado es `registry.terraform.io`.
+
 ### `--quiet-policy-checks` <Badge text="v0.32.0+" type="info"/>
 
 ```bash
