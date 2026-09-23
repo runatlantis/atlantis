@@ -241,6 +241,8 @@ func (s CommandShell) String() string {
 type Step struct {
 	StepName  string
 	ExtraArgs []string
+	// PlanStore marks a custom run as producing or consuming $PLANFILE.
+	PlanStore *RunPlanStore
 	// RunCommand is either a custom run step or the command to run
 	// during an env step to populate the environment variable dynamically.
 	RunCommand string
@@ -257,6 +259,20 @@ type Step struct {
 	// FilterRegex is a list of regexes for post-processing a RunCommand output
 	// these will be executed in the received order
 	FilterRegexes []*regexp.Regexp
+}
+
+type RunPlanStoreMode string
+
+const (
+	RunPlanStoreSaveMode    RunPlanStoreMode = "save"
+	RunPlanStoreConsumeMode RunPlanStoreMode = "consume"
+)
+
+type RunPlanStore struct {
+	// Mode identifies whether the marked run produces or consumes $PLANFILE.
+	Mode RunPlanStoreMode
+	// SkipIfEmpty replaces any stored plan with the empty plan, then removes it.
+	SkipIfEmpty bool
 }
 
 type Workflow struct {
