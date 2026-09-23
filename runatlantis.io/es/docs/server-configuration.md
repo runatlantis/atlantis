@@ -1357,6 +1357,30 @@ reintento pueda ocurrir después de abandonar una instalación bloqueada. Solo
 se usa cuando `--provider-cache` está configurado. El valor predeterminado es
 `2m`.
 
+### `--provider-cache-max-age`
+
+```bash
+atlantis server --provider-cache-max-age=720h
+# or
+ATLANTIS_PROVIDER_CACHE_MAX_AGE=720h
+```
+
+Cadena de duración de Go (p. ej. `720h`, `24h`) que limita cuánto tiempo puede
+permanecer sin uso un artefacto en caché o una versión de provider instalada
+antes de que el limpiador en segundo plano del proxy de caché de providers lo
+elimine. Una limpieza cada hora (más una inmediata al iniciar) elimina
+cualquier artefacto sin procesar o versión de provider instalada cuya fecha de
+modificación sea más antigua que este valor, y luego elimina cualquier
+directorio ancestro que quede vacío como resultado - la misma limpieza que un
+operador tendría que hacer manualmente en el antiguo directorio de caché de
+plugins compartido. Un provider que sigue en uso activo se mantiene fresco:
+cada acierto de caché y cada solicitud de la fase de descubrimiento para un
+provider ya instalado actualiza su fecha de modificación, de modo que esto
+solo elimina entradas que nadie ha solicitado en mucho tiempo. Configúrelo en
+`0` para deshabilitar esta limpieza por completo y dejar que la caché crezca
+sin límite. Solo se usa cuando `--provider-cache` está configurado. El valor
+predeterminado es `720h` (30 días).
+
 ### `--provider-cache-mirror-wait-timeout`
 
 ```bash

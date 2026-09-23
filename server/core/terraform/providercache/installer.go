@@ -108,6 +108,14 @@ const defaultInstallTimeout = 2 * time.Minute
 // and the signing keys needed to verify them.
 func (in *installer) EnsureInstalled(coordinate Coordinate, meta map[string]any) {
 	if in.isPublished(coordinate) {
+		// Every discovery-phase request for a coordinate that's already
+		// installed is otherwise invisible to us - Terraform reads the
+		// mirror directly, never asking the proxy again - so this is the
+		// only "still in active use" signal a warm coordinate gets. Without
+		// it, the janitor's age-based sweep would eventually remove a
+		// provider every project actively depends on, just because nothing
+		// here observed a reason to keep it.
+		in.touchPublished(coordinate)
 		return
 	}
 	ch := in.sf.DoChan(coordinate.key(), func() (any, error) {
@@ -175,6 +183,97 @@ func (in *installer) LastErrors(host string) []string {
 func (in *installer) isPublished(c Coordinate) bool {
 	info, err := os.Stat(c.mirrorPath(in.mirrorDir))
 	return err == nil && info.IsDir()
+}
+
+// touchPublished bumps the mtime of c's mirror directory to now, marking it
+// as still in use - see EnsureInstalled's call site and publish, which sets
+// this same mtime (via the rename) the moment a coordinate is first
+// installed.
+func (in *installer) touchPublished(c Coordinate) {
+	touch(in.log, c.mirrorPath(in.mirrorDir))
+}
+
+// sweepMirror removes installed provider platform directories
+// (mirrorDir/host/namespace/type/version/os_arch, see Coordinate.mirrorPath)
+// whose mtime is older than maxAge, then prunes any ancestor directory
+// (version, type, namespace, host) left empty by that removal - mirroring
+// the manual cleanup an operator would otherwise have to run by hand on the
+// old shared plugin-cache dir. A no-op when maxAge is <= 0.
+func (in *installer) sweepMirror(maxAge time.Duration, now time.Time) error {
+	if maxAge <= 0 {
+		return nil
+	}
+	hosts, err := os.ReadDir(in.mirrorDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, hostEntry := range hosts {
+		// Skip anything that isn't a published host directory: in
+		// particular a leftover .install-* temp dir from a crash mid-
+		// install (see publish) - never expiry-swept, since it isn't part
+		// of the coordinate tree sweepMirror or isPublished ever looks at.
+		if !hostEntry.IsDir() || strings.HasPrefix(hostEntry.Name(), ".") {
+			continue
+		}
+		hostPath := filepath.Join(in.mirrorDir, hostEntry.Name())
+		if err := in.sweepMirrorLevel(hostPath, maxAge, now, 3); err != nil {
+			in.log.Warn("provider cache: sweeping %s: %s", hostPath, err)
+		}
+		pruneIfEmpty(in.log, hostPath)
+	}
+	return nil
+}
+
+// sweepMirrorLevel recurses depthRemaining levels down from dir
+// (namespace/type/version), then removes any leaf (os_arch) directory whose
+// mtime is older than maxAge, pruning each now-empty ancestor back up to (but
+// not including) dir itself - the caller prunes dir.
+func (in *installer) sweepMirrorLevel(dir string, maxAge time.Duration, now time.Time, depthRemaining int) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		if depthRemaining > 0 {
+			if err := in.sweepMirrorLevel(path, maxAge, now, depthRemaining-1); err != nil {
+				in.log.Warn("provider cache: sweeping %s: %s", path, err)
+			}
+			pruneIfEmpty(in.log, path)
+			continue
+		}
+		// path is a leaf (os_arch) provider directory.
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if now.Sub(info.ModTime()) <= maxAge {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			in.log.Warn("provider cache: removing expired provider %s: %s", path, err)
+		}
+	}
+	return nil
+}
+
+// pruneIfEmpty removes dir if it has no entries left. Best-effort: any error
+// (including dir not being empty, or a concurrent install populating it
+// between the caller's last check and now) is logged, not fatal.
+func pruneIfEmpty(log logging.SimpleLogging, dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) > 0 {
+		return
+	}
+	if err := os.Remove(dir); err != nil && !os.IsNotExist(err) {
+		log.Debug("provider cache: pruning empty directory %s: %s", dir, err)
+	}
 }
 
 // install fetches, verifies and unpacks the provider archive for coordinate,

@@ -221,7 +221,7 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool, msg string, 
 // newProxy starts a proxy pointed (via a pre-seeded discovery entry) at upstream.
 func newProxy(t *testing.T, upstream *httptest.Server) *Server {
 	t.Helper()
-	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0, 0)
+	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0, 0, 0)
 	Ok(t, err)
 	// Bypass real (https) service discovery by seeding the resolved base URL.
 	s.disco[registryHost] = upstream.URL + "/v1/providers/"
@@ -415,6 +415,72 @@ func TestProxy_RejectsUnconfiguredRegistryHost(t *testing.T) {
 	// so the proxy cannot be used to reach arbitrary hosts (SSRF).
 	resp, _ := mustGet(t, s.MirrorBaseURL()+"evil.example.com/v1/providers/hashicorp/null/versions")
 	Equals(t, http.StatusNotFound, resp.StatusCode)
+}
+
+// newUnstartedProxy is like newProxy, but never calls Start: no HTTP server
+// and, crucially, no background janitor goroutine. Used by tests that call
+// ensureCached/sweepExpiredCache directly and want to backdate a file's mtime
+// deterministically, without racing an hourly-ticker janitor that Start would
+// otherwise launch concurrently (harmless in practice - the ticker won't fire
+// within a test's lifetime - but still an unsynchronized access to s.maxAge
+// under the race detector if a test mutates it after Start).
+func newUnstartedProxy(t *testing.T, upstream *httptest.Server, maxAge time.Duration) *Server {
+	t.Helper()
+	s, err := New(logging.NewNoopLogger(t), t.TempDir(), []string{registryHost}, 0, 0, maxAge)
+	Ok(t, err)
+	t.Cleanup(func() { _ = s.listener.Close() })
+	s.disco[registryHost] = upstream.URL + "/v1/providers/"
+	return s
+}
+
+// Test that a cache hit in ensureCached bumps the blob's mtime - the signal
+// sweepExpiredCache's age-based removal relies on to leave an actively-reused
+// blob alone (see touch's doc comment).
+func TestServer_EnsureCachedTouchesOnCacheHit(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newUnstartedProxy(t, upstream, 0)
+
+	rawURL := upstream.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS"
+	cachePath, err := s.ensureCached(context.Background(), rawURL)
+	Ok(t, err)
+
+	old := time.Now().Add(-2 * time.Hour)
+	Ok(t, os.Chtimes(cachePath, old, old))
+
+	// A second call for the same URL is a cache hit (the file already exists),
+	// not a re-download.
+	_, err = s.ensureCached(context.Background(), rawURL)
+	Ok(t, err)
+
+	info, err := os.Stat(cachePath)
+	Ok(t, err)
+	Assert(t, info.ModTime().After(old), "expected a cache hit to bump the blob's mtime past %s, got %s", old, info.ModTime())
+}
+
+// Test that sweepExpiredCache removes a raw artifact blob whose mtime is
+// older than maxAge, while leaving a fresher one (or one untouched since
+// download, i.e. never expired) in place.
+func TestServer_SweepExpiredCacheRemovesExpiredKeepsFresh(t *testing.T) {
+	upstream, _ := newUpstream(t)
+	s := newUnstartedProxy(t, upstream, time.Hour)
+
+	expiredURL := upstream.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS"
+	freshURL := upstream.URL + "/archives/terraform-provider-null_3.2.1_SHA256SUMS.sig"
+
+	expiredPath, err := s.ensureCached(context.Background(), expiredURL)
+	Ok(t, err)
+	freshPath, err := s.ensureCached(context.Background(), freshURL)
+	Ok(t, err)
+
+	old := time.Now().Add(-2 * time.Hour)
+	Ok(t, os.Chtimes(expiredPath, old, old))
+
+	Ok(t, s.sweepExpiredCache(time.Now()))
+
+	_, err = os.Stat(expiredPath)
+	Assert(t, os.IsNotExist(err), "expected the expired cache blob to be removed")
+	_, err = os.Stat(freshPath)
+	Ok(t, err)
 }
 
 func TestAllowedArtifactURL(t *testing.T) {

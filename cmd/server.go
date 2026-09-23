@@ -154,6 +154,7 @@ const (
 	ProviderCacheFlag                = "provider-cache"
 	ProviderCacheDirFlag             = "provider-cache-dir"
 	ProviderCacheInstallTimeout      = "provider-cache-install-timeout"
+	ProviderCacheMaxAge              = "provider-cache-max-age"
 	ProviderCacheMirrorWaitTimeout   = "provider-cache-mirror-wait-timeout"
 	ProviderCachePortFlag            = "provider-cache-port"
 	ProviderCacheRegistryHostsFlag   = "provider-cache-registry-hosts"
@@ -202,6 +203,7 @@ const (
 	DefaultStatsNamespace                 = "atlantis"
 	DefaultPort                           = 4141
 	DefaultProviderCacheInstallTimeout    = "2m"
+	DefaultProviderCacheMaxAge            = "720h"
 	DefaultProviderCacheMirrorWaitTimeout = "5m"
 	DefaultProviderCachePort              = 0
 	DefaultProviderCacheRegistryHosts     = "registry.terraform.io"
@@ -533,6 +535,12 @@ var stringFlags = map[string]stringFlag{
 			" (download, verify and unpack), so a stalled upstream can't block that provider from ever being retried." +
 			" Only used when --" + ProviderCacheFlag + " is set.",
 		defaultValue: DefaultProviderCacheInstallTimeout,
+	},
+	ProviderCacheMaxAge: {
+		description: "Go duration string (e.g. '720h', '24h') bounding how long a cached artifact or installed provider version may sit unused" +
+			" before the provider cache proxy's background janitor removes it. Set to '0' to disable this cleanup entirely and let the cache grow without bound." +
+			" Only used when --" + ProviderCacheFlag + " is set.",
+		defaultValue: DefaultProviderCacheMaxAge,
 	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
@@ -1101,6 +1109,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.ProviderCacheInstallTimeout == "" {
 		c.ProviderCacheInstallTimeout = DefaultProviderCacheInstallTimeout
 	}
+	if c.ProviderCacheMaxAge == "" {
+		c.ProviderCacheMaxAge = DefaultProviderCacheMaxAge
+	}
 	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
 		c.DefaultTFDistribution = c.TFDistribution
 	}
@@ -1276,6 +1287,9 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		}
 		if _, err := time.ParseDuration(userConfig.ProviderCacheInstallTimeout); err != nil {
 			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheInstallTimeout, userConfig.ProviderCacheInstallTimeout, err)
+		}
+		if _, err := time.ParseDuration(userConfig.ProviderCacheMaxAge); err != nil {
+			return fmt.Errorf("invalid --%s %q: %w", ProviderCacheMaxAge, userConfig.ProviderCacheMaxAge, err)
 		}
 	}
 

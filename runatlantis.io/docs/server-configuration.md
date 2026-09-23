@@ -1350,6 +1350,27 @@ comfortably shorter than `--provider-cache-mirror-wait-timeout` so at least
 one retry can happen after a stalled install is abandoned. Only used when
 `--provider-cache` is set. Defaults to `2m`.
 
+### `--provider-cache-max-age`
+
+```bash
+atlantis server --provider-cache-max-age=720h
+# or
+ATLANTIS_PROVIDER_CACHE_MAX_AGE=720h
+```
+
+Go duration string (e.g. `720h`, `24h`) bounding how long a cached artifact or
+installed provider version may sit unused before the provider cache proxy's
+background janitor removes it. An hourly sweep (plus one immediately on
+startup) removes any raw artifact blob or installed provider version whose
+mtime is older than this, then prunes any now-empty ancestor directory left
+behind - the same cleanup an operator would otherwise have to run by hand on
+the old shared plugin-cache dir. A provider that's still actively used stays
+fresh: every cache hit and every discovery-phase request for an
+already-installed provider bumps its mtime, so this only ever removes entries
+nothing has asked for in a long time. Set to `0` to disable this cleanup
+entirely and let the cache grow without bound. Only used when
+`--provider-cache` is set. Defaults to `720h` (30 days).
+
 ### `--provider-cache-mirror-wait-timeout`
 
 ```bash

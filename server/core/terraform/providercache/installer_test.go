@@ -374,6 +374,90 @@ func TestInstaller_EnsureInstalledRespectsInstallTimeout(t *testing.T) {
 	Assert(t, len(errs) == 1, "expected the timeout to be recorded as this coordinate's last error, got %v", errs)
 }
 
+// Test that EnsureInstalled on a coordinate that's already published bumps
+// its mirror directory's mtime instead of merely no-op'ing - this is the only
+// "still in active use" signal a warm coordinate ever gets (see
+// touchPublished's doc comment), since Terraform reads the mirror directly
+// on every subsequent init and never asks the proxy again.
+func TestInstaller_EnsureInstalledTouchesAlreadyPublishedCoordinate(t *testing.T) {
+	meta, files := validMeta(t)
+	in := newTestInstaller(t, files)
+	Ok(t, in.install(context.Background(), testCoordinate, meta))
+
+	mirrorPath := testCoordinate.mirrorPath(in.mirrorDir)
+	old := time.Now().Add(-2 * time.Hour)
+	Ok(t, os.Chtimes(mirrorPath, old, old))
+
+	// Synchronous: the already-published branch of EnsureInstalled never
+	// touches the network or the singleflight group, so no waiting is needed.
+	in.EnsureInstalled(testCoordinate, meta)
+
+	info, err := os.Stat(mirrorPath)
+	Ok(t, err)
+	Assert(t, info.ModTime().After(old), "expected EnsureInstalled to bump the published coordinate's mtime past %s, got %s", old, info.ModTime())
+}
+
+// mkMirrorDir creates coordinate's mirror directory with a single fake file
+// in it (a real install always publishes at least one file; sweepMirrorLevel
+// only ever recurses into and prunes directories, so an empty one wouldn't
+// exercise the same path) and backdates it to age old.
+func mkMirrorDir(t *testing.T, mirrorDir string, c Coordinate, age time.Duration) string {
+	t.Helper()
+	dir := c.mirrorPath(mirrorDir)
+	Ok(t, os.MkdirAll(dir, 0o700))
+	Ok(t, os.WriteFile(filepath.Join(dir, providerBinaryName), []byte("fake"), 0o600))
+	when := time.Now().Add(-age)
+	Ok(t, os.Chtimes(dir, when, when))
+	return dir
+}
+
+// Test that sweepMirror removes an installed provider version whose mirror
+// directory mtime is older than maxAge, while leaving a fresher sibling
+// version (same host/namespace/type, different version) untouched.
+func TestInstaller_SweepMirrorRemovesExpiredKeepsFresh(t *testing.T) {
+	in := &installer{log: logging.NewNoopLogger(t), mirrorDir: t.TempDir()}
+
+	expired := Coordinate{Host: registryHost, Namespace: "hashicorp", Type: "null", Version: "3.2.1", OS: "linux", Arch: "amd64"}
+	fresh := Coordinate{Host: registryHost, Namespace: "hashicorp", Type: "null", Version: "3.3.0", OS: "linux", Arch: "amd64"}
+	expiredDir := mkMirrorDir(t, in.mirrorDir, expired, 2*time.Hour)
+	freshDir := mkMirrorDir(t, in.mirrorDir, fresh, time.Minute)
+
+	Ok(t, in.sweepMirror(time.Hour, time.Now()))
+
+	Assert(t, !in.isPublished(expired), "expected the expired provider version to be removed")
+	_, err := os.Stat(expiredDir)
+	Assert(t, os.IsNotExist(err), "expected %s to no longer exist", expiredDir)
+
+	Assert(t, in.isPublished(fresh), "expected the fresh provider version to survive the sweep")
+	_, err = os.Stat(freshDir)
+	Ok(t, err)
+	// The type directory ("null") is still shared with the surviving fresh
+	// version, so it must not have been pruned away.
+	_, err = os.Stat(filepath.Dir(filepath.Dir(expiredDir)))
+	Ok(t, err)
+}
+
+// Test that removing the only installed provider version under a host prunes
+// every now-empty ancestor directory it leaves behind (version, type,
+// namespace, host) - mirroring the manual cleanup an operator would
+// otherwise have to run by hand on the old shared plugin-cache dir.
+func TestInstaller_SweepMirrorPrunesEmptyAncestors(t *testing.T) {
+	in := &installer{log: logging.NewNoopLogger(t), mirrorDir: t.TempDir()}
+
+	c := Coordinate{Host: registryHost, Namespace: "hashicorp", Type: "null", Version: "3.2.1", OS: "linux", Arch: "amd64"}
+	mkMirrorDir(t, in.mirrorDir, c, 2*time.Hour)
+
+	Ok(t, in.sweepMirror(time.Hour, time.Now()))
+
+	hostDir := filepath.Join(in.mirrorDir, c.Host)
+	_, err := os.Stat(hostDir)
+	Assert(t, os.IsNotExist(err), "expected the now-empty host directory %s to be pruned", hostDir)
+
+	// mirrorDir itself is never pruned - only its contents.
+	_, err = os.Stat(in.mirrorDir)
+	Ok(t, err)
+}
+
 func waitForInstaller(t *testing.T, in *installer, c Coordinate) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

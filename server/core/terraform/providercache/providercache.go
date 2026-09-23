@@ -138,6 +138,15 @@ type Server struct {
 	// doc comment and the package doc comment above for why.
 	installer *installer
 
+	// maxAge bounds how long an artifact blob or installed provider version
+	// may sit unused before the janitor removes it. <= 0 disables sweeping
+	// entirely, so the cache grows without bound (the pre-existing
+	// behavior).
+	maxAge time.Duration
+	// janitorCancel stops the background sweep goroutine started by Start;
+	// nil until Start has run.
+	janitorCancel context.CancelFunc
+
 	listener   net.Listener
 	httpServer *http.Server
 }
@@ -146,8 +155,11 @@ type Server struct {
 // is the list of registry hostnames to serve; it must contain at least one
 // entry. port is the TCP port to listen on; pass 0 to let the OS choose a free
 // port (recommended). installTimeout bounds a single provider install
-// attempt (see installer.installTimeout); pass 0 for the default.
-func New(log logging.SimpleLogging, cacheDir string, registries []string, port int, installTimeout time.Duration) (*Server, error) {
+// attempt (see installer.installTimeout); pass 0 for the default. maxAge
+// bounds how long an unused cache entry may sit before Start's background
+// janitor removes it; pass <= 0 to disable sweeping (the cache then grows
+// without bound, as it did before this parameter existed).
+func New(log logging.SimpleLogging, cacheDir string, registries []string, port int, installTimeout, maxAge time.Duration) (*Server, error) {
 	if len(registries) == 0 {
 		return nil, errors.New("at least one registry host is required")
 	}
@@ -181,6 +193,7 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 		downloadClient: &http.Client{},
 		disco:          make(map[string]string),
 		meta:           make(map[string]map[string]any),
+		maxAge:         maxAge,
 		listener:       listener,
 	}
 	s.installer = &installer{
@@ -214,7 +227,8 @@ func New(log logging.SimpleLogging, cacheDir string, registries []string, port i
 
 // Start begins serving in a background goroutine. It returns immediately once
 // the listener is accepting connections (the listener is already open after
-// New), so the address returned by Addr is valid as soon as New returns.
+// New), so the address returned by Addr is valid as soon as New returns. It
+// also starts the background janitor (see runJanitor), stopped by Stop.
 func (s *Server) Start() {
 	go func() {
 		if err := s.httpServer.Serve(s.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -222,11 +236,97 @@ func (s *Server) Start() {
 		}
 	}()
 	s.log.Info("provider cache proxy listening on %s, caching to %s", s.Addr(), s.cacheDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.janitorCancel = cancel
+	go s.runJanitor(ctx)
 }
 
-// Stop gracefully shuts the proxy down.
+// Stop gracefully shuts the proxy down, including the background janitor.
 func (s *Server) Stop(ctx context.Context) error {
+	if s.janitorCancel != nil {
+		s.janitorCancel()
+	}
 	return s.httpServer.Shutdown(ctx)
+}
+
+// runJanitor sweeps expired cache entries once immediately, then once an
+// hour, until ctx is canceled (by Stop). A no-op sweep (maxAge <= 0) still
+// runs on this same schedule rather than skipping the goroutine entirely,
+// so enabling sweeping later would need no restart-time wiring change - but
+// sweepOnce itself is cheap to call when disabled, so this costs nothing.
+func (s *Server) runJanitor(ctx context.Context) {
+	s.sweepOnce()
+
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.sweepOnce()
+		}
+	}
+}
+
+// sweepOnce removes cache entries (raw artifact blobs and installed
+// provider versions) that haven't been used in maxAge. A no-op when maxAge
+// is <= 0.
+func (s *Server) sweepOnce() {
+	if s.maxAge <= 0 {
+		return
+	}
+	now := time.Now()
+	if err := s.sweepExpiredCache(now); err != nil {
+		s.log.Err("provider cache: sweeping expired artifact cache: %s", err)
+	}
+	if err := s.installer.sweepMirror(s.maxAge, now); err != nil {
+		s.log.Err("provider cache: sweeping expired mirror entries: %s", err)
+	}
+}
+
+// sweepExpiredCache removes raw artifact blobs (archives, SHA256SUMS,
+// signature files - the flat, hash-named files directly under cacheDir,
+// alongside but distinct from the mirror subdirectory the installer owns -
+// see New) whose mtime is older than maxAge. touch (called on every cache
+// hit in ensureCached) keeps an actively-reused blob's mtime current, so
+// this only removes blobs nothing has asked for in a long time.
+func (s *Server) sweepExpiredCache(now time.Time) error {
+	entries, err := os.ReadDir(s.cacheDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// The mirror subdirectory, or a stray temp directory; neither is
+			// a raw blob this loop owns.
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if now.Sub(info.ModTime()) <= s.maxAge {
+			continue
+		}
+		path := filepath.Join(s.cacheDir, entry.Name())
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			s.log.Warn("provider cache: removing expired cache blob %s: %s", path, err)
+		}
+	}
+	return nil
+}
+
+// touch bumps path's mtime to now, marking it as still in use so the
+// janitor's age-based sweep doesn't remove it out from under an active
+// coordinate. Best-effort: a failure here (e.g. the file was removed by a
+// concurrent sweep) is not fatal to the caller.
+func touch(log logging.SimpleLogging, path string) {
+	now := time.Now()
+	if err := os.Chtimes(path, now, now); err != nil && !os.IsNotExist(err) {
+		log.Debug("provider cache: touching %s: %s", path, err)
+	}
 }
 
 // Addr is the host:port the proxy is listening on.
@@ -491,6 +591,7 @@ func (s *Server) ensureCached(ctx context.Context, rawURL string) (string, error
 	cachePath := s.cachePath(rawURL)
 	if _, err := os.Stat(cachePath); err == nil {
 		s.log.Debug("provider cache hit: %s", rawURL)
+		touch(s.log, cachePath)
 		return cachePath, nil
 	}
 

@@ -506,7 +506,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, fmt.Errorf("invalid provider-cache-install-timeout %q: %w", userConfig.ProviderCacheInstallTimeout, err)
 		}
 
-		providerCacheServer, err = providercache.New(logger, providerCacheDir, registries, userConfig.ProviderCachePort, providerCacheInstallTimeout)
+		providerCacheMaxAge, err := time.ParseDuration(userConfig.ProviderCacheMaxAge)
+		if err != nil {
+			return nil, fmt.Errorf("invalid provider-cache-max-age %q: %w", userConfig.ProviderCacheMaxAge, err)
+		}
+
+		providerCacheServer, err = providercache.New(logger, providerCacheDir, registries, userConfig.ProviderCachePort, providerCacheInstallTimeout, providerCacheMaxAge)
 		if err != nil {
 			return nil, fmt.Errorf("starting provider cache proxy: %w", err)
 		}

@@ -156,6 +156,7 @@ var testFlags = map[string]any{
 	ProviderCacheFlag:                true,
 	ProviderCacheDirFlag:             "/provider-cache",
 	ProviderCacheInstallTimeout:      "2m",
+	ProviderCacheMaxAge:              "720h",
 	ProviderCacheMirrorWaitTimeout:   "5m",
 	ProviderCachePortFlag:            1234,
 	ProviderCacheRegistryHostsFlag:   "registry.terraform.io,registry.opentofu.org",

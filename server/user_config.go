@@ -152,6 +152,7 @@ type UserConfig struct {
 	ProviderCache                  bool            `mapstructure:"provider-cache"`
 	ProviderCacheDir               string          `mapstructure:"provider-cache-dir"`
 	ProviderCacheInstallTimeout    string          `mapstructure:"provider-cache-install-timeout"`
+	ProviderCacheMaxAge            string          `mapstructure:"provider-cache-max-age"`
 	ProviderCacheMirrorWaitTimeout string          `mapstructure:"provider-cache-mirror-wait-timeout"`
 	ProviderCachePort              int             `mapstructure:"provider-cache-port"`
 	ProviderCacheRegistryHosts     string          `mapstructure:"provider-cache-registry-hosts"`
