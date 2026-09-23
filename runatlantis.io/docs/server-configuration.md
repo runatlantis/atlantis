@@ -1545,6 +1545,16 @@ ATLANTIS_SKIP_CLONE_NO_CHANGES=true
 
 `--skip-clone-no-changes` will skip cloning the repo during autoplan if there are no changes to Terraform projects. This will only apply for GitHub and GitLab and only for repos that have `atlantis.yaml` file. Defaults to `false`.
 
+### `--slack-include-body`
+
+```bash
+atlantis server --slack-include-body=false
+# or (recommended)
+ATLANTIS_SLACK_INCLUDE_BODY=false
+```
+
+Whether to include the pull request body in the Slack message under an extra "description" field. Defaults to `true`.
+
 ### `--slack-token` <Badge text="v0.43.0+" type="info"/>
 
 ```bash
