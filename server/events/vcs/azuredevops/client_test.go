@@ -324,6 +324,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 		testName     string
 		mergeStatus  string
 		policy       Policy
+		ignore       []string
 		expMergeable models.MergeableStatus
 	}{
 		{
@@ -334,6 +335,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"approved",
 			},
+			nil,
 			models.MergeableStatus{
 				IsMergeable: false,
 			},
@@ -346,6 +348,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"rejected",
 			},
+			nil,
 			models.MergeableStatus{
 				IsMergeable: false,
 			}},
@@ -357,6 +360,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"approved",
 			},
+			nil,
 			models.MergeableStatus{
 				IsMergeable: true,
 			}},
@@ -368,6 +372,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 				"foo",
 				"pending",
 			},
+			nil,
 			models.MergeableStatus{
 				IsMergeable: false,
 			},
@@ -376,12 +381,52 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 			"atlantis apply status rejected",
 			azuredevops.MergeSucceeded.String(),
 			Policy{
-				"Atlantis Bot/atlantis",
+				"Atlantis Bot/atlantis-test",
 				"apply",
 				"rejected",
 			},
+			nil,
 			models.MergeableStatus{
 				IsMergeable: true,
+			},
+		},
+		{
+			"ignored blocking status by genre",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Sonar/quality-gate",
+				"analysis",
+				"rejected",
+			},
+			[]string{"Sonar/quality-gate"},
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			"ignored blocking status by name",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Human Review",
+				"manual-gate",
+				"rejected",
+			},
+			[]string{"manual-gate"},
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			"non-ignored blocking status still blocks",
+			azuredevops.MergeSucceeded.String(),
+			Policy{
+				"Sonar/quality-gate",
+				"analysis",
+				"rejected",
+			},
+			[]string{"other-status"},
+			models.MergeableStatus{
+				IsMergeable: false,
 			},
 		},
 	}
@@ -440,7 +485,7 @@ func TestAzureDevopsClient_PullIsMergeable(t *testing.T) {
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, "atlantis-test", []string{})
+				}, "atlantis-test", c.ignore)
 			Ok(t, err)
 			Equals(t, c.expMergeable, actMergeable)
 		})
