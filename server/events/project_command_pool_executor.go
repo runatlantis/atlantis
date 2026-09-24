@@ -4,7 +4,7 @@
 package events
 
 import (
-	"fmt"
+	"errors"
 	"sort"
 	"sync"
 
@@ -14,6 +14,10 @@ import (
 )
 
 type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
+
+const operationCancelledErrMsg = "operation cancelled via `atlantis cancel` command"
+
+var errOperationCancelled = errors.New(operationCancelledErrMsg)
 
 func RunOneProjectCmd(
 	runnerFunc prjCmdRunnerFunc,
@@ -81,7 +85,7 @@ func runProjectCmdsParallel(
 			results = append(results, command.ProjectResult{
 				Command: pCmd.CommandName,
 				ProjectCommandOutput: command.ProjectCommandOutput{
-					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
+					Error: errOperationCancelled,
 				},
 				RepoRelDir:  pCmd.RepoRelDir,
 				Workspace:   pCmd.Workspace,
@@ -227,7 +231,7 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 			cancelledResults = append(cancelledResults, command.ProjectResult{
 				Command: cmd.CommandName,
 				ProjectCommandOutput: command.ProjectCommandOutput{
-					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
+					Error: errOperationCancelled,
 				},
 				RepoRelDir:  cmd.RepoRelDir,
 				Workspace:   cmd.Workspace,
