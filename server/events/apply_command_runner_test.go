@@ -262,6 +262,59 @@ func TestApplyCommandRunner_IsSilenced(t *testing.T) {
 	}
 }
 
+func TestApplyCommandRunner_EmptyApplyOutputIsSuccessful(t *testing.T) {
+	database := newTestBoltDB(t)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+	})
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "abc123",
+		BaseBranch: "main",
+	}
+	_, err := database.UpdatePullWithResults(pull, []command.ProjectResult{
+		plannedProjectResult("project", events.DefaultWorkspace, "project"),
+	})
+	Ok(t, err)
+
+	cmd := &events.CommentCommand{Name: command.Apply}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	projectCtx := command.ProjectContext{
+		CommandName:       command.Apply,
+		RepoRelDir:        "project",
+		Workspace:         events.DefaultWorkspace,
+		ProjectName:       "project",
+		ProjectPlanStatus: models.PlannedPlanStatus,
+		Pull:              pull,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+	When(projectCommandRunner.Apply(projectCtx)).ThenReturn(command.ProjectCommandOutput{})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "successful apply with empty output was classified as failed")
+	pullStatus, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, models.AppliedPlanStatus, pullStatus.Projects[0].Status)
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](),
+		Eq(testdata.GithubRepo),
+		Eq(pull),
+		Eq(models.SuccessCommitStatus),
+		Eq(command.Apply),
+		Eq(models.ProjectCounts{Success: 1, Total: 1}),
+	)
+}
+
 func TestApplyCommandRunner_IgnoredTargetedDirNoOp(t *testing.T) {
 	RegisterMockTestingT(t)
 	vcsClient := setup(t)
