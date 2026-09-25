@@ -49,6 +49,7 @@ const (
 	AllowCommandsFlag                = "allow-commands"
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
+	AtlantisPluginCacheFlag          = "atlantis-plugin-cache"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
@@ -149,6 +150,7 @@ const (
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
+	TFPluginCacheDirFlag             = "tf-plugin-cache-dir"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
@@ -480,6 +482,12 @@ var stringFlags = map[string]stringFlag{
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
 	},
+	TFPluginCacheDirFlag: {
+		description: "Override the directory used as the Terraform plugin cache (TF_PLUGIN_CACHE_DIR)." +
+			" Defaults to <data-dir>/plugin-cache when --" + UseTFPluginCache + " is enabled." +
+			" Useful to place the cache on storage shared across Atlantis replicas." +
+			" Pair with --" + AtlantisPluginCacheFlag + " so terraform init runs are serialized against the shared cache.",
+	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
 		defaultValue: DefaultTFEHostname,
@@ -538,6 +546,12 @@ var stringFlags = map[string]stringFlag{
 var boolFlags = map[string]boolFlag{
 	AllowForkPRsFlag: {
 		description:  "Allow Atlantis to run on pull requests from forks. A security issue for public repos.",
+		defaultValue: false,
+	},
+	AtlantisPluginCacheFlag: {
+		description: "Declare that Atlantis uses a shared Terraform plugin cache. Because terraform init is not " +
+			"concurrency safe against a shared plugin cache (hashicorp/terraform#25849), enabling this serializes " +
+			"terraform init commands so only one runs at a time. Plan and apply parallelism are not affected.",
 		defaultValue: false,
 	},
 	AutoplanModules: {
@@ -948,6 +962,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setTFPluginCacheDir(&userConfig); err != nil {
+		return err
+	}
 	s.setVarFileAllowlist(&userConfig)
 	if err := s.deprecationWarnings(&userConfig); err != nil {
 		return err
@@ -1214,6 +1231,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
+	if userConfig.TFPluginCacheDir != "" && !userConfig.UseTFPluginCache {
+		fmt.Printf("WARNING: --%s has no effect because --%s is disabled; the Terraform plugin cache is not used.\n",
+			TFPluginCacheDirFlag, UseTFPluginCache)
+	}
+
 	return nil
 }
 
@@ -1275,6 +1297,33 @@ func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
 		return fmt.Errorf("making share-plan-dir absolute: %w", err)
 	}
 	userConfig.SharePlanDir = finalPath
+	return nil
+}
+
+// setTFPluginCacheDir checks if ~ was used in tf-plugin-cache-dir and converts
+// it to the actual home directory, like data-dir. Relative paths are also made
+// absolute. If unset, the default of <data-dir>/plugin-cache is used.
+func (s *ServerCmd) setTFPluginCacheDir(userConfig *server.UserConfig) error {
+	if userConfig.TFPluginCacheDir == "" {
+		return nil
+	}
+
+	finalPath := userConfig.TFPluginCacheDir
+
+	// Convert ~ to the actual home dir.
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making tf-plugin-cache-dir absolute: %w", err)
+	}
+	userConfig.TFPluginCacheDir = finalPath
 	return nil
 }
 
