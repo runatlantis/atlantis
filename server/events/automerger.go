@@ -85,10 +85,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 // AutomergeRetryCount is 0 (the default) the merge is attempted exactly once and
 // this behaves identically to a single MergePull call.
 func (c *AutoMerger) mergeWithRetry(ctx *command.Context, pullOptions models.PullRequestOptions) error {
-	retryCount := c.AutomergeRetryCount
-	if retryCount < 0 {
-		retryCount = 0
-	}
+	retryCount := max(0, c.AutomergeRetryCount)
 	maxAttempts := retryCount + 1
 	var err error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -121,6 +118,7 @@ func (c *AutoMerger) retryBackoff(attempt int) time.Duration {
 	}
 
 	if delay > minBackoff {
+		//nolint:gosec // G404: math/rand is intentional for non-security backoff jitter
 		delay = minBackoff + rand.N(delay-minBackoff+1)
 	}
 	return delay
