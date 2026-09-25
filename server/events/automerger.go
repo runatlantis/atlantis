@@ -85,7 +85,11 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 // AutomergeRetryCount is 0 (the default) the merge is attempted exactly once and
 // this behaves identically to a single MergePull call.
 func (c *AutoMerger) mergeWithRetry(ctx *command.Context, pullOptions models.PullRequestOptions) error {
-	maxAttempts := c.AutomergeRetryCount + 1
+	retryCount := c.AutomergeRetryCount
+	if retryCount < 0 {
+		retryCount = 0
+	}
+	maxAttempts := retryCount + 1
 	var err error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if err = c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions); err == nil {
