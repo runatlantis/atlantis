@@ -19,9 +19,15 @@ import (
 //	 <description>
 //
 // We use it over the default template so that the output it easier to read.
-func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag) string {
+func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag, int64Flags map[string]int64Flag) string {
 	var flagNames []string
 	for name, f := range stringFlags {
+		if f.hidden {
+			continue
+		}
+		flagNames = append(flagNames, name)
+	}
+	for name, f := range int64Flags {
 		if f.hidden {
 			continue
 		}
@@ -62,6 +68,13 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 			descrip = to80CharCols(f.description)
 			isBool = true
 		} else if f, ok := intFlags[name]; ok {
+			descripWithDefault := f.description
+			if f.defaultValue != 0 {
+				descripWithDefault += fmt.Sprintf(" (default %d)", f.defaultValue)
+			}
+			descrip = to80CharCols(descripWithDefault)
+			isBool = false
+		} else if f, ok := int64Flags[name]; ok {
 			descripWithDefault := f.description
 			if f.defaultValue != 0 {
 				descripWithDefault += fmt.Sprintf(" (default %d)", f.defaultValue)
