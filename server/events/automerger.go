@@ -9,6 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/events/vcs/github"
 )
 
 type AutoMerger struct {
@@ -26,16 +27,23 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 		}
 	}
 
-	// Comment that we're automerging the pull request.
-	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, automergeComment, command.Apply.String()); err != nil {
-		ctx.Log.Err("failed to comment about automerge: %s", err)
-		// Commenting isn't required so continue.
-	}
-
 	// Fall back to the server-side default merge method when the comment
 	// command didn't specify one with --auto-merge-method.
 	if mergeMethod == "" {
 		mergeMethod = c.GlobalAutomergeMethod
+	}
+	// The merge queue doesn't merge the pull request, it hands it to the VCS to
+	// merge later, so say that instead of claiming we merged it.
+	queueing := mergeMethod == github.MergeQueueMergeMethod
+
+	// Comment that we're automerging the pull request.
+	startComment := automergeComment
+	if queueing {
+		startComment = automergeQueueComment
+	}
+	if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, startComment, command.Apply.String()); err != nil {
+		ctx.Log.Err("failed to comment about automerge: %s", err)
+		// Commenting isn't required so continue.
 	}
 
 	// Make the API call to perform the merge.
@@ -48,9 +56,13 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	if err != nil {
 		ctx.Log.Err("automerging failed: %s", err)
 
-		failureComment := fmt.Sprintf("Automerging failed:\n```\n%s\n```", err)
+		failureAction := "Automerging"
+		if queueing {
+			failureAction = "Adding to the merge queue"
+		}
+		failureComment := fmt.Sprintf("%s failed:\n```\n%s\n```", failureAction, err)
 		if commentErr := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, failureComment, command.Apply.String()); commentErr != nil {
-			ctx.Log.Err("failed to comment about automerge failing: %s", err)
+			ctx.Log.Err("failed to comment about automerge failing: %s", commentErr)
 		}
 	}
 }
