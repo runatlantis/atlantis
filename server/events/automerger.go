@@ -107,7 +107,7 @@ func (c *AutoMerger) mergeWithRetry(ctx *command.Context, pullOptions models.Pul
 
 // retryBackoff returns how long to wait before the given 1-indexed retry
 // attempt. The delay starts at the minimum bound, doubles with each attempt,
-// and is capped at the maximum bound. Full jitter is then applied (a random
+// and is capped at the maximum bound. Jitter is then applied (a random
 // duration in [min, delay]) so repeated retries don't fire in lockstep.
 func (c *AutoMerger) retryBackoff(attempt int) time.Duration {
 	minBackoff, maxBackoff := c.backoffBounds()
