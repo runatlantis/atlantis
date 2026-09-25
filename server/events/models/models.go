@@ -10,6 +10,7 @@ package models
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -495,9 +496,37 @@ func ApprovalCoversAllHashes(approvalHashes, required []string) bool {
 type PolicySetStatus struct {
 	PolicySetName   string
 	Passed          bool
-	Approvals       []PolicySetApproval
+	Approvals       PolicySetApprovals
 	Hashes          []string
 	PolicyItemRegex string
+}
+
+// PolicySetApprovals is assignable to and from []PolicySetApproval. It exists
+// only to carry the UnmarshalJSON below, which is declared here rather than on
+// PolicySetStatus so that the struct keeps decoding on encoding/json's native
+// path; an Unmarshaler costs a second parse of whatever it covers.
+type PolicySetApprovals []PolicySetApproval
+
+// UnmarshalJSON also accepts the bare count written before approvals recorded
+// an approver, treating it as no approvals: the count named nobody, and an
+// approval cannot be revived without inventing an approver.
+func (psa *PolicySetApprovals) UnmarshalJSON(data []byte) error {
+	// json validates the document before calling an Unmarshaler, so the first
+	// byte identifies the value.
+	if len(data) == 0 {
+		*psa = nil
+		return nil
+	}
+
+	switch data[0] {
+	case '[':
+		return json.Unmarshal(data, (*[]PolicySetApproval)(psa))
+	case 'n', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9': // null or count
+		*psa = nil
+		return nil
+	default:
+		return fmt.Errorf("policy set approvals are neither a list nor a count: %s", data)
+	}
 }
 
 // GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
