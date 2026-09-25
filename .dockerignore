@@ -3,6 +3,7 @@
 !scripts/download-release.sh
 !server/
 !testdrive/
+!testing/
 !main.go
 !go.mod
 !go.sum
