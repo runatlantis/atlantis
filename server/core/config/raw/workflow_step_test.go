@@ -141,6 +141,20 @@ func TestWorkflowHook_ToValid(t *testing.T) {
 				RunCommand: "my 'run command'",
 			},
 		},
+		{
+			description: "run step with project scope",
+			input: raw.WorkflowHook{
+				StringVal: map[string]string{
+					"run":   "my command",
+					"scope": "project",
+				},
+			},
+			exp: &valid.WorkflowHook{
+				StepName:   "run",
+				RunCommand: "my command",
+				Scope:      "project",
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {

@@ -97,6 +97,26 @@ command](custom-workflows.md#custom-run-command).
 | description | string | none | no | Post hook description |
 | shell | string | 'sh' | no | The shell to use for running the command |
 | shellArgs | string | '-c' | no | The shell arguments to use for running the command |
+| scope | string | 'repo' | no | When the hook runs: `repo` (once per command) or `project` (once per project during plan/apply) |
+
+### Project-Scoped Hooks
+
+By default a post workflow hook runs once per command (`scope: repo`). Setting
+`scope: project` instead runs the hook **once per project** after each project is
+planned/applied, which is useful for per-project side effects such as per-project
+deploy tracking. Project-scoped hooks run for every project regardless of a
+repo's custom workflow, receive the per-project environment variables
+`REPO_REL_DIR`, `WORKSPACE`, and `PROJECT_NAME`, and their `COMMAND_HAS_ERRORS`
+reflects that project's result.
+
+```yaml
+repos:
+  - id: /.*/
+    post_workflow_hooks:
+      - run: my-per-project-hook
+        scope: project
+        commands: apply
+```
 
 ::: tip Notes
 
@@ -116,7 +136,11 @@ command](custom-workflows.md#custom-run-command).
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
     every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
-  * `COMMAND_HAS_ERRORS` - Indicates whether any errors occurred during the execution of the command (`plan`, `apply`). If set to `true`, at least one error was encountered; otherwise, it is `false`.
+  * `COMMAND_HAS_ERRORS` - Indicates whether any errors occurred during the execution of the command (`plan`, `apply`). If set to `true`, at least one error was encountered; otherwise, it is `false`. For `scope: project` hooks this reflects the individual project's result.
+* For `scope: project` hooks (see [Project-Scoped Hooks](#project-scoped-hooks)) the following additional environment variables are set:
+  * `REPO_REL_DIR` - The directory of the project relative to the repository root, ex. `envs/prod`.
+  * `WORKSPACE` - The Terraform workspace of the project, ex. `default`.
+  * `PROJECT_NAME` - The name of the project being planned/applied.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
   * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty.
 :::

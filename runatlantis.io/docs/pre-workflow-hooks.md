@@ -94,6 +94,26 @@ command](custom-workflows.md#custom-run-command).
 | description | string | none | no | Pre hook description |
 | shell | string | 'sh' | no | The shell to use for running the command |
 | shellArgs | string | '-c' | no | The shell arguments to use for running the command |
+| scope | string | 'repo' | no | When the hook runs: `repo` (once per command, before project discovery) or `project` (once per project during plan/apply) |
+
+### Project-Scoped Hooks
+
+By default a pre workflow hook runs once per command, before project discovery
+(`scope: repo`). Setting `scope: project` instead runs the hook **once per
+project** as each project is planned/applied, which is useful for per-project
+side effects (for example, per-project deploy tracking). Project-scoped hooks
+run for every project regardless of a repo's custom workflow, and additionally
+receive the per-project environment variables `REPO_REL_DIR`, `WORKSPACE`, and
+`PROJECT_NAME` (see below).
+
+```yaml
+repos:
+  - id: /.*/
+    pre_workflow_hooks:
+      - run: my-per-project-hook
+        scope: project
+        commands: apply
+```
 
 ::: tip Notes
 
@@ -114,6 +134,9 @@ command](custom-workflows.md#custom-run-command).
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
-  * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty.
+  * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty. For `scope: project` hooks this is the name of the project being planned/applied.
+* For `scope: project` hooks (see [Project-Scoped Hooks](#project-scoped-hooks)) the following additional environment variables are set:
+  * `REPO_REL_DIR` - The directory of the project relative to the repository root, ex. `envs/prod`.
+  * `WORKSPACE` - The Terraform workspace of the project, ex. `default`.
 
 :::

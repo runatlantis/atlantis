@@ -26,6 +26,7 @@ type PostWorkflowHookURLGenerator interface {
 
 type PostWorkflowHooksCommandRunner interface {
 	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
+	RunPostHooksForProject(pctx command.ProjectContext, commandHasErrors bool) error
 }
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
@@ -43,8 +44,12 @@ type DefaultPostWorkflowHooksCommandRunner struct {
 func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Context, cmd *CommentCommand) error {
 	postWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && repo.BranchMatches(ctx.Pull.BaseBranch) && len(repo.PostWorkflowHooks) > 0 {
-			postWorkflowHooks = append(postWorkflowHooks, repo.PostWorkflowHooks...)
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && repo.BranchMatches(ctx.Pull.BaseBranch) {
+			for _, hook := range repo.PostWorkflowHooks {
+				if !hook.RunsPerProject() {
+					postWorkflowHooks = append(postWorkflowHooks, hook)
+				}
+			}
 		}
 	}
 
@@ -94,6 +99,58 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		return err
 	}
 
+	return nil
+}
+
+func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooksForProject(pctx command.ProjectContext, commandHasErrors bool) error {
+	postWorkflowHooks := make([]*valid.WorkflowHook, 0)
+	for _, repo := range w.GlobalCfg.Repos {
+		if repo.IDMatches(pctx.Pull.BaseRepo.ID()) && repo.BranchMatches(pctx.Pull.BaseBranch) {
+			for _, hook := range repo.PostWorkflowHooks {
+				if hook.RunsPerProject() {
+					postWorkflowHooks = append(postWorkflowHooks, hook)
+				}
+			}
+		}
+	}
+	if len(postWorkflowHooks) == 0 {
+		return nil
+	}
+
+	unlockFn, err := w.WorkingDirLocker.TryLock(pctx.Pull.BaseRepo.FullName, pctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, pctx.ProjectName, pctx.CommandName, WorkingDirLockMetadataForPull(pctx.Pull))
+	if err != nil {
+		return err
+	}
+	defer unlockFn()
+
+	repoDir, err := w.WorkingDir.Clone(pctx.Log, pctx.HeadRepo, pctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return err
+	}
+
+	err = w.runHooks(
+		models.WorkflowHookCommandContext{
+			BaseRepo:           pctx.Pull.BaseRepo,
+			HeadRepo:           pctx.HeadRepo,
+			Log:                pctx.Log,
+			Pull:               pctx.Pull,
+			User:               pctx.User,
+			Verbose:            false,
+			EscapedCommentArgs: pctx.EscapedCommentArgs,
+			CommandName:        pctx.CommandName.String(),
+			CommandHasErrors:   commandHasErrors,
+			API:                pctx.API,
+			ProjectName:        pctx.ProjectName,
+			RepoRelDir:         pctx.RepoRelDir,
+			Workspace:          pctx.Workspace,
+			SuppressJobOutput:  pctx.SuppressJobOutput,
+		},
+		postWorkflowHooks, repoDir, pctx.SuppressVCSStatus)
+
+	if err != nil {
+		pctx.Log.Err("Error running project-scoped post-workflow hooks: %s", err)
+		return err
+	}
 	return nil
 }
 
