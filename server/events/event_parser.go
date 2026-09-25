@@ -131,6 +131,10 @@ type CommentCommand struct {
 	// project specified in an atlantis.yaml file.
 	// If empty then the comment specified no project.
 	ProjectName string
+	// Group is the name of a group of projects to run the command on. It refers
+	// to the group key of projects specified in an atlantis.yaml file.
+	// If empty then the comment specified no group.
+	Group string
 	// DiscoverAllProjects is true when API drift detection should enumerate all
 	// configured or auto-discovered projects without consulting PR modified files.
 	DiscoverAllProjects bool
@@ -145,6 +149,16 @@ type CommentCommand struct {
 // apply".
 func (c CommentCommand) IsForSpecificProject() bool {
 	return c.RepoRelDir != "" || c.Workspace != "" || c.ProjectName != ""
+}
+
+// IsGeneric returns true if the command wasn't targeted at a subset of the
+// pull request's projects, ex. "atlantis plan" or "atlantis apply". Generic
+// commands own the state of the whole pull request: a generic plan discards
+// plans previously created for this pull request and replaces its status,
+// whereas a targeted command (a specific dir/workspace/project or a group) only
+// affects the projects it targets.
+func (c CommentCommand) IsGeneric() bool {
+	return !c.IsForSpecificProject() && c.Group == ""
 }
 
 // Dir returns the dir of this command.
@@ -174,11 +188,11 @@ func (c CommentCommand) IsAutoplan() bool {
 
 // String returns a string representation of the command.
 func (c CommentCommand) String() string {
-	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, policyset=%q, auto-merge-disabled=%t, auto-merge-method=%s, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.PolicySet, c.AutoMergeDisabled, c.AutoMergeMethod, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
+	return fmt.Sprintf("command=%q, verbose=%t, dir=%q, workspace=%q, project=%q, group=%q, policyset=%q, auto-merge-disabled=%t, auto-merge-method=%s, clear-policy-approval=%t, flags=%q", c.Name.String(), c.Verbose, c.RepoRelDir, c.Workspace, c.ProjectName, c.Group, c.PolicySet, c.AutoMergeDisabled, c.AutoMergeMethod, c.ClearPolicyApproval, strings.Join(c.Flags, ","))
 }
 
 // NewCommentCommand constructs a CommentCommand, setting all missing fields to defaults.
-func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, autoMergeMethod string, workspace string, project string, policySet string, clearPolicyApproval bool) *CommentCommand {
+func NewCommentCommand(repoRelDir string, flags []string, name command.Name, subName string, verbose, autoMergeDisabled bool, autoMergeMethod string, workspace string, project string, group string, policySet string, clearPolicyApproval bool) *CommentCommand {
 	// If repoRelDir was empty we want to keep it that way to indicate that it
 	// wasn't specified in the comment.
 	if repoRelDir != "" {
@@ -197,6 +211,7 @@ func NewCommentCommand(repoRelDir string, flags []string, name command.Name, sub
 		AutoMergeDisabled:   autoMergeDisabled,
 		AutoMergeMethod:     autoMergeMethod,
 		ProjectName:         project,
+		Group:               group,
 		PolicySet:           policySet,
 		ClearPolicyApproval: clearPolicyApproval,
 	}
