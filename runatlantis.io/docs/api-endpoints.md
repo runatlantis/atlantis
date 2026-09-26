@@ -610,15 +610,16 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 
 #### Parameters
 
-| Name                 | Type                 | Required    | Description                                                                          |
-|----------------------|----------------------|-------------|--------------------------------------------------------------------------------------|
-| repository           | string               | Yes         | Full repository name (e.g., `owner/repo`)                                            |
-| ref                  | string               | Yes         | Git reference (branch/tag/commit) to check for drift                                 |
-| base_branch          | string               | Conditional | Branch context for repo-config branch filters and undiverged checks                  |
-| type                 | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                                 |
-| projects             | []string             | No          | List of project names to check. If empty, all are checked                            |
-| paths                | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used                             |
-| include_plan_output  | boolean              | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
+| Name                | Type                 | Required    | Description                                                                                        |
+|---------------------|----------------------|-------------|----------------------------------------------------------------------------------------------------|
+| repository          | string               | Yes         | Full repository name (e.g., `owner/repo`)                                                          |
+| ref                 | string               | Yes         | Git reference (branch/tag/commit) to check for drift                                               |
+| base_branch         | string               | Conditional | Branch context for repo-config branch filters and undiverged checks                                |
+| type                | string               | Yes         | Type of the VCS provider (`Github`/`Gitlab`/`Gitea`)                                               |
+| projects            | []string             | No          | List of project names to check. If empty, all are checked                                          |
+| exclude_projects    | []string             | No          | List of project names to skip during full detection. Cannot be combined with `projects` or `paths` |
+| paths               | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used                                           |
+| include_plan_output | boolean              | No          | If true, include `plan_output` for each project in the response. Defaults to `false`               |
 
 #### DriftDetectionPath
 
@@ -630,7 +631,7 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 Path selectors are literal normalized repo-relative paths. Glob patterns such as `envs/*` are not supported.
 
 ::: tip NOTE
-At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request.
+At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request. To scan all discovered projects except a few, use `exclude_projects` instead of enumerating every project in `projects`. `exclude_projects` cannot be combined with `projects` or `paths`, since it only applies to full discovery, and it preserves stored drift records for the projects it skips rather than reconciling them away.
 :::
 
 ::: tip Status Side Effects
@@ -674,6 +675,21 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
         {"directory": "modules/vpc", "workspace": "production"},
         {"directory": "modules/ec2", "workspace": "production"}
     ],
+    "include_plan_output": true
+}'
+```
+
+#### Sample Request (all projects except some)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "exclude_projects": ["legacy", "sandbox"],
     "include_plan_output": true
 }'
 ```
