@@ -732,3 +732,5 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
+
+var automergeQueueComment = `Automatically adding to the merge queue because all plans have been successfully applied.`
