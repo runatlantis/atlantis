@@ -1030,6 +1030,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		AllowForkPRsFlag:               config.AllowForkPRsFlag,
 		SilenceForkPRErrors:            userConfig.SilenceForkPRErrors,
 		SilenceForkPRErrorsFlag:        config.SilenceForkPRErrorsFlag,
+		SilenceClosedPRErrors:          userConfig.SilenceClosedPRErrors,
 		SilenceVCSStatusNoProjects:     userConfig.SilenceVCSStatusNoProjects,
 		DisableAutoplan:                userConfig.DisableAutoplan,
 		DisableAutoplanLabel:           userConfig.DisableAutoplanLabel,
