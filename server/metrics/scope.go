@@ -30,8 +30,26 @@ func NewScope(cfg valid.Metrics, logger logging.SimpleLogging, statsNamespace st
 	}
 
 	scopeOpts := tally.ScopeOptions{
-		Prefix:          statsNamespace,
-		SanitizeOptions: &tallyprom.DefaultSanitizerOpts,
+		Prefix: statsNamespace,
+		SanitizeOptions: &tally.SanitizeOptions{
+			NameCharacters: tally.ValidCharacters{
+				Ranges:     tally.AlphanumericRange,
+				Characters: tally.UnderscoreCharacters,
+			},
+			KeyCharacters: tally.ValidCharacters{
+				Ranges:     tally.AlphanumericRange,
+				Characters: tally.UnderscoreCharacters,
+			},
+			ValueCharacters: tally.ValidCharacters{
+				Ranges: []tally.SanitizeRange{
+					{rune('a'), rune('z')},
+					{rune('A'), rune('Z')},
+					{rune('0'), rune('9')},
+					{rune('-'), rune('.')},
+				},
+			},
+			ReplacementCharacter: tally.DefaultReplacementCharacter,
+		},
 	}
 
 	if r, ok := reporter.(tally.StatsReporter); ok {
