@@ -77,10 +77,44 @@ func TestParse_Ignored(t *testing.T) {
 		"atlantis plan\nbut with newlines",
 		"terraform plan\nbut with newlines",
 		"This shouldn't error, but it does.",
+		"<!-- linear:isThreadRoot -->",
+		"atlantis plan\nbut with newlines\n<!-- linear:isThreadRoot -->",
 	}
 	for _, c := range ignoreComments {
 		r := commentParser.Parse(c, models.Github)
 		Assert(t, r.Ignore, "expected Ignore to be true for comment %q", c)
+	}
+}
+
+func TestParse_HTMLCommentTrailers(t *testing.T) {
+	cases := []struct {
+		name    string
+		comment string
+	}{
+		{
+			name:    "trailer appended by a third-party VCS client",
+			comment: "atlantis plan\n<!-- linear:isThreadRoot -->",
+		},
+		{
+			name:    "leading html comment",
+			comment: "<!-- linear:isThreadRoot -->\natlantis plan",
+		},
+		{
+			name:    "multi-line html comment",
+			comment: "atlantis plan\n<!-- linear:isThreadRoot\n  more metadata\n-->",
+		},
+		{
+			name:    "several html comments",
+			comment: "<!-- one -->\natlantis plan\n<!-- two -->",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := commentParser.Parse(c.comment, models.Github)
+			Assert(t, !r.Ignore, "expected comment %q not to be ignored", c.comment)
+			Equals(t, "", r.CommentResponse)
+			Equals(t, command.Plan, r.Command.Name)
+		})
 	}
 }
 
