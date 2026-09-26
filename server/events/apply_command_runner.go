@@ -220,6 +220,10 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 					ctx.Log.Warn("unable to update commit status: %s", err)
 				}
 			}
+		} else {
+			// Suppress post-workflow hooks so uninvolved instances don't execute
+			// hooks or create GitHub checks (for example: notify/automerge).
+			ctx.SuppressVCSStatus = true
 		}
 		return
 	}
