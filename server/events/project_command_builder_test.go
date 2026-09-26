@@ -43,6 +43,7 @@ var defaultUserConfig = struct {
 	RestrictFileList         bool
 	DefaultTFDistribution    string
 	SilenceNoProjects        bool
+	AllowPartialApply        bool
 	IncludeGitUntrackedFiles bool
 	AutoDiscoverMode         string
 }{
@@ -56,6 +57,7 @@ var defaultUserConfig = struct {
 	RestrictFileList:         false,
 	DefaultTFDistribution:    "",
 	SilenceNoProjects:        false,
+	AllowPartialApply:        false,
 	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
 }
@@ -291,6 +293,7 @@ terraform {
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -392,7 +395,7 @@ func TestDefaultProjectCommandBuilder_OpenTofuWorkspaceDetection(t *testing.T) {
 				"**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 				false,
 				c.distribution,
-				false, false,
+				false, false, false,
 				"auto",
 				scope,
 				terraformClient, &runtime.LocalPlanStore{},
@@ -780,6 +783,7 @@ projects:
 					userConfig.RestrictFileList,
 					userConfig.DefaultTFDistribution,
 					c.Silenced,
+					userConfig.AllowPartialApply,
 					userConfig.IncludeGitUntrackedFiles,
 					c.AutoDiscoverModeUserCfg,
 					scope,
@@ -876,6 +880,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsM
 		defaultUserConfig.RestrictFileList,
 		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.AllowPartialApply,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
@@ -963,6 +968,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfig
 		defaultUserConfig.RestrictFileList,
 		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.AllowPartialApply,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
@@ -1043,6 +1049,7 @@ func TestDefaultProjectCommandBuilder_PathSelectorRespectsBranchFilteredProjects
 		defaultUserConfig.RestrictFileList,
 		defaultUserConfig.DefaultTFDistribution,
 		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.AllowPartialApply,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
@@ -1139,6 +1146,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITea
 				defaultUserConfig.RestrictFileList,
 				defaultUserConfig.DefaultTFDistribution,
 				defaultUserConfig.SilenceNoProjects,
+				defaultUserConfig.AllowPartialApply,
 				defaultUserConfig.IncludeGitUntrackedFiles,
 				defaultUserConfig.AutoDiscoverMode,
 				scope,
@@ -1228,6 +1236,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testin
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1315,6 +1324,7 @@ func TestDefaultProjectCommandBuilder_BuildWorkspaceOnlyCommand_IgnorePathsNotSk
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1387,6 +1397,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWit
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1501,6 +1512,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1565,6 +1577,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesHeadCommitForRe
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1630,6 +1643,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirRespectsGlobProject
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1701,6 +1715,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFailsOpenWhenRemote
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1762,6 +1777,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirAllowsAuthoritative
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1824,6 +1840,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesGlobalIgnoreWhe
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1899,6 +1916,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -1960,6 +1978,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsuppo
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2036,6 +2055,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithLo
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2094,6 +2114,7 @@ func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithou
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2179,6 +2200,7 @@ autodiscover:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2292,6 +2314,7 @@ autodiscover:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2376,6 +2399,7 @@ func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTar
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2455,6 +2479,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -2893,6 +2918,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -2997,6 +3023,7 @@ projects:
 		false,
 		"",
 		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.AllowPartialApply,
 		defaultUserConfig.IncludeGitUntrackedFiles,
 		defaultUserConfig.AutoDiscoverMode,
 		scope,
@@ -3364,6 +3391,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -3463,6 +3491,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -3505,6 +3534,120 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	for _, ctx := range ctxs {
 		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+	}
+}
+
+// Test the generic apply behavior when some projects have errored plans (e.g.
+// Terragrunt projects whose dependencies haven't been applied yet). With
+// AllowPartialApply disabled the whole command errors; with it enabled the
+// planned subset is applied and errored projects are skipped.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_PartialApply(t *testing.T) {
+	cases := []struct {
+		name              string
+		allowPartialApply bool
+		expErr            string
+		expCtxs           int
+	}{
+		{
+			name:              "strict validation fails when a project errored during plan",
+			allowPartialApply: false,
+			expErr:            "cannot be applied without a plan file",
+		},
+		{
+			name:              "partial apply skips errored project and applies planned subset",
+			allowPartialApply: true,
+			expCtxs:           1,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, map[string]any{
+				"workspace1": map[string]any{
+					"project1": map[string]any{
+						"main.tf":           nil,
+						"workspace1.tfplan": nil,
+					},
+					// project2's plan errored (e.g. unapplied Terragrunt
+					// dependency) so no plan file exists.
+					"project2": map[string]any{
+						"main.tf": nil,
+					},
+				},
+			})
+			runCmd(t, filepath.Join(tmpDir, "workspace1"), "git", "init")
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.GetPullDir(
+				Any[models.Repo](),
+				Any[models.PullRequest]())).
+				ThenReturn(tmpDir, nil)
+
+			logger := logging.NewNoopLogger(t)
+			userConfig := defaultUserConfig
+
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+			terraformClient := tfclientmocks.NewMockClient()
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				nil,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				userConfig.SkipCloneNoChanges,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
+				userConfig.SilenceNoProjects,
+				c.allowPartialApply,
+				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
+				scope,
+				terraformClient, &runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildApplyCommands(
+				&command.Context{
+					Log:   logger,
+					Scope: scope,
+					Pull:  models.PullRequest{HeadCommit: "abc123"},
+					PullStatus: &models.PullStatus{
+						Pull: models.PullRequest{HeadCommit: "abc123"},
+						Projects: []models.ProjectStatus{
+							{RepoRelDir: "project1", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+							{RepoRelDir: "project2", Workspace: "workspace1", Status: models.ErroredPlanStatus},
+						},
+					},
+				},
+				&events.CommentCommand{
+					RepoRelDir:  "",
+					Flags:       nil,
+					Name:        command.Apply,
+					Verbose:     false,
+					Workspace:   "",
+					ProjectName: "",
+				})
+			if c.expErr != "" {
+				Assert(t, err != nil, "expected error")
+				Assert(t, strings.Contains(err.Error(), c.expErr), "expected %q in error, got: %s", c.expErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.expCtxs, len(ctxs))
+			Equals(t, "project1", ctxs[0].RepoRelDir)
+			Equals(t, "workspace1", ctxs[0].Workspace)
+		})
 	}
 }
 
@@ -3585,6 +3728,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) 
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -3701,6 +3845,7 @@ autodiscover:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -3818,6 +3963,7 @@ autodiscover:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -3911,6 +4057,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -4008,6 +4155,7 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgno
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -4100,6 +4248,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -4189,6 +4338,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -4380,6 +4530,7 @@ projects:
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -4525,6 +4676,7 @@ projects:
 			userConfig.RestrictFileList,
 			userConfig.DefaultTFDistribution,
 			userConfig.SilenceNoProjects,
+			userConfig.AllowPartialApply,
 			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
@@ -4610,6 +4762,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -4699,6 +4852,7 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -4830,6 +4984,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -4942,6 +5097,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.RestrictFileList,
 				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
+				userConfig.AllowPartialApply,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
@@ -5743,6 +5899,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -5926,6 +6083,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -6036,6 +6194,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparateSharePla
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -6125,6 +6284,7 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_OnlyNonDefaultWo
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -6203,6 +6363,7 @@ func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparateSharePlanDi
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
@@ -6292,6 +6453,7 @@ projects:
 		userConfig.RestrictFileList,
 		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
+		userConfig.AllowPartialApply,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
