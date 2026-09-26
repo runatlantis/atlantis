@@ -117,7 +117,7 @@ For apply events from pull requests, `Pull.HeadBranch` is the source branch from
 
 For this you'll need to:
 
-* Create a Bot user in Slack
+* Create a Slack App to funcation as a Bot user in Slack
 * Configure Atlantis to send notifications to Slack.
 
 ### Configuring Slack for Atlantis
