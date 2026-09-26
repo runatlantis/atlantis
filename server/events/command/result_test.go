@@ -60,6 +60,14 @@ func TestCommandResult_HasErrors(t *testing.T) {
 			},
 			exp: false,
 		},
+		"successful apply with empty output": {
+			cr: command.Result{
+				ProjectResults: []command.ProjectResult{
+					{Command: command.Apply},
+				},
+			},
+			exp: false,
+		},
 		"single errored project": {
 			cr: command.Result{
 				ProjectResults: []command.ProjectResult{
