@@ -236,6 +236,84 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			expErr: "version: only versions 2 and 3 are supported.",
 		},
+		{
+			description: "depends_on names a defined project",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("staging"), Name: String("staging-gate")},
+					{Dir: String("prod"), Name: String("prod-gate"), DependsOn: []string{"staging-gate"}},
+				},
+			},
+			expErr: "",
+		},
+		{
+			description: "depends_on names an undefined project",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("staging"), Name: String("staging-gate")},
+					{Dir: String("prod"), Name: String("prod-gate"), DependsOn: []string{"staging-gat"}},
+				},
+			},
+			expErr: "depends_on: project \"prod-gate\" depends on \"staging-gat\" which is not a project name defined in this repo config",
+		},
+		{
+			description: "depends_on from a project without a name reports its dir",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("prod"), DependsOn: []string{"nope"}},
+				},
+			},
+			expErr: "depends_on: the project in dir \"prod\" depends on \"nope\" which is not a project name defined in this repo config",
+		},
+		{
+			description: "depends_on cannot name an unnamed project",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("staging")},
+					{Dir: String("prod"), Name: String("prod-gate"), DependsOn: []string{"staging"}},
+				},
+			},
+			expErr: "depends_on: project \"prod-gate\" depends on \"staging\" which is not a project name defined in this repo config",
+		},
+		{
+			description: "depends_on itself",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("prod"), Name: String("prod-gate"), DependsOn: []string{"prod-gate"}},
+				},
+			},
+			expErr: "depends_on: project \"prod-gate\" cannot depend on itself",
+		},
+		{
+			description: "depends_on cycle",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("a"), Name: String("a"), DependsOn: []string{"b"}},
+					{Dir: String("b"), Name: String("b"), DependsOn: []string{"c"}},
+					{Dir: String("c"), Name: String("c"), DependsOn: []string{"a"}},
+				},
+			},
+			expErr: "depends_on: projects cannot depend on each other in a cycle: a -> b -> c -> a",
+		},
+		{
+			description: "diamond dependencies are not a cycle",
+			input: raw.RepoCfg{
+				Version: Int(3),
+				Projects: []raw.Project{
+					{Dir: String("gate"), Name: String("gate")},
+					{Dir: String("a"), Name: String("a"), DependsOn: []string{"gate"}},
+					{Dir: String("b"), Name: String("b"), DependsOn: []string{"gate"}},
+					{Dir: String("c"), Name: String("c"), DependsOn: []string{"a", "b"}},
+				},
+			},
+			expErr: "",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
