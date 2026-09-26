@@ -653,6 +653,18 @@ ATLANTIS_ENABLE_EXTERNAL_STORES=true
 
 Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
 
+Set `external_stores.plan_store.type` to `s3` or `redis`. The `s3` backend uploads one object per plan to an S3-compatible bucket, configured by `bucket` and `region` plus optional `prefix`, `endpoint`, `force_path_style`, and `profile`. The `redis` backend stores a pull request's plans as fields of one hash keyed `plan:{owner/repo/pull}` and reuses the server's redis connection, so it requires `--locking-db-type=redis`.
+
+```yaml
+external_stores:
+  plan_store:
+    type: redis
+    redis:
+      ttl: 168h
+```
+
+With the redis backend, an unset or `0` `ttl` keeps each plan until its apply succeeds or its PR closes; set a `ttl` to expire plans left by PRs that never emit a close event. All of a pull's plans share one hash, so the key grows with plan count times plan size and stays in RAM beside locks, which fits typical plans of tens to low-hundreds of KB; send many-MB plans or PRs spanning thousands of projects to `s3` instead.
+
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
 ```bash
