@@ -119,6 +119,10 @@ type ProjectContext struct {
 	// LocalSharePlanDir is the root directory for local Terraform plan files.
 	// If empty, plan files are stored in the project working directory.
 	LocalSharePlanDir string
+	// Group is the group this project belongs to, set by the group key in
+	// atlantis.yaml. Projects without an explicit group belong to
+	// valid.DefaultGroup.
+	Group string
 	// RepoConfigVersion is the version of the repo's atlantis.yaml file. If
 	// there was no file, this will be 0.
 	RepoConfigVersion int

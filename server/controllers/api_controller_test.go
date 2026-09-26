@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
@@ -152,6 +153,132 @@ func TestAPIController_Plan(t *testing.T) {
 
 	projectCommandBuilder.VerifyWasCalled(Times(expectedCalls)).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	projectCommandRunner.VerifyWasCalled(Times(expectedCalls)).Plan(Any[command.ProjectContext]())
+}
+
+// A group selects every project in the group. Since API requests aren't driven
+// by a pull request's modified files, the builder is asked to enumerate all
+// projects and filter by group.
+func TestAPIController_PlanByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedCmd.Group)
+	Equals(t, true, capturedCmd.DiscoverAllProjects)
+	Equals(t, "", capturedCmd.ProjectName)
+	Equals(t, "", capturedCmd.RepoRelDir)
+	projectCommandRunner.VerifyWasCalled(Times(1)).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_ApplyByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedApplyCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedApplyCmd.Group)
+	// The apply endpoint plans first, so the group has to reach both phases.
+	_, capturedPlanCmd := projectCommandBuilder.VerifyWasCalled(Times(1)).
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "infra", capturedPlanCmd.Group)
+	projectCommandRunner.VerifyWasCalled(Times(1)).Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_GroupRequestValidation(t *testing.T) {
+	cases := map[string]struct {
+		request controllers.APIRequest
+		expErr  string
+	}{
+		"group with projects": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group:    "infra",
+				Projects: []string{"project1"},
+			},
+			expErr: "cannot use 'group' at the same time as 'projects' or 'paths'",
+		},
+		"group with paths": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "infra",
+				Paths: []controllers.APIRequestPath{{Directory: "."}},
+			},
+			expErr: "cannot use 'group' at the same time as 'projects' or 'paths'",
+		},
+		"group with unsafe characters": {
+			request: controllers.APIRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "my group",
+			},
+			expErr: "invalid group",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			body, _ := json.Marshal(c.request)
+
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+			ResponseContains(t, w, http.StatusBadRequest, c.expErr)
+
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+// An unknown group is a caller mistake, so it must not be reported as a 500.
+func TestAPIController_PlanUnknownGroupIsClientError(t *testing.T) {
+	ac, projectCommandBuilder, _ := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, valid.GroupNotAllowedError{
+			Group:         "nope",
+			AllowedGroups: []string{"default", "infra"},
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "nope",
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusBadRequest, "only configured for the following groups: default, infra")
 }
 
 func TestAPIController_PlanSortsByExecutionOrder(t *testing.T) {
@@ -4120,6 +4247,141 @@ func TestAPIController_DetectDriftEmptySelectorsDiscoverAllProjects(t *testing.T
 	Assert(t, capturedCtx != nil, "expected command context")
 	Assert(t, capturedCtx.ExactProjectNameMatching, "expected drift API project selectors to use exact matching")
 	Assert(t, capturedCtx.SortByExecutionOrder, "expected drift API contexts to opt into execution-order sorting")
+}
+
+// A group-scoped detection plans only the group's projects and records the
+// group on each drift result so remediation can target it later.
+func TestAPIController_DetectDriftByGroup(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	var capturedCmd *events.CommentCommand
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			capturedCmd = args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName: command.Plan,
+				ProjectName: "app",
+				RepoRelDir:  "app",
+				Workspace:   events.DefaultWorkspace,
+				Group:       "infra",
+			}}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy."},
+	})
+
+	driftStorage := driftmocks.NewMockStorage()
+	var stored models.ProjectDrift
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).
+		Then(func(args []Param) ReturnValues {
+			stored = args[1].(models.ProjectDrift)
+			return ReturnValues{nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Group:      "infra",
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DetectDrift(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Assert(t, capturedCmd != nil, "expected project command builder to be called")
+	Equals(t, "infra", capturedCmd.Group)
+	Assert(t, capturedCmd.DiscoverAllProjects, "expected group detection to enumerate all projects and filter by group")
+	Equals(t, "infra", stored.Group)
+
+	// A partial detection must not reconcile storage: that would delete the
+	// drift records of every project outside the group.
+	driftStorage.VerifyWasCalled(Never()).Get(Any[string](), Any[drift.GetOptions]())
+	driftStorage.VerifyWasCalled(Never()).DeleteMatching(Any[string](), Any[drift.GetOptions]())
+}
+
+func TestAPIController_DetectDriftGroupValidation(t *testing.T) {
+	cases := map[string]struct {
+		request models.DriftDetectionRequest
+		expErr  string
+	}{
+		"group with projects": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group:    "infra",
+				Projects: []string{"app"},
+			},
+			expErr: "group cannot be combined with projects or paths",
+		},
+		"group with paths": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "infra",
+				Paths: []models.DriftDetectionPath{{Directory: "app"}},
+			},
+			expErr: "group cannot be combined with projects or paths",
+		},
+		"group with unsafe characters": {
+			request: models.DriftDetectionRequest{
+				Repository: "Repo", Ref: "main", Type: "Gitlab",
+				Group: "my group",
+			},
+			expErr: "group must contain only URL safe characters",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			ac.DriftStorage = driftmocks.NewMockStorage()
+
+			body, _ := json.Marshal(c.request)
+			req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.DetectDrift(w, req)
+
+			Equals(t, http.StatusBadRequest, w.Code)
+			Assert(t, strings.Contains(w.Body.String(), c.expErr),
+				"expected body %q to contain %q", w.Body.String(), c.expErr)
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+		})
+	}
+}
+
+func TestAPIController_DriftStatus_GroupFilter(t *testing.T) {
+	ac, _, _ := setup(t)
+	driftStorage := driftmocks.NewMockStorage()
+	var capturedOpts drift.GetOptions
+	When(driftStorage.Get(Any[string](), Any[drift.GetOptions]())).
+		Then(func(args []Param) ReturnValues {
+			capturedOpts = args[1].(drift.GetOptions)
+			return ReturnValues{[]models.ProjectDrift{}, nil}
+		})
+	ac.DriftStorage = driftStorage
+
+	req, _ := http.NewRequest("GET", "/api/drift/status?repository=Repo&type=Gitlab&group=infra", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	Equals(t, "infra", capturedOpts.Group)
+}
+
+func TestAPIController_DriftStatus_InvalidGroupFilter(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.DriftStorage = driftmocks.NewMockStorage()
+
+	req, _ := http.NewRequest("GET", "/api/drift/status?repository=Repo&type=Gitlab&group=my%20group", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.DriftStatus(w, req)
+
+	Equals(t, http.StatusBadRequest, w.Code)
+	Assert(t, strings.Contains(w.Body.String(), "group must contain only URL safe characters"),
+		"expected group validation error, got %q", w.Body.String())
 }
 
 func TestAPIController_DetectDriftNormalizesBranchRefsForSelectionAndStorage(t *testing.T) {

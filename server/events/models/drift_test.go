@@ -563,3 +563,54 @@ func TestDriftDetectionRequestValidateRejectsMalformedRepositories(t *testing.T)
 	gitlab := models.DriftDetectionRequest{Repository: "group/subgroup/repo", Ref: "main", Type: "Gitlab"}
 	Equals(t, 0, len(gitlab.Validate()))
 }
+
+func TestDriftDetectionRequestValidateGroupSelector(t *testing.T) {
+	base := func() models.DriftDetectionRequest {
+		return models.DriftDetectionRequest{
+			Repository: "owner/repo",
+			Ref:        "main",
+			Type:       "Github",
+		}
+	}
+
+	t.Run("valid group", func(t *testing.T) {
+		request := base()
+		request.Group = "my-group_1"
+		Equals(t, 0, len(request.Validate()))
+	})
+
+	t.Run("no group", func(t *testing.T) {
+		request := base()
+		Equals(t, 0, len(request.Validate()))
+	})
+
+	t.Run("group with projects", func(t *testing.T) {
+		request := base()
+		request.Group = "infra"
+		request.Projects = []string{"app"}
+		errs := request.Validate()
+		Assert(t, len(errs) > 0, "expected validation error")
+		Equals(t, "group", errs[0].Field)
+		Equals(t, "group cannot be combined with projects or paths", errs[0].Message)
+	})
+
+	t.Run("group with paths", func(t *testing.T) {
+		request := base()
+		request.Group = "infra"
+		request.Paths = []models.DriftDetectionPath{{Directory: "app"}}
+		errs := request.Validate()
+		Assert(t, len(errs) > 0, "expected validation error")
+		Equals(t, "group", errs[0].Field)
+	})
+
+	for _, group := range []string{"my group", "infra/prod", "in fra"} {
+		t.Run("invalid "+group, func(t *testing.T) {
+			request := base()
+			request.Group = group
+			errs := request.Validate()
+			Assert(t, len(errs) > 0, "expected validation error")
+			Equals(t, "group", errs[0].Field)
+			Equals(t, "group must contain only URL safe characters", errs[0].Message)
+		})
+	}
+}

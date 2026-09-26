@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 )
 
 // DriftSummary represents detected infrastructure drift from a plan output.
@@ -190,6 +191,30 @@ func NormalizeAPIPath(directory string) (string, bool) {
 	return cleaned, true
 }
 
+// IsValidAPIGroup returns true if group is usable as a drift API group
+// selector. Groups are matched verbatim against the group key in the repo
+// config, so the same rule that file is validated with applies here.
+func IsValidAPIGroup(group string) bool {
+	return valid.ValidateGroupName(group) == nil
+}
+
+// validateAPIGroupSelector validates a group selector shared by the drift
+// detection and remediation requests. A group selects a set of projects, so it
+// can't be combined with the selectors that name individual projects.
+func validateAPIGroupSelector(group string, hasProjectSelectors bool) []FieldError {
+	if group == "" {
+		return nil
+	}
+	var errors []FieldError
+	if hasProjectSelectors {
+		errors = append(errors, FieldError{Field: "group", Message: "group cannot be combined with projects or paths"})
+	}
+	if !IsValidAPIGroup(group) {
+		errors = append(errors, FieldError{Field: "group", Message: "group must contain only URL safe characters"})
+	}
+	return errors
+}
+
 // IsValidAPIWorkspace reports whether an explicit drift/remediation workspace
 // selector is safe to use for plan-file path construction.
 func IsValidAPIWorkspace(workspace string) bool {
@@ -299,6 +324,10 @@ type ProjectDrift struct {
 	Path string `json:"path"`
 	// Workspace is the Terraform workspace.
 	Workspace string `json:"workspace"`
+	// Group is the group the project belonged to when drift was detected, from
+	// the group key in the repo config. Records written before groups existed
+	// have no group, so a group-filtered request skips them.
+	Group string `json:"group,omitempty"`
 	// Ref is the git reference (branch/tag/commit) that was checked.
 	Ref string `json:"ref"`
 	// BaseBranch is the branch context used for repo config branch filters and
@@ -391,6 +420,9 @@ type DriftDetectionRequest struct {
 	// (potentially large) Terraform plan text for each project. Defaults to
 	// false; set to true to receive plan_output on this detect response.
 	IncludePlanOutput bool `json:"include_plan_output,omitempty"`
+	// Group restricts detection to the projects belonging to that group in the
+	// repo config. Cannot be combined with Projects or Paths.
+	Group string `json:"group,omitempty"`
 }
 
 // Validate checks the request and returns any validation errors.
@@ -422,6 +454,7 @@ func (r *DriftDetectionRequest) Validate() []FieldError {
 	if len(r.Projects) > 0 && len(r.Paths) > 0 {
 		errors = append(errors, FieldError{Field: "paths", Message: "projects and paths cannot both be set"})
 	}
+	errors = append(errors, validateAPIGroupSelector(r.Group, len(r.Projects) > 0 || len(r.Paths) > 0)...)
 	for _, project := range r.Projects {
 		if strings.TrimSpace(project) == "" {
 			errors = append(errors, FieldError{Field: "projects", Message: "project names cannot be empty"})

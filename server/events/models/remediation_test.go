@@ -289,3 +289,45 @@ func TestRemediationRequestValidateRejectsMalformedRepositories(t *testing.T) {
 	gitlab := models.RemediationRequest{Repository: "group/subgroup/repo", Ref: "main", Type: "Gitlab"}
 	Equals(t, 0, len(gitlab.Validate()))
 }
+
+func TestRemediationRequestValidateGroupSelector(t *testing.T) {
+	base := func() models.RemediationRequest {
+		return models.RemediationRequest{
+			Repository: "owner/repo",
+			Ref:        "main",
+			Type:       "Github",
+			Action:     models.RemediationPlanOnly,
+		}
+	}
+
+	t.Run("valid group", func(t *testing.T) {
+		request := base()
+		request.Group = "infra"
+		Equals(t, 0, len(request.Validate()))
+	})
+
+	t.Run("group with workspaces is allowed", func(t *testing.T) {
+		request := base()
+		request.Group = "infra"
+		request.Workspaces = []string{"production"}
+		Equals(t, 0, len(request.Validate()))
+	})
+
+	t.Run("group with projects", func(t *testing.T) {
+		request := base()
+		request.Group = "infra"
+		request.Projects = []string{"app"}
+		errs := request.Validate()
+		Assert(t, len(errs) > 0, "expected validation error")
+		Equals(t, "group", errs[0].Field)
+		Equals(t, "group cannot be combined with projects or paths", errs[0].Message)
+	})
+
+	t.Run("group with unsafe characters", func(t *testing.T) {
+		request := base()
+		request.Group = "my group"
+		errs := request.Validate()
+		Assert(t, len(errs) > 0, "expected validation error")
+		Equals(t, "group", errs[0].Field)
+	})
+}
