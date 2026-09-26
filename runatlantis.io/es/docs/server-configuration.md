@@ -265,8 +265,8 @@ Si le afecta este cambio [docs](https://learn.microsoft.com/en-us/azure/devops/r
 o este [issue](https://github.com/runatlantis/atlantis/issues/5595)
 ambos Service Hooks (v1 y v2) convertirán el nombre de la organización de AD a minúsculas:
 Ejemplos:
-`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` se convertirán en `mycompany`
-`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` se convertirán en `mycompany`
+`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` se convertirán en `mycompany` <!-- // sadscan:disable kingfisher.azure.devops.1 -->
+`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` se convertirán en `mycompany` <!-- // sadscan:disable kingfisher.azure.devops.1 -->
 
 Este [cambio](https://github.com/runatlantis/atlantis/pull/5596) se aplicará a partir de la versión v0.35.0
 
@@ -1052,12 +1052,14 @@ atlantis server --hide-prev-plan-comments
 ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
-Ocultar comentarios de plan anteriores para reducir el desorden en los PRs. Esto solo está soportado actualmente en
-GitHub, GitLab y Bitbucket y no está habilitado por defecto.
+Ocultar los comentarios de comandos anteriores para reducir el desorden en los pull requests. Esta opción no está habilitada por defecto.
+GitHub minimiza los comentarios coincidentes; GitLab y Gitea los envuelven como reemplazados; Bitbucket
+Cloud los elimina porque no admite ocultar comentarios.
 
-Para Bitbucket, los comentarios se eliminan en lugar de ocultarse ya que Bitbucket no soporta ocultar comentarios.
-
-Para GitHub, asegúrese de que `--gh-user` esté establecido apropiadamente o los comentarios no se ocultarán.
+Cuando varios servidores Atlantis comparten un usuario o una App de VCS, configure un
+[`--vcs-comment-namespace`](#vcs-comment-namespace) único en cada instancia para que no
+oculten los comentarios de las demás. Para GitHub, asegúrese de que `--gh-user` o `--gh-app-slug` identifique
+la cuenta que publica los comentarios de Atlantis.
 
 Al usar GitHub App, necesita establecer `--gh-app-slug` para habilitar esta feature.
 
@@ -1398,7 +1400,7 @@ Ejemplos:
 - Incluir en allowlist todos los repos en mi instalación GitHub Enterprise
   - `--repo-allowlist='github.yourcompany.com/*'`
 - Incluir en allowlist todos los repos bajo el proyecto `myorg` `myproject` en Azure DevOps
-  - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'`
+  - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'` <!-- // sadscan:disable kingfisher.azure.devops.1 -->
 - Incluir en allowlist todos los repositorios
   - `--repo-allowlist='*'`
 
@@ -1679,6 +1681,35 @@ ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
 Lista separada por comas de rutas de directorios adicionales desde donde pueden leerse [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files).
 Las rutas en este argumento deben ser rutas absolutas. Las rutas relativas y el globbing actualmente no están soportados.
 Si este argumento no se proporciona, su valor predeterminado es el directorio de datos de Atlantis, determinado por el argumento `--data-dir`.
+
+### `--vcs-comment-namespace`
+
+```bash
+atlantis server --vcs-comment-namespace="atlantis-dev"
+# or
+ATLANTIS_VCS_COMMENT_NAMESPACE="atlantis-dev"
+```
+
+Namespace opcional usado para identificar los comentarios de pull requests creados por una instancia de Atlantis.
+Esto es útil cuando varios servidores Atlantis comparten un usuario o una App de VCS y habilitan
+[`--hide-prev-plan-comments`](#hide-prev-plan-comments). En GitHub, GitLab y Gitea,
+asigne a cada instancia un valor único y estable para evitar que oculte comentarios creados
+por otra instancia.
+
+El valor predeterminado está vacío, lo que conserva la coincidencia heredada por autor, comando y directorio.
+Cuando se configura un namespace, Atlantis agrega un marcador oculto a cada nuevo fragmento de comentario
+de GitHub, GitLab y Gitea, y solo oculta los comentarios que llevan el mismo namespace. Los comentarios
+existentes sin marcador permanecen visibles. Cambiar el namespace inicia una nueva generación
+de propiedad de comentarios.
+
+Bitbucket Cloud muestra los marcadores de comentarios HTML como texto, por lo que no admite la propiedad
+de comentarios con namespace. Cuando se configura un namespace, Atlantis publica comentarios de Bitbucket
+Cloud sin marcador y omite la eliminación de comentarios anteriores. Para eliminar comentarios anteriores,
+deje el namespace sin establecer y use credenciales que pertenezcan a usuarios distintos de Bitbucket Cloud
+para que sus UUID autenticados sean diferentes.
+
+`--vcs-comment-namespace` es independiente de [`--vcs-status-name`](#vcs-status-name),
+aunque los despliegues con múltiples instancias suelen asignar el mismo valor a ambas configuraciones.
 
 ### `--vcs-status-name` <Badge text="v0.42.0+" type="info"/>
 

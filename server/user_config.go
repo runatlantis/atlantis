@@ -138,6 +138,7 @@ type UserConfig struct {
 	TFELocalExecutionMode      bool            `mapstructure:"tfe-local-execution-mode"`
 	TFEToken                   string          `mapstructure:"tfe-token"`
 	VarFileAllowlist           string          `mapstructure:"var-file-allowlist"`
+	VCSCommentNamespace        string          `mapstructure:"vcs-comment-namespace"`
 	VCSStatusName              string          `mapstructure:"vcs-status-name"`
 	DefaultTFDistribution      string          `mapstructure:"default-tf-distribution"`
 	DefaultTFVersion           string          `mapstructure:"default-tf-version"`
