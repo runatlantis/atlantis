@@ -52,10 +52,21 @@ interface, and serve jobs that are no longer in memory from those files.
 
 ### Write path
 
-Every output line is written through to the store as it is produced, alongside
-the in-memory buffer, not in bulk when the job ends. A crash mid-apply keeps
-everything printed up to that point. When a job completes, its file is synced
-to disk and closed.
+Every output line is handed to the store as it is produced, alongside the
+in-memory buffer. The store buffers it per job and a background flusher
+appends it to the job's file every two seconds, or sooner once a job has
+256 KiB buffered. Completing a job triggers a final flush, after which the
+file is synced to disk and closed.
+
+Handing a line to the store never touches the filesystem. All output for the
+server is fanned out by one goroutine, so a write that blocked on a slow
+volume, such as a network mount, would stall live output for every job.
+
+A process killed mid-job loses at most one flush interval of that job's
+output. A write that fails or is cut short keeps the unwritten output
+buffered and retries it on the next flush. While writes keep failing, a job
+buffers at most 16 MiB; later lines are counted instead, and a marker line
+records how many were dropped once writes succeed again.
 
 The in-memory buffer keeps serving live viewers. Persistence never reads from
 it, so a later cap on the buffer does not limit what is persisted.
@@ -108,10 +119,20 @@ NFS, Amazon EFS, and Azure Files do. Mountpoint for Amazon S3 does not support
 appends in general-purpose buckets.
 
 Live tailing of a job running on another replica is out of scope. Such a job
-shows the output written so far.
+shows its output up to the last flush.
 
 ### Alternatives considered
 
+- **Write each job's output once, when it completes.** Rejected. A process
+  killed mid-job, by an OOM kill or a node drain during a rolling deploy,
+  writes nothing, which is the case an audit trail matters most for. It also
+  hides a running job from every replica except the one running it.
+- **Write each line to the file as it is produced.** Rejected. It loses
+  nothing and shows other replicas every line at once, but it makes one write
+  per line on the goroutine that fans out output for every job on the server,
+  where a slow volume stalls all of them. Periodic flushing bounds the loss
+  and the lag to a couple of seconds and cuts the number of writes by the
+  lines per interval.
 - **Store output in the coordination database**, as in #6176. Rejected.
   Writing the whole output when the job ends loses it when the process dies
   mid-job, which is the case an audit trail matters most for. Large plan and
@@ -143,6 +164,8 @@ shows the output written so far.
 - The jobs index on the main page still lists only jobs in memory. Past jobs
   are reached through their links until the index can be rebuilt from stored
   metadata.
+- A crash loses up to one flush interval, two seconds, of each running job's
+  output, and other replicas see a running job's output up to that far behind.
 - A shared volume without append support fails writes, which are logged as
   warnings, while the jobs themselves continue.
 - If #6829 is accepted, `--job-log-dir` maps to the `filesystem` backend root
