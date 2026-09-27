@@ -26,6 +26,7 @@ type PreWorkflowHookURLGenerator interface {
 
 type PreWorkflowHooksCommandRunner interface {
 	RunPreHooks(ctx *command.Context, cmd *CommentCommand) error
+	RunPreHooksForProject(pctx command.ProjectContext) error
 }
 
 type PreWorkflowHooksConfiguredChecker interface {
@@ -34,13 +35,14 @@ type PreWorkflowHooksConfiguredChecker interface {
 
 // DefaultPreWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPreWorkflowHooksCommandRunner struct {
-	VCSClient             vcs.Client                    `validate:"required"`
-	WorkingDirLocker      WorkingDirLocker              `validate:"required"`
-	WorkingDir            WorkingDir                    `validate:"required"`
-	GlobalCfg             valid.GlobalCfg               `validate:"required"`
-	PreWorkflowHookRunner runtime.PreWorkflowHookRunner `validate:"required"`
-	CommitStatusUpdater   CommitStatusUpdater           `validate:"required"`
-	Router                PreWorkflowHookURLGenerator   `validate:"required"`
+	VCSClient                  vcs.Client                    `validate:"required"`
+	WorkingDirLocker           WorkingDirLocker              `validate:"required"`
+	WorkingDir                 WorkingDir                    `validate:"required"`
+	GlobalCfg                  valid.GlobalCfg               `validate:"required"`
+	PreWorkflowHookRunner      runtime.PreWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater        CommitStatusUpdater           `validate:"required"`
+	Router                     PreWorkflowHookURLGenerator   `validate:"required"`
+	FailOnPreWorkflowHookError bool
 }
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
@@ -104,11 +106,68 @@ func (w *DefaultPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(ctx *command.
 func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Context) []*valid.WorkflowHook {
 	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
-		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) && len(repo.PreWorkflowHooks) > 0 {
-			preWorkflowHooks = append(preWorkflowHooks, repo.PreWorkflowHooks...)
+		if repo.IDMatches(ctx.Pull.BaseRepo.ID()) {
+			for _, hook := range repo.PreWorkflowHooks {
+				if !hook.RunsPerProject() {
+					preWorkflowHooks = append(preWorkflowHooks, hook)
+				}
+			}
 		}
 	}
 	return preWorkflowHooks
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooksForProject(pctx command.ProjectContext) error {
+	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
+	for _, repo := range w.GlobalCfg.Repos {
+		if repo.IDMatches(pctx.Pull.BaseRepo.ID()) {
+			for _, hook := range repo.PreWorkflowHooks {
+				if hook.RunsPerProject() {
+					preWorkflowHooks = append(preWorkflowHooks, hook)
+				}
+			}
+		}
+	}
+	if len(preWorkflowHooks) == 0 {
+		return nil
+	}
+
+	unlockFn, err := w.WorkingDirLocker.TryLock(pctx.Pull.BaseRepo.FullName, pctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, pctx.ProjectName, pctx.CommandName, WorkingDirLockMetadataForPull(pctx.Pull))
+	if err != nil {
+		return err
+	}
+	defer unlockFn()
+
+	repoDir, err := w.WorkingDir.Clone(pctx.Log, pctx.HeadRepo, pctx.Pull, DefaultWorkspace)
+	if err != nil {
+		return err
+	}
+
+	err = w.runHooks(
+		models.WorkflowHookCommandContext{
+			BaseRepo:           pctx.Pull.BaseRepo,
+			HeadRepo:           pctx.HeadRepo,
+			Log:                pctx.Log,
+			Pull:               pctx.Pull,
+			User:               pctx.User,
+			Verbose:            false,
+			EscapedCommentArgs: pctx.EscapedCommentArgs,
+			CommandName:        pctx.CommandName.String(),
+			API:                pctx.API,
+			ProjectName:        pctx.ProjectName,
+			RepoRelDir:         pctx.RepoRelDir,
+			Workspace:          pctx.Workspace,
+			SuppressJobOutput:  pctx.SuppressJobOutput,
+		},
+		preWorkflowHooks, repoDir, pctx.SuppressVCSStatus)
+
+	if err != nil {
+		pctx.Log.Err("Error running project-scoped pre-workflow hooks: %s", err)
+		if w.FailOnPreWorkflowHookError {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
