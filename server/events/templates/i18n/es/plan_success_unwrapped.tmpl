@@ -3,9 +3,6 @@
 {{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
 ```
 
-{{ if .PlanWasDeleted -}}
-Este plan no se guardó porque uno o más proyectos fallaron y automerge requiere que todos los planes pasen.
-{{ else -}}
 {{ if not .DisableApply -}}
 * :arrow_forward: Para **aplicar** este plan, comenta:
   ```shell
@@ -19,6 +16,5 @@ Este plan no se guardó porque uno o más proyectos fallaron y automerge requier
   ```shell
   {{ .RePlanCmd }}
   ```
-{{ end -}}
 {{ template "mergedAgain" . -}}
 {{ end -}}

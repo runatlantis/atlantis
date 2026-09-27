@@ -3,7 +3,7 @@
 ### Plan Summary
 
 {{ len .Results }} projects, {{ .NumPlansWithChanges }} with changes, {{ .NumPlansWithNoChanges }} with no changes, {{ .NumPlanFailures }} failed
-{{ if and (not .PlansDeleted) (ne .DisableApplyAll true) }}
+{{ if ne .DisableApplyAll true }}
 * :fast_forward: To **apply** all unapplied plans from this {{ .VcsRequestType }}, comment:
   ```shell
   {{ .ExecutableName }} apply
