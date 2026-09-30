@@ -5,6 +5,7 @@ package terraform
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -47,7 +48,9 @@ func (d *TofuDownloader) Install(ctx context.Context, dir string, _downloadURL s
 }
 
 type TerraformDownloader struct {
-	apiAuth APIAuth
+	// httpClient is used by hc-install for all requests; nil means the
+	// hc-install default client.
+	httpClient *http.Client
 }
 
 func (d *TerraformDownloader) Install(ctx context.Context, dir string, downloadURL string, v *version.Version) (string, error) {
@@ -58,7 +61,7 @@ func (d *TerraformDownloader) Install(ctx context.Context, dir string, downloadU
 			Version:    v,
 			InstallDir: dir,
 			ApiBaseURL: downloadURL,
-			Transport:  d.apiAuth.transport(),
+			HTTPClient: d.httpClient,
 		},
 	})
 	if err != nil {
