@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -99,6 +100,38 @@ func TestResolveTerraformVersions_MirrorBasicAuth(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	d := terraform.NewDistribution("terraform", srv.URL, terraform.APIAuth{Username: wantUser, Password: wantPass})
+	version, err := d.ResolveConstraint(context.Background(), "= 1.9.3")
+	Ok(t, err)
+	Equals(t, version.String(), "1.9.3")
+}
+
+func TestResolveTerraformVersions_MirrorAuthNotForwardedOnRedirect(t *testing.T) {
+	const wantToken = "my-mirror-token"
+
+	// e.g. object storage the mirror redirects to, which must not
+	// receive the mirror's credentials. Addressed via a different
+	// hostname below, as redirect header stripping ignores ports.
+	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			http.Error(w, "unexpected Authorization header", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(mirrorIndexBody))
+	}))
+	t.Cleanup(storage.Close)
+
+	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+wantToken {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		storageURL := strings.Replace(storage.URL, "127.0.0.1", "localhost", 1)
+		http.Redirect(w, r, storageURL+r.URL.Path, http.StatusFound)
+	}))
+	t.Cleanup(mirror.Close)
+
+	d := terraform.NewDistribution("terraform", mirror.URL, terraform.APIAuth{BearerToken: wantToken})
 	version, err := d.ResolveConstraint(context.Background(), "= 1.9.3")
 	Ok(t, err)
 	Equals(t, version.String(), "1.9.3")
