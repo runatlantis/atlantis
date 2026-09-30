@@ -357,8 +357,8 @@ func escapeArgs(args []string) []string {
 
 // requiresAtlantisManagedPlanFile reports whether Atlantis owns the convention
 // plan artifact (<workspace>.tfplan) for this workflow. That is true when the
-// workflow uses the built-in plan step (Atlantis writes the file) or the
-// built-in apply step (Atlantis reads it). A workflow built only from custom
+// workflow uses the built-in plan/apply steps or a marked custom run produces
+// or consumes a plan at $PLANFILE. A workflow built only from unmarked custom
 // run steps writes its plan wherever the user's commands choose, so Atlantis
 // must not require, hash, or delete a convention plan file for it.
 func requiresAtlantisManagedPlanFile(workflow valid.Workflow) bool {
@@ -366,11 +366,20 @@ func requiresAtlantisManagedPlanFile(workflow valid.Workflow) bool {
 }
 
 func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
-	return hasStepNamed(steps, "plan")
+	return hasStepNamed(steps, "plan") || hasRunPlanStoreMode(steps, valid.RunPlanStoreSaveMode)
 }
 
 func hasAtlantisManagedApplyStep(steps []valid.Step) bool {
-	return hasStepNamed(steps, "apply")
+	return hasStepNamed(steps, "apply") || hasRunPlanStoreMode(steps, valid.RunPlanStoreConsumeMode)
+}
+
+func hasRunPlanStoreMode(steps []valid.Step, mode valid.RunPlanStoreMode) bool {
+	for _, step := range steps {
+		if step.StepName == "run" && step.PlanStore != nil && step.PlanStore.Mode == mode {
+			return true
+		}
+	}
+	return false
 }
 
 func hasStepNamed(steps []valid.Step, name string) bool {
