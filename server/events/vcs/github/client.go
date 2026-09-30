@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit/github_secondary_ratelimit"
 	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -116,7 +117,7 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
-	transportWithRateLimit := newSecondaryRateLimitHTTPClient(transport)
+	transportWithRateLimit := newSecondaryRateLimitHTTPClient(transport, logger)
 
 	var client *github.Client
 	if hostname == "github.com" {
@@ -158,9 +159,18 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 	}, nil
 }
 
-func newSecondaryRateLimitHTTPClient(client *http.Client) *http.Client {
+func newSecondaryRateLimitHTTPClient(client *http.Client, logger logging.SimpleLogging) *http.Client {
 	clientWithRateLimit := *client
-	clientWithRateLimit.Transport = github_ratelimit.NewSecondaryLimiter(client.Transport)
+	clientWithRateLimit.Transport = github_ratelimit.NewSecondaryLimiter(
+		client.Transport,
+		github_secondary_ratelimit.WithLimitDetectedCallback(func(ctx *github_secondary_ratelimit.CallbackContext) {
+			logger.Warn(
+				"GitHub secondary rate limit detected; pausing requests until %s (accumulated wait: %s)",
+				ctx.ResetTime.UTC().Format(time.RFC3339),
+				ctx.TotalSleepTime.String(),
+			)
+		}),
+	)
 	return &clientWithRateLimit
 }
 
