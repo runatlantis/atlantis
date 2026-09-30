@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/hc-install/httpclient"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/opentofu/tofudl"
@@ -23,33 +25,49 @@ type APIAuth struct {
 	BearerToken string
 }
 
-// transport builds an http.RoundTripper wrapper that injects these
-// credentials into every outgoing request, suitable for
-// releases.Versions.Transport / releases.ExactVersion.Transport. It returns
-// nil when no credentials are configured, so hc-install's default transport
-// is used unmodified.
-func (a APIAuth) transport() func(http.RoundTripper) http.RoundTripper {
-	if a.BearerToken == "" && a.Username == "" {
+// newMirrorHTTPClient returns an http.Client for hc-install which injects
+// auth credentials into requests made to the host of mirrorURL only, so they
+// are never sent to any other host.
+//
+// It returns nil when no credentials are configured, or no mirror host can be
+// determined, so that hc-install falls back to its default client.
+func newMirrorHTTPClient(mirrorURL string, auth APIAuth) *http.Client {
+	if auth.BearerToken == "" && auth.Username == "" {
 		return nil
 	}
-	return func(next http.RoundTripper) http.RoundTripper {
-		return &apiAuthRoundTripper{next: next, auth: a}
+	u, err := url.Parse(mirrorURL)
+	if err != nil || u.Host == "" {
+		return nil
 	}
+
+	client := httpclient.New()
+	client.Transport = &apiAuthRoundTripper{
+		host:  u.Host,
+		auth:  auth,
+		inner: client.Transport,
+	}
+	return client
 }
 
 type apiAuthRoundTripper struct {
-	next http.RoundTripper
-	auth APIAuth
+	host  string
+	auth  APIAuth
+	inner http.RoundTripper
 }
 
 func (rt *apiAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Host != rt.host {
+		return rt.inner.RoundTrip(req)
+	}
+
+	req = req.Clone(req.Context())
 	switch {
 	case rt.auth.BearerToken != "":
 		req.Header.Set("Authorization", "Bearer "+rt.auth.BearerToken)
 	case rt.auth.Username != "":
 		req.SetBasicAuth(rt.auth.Username, rt.auth.Password)
 	}
-	return rt.next.RoundTrip(req)
+	return rt.inner.RoundTrip(req)
 }
 
 type Distribution interface {
@@ -62,16 +80,18 @@ type Distribution interface {
 // NewDistribution returns the distribution implementation for Atlantis.
 // tfDownloadBaseURL is used for Terraform release listing and installs when
 // distribution is terraform (e.g. --tf-download-url); it is ignored for OpenTofu.
-// apiAuth carries optional credentials for a custom mirror; a zero value
-// means no auth (the hc-install default).
+// apiAuth carries optional credentials for the tfDownloadBaseURL mirror; a
+// zero value means no auth (the hc-install default).
 func NewDistribution(distribution string, tfDownloadBaseURL string, apiAuth APIAuth) Distribution {
 	if distribution == "opentofu" {
 		return NewDistributionOpenTofu()
 	}
+	downloadBaseURL := strings.TrimSpace(tfDownloadBaseURL)
+	httpClient := newMirrorHTTPClient(downloadBaseURL, apiAuth)
 	return &DistributionTerraform{
-		downloader:      &TerraformDownloader{apiAuth: apiAuth},
-		downloadBaseURL: strings.TrimSpace(tfDownloadBaseURL),
-		apiAuth:         apiAuth,
+		downloader:      &TerraformDownloader{httpClient: httpClient},
+		downloadBaseURL: downloadBaseURL,
+		httpClient:      httpClient,
 	}
 }
 
@@ -142,7 +162,7 @@ func (*DistributionOpenTofu) ResolveConstraint(ctx context.Context, constraintSt
 type DistributionTerraform struct {
 	downloader      Downloader
 	downloadBaseURL string
-	apiAuth         APIAuth
+	httpClient      *http.Client
 }
 
 func NewDistributionTerraform() Distribution {
@@ -174,10 +194,8 @@ func (d *DistributionTerraform) ResolveConstraint(ctx context.Context, constrain
 	constrainedVersions := &releases.Versions{
 		Product:     product.Terraform,
 		Constraints: vc,
-		Transport:   d.apiAuth.transport(),
-	}
-	if d.downloadBaseURL != "" {
-		constrainedVersions.ApiBaseURL = d.downloadBaseURL
+		ApiBaseURL:  d.downloadBaseURL,
+		HTTPClient:  d.httpClient,
 	}
 
 	installCandidates, err := constrainedVersions.List(ctx)

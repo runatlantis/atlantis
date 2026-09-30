@@ -77,7 +77,7 @@ require (
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/ProtonMail/go-crypto v1.4.1 // indirect
+	github.com/ProtonMail/go-crypto v1.5.2 // indirect
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/ProtonMail/gopenpgp/v2 v2.7.5 // indirect
 	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
@@ -159,9 +159,9 @@ require (
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/mod v0.40.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
@@ -177,7 +177,8 @@ tool (
 	go.uber.org/mock/mockgen
 )
 
-// Pin to local hc-install until a release includes the Transport interceptor
-// hook used for --tf-download-username/-password/-token. Remove after
+// Pin to local hc-install until a release includes Versions.ApiBaseURL and
+// HTTPClient passthrough (hashicorp/hc-install#364) used for --tf-download-url
+// version listing and --tf-download-username/-password/-token. Remove after
 // upgrading to that version.
 replace github.com/hashicorp/hc-install => ../hc-install
