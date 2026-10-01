@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
@@ -9,7 +12,8 @@ import (
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/runtime"
-	"github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tf "github.com/runatlantis/atlantis/server/core/terraform"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events/models"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -39,7 +43,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 
 	defaultShell := "sh"
 	defaultShellArgs := "-c"
-	defautShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
+	defaultShellCommandNotFoundErrorFormat := commandNotFoundErrorFormat(defaultShell)
 	defaultUnterminatedStringError := unterminatedStringError(defaultShell, defaultShellArgs)
 
 	cases := []struct {
@@ -102,15 +106,15 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			Command:        "lkjlkj",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         fmt.Sprintf(defautShellCommandNotFoundErrorFormat, "lkjlkj"),
+			ExpOut:         fmt.Sprintf(defaultShellCommandNotFoundErrorFormat, "lkjlkj"),
 			ExpErr:         "exit status 127: running \"sh -c lkjlkj\" in",
 			ExpDescription: "",
 		},
 		{
-			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR",
+			Command:        "echo base_repo_name=$BASE_REPO_NAME base_repo_owner=$BASE_REPO_OWNER head_repo_name=$HEAD_REPO_NAME head_repo_owner=$HEAD_REPO_OWNER head_branch_name=$HEAD_BRANCH_NAME head_commit=$HEAD_COMMIT base_branch_name=$BASE_BRANCH_NAME pull_num=$PULL_NUM pull_url=$PULL_URL pull_author=$PULL_AUTHOR project_name=$PROJECT_NAME",
 			Shell:          defaultShell,
 			ShellArgs:      defaultShellArgs,
-			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme\r\n",
+			ExpOut:         "base_repo_name=basename base_repo_owner=baseowner head_repo_name=headname head_repo_owner=headowner head_branch_name=add-feat head_commit=12345abcdef base_branch_name=main pull_num=2 pull_url=https://github.com/runatlantis/atlantis/pull/2 pull_author=acme project_name=*\r\n",
 			ExpErr:         "",
 			ExpDescription: "",
 		},
@@ -162,8 +166,8 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		Ok(t, err)
 
 		RegisterMockTestingT(t)
-		terraform := mocks.NewMockClient()
-		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[*version.Version]())).
+		terraform := tfclientmocks.NewMockClient()
+		When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
 			ThenReturn(nil)
 
 		logger := logging.NewNoopLogger(t)
@@ -196,6 +200,7 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 				},
 				Log:         logger,
 				CommandName: "plan",
+				ProjectName: "*",
 			}
 			_, desc, err := r.Run(ctx, c.Command, c.Shell, c.ShellArgs, tmpDir)
 			if c.ExpErr != "" {
@@ -207,9 +212,27 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 			// here because when constructing the cases we don't yet know the
 			// temp dir.
 			Equals(t, c.ExpDescription, desc)
-			expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
+			expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 			projectCmdOutputHandler.VerifyWasCalledOnce().SendWorkflowHook(
 				Any[models.WorkflowHookCommandContext](), Eq(expOut), Eq(false))
 		})
 	}
+}
+
+func TestPreWorkflowHookRunnerSuppressesJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	tmpDir := t.TempDir()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	r := runtime.DefaultPreWorkflowHookRunner{OutputHandler: projectCmdOutputHandler}
+
+	ctx := models.WorkflowHookCommandContext{
+		Log:               logger,
+		CommandName:       "plan",
+		SuppressJobOutput: true,
+	}
+	_, _, err := r.Run(ctx, "echo hidden", "sh", "-c", tmpDir)
+
+	Ok(t, err)
+	projectCmdOutputHandler.VerifyWasCalled(Never()).SendWorkflowHook(Any[models.WorkflowHookCommandContext](), Any[string](), Any[bool]())
 }

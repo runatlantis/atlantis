@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -17,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -60,10 +53,21 @@ func TestRenderErr(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -97,6 +101,132 @@ func TestRenderErr(t *testing.T) {
 	}
 }
 
+func TestRenderWorkingDirLockMetadata(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	const commitURL = "https://github.com/owner/repo/commit/" + sha
+	const jobURL = "https://atlantis.example.com/jobs/job-id"
+	metadata := events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL, JobURL: jobURL}
+	newLockError := func(ownerMetadata events.WorkingDirLockMetadata) error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Plan, ownerMetadata)
+		Ok(t, err)
+		_, err = locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newMultipleJobsLockError := func() error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLockPull("owner/repo", 1, command.Plan, metadata)
+		Ok(t, err)
+		for i, url := range []string{jobURL + "-1", jobURL + "-2"} {
+			_, err = locker.TryLock("owner/repo", 1, "default", ".", fmt.Sprintf("project-%d", i), command.Plan, events.WorkingDirLockMetadata{HeadCommit: sha, JobURL: url})
+			Ok(t, err)
+		}
+		_, err = locker.TryLockPull("owner/repo", 1, command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newRenderer := func(language string) *events.MarkdownRenderer {
+		return events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+	}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{BaseRepo: models.Repo{VCSHost: models.VCSHost{Type: models.Github}}},
+	}
+	ctx.Log.Info("log output")
+
+	t.Run("command error renders links before log", func(t *testing.T) {
+		rendered := newRenderer("en").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan, Verbose: true})
+		commitLink := "- Commit: [" + sha + "](" + commitURL + ")"
+		jobLink := "- Blocking job: [View Atlantis execution](" + jobURL + ")"
+		for _, text := range []string{"```\ncannot run", commitLink + "\n" + jobLink, "<details><summary>Log</summary>"} {
+			if !strings.Contains(rendered, text) {
+				t.Fatalf("expected %q in:\n%s", text, rendered)
+			}
+		}
+		if strings.Index(rendered, "```") >= strings.Index(rendered, commitLink) || strings.Index(rendered, commitLink) >= strings.Index(rendered, jobLink) || strings.Index(rendered, jobLink) >= strings.Index(rendered, "<details><summary>Log</summary>") {
+			t.Fatalf("unexpected command error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("link fallbacks are independent", func(t *testing.T) {
+		shaOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{HeadCommit: sha})}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(shaOnly, "for commit 0123456") || strings.Contains(shaOnly, "for commit "+sha) || strings.Contains(shaOnly, "- Commit:") || strings.Contains(shaOnly, "- Blocking job:") {
+			t.Fatalf("unexpected SHA-only fallback:\n%s", shaOnly)
+		}
+		jobOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{JobURL: jobURL})}, &events.CommentCommand{Name: command.Plan})
+		if strings.Contains(jobOnly, "- Commit:") || !strings.Contains(jobOnly, "- Blocking job: [View Atlantis execution]("+jobURL+")") {
+			t.Fatalf("unexpected job-only fallback:\n%s", jobOnly)
+		}
+	})
+
+	t.Run("project error renders links before context", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: newLockError(metadata),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(rendered, "```\ncannot run") || strings.Index(rendered, "- Commit:") <= strings.Index(rendered, "```\ncannot run") || strings.Index(rendered, "rendered context") <= strings.Index(rendered, "- Blocking job:") {
+			t.Fatalf("unexpected unwrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("wrapped project error keeps context in details and links after", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), newLockError(metadata)),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		closeDetails := strings.Index(rendered, "</details>")
+		if strings.Index(rendered, "rendered context") >= closeDetails || closeDetails >= strings.Index(rendered, "- Commit:") || strings.Index(rendered, "- Commit:") >= strings.Index(rendered, "- Blocking job:") {
+			t.Fatalf("unexpected wrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("Spanish template has the same link structure", func(t *testing.T) {
+		rendered := newRenderer("es").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(rendered, "- Commit: ["+sha+"]("+commitURL+")") || !strings.Contains(rendered, "- Trabajo bloqueante: [Ver ejecución de Atlantis]("+jobURL+")") {
+			t.Fatalf("expected localized links in:\n%s", rendered)
+		}
+	})
+
+	t.Run("multiple jobs notice is localized and outside error details", func(t *testing.T) {
+		for _, tt := range []struct {
+			language string
+			notice   string
+		}{
+			{language: "en", notice: "- Multiple Atlantis jobs are currently running for this commit."},
+			{language: "es", notice: "- Actualmente se están ejecutando varios trabajos de Atlantis para este commit."},
+		} {
+			t.Run(tt.language, func(t *testing.T) {
+				err := newMultipleJobsLockError()
+				unwrapped := newRenderer(tt.language).Render(ctx, command.Result{Error: err}, &events.CommentCommand{Name: command.Apply})
+				fence := strings.Index(unwrapped, "\n```\n- Commit:")
+				if notice := strings.Index(unwrapped, tt.notice); fence < 0 || notice < fence {
+					t.Fatalf("expected notice below fenced error:\n%s", unwrapped)
+				}
+
+				result := command.ProjectResult{ProjectCommandOutput: command.ProjectCommandOutput{Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), err)}}
+				wrapped := newRenderer(tt.language).Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Apply})
+				details := strings.Index(wrapped, "</details>")
+				if notice := strings.Index(wrapped, tt.notice); details < 0 || notice < details {
+					t.Fatalf("expected notice below wrapped error details:\n%s", wrapped)
+				}
+			})
+		}
+	})
+}
+
 func TestRenderFailure(t *testing.T) {
 	cases := []struct {
 		Description string
@@ -124,10 +254,21 @@ func TestRenderFailure(t *testing.T) {
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -162,8 +303,346 @@ func TestRenderFailure(t *testing.T) {
 	}
 }
 
+func TestRenderSpanishLocalization(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es", // language
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	planResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+	planOutput := r.Render(ctx, planResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(planOutput, "Se ejecutó Planificar para directorio:") {
+		t.Fatalf("expected Spanish plan header, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar**") {
+		t.Fatalf("expected Spanish plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish nested plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **eliminar** este plan y bloqueo") {
+		t.Fatalf("expected Spanish nested plan delete instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish nested plan rerun instruction, got: %s", planOutput)
+	}
+	if strings.Contains(planOutput, "To **apply** this plan") || strings.Contains(planOutput, "To **delete** this plan and lock") || strings.Contains(planOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English nested plan instructions, got: %s", planOutput)
+	}
+
+	wrappedPlanResult := planResult
+	wrappedPlanResult.ProjectResults[0].PlanSuccess = &models.PlanSuccess{
+		TerraformOutput: strings.Repeat("terraform-output\n", 14),
+		LockURL:         "lock-url",
+		RePlanCmd:       "atlantis plan -d path -w workspace",
+		ApplyCmd:        "atlantis apply -d path -w workspace",
+	}
+	wrappedPlanOutput := r.Render(ctx, wrappedPlanResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(wrappedPlanOutput, "<details><summary>Mostrar salida</summary>") {
+		t.Fatalf("expected Spanish wrapped plan output summary, got: %s", wrappedPlanOutput)
+	}
+	if !strings.Contains(wrappedPlanOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish wrapped plan apply instruction, got: %s", wrappedPlanOutput)
+	}
+	if strings.Contains(wrappedPlanOutput, "Show Output") || strings.Contains(wrappedPlanOutput, "To **apply** this plan") {
+		t.Fatalf("expected no English wrapped plan text, got: %s", wrappedPlanOutput)
+	}
+
+	failureOutput := r.Render(ctx, command.Result{Failure: "fallo"}, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(failureOutput, "**Aplicar falló**: fallo") {
+		t.Fatalf("expected Spanish failure rendering, got: %s", failureOutput)
+	}
+
+	importResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ImportSuccess: &models.ImportSuccess{
+						Output:    "import-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				Workspace:   "workspace",
+				RepoRelDir:  "path",
+				ProjectName: "projectname",
+			},
+		},
+	}
+	importOutput := r.Render(ctx, importResult, &events.CommentCommand{Name: command.Import})
+	if !strings.Contains(importOutput, "Se ejecutó Importar para proyecto:") {
+		t.Fatalf("expected Spanish import header, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Se descartó un archivo de plan") {
+		t.Fatalf("expected Spanish import discarded-plan message, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish import re-plan instruction, got: %s", importOutput)
+	}
+	if strings.Contains(importOutput, "Ran Importar") || strings.Contains(importOutput, "A plan file was discarded") || strings.Contains(importOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English import fallback text, got: %s", importOutput)
+	}
+}
+
+func TestRenderCustomLanguageConfigOverride(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "custom-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+pull_request_label: Pull Request (custom)
+command_titles:
+  plan: Plan (custom)
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",              // unsupported without custom file
+			CatalogPath:  customCatalogPath, // custom language config file
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(output, "Ran Plan (custom) for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected command title override, got: %s", output)
+	}
+	if !strings.Contains(output, "Pull Request (custom)") {
+		t.Fatalf("expected pull request label override, got: %s", output)
+	}
+}
+
+func TestRenderUsesStableCommandIdentifierWhenTitlesCollide(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "colliding-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+command_titles:
+  plan: Run
+  apply: Run
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",
+			CatalogPath:  customCatalogPath,
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "apply-success-output",
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(output, "Ran Run for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected localized custom command title in output, got: %s", output)
+	}
+	if strings.Contains(output, "To **apply** all unapplied plans") {
+		t.Fatalf("expected apply template selection despite colliding titles, got: %s", output)
+	}
+}
+
+func TestRenderPolicyCheckIncludesPolicyOutputForLocalizedCommand(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es",
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PreConftestOutput: "pre-policy-output",
+						PolicySetResults: []models.PolicySetResult{
+							{PolicySetName: "set-a", PolicyOutput: "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions", Passed: true},
+						},
+						PostConftestOutput: "post-policy-output",
+						LockURL:            "lock-url",
+						RePlanCmd:          "atlantis plan -d path -w workspace",
+						ApplyCmd:           "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.PolicyCheck})
+	if !strings.Contains(output, "pre-policy-output") {
+		t.Fatalf("expected policy pre-conftest output in localized rendering, got: %s", output)
+	}
+	if !strings.Contains(output, "post-policy-output") {
+		t.Fatalf("expected policy post-conftest output in localized rendering, got: %s", output)
+	}
+
+	wrappedRes := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "set-a",
+								PolicyOutput:  strings.Repeat("policy-output\n", 14) + "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	wrappedOutput := r.Render(ctx, wrappedRes, &events.CommentCommand{Name: command.PolicyCheck})
+	if strings.Count(wrappedOutput, "<details") != strings.Count(wrappedOutput, "</details>") {
+		t.Fatalf("expected balanced details tags in wrapped localized policy output, got: %s", wrappedOutput)
+	}
+	closeDetailsIndex := strings.Index(wrappedOutput, "</details>")
+	applyInstructionIndex := strings.Index(wrappedOutput, "Para **aplicar** este plan")
+	if closeDetailsIndex == -1 || applyInstructionIndex == -1 || closeDetailsIndex > applyInstructionIndex {
+		t.Fatalf("expected Spanish policy apply instruction after closed output details block, got: %s", wrappedOutput)
+	}
+}
+
 func TestRenderErrAndFailure(t *testing.T) {
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	ctx := &command.Context{
 		Log: logger,
@@ -211,11 +690,13 @@ func TestRenderProjectResults(t *testing.T) {
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -256,12 +737,14 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						MergedAgain:     true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							MergedAgain:     true,
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -303,11 +786,13 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -349,28 +834,30 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+								{
+									PolicySetName: "policy2",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
+								},
 							},
-							{
-								PolicySetName: "policy2",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
-								Passed:       true,
-								ReqApprovals: 1,
-							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -426,21 +913,23 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								// strings.Repeat require to get wrapped result
-								PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
 
 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
-								Passed:       false,
-								ReqApprovals: 1,
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
 							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						RePlanCmd: "atlantis plan -d path -w workspace",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -510,9 +999,11 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ImportSuccess: &models.ImportSuccess{
-						Output:    "import-output",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ImportSuccess: &models.ImportSuccess{
+							Output:    "import-output",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -541,9 +1032,11 @@ $$$
 			"rm",
 			[]command.ProjectResult{
 				{
-					StateRmSuccess: &models.StateRmSuccess{
-						Output:    "state-rm-output",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						StateRmSuccess: &models.StateRmSuccess{
+							Output:    "state-rm-output",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -572,9 +1065,11 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			models.Github,
@@ -592,10 +1087,12 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ProjectName:  "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
 				},
 			},
 			models.Github,
@@ -615,22 +1112,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -696,33 +1197,37 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
 							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
 						},
-						LockURL:   "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url2",
-						ApplyCmd:  "atlantis apply -d path2 -w workspace",
-						RePlanCmd: "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url2",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -786,15 +1291,19 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					RepoRelDir:   "path",
-					Workspace:    "workspace",
-					ProjectName:  "projectname",
-					ApplySuccess: "success",
+					RepoRelDir:  "path",
+					Workspace:   "workspace",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
-					RepoRelDir:   "path2",
-					Workspace:    "workspace",
-					ApplySuccess: "success2",
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success2",
+					},
 				},
 			},
 			models.Github,
@@ -828,7 +1337,9 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 					RepoRelDir: "path",
 					Workspace:  "workspace",
 				},
@@ -851,7 +1362,9 @@ $$$
 				{
 					RepoRelDir: "path",
 					Workspace:  "workspace",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 			},
 			models.Github,
@@ -869,23 +1382,29 @@ Ran Plan for dir: $path$ workspace: $workspace$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -946,40 +1465,46 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-								Passed:        true,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
-					PolicyCheckResults: &models.PolicyCheckResults{
-						PolicySetResults: []models.PolicySetResult{
-							{
-								PolicySetName: "policy1",
-								PolicyOutput:  "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
-								Passed:        false,
-								ReqApprovals:  1,
-							},
-						}, LockURL: "lock-url",
-						ApplyCmd:  "atlantis apply -d path -w workspace",
-						RePlanCmd: "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1054,24 +1579,281 @@ $$$
 `,
 		},
 		{
+			"approved policy set shows output in details",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+										},
+									}},
+								},
+								{
+									PolicySetName: "policy2",
+									PolicyOutput:  "2 tests, 2 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+<details><summary>:white_check_mark: 2 previously approved items</summary>
+
+$$$diff
+FAIL - deny_something
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+</details>
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failures, 0 exceptions
+$$$
+
+
+* :arrow_forward: To **apply** this plan, comment:
+  $$$shell
+  atlantis apply -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"partially approved multi-set policy check",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions"),
+										},
+									}},
+								},
+								{
+									PolicySetName:    "policy2",
+									PolicyOutput:     "FAIL - deny_other\n1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+							},
+							LockURL:            "lock-url",
+							ApplyCmd:           "atlantis apply -d path -w workspace",
+							RePlanCmd:          "atlantis plan -d path -w workspace",
+							ApprovePoliciesCmd: "atlantis approve_policies -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+<details><summary>:white_check_mark: 2 previously approved items</summary>
+
+$$$diff
+FAIL - deny_something
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+</details>
+
+#### Policy Set: $policy2$
+$$$diff
+FAIL - deny_other
+1 tests, 0 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: approved.
+policy set: policy2: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  atlantis approve_policies -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"per-item filtering with stale approval",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "FAIL - deny_something\nFAIL - deny_other",
+									Passed:           false,
+									ReqApprovalCount: 1,
+									PolicyItemRegex:  ".+",
+									Hashes: []string{
+										models.HashPolicyItem("FAIL - deny_something"),
+										models.HashPolicyItem("FAIL - deny_other"),
+									},
+									Approvals: []models.PolicySetApproval{{
+										Approver: "boss",
+										Hashes: []string{
+											models.HashPolicyItem("FAIL - deny_something"),
+											models.HashPolicyItem("old_line"),
+										},
+									}},
+								},
+							},
+							LockURL:            "lock-url",
+							ApplyCmd:           "atlantis apply -d path -w workspace",
+							RePlanCmd:          "atlantis plan -d path -w workspace",
+							ApprovePoliciesCmd: "atlantis approve_policies -d path -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - deny_other
+$$$
+<details><summary>:white_check_mark: 1 previously approved item</summary>
+
+$$$diff
+FAIL - deny_something
+$$$
+</details>
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  atlantis approve_policies -d path -w workspace
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
 			"successful, failed, and errored apply",
 			command.Apply,
 			"",
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1111,19 +1893,25 @@ $$$
 			"",
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -1159,10 +1947,409 @@ $$$
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
+	ctx := &command.Context{
+		Log: logger,
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			res := command.Result{
+				ProjectResults: c.ProjectResults,
+			}
+			for _, verbose := range []bool{true, false} {
+				t.Run(c.Description, func(t *testing.T) {
+					cmd := &events.CommentCommand{
+						Name:    c.Command,
+						SubName: c.SubCommand,
+						Verbose: verbose,
+					}
+					s := r.Render(ctx, res, cmd)
+					if !verbose {
+						Equals(t, normalize(c.Expected), normalize(s))
+					} else {
+						log := fmt.Sprintf("[INFO] %s", logText)
+						Equals(t, normalize(c.Expected+
+							fmt.Sprintf("<details><summary>Log</summary>\n<p>\n\n```\n%s\n```\n</p></details>", log)), normalize(s))
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRenderProjectResultsWithQuietPolicyChecks(t *testing.T) {
+	cases := []struct {
+		Description    string
+		Command        command.Name
+		SubCommand     string
+		ProjectResults []command.ProjectResult
+		VCSHost        models.VCSHostType
+		Expected       string
+	}{
+		{
+			"single successful policy check with multiple policy sets and project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput: `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+								{
+									PolicySetName:    "policy2",
+									PolicyOutput:     "2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions",
+									Passed:           true,
+									ReqApprovalCount: 1,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+#### Policy Set: $policy1$
+$$$diff
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+#### Policy Set: $policy2$
+$$$diff
+2 tests, 2 passed, 0 warnings, 0 failure, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+policy set: policy2: passed.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"single successful policy check with project name",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									// strings.Repeat require to get wrapped result
+									PolicyOutput: strings.Repeat("line\n", 13) + `FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions`,
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+							},
+							LockURL:   "lock-url",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+						},
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for project: $projectname$ dir: $path$ workspace: $workspace$
+
+<details><summary>Show Output</summary>
+
+#### Policy Set: $policy1$
+$$$diff
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+line
+FAIL - <redacted plan file> - main - WARNING: Null Resource creation is prohibited.
+
+2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+
+</details>
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+$$$
+policy set: policy1: 2 tests, 1 passed, 0 warnings, 1 failure, 0 exceptions
+$$$
+
+---
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"multiple successful policy checks",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							},
+							LockURL:   "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path2",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url2",
+							ApplyCmd:  "atlantis apply -d path2 -w workspace",
+							RePlanCmd: "atlantis plan -d path2 -w workspace",
+						},
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 2 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. project: $projectname$ dir: $path2$ workspace: $workspace$
+---
+
+* :fast_forward: To **apply** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis apply
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+`,
+		},
+		{
+			"successful, failed, and errored policy check",
+			command.PolicyCheck,
+			"",
+			[]command.ProjectResult{
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName: "policy1",
+									PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+									Passed:        true,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:  "workspace",
+					RepoRelDir: "path2",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+						PolicyCheckResults: &models.PolicyCheckResults{
+							PolicySetResults: []models.PolicySetResult{
+								{
+									PolicySetName:    "policy1",
+									PolicyOutput:     "4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions",
+									Passed:           false,
+									ReqApprovalCount: 1,
+								},
+							}, LockURL: "lock-url",
+							ApplyCmd:  "atlantis apply -d path -w workspace",
+							RePlanCmd: "atlantis plan -d path -w workspace",
+						},
+					},
+				},
+				{
+					Workspace:   "workspace",
+					RepoRelDir:  "path3",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
+				},
+			},
+			models.Github,
+			`
+Ran Policy Check for 3 projects:
+
+1. dir: $path$ workspace: $workspace$
+1. dir: $path2$ workspace: $workspace$
+1. project: $projectname$ dir: $path3$ workspace: $workspace$
+---
+
+### 2. dir: $path2$ workspace: $workspace$
+**Policy Check Failed**: failure
+#### Policy Set: $policy1$
+$$$diff
+4 tests, 2 passed, 0 warnings, 2 failures, 0 exceptions
+$$$
+
+
+#### Policy Approval Status:
+$$$
+policy set: policy1: requires: 1 approval(s), have: 0.
+$$$
+* :heavy_check_mark: To **approve** this project, comment:
+  $$$shell
+  
+  $$$
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan -d path -w workspace
+  $$$
+
+---
+### 3. project: $projectname$ dir: $path3$ workspace: $workspace$
+**Policy Check Error**
+$$$
+error
+$$$
+
+---
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  $$$shell
+  atlantis approve_policies
+  $$$
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  $$$shell
+  atlantis unlock
+  $$$
+* :repeat: To re-run policies **plan** this project again by commenting:
+  $$$shell
+  atlantis plan
+  $$$
+`,
+		},
+	}
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		true,       // quietPolicyChecks
+	)
+	logger := logging.NewNoopLogger(t).WithHistory()
+	logText := "log"
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1213,11 +2400,13 @@ func TestRenderProjectResultsDisableApplyAll(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1247,11 +2436,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1284,22 +2475,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -1356,13 +2551,14 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1412,11 +2608,13 @@ func TestRenderProjectResultsDisableApply(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -1442,11 +2640,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -1475,22 +2675,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -1540,13 +2744,14 @@ $$$
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1598,13 +2803,14 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		tmpDir,     // MarkdownTemplateOverridesDir
+		tmpDir,     // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1621,16 +2827,18 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 			{
 				Workspace:  "workspace",
 				RepoRelDir: "path",
-				PolicyCheckResults: &models.PolicyCheckResults{
-					PolicySetResults: []models.PolicySetResult{
-						{
-							PolicySetName: "policy1",
-							PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
-							Passed:        true,
-						},
-					}, LockURL: "lock-url",
-					ApplyCmd:  "atlantis apply -d path -w workspace",
-					RePlanCmd: "atlantis plan -d path -w workspace",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "policy1",
+								PolicyOutput:  "4 tests, 4 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						}, LockURL: "lock-url",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
 				},
 			},
 		},
@@ -1672,13 +2880,14 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 		true,       // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1694,7 +2903,9 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "default",
-				Error:      errors.New(strings.Repeat("line\n", 13)),
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					Error: errors.New(strings.Repeat("line\n", 13)),
+				},
 			},
 		},
 	}
@@ -1781,13 +2992,14 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 					false,                     // disableMarkdownFolding
 					false,                     // disableRepoLocking
 					false,                     // enableDiffMarkdownFormat
-					"",                        // MarkdownTemplateOverridesDir
+					"",                        // markdownTemplateOverridesDir
 					"atlantis",                // executableName
 					false,                     // hideUnchangedPlanComments
+					false,                     // quietPolicyChecks
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
-				logger.Info(logText)
+				logger.Info("%s", logText)
 				ctx := &command.Context{
 					Log: logger,
 					Pull: models.PullRequest{
@@ -1803,7 +3015,9 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 						{
 							RepoRelDir: ".",
 							Workspace:  "default",
-							Error:      errors.New(c.Output),
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								Error: errors.New(c.Output),
+							},
 						},
 					},
 				}
@@ -1926,13 +3140,14 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						false,                     // disableMarkdownFolding
 						false,                     // disableRepoLocking
 						false,                     // enableDiffMarkdownFormat
-						"",                        // MarkdownTemplateOverridesDir
+						"",                        // markdownTemplateOverridesDir
 						"atlantis",                // executableName
 						false,                     // hideUnchangedPlanComments
+						false,                     // quietPolicyChecks
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
-					logger.Info(logText)
+					logger.Info("%s", logText)
 					ctx := &command.Context{
 						Log: logger,
 						Pull: models.PullRequest{
@@ -1950,18 +3165,22 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 						pr = command.ProjectResult{
 							RepoRelDir: ".",
 							Workspace:  "default",
-							PlanSuccess: &models.PlanSuccess{
-								TerraformOutput: c.Output,
-								LockURL:         "lock-url",
-								RePlanCmd:       "replancmd",
-								ApplyCmd:        "applycmd",
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								PlanSuccess: &models.PlanSuccess{
+									TerraformOutput: c.Output,
+									LockURL:         "lock-url",
+									RePlanCmd:       "replancmd",
+									ApplyCmd:        "applycmd",
+								},
 							},
 						}
 					case command.Apply:
 						pr = command.ProjectResult{
-							RepoRelDir:   ".",
-							Workspace:    "default",
-							ApplySuccess: c.Output,
+							RepoRelDir: ".",
+							Workspace:  "default",
+							ProjectCommandOutput: command.ProjectCommandOutput{
+								ApplySuccess: c.Output,
+							},
 						}
 					}
 					res := command.Result{
@@ -2076,13 +3295,14 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2097,14 +3317,18 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	res := command.Result{
 		ProjectResults: []command.ProjectResult{
 			{
-				RepoRelDir:   ".",
-				Workspace:    "staging",
-				ApplySuccess: tfOut,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: tfOut,
+				},
 			},
 			{
-				RepoRelDir:   ".",
-				Workspace:    "production",
-				ApplySuccess: tfOut,
+				RepoRelDir: ".",
+				Workspace:  "production",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: tfOut,
+				},
 			},
 		},
 	}
@@ -2155,13 +3379,14 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2178,21 +3403,25 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 			{
 				RepoRelDir: ".",
 				Workspace:  "staging",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOut,
-					LockURL:         "staging-lock-url",
-					ApplyCmd:        "staging-apply-cmd",
-					RePlanCmd:       "staging-replan-cmd",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOut,
+						LockURL:         "staging-lock-url",
+						ApplyCmd:        "staging-apply-cmd",
+						RePlanCmd:       "staging-replan-cmd",
+					},
 				},
 			},
 			{
 				RepoRelDir: ".",
 				Workspace:  "production",
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOut,
-					LockURL:         "production-lock-url",
-					ApplyCmd:        "production-apply-cmd",
-					RePlanCmd:       "production-replan-cmd",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOut,
+						LockURL:         "production-lock-url",
+						ApplyCmd:        "production-apply-cmd",
+						RePlanCmd:       "production-replan-cmd",
+					},
 				},
 			},
 		},
@@ -2278,7 +3507,9 @@ func TestRenderProjectResults_PlansDeleted(t *testing.T) {
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 				},
 				PlansDeleted: true,
@@ -2295,12 +3526,16 @@ Ran Plan for dir: $.$ workspace: $staging$
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 					{
 						RepoRelDir: ".",
 						Workspace:  "production",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 				},
 				PlansDeleted: true,
@@ -2331,16 +3566,20 @@ Ran Plan for 2 projects:
 					{
 						RepoRelDir: ".",
 						Workspace:  "staging",
-						Failure:    "failure",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							Failure: "failure",
+						},
 					},
 					{
 						RepoRelDir: ".",
 						Workspace:  "production",
-						PlanSuccess: &models.PlanSuccess{
-							TerraformOutput: "tf out",
-							LockURL:         "lock-url",
-							RePlanCmd:       "re-plan cmd",
-							ApplyCmd:        "apply cmd",
+						ProjectCommandOutput: command.ProjectCommandOutput{
+							PlanSuccess: &models.PlanSuccess{
+								TerraformOutput: "tf out",
+								LockURL:         "lock-url",
+								RePlanCmd:       "re-plan cmd",
+								ApplyCmd:        "apply cmd",
+							},
 						},
 					},
 				},
@@ -2381,13 +3620,14 @@ This plan was not saved because one or more projects failed and automerge requir
 				false,      // disableMarkdownFolding
 				false,      // disableRepoLocking
 				false,      // enableDiffMarkdownFormat
-				"",         // MarkdownTemplateOverridesDir
+				"",         // markdownTemplateOverridesDir
 				"atlantis", // executableName
 				false,      // hideUnchangedPlanComments
+				false,      // quietPolicyChecks
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
-			logger.Info(logText)
+			logger.Info("%s", logText)
 			ctx := &command.Context{
 				Log: logger,
 				Pull: models.PullRequest{
@@ -2429,11 +3669,13 @@ func TestRenderProjectResultsWithRepoLockingDisabled(t *testing.T) {
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -2472,12 +3714,14 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						MergedAgain:     true,
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							MergedAgain:     true,
+						},
 					},
 					Workspace:  "workspace",
 					RepoRelDir: "path",
@@ -2517,11 +3761,13 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+						},
 					},
 					Workspace:   "workspace",
 					RepoRelDir:  "path",
@@ -2561,9 +3807,11 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:  "workspace",
+					RepoRelDir: "path",
 				},
 			},
 			models.Github,
@@ -2580,10 +3828,12 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					ApplySuccess: "success",
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ProjectName:  "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
+					Workspace:   "workspace",
+					RepoRelDir:  "path",
+					ProjectName: "projectname",
 				},
 			},
 			models.Github,
@@ -2602,22 +3852,26 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -2678,15 +3932,19 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					RepoRelDir:   "path",
-					Workspace:    "workspace",
-					ProjectName:  "projectname",
-					ApplySuccess: "success",
+					RepoRelDir:  "path",
+					Workspace:   "workspace",
+					ProjectName: "projectname",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
-					RepoRelDir:   "path2",
-					Workspace:    "workspace",
-					ApplySuccess: "success2",
+					RepoRelDir: "path2",
+					Workspace:  "workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success2",
+					},
 				},
 			},
 			models.Github,
@@ -2719,7 +3977,9 @@ $$$
 			command.Plan,
 			[]command.ProjectResult{
 				{
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 					RepoRelDir: "path",
 					Workspace:  "workspace",
 				},
@@ -2741,7 +4001,9 @@ $$$
 				{
 					RepoRelDir: "path",
 					Workspace:  "workspace",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 			},
 			models.Github,
@@ -2758,23 +4020,29 @@ Ran Plan for dir: $path$ workspace: $workspace$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname",
-					Error:       errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -2831,19 +4099,25 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -2882,19 +4156,25 @@ $$$
 			command.Apply,
 			[]command.ProjectResult{
 				{
-					Workspace:    "workspace",
-					RepoRelDir:   "path",
-					ApplySuccess: "success",
+					Workspace:  "workspace",
+					RepoRelDir: "path",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						ApplySuccess: "success",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path2",
-					Failure:    "failure",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Failure: "failure",
+					},
 				},
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path3",
-					Error:      errors.New("error"),
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						Error: errors.New("error"),
+					},
 				},
 			},
 			models.Github,
@@ -2937,13 +4217,14 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2994,22 +4275,26 @@ func TestRenderProjectResultsWithGitLab(t *testing.T) {
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output2",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output2",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 			},
@@ -3074,13 +4359,14 @@ $$$
 		false,      // disableMarkdownFolding
 		true,       // disableRepoLocking
 		false,      // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			ctx := &command.Context{
@@ -3313,11 +4599,13 @@ var cases = []struct {
 		command.Plan,
 		[]command.ProjectResult{
 			{
-				PlanSuccess: &models.PlanSuccess{
-					TerraformOutput: tfOutput,
-					LockURL:         "lock-url",
-					RePlanCmd:       "atlantis plan -d path -w workspace",
-					ApplyCmd:        "atlantis apply -d path -w workspace",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: tfOutput,
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
 				},
 				Workspace:  "workspace",
 				RepoRelDir: "path",
@@ -3533,13 +4821,14 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -3588,13 +4877,14 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 		false,      // disableMarkdownFolding
 		false,      // disableRepoLocking
 		true,       // enableDiffMarkdownFormat
-		"",         // MarkdownTemplateOverridesDir
+		"",         // markdownTemplateOverridesDir
 		"atlantis", // executableName
 		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		b.Run(c.Description, func(b *testing.B) {
@@ -3645,33 +4935,39 @@ func TestRenderProjectResultsHideUnchangedPlans(t *testing.T) {
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "terraform-output3",
-						LockURL:         "lock-url3",
-						ApplyCmd:        "atlantis apply -d path3 -w workspace",
-						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "terraform-output3",
+							LockURL:         "lock-url3",
+							ApplyCmd:        "atlantis apply -d path3 -w workspace",
+							RePlanCmd:       "atlantis plan -d path3 -w workspace",
+						},
 					},
 				},
 			},
@@ -3738,33 +5034,39 @@ $$$
 				{
 					Workspace:  "workspace",
 					RepoRelDir: "path",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url",
-						ApplyCmd:        "atlantis apply -d path -w workspace",
-						RePlanCmd:       "atlantis plan -d path -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url",
+							ApplyCmd:        "atlantis apply -d path -w workspace",
+							RePlanCmd:       "atlantis plan -d path -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path2",
 					ProjectName: "projectname",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url2",
-						ApplyCmd:        "atlantis apply -d path2 -w workspace",
-						RePlanCmd:       "atlantis plan -d path2 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url2",
+							ApplyCmd:        "atlantis apply -d path2 -w workspace",
+							RePlanCmd:       "atlantis plan -d path2 -w workspace",
+						},
 					},
 				},
 				{
 					Workspace:   "workspace",
 					RepoRelDir:  "path3",
 					ProjectName: "projectname2",
-					PlanSuccess: &models.PlanSuccess{
-						TerraformOutput: "No changes. Infrastructure is up-to-date.",
-						LockURL:         "lock-url3",
-						ApplyCmd:        "atlantis apply -d path3 -w workspace",
-						RePlanCmd:       "atlantis plan -d path3 -w workspace",
+					ProjectCommandOutput: command.ProjectCommandOutput{
+						PlanSuccess: &models.PlanSuccess{
+							TerraformOutput: "No changes. Infrastructure is up-to-date.",
+							LockURL:         "lock-url3",
+							ApplyCmd:        "atlantis apply -d path3 -w workspace",
+							RePlanCmd:       "atlantis plan -d path3 -w workspace",
+						},
 					},
 				},
 			},
@@ -3793,10 +5095,21 @@ Ran Plan for 3 projects:
 		},
 	}
 
-	r := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", true)
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		true,       // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {

@@ -29,19 +29,19 @@ func (mock *MockRunner) Run(ctx command.ProjectContext, extraArgs []string, path
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockRunner().")
 	}
-	params := []pegomock.Param{ctx, extraArgs, path, envs}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Run", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 string
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{ctx, extraArgs, path, envs}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Run", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockRunner) VerifyWasCalledOnce() *VerifierMockRunner {
@@ -82,8 +82,8 @@ type VerifierMockRunner struct {
 }
 
 func (verifier *VerifierMockRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) *MockRunner_Run_OngoingVerification {
-	params := []pegomock.Param{ctx, extraArgs, path, envs}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, extraArgs, path, envs}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", _params, verifier.timeout)
 	return &MockRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -98,23 +98,31 @@ func (c *MockRunner_Run_OngoingVerification) GetCapturedArguments() (command.Pro
 }
 
 func (c *MockRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext, _param1 [][]string, _param2 []string, _param3 []map[string]string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]command.ProjectContext, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(command.ProjectContext)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
+			}
 		}
-		_param1 = make([][]string, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.([]string)
+		if len(_params) > 1 {
+			_param1 = make([][]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.([]string)
+			}
 		}
-		_param2 = make([]string, len(c.methodInvocations))
-		for u, param := range params[2] {
-			_param2[u] = param.(string)
+		if len(_params) > 2 {
+			_param2 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(string)
+			}
 		}
-		_param3 = make([]map[string]string, len(c.methodInvocations))
-		for u, param := range params[3] {
-			_param3[u] = param.(map[string]string)
+		if len(_params) > 3 {
+			_param3 = make([]map[string]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(map[string]string)
+			}
 		}
 	}
 	return

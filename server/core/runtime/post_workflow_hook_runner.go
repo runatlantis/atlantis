@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/runatlantis/atlantis/server/jobs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_post_workflows_hook_runner.go PostWorkflowHookRunner
 type PostWorkflowHookRunner interface {
 	Run(ctx models.WorkflowHookCommandContext, command string, shell string, shellArgs string, path string) (string, string, error)
 }
@@ -44,6 +47,8 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		"USER_NAME":          ctx.User.Username,
 		"OUTPUT_STATUS_FILE": outputFilePath,
 		"COMMAND_NAME":       ctx.CommandName,
+		"COMMAND_HAS_ERRORS": fmt.Sprintf("%t", ctx.CommandHasErrors),
+		"PROJECT_NAME":       ctx.ProjectName,
 	}
 
 	finalEnvVars := baseEnvVars
@@ -55,11 +60,13 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 	out, err := cmd.CombinedOutput()
 
 	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
-	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	if !ctx.SuppressJobOutput {
+		wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
+		wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	}
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+		err = fmt.Errorf("%s: running '%s' in '%s': \n%s", err, shell+" "+shellArgs+" "+command, path, out)
 		ctx.Log.Debug("error: %s", err)
 		return string(out), "", err
 	}
@@ -71,12 +78,12 @@ func (wh DefaultPostWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContex
 		var customStatusErr error
 		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
 		if customStatusErr != nil {
-			err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+			err = fmt.Errorf("reading workflow hook status file %q after running %q in %q: %w\n%s", outputFilePath, shell+" "+shellArgs+" "+command, path, customStatusErr, out)
 			ctx.Log.Debug("error: %s", err)
 			return string(out), "", err
 		}
 	}
 
-	ctx.Log.Info("successfully ran %q in %q", shell+" "+shellArgs+" "+command, path)
+	ctx.Log.Info("Successfully ran '%s' in '%s'", shell+" "+shellArgs+" "+command, path)
 	return string(out), strings.Trim(string(customStatusOut), "\n"), nil
 }

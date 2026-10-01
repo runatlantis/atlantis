@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package command
 
 import (
@@ -21,6 +24,9 @@ type TeamAllowlistChecker interface {
 
 	// IsCommandAllowedForAnyTeam determines if any of the specified teams can perform the specified action
 	IsCommandAllowedForAnyTeam(ctx models.TeamAllowlistCheckerContext, teams []string, command string) bool
+
+	// AllTeams returns all teams configured in the allowlist
+	AllTeams() []string
 }
 
 // DefaultTeamAllowlistChecker implements checking the teams and the operations that the members
@@ -83,4 +89,15 @@ func (checker *DefaultTeamAllowlistChecker) IsCommandAllowedForAnyTeam(ctx model
 		}
 	}
 	return false
+}
+
+// AllTeams returns all teams configured in the allowlist
+func (checker *DefaultTeamAllowlistChecker) AllTeams() []string {
+	var teamNames []string
+	for _, rule := range checker.rules {
+		for key := range rule {
+			teamNames = append(teamNames, key)
+		}
+	}
+	return teamNames
 }

@@ -22,32 +22,58 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
     outputs:
       should-run-build: ${{ steps.changes.outputs.src == 'true' || startsWith(github.ref, 'refs/tags/') }}
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
         with:
           filters: |
             src:
               - 'Dockerfile'
+              - '.dockerignore'
               - 'docker-entrypoint.sh'
+              - 'goss.yaml'
+              - 'goss-slim.yaml'
+              - 'scripts/download-release.sh'
               - '.github/workflows/atlantis-image.yml'
-              - '**.go'
-              - 'go.*'
+              - 'cmd/**'
+              - 'server/**'
+              - 'testdrive/**'
+              - 'main.go'
+              - 'go.mod'
+              - 'go.sum'
 
   build:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Build Image
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      attestations: write
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        # The -slim variants carry no Terraform or OpenTofu binaries; Atlantis
+        # downloads the version it needs at runtime. See the Dockerfile.
+        image_type: [alpine, debian, alpine-slim, debian-slim]
     runs-on: ubuntu-24.04
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
@@ -56,26 +82,37 @@ jobs:
       PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
 
     steps:
-    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+    - name: Harden Runner
+      uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
     # Lint the Dockerfile first before setting anything up
     - name: Lint Dockerfile
-      uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+      uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
       with:
         dockerfile: "Dockerfile"
+        failure-threshold: error
+
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: "go.mod"
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3
+      uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
       with:
-        image: tonistiigi/binfmt:latest
+        image: tonistiigi/binfmt:qemu-v10.2.1@sha256:d3b963f787999e6c0219a48dba02978769286ff61a5f4d26245cb6a6e5567ea3
         platforms: arm64,arm
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3
-      # https://github.com/docker/build-push-action/issues/761#issuecomment-1575006515
-      with:
-        driver-opts: |
-          image=moby/buildkit:v0.14.0
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+    - name: "Install cosign"
+      uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
 
     # release version is the name of the tag i.e. v0.10.0
     # release version also has the image type appended i.e. v0.10.0-alpine
@@ -83,9 +120,10 @@ jobs:
     # release tag also has the image type appended i.e. latest-alpine
     # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
+    # the slim variants only ever get the suffixed form, i.e. v0.10.0-alpine-slim, latest-debian-slim
     - name: Docker meta
       id: meta
-      uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5
+      uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
       with:
@@ -117,7 +155,7 @@ jobs:
           # Suffix is not used here since there's no way to disable it above
 
     - name: Login to Packages Container registry
-      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
+      uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -129,8 +167,9 @@ jobs:
       run: echo "RELEASE_VERSION=${{ startsWith(github.ref, 'refs/tags/') && '${GITHUB_REF#refs/*/}' || 'dev' }}" >> $GITHUB_ENV
 
     - name: "Build ${{ env.PUSH == 'true' && 'and push' || '' }} ${{ env.DOCKER_REPO }} image"
+      id: build
       if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-      uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
+      uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
       with:
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -140,38 +179,67 @@ jobs:
           ATLANTIS_VERSION=${{ env.RELEASE_VERSION }}
           ATLANTIS_COMMIT=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
           ATLANTIS_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-        platforms: linux/arm64/v8,linux/amd64,linux/arm/v7
+        platforms: linux/arm64/v8, linux/amd64, linux/arm/v7
         push: ${{ env.PUSH }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ matrix.image_type }}
         labels: ${{ steps.meta.outputs.labels }}
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.description'] }}
 
+    - name: "Create Image Attestation"
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+      with:
+        subject-digest: ${{ steps.build.outputs.digest }}
+        subject-name: ghcr.io/${{ github.repository }}
+        push-to-registry: true
+
+    - name: "Sign images with environment annotations"
+      # no key needed, we're using the GitHub OIDC flow
+      if: env.PUSH == 'true' && github.event_name != 'pull_request'
+      run: |
+        # Sign dev tags, version tags, and latest tags
+        echo "${TAGS}" | xargs -I {} cosign sign \
+          --yes \
+          -a "actor=${ACTOR}" \
+          -a "ref_name=${REF_NAME}" \
+          -a "ref=${SHA}" \
+          {}@${DIGEST}
+      env:
+        TAGS: ${{ steps.meta.outputs.tags }}
+        DIGEST: ${{ steps.build.outputs.digest }}
+        ACTOR: ${{ github.actor }}
+        REF_NAME: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'true'
     name: Test Image With Goss
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, debian, alpine-slim, debian-slim]
+        platform: [linux/arm64/v8, linux/amd64, linux/arm/v7]
     env:
       # Set docker repo to either the fork or the main repo where the branch exists
       DOCKER_REPO: ghcr.io/${{ github.repository }}
 
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3
-        # https://github.com/docker/build-push-action/issues/761#issuecomment-1575006515
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          driver-opts: |
-            image=moby/buildkit:v0.14.0
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: "Build and load into Docker"
         if: contains(fromJson('["push", "pull_request"]'), github.event_name)
-        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -184,11 +252,15 @@ jobs:
           target: ${{ matrix.image_type }}
 
       - name: "Setup Goss"
-        uses: e1himself/goss-installation-action@fbb6fb55d3e59c96045b2500eeb8ce0995d99ac1 # v1.2.1
+        uses: e1himself/goss-installation-action@3b8340a7c772f8064444f48b0df4c2a80d2e50fc # v1.3.0
         with:
           version: "v0.4.7"
 
       - name: Execute Goss tests
+        env:
+          # The slim images have their own test file asserting the Terraform
+          # and OpenTofu binaries are absent.
+          GOSS_FILE: ${{ endsWith(matrix.image_type, '-slim') && 'goss-slim.yaml' || 'goss.yaml' }}
         run: |
           dgoss run --rm ${{ env.DOCKER_REPO }}:goss-test bash -c 'while true; do sleep 1; done;'
 
@@ -196,9 +268,16 @@ jobs:
     needs: [changes]
     if: needs.changes.outputs.should-run-build == 'false'
     name: Build Image
+    permissions:
+      contents: read
     strategy:
       matrix:
-        image_type: [alpine, debian]
+        image_type: [alpine, debian, alpine-slim, debian-slim]
     runs-on: ubuntu-24.04
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
       - run: 'echo "No build required"'

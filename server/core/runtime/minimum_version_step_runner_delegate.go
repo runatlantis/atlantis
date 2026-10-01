@@ -1,10 +1,12 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
 	"fmt"
 
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -20,7 +22,7 @@ func NewMinimumVersionStepRunnerDelegate(minimumVersionStr string, defaultVersio
 	minimumVersion, err := version.NewVersion(minimumVersionStr)
 
 	if err != nil {
-		return &minimumVersionStepRunnerDelegate{}, errors.Wrap(err, "initializing minimum version")
+		return &minimumVersionStepRunnerDelegate{}, fmt.Errorf("initializing minimum version: %w", err)
 	}
 
 	return &minimumVersionStepRunnerDelegate{

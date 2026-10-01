@@ -22,6 +22,12 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  TERRAFORM_VERSION: 1.11.1
+  # Keep the checksum in sync with the versioned archive URL.
+  NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+  NGROK_DOWNLOAD_SHA256: 7d5cf30be47a38d937958dff61a2b175a289bdbf72fdc20774a6dceeaaaa3dbf
+
 jobs:
   changes:
     permissions:
@@ -32,40 +38,56 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
         with:
           filters: |
             go:
-              - '**.go'
-              - '**.txt' # golden file test output
+              - '**/*.go'
+              - '**/*.txt' # golden file test output
               - 'go.*'
-              - '**.tmpl'
+              - '**/go.mod'
+              - '**/go.sum'
+              - '**/*.tmpl'
+              - 'Makefile'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
     if: needs.changes.outputs.should-run-tests == 'true'
     name: Tests
     runs-on: ubuntu-24.04
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:55abc22b2ae956ac91ab4170be17e13ed6d34f932ddd2891c1bc2b1c00fa11fb
+    # Use latest testing environment for automatic updates
+    # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:dc683c36e7fb8f26fcc8628fdcf328f42d3b1903e130aebb8484223fbdedfd98
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
 
       - run: make test-all
       - run: make check-fmt
+      - run: make check-go-toolchain
 
       ###########################################################
       # Notifying #contributors about test failure on main branch
       ###########################################################
       - name: Slack failure notification
         if: ${{ github.ref == 'refs/heads/main' && failure() }}
-        uses: slackapi/slack-github-action@37ebaef184d7626c5f204ab8d3baff4262dd30f0 # v1.27.0
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
         with:
           payload: |
             {
@@ -106,20 +128,30 @@ jobs:
     name: Tests
     runs-on: ubuntu-24.04
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
       - run: 'echo "No build required"'
 
   e2e-github:
-    runs-on: ubuntu-latest
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-24.04
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
-      TERRAFORM_VERSION: 1.9.2
-      ATLANTIS_GH_USER: ${{ secrets.ATLANTISBOT_GITHUB_USERNAME }}
-      ATLANTIS_GH_TOKEN: ${{ secrets.ATLANTISBOT_GITHUB_TOKEN }}
+      ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
+      ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
+      ATLANTIS_GH_APP_SLUG: ${{ secrets.ATLANTISBOT_GH_APP_SLUG }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
 
@@ -127,36 +159,45 @@ jobs:
       # We do this instead of setting --default-tf-version because setting
       # that flag starts the download asynchronously so we'd have a race
       # condition.
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
       - name: Setup gitconfig
         run: |
           git config --global user.email "maintainers@runatlantis.io"
-          git config --global user.name "atlantisbot"
+          if [ -n "${ATLANTIS_GH_APP_SLUG:-}" ]; then
+            git config --global user.name "${ATLANTIS_GH_APP_SLUG}[bot]"
+          else
+            git config --global user.name "atlantis[bot]"
+          fi
 
       - run: |
           make build-service
           ./scripts/e2e.sh
   e2e-gitlab:
-    runs-on: ubuntu-latest
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-24.04
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
-      TERRAFORM_VERSION: 1.9.2
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
-      - uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
 
@@ -164,13 +205,14 @@ jobs:
       # We do this instead of setting --default-tf-version because setting
       # that flag starts the download asynchronously so we'd have a race
       # condition.
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz https://bin.equinox.io/a/4no1PS1PoRF/ngrok-v3-3.13.0-linux-amd64.tar.gz
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

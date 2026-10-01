@@ -6,11 +6,11 @@ run `terraform plan` in the directories it thinks hold modified Terraform projec
 The algorithm it uses is as follows:
 
 1. Get list of all modified files in pull request
-1. Filter to those containing `.tf`
+1. Filter to those matching the configured [`--autoplan-file-list`](server-configuration.md#autoplan-file-list) (default includes `.tf`, `.tf.json`, `.tfvars`, `.tofu`, `.tofu.json`, etc.)
 1. Get the directories that those files are in
 1. If the directory path doesn't contain `modules/` then try to run `plan` in that directory
 1. If it does contain `modules/` look at the directory one level above `modules/`. If it
-contains a `main.tf` run plan in that directory, otherwise ignore the change (see below for exceptions).
+contains a supported project indicator file (`*.tf`, `*.tf.json`, `*.tofu`, `*.tofu.json`, or `terragrunt.hcl`) run plan in that directory, otherwise ignore the change (see below for exceptions).
 
 ## Example
 

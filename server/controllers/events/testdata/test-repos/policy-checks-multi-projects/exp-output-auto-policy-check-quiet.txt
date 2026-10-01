@@ -1,0 +1,44 @@
+Ran Policy Check for 2 projects:
+
+1. dir: `dir1` workspace: `default`
+1. dir: `dir2` workspace: `default`
+---
+
+### 2. dir: `dir2` workspace: `default`
+**Policy Check Failed**: Some policy sets did not pass.
+#### Policy Set: `test_policy`
+```diff
+FAIL - <redacted plan file> - main - WARNING: Forbidden Resource creation is prohibited.
+
+1 test, 0 passed, 0 warnings, 1 failure, 0 exceptions
+
+```
+
+
+#### Policy Approval Status:
+```
+policy set: test_policy: requires: 1 approval(s), have: 0.
+```
+* :heavy_check_mark: To **approve** this project, comment:
+  ```shell
+  atlantis approve_policies -d dir2
+  ```
+* :put_litter_in_its_place: To **delete** this plan and lock, click [here](lock-url)
+* :repeat: To re-run policies **plan** this project again by commenting:
+  ```shell
+  atlantis plan -d dir2
+  ```
+
+---
+* :heavy_check_mark: To **approve** all unapplied plans from this Pull Request, comment:
+  ```shell
+  atlantis approve_policies
+  ```
+* :put_litter_in_its_place: To **delete** all plans and locks from this Pull Request, comment:
+  ```shell
+  atlantis unlock
+  ```
+* :repeat: To re-run policies **plan** this project again by commenting:
+  ```shell
+  atlantis plan
+  ```

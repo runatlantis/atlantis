@@ -1,33 +1,29 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
 
 import (
+	"bufio"
+	"cmp"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v4"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events/vcs/testdata"
+	githubtestdata "github.com/runatlantis/atlantis/server/events/vcs/github/testdata"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -51,7 +47,7 @@ func (s *ServerStarterMock) Start() error {
 
 // Adding a new flag? Add it to this slice for testing in alphabetical
 // order.
-var testFlags = map[string]interface{}{
+var testFlags = map[string]any{
 	ADHostnameFlag:                   "dev.azure.com",
 	ADTokenFlag:                      "ad-token",
 	ADUserFlag:                       "ad-user",
@@ -61,11 +57,14 @@ var testFlags = map[string]interface{}{
 	AutoplanModules:                  false,
 	AutoplanModulesFromProjects:      "",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
+	BlockedExtraArgsFlag:             "-chdir,--chdir,-plugin-dir,--plugin-dir",
 	AllowForkPRsFlag:                 true,
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
+	AutomergeMethodFlag:              "squash",
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
+	BitbucketApiUserFlag:             "bitbucket-api-user",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
 	BitbucketTokenFlag:               "bitbucket-token",
 	BitbucketUserFlag:                "bitbucket-user",
@@ -73,6 +72,7 @@ var testFlags = map[string]interface{}{
 	CheckoutStrategyFlag:             CheckoutStrategyMerge,
 	CheckoutDepthFlag:                0,
 	DataDirFlag:                      "/path",
+	DefaultTFDistributionFlag:        "terraform",
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
@@ -86,6 +86,7 @@ var testFlags = map[string]interface{}{
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",
+	GHTokenFileFlag:                  "",
 	GHUserFlag:                       "user",
 	GHAppIDFlag:                      int64(0),
 	GHAppKeyFlag:                     "",
@@ -99,23 +100,30 @@ var testFlags = map[string]interface{}{
 	GiteaUserFlag:                    "gitea-user",
 	GiteaWebhookSecretFlag:           "gitea-secret",
 	GiteaPageSizeFlag:                30,
+	GitlabGroupAllowlistFlag:         "",
 	GitlabHostnameFlag:               "gitlab-hostname",
 	GitlabTokenFlag:                  "gitlab-token",
 	GitlabUserFlag:                   "gitlab-user",
 	GitlabWebhookSecretFlag:          "gitlab-secret",
+	GitlabStatusRetryEnabledFlag:     false,
 	HideUnchangedPlanComments:        false,
 	HidePrevPlanComments:             false,
 	IncludeGitUntrackedFiles:         false,
+	LanguageFlag:                     "es",
+	LanguageConfigFileFlag:           "",
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
 	MaxCommentsPerCommand:            10,
 	StatsNamespace:                   "atlantis",
 	AllowDraftPRs:                    true,
+	EnableExternalStoresFlag:         false,
 	PortFlag:                         8181,
 	ParallelPoolSize:                 100,
+	SharePlanDirFlag:                 "/plans",
 	ParallelPlanFlag:                 true,
 	ParallelApplyFlag:                true,
+	PendingApplyStatusFlag:           false,
 	QuietPolicyChecks:                false,
 	RedisHost:                        "",
 	RedisInsecureSkipVerify:          false,
@@ -123,6 +131,8 @@ var testFlags = map[string]interface{}{
 	RedisPort:                        6379,
 	RedisTLSEnabled:                  false,
 	RedisDB:                          0,
+	RedisUsername:                    "",
+	RedisClusterAddresses:            "",
 	RepoAllowlistFlag:                "github.com/runatlantis/atlantis",
 	RepoConfigFlag:                   "",
 	RepoConfigJSONFlag:               "",
@@ -145,6 +155,8 @@ var testFlags = map[string]interface{}{
 	UseTFPluginCache:                 true,
 	VarFileAllowlistFlag:             "/path",
 	VCSStatusName:                    "my-status",
+	IgnoreVCSStatusNames:             "",
+	WebhookHttpHeaders:               `{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}`,
 	WebBasicAuthFlag:                 false,
 	WebPasswordFlag:                  "atlantis",
 	WebUsernameFlag:                  "atlantis",
@@ -152,16 +164,20 @@ var testFlags = map[string]interface{}{
 	WriteGitCredsFlag:                true,
 	DisableAutoplanFlag:              true,
 	DisableAutoplanLabelFlag:         "no-auto-plan",
+	DisableAutomergeLabelFlag:        "no-auto-merge",
 	DisableUnlockLabelFlag:           "do-not-unlock",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
+	EnableDriftDetectionFlag:         true,
+	EnableDriftRemediationFlag:       true,
+	EnableProfilingAPI:               false,
 }
 
 func TestExecute_Defaults(t *testing.T) {
 	t.Log("Should set the defaults for all unspecified flags.")
 
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		GiteaBaseURLFlag:  "http://localhost",
@@ -186,6 +202,7 @@ func TestExecute_Defaults(t *testing.T) {
 		GiteaBaseURLFlag:                 "http://localhost",
 		DataDirFlag:                      dataDir,
 		MarkdownTemplateOverridesDirFlag: markdownTemplateOverridesDir,
+		SharePlanDirFlag:                 dataDir,
 		AtlantisURLFlag:                  "http://" + hostname + ":4141",
 		RepoAllowlistFlag:                "*",
 		VarFileAllowlistFlag:             dataDir,
@@ -213,31 +230,131 @@ func TestExecute_Defaults(t *testing.T) {
 	}
 }
 
+func normalizePath(s string) string {
+	if s == "" || s == "." {
+		return ""
+	}
+
+	if len(s) >= 2 && s[1] == ':' {
+		s = s[2:]
+	}
+
+	s = strings.ReplaceAll(s, "\\", "/")
+	s = path.Clean(s)
+	if s == "." {
+		return ""
+	}
+
+	return s
+}
+
+func TestNormalizePath(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		exp  string
+	}{
+		{
+			name: "empty",
+			in:   "",
+			exp:  "",
+		},
+		{
+			name: "dot",
+			in:   ".",
+			exp:  "",
+		},
+		{
+			name: "unix path",
+			in:   "foo/bar",
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows separators",
+			in:   `foo\bar`,
+			exp:  "foo/bar",
+		},
+		{
+			name: "windows drive with backslashes",
+			in:   `C:\foo\bar`,
+			exp:  "/foo/bar",
+		},
+		{
+			name: "windows drive with slashes",
+			in:   "C:/foo/bar",
+			exp:  "/foo/bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Equals(t, tt.exp, normalizePath(tt.in))
+		})
+	}
+}
+
+var pathFlags = map[string]struct{}{
+	DataDirFlag:                      {},
+	MarkdownTemplateOverridesDirFlag: {},
+	SharePlanDirFlag:                 {},
+}
+
 func TestExecute_Flags(t *testing.T) {
 	t.Log("Should use all flags that are set.")
+
 	c := setup(testFlags, t)
+
 	err := c.Execute()
 	Ok(t, err)
+
 	for flag, exp := range testFlags {
-		Equals(t, exp, configVal(t, passedConfig, flag))
+		got := configVal(t, passedConfig, flag)
+
+		if _, ok := pathFlags[flag]; ok {
+			expPath, ok := exp.(string)
+			Equals(t, true, ok)
+			gotPath, ok := got.(string)
+			Equals(t, true, ok)
+
+			normExp := normalizePath(expPath)
+			normGot := normalizePath(gotPath)
+
+			t.Logf("flag=%s exp=%v got=%v", flag, normExp, normGot)
+			Equals(t, normExp, normGot)
+			continue
+		}
+
+		t.Logf("flag=%s exp=%v got=%v", flag, exp, got)
+		Equals(t, exp, got)
 	}
+}
+
+func getUserConfigKeysWithFlags() []string {
+	var ret []string
+	u := reflect.TypeFor[server.UserConfig]()
+
+	for field := range u.Fields() {
+
+		userConfigKey := field.Tag.Get("mapstructure")
+		// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
+		// Some fields are too complicated to have flags, so are only expressible in the config yaml
+		flagKey := field.Tag.Get("flag")
+		if flagKey == "false" {
+			continue
+		}
+		ret = append(ret, userConfigKey)
+
+	}
+	return ret
+
 }
 
 func TestUserConfigAllTested(t *testing.T) {
 	t.Log("All settings in userConfig should be tested.")
 
-	u := reflect.TypeOf(server.UserConfig{})
+	for _, userConfigKey := range getUserConfigKeysWithFlags() {
 
-	for i := 0; i < u.NumField(); i++ {
-
-		userConfigKey := u.Field(i).Tag.Get("mapstructure")
 		t.Run(userConfigKey, func(t *testing.T) {
-			// By default, we expect all fields in UserConfig to have flags defined in server.go and tested here in server_test.go
-			// Some fields are too complicated to have flags, so are only expressible in the config yaml
-			flagKey := u.Field(i).Tag.Get("flag")
-			if flagKey == "false" {
-				return
-			}
 			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
 			// for specifying the flag, that probably means one *also* needs to be added to server.go
 			if _, ok := testFlags[userConfigKey]; !ok {
@@ -249,6 +366,124 @@ func TestUserConfigAllTested(t *testing.T) {
 
 }
 
+func getDocumentedFlags(t *testing.T) []string {
+
+	var ret []string
+	docFile := "../runatlantis.io/docs/server-configuration.md"
+
+	file, err := os.Open(docFile)
+	Ok(t, err)
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "### ") {
+			continue
+		}
+		split := strings.Split(line, "`")
+		if len(split) != 3 {
+			t.Errorf("Unexpected line in %s: %s", docFile, line)
+			continue
+		}
+		flag := split[1]
+		if !strings.HasPrefix(flag, "--") {
+			t.Errorf("Unexpected line in %s: %s", docFile, line)
+			continue
+		}
+		flag = strings.TrimPrefix(flag, "--")
+		ret = append(ret, flag)
+	}
+
+	err = scanner.Err()
+	Ok(t, err)
+
+	return ret
+}
+
+func testIsSorted[S ~[]E, E cmp.Ordered](t *testing.T, x S) {
+	// TODO: This is n^2, probably a better algorithm for this
+	// Also, this works best for lists that are mostly sorted, if the whole thing is wrong, it's just
+	// going to say that every individual element is out of order
+	for i, elem := range x {
+		for j, compareTo := range x {
+			if i == j {
+				continue
+			}
+			if i > j && cmp.Less(elem, compareTo) {
+				t.Errorf("%v is out of order (should be before %v)", elem, compareTo)
+				break
+			}
+			if i < j && cmp.Less(compareTo, elem) {
+				t.Errorf("%v is out of order (should be after %v)", elem, compareTo)
+				break
+			}
+		}
+	}
+}
+
+func TestAllFlagsDocumented(t *testing.T) {
+	// This is not a unit test per se, but is a helpful way of making sure when flags are added/removed
+	// the corresponding documentation is kept up-to-date.
+	t.Log("All flags in userConfig should have documentation in server-configuration.md.")
+
+	userConfigKeys := getUserConfigKeysWithFlags()
+	documentedFlags := getDocumentedFlags(t)
+
+	testIsSorted(t, documentedFlags)
+	slices.Sort(userConfigKeys)
+	slices.Sort(documentedFlags)
+
+	for _, userConfigKey := range userConfigKeys {
+		_, found := slices.BinarySearch(documentedFlags, userConfigKey)
+		if !found {
+			t.Errorf("Found undocumented config key: %s", userConfigKey)
+		}
+	}
+
+	for _, documentedFlag := range documentedFlags {
+		// --help and --config are documented but don't have a setting on userConfig
+		if documentedFlag == "help" || documentedFlag == "config" {
+			continue
+		}
+		_, found := slices.BinarySearch(userConfigKeys, documentedFlag)
+		if !found {
+			t.Errorf("Found documentation for flag that doesn't exist: %s", documentedFlag)
+		}
+	}
+
+}
+
+func TestExecute_ExpandHomeInSharePlanDir(t *testing.T) {
+	t.Log("If ~ is used as a share-plan-dir path, should expand to absolute home path")
+	c := setup(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+		SharePlanDirFlag:  "~/this/is/a/path",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+
+	home, err := homedir.Dir()
+	Ok(t, err)
+	Equals(t, home+"/this/is/a/path", passedConfig.SharePlanDir)
+}
+
+func TestExecute_RelativeSharePlanDir(t *testing.T) {
+	t.Log("Should convert relative share-plan-dir to absolute.")
+	c := setupWithDefaults(map[string]any{
+		SharePlanDirFlag: "../",
+	}, t)
+
+	expectedAbsolutePath, err := filepath.Abs("../")
+	Ok(t, err)
+
+	err = c.Execute()
+	Ok(t, err)
+	Equals(t, expectedAbsolutePath, passedConfig.SharePlanDir)
+}
+
 func TestExecute_ConfigFile(t *testing.T) {
 	t.Log("Should use all the values from the config file.")
 	// Use yaml package to quote values that need quoting
@@ -256,7 +491,7 @@ func TestExecute_ConfigFile(t *testing.T) {
 	Ok(t, yamlErr)
 	tmpFile := tempFile(t, string(cfgContents))
 	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		ConfigFlag: tmpFile,
 	}, t)
 	err := c.Execute()
@@ -283,7 +518,7 @@ func TestExecute_EnvironmentVariables(t *testing.T) {
 
 func TestExecute_NoConfigFlag(t *testing.T) {
 	t.Log("If there is no config flag specified Execute should return nil.")
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		ConfigFlag: "",
 	}, t)
 	err := c.Execute()
@@ -292,7 +527,7 @@ func TestExecute_NoConfigFlag(t *testing.T) {
 
 func TestExecute_ConfigFileExtension(t *testing.T) {
 	t.Log("If the config file doesn't have an extension then error.")
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		ConfigFlag: "does-not-exist",
 	}, t)
 	err := c.Execute()
@@ -301,7 +536,7 @@ func TestExecute_ConfigFileExtension(t *testing.T) {
 
 func TestExecute_ConfigFileMissing(t *testing.T) {
 	t.Log("If the config file doesn't exist then error.")
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		ConfigFlag: "does-not-exist.yaml",
 	}, t)
 	err := c.Execute()
@@ -312,7 +547,7 @@ func TestExecute_ConfigFileExists(t *testing.T) {
 	t.Log("If the config file exists then there should be no error.")
 	tmpFile := tempFile(t, "")
 	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		ConfigFlag: tmpFile,
 	}, t)
 	err := c.Execute()
@@ -323,7 +558,7 @@ func TestExecute_InvalidConfig(t *testing.T) {
 	t.Log("If the config file contains invalid yaml there should be an error.")
 	tmpFile := tempFile(t, "invalidyaml")
 	defer os.Remove(tmpFile) // nolint: errcheck
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		ConfigFlag: tmpFile,
 	}, t)
 	err := c.Execute()
@@ -332,7 +567,7 @@ func TestExecute_InvalidConfig(t *testing.T) {
 
 // Should error if the repo allowlist contained a scheme.
 func TestExecute_RepoAllowlistScheme(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "http://github.com/*",
@@ -345,19 +580,19 @@ func TestExecute_RepoAllowlistScheme(t *testing.T) {
 func TestExecute_ValidateLogLevel(t *testing.T) {
 	cases := []struct {
 		description string
-		flags       map[string]interface{}
+		flags       map[string]any
 		expectError bool
 	}{
 		{
 			"log level is invalid",
-			map[string]interface{}{
+			map[string]any{
 				LogLevelFlag: "invalid",
 			},
 			true,
 		},
 		{
 			"log level is valid uppercase",
-			map[string]interface{}{
+			map[string]any{
 				LogLevelFlag: "DEBUG",
 			},
 			false,
@@ -376,42 +611,91 @@ func TestExecute_ValidateLogLevel(t *testing.T) {
 }
 
 func TestExecute_ValidateCheckoutStrategy(t *testing.T) {
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		CheckoutStrategyFlag: "invalid",
 	}, t)
 	err := c.Execute()
 	ErrEquals(t, "invalid checkout strategy: not one of branch or merge", err)
 }
 
+func TestExecute_ValidateAutomergeMethod(t *testing.T) {
+	cases := []struct {
+		description string
+		method      string
+		expectErr   string
+	}{
+		{
+			"empty method uses VCS default",
+			"",
+			"",
+		},
+		{
+			"merge",
+			"merge",
+			"",
+		},
+		{
+			"rebase",
+			"rebase",
+			"",
+		},
+		{
+			"squash",
+			"squash",
+			"",
+		},
+		{
+			"invalid method",
+			"fast-forward",
+			"invalid --automerge-method: must be one of [merge rebase squash]",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.description, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{
+				AutomergeMethodFlag: testCase.method,
+			}, t)
+
+			err := c.Execute()
+			if testCase.expectErr != "" {
+				ErrEquals(t, testCase.expectErr, err)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
+}
+
 func TestExecute_ValidateSSLConfig(t *testing.T) {
 	expErr := "--ssl-key-file and --ssl-cert-file are both required for ssl"
 	cases := []struct {
 		description string
-		flags       map[string]interface{}
+		flags       map[string]any
 		expectError bool
 	}{
 		{
 			"neither option set",
-			make(map[string]interface{}),
+			make(map[string]any),
 			false,
 		},
 		{
 			"just ssl-key-file set",
-			map[string]interface{}{
+			map[string]any{
 				SSLKeyFileFlag: "file",
 			},
 			true,
 		},
 		{
 			"just ssl-cert-file set",
-			map[string]interface{}{
+			map[string]any{
 				SSLCertFileFlag: "flag",
 			},
 			true,
 		},
 		{
 			"both flags set",
-			map[string]interface{}{
+			map[string]any{
 				SSLCertFileFlag: "cert",
 				SSLKeyFileFlag:  "key",
 			},
@@ -432,111 +716,111 @@ func TestExecute_ValidateSSLConfig(t *testing.T) {
 }
 
 func TestExecute_ValidateVCSConfig(t *testing.T) {
-	expErr := "--gh-user/--gh-token or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
+	expErr := "--gh-user/--gh-token or --gh-user/--gh-token-file or --gh-app-id/--gh-app-key-file or --gh-app-id/--gh-app-key or --gitea-user/--gitea-token or --gitlab-user/--gitlab-token or --bitbucket-user/--bitbucket-token or --azuredevops-user/--azuredevops-token must be set"
 	cases := []struct {
 		description string
-		flags       map[string]interface{}
+		flags       map[string]any
 		expectError bool
 	}{
 		{
 			"no config set",
-			make(map[string]interface{}),
+			make(map[string]any),
 			true,
 		},
 		{
 			"just github token set",
-			map[string]interface{}{
+			map[string]any{
 				GHTokenFlag: "token",
 			},
 			true,
 		},
 		{
 			"just gitea token set",
-			map[string]interface{}{
+			map[string]any{
 				GiteaTokenFlag: "token",
 			},
 			true,
 		},
 		{
 			"just gitlab token set",
-			map[string]interface{}{
+			map[string]any{
 				GitlabTokenFlag: "token",
 			},
 			true,
 		},
 		{
 			"just bitbucket token set",
-			map[string]interface{}{
+			map[string]any{
 				BitbucketTokenFlag: "token",
 			},
 			true,
 		},
 		{
 			"just azuredevops token set",
-			map[string]interface{}{
+			map[string]any{
 				ADTokenFlag: "token",
 			},
 			true,
 		},
 		{
 			"just github user set",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag: "user",
 			},
 			true,
 		},
 		{
 			"just gitea user set",
-			map[string]interface{}{
+			map[string]any{
 				GiteaUserFlag: "user",
 			},
 			true,
 		},
 		{
 			"just github app set",
-			map[string]interface{}{
+			map[string]any{
 				GHAppIDFlag: "1",
 			},
 			true,
 		},
 		{
 			"just github app key file set",
-			map[string]interface{}{
+			map[string]any{
 				GHAppKeyFileFlag: "key.pem",
 			},
 			true,
 		},
 		{
 			"just github app key set",
-			map[string]interface{}{
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+			map[string]any{
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			true,
 		},
 		{
 			"just gitlab user set",
-			map[string]interface{}{
+			map[string]any{
 				GitlabUserFlag: "user",
 			},
 			true,
 		},
 		{
 			"just bitbucket user set",
-			map[string]interface{}{
+			map[string]any{
 				BitbucketUserFlag: "user",
 			},
 			true,
 		},
 		{
 			"just azuredevops user set",
-			map[string]interface{}{
+			map[string]any{
 				ADUserFlag: "user",
 			},
 			true,
 		},
 		{
 			"github user and gitlab token set",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag:      "user",
 				GitlabTokenFlag: "token",
 			},
@@ -544,7 +828,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"gitlab user and github token set",
-			map[string]interface{}{
+			map[string]any{
 				GitlabUserFlag: "user",
 				GHTokenFlag:    "token",
 			},
@@ -552,7 +836,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"github user and bitbucket token set",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag:         "user",
 				BitbucketTokenFlag: "token",
 			},
@@ -560,7 +844,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"github user and gitea token set",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag:     "user",
 				GiteaTokenFlag: "token",
 			},
@@ -568,7 +852,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"gitea user and github token set",
-			map[string]interface{}{
+			map[string]any{
 				GiteaUserFlag: "user",
 				GHTokenFlag:   "token",
 			},
@@ -576,15 +860,32 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"github user and github token set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag:  "user",
 				GHTokenFlag: "token",
 			},
 			false,
 		},
 		{
+			"github user and github token file and should be successful",
+			map[string]any{
+				GHUserFlag:      "user",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			false,
+		},
+		{
+			"github user, github token, and github token file and should fail",
+			map[string]any{
+				GHUserFlag:      "user",
+				GHTokenFlag:     "token",
+				GHTokenFileFlag: "/path/to/token",
+			},
+			true,
+		},
+		{
 			"gitea user and gitea token set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GiteaUserFlag:  "user",
 				GiteaTokenFlag: "token",
 			},
@@ -592,7 +893,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"github app and key file set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GHAppIDFlag:      "1",
 				GHAppKeyFileFlag: "key.pem",
 			},
@@ -600,15 +901,15 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"github app and key set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GHAppIDFlag:  "1",
-				GHAppKeyFlag: testdata.GithubPrivateKey,
+				GHAppKeyFlag: githubtestdata.PrivateKey,
 			},
 			false,
 		},
 		{
 			"gitlab user and gitlab token set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GitlabUserFlag:  "user",
 				GitlabTokenFlag: "token",
 			},
@@ -616,7 +917,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"bitbucket user and bitbucket token set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				BitbucketUserFlag:  "user",
 				BitbucketTokenFlag: "token",
 			},
@@ -624,7 +925,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"azuredevops user and azuredevops token set and should be successful",
-			map[string]interface{}{
+			map[string]any{
 				ADUserFlag:  "user",
 				ADTokenFlag: "token",
 			},
@@ -632,7 +933,7 @@ func TestExecute_ValidateVCSConfig(t *testing.T) {
 		},
 		{
 			"all set should be successful",
-			map[string]interface{}{
+			map[string]any{
 				GHUserFlag:         "user",
 				GHTokenFlag:        "token",
 				GiteaUserFlag:      "user",
@@ -680,7 +981,7 @@ func TestExecute_ValidateAllowCommands(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		c := setupWithDefaults(map[string]interface{}{
+		c := setupWithDefaults(map[string]any{
 			AllowCommandsFlag: testCase.allowCommandsFlag,
 		}, t)
 		err := c.Execute()
@@ -694,7 +995,7 @@ func TestExecute_ValidateAllowCommands(t *testing.T) {
 
 func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 	t.Log("If ~ is used as a data-dir path, should expand to absolute home path")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
@@ -710,7 +1011,7 @@ func TestExecute_ExpandHomeInDataDir(t *testing.T) {
 
 func TestExecute_RelativeDataDir(t *testing.T) {
 	t.Log("Should convert relative dir to absolute.")
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		DataDirFlag: "../",
 	}, t)
 
@@ -725,7 +1026,7 @@ func TestExecute_RelativeDataDir(t *testing.T) {
 
 func TestExecute_GithubUser(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:        "@user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
@@ -738,8 +1039,8 @@ func TestExecute_GithubUser(t *testing.T) {
 
 func TestExecute_GithubApp(t *testing.T) {
 	t.Log("Should remove the @ from the github username if it's passed.")
-	c := setup(map[string]interface{}{
-		GHAppKeyFlag:      testdata.GithubPrivateKey,
+	c := setup(map[string]any{
+		GHAppKeyFlag:      githubtestdata.PrivateKey,
 		GHAppIDFlag:       "1",
 		RepoAllowlistFlag: "*",
 	}, t)
@@ -751,8 +1052,8 @@ func TestExecute_GithubApp(t *testing.T) {
 
 func TestExecute_GithubAppWithInstallationID(t *testing.T) {
 	t.Log("Should pass the installation ID to the config.")
-	c := setup(map[string]interface{}{
-		GHAppKeyFlag:            testdata.GithubPrivateKey,
+	c := setup(map[string]any{
+		GHAppKeyFlag:            githubtestdata.PrivateKey,
 		GHAppIDFlag:             "1",
 		GHAppInstallationIDFlag: "2",
 		RepoAllowlistFlag:       "*",
@@ -766,7 +1067,7 @@ func TestExecute_GithubAppWithInstallationID(t *testing.T) {
 
 func TestExecute_GiteaUser(t *testing.T) {
 	t.Log("Should remove the @ from the gitea username if it's passed.")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GiteaUserFlag:     "@user",
 		GiteaTokenFlag:    "token",
 		RepoAllowlistFlag: "*",
@@ -779,7 +1080,7 @@ func TestExecute_GiteaUser(t *testing.T) {
 
 func TestExecute_GitlabUser(t *testing.T) {
 	t.Log("Should remove the @ from the gitlab username if it's passed.")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GitlabUserFlag:    "@user",
 		GitlabTokenFlag:   "token",
 		RepoAllowlistFlag: "*",
@@ -792,7 +1093,7 @@ func TestExecute_GitlabUser(t *testing.T) {
 
 func TestExecute_BitbucketUser(t *testing.T) {
 	t.Log("Should remove the @ from the bitbucket username if it's passed.")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		BitbucketUserFlag:  "@user",
 		BitbucketTokenFlag: "token",
 		RepoAllowlistFlag:  "*",
@@ -805,7 +1106,7 @@ func TestExecute_BitbucketUser(t *testing.T) {
 
 func TestExecute_ADUser(t *testing.T) {
 	t.Log("Should remove the @ from the azure devops username if it's passed.")
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		ADUserFlag:        "@user",
 		ADTokenFlag:       "token",
 		RepoAllowlistFlag: "*",
@@ -816,21 +1117,9 @@ func TestExecute_ADUser(t *testing.T) {
 	Equals(t, "user", passedConfig.AzureDevopsUser)
 }
 
-// If using bitbucket cloud, webhook secrets are not supported.
-func TestExecute_BitbucketCloudWithWebhookSecret(t *testing.T) {
-	c := setup(map[string]interface{}{
-		BitbucketUserFlag:          "user",
-		BitbucketTokenFlag:         "token",
-		RepoAllowlistFlag:          "*",
-		BitbucketWebhookSecretFlag: "my secret",
-	}, t)
-	err := c.Execute()
-	ErrEquals(t, "--bitbucket-webhook-secret cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", err)
-}
-
 // Base URL must have a scheme.
 func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
@@ -838,7 +1127,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 	}, t)
 	ErrEquals(t, "--bitbucket-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
 
-	c = setup(map[string]interface{}{
+	c = setup(map[string]any{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
@@ -849,7 +1138,7 @@ func TestExecute_BitbucketServerBaseURLScheme(t *testing.T) {
 
 // Port should be retained on base url.
 func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		BitbucketUserFlag:    "user",
 		BitbucketTokenFlag:   "token",
 		RepoAllowlistFlag:    "*",
@@ -861,7 +1150,7 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 
 // Can't use both --repo-config and --repo-config-json.
 func TestExecute_RepoCfgFlags(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:         "user",
 		GHTokenFlag:        "token",
 		RepoAllowlistFlag:  "github.com",
@@ -874,7 +1163,7 @@ func TestExecute_RepoCfgFlags(t *testing.T) {
 
 // Can't use both --tfe-hostname flag without --tfe-token.
 func TestExecute_TFEHostnameOnly(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:        "user",
 		GHTokenFlag:       "token",
 		RepoAllowlistFlag: "github.com",
@@ -886,7 +1175,7 @@ func TestExecute_TFEHostnameOnly(t *testing.T) {
 
 // Must set allow or whitelist.
 func TestExecute_AllowAndWhitelist(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GHUserFlag:  "user",
 		GHTokenFlag: "token",
 	}, t)
@@ -896,14 +1185,14 @@ func TestExecute_AllowAndWhitelist(t *testing.T) {
 
 func TestExecute_AutoDetectModulesFromProjects_Env(t *testing.T) {
 	t.Setenv("ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS", "**/init.tf")
-	c := setupWithDefaults(map[string]interface{}{}, t)
+	c := setupWithDefaults(map[string]any{}, t)
 	err := c.Execute()
 	Ok(t, err)
 	Equals(t, "**/init.tf", passedConfig.AutoplanModulesFromProjects)
 }
 
 func TestExecute_AutoDetectModulesFromProjects(t *testing.T) {
-	c := setupWithDefaults(map[string]interface{}{
+	c := setupWithDefaults(map[string]any{
 		AutoplanModulesFromProjects: "**/*.tf",
 	}, t)
 	err := c.Execute()
@@ -914,33 +1203,33 @@ func TestExecute_AutoDetectModulesFromProjects(t *testing.T) {
 func TestExecute_AutoplanFileList(t *testing.T) {
 	cases := []struct {
 		description string
-		flags       map[string]interface{}
+		flags       map[string]any
 		expectErr   string
 	}{
 		{
 			"default value",
-			map[string]interface{}{
+			map[string]any{
 				AutoplanFileListFlag: DefaultAutoplanFileList,
 			},
 			"",
 		},
 		{
 			"valid value",
-			map[string]interface{}{
+			map[string]any{
 				AutoplanFileListFlag: "**/*.tf",
 			},
 			"",
 		},
 		{
 			"invalid exclusion pattern",
-			map[string]interface{}{
+			map[string]any{
 				AutoplanFileListFlag: "**/*.yml,!",
 			},
 			"invalid pattern in --autoplan-file-list, **/*.yml,!: illegal exclusion pattern: \"!\"",
 		},
 		{
 			"invalid pattern",
-			map[string]interface{}{
+			map[string]any{
 				AutoplanFileListFlag: "[^]",
 			},
 			"invalid pattern in --autoplan-file-list, [^]: syntax error in pattern",
@@ -958,7 +1247,129 @@ func TestExecute_AutoplanFileList(t *testing.T) {
 	}
 }
 
-func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
+func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]any
+		expectErr   string
+	}{
+		{
+			"terraform",
+			map[string]any{
+				DefaultTFDistributionFlag: "terraform",
+			},
+			"",
+		},
+		{
+			"opentofu",
+			map[string]any{
+				DefaultTFDistributionFlag: "opentofu",
+			},
+			"",
+		},
+		{
+			"errs on invalid distribution",
+			map[string]any{
+				DefaultTFDistributionFlag: "invalid_distribution",
+			},
+			"invalid tf distribution: expected one of terraform or opentofu",
+		},
+	}
+	for _, testCase := range cases {
+		t.Log("Should validate default tf distribution when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateLanguage(t *testing.T) {
+	cases := []struct {
+		description string
+		flags       map[string]any
+		expectErr   string
+	}{
+		{
+			"english",
+			map[string]any{
+				LanguageFlag: "en",
+			},
+			"",
+		},
+		{
+			"spanish",
+			map[string]any{
+				LanguageFlag: "es",
+			},
+			"",
+		},
+		{
+			"language variant normalizes",
+			map[string]any{
+				LanguageFlag: "es-MX",
+			},
+			"",
+		},
+		{
+			"errs on unsupported language",
+			map[string]any{
+				LanguageFlag: "de",
+			},
+			`unsupported language "de": supported languages are en, es`,
+		},
+		{
+			"unsupported language with custom config file",
+			map[string]any{
+				LanguageFlag:           "de",
+				LanguageConfigFileFlag: writeTempLanguageConfig(t, "command_titles:\n  apply: Anwenden\n"),
+			},
+			"",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Log("Should validate language when " + testCase.description)
+		c := setupWithDefaults(testCase.flags, t)
+		err := c.Execute()
+		if testCase.expectErr != "" {
+			ErrEquals(t, testCase.expectErr, err)
+		} else {
+			Ok(t, err)
+		}
+	}
+}
+
+func TestExecute_ValidateLanguageConfigFileInvalid(t *testing.T) {
+	c := setupWithDefaults(map[string]any{
+		LanguageFlag:           "de",
+		LanguageConfigFileFlag: writeTempLanguageConfig(t, ":\n"),
+	}, t)
+	err := c.Execute()
+	if err == nil {
+		t.Fatalf("expected error for invalid language config file")
+	}
+	if !strings.Contains(err.Error(), "invalid language-config-file") {
+		t.Fatalf("expected language config validation error, got: %s", err.Error())
+	}
+}
+
+func writeTempLanguageConfig(t *testing.T, contents string) string {
+	f, err := os.CreateTemp("", "atlantis-language-*.yaml")
+	Ok(t, err)
+	t.Cleanup(func() {
+		_ = os.Remove(f.Name())
+	})
+	_, err = f.WriteString(contents)
+	Ok(t, err)
+	Ok(t, f.Close())
+	return f.Name()
+}
+
+func setup(flags map[string]any, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	for k, v := range flags {
 		vipr.Set(k, v)
@@ -972,7 +1383,7 @@ func setup(flags map[string]interface{}, t *testing.T) *cobra.Command {
 	return c.Init()
 }
 
-func setupWithDefaults(flags map[string]interface{}, t *testing.T) *cobra.Command {
+func setupWithDefaults(flags map[string]any, t *testing.T) *cobra.Command {
 	vipr := viper.New()
 	flags[GHUserFlag] = "user"
 	flags[GHTokenFlag] = "token"
@@ -1000,7 +1411,7 @@ func tempFile(t *testing.T, contents string) string {
 	return newName
 }
 
-func configVal(t *testing.T, u server.UserConfig, tag string) interface{} {
+func configVal(t *testing.T, u server.UserConfig, tag string) any {
 	t.Helper()
 	v := reflect.ValueOf(u)
 	typeOfS := v.Type()
@@ -1015,7 +1426,7 @@ func configVal(t *testing.T, u server.UserConfig, tag string) interface{} {
 
 // Gitea base URL must have a scheme.
 func TestExecute_GiteaBaseURLScheme(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GiteaUserFlag:     "user",
 		GiteaTokenFlag:    "token",
 		RepoAllowlistFlag: "*",
@@ -1023,7 +1434,7 @@ func TestExecute_GiteaBaseURLScheme(t *testing.T) {
 	}, t)
 	ErrEquals(t, "--gitea-base-url must have http:// or https://, got \"mydomain.com\"", c.Execute())
 
-	c = setup(map[string]interface{}{
+	c = setup(map[string]any{
 		GiteaUserFlag:     "user",
 		GiteaTokenFlag:    "token",
 		RepoAllowlistFlag: "*",
@@ -1033,7 +1444,7 @@ func TestExecute_GiteaBaseURLScheme(t *testing.T) {
 }
 
 func TestExecute_GiteaWithWebhookSecret(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GiteaUserFlag:          "user",
 		GiteaTokenFlag:         "token",
 		RepoAllowlistFlag:      "*",
@@ -1045,7 +1456,7 @@ func TestExecute_GiteaWithWebhookSecret(t *testing.T) {
 
 // Port should be retained on base url.
 func TestExecute_GiteaBaseURLPort(t *testing.T) {
-	c := setup(map[string]interface{}{
+	c := setup(map[string]any{
 		GiteaUserFlag:     "user",
 		GiteaTokenFlag:    "token",
 		RepoAllowlistFlag: "*",
@@ -1053,4 +1464,44 @@ func TestExecute_GiteaBaseURLPort(t *testing.T) {
 	}, t)
 	Ok(t, c.Execute())
 	Equals(t, "http://mydomain.com:7990", passedConfig.GiteaBaseURL)
+}
+
+func TestSanitizeKubernetesServiceLinks(t *testing.T) {
+	t.Log("Kubernetes service link env vars should be sanitized to defaults")
+	// Simulate Kubernetes injecting ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "tcp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
+}
+
+func TestSanitizeKubernetesServiceLinks_UDPIgnored(t *testing.T) {
+	t.Log("UDP service link env vars should also be sanitized")
+	envKey := "ATLANTIS_REDIS_PORT"
+	os.Setenv(envKey, "udp://10.96.0.15:6379") // nolint: errcheck
+	defer os.Unsetenv(envKey)
+
+	c := setupWithDefaults(map[string]any{
+		GHUserFlag:        "user",
+		GHTokenFlag:       "token",
+		RepoAllowlistFlag: "*",
+	}, t)
+	err := c.Execute()
+	Ok(t, err)
+	Equals(t, DefaultRedisPort, passedConfig.RedisPort)
+}
+
+func TestDefaultAutoplanFileList_ContainsExpectedPatterns(t *testing.T) {
+	// Pin the public server default independently of the constant.
+	// If a pattern is accidentally removed, this test fails.
+	expected := "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	Equals(t, expected, DefaultAutoplanFileList)
 }

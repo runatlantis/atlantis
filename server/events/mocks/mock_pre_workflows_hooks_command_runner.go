@@ -32,15 +32,15 @@ func (mock *MockPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPreWorkflowHooksCommandRunner().")
 	}
-	params := []pegomock.Param{ctx, cmd}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("RunPreHooks", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	_params := []pegomock.Param{ctx, cmd}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("RunPreHooks", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockPreWorkflowHooksCommandRunner) VerifyWasCalledOnce() *VerifierMockPreWorkflowHooksCommandRunner {
@@ -81,8 +81,8 @@ type VerifierMockPreWorkflowHooksCommandRunner struct {
 }
 
 func (verifier *VerifierMockPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *events.CommentCommand) *MockPreWorkflowHooksCommandRunner_RunPreHooks_OngoingVerification {
-	params := []pegomock.Param{ctx, cmd}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunPreHooks", params, verifier.timeout)
+	_params := []pegomock.Param{ctx, cmd}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunPreHooks", _params, verifier.timeout)
 	return &MockPreWorkflowHooksCommandRunner_RunPreHooks_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -97,15 +97,19 @@ func (c *MockPreWorkflowHooksCommandRunner_RunPreHooks_OngoingVerification) GetC
 }
 
 func (c *MockPreWorkflowHooksCommandRunner_RunPreHooks_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]*command.Context, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(*command.Context)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
 		}
-		_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
-		for u, param := range params[1] {
-			_param1[u] = param.(*events.CommentCommand)
+		if len(_params) > 1 {
+			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*events.CommentCommand)
+			}
 		}
 	}
 	return

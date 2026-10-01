@@ -29,34 +29,34 @@ func (mock *MockPendingPlanFinder) DeletePlans(pullDir string) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPendingPlanFinder().")
 	}
-	params := []pegomock.Param{pullDir}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("DeletePlans", params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(error)
+	_params := []pegomock.Param{pullDir}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeletePlans", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockPendingPlanFinder) Find(pullDir string) ([]events.PendingPlan, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockPendingPlanFinder().")
 	}
-	params := []pegomock.Param{pullDir}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("Find", params, []reflect.Type{reflect.TypeOf((*[]events.PendingPlan)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
-	var ret0 []events.PendingPlan
-	var ret1 error
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].([]events.PendingPlan)
+	_params := []pegomock.Param{pullDir}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("Find", _params, []reflect.Type{reflect.TypeOf((*[]events.PendingPlan)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []events.PendingPlan
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]events.PendingPlan)
 		}
-		if result[1] != nil {
-			ret1 = result[1].(error)
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
 		}
 	}
-	return ret0, ret1
+	return _ret0, _ret1
 }
 
 func (mock *MockPendingPlanFinder) VerifyWasCalledOnce() *VerifierMockPendingPlanFinder {
@@ -97,8 +97,8 @@ type VerifierMockPendingPlanFinder struct {
 }
 
 func (verifier *VerifierMockPendingPlanFinder) DeletePlans(pullDir string) *MockPendingPlanFinder_DeletePlans_OngoingVerification {
-	params := []pegomock.Param{pullDir}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeletePlans", params, verifier.timeout)
+	_params := []pegomock.Param{pullDir}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeletePlans", _params, verifier.timeout)
 	return &MockPendingPlanFinder_DeletePlans_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -113,19 +113,21 @@ func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetCapturedArgum
 }
 
 func (c *MockPendingPlanFinder_DeletePlans_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
 		}
 	}
 	return
 }
 
 func (verifier *VerifierMockPendingPlanFinder) Find(pullDir string) *MockPendingPlanFinder_Find_OngoingVerification {
-	params := []pegomock.Param{pullDir}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Find", params, verifier.timeout)
+	_params := []pegomock.Param{pullDir}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Find", _params, verifier.timeout)
 	return &MockPendingPlanFinder_Find_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -140,11 +142,13 @@ func (c *MockPendingPlanFinder_Find_OngoingVerification) GetCapturedArguments() 
 }
 
 func (c *MockPendingPlanFinder_Find_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
 		}
 	}
 	return

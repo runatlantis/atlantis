@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
@@ -5,7 +8,7 @@ import (
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/mocks"
@@ -47,11 +50,11 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	expectedApplyCmt := "Apply Comment"
 	expectedPlanCmt := "Plan Comment"
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	t.Run("with project name defined", func(t *testing.T) {
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName, false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName, false, "")).ThenReturn(expectedApplyCmt)
 
 		pullStatus.Projects = []models.ProjectStatus{
 			{
@@ -68,7 +71,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	t.Run("with no project name defined", func(t *testing.T) {
 		projCfg.Name = ""
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false, "")).ThenReturn(expectedApplyCmt)
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:     models.ErroredPlanStatus,
@@ -88,7 +91,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 	t.Run("when ParallelApply is set to true", func(t *testing.T) {
 		projCfg.Name = "Apply Comment"
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false, "")).ThenReturn(expectedApplyCmt)
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:     models.ErroredPlanStatus,
@@ -106,10 +109,10 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 		assert.False(t, result[0].ParallelPlanEnabled)
 	})
 
-	t.Run("when AbortOnExcecutionOrderFail is set to true", func(t *testing.T) {
+	t.Run("when AbortOnExecutionOrderFail is set to true", func(t *testing.T) {
 		projCfg.Name = "Apply Comment"
 		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, "", []string{})).ThenReturn(expectedPlanCmt)
-		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false)).ThenReturn(expectedApplyCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, "", false, "")).ThenReturn(expectedApplyCmt)
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:     models.ErroredPlanStatus,
@@ -123,6 +126,50 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
 		result := subject.BuildProjectContext(commandCtx, command.Plan, "", projCfg, []string{}, "some/dir", false, false, false, false, true, terraformClient)
 
-		assert.True(t, result[0].AbortOnExcecutionOrderFail)
+		assert.True(t, result[0].AbortOnExecutionOrderFail)
 	})
+}
+
+func TestProjectCommandContextBuilder_PropagatesAPIWorkflowFlags(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockCommentBuilder := mocks.NewMockCommentBuilder()
+	subject := events.DefaultProjectCommandContextBuilder{
+		CommentBuilder: mockCommentBuilder,
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	projCfg := valid.MergedProjectCfg{
+		RepoRelDir: "env",
+		Workspace:  "prod",
+		Name:       "app",
+		Workflow: valid.Workflow{
+			Name: valid.DefaultWorkflowName,
+			Plan: valid.DefaultPlanStage,
+		},
+	}
+	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
+
+	apiCtx := &command.Context{
+		Log:                   logging.NewNoopLogger(t),
+		API:                   true,
+		SkipPRRequirements:    true,
+		SkipPRModifiedFiles:   true,
+		SuppressVCSStatus:     true,
+		SuppressJobOutput:     true,
+		SuppressApplyWebhooks: true,
+	}
+	apiResult := subject.BuildProjectContext(apiCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
+	assert.True(t, apiResult[0].API)
+	assert.True(t, apiResult[0].SkipPRRequirements)
+	assert.True(t, apiResult[0].SuppressVCSStatus)
+	assert.True(t, apiResult[0].SuppressJobOutput)
+	assert.True(t, apiResult[0].SuppressApplyWebhooks)
+
+	When(mockCommentBuilder.BuildPlanComment("env", "prod", "app", []string{})).ThenReturn("plan comment")
+	normalCtx := &command.Context{Log: logging.NewNoopLogger(t)}
+	normalResult := subject.BuildProjectContext(normalCtx, command.Plan, "", projCfg, []string{}, "repo", false, false, false, false, false, terraformClient)
+	assert.False(t, normalResult[0].API)
+	assert.False(t, normalResult[0].SkipPRRequirements)
+	assert.False(t, normalResult[0].SuppressVCSStatus)
+	assert.False(t, normalResult[0].SuppressJobOutput)
+	assert.False(t, normalResult[0].SuppressApplyWebhooks)
 }

@@ -2,8 +2,10 @@
 {{ template "multiProjectHeader" . -}}
 {{ $disableApplyAll := .DisableApplyAll -}}
 {{ $hideUnchangedPlans := .HideUnchangedPlanComments -}}
+{{ $quietPolicyChecks := .QuietPolicyChecks -}}
 {{ range $i, $result := .Results -}}
 {{ if (and $hideUnchangedPlans $result.NoChanges) }}{{continue}}{{end -}}
+{{ if (and $quietPolicyChecks $result.IsSuccessful) }}{{continue}}{{end -}}
 ### {{ add $i 1 }}. {{ if $result.ProjectName }}project: `{{ $result.ProjectName }}` {{ end }}dir: `{{ $result.RepoRelDir }}` workspace: `{{ $result.Workspace }}`
 {{ $result.Rendered }}
 

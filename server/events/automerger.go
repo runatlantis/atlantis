@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -9,11 +12,12 @@ import (
 )
 
 type AutoMerger struct {
-	VCSClient       vcs.Client
-	GlobalAutomerge bool
+	VCSClient             vcs.Client
+	GlobalAutomerge       bool
+	GlobalAutomergeMethod string
 }
 
-func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool) {
+func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatus, deleteSourceBranchOnMerge bool, mergeMethod string) {
 	// We only automerge if all projects have been successfully applied.
 	for _, p := range pullStatus.Projects {
 		if p.Status != models.AppliedPlanStatus {
@@ -28,10 +32,17 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 		// Commenting isn't required so continue.
 	}
 
+	// Fall back to the server-side default merge method when the comment
+	// command didn't specify one with --auto-merge-method.
+	if mergeMethod == "" {
+		mergeMethod = c.GlobalAutomergeMethod
+	}
+
 	// Make the API call to perform the merge.
 	ctx.Log.Info("automerging pull request")
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
+	pullOptions.MergeMethod = mergeMethod
 	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
 
 	if err != nil {

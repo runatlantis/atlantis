@@ -117,10 +117,6 @@ echo -n "yoursecret" > webhook-secret
 kubectl create secret generic atlantis-vcs --from-file=token --from-file=webhook-secret
 ```
 
-::: tip Note
-If you're using Bitbucket Cloud then there is no webhook secret since it's not supported.
-:::
-
 Next, edit the manifests below as follows:
 
 1. Replace `<VERSION>` in `image: ghcr.io/runatlantis/atlantis:<VERSION>` with the most recent version from [GitHub: Atlantis latest release](https://github.com/runatlantis/atlantis/releases/latest).
@@ -231,6 +227,11 @@ spec:
             secretKeyRef:
               name: atlantis-vcs
               key: token
+        - name: ATLANTIS_BITBUCKET_WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: atlantis-vcs
+              key: webhook-secret
         ### End Bitbucket Config ###
 
         ### Azure DevOps Config ###
@@ -627,6 +628,26 @@ After it is deployed, see [Next Steps](#next-steps).
 
 Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
+#### Image variants
+
+Every release is published in four variants. The unsuffixed tag (for example `v0.47.1` or `latest`) is the Alpine image.
+
+| Tag suffix     | Base   | Bundled Terraform and OpenTofu |
+|----------------|--------|--------------------------------|
+| `-alpine`      | Alpine | yes                            |
+| `-debian`      | Debian | yes                            |
+| `-alpine-slim` | Alpine | no                             |
+| `-debian-slim` | Debian | no                             |
+
+The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
+
+The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to be told which version that is:
+
+* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The slim image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
+* Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
+* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and give an OpenTofu version as the default.
+* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
+
 #### Customization
 
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
@@ -639,6 +660,7 @@ If you need to modify the Docker image that we provide, for instance to add the 
     # copy a terraform binary of the version you need
     USER root
     COPY terragrunt /usr/local/bin/terragrunt
+    USER atlantis
     ```
 
 Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.
@@ -689,7 +711,7 @@ atlantis server \
 ##### GitHub Enterprise
 
 ```bash
-HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io or tenant.ghe.com
 atlantis server \
 --atlantis-url="$URL" \
 --gh-user="$USERNAME" \
@@ -698,6 +720,8 @@ atlantis server \
 --gh-hostname="$HOSTNAME" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
+
+For GitHub Enterprise Cloud, set `--gh-hostname` to the tenant hostname, such as `tenant.ghe.com`, without `https://` or an `api.` prefix.
 
 ##### GitLab
 
@@ -726,10 +750,12 @@ atlantis server \
 ##### Gitea
 
 ```bash
+GITEA_BASE_URL=YOUR_GITEA_BASE_URL # ex. https://gitea.example.com:3000
 atlantis server \
 --atlantis-url="$URL" \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
+--gitea-base-url="$GITEA_BASE_URL" \
 --gitea-webhook-secret="$SECRET" \
 --gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"
@@ -742,6 +768,7 @@ atlantis server \
 --atlantis-url="$URL" \
 --bitbucket-user="$USERNAME" \
 --bitbucket-token="$TOKEN" \
+--bitbucket-webhook-secret="$SECRET" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 

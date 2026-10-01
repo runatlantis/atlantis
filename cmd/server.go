@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -18,16 +9,17 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -55,15 +47,18 @@ const (
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
+	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
+	BitbucketApiUserFlag             = "bitbucket-api-user"
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
@@ -72,10 +67,12 @@ const (
 	CheckoutStrategyFlag             = "checkout-strategy"
 	ConfigFlag                       = "config"
 	DataDirFlag                      = "data-dir"
+	DefaultTFDistributionFlag        = "default-tf-distribution"
 	DefaultTFVersionFlag             = "default-tf-version"
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -85,12 +82,14 @@ const (
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
+	EnableProfilingAPI               = "enable-profiling-api"
 	ExecutableName                   = "executable-name"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
 	GHTeamAllowlistFlag              = "gh-team-allowlist"
 	GHTokenFlag                      = "gh-token"
+	GHTokenFileFlag                  = "gh-token-file" // nolint: gosec
 	GHUserFlag                       = "gh-user"
 	GHAppIDFlag                      = "gh-app-id"
 	GHAppKeyFlag                     = "gh-app-key"
@@ -105,10 +104,12 @@ const (
 	GiteaUserFlag                    = "gitea-user"
 	GiteaWebhookSecretFlag           = "gitea-webhook-secret" // nolint: gosec
 	GiteaPageSizeFlag                = "gitea-page-size"
+	GitlabGroupAllowlistFlag         = "gitlab-group-allowlist"
 	GitlabHostnameFlag               = "gitlab-hostname"
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
@@ -118,8 +119,11 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	SharePlanDirFlag                 = "share-plan-dir"
+	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
+	EnableExternalStoresFlag         = "enable-external-stores"
 	PortFlag                         = "port"
 	RedisDB                          = "redis-db"
 	RedisHost                        = "redis-host"
@@ -127,6 +131,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -140,19 +146,25 @@ const (
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
 	RestrictFileList                 = "restrict-file-list"
-	TFDistributionFlag               = "tf-distribution"
+	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
+	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	LanguageFlag                     = "language"
+	LanguageConfigFileFlag           = "language-config-file"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
 	WriteGitCredsFlag                = "write-git-creds" // nolint: gosec
+	WebhookHttpHeaders               = "webhook-http-headers"
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag         = "enable-drift-detection"
+	EnableDriftRemediationFlag       = "enable-drift-remediation"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -160,8 +172,9 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
+	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
+	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -174,7 +187,9 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
+	DefaultLanguage                     = i18n.DefaultLanguage
 	DefaultLogLevel                     = "info"
+	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
 	DefaultParallelPoolSize             = 15
 	DefaultStatsNamespace               = "atlantis"
@@ -220,6 +235,12 @@ var stringFlags = map[string]stringFlag{
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
 	},
+	BlockedExtraArgsFlag: {
+		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+			"in comment extra args (the flags after '--'). " +
+			"Defaults to " + DefaultBlockedExtraArgs + ".",
+		defaultValue: DefaultBlockedExtraArgs,
+	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
@@ -228,6 +249,11 @@ var stringFlags = map[string]stringFlag{
 			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
+	},
+	AutomergeMethodFlag: {
+		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
+			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -243,8 +269,11 @@ var stringFlags = map[string]stringFlag{
 			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
 		defaultValue: DefaultAutoplanFileList,
 	},
+	BitbucketApiUserFlag: {
+		description: "Bitbucket username for API calls. If not set, defaults to bitbucket-user for backward compatibility. Can also be specified via the ATLANTIS_BITBUCKET_API_USER environment variable.",
+	},
 	BitbucketUserFlag: {
-		description: "Bitbucket username of API user.",
+		description: "Bitbucket username for git operations.",
 	},
 	BitbucketTokenFlag: {
 		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
@@ -256,7 +285,7 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultBitbucketBaseURL,
 	},
 	BitbucketWebhookSecretFlag: {
-		description: "Secret used to validate Bitbucket webhooks. Only Bitbucket Server supports webhook secrets." +
+		description: "Secret used to validate Bitbucket webhooks." +
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from Bitbucket. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_BITBUCKET_WEBHOOK_SECRET environment variable.",
@@ -279,6 +308,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableAutomergeLabelFlag: {
+		description:  "Pull request label to disable atlantis automerge feature only if present.",
 		defaultValue: "",
 	},
 	DisableUnlockLabelFlag: {
@@ -314,6 +347,9 @@ var stringFlags = map[string]stringFlag{
 	},
 	GHTokenFlag: {
 		description: "GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN environment variable.",
+	},
+	GHTokenFileFlag: {
+		description: "A path to a file containing the GitHub token of API user. Can also be specified via the ATLANTIS_GH_TOKEN_FILE environment variable.",
 	},
 	GHAppKeyFlag: {
 		description:  "The GitHub App's private key",
@@ -352,6 +388,17 @@ var stringFlags = map[string]stringFlag{
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITEA_WEBHOOK_SECRET environment variable.",
 	},
+	GitlabGroupAllowlistFlag: {
+		description: "Comma separated list of key-value pairs representing the GitLab groups and the operations that " +
+			"the members of a particular group are allowed to perform. " +
+			"The format is {group}:{command},{group}:{command}. " +
+			"Valid values for 'command' are 'plan', 'apply' and '*', e.g. 'myorg/dev:plan,myorg/ops:apply,myorg/devops:*'" +
+			"This example gives the users from the 'myorg/dev' GitLab group the permissions to execute the 'plan' command, " +
+			"the 'myorg/ops' group the permissions to execute the 'apply' command, " +
+			"and allows the 'myorg/devops' group to perform any operation. If this argument is not provided, the default value (*:*) " +
+			"will be used and the default behavior will be to not check permissions " +
+			"and to allow users from any group to perform any operation.",
+	},
 	GitlabHostnameFlag: {
 		description:  "Hostname of your GitLab Enterprise installation. If using gitlab.com, no need to set.",
 		defaultValue: DefaultGitlabHostname,
@@ -387,11 +434,22 @@ var stringFlags = map[string]stringFlag{
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
 	},
+	SharePlanDirFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
+	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -415,8 +473,8 @@ var stringFlags = map[string]stringFlag{
 		description: fmt.Sprintf("File containing x509 private key matching --%s.", SSLCertFileFlag),
 	},
 	TFDistributionFlag: {
-		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
-		defaultValue: DefaultTFDistribution,
+		description: "[Deprecated for --default-tf-distribution].",
+		hidden:      true,
 	},
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
@@ -431,6 +489,10 @@ var stringFlags = map[string]stringFlag{
 			" Only set if using TFC/E as a remote backend." +
 			" Should be specified via the ATLANTIS_TFE_TOKEN environment variable for security.",
 	},
+	DefaultTFDistributionFlag: {
+		description:  fmt.Sprintf("Which TF distribution to use. Can be set to %s or %s.", TFDistributionTerraform, TFDistributionOpenTofu),
+		defaultValue: DefaultTFDistribution,
+	},
 	DefaultTFVersionFlag: {
 		description: "Terraform version to default to (ex. v0.12.0). Will download if not yet on disk." +
 			" If not set, Atlantis uses the terraform binary in its PATH.",
@@ -439,9 +501,29 @@ var stringFlags = map[string]stringFlag{
 		description: "Comma-separated list of additional paths where variable definition files can be read from." +
 			" If this argument is not provided, it defaults to Atlantis' data directory, determined by the --data-dir argument.",
 	},
+	IgnoreVCSStatusNames: {
+		description: "Comma separated list of VCS status names from other atlantis services." +
+			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
+			" Currently only implemented for GitHub.",
+		defaultValue: DefaultIgnoreVCSStatusNames,
+	},
+	LanguageFlag: {
+		description:  "Language used for Atlantis pull request comments. Supported values: " + i18n.SupportedLanguagesDescription() + ".",
+		defaultValue: DefaultLanguage,
+	},
+	LanguageConfigFileFlag: {
+		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
+			"Supports partial overrides and can be combined with --language.",
+	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
 		defaultValue: DefaultVCSStatusName,
+	},
+	WebhookHttpHeaders: {
+		description: "Additional headers added to each HTTP POST payload when using HTTP webhooks provided as a JSON string." +
+			" The map key is the header name and the value is the header value (string) or values (array of string)." +
+			" For example: `{\"Authorization\":\"Bearer some-token\",\"X-Custom-Header\":[\"value1\",\"value2\"]}`.",
+		defaultValue: "",
 	},
 	WebUsernameFlag: {
 		description:  "Username used for Web Basic Authentication on Atlantis HTTP Middleware",
@@ -493,6 +575,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable Atlantis to use regular expressions on plan/apply commands when \"-p\" flag is passed with it.",
 		defaultValue: false,
 	},
+	EnableProfilingAPI: {
+		description:  "Enable net/http/pprof routes in server for continuous profiling.",
+		defaultValue: false,
+	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
 		defaultValue: false,
@@ -503,6 +589,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GitlabStatusRetryEnabledFlag: {
+		description:  "Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.",
 		defaultValue: false,
 	},
 	AllowDraftPRs: {
@@ -524,6 +614,14 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	PendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
+		defaultValue: false,
+	},
+	EnableExternalStoresFlag: {
+		description:  "Enable external storage backends configured in the server-side repo config (external_stores block).",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -591,6 +689,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
+		defaultValue: false,
+	},
+	EnableDriftRemediationFlag: {
+		description:  "Enable drift remediation apply API actions. Requires --enable-drift-detection.",
+		defaultValue: false,
+	},
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
@@ -649,6 +755,10 @@ var int64Flags = map[string]int64Flag{
 
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
+
+// ValidAutomergeMethods are the valid merge methods that can be set for the
+// automerge-method flag.
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
 
 type stringFlag struct {
 	description  string
@@ -790,13 +900,29 @@ func (s *ServerCmd) preRun() error {
 	if configFile != "" {
 		s.Viper.SetConfigFile(configFile)
 		if err := s.Viper.ReadInConfig(); err != nil {
-			return errors.Wrapf(err, "invalid config: reading %s", configFile)
+			return fmt.Errorf("invalid config: reading %s: %w", configFile, err)
 		}
 	}
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
@@ -816,6 +942,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setSharePlanDir(&userConfig); err != nil {
+		return err
+	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
@@ -828,16 +957,17 @@ func (s *ServerCmd) run() error {
 
 	// Config looks good. Start the server.
 	server, err := s.ServerCreator.NewServer(userConfig, server.Config{
-		AllowForkPRsFlag:        AllowForkPRsFlag,
-		AtlantisURLFlag:         AtlantisURLFlag,
-		AtlantisVersion:         s.AtlantisVersion,
-		DefaultTFVersionFlag:    DefaultTFVersionFlag,
-		RepoConfigJSONFlag:      RepoConfigJSONFlag,
-		SilenceForkPRErrorsFlag: SilenceForkPRErrorsFlag,
+		AllowForkPRsFlag:          AllowForkPRsFlag,
+		AtlantisURLFlag:           AtlantisURLFlag,
+		AtlantisVersion:           s.AtlantisVersion,
+		DefaultTFDistributionFlag: DefaultTFDistributionFlag,
+		DefaultTFVersionFlag:      DefaultTFVersionFlag,
+		RepoConfigJSONFlag:        RepoConfigJSONFlag,
+		SilenceForkPRErrorsFlag:   SilenceForkPRErrorsFlag,
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "initializing server")
+		return fmt.Errorf("initializing server: %w", err)
 	}
 	return server.Start()
 }
@@ -854,6 +984,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
+	}
+	if c.BlockedExtraArgs == "" {
+		c.BlockedExtraArgs = DefaultBlockedExtraArgs
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
@@ -885,6 +1018,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
 	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
+	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
 	}
@@ -909,14 +1045,20 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.RedisPort == 0 {
 		c.RedisPort = DefaultRedisPort
 	}
-	if c.TFDistribution == "" {
-		c.TFDistribution = DefaultTFDistribution
+	if c.TFDistribution != "" && c.DefaultTFDistribution == "" {
+		c.DefaultTFDistribution = c.TFDistribution
+	}
+	if c.DefaultTFDistribution == "" {
+		c.DefaultTFDistribution = DefaultTFDistribution
 	}
 	if c.TFDownloadURL == "" {
 		c.TFDownloadURL = DefaultTFDownloadURL
 	}
 	if c.VCSStatusName == "" {
 		c.VCSStatusName = DefaultVCSStatusName
+	}
+	if c.IgnoreVCSStatusNames == "" {
+		c.IgnoreVCSStatusNames = DefaultIgnoreVCSStatusNames
 	}
 	if c.TFEHostname == "" {
 		c.TFEHostname = DefaultTFEHostname
@@ -937,8 +1079,19 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
 	}
+	// Intentionally allow unsupported --language values when a custom language
+	// catalog is provided, so operators can define their own locale codes.
+	if strings.TrimSpace(userConfig.LanguageConfigFile) == "" {
+		if err := i18n.ValidateLanguage(userConfig.Language); err != nil {
+			return err
+		}
+	} else {
+		if err := i18n.ValidateCustomCatalog(userConfig.LanguageConfigFile); err != nil {
+			return err
+		}
+	}
 
-	if userConfig.TFDistribution != TFDistributionTerraform && userConfig.TFDistribution != TFDistributionOpenTofu {
+	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
 		return fmt.Errorf("invalid tf distribution: expected one of %s or %s",
 			TFDistributionTerraform, TFDistributionOpenTofu)
 	}
@@ -949,31 +1102,38 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
 	}
 
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
+	}
+
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
 		return fmt.Errorf("--%s and --%s are both required for ssl", SSLKeyFileFlag, SSLCertFileFlag)
 	}
 
 	// The following combinations are valid.
-	// 1. github user and token set
+	// 1. github user and (token or token file)
 	// 2. github app ID and (key file set or key set)
 	// 3. gitea user and token set
 	// 4. gitlab user and token set
 	// 5. bitbucket user and token set
 	// 6. azuredevops user and token set
 	// 7. any combination of the above
-	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
-	if ((userConfig.GithubUser == "") != (userConfig.GithubToken == "")) ||
-		((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
+	vcsErr := fmt.Errorf("--%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s or --%s/--%s must be set", GHUserFlag, GHTokenFlag, GHUserFlag, GHTokenFileFlag, GHAppIDFlag, GHAppKeyFileFlag, GHAppIDFlag, GHAppKeyFlag, GiteaUserFlag, GiteaTokenFlag, GitlabUserFlag, GitlabTokenFlag, BitbucketUserFlag, BitbucketTokenFlag, ADUserFlag, ADTokenFlag)
+	if ((userConfig.GiteaUser == "") != (userConfig.GiteaToken == "")) ||
 		((userConfig.GitlabUser == "") != (userConfig.GitlabToken == "")) ||
 		((userConfig.BitbucketUser == "") != (userConfig.BitbucketToken == "")) ||
 		((userConfig.AzureDevopsUser == "") != (userConfig.AzureDevopsToken == "")) {
 		return vcsErr
 	}
-	if (userConfig.GithubAppID != 0) && ((userConfig.GithubAppKey == "") && (userConfig.GithubAppKeyFile == "")) {
-		return vcsErr
+	if userConfig.GithubUser != "" {
+		if (userConfig.GithubToken == "") == (userConfig.GithubTokenFile == "") {
+			return vcsErr
+		}
 	}
-	if (userConfig.GithubAppID == 0) && ((userConfig.GithubAppKey != "") || (userConfig.GithubAppKeyFile != "")) {
-		return vcsErr
+	if userConfig.GithubAppID != 0 {
+		if (userConfig.GithubAppKey == "") == (userConfig.GithubAppKeyFile == "") {
+			return vcsErr
+		}
 	}
 	// At this point, we know that there can't be a single user/token without
 	// its partner, but we haven't checked if any user/token is set at all.
@@ -986,10 +1146,6 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	if strings.Contains(userConfig.RepoAllowlist, "://") {
 		return fmt.Errorf("--%s cannot contain ://, should be hostnames only", RepoAllowlistFlag)
-	}
-
-	if userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret != "" {
-		return fmt.Errorf("--%s cannot be specified for Bitbucket Cloud because it is not supported by Bitbucket", BitbucketWebhookSecretFlag)
 	}
 
 	parsed, err := url.Parse(userConfig.BitbucketBaseURL)
@@ -1015,6 +1171,7 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// Warn if any tokens have newlines.
 	for name, token := range map[string]string{
 		GHTokenFlag:                userConfig.GithubToken,
+		GHTokenFileFlag:            userConfig.GithubTokenFile,
 		GHWebhookSecretFlag:        userConfig.GithubWebhookSecret,
 		GitlabTokenFlag:            userConfig.GitlabToken,
 		GitlabWebhookSecretFlag:    userConfig.GitlabWebhookSecret,
@@ -1032,13 +1189,29 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
 	}
 
+	if userConfig.RedisClusterAddresses != "" {
+		if userConfig.RedisHost != "" {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisHost)
+		}
+		if userConfig.RedisPort != DefaultRedisPort {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisPort)
+		}
+		if userConfig.RedisDB != DefaultRedisDB {
+			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
+		}
+	}
+
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
-		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
+		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+		return fmt.Errorf("invalid --%s: %w", AllowCommandsFlag, err)
+	}
+
+	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
+		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
 	return nil
@@ -1049,7 +1222,7 @@ func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
 	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return errors.Wrap(err, "failed to determine hostname")
+			return fmt.Errorf("failed to determine hostname: %w", err)
 		}
 		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}
@@ -1067,16 +1240,41 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making data-dir absolute")
+		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
+	return nil
+}
+
+// setSharePlanDir checks if ~ was used in share-plan-dir and converts it to the actual
+// home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
+func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
+	if userConfig.SharePlanDir == "" {
+		userConfig.SharePlanDir = userConfig.DataDir
+		return nil
+	}
+
+	finalPath := userConfig.SharePlanDir
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making share-plan-dir absolute: %w", err)
+	}
+	userConfig.SharePlanDir = finalPath
 	return nil
 }
 
@@ -1091,14 +1289,14 @@ func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfi
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making markdown-template-overrides-dir absolute")
+		return fmt.Errorf("making markdown-template-overrides-dir absolute: %w", err)
 	}
 	userConfig.MarkdownTemplateOverridesDir = finalPath
 	return nil
@@ -1134,9 +1332,6 @@ func (s *ServerCmd) securityWarnings(userConfig *server.UserConfig) {
 	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL != DefaultBitbucketBaseURL && userConfig.BitbucketWebhookSecret == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Bitbucket webhook secret set. This could allow attackers to spoof requests from Bitbucket")
 	}
-	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL && !s.SilenceOutput {
-		s.Logger.Warn("Bitbucket Cloud does not support webhook secrets. This could allow attackers to spoof requests from Bitbucket. Ensure you are allowing only Bitbucket IPs")
-	}
 	if userConfig.AzureDevopsWebhookUser != "" && userConfig.AzureDevopsWebhookPassword == "" && !s.SilenceOutput {
 		s.Logger.Warn("no Azure DevOps webhook user and password set. This could allow attackers to spoof requests from Azure DevOps.")
 	}
@@ -1152,6 +1347,10 @@ func (s *ServerCmd) deprecationWarnings(userConfig *server.UserConfig) error {
 	//               deprecatedFlags = append(deprecatedFlags, SomeDeprecatedFlag)
 	//       }
 	//
+
+	if userConfig.TFDistribution != "" {
+		deprecatedFlags = append(deprecatedFlags, TFDistributionFlag)
+	}
 
 	if len(deprecatedFlags) > 0 {
 		warning := "WARNING: "
@@ -1183,11 +1382,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }

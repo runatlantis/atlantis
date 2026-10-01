@@ -1,19 +1,27 @@
-# syntax=docker/dockerfile:1@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
 # what distro is the image being built for
-ARG ALPINE_TAG=3.20.3@sha256:beefdbd8a1da6d2915566fde36db9db0b524eb737fc57cd1367effd16dc0d06d
-ARG DEBIAN_TAG=12.7-slim@sha256:ad86386827b083b3d71139050b47ffb32bbd9559ea9b1345a739b14fec2d9ecf
-ARG GOLANG_TAG=1.23.0-alpine@sha256:d0b31558e6b3e4cc59f6011d79905835108c919143ebecc58f35965bf79948f4
+ARG ALPINE_TAG=3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
+# renovate: datasource=docker depName=golang versioning=docker
+ARG GOLANG_TAG=1.27.1-alpine3.24@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.9.7
+ARG TERRAFORM_1_15_VERSION=1.15.9
+# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
+ARG TERRAFORM_1_16_VERSION=1.16.3
+ARG DEFAULT_TERRAFORM_VERSION=${TERRAFORM_1_16_VERSION}
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.8.2
+ARG DEFAULT_OPENTOFU_VERSION=1.12.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.55.0
+ARG DEFAULT_CONFTEST_VERSION=0.70.0
 
 # Stage 1: build artifact and download deps
 
-FROM golang:${GOLANG_TAG} AS builder
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_TAG} AS builder
+
+# These are automatically populated by Docker
+ARG TARGETOS
+ARG TARGETARCH
 
 ARG ATLANTIS_VERSION=dev
 ENV ATLANTIS_VERSION=${ATLANTIS_VERSION}
@@ -32,8 +40,12 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
+# renovate: datasource=apk depName=bash
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
+
 RUN apk add --no-cache \
-        bash~=5.2
+    bash=${BUILDER_BASH_VERSION}
+
 COPY go.mod go.sum ./
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -42,29 +54,51 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . /app
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags "-s -w -X 'main.version=${ATLANTIS_VERSION}' -X 'main.commit=${ATLANTIS_COMMIT}' -X 'main.date=${ATLANTIS_DATE}'" -v -o atlantis .
 
-FROM debian:${DEBIAN_TAG} as debian-base
+FROM debian:${DEBIAN_TAG} AS debian-base
+
+# Define package versions for Debian
+# renovate: datasource=deb depName=ca-certificates
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+# renovate: datasource=deb depName=curl
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u5"
+# renovate: datasource=deb depName=git
+ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
+# renovate: datasource=deb depName=unzip
+ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
+# renovate: datasource=deb depName=openssh-server
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
+# renovate: datasource=deb depName=dumb-init
+ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
+# renovate: datasource=deb depName=gnupg
+ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
+# renovate: datasource=deb depName=openssl
+ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u2"
+
+# Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
+RUN groupadd --gid 1000 atlantis && \
+    useradd --uid 100 --system --create-home --gid 1000 --shell /bin/bash atlantis && \
+    useradd --uid 1000 --system --home=/home/atlantis --gid 1000 --shell /bin/bash atlantis2 && \
+    chown atlantis:atlantis /home/atlantis/ && \
+    chmod ug+rwx /home/atlantis/
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
-# hadolint ignore explanation
-# DL3008 (pin versions using "=") - Ignored to avoid failing the build
-# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-        unzip \
-        openssh-server \
-        dumb-init \
-        gnupg \
-        openssl && \
+    ca-certificates=${DEBIAN_CA_CERTIFICATES_VERSION} \
+    curl=${DEBIAN_CURL_VERSION} \
+    git=${DEBIAN_GIT_VERSION} \
+    unzip=${DEBIAN_UNZIP_VERSION} \
+    openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
+    dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
+    gnupg=${DEBIAN_GNUPG_VERSION} \
+    openssl=${DEBIAN_OPENSSL_VERSION} && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian-base as deps
+FROM debian-base AS deps
 
 # Get the architecture the image is being built for
 ARG TARGETPLATFORM
@@ -94,20 +128,33 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.5.1
+ENV GIT_LFS_VERSION=3.8.0
 
+# Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
+# SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e455e00f15d9b95661b8d53498ffb0c3367962cf1ec73c31ab7369516cd6ab8d ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=ac9c8efac980bb0505ead384d087e2acb6486fd8498691a2165fa174ec6118c2 ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=67144f93c2342f46456d22dbf33077f54e0581cb91f2966393151871ca328553 ;; \
+        *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    echo "${GIT_LFS_SHA256}  git-lfs.tar.gz" | sha256sum -c - && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version
 
+# Terraform and OpenTofu live in their own stage so the slim targets never
+# download them. The full targets copy from tf-deps; the slim targets do not.
+FROM deps AS tf-deps
+
+ARG TARGETPLATFORM
+WORKDIR /tmp/build
+
 # install terraform binaries
+ARG TERRAFORM_1_15_VERSION
+ARG TERRAFORM_1_16_VERSION
 ARG DEFAULT_TERRAFORM_VERSION
 ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 ARG DEFAULT_OPENTOFU_VERSION
@@ -116,13 +163,12 @@ ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
 # COPY scripts/download-release.sh .
 COPY --from=builder /app/scripts/download-release.sh download-release.sh
 
-# In the official Atlantis image, we only have the latest of each Terraform version.
-# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
+# HashiCorp patches only the two most recent minor releases.
 RUN ./download-release.sh \
         "terraform" \
         "${TARGETPLATFORM}" \
         "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.6.6 1.7.5 1.8.5 ${DEFAULT_TERRAFORM_VERSION}" \
+        "${TERRAFORM_1_15_VERSION} ${TERRAFORM_1_16_VERSION}" \
     && ./download-release.sh \
         "tofu" \
         "${TARGETPLATFORM}" \
@@ -130,75 +176,179 @@ RUN ./download-release.sh \
         "${DEFAULT_OPENTOFU_VERSION}"
 
 # Stage 2 - Alpine
-# Creating the individual distro builds using targets
-FROM alpine:${ALPINE_TAG} AS alpine
+# Creating the individual distro builds using targets.
+#
+# Each distro has a runtime stage with everything except the Terraform and
+# OpenTofu binaries, and two final targets built on it:
+#   <distro>-slim  no Terraform or OpenTofu. Atlantis downloads the version it
+#                  needs at runtime (see --tf-download), so this image carries
+#                  none of the advisories filed against bundled binaries.
+#   <distro>       the runtime stage plus the bundled binaries. This is the
+#                  image that has always been published.
+FROM alpine:${ALPINE_TAG} AS alpine-runtime
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # Set up the 'atlantis' user and adjust permissions
-RUN addgroup atlantis && \
-    adduser -S -G atlantis atlantis && \
+RUN addgroup --gid 1000 atlantis && \
+    adduser -u 100 -S -G atlantis atlantis && \
     chown atlantis:root /home/atlantis/ && \
     chmod u+rwx /home/atlantis/
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_20/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20240705-r0"
+# renovate: datasource=apk depName=ca-certificates
+ENV CA_CERTIFICATES_VERSION="20260909-r0"
+# renovate: datasource=apk depName=curl
+ENV CURL_VERSION="8.22.0-r0"
+# renovate: datasource=apk depName=git
+ENV GIT_VERSION="2.54.0-r0"
+# renovate: datasource=apk depName=unzip
+ENV UNZIP_VERSION="6.0-r16"
+# renovate: datasource=apk depName=bash
+ENV BASH_VERSION="5.3.9-r1"
+# renovate: datasource=apk depName=openssh
+ENV OPENSSH_VERSION="10.3_p1-r1"
+# renovate: datasource=apk depName=dumb-init
+ENV DUMB_INIT_VERSION="1.2.5-r4"
+# renovate: datasource=apk depName=gcompat
+ENV GCOMPAT_VERSION="1.1.0-r4"
+# renovate: datasource=apk depName=coreutils-env
+ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
 RUN apk add --no-cache \
-        ca-certificates~=${CA_CERTIFICATES_VERSION} \
-        curl~=8 \
-        git~=2 \
-        unzip~=6 \
-        bash~=5 \
-        openssh~=9 \
-        dumb-init~=1 \
-        gcompat~=1
+    ca-certificates=${CA_CERTIFICATES_VERSION} \
+    curl=${CURL_VERSION} \
+    git=${GIT_VERSION} \
+    unzip=${UNZIP_VERSION} \
+    bash=${BASH_VERSION} \
+    openssh=${OPENSSH_VERSION} \
+    dumb-init=${DUMB_INIT_VERSION} \
+    gcompat=${GCOMPAT_VERSION} \
+    coreutils-env=${COREUTILS_ENV_VERSION}
+
+# Strip file capabilities only under fcap_scan_dirs (common rootfs locations for
+# binaries and libs: /bin, /sbin, /usr, /opt, /lib, /lib64). This is a scoped
+# scan, not a full getcap -r /: walking from / would traverse /proc, /sys, /dev,
+# etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
+# and verify share the same list; post-pass getcap|grep fails the build if
+# capabilities remain under that scope.
+# renovate: datasource=apk depName=libcap
+ENV LIBCAP_VERSION="2.78-r0"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apk add --no-cache libcap=${LIBCAP_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apk del libcap
+
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
-# Stage 2 - Debian
-FROM debian-base AS debian
+FROM alpine-runtime AS alpine-slim
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+# Nothing to add. With no terraform on PATH, Atlantis refuses to start until
+# --default-tf-version is set (flag, ATLANTIS_DEFAULT_TF_VERSION, or the
+# server config file) and then downloads that version on first use.
+#
+# Deliberately no ENV ATLANTIS_DEFAULT_TF_VERSION here: environment variables
+# take precedence over the server config file, so a version baked into the
+# image would silently override a version pinned in that file.
+
+FROM alpine-runtime AS alpine
+
+# copy terraform binaries. These come out of release zip files, which carry no
+# file capabilities, so the capability strip in alpine-runtime still holds.
+COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/
+
+# Stage 2 - Debian
+FROM debian-base AS debian-runtime
+
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
-  CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
-
-# Set up the 'atlantis' user and adjust permissions
-RUN useradd --create-home --user-group --shell /bin/bash atlantis && \
-    chown atlantis:root /home/atlantis/ && \
-    chmod u+rwx /home/atlantis/
+    CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 # copy docker-entrypoint.sh
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+ARG DEFAULT_CONFTEST_VERSION
+ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
+
+# Same as Alpine: strip and verify only under fcap_scan_dirs (scoped rootfs
+# trees, not the entire image). Post-pass: if getcap still reports any
+# "path = cap_set" line under that scope, the build fails. Strip may use
+# 2>/dev/null and setcap || true; verification is the hard guarantee.
+# renovate: datasource=deb depName=libcap2-bin
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b3"
+# hadolint ignore=DL4006
+RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libcap2-bin=${DEBIAN_LIBCAP2_BIN_VERSION} && \
+    command -v getcap >/dev/null && command -v setcap >/dev/null && \
+    for d in $fcap_scan_dirs; do \
+        [ -d "$d" ] && getcap -r "$d" 2>/dev/null; \
+    done | awk '{ print $1 }' | sort -u | while read -r f; do \
+        [ -n "$f" ] && { setcap -r "$f" 2>/dev/null || echo "warning: could not strip caps from $f" >&2; }; \
+    done && \
+    remaining="$(for d in $fcap_scan_dirs; do [ -d "$d" ] && getcap -r "$d" 2>/dev/null || :; done)" && \
+    if [ -n "$remaining" ]; then \
+        echo "failed to remove all file capabilities (post-pass getcap under fcap_scan_dirs):" >&2; \
+        echo "$remaining" >&2; \
+        exit 1; \
+    fi && \
+    apt-get purge -y libcap2-bin && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set the entry point to the atlantis user and run the atlantis command
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
+
+FROM debian-runtime AS debian-slim
+
+# Nothing to add. See alpine-slim for why no default Terraform version is set.
+
+FROM debian-runtime AS debian
+
+# copy terraform binaries. See the alpine target for why this is safe to do
+# after the capability strip.
+COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
+COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/

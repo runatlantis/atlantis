@@ -1,8 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 )
 
@@ -13,7 +18,7 @@ type policyCheckStepRunner struct {
 }
 
 // NewPolicyCheckStepRunner creates a new step runner from an executor workflow
-func NewPolicyCheckStepRunner(defaultTfVersion *version.Version, executorWorkflow VersionedExecutorWorkflow) (Runner, error) {
+func NewPolicyCheckStepRunner(defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, executorWorkflow VersionedExecutorWorkflow) (Runner, error) {
 	policyCheckStepRunner := &policyCheckStepRunner{
 		versionEnsurer: executorWorkflow,
 		executor:       executorWorkflow,
@@ -28,7 +33,7 @@ func (p *policyCheckStepRunner) Run(ctx command.ProjectContext, extraArgs []stri
 	executable, err := p.versionEnsurer.EnsureExecutorVersion(ctx.Log, ctx.PolicySets.Version)
 
 	if err != nil {
-		return "", errors.Wrapf(err, "ensuring policy executor version")
+		return "", fmt.Errorf("ensuring policy executor version: %w", err)
 	}
 
 	return p.executor.Run(ctx, executable, envs, path, extraArgs)

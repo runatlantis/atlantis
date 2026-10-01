@@ -28,15 +28,15 @@ func (mock *MockLockURLGenerator) GenerateLockURL(lockID string) string {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockLockURLGenerator().")
 	}
-	params := []pegomock.Param{lockID}
-	result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateLockURL", params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
-	var ret0 string
-	if len(result) != 0 {
-		if result[0] != nil {
-			ret0 = result[0].(string)
+	_params := []pegomock.Param{lockID}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("GenerateLockURL", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem()})
+	var _ret0 string
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
 		}
 	}
-	return ret0
+	return _ret0
 }
 
 func (mock *MockLockURLGenerator) VerifyWasCalledOnce() *VerifierMockLockURLGenerator {
@@ -77,8 +77,8 @@ type VerifierMockLockURLGenerator struct {
 }
 
 func (verifier *VerifierMockLockURLGenerator) GenerateLockURL(lockID string) *MockLockURLGenerator_GenerateLockURL_OngoingVerification {
-	params := []pegomock.Param{lockID}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateLockURL", params, verifier.timeout)
+	_params := []pegomock.Param{lockID}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "GenerateLockURL", _params, verifier.timeout)
 	return &MockLockURLGenerator_GenerateLockURL_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
@@ -93,11 +93,13 @@ func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetCapturedAr
 }
 
 func (c *MockLockURLGenerator_GenerateLockURL_OngoingVerification) GetAllCapturedArguments() (_param0 []string) {
-	params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(params) > 0 {
-		_param0 = make([]string, len(c.methodInvocations))
-		for u, param := range params[0] {
-			_param0[u] = param.(string)
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
 		}
 	}
 	return

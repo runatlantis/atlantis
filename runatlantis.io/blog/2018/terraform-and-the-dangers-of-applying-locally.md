@@ -19,27 +19,27 @@ Here's how that tends to happen:
 
 Say we have two developers: Alice and Bob. Alice needs to add a new security group rule. She checks out a new branch, adds her rule and creates a pull request:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic1.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic1.webp)
 
 When she runs `terraform plan` locally she sees what she expects.
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic2.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic2.webp)
 
 Meanwhile, Bob is working on an emergency fix. He checks out a new branch and adds a different security group rule called `emergency`:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic3.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic3.webp)
 
 And, because it's an emergency, he **immediately runs apply**:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic4.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic4.webp)
 
 Now back to Alice. She's just gotten approval on her pull request change and so she runs `terraform apply`:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic5.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic5.webp)
 
 Did you catch what happened? Did you notice that the `apply` deleted Bob's rule?
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic6.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic6.webp)
 
 In this example, it wasn't too hard to see. However if the plan is much longer, or if the change is less obvious then it can be easy to miss.
 
@@ -51,7 +51,7 @@ There are some ways to avoid this:
 
 If Alice had run `terraform plan -out plan.tfplan` then when she ran `terraform apply plan.tfplan` she would see:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic7.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic7.webp)
 
 The problem with this solution is that few people run `terraform plan` anymore, much less `terraform plan -out`!
 
@@ -87,21 +87,21 @@ When Alice makes her change, she creates a pull request and Atlantis automatical
 
 When Bob makes his change, he creates a pull request and Atlantis automatically runs `terraform plan` and comments on the pull request.
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic8.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic8.webp)
 
 Atlantis also **locks the directory** to ensure that no one else can run `plan` or `apply` until Alice's plan has been intentionally deleted or she merges the pull request.
 
 If Bob creates a pull request for his emergency change he'd see this error:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic9.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic9.webp)
 
 Alice can then comment `atlantis apply` and Atlantis will run the apply itself:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic10.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic10.webp)
 
 Finally, she merges the pull request and unlocks Bob's branch:
 
-![](/blog/terraform-and-the-dangers-of-applying-locally/pic11.webp)
+![](terraform-and-the-dangers-of-applying-locally/pic11.webp)
 
 ### But what if Bob ran `apply` locally?
 

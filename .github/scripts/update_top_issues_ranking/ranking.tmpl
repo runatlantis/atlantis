@@ -1,0 +1,19 @@
+# Top-Ranking Atlantis Issues 📊
+
+_Last updated: {{ .GeneratedAt }}._
+
+This issue is updated automatically from open Atlantis issues ranked by 👍 reactions on the original issue. Rankings are community signal for maintainers and contributors, not a roadmap commitment, priority guarantee, or acceptance decision.
+
+Minimum 👍 threshold: {{ .MinThumbsUp }}.
+
+Excluded labels: {{ .ExcludedLabels }}.
+{{ range .Categories }}
+## {{ .Name }}
+{{ if .Issues }}
+| Rank | Issue | 👍 | Comments | Updated | Labels |
+| --- | --- | ---: | ---: | --- | --- |
+{{ range .Issues }}| {{ .Rank }} | {{ .Issue }} | {{ .ThumbsUp }} | {{ .Comments }} | {{ .Updated }} | {{ .Labels }} |
+{{ end }}{{ else }}
+No matching issues above threshold.
+{{ end }}
+{{ end }}

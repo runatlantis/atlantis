@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -8,7 +11,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 )
@@ -26,37 +29,57 @@ var (
 )
 
 type planStepRunner struct {
-	TerraformExecutor   TerraformExec
-	DefaultTFVersion    *version.Version
-	CommitStatusUpdater StatusUpdater
-	AsyncTFExec         AsyncTFExec
+	TerraformExecutor     TerraformExec
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
+	CommitStatusUpdater   StatusUpdater
+	AsyncTFExec           AsyncTFExec
+	PlanStore             PlanStore
 }
 
-func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec) Runner {
+func NewPlanStepRunner(terraformExecutor TerraformExec, defaultTfDistribution terraform.Distribution, defaultTfVersion *version.Version, commitStatusUpdater StatusUpdater, asyncTFExec AsyncTFExec, planStore PlanStore) Runner {
 	runner := &planStepRunner{
-		TerraformExecutor:   terraformExecutor,
-		DefaultTFVersion:    defaultTfVersion,
-		CommitStatusUpdater: commitStatusUpdater,
-		AsyncTFExec:         asyncTFExec,
+		TerraformExecutor:     terraformExecutor,
+		DefaultTFDistribution: defaultTfDistribution,
+		DefaultTFVersion:      defaultTfVersion,
+		CommitStatusUpdater:   commitStatusUpdater,
+		AsyncTFExec:           asyncTFExec,
+		PlanStore:             planStore,
 	}
-	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfVersion, runner)
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
 
 func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	// extra_args comes from configuration, so environment variable references
+	// in it may be expanded. Marked on this copy of the context; everything
+	// else, including comment args, stays literal.
+	if len(extraArgs) > 0 {
+		ctx.ExpandableArgs = extraArgs
+	}
+	tfDistribution := p.DefaultTFDistribution
 	tfVersion := p.DefaultTFVersion
+	if ctx.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
 
-	planFile := filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	planFile := GetPlanFilePath(ctx, path)
+	if err := EnsurePlanFileDir(ctx, path); err != nil {
+		return "", err
+	}
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
-	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfVersion, ctx.Workspace)
+	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
 		ctx.Log.Debug("detected that this project is using TFE remote ops")
-		return p.remotePlan(ctx, extraArgs, path, tfVersion, planFile, envs)
+		return p.remotePlan(ctx, extraArgs, path, tfDistribution, tfVersion, planFile, envs)
 	}
 	if err != nil {
 		return output, err
+	}
+	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 	return p.fmtPlanOutput(output, tfVersion), nil
 }
@@ -72,14 +95,14 @@ func (p *planStepRunner) isRemoteOpsErr(output string, err error) bool {
 
 // remotePlan runs a terraform plan command compatible with TFE remote
 // operations.
-func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
+func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []string, path string, tfDistribution terraform.Distribution, tfVersion *version.Version, planFile string, envs map[string]string) (string, error) {
 	argList := [][]string{
 		{"plan", "-input=false", "-refresh", "-no-color"},
 		extraArgs,
-		ctx.EscapedCommentArgs,
+		ctx.CommentArgs,
 	}
 	args := p.flatten(argList)
-	output, err := p.runRemotePlan(ctx, args, path, tfVersion, envs)
+	output, err := p.runRemotePlan(ctx, args, path, tfDistribution, tfVersion, envs)
 	if err != nil {
 		return output, err
 	}
@@ -98,7 +121,10 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	// know this is a remote apply.
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
-		return output, errors.Wrap(err, "unable to create planfile for remote ops")
+		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
+	}
+	if saveErr := p.PlanStore.Save(ctx, planFile); saveErr != nil {
+		return output, fmt.Errorf("saving plan: %w", saveErr)
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil
@@ -118,12 +144,13 @@ func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []st
 	}
 
 	argList := [][]string{
-		// NOTE: we need to quote the plan filename because Bitbucket Server can
-		// have spaces in its repo owner names.
-		{"plan", "-input=false", "-refresh", "-out", fmt.Sprintf("%q", planFile)},
+		// The plan filename is passed as its own argument, so a path containing
+		// a space (Bitbucket Server allows spaces in repo owner names) needs no
+		// quoting. Quoting it here would make the quotes part of the filename.
+		{"plan", "-input=false", "-refresh", "-out", planFile},
 		tfVars,
 		extraArgs,
-		ctx.EscapedCommentArgs,
+		ctx.CommentArgs,
 		envFileArgs,
 	}
 
@@ -145,17 +172,18 @@ func (p *planStepRunner) tfVars(ctx command.ProjectContext, tfVersion *version.V
 
 	// NOTE: not using maps and looping here because we need to keep the
 	// ordering for testing purposes.
-	// NOTE: quoting the values because in Bitbucket the owner can have
-	// spaces, ex -var atlantis_repo_owner="bitbucket owner".
+	// Each -var value is passed as its own argument, so a value containing a
+	// space (in Bitbucket the owner can have one) needs no quoting. Quoting it
+	// here would make the quotes part of the variable's value.
 	return []string{
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_user", ctx.User.Username),
+		fmt.Sprintf("%s=%s", "atlantis_user", ctx.User.Username),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo", ctx.BaseRepo.FullName),
+		fmt.Sprintf("%s=%s", "atlantis_repo", ctx.BaseRepo.FullName),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo_name", ctx.BaseRepo.Name),
+		fmt.Sprintf("%s=%s", "atlantis_repo_name", ctx.BaseRepo.Name),
 		"-var",
-		fmt.Sprintf("%s=%q", "atlantis_repo_owner", ctx.BaseRepo.Owner),
+		fmt.Sprintf("%s=%s", "atlantis_repo_owner", ctx.BaseRepo.Owner),
 		"-var",
 		fmt.Sprintf("%s=%d", "atlantis_pull_num", ctx.Pull.Num),
 	}
@@ -193,6 +221,7 @@ func (p *planStepRunner) runRemotePlan(
 	ctx command.ProjectContext,
 	cmdArgs []string,
 	path string,
+	tfDistribution terraform.Distribution,
 	tfVersion *version.Version,
 	envs map[string]string) (string, error) {
 
@@ -205,7 +234,7 @@ func (p *planStepRunner) runRemotePlan(
 
 	// Start the async command execution.
 	ctx.Log.Debug("starting async tf remote operation")
-	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfVersion, ctx.Workspace)
+	_, outCh := p.AsyncTFExec.RunCommandAsync(ctx, filepath.Clean(path), cmdArgs, envs, tfDistribution, tfVersion, ctx.Workspace)
 	var lines []string
 	nextLineIsRunURL := false
 	var runURL string
@@ -265,6 +294,14 @@ func StripRefreshingFromPlanOutput(output string, tfVersion *version.Version) st
 	return output
 }
 
+func FilterRegexFromPlanOutput(output string, filterRegex *regexp.Regexp) string {
+	if filterRegex == nil {
+		return output
+	}
+
+	return filterRegex.ReplaceAllString(output, "${1}<redacted>$2")
+}
+
 // remoteOpsErr01114 is the error terraform plan will return if this project is
 // using TFE remote operations in TF 0.11.15.
 var remoteOpsErr01114 = `Error: Saving a generated plan is currently not supported!
@@ -284,7 +321,7 @@ locally at this time.
 
 `
 
-// remoteOpsErr100 is the error terraform plan will retrun if this project is
+// remoteOpsErr100 is the error terraform plan will return if this project is
 // using TFE remote operations in TF 1.0.{0,1}.
 var remoteOpsErr100 = `Error: Saving a generated plan is currently not supported
 

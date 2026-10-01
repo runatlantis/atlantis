@@ -20,6 +20,41 @@ const config = defineConfig({
                 sidebar: sidebars.en,
             },
         },
+        // Machine-translated, reviewed by maintainers before merge. Pages that
+        // have not been translated yet fall back to English in the nav and
+        // sidebar — see runatlantis.io/.vitepress/sidebars.ts.
+        es: {
+            label: 'Español',
+            lang: 'es-ES',
+            themeConfig: {
+                nav: navbars.es,
+                sidebar: sidebars.es,
+                editLink: {
+                    pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path',
+                    text: 'Editar esta página en GitHub',
+                },
+                docFooter: {
+                    prev: 'Anterior',
+                    next: 'Siguiente',
+                },
+                outline: {
+                    level: [2, 3],
+                    label: 'En esta página',
+                },
+                lastUpdated: {
+                    text: 'Última actualización',
+                },
+                darkModeSwitchLabel: 'Apariencia',
+                lightModeSwitchTitle: 'Cambiar a modo claro',
+                darkModeSwitchTitle: 'Cambiar a modo oscuro',
+                sidebarMenuLabel: 'Menú',
+                returnToTopLabel: 'Volver arriba',
+                langMenuLabel: 'Cambiar idioma',
+                footer: {
+                    message: 'Copyright Atlantis a Series of LF Projects, LLC. Para los términos de uso del sitio web, la política de marcas y otras políticas del proyecto, consulta <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
+                },
+            },
+        },
     },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
@@ -48,14 +83,28 @@ const config = defineConfig({
                             },
                         },
                     },
+                    // NOTE: results stay English-only until the DocSearch
+                    // crawler is configured to index /es/ with a `lang` facet.
+                    // That change lives in Algolia's crawler config, not here.
+                    '/es/': {
+                        placeholder: 'Buscar en la documentación',
+                        translations: {
+                            button: {
+                                buttonText: 'Buscar',
+                            },
+                        },
+                    },
                 },
             }
         },
         socialLinks: [
-          { icon: "slack", link: "https://join.slack.com/t/atlantis-community/shared_invite/zt-9xlxtxtc-CUSKB1ATt_sQy6um~LDPNw" },
+          { icon: "slack", link: "https://slack.cncf.io/" },
           { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
+        footer: {
+            message: 'Copyright Atlantis a Series of LF Projects, LLC. For website terms of use, trademark policy and other project policies please see <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
+        },
     },
     // SEO Improvement - sitemap.xml & robots.txt
     buildEnd: async ({ outDir }) => {
@@ -90,7 +139,7 @@ const config = defineConfig({
         // google analytics
         [
             'script',
-            { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=UA-6850151-3' }
+            { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-PGYBJTZMP2' }
         ],
         [
             'script',
@@ -99,7 +148,7 @@ const config = defineConfig({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
 
-            gtag('config', 'UA-6850151-3');`
+            gtag('config', 'G-PGYBJTZMP2');`
         ],
         [
             'script',

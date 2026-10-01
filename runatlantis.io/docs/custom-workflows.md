@@ -19,6 +19,10 @@ Custom workflows can be specified in the Server-Side Repo Config or in the Repo-
 
 ### .tfvars files
 
+::: tip
+Before creating custom workflows for `.tfvars` files, consider using Atlantis's automatic `env/{workspace}.tfvars` feature. If you structure your files as `env/staging.tfvars`, `env/production.tfvars`, etc., Atlantis will automatically include them based on the workspace without any configuration. See [Using Atlantis - Automatic Environment Variable Files](using-atlantis.md#automatic-environment-variable-files) for details.
+:::
+
 Given the structure:
 
 ```plain
@@ -129,6 +133,16 @@ workflows:
           extra_args: ["-lock=false"]
 ```
 
+::: tip Note
+Each entry in `extra_args` is passed to Terraform as a single argument. It is not
+interpreted by a shell, so shell operators (`;`, `&&`, `|`, redirections),
+globbing and word splitting do not apply. Environment variable references such
+as `$WORKSPACE`, `$DIR` and `$ATLANTIS_TERRAFORM_VERSION` are still expanded.
+
+If you need shell behaviour, use a `run` step, which is executed with a shell by
+design.
+:::
+
 If [policy checking](policy-checking.md#how-it-works) is enabled, `extra_args` can also be used to change the default behaviour of conftest.
 
 ```yaml
@@ -174,16 +188,28 @@ workflows:
       - run: terraform apply $PLANFILE
 ```
 
-### CDKTF
+### CDK Terrain (CDKTN)
 
-Here are the requirements to enable [CDKTF](https://developer.hashicorp.com/terraform/cdktf)
+[CDK Terrain](https://cdktn.io) (CDKTN) is the community continuation of CDK for Terraform (CDKTF), which
+HashiCorp archived in December 2025. It synthesizes Terraform configuration from TypeScript, Python, Go, Java
+or C#, and supports both Terraform and OpenTofu.
 
-* A custom image with `CDKTF` installed
+Here are the requirements to enable [CDKTN](https://cdktn.io/docs)
+
+* A custom image with `cdktn-cli` installed
 * Add `**/cdk.tf.json` to the list of Atlantis autoplan files.
 * Set the `atlantis-include-git-untracked-files` flag so that the Terraform files dynamically generated
-by CDKTF will be add to the Atlantis modified file list.
-* Use `pre_workflow_hooks` to run `cdktf synth`
+by CDKTN will be added to the Atlantis modified file list.
+* Use `pre_workflow_hooks` to run `cdktn synth`
 * Optional: There isn't a requirement to use a repo `atlantis.yaml` but one can be leveraged if needed.
+
+::: tip Migrating from CDKTF
+Migration is mostly a rename: install `cdktn-cli` instead of `cdktf-cli`, and swap the `cdktf` and
+`@cdktf/provider-*` packages for `cdktn` and `@cdktn/provider-*`. The project manifest is still `cdktf.json`,
+the synthesized files are still `cdk.tf.json`, and the `CDKTF_*` environment variables are unchanged, so the
+Atlantis configuration below applies to both. See the
+[migration guide](https://cdktn.io/docs/release/upgrade-guide-v0-22).
+:::
 
 #### Custom Image
 
@@ -192,7 +218,7 @@ by CDKTF will be add to the Atlantis modified file list.
 FROM ghcr.io/runatlantis/atlantis:v0.19.7
 
 USER root
-RUN apk add npm && npm i -g cdktf-cli
+RUN apk add npm && npm i -g cdktn-cli
 ```
 
 #### Server Config
@@ -222,38 +248,63 @@ Use `pre_workflow_hooks`
 ```yaml
 # repos.yaml
 repos:
-  - id: /.*cdktf.*/
+  - id: /.*cdktn.*/
     pre_workflow_hooks:
-      - run: npm i && cdktf get && cdktf synth --output ci-cdktf.out
+      - run: npm i && cdktn get && cdktn synth --output ci-cdktn.out
 ```
 
-**Note:** don't use the default `cdktf.out` directory that CDKTF uses, as this should be in the `.gitignore` list of the
+**Note:** don't use the default `cdktf.out` directory that CDKTN uses, as this should be in the `.gitignore` list of the
 repo, so that locally generated files are not checked in.
 
 #### Repo Structure
 
-This is the git repo structure after running `cdktf synth`. The `cdk.tf.json` files contain the Terraform configuration
+This is the git repo structure after running `cdktn synth`. The `cdk.tf.json` files contain the Terraform configuration
 that atlantis can run.
 
 ```bash
 $ tree --gitignore
 .
 ├── cdktf.json
-├── ci-cdktf.out
+├── ci-cdktn.out
 │   ├── manifest.json
 │   └── stacks
 │       └── eks
 │           └── cdk.tf.json
 ```
 
+#### Terraform or OpenTofu
+
+CDKTN supports both distributions. Atlantis runs `plan` and `apply` itself with the one selected by
+[`--default-tf-distribution`](server-configuration.md#default-tf-distribution), so declare the matching
+versions in `cdktf.json`:
+
+```json
+{
+  "targetVersions": {
+    "terraform": ">=1.5.7",
+    "opentofu": ">=1.6.0"
+  }
+}
+```
+
+CDKTN validates the configuration it generates against these ranges at synth time, without running a binary.
+Core functions and provider capabilities that only exist in newer releases — provider-defined functions,
+ephemeral resources, write-only attributes — then fail `cdktn synth` in the `pre_workflow_hooks` step rather
+than surfacing as a Terraform error during `plan`. See the
+[function availability matrix](https://cdktn.io/docs/release/function-availability) for which version
+introduced what.
+
+To have `cdktn` itself drive OpenTofu rather than Terraform, set `TERRAFORM_BINARY_NAME=tofu` in the Atlantis
+environment.
+
 #### Workflow
 
-1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktf` installed with
+1. Container orchestrator (k8s/fargate/ecs/etc) uses the custom docker image of atlantis with `cdktn` installed with
 the `--autoplan-file-list` to trigger on `cdk.tf.json` files and `--include-git-untracked-files` set to include the
-CDKTF dynamically generated Terraform files in the Atlantis plan.
-1. PR branch is pushed up containing `cdktf` code changes.
+CDKTN dynamically generated Terraform files in the Atlantis plan.
+1. PR branch is pushed up containing `cdktn` code changes.
 1. Atlantis checks out the branch in the repo.
-1. Atlantis runs the `npm i && cdktf get && cdktf synth` command in the repo root as a step in `pre_workflow_hooks`,
+1. Atlantis runs the `npm i && cdktn get && cdktn synth` command in the repo root as a step in `pre_workflow_hooks`,
 generating the `cdk.tf.json` Terraform files.
 1. Atlantis detects the `cdk.tf.json` untracked files in a number of directories.
 1. Atlantis then runs `terraform` workflows in the respective directories as usual.
@@ -265,6 +316,11 @@ commands. We can use this functionality to enable
 [Terragrunt](https://github.com/gruntwork-io/terragrunt).
 
 You can either use your repo's `atlantis.yaml` file or the Atlantis server's `repos.yaml` file.
+
+Atlantis selects each project's Terraform distribution and version. In the workflows below,
+`ATLANTIS_TERRAFORM_DISTRIBUTION` expands to the executable prefix (`terraform` or `tofu`), and combining it with
+`ATLANTIS_TERRAFORM_VERSION` points Terragrunt at the same versioned binary. This also supports repositories containing
+both Terraform and OpenTofu projects.
 
 Given a directory structure:
 
@@ -281,7 +337,6 @@ If using the server `repos.yaml` file, you would use the following config:
 
 ```yaml
 # repos.yaml
-# Specify TERRAGRUNT_TFPATH environment variable to accommodate setting --default-tf-version
 # Generate json plan via terragrunt for policy checks
 repos:
 - id: "/.*/"
@@ -291,14 +346,14 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
           value: 'true'
       - run:
-          # Allow for targetted plans/applies as not supported for Terraform wrappers by default
+          # Allow for targeted plans/applies as not supported for Terraform wrappers by default
           command: terragrunt plan -input=false $(printf '%s' $COMMENT_ARGS | sed 's/,/ /g' | tr -d '\\') -no-color -out $PLANFILE
           output: hide
       - run: |
@@ -306,8 +361,8 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -316,8 +371,8 @@ workflows:
     import:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           name: TF_VAR_author
           command: 'git show -s --format="%ae" $HEAD_COMMIT'
@@ -326,8 +381,8 @@ workflows:
     state_rm:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${DEFAULT_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       # Allow for state removals as not supported for Terraform wrappers by default
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
@@ -346,8 +401,8 @@ workflows:
     plan:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -358,8 +413,8 @@ workflows:
     apply:
       steps:
       - env:
-          name: TERRAGRUNT_TFPATH
-          command: 'echo "terraform${ATLANTIS_TERRAFORM_VERSION}"'
+          name: TG_TF_PATH
+          command: 'echo "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}"'
       - env:
           # Reduce Terraform suggestion output
           name: TF_IN_AUTOMATION
@@ -400,7 +455,7 @@ isn't set, Atlantis will use the default plan workflow which is what we want in 
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 :::
@@ -576,9 +631,9 @@ A map from string to `extra_args` for a built-in command with extra arguments.
     extra_args: [arg1, arg2]
 ```
 
-| Key                             | Type                               | Default | Required | Description                                                                                                                                                               |
-|---------------------------------|------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
 
@@ -594,21 +649,41 @@ Compact:
 |-----|--------|---------|----------|----------------------|
 | run | string | none    | no       | Run a custom command |
 
-Full
+Full example:
 
 ```yaml
 - run:
     command: custom-command arg1 arg2
+    shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
     output: show
 ```
 
-| Key | Type                                                         | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                             |
-|-----|--------------------------------------------------------------|---------|----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| run | map\[string -> string\] | none    | no       | Run a custom command                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.command | string                                                       | none | yes      | Shell command to run                                                                                                                                                                                                                                                                                                                                                                                    |
-| run.output | string                                                       | "show" | no       | How to post-process the output of this command when posted in the PR comment. The options are<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> * `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command |
+Full example, filtering output and masking matching text (`mySecret: "foo"` -> `mySecret: "<redacted>"`):
 
-::: tip Notes
+```yaml
+- run:
+    command: custom-command arg1 arg2
+    shell: sh
+    shellArgs:
+     - "--debug"
+     - "-c"
+    output:
+      - strip_refreshing
+      - filter_regex: "((?i)secret:\\s\")[^\"]*"
+```
+
+| Key | Type | Default | Required | Description |
+| ----- | ----- | ----- | ----- | ----- |
+| run | map\[string -> string\] | none | no | Run a custom command |
+| run.command | string | none | yes | Shell command to run |
+| run.shell | string | "sh" | no | Name of the shell to use for command execution |
+| run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
+| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
+
+#### Native Environment Variables
 
 * `run` steps in the main `workflow` are executed with the following environment variables:
   note: these variables are not available to `pre` or `post` workflows
@@ -619,6 +694,11 @@ Full
   * `PLANFILE` - Absolute path to the location where Atlantis expects the plan to
       either be generated (by plan) or already exist (if running apply). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform plan -out $PLANFILE`.
+      A workflow whose `plan` and `apply` are both made up entirely of custom `run` steps
+      may write its plan to a path of its own choosing instead of `$PLANFILE`. Atlantis
+      does not require, hash, or delete a plan artifact for such a workflow; it still
+      validates the project's recorded plan state before running `apply`. As soon as a
+      workflow uses the built-in `plan` or `apply` step, the plan must be at `$PLANFILE`.
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
@@ -639,10 +719,13 @@ Full
   * `USER_NAME` - Username of the VCS user running command, ex. `acme-user`. During an autoplan, the user will be the Atlantis API user, ex. `atlantis`.
   * `COMMENT_ARGS` - Any additional flags passed in the comment on the pull request. Flags are separated by commas and
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+  * `ATLANTIS_PR_APPROVED` - "true" if the PR is approved
+  * `ATLANTIS_PR_MERGEABLE` - "true" if the PR is mergeable
+
 * A custom command will only terminate if all output file descriptors are closed.
 Therefore a custom command can only be sent to the background (e.g. for an SSH tunnel during
 the terraform run) when its output is redirected to a different location. For example, Atlantis
-will execute a custom script containing the following code to create a SSH tunnel correctly:
+will execute a custom script containing the following code to create an SSH tunnel correctly:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 * If a workflow step returns a non-zero exit code, the workflow will stop.
@@ -664,14 +747,23 @@ as the environment variable value.
 - env:
     name: ENV_NAME_2
     command: 'echo "dynamic-value-$(date)"'
+- env:
+    name: ENV_NAME_3
+    command: echo ${DIR%$REPO_REL_DIR}
+    shell: bash
+    shellArgs:
+      - "--verbose"
+      - "-c"
 ```
 
-| Key             | Type                  | Default | Required | Description                                                                                                     |
-|-----------------|-----------------------|---------|----------|-----------------------------------------------------------------------------------------------------------------|
-| env | map\[string -> string\] | none    | no       | Set environment variables for subsequent steps                                                                  |
-| env.name | string | none | yes | Name of the environment variable                                                                                |
-| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command`   |
+| Key | Type | Default | Required | Description |
+| ----------------- | ----------------------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| env | map\[string -> string\] | none | no | Set environment variables for subsequent steps |
+| env.name | string | none | yes | Name of the environment variable |
+| env.value | string | none | no | Set the value of the environment variable to a hard-coded string. Cannot be set at the same time as `command` |
 | env.command | string | none | no | Set the value of the environment variable to the output of a command. Cannot be set at the same time as `value` |
+| env.shell | string | "sh" | no | Name of the shell to use for command execution. Cannot be set without `command` |
+| env.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
 
 ::: tip Notes
 
@@ -699,14 +791,20 @@ Full:
 ```yaml
 - multienv:
     command: custom-command
+    shell: bash
+    shellArgs:
+      - "--verbose"
+      - "-c"
     output: show
 ```
 
-| Key              | Type                  | Default | Required | Description                                                                         |
-|------------------|-----------------------|---------|----------|-------------------------------------------------------------------------------------|
-| multienv         | map[string -> string] | none    | no       | Run a custom command and add printed environment variables                          |
-| multienv.command | string                | none    | yes      | Name of the custom script to run                                                    |
-| multienv.output  | string                | "show"  | no       | Setting output to "hide" will supress the message obout added environment variables |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| multienv | map[string -> string] | none | no | Run a custom command and add printed environment variables |
+| multienv.command | string | none | yes | Name of the custom script to run |
+| multienv.shell | string | "sh" | no | Name of the shell to use for command execution |
+| multienv.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
+| multienv.output | string | "show" | no | Setting output to "hide" will suppress the message about added environment variables |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`

@@ -1,0 +1,7 @@
+{{ define "singleProjectPlanUnsuccessful" -}}
+{{ $result := index .Results 0 -}}
+Se ejecutó {{ .Command }} para directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{ template "log" . -}}
+{{ end -}}

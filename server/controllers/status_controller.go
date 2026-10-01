@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package controllers
 
 import (
@@ -11,9 +14,9 @@ import (
 
 // StatusController handles the status of Atlantis.
 type StatusController struct {
-	Logger          logging.SimpleLogging
-	Drainer         *events.Drainer
-	AtlantisVersion string
+	Logger          logging.SimpleLogging `validate:"required"`
+	Drainer         *events.Drainer       `validate:"required"`
+	AtlantisVersion string                `validate:"required"`
 }
 
 type StatusResponse struct {

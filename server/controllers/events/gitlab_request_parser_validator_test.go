@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events_test
@@ -16,27 +7,38 @@ package events_test
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers/events"
 	. "github.com/runatlantis/atlantis/testing"
-	gitlab "github.com/xanzy/go-gitlab"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 var parser = events.DefaultGitlabRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
-	t.Log("If the secret header is set and doesn't match expected an error is returned")
-	RegisterMockTestingT(t)
-	buf := bytes.NewBufferString("")
-	req, err := http.NewRequest("POST", "http://localhost/event", buf)
-	Ok(t, err)
-	req.Header.Set("X-Gitlab-Token", "does-not-match")
-	_, err = parser.ParseAndValidate(req, []byte("secret"))
-	Assert(t, err != nil, "should be an error")
-	Equals(t, "header X-Gitlab-Token=does-not-match did not match expected secret", err.Error())
+	const expectedSecret = "expected-server-token"
+	for _, header := range []string{"", "rejected-client-token", expectedSecret + "-suffix"} {
+		t.Run(header, func(t *testing.T) {
+			// Authentication must reject the request before parsing its malformed body.
+			req := httptest.NewRequest(http.MethodPost, "/events", strings.NewReader("{"))
+			req.Header.Set("X-Gitlab-Token", header)
+			req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
+
+			event, err := parser.ParseAndValidate(req, []byte(expectedSecret))
+
+			Equals(t, nil, event)
+			ErrEquals(t, "header X-Gitlab-Token did not match expected secret", err)
+			Assert(t, !strings.Contains(err.Error(), expectedSecret), "error contains configured token")
+			if header != "" {
+				Assert(t, !strings.Contains(err.Error(), header), "error contains supplied token")
+			}
+		})
+	}
 }
 
 func TestValidate_ValidSecret(t *testing.T) {

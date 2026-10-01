@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -12,14 +15,14 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflow_hook_url_generator.go PostWorkflowHookURLGenerator
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_post_workflow_hook_url_generator.go PostWorkflowHookURLGenerator
 
 // PostWorkflowHookURLGenerator generates urls to view the post workflow progress.
 type PostWorkflowHookURLGenerator interface {
 	GenerateProjectWorkflowHookURL(hookID string) (string, error)
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_post_workflows_hooks_command_runner.go PostWorkflowHooksCommandRunner
 
 type PostWorkflowHooksCommandRunner interface {
 	RunPostHooks(ctx *command.Context, cmd *CommentCommand) error
@@ -27,13 +30,13 @@ type PostWorkflowHooksCommandRunner interface {
 
 // DefaultPostWorkflowHooksCommandRunner is the first step when processing a workflow hook commands.
 type DefaultPostWorkflowHooksCommandRunner struct {
-	VCSClient              vcs.Client
-	WorkingDirLocker       WorkingDirLocker
-	WorkingDir             WorkingDir
-	GlobalCfg              valid.GlobalCfg
-	PostWorkflowHookRunner runtime.PostWorkflowHookRunner
-	CommitStatusUpdater    CommitStatusUpdater
-	Router                 PostWorkflowHookURLGenerator
+	VCSClient              vcs.Client                     `validate:"required"`
+	WorkingDirLocker       WorkingDirLocker               `validate:"required"`
+	WorkingDir             WorkingDir                     `validate:"required"`
+	GlobalCfg              valid.GlobalCfg                `validate:"required"`
+	PostWorkflowHookRunner runtime.PostWorkflowHookRunner `validate:"required"`
+	CommitStatusUpdater    CommitStatusUpdater            `validate:"required"`
+	Router                 PostWorkflowHookURLGenerator   `validate:"required"`
 }
 
 // RunPostHooks runs post_workflow_hooks after a plan/apply has completed
@@ -50,16 +53,16 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 		return nil
 	}
 
-	ctx.Log.Debug("post-hooks configured, running...")
+	ctx.Log.Info("Post-workflow hooks configured, running...")
 
-	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir)
+	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		return err
 	}
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, _, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	repoDir, err := w.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	if err != nil {
 		return err
 	}
@@ -79,11 +82,15 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 			Verbose:            false,
 			EscapedCommentArgs: escapedArgs,
 			CommandName:        cmd.Name.String(),
+			CommandHasErrors:   ctx.CommandHasErrors,
 			API:                ctx.API,
+			ProjectName:        cmd.ProjectName,
+			SuppressJobOutput:  ctx.SuppressJobOutput,
 		},
-		postWorkflowHooks, repoDir)
+		postWorkflowHooks, repoDir, ctx.SuppressVCSStatus)
 
 	if err != nil {
+		ctx.Log.Err("Error running post-workflow hooks %s.", err)
 		return err
 	}
 
@@ -94,6 +101,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 	ctx models.WorkflowHookCommandContext,
 	postWorkflowHooks []*valid.WorkflowHook,
 	repoDir string,
+	suppressVCSStatus bool,
 ) error {
 
 	for i, hook := range postWorkflowHooks {
@@ -129,22 +137,31 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
-			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.PendingCommitStatus, ctx.HookDescription, "", url); err != nil {
+				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+			}
 		}
 
 		_, runtimeDesc, err := w.PostWorkflowHookRunner.Run(ctx, hook.RunCommand, shell, shellArgs, repoDir)
 
 		if err != nil {
-			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+			if !suppressVCSStatus {
+				if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.FailedCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+					ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+				}
 			}
 			return err
 		}
 
-		if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
-			ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+		if !suppressVCSStatus {
+			if err := w.CommitStatusUpdater.UpdatePostWorkflowHook(ctx.Log, ctx.Pull, models.SuccessCommitStatus, ctx.HookDescription, runtimeDesc, url); err != nil {
+				ctx.Log.Warn("unable to update post workflow hook status: %s", err)
+			}
 		}
 	}
+
+	ctx.Log.Info("Post-workflow hooks completed")
+
 	return nil
 }

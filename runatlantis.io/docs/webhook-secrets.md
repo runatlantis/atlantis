@@ -20,11 +20,6 @@ Azure DevOps uses Basic authentication for webhooks rather than webhook secrets.
 An app-wide token is generated during [GitHub App setup](access-credentials.md#github-app). You can recover it by navigating to the [GitHub app settings page](https://github.com/settings/apps) and selecting "Edit" next to your Atlantis app's name. Token appears after clicking "Edit" under the Webhook header.
 :::
 
-::: warning
-Bitbucket.org **does not** support webhook secrets.
-To mitigate, use repo allowlists and IP allowlists. See [Security](security.md#bitbucket-cloud-bitbucket-org) for more information.
-:::
-
 ## Generating A Webhook Secret
 
 You can use any random string generator to create your Webhook secret. It should be > 24 characters.

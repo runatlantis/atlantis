@@ -66,7 +66,7 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 
 Adopting Terraform is great for your operations team's effectiveness but it doesn't change much for devs. Before Terraform adoption, devs typically interacted with an ops team like this:
 
-![](/blog/putting-the-dev-into-devops/pic1.webp)
+![](putting-the-dev-into-devops/pic1.webp)
 
 1. **Dev: Creates ticket asking for some ops work**
 2. **Dev: Waits**
@@ -77,7 +77,7 @@ Adopting Terraform is great for your operations team's effectiveness but it does
 
 After the Ops team adopts Terraform, the workflow from a dev's perspective is the same!
 
-![](/blog/putting-the-dev-into-devops/pic2.webp)
+![](putting-the-dev-into-devops/pic2.webp)
 
 1. **Dev: Creates ticket asking for some ops work**
 2. **Dev: Waits**
@@ -104,7 +104,7 @@ Developers could make all of these changes because they're small and well define
 
 In many organizations, devs are locked out of the cloud console.
 
-![](/blog/putting-the-dev-into-devops/pic3.webp)
+![](putting-the-dev-into-devops/pic3.webp)
 
 They might be locked out for good reasons:
 
@@ -153,7 +153,7 @@ Devs understand code (surprise!) so it's a lot easier for them to make those sma
 
 Here's the new workflow:
 
-![](/blog/putting-the-dev-into-devops/pic4.webp)
+![](putting-the-dev-into-devops/pic4.webp)
 
 1. **Dev: Writes Terraform code**
 2. **Dev: Creates pull request**
@@ -185,37 +185,37 @@ Here's what the workflow looks like:
 
 A developer creates a pull request with their change to add a security group rule.
 
-![](/blog/putting-the-dev-into-devops/pic5.webp)
+![](putting-the-dev-into-devops/pic5.webp)
 
 ### Step 2 — Atlantis Runs Terraform Plan
 
 Atlantis automatically runs `terraform plan` and comments back on the pull request with the output. Now developers can fix their Terraform errors before asking for a review.
 
-![](/blog/putting-the-dev-into-devops/pic6.webp)
+![](putting-the-dev-into-devops/pic6.webp)
 
 ### Step 3 — Fix The Terraform
 
 The developer pushes a new commit that fixes their error and Atlantis comments back with the valid `terraform plan` output. Now the developer can verify that the plan output looks good.
 
-![](/blog/putting-the-dev-into-devops/pic7.webp)
+![](putting-the-dev-into-devops/pic7.webp)
 
 ### Step 4 — Get Approval
 
 You'll probably want to run Atlantis with the --require-approval flag that requires pull requests to be Approved before running atlantis apply.
 
-![](/blog/putting-the-dev-into-devops/pic8.webp)
+![](putting-the-dev-into-devops/pic8.webp)
 
 ### Step 4a — Actually Get Approval
 
 An operator can now come along and review the changes and the output of `terraform plan`. This is much faster than doing the change themselves.
 
-![](/blog/putting-the-dev-into-devops/pic9.webp)
+![](putting-the-dev-into-devops/pic9.webp)
 
 ### Step 5 — Apply
 
 To apply the changes, the developer or operator comments “atlantis apply”.
 
-![](/blog/putting-the-dev-into-devops/pic10.webp)
+![](putting-the-dev-into-devops/pic10.webp)
 
 ## Success
 
@@ -241,4 +241,4 @@ Another company uses Atlantis to manage 600+ Terraform repos collaborated on by 
 
 - Thanks to [Seth Vargo](https://medium.com/@sethvargo) for his talk [Version-Controlled Infrastructure with GitHub](https://www.youtube.com/watch?v=2TWqi7dLSro) that inspired a lot of this post.
 - Thanks to Isha for reading drafts of this post.
-- Icons in graphics from made by [Freepik](http://freepik.com/) from [Flaticon](https://www.flaticon.com/) and licensed by [CC 3.0](https://creativecommons.org/licenses/by/3.0/)
+- Icons in graphics from made by [Freepik](https://www.freepik.com/) from [Flaticon](https://www.flaticon.com/) and licensed by [CC 3.0](https://creativecommons.org/licenses/by/3.0/)

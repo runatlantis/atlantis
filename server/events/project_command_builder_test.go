@@ -1,15 +1,25 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events_test
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-version"
 	. "github.com/petergtz/pegomock/v4"
-	terraform_mocks "github.com/runatlantis/atlantis/server/core/terraform/mocks"
+	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	tfclientmocks "github.com/runatlantis/atlantis/server/core/terraform/tfclient/mocks"
+	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
 	"github.com/runatlantis/atlantis/server/core/config"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -19,7 +29,6 @@ import (
 	"github.com/runatlantis/atlantis/server/events/models"
 	vcsmocks "github.com/runatlantis/atlantis/server/events/vcs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
-	"github.com/runatlantis/atlantis/server/metrics"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -32,6 +41,7 @@ var defaultUserConfig = struct {
 	AutoDetectModuleFiles    string
 	AutoplanFileList         string
 	RestrictFileList         bool
+	DefaultTFDistribution    string
 	SilenceNoProjects        bool
 	IncludeGitUntrackedFiles bool
 	AutoDiscoverMode         string
@@ -44,16 +54,25 @@ var defaultUserConfig = struct {
 	AutoDetectModuleFiles:    "",
 	AutoplanFileList:         "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
 	RestrictFileList:         false,
+	DefaultTFDistribution:    "",
 	SilenceNoProjects:        false,
-	IncludeGitUntrackedFiles: true,
+	IncludeGitUntrackedFiles: false,
 	AutoDiscoverMode:         "auto",
 }
 
-func ChangedFiles(dirStructure map[string]interface{}, parent string) []string {
+type checkoutMergeWorkingDir struct {
+	events.WorkingDir
+}
+
+func (w checkoutMergeWorkingDir) CheckoutMergeEnabled() bool {
+	return true
+}
+
+func ChangedFiles(dirStructure map[string]any, parent string) []string {
 	var files []string
 	for k, v := range dirStructure {
 		switch v := v.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			files = append(files, ChangedFiles(v, k)...)
 		default:
 			files = append(files, filepath.Join(parent, k))
@@ -71,7 +90,7 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		RepoRelDir  string
 		Workspace   string
 	}
-	defaultTestDirStructure := map[string]interface{}{
+	defaultTestDirStructure := map[string]any{
 		"main.tf": nil,
 	}
 
@@ -79,7 +98,7 @@ func TestDefaultProjectCommandBuilder_BuildAutoplanCommands(t *testing.T) {
 		Description      string
 		AtlantisYAML     string
 		ServerSideYAML   string
-		TestDirStructure map[string]interface{}
+		TestDirStructure map[string]any
 		exp              []expCtxFields
 	}{
 		{
@@ -169,8 +188,8 @@ projects:
 		},
 		{
 			Description: "workspaces from subdirectories detected",
-			TestDirStructure: map[string]interface{}{
-				"work": map[string]interface{}{
+			TestDirStructure: map[string]any{
+				"work": map[string]any{
 					"main.tf": `
 terraform {
   cloud {
@@ -181,7 +200,7 @@ terraform {
   }
 }`,
 				},
-				"test": map[string]interface{}{
+				"test": map[string]any{
 					"main.tf": `
 terraform {
   cloud {
@@ -208,7 +227,7 @@ terraform {
 		},
 		{
 			Description: "workspaces in parent directory are detected",
-			TestDirStructure: map[string]interface{}{
+			TestDirStructure: map[string]any{
 				"main.tf": `
 terraform {
   cloud {
@@ -230,10 +249,10 @@ terraform {
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -241,7 +260,7 @@ terraform {
 			tmpDir := DirStructure(t, c.TestDirStructure)
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.TestDirStructure, ""), nil)
@@ -270,16 +289,17 @@ terraform {
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 				PullRequestStatus: models.PullReqStatus{
-					Mergeable: true,
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
 				},
 				Log:   logger,
 				Scope: scope,
@@ -307,6 +327,98 @@ terraform {
 	}
 }
 
+func TestDefaultProjectCommandBuilder_OpenTofuWorkspaceDetection(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	cases := []struct {
+		description       string
+		distribution      string
+		dirStructure      map[string]any
+		expectedWorkspace string
+	}{
+		{
+			"OpenTofu server default detects workspace from .tofu",
+			"opentofu",
+			map[string]any{
+				"main.tofu": `terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces { name = "tofu-workspace" }
+  }
+}`,
+			},
+			"tofu-workspace",
+		},
+		{
+			"Terraform server default ignores .tofu workspace",
+			"",
+			map[string]any{
+				"main.tofu": `terraform {
+  cloud {
+    organization = "atlantis-test"
+    workspaces { name = "tofu-workspace" }
+  }
+}`,
+			},
+			"default",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			tmpDir := DirStructure(t, c.dirStructure)
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest]())).ThenReturn(ChangedFiles(c.dirStructure, ""), nil)
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				false, false, false, false, false,
+				"",
+				"**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl",
+				false,
+				c.distribution,
+				false, false,
+				"auto",
+				scope,
+				terraformClient, &runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildAutoplanCommands(&command.Context{
+				PullRequestStatus: models.PullReqStatus{MergeableStatus: models.MergeableStatus{IsMergeable: true}},
+				Log:               logger,
+				Scope:             scope,
+				Pull:              models.PullRequest{BaseRepo: models.Repo{}},
+			})
+			Ok(t, err)
+			if c.expectedWorkspace == "default" {
+				// With only .tofu and Terraform distribution, project may not be discovered
+				// or workspace falls back to default
+				for _, ctx := range ctxs {
+					Equals(t, "default", ctx.Workspace)
+				}
+			} else {
+				Assert(t, len(ctxs) > 0, "expected at least one project context")
+				Equals(t, c.expectedWorkspace, ctxs[0].Workspace)
+			}
+		})
+	}
+}
+
 // Test building a plan and apply command for one project.
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) {
 	cases := []struct {
@@ -328,6 +440,7 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand(t *testing.T) 
 		ExpParallelPlan            bool
 		ExpParallelApply           bool
 		ExpNoProjects              bool
+		API                        bool
 	}{
 		{
 			Description: "no atlantis.yaml",
@@ -419,6 +532,29 @@ projects:
 			ExpProjectName: "myproject",
 			ExpWorkspace:   "myworkspace",
 			ExpDir:         ".",
+		},
+		{
+			Description: "atlantis.yaml with projectname and workspace",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				ProjectName: "myproject",
+				Workspace:   "staging",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: otherproject
+  dir: production
+  workspace: production
+- name: myproject
+  dir: staging
+  workspace: staging
+  apply_requirements: [approved]`,
+			ExpApplyReqs:   []string{"approved"},
+			ExpProjectName: "myproject",
+			ExpWorkspace:   "staging",
+			ExpDir:         "staging",
+			API:            true,
 		},
 		{
 			Description: "atlantis.yaml with mergeable apply requirement",
@@ -588,7 +724,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for _, c := range cases {
@@ -596,13 +732,19 @@ projects:
 		for _, cmdName := range []command.Name{command.Plan, command.Apply} {
 			t.Run(c.Description+"_"+cmdName.String(), func(t *testing.T) {
 				RegisterMockTestingT(t)
-				tmpDir := DirStructure(t, map[string]interface{}{
+				tmpDir := DirStructure(t, map[string]any{
 					"main.tf": nil,
 				})
+				if cmdName == command.Apply && c.ExpErr == "" && !c.ExpNoProjects {
+					planDir := filepath.Join(tmpDir, c.ExpDir)
+					Ok(t, os.MkdirAll(planDir, 0700))
+					planPath := filepath.Join(planDir, runtime.GetPlanFilename(c.ExpWorkspace, c.ExpProjectName))
+					Ok(t, os.WriteFile(planPath, []byte("targeted plan"), 0600))
+				}
 
 				workingDir := mocks.NewMockWorkingDir()
 				When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-					Any[string]())).ThenReturn(tmpDir, false, nil)
+					Any[string]())).ThenReturn(tmpDir, nil)
 				When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 				vcsClient := vcsmocks.NewMockClient()
 				When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -616,7 +758,7 @@ projects:
 					AllowAllRepoSettings: true,
 				}
 
-				terraformClient := terraform_mocks.NewMockClient()
+				terraformClient := tfclientmocks.NewMockClient()
 
 				builder := events.NewProjectCommandBuilder(
 					false,
@@ -636,23 +778,26 @@ projects:
 					userConfig.AutoDetectModuleFiles,
 					userConfig.AutoplanFileList,
 					userConfig.RestrictFileList,
+					userConfig.DefaultTFDistribution,
 					c.Silenced,
 					userConfig.IncludeGitUntrackedFiles,
 					c.AutoDiscoverModeUserCfg,
 					scope,
-					terraformClient,
+					terraformClient, &runtime.LocalPlanStore{},
 				)
 
 				var actCtxs []command.ProjectContext
 				var err error
 				cmd := c.Cmd
+				cmd.Name = cmdName
 				if cmdName == command.Plan {
 					actCtxs, err = builder.BuildPlanCommands(&command.Context{
 						Log:   logger,
 						Scope: scope,
+						API:   c.API,
 					}, &cmd)
 				} else {
-					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope}, &cmd)
+					actCtxs, err = builder.BuildApplyCommands(&command.Context{Log: logger, Scope: scope, API: c.API}, &cmd)
 				}
 
 				if c.ExpErr != "" {
@@ -674,21 +819,1689 @@ projects:
 				Equals(t, c.ExpAutoMerge, actCtx.AutomergeEnabled)
 				Equals(t, c.ExpParallelPlan, actCtx.ParallelPlanEnabled)
 				Equals(t, c.ExpParallelApply, actCtx.ParallelApplyEnabled)
+				if cmdName == command.Apply {
+					Assert(t, actCtx.ExpectedPlanHash != "", "expected targeted apply to record plan hash")
+				}
 			})
 		}
 	}
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsSkipsModifiedFiles(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"project1": map[string]any{
+			"main.tf": nil,
+		},
+		"project2": map[string]any{
+			"main.tf": nil,
+		},
+		".terragrunt-cache": map[string]any{
+			"cached-project": map[string]any{
+				"main.tf": nil,
+			},
+		},
+		"modules": map[string]any{
+			"network": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: models.Repo{FullName: "owner/repo"},
+		Pull: models.PullRequest{
+			Num:      -1,
+			BaseRepo: models.Repo{FullName: "owner/repo"},
+		},
+		API: true,
+	}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+	Ok(t, err)
+
+	dirs := make([]string, 0, len(ctxs))
+	for _, ctx := range ctxs {
+		dirs = append(dirs, ctx.RepoRelDir)
+	}
+	sort.Strings(dirs)
+	Equals(t, []string{"project1", "project2"}, dirs)
+	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsConfiguredProjects(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"app": map[string]any{
+			"main.tf": nil,
+		},
+		"db": map[string]any{
+			"main.tf": nil,
+		},
+		"release": map[string]any{
+			"main.tf": nil,
+		},
+	})
+	atlantisYAML := "version: 3\n" +
+		"projects:\n" +
+		"  - name: app\n" +
+		"    dir: app\n" +
+		"    workspace: prod\n" +
+		"    execution_order_group: 2\n" +
+		"    branch: /main/\n" +
+		"  - name: db\n" +
+		"    dir: db\n" +
+		"    workspace: default\n" +
+		"    execution_order_group: 1\n" +
+		"    branch: /main/\n" +
+		"  - name: release-only\n" +
+		"    dir: release\n" +
+		"    workspace: default\n" +
+		"    execution_order_group: 3\n" +
+		"    branch: /release/\n"
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(atlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: models.Repo{FullName: "owner/repo"},
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: "main",
+			BaseRepo:   models.Repo{FullName: "owner/repo"},
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+	Ok(t, err)
+
+	byName := make(map[string]command.ProjectContext, len(ctxs))
+	for _, ctx := range ctxs {
+		byName[ctx.ProjectName] = ctx
+	}
+	Equals(t, 2, len(byName))
+	Equals(t, "app", byName["app"].RepoRelDir)
+	Equals(t, "prod", byName["app"].Workspace)
+	Equals(t, 2, byName["app"].ExecutionOrderGroup)
+	Equals(t, "db", byName["db"].RepoRelDir)
+	Equals(t, "default", byName["db"].Workspace)
+	Equals(t, 1, byName["db"].ExecutionOrderGroup)
+	_, releaseIncluded := byName["release-only"]
+	Assert(t, !releaseIncluded, "branch-filtered release project should not be included for main")
+	vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
+func TestDefaultProjectCommandBuilder_PathSelectorRespectsBranchFilteredProjects(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"env": map[string]any{
+			"main.tf": nil,
+		},
+	})
+	atlantisYAML := "version: 3\n" +
+		"projects:\n" +
+		"  - name: app\n" +
+		"    dir: env\n" +
+		"    workspace: default\n" +
+		"    branch: /main/\n"
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(atlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+		ThenReturn(tmpDir, nil)
+	terraformClient := tfclientmocks.NewMockClient()
+	repo := models.Repo{FullName: "owner/repo"}
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		defaultUserConfig.EnableRegExpCmd,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		defaultUserConfig.RestrictFileList,
+		defaultUserConfig.DefaultTFDistribution,
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	mainCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        -1,
+			BaseBranch: "main",
+			BaseRepo:   repo,
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, RepoRelDir: "env"})
+	Ok(t, err)
+	Equals(t, 1, len(mainCtxs))
+	Equals(t, "app", mainCtxs[0].ProjectName)
+	Equals(t, "env", mainCtxs[0].RepoRelDir)
+
+	featureCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: repo,
+		Pull: models.PullRequest{
+			Num:        -2,
+			BaseBranch: "feature/foo",
+			BaseRepo:   repo,
+		},
+		API:                 true,
+		SkipPRModifiedFiles: true,
+	}, &events.CommentCommand{Name: command.Plan, RepoRelDir: "env"})
+	ErrContains(t, "on branch: 'feature/foo'", err)
+	Equals(t, 0, len(featureCtxs))
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITeamAllowlist(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		allowlist string
+		wantErr   bool
+	}{
+		{
+			name:      "restrictive allowlist fails closed",
+			allowlist: "platform:plan",
+			wantErr:   true,
+		},
+		{
+			name:      "wildcard allowlist remains allowed",
+			allowlist: "*:plan",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			logger := logging.NewNoopLogger(t)
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+			tmpDir := DirStructure(t, map[string]any{
+				"project1": map[string]any{
+					"main.tf": nil,
+				},
+				"project2": map[string]any{
+					"main.tf": nil,
+				},
+			})
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).
+				ThenReturn(tmpDir, nil)
+			vcsClient := vcsmocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
+			teamAllowlistChecker, err := command.NewTeamAllowlistChecker(tc.allowlist)
+			Ok(t, err)
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				vcsClient,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				defaultUserConfig.SkipCloneNoChanges,
+				defaultUserConfig.EnableRegExpCmd,
+				defaultUserConfig.EnableAutoMerge,
+				defaultUserConfig.EnableParallelPlan,
+				defaultUserConfig.EnableParallelApply,
+				defaultUserConfig.AutoDetectModuleFiles,
+				defaultUserConfig.AutoplanFileList,
+				defaultUserConfig.RestrictFileList,
+				defaultUserConfig.DefaultTFDistribution,
+				defaultUserConfig.SilenceNoProjects,
+				defaultUserConfig.IncludeGitUntrackedFiles,
+				defaultUserConfig.AutoDiscoverMode,
+				scope,
+				terraformClient, &runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildPlanCommands(&command.Context{
+				Log:                       logger,
+				Scope:                     scope,
+				HeadRepo:                  models.Repo{FullName: "owner/repo"},
+				TeamAllowlistChecker:      teamAllowlistChecker,
+				FailOnTeamAllowlistDenied: true,
+				Pull:                      models.PullRequest{Num: -1, BaseRepo: models.Repo{FullName: "owner/repo"}},
+				API:                       true,
+			}, &events.CommentCommand{Name: command.Plan, DiscoverAllProjects: true})
+			if tc.wantErr {
+				Assert(t, errors.Is(err, events.ErrTeamAllowlistDenied), "expected team allowlist error, got %v", err)
+				return
+			}
+			Ok(t, err)
+
+			dirs := make([]string, 0, len(ctxs))
+			for _, ctx := range ctxs {
+				dirs = append(dirs, ctx.RepoRelDir)
+			}
+			sort.Strings(dirs)
+			Equals(t, []string{"project1", "project2"}, dirs)
+			vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+		})
+	}
+}
+
+// Test that autodiscover.ignore_paths blocks targeted plan/apply -d commands
+// when the directory has no explicit project config (global config ignore_paths).
+func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+			"nonprod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+		Any[models.PullRequest]())).ThenReturn([]string{"environments/prod/main.tf", "environments/nonprod/main.tf"}, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	// Targeted plan -d to ignored path should return no projects
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(planCtxs))
+
+	// Targeted plan -d to non-ignored path should succeed
+	planCtxs, err = builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/nonprod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
+	Equals(t, "environments/nonprod", planCtxs[0].RepoRelDir)
+
+	// Targeted apply -d to ignored path should return no projects
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+
+	// Targeted apply -d to non-ignored path should succeed
+	applyCtxs, err = builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/nonprod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
+}
+
+func TestDefaultProjectCommandBuilder_BuildWorkspaceOnlyCommand_IgnorePathsNotSkipped(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"main.tf": nil,
+	})
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
+	cmdCtx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     models.PullRequest{BaseRepo: repo, Num: 1, HeadBranch: "feature", BaseBranch: "main"},
+		HeadRepo: repo,
+	}
+
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Plan,
+		Workspace: "staging",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
+	Equals(t, events.DefaultRepoRelDir, planCtxs[0].RepoRelDir)
+	Equals(t, "staging", planCtxs[0].Workspace)
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:      command.Apply,
+		Workspace: "staging",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, events.DefaultRepoRelDir, applyCtxs[0].RepoRelDir)
+	Equals(t, "staging", applyCtxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWithoutWorkingDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("", os.ErrNotExist)
+	vcsClient := vcsmocks.NewMockClient()
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	repo := models.Repo{FullName: "runatlantis/atlantis", Owner: "runatlantis", Name: "atlantis"}
+	cmdCtx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     models.PullRequest{BaseRepo: repo, Num: 1, HeadBranch: "feature", BaseBranch: "main"},
+		HeadRepo: repo,
+	}
+
+	cases := []struct {
+		description string
+		cmd         events.CommentCommand
+		build       func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)
+	}{
+		{
+			description: "apply",
+			cmd:         events.CommentCommand{Name: command.Apply, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildApplyCommands,
+		},
+		{
+			description: "approve policies",
+			cmd:         events.CommentCommand{Name: command.ApprovePolicies, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildApprovePoliciesCommands,
+		},
+		{
+			description: "import",
+			cmd:         events.CommentCommand{Name: command.Import, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildImportCommands,
+		},
+		{
+			description: "version",
+			cmd:         events.CommentCommand{Name: command.Version, RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildVersionCommands,
+		},
+		{
+			description: "state rm",
+			cmd:         events.CommentCommand{Name: command.State, SubName: "rm", RepoRelDir: "environments/prod", Workspace: "default"},
+			build:       builder.BuildStateRmCommands,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			ctxs, err := c.build(cmdCtx, &c.cmd)
+			Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+			Equals(t, 0, len(ctxs))
+		})
+	}
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirPrefersGeneratedLocalConfig(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	remoteAtlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+`
+	localAtlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+projects:
+- dir: environments/prod
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(localAtlantisYAML), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("feature"), Eq(valid.DefaultAtlantisFile))).ThenReturn(true, []byte(remoteAtlantisYAML), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected remote config without explicit project to ignore target")
+
+	ctx.PreferLocalRepoCfgForTargetedIgnore = true
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected generated local explicit project to prevent ignored-target skip")
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesHeadCommitForRemoteConfig(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn("", os.ErrNotExist)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(true, []byte(atlantisYAML), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected remote head commit config to ignore target")
+	vcsClient.VerifyWasCalledOnce().GetFileContent(Any[logging.SimpleLogging](), Eq(baseRepo), Eq("abc123"), Eq(valid.DefaultAtlantisFile))
+	vcsClient.VerifyWasCalled(Never()).GetFileContent(Any[logging.SimpleLogging](), Eq(baseRepo), Eq("feature"), Eq(valid.DefaultAtlantisFile))
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirRespectsGlobProjectDirs(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"modules/**\"\n" +
+		"projects:\n" +
+		"- dir: \"modules/*\"\n"
+
+	workingDir := mocks.NewMockWorkingDir()
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(true, []byte(atlantisYAML), nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "modules/foo", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected glob-configured project dir to prevent ignored-target skip")
+	vcsClient.VerifyWasCalledOnce().GetFileContent(Any[logging.SimpleLogging](), Eq(baseRepo), Eq("abc123"), Eq(valid.DefaultAtlantisFile))
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFailsOpenWhenRemoteConfigUnknown(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	staleLocalAtlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(staleLocalAtlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(false, []byte{}, errors.New("not implemented"))
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected unknown current repo config to avoid pre-clone skip")
+	workingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirAllowsAuthoritativeMissingRemoteConfig(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn("", os.ErrNotExist)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(false, []byte{}, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected authoritative missing repo config to allow global ignored-target skip")
+	workingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirUsesGlobalIgnoreWhenFileDownloadUnsupported(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn("", os.ErrNotExist)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(false, []byte{}, errors.New("not implemented"))
+	When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(false)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected global ignored-target skip when VCS file download is unsupported")
+	workingDir.VerifyWasCalledOnce().GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsupportedPreservesExplicitLocalProject(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"projects:\n" +
+		"- name: prod-project\n" +
+		"  dir: environments/prod\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	Ok(t, os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(atlantisYAML), 0600))
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(false, []byte{}, errors.New("not implemented"))
+	When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(false)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected local explicit project to prevent ignored-target skip when file download is unsupported")
+	workingDir.VerifyWasCalledOnce().GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirFileDownloadUnsupportedFailsOpenForPlan(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	workingDir := mocks.NewMockWorkingDir()
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("abc123"), Eq(valid.DefaultAtlantisFile))).ThenReturn(false, []byte{}, errors.New("not implemented"))
+	When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(false)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{"environments/prod/**"},
+	}
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.AzureDevops}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			HeadCommit: "abc123",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected plan to avoid pre-clone skip when file download is unsupported")
+	workingDir.VerifyWasCalled(Never()).GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithLocalConfigFailsOpen(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	staleLocalAtlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	vcsClient := vcsmocks.NewMockClient()
+
+	dataDir := t.TempDir()
+	workingDir := &events.FileWorkspace{
+		DataDir:       dataDir,
+		CheckoutMerge: true,
+	}
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseBranch: "main",
+		HeadBranch: "feature",
+		BaseRepo:   baseRepo,
+	}
+	repoDir := filepath.Join(dataDir, "repos", baseRepo.FullName, "1", events.DefaultWorkspace)
+	Ok(t, os.MkdirAll(repoDir, 0700))
+	Ok(t, os.WriteFile(filepath.Join(repoDir, valid.DefaultAtlantisFile), []byte(staleLocalAtlantisYAML), 0600))
+
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull:     pull,
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected merge checkout to avoid pre-clone skip from stale local config")
+	vcsClient.VerifyWasCalled(Never()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+}
+
+func TestDefaultProjectCommandBuilder_ShouldIgnoreTargetedDirMergeCheckoutWithoutLocalConfigFailsOpen(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	remoteAtlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	terraformClient := tfclientmocks.NewMockClient()
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Eq("feature"), Eq(valid.DefaultAtlantisFile))).ThenReturn(true, []byte(remoteAtlantisYAML), nil)
+
+	workingDir := &events.FileWorkspace{
+		DataDir:       t.TempDir(),
+		CheckoutMerge: true,
+	}
+	userConfig := defaultUserConfig
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	baseRepo := models.Repo{Owner: "owner", Name: "repo", FullName: "owner/repo", VCSHost: models.VCSHost{Type: models.Github}}
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		HeadRepo: baseRepo,
+		Pull: models.PullRequest{
+			Num:        1,
+			BaseBranch: "main",
+			HeadBranch: "feature",
+			BaseRepo:   baseRepo,
+		},
+	}
+	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "environments/prod", Workspace: events.DefaultWorkspace}
+
+	Assert(t, !builder.ShouldIgnoreTargetedDir(ctx, cmd), "expected merge checkout without local config to avoid pre-clone skip")
+	vcsClient.VerifyWasCalled(Never()).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+}
+
+// Test that autodiscover.ignore_paths set in repo-level atlantis.yaml blocks
+// targeted plan/apply -d commands for non-configured projects.
+func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePathsRepoCfg(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+			"nonprod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(atlantisYAML), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+		Any[models.PullRequest]())).ThenReturn([]string{"environments/prod/main.tf", "environments/nonprod/main.tf"}, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	// Targeted plan -d to ignored path should return no projects
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(planCtxs))
+
+	// Non-ignored path should work
+	planCtxs, err = builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/nonprod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
+	Equals(t, "environments/nonprod", planCtxs[0].RepoRelDir)
+
+	// Targeted apply -d to ignored path should return no projects
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+
+	// Targeted apply -d to non-ignored path should work
+	applyCtxs, err = builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/nonprod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "environments/nonprod", applyCtxs[0].RepoRelDir)
+}
+
+func TestDefaultProjectCommandBuilder_BuildTargetedApply_LocalConfigIgnoredTargetSkipsBeforeProjectLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	pull := models.PullRequest{
+		Num:      1,
+		BaseRepo: repo,
+	}
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlockPlan()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		locker,
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  events.DefaultWorkspace,
+	})
+
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+}
+
+func TestDefaultProjectCommandBuilder_BuildTargetedApply_MergeCheckoutIgnoredTargetSkipsBeforeProjectLock(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\n" +
+		"autodiscover:\n" +
+		"  mode: enabled\n" +
+		"  ignore_paths:\n" +
+		"  - \"environments/prod/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"atlantis.yaml": atlantisYAML,
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	repo := models.Repo{
+		FullName: "runatlantis/atlantis",
+		Owner:    "runatlantis",
+		Name:     "atlantis",
+		VCSHost: models.VCSHost{
+			Hostname: "github.com",
+			Type:     models.Github,
+		},
+	}
+	pull := models.PullRequest{
+		Num:        1,
+		BaseBranch: "main",
+		HeadBranch: "feature",
+		BaseRepo:   repo,
+	}
+	baseWorkingDir := mocks.NewMockWorkingDir()
+	When(baseWorkingDir.GetWorkingDir(repo, pull, events.DefaultWorkspace)).ThenReturn(tmpDir, nil)
+	workingDir := checkoutMergeWorkingDir{WorkingDir: baseWorkingDir}
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockPlan, err := locker.TryLock(repo.FullName, pull.Num, events.DefaultWorkspace, events.DefaultRepoRelDir, "", command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlockPlan()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		locker,
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+	cmdCtx := &command.Context{Log: logger, Scope: scope, Pull: pull, HeadRepo: repo}
+
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  events.DefaultWorkspace,
+	})
+
+	Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+	Equals(t, 0, len(applyCtxs))
+}
+
+// Test that targeted -d commands to a path with an explicit project config
+// are NOT blocked by ignore_paths.
+func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePathsExplicitProjectAllowed(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - "environments/prod/**"
+projects:
+- name: prod-project
+  dir: environments/prod
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(atlantisYAML), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+		Any[models.PullRequest]())).ThenReturn([]string{"environments/prod/main.tf"}, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	globalCfgArgs := valid.GlobalCfgArgs{AllowAllRepoSettings: true}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+
+	terraformClient := tfclientmocks.NewMockClient()
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	// Targeted plan -d to ignored path with explicit config should succeed
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
+	Equals(t, "prod-project", planCtxs[0].ProjectName)
+
+	// Targeted apply -d to ignored path with explicit config should succeed
+	applyCtxs, err := builder.BuildApplyCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Apply,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(applyCtxs))
+	Equals(t, "prod-project", applyCtxs[0].ProjectName)
 }
 
 // Test building a plan and apply command for one project
 // with the RestrictFileList
 func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFileList(t *testing.T) {
 	cases := []struct {
-		Description        string
-		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
-		ModifiedFiles      []string
-		Cmd                events.CommentCommand
-		ExpErr             string
+		Description         string
+		AtlantisYAML        string
+		DirectoryStructure  map[string]any
+		ModifiedFiles       []string
+		Cmd                 events.CommentCommand
+		API                 bool
+		EnableRegExpCmd     bool
+		ExactProjectNames   bool
+		ExpErr              string
+		ExpNoProjects       bool
+		ExpSkipFileList     bool
+		SkipPRModifiedFiles bool
+		ExpProjectNames     []string
+		ExpCloneWorkspaces  []string
 	}{
 		{
 			Description: "planning a file outside of the changed files",
@@ -697,11 +2510,11 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 				RepoRelDir: "directory-1",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -715,15 +2528,60 @@ func TestDefaultProjectCommandBuilder_BuildSinglePlanApplyCommand_WithRestrictFi
 				RepoRelDir: "directory-1",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
 			ModifiedFiles: []string{"directory-1/main.tf"},
+		},
+		{
+			Description: "planning an ignored targeted dir outside of the changed files",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "ignored",
+				Workspace:  "default",
+			},
+			AtlantisYAML: `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ignored/**
+`,
+			DirectoryStructure: map[string]any{
+				"ignored": map[string]any{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"directory-2/main.tf"},
+			ExpNoProjects:   true,
+			ExpSkipFileList: true,
+		},
+		{
+			Description: "API drift targeted path skips pull request modified file filtering",
+			Cmd: events.CommentCommand{
+				Name:       command.Plan,
+				RepoRelDir: "directory-1",
+				Workspace:  "default",
+			},
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
+					"main.tf": nil,
+				},
+				"directory-2": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:       []string{"directory-2/main.tf"},
+			ExpSkipFileList:     true,
+			SkipPRModifiedFiles: true,
 		},
 		{
 			Description: "planning a project outside of the requested changed files",
@@ -740,11 +2598,11 @@ projects:
 - name: project-2
   dir: directory-2
 `,
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -766,20 +2624,229 @@ projects:
 - name: project-2
   dir: directory-2
 `,
-			DirectoryStructure: map[string]interface{}{
-				"directory-1": map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				"directory-1": map[string]any{
 					"main.tf": nil,
 				},
-				"directory-2": map[string]interface{}{
+				"directory-2": map[string]any{
 					"main.tf": nil,
 				},
 			},
 			ModifiedFiles: []string{"directory-1/main.tf"},
 		},
+		{
+			Description: "API project path selector keeps project name exact when regexp commands disabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "prod.*",
+				RepoRelDir:  "prod-api",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: prod-api
+  dir: prod-api
+`,
+			DirectoryStructure: map[string]any{
+				"prod-api": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles: []string{"prod-api/main.tf"},
+			ExpErr:        "no project with name 'prod.*' is defined in 'atlantis.yaml'",
+		},
+		{
+			Description: "API project path selector treats regexp metacharacters as literal when disabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "prod.api",
+				RepoRelDir:  "literal",
+			},
+			AtlantisYAML: `
+version: 3
+projects:
+- name: prod.api
+  dir: literal
+- name: prodXapi
+  dir: other
+`,
+			DirectoryStructure: map[string]any{
+				"literal": map[string]any{
+					"main.tf": nil,
+				},
+				"other": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"literal/main.tf"},
+			ExpProjectNames: []string{"prod.api"},
+		},
+		{
+			Description: "API exact project selector treats regexp metacharacters as literal when regexp commands enabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "app.prod",
+			},
+			API:                 true,
+			EnableRegExpCmd:     true,
+			ExactProjectNames:   true,
+			SkipPRModifiedFiles: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: app.prod
+  dir: literal
+- name: appXprod
+  dir: other
+`,
+			DirectoryStructure: map[string]any{
+				"literal": map[string]any{
+					"main.tf": nil,
+				},
+				"other": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ExpProjectNames: []string{"app.prod"},
+			ExpSkipFileList: true,
+		},
+		{
+			Description: "API project path selector keeps cached project name exact when regexp commands enabled",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "prod",
+				ProjectName: "app.prod",
+				RepoRelDir:  "env",
+			},
+			API:             true,
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: app.prod
+  dir: env
+  workspace: prod
+- name: app-prod
+  dir: env
+  workspace: prod
+`,
+			DirectoryStructure: map[string]any{
+				"env": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			ModifiedFiles:   []string{"env/main.tf"},
+			ExpProjectNames: []string{"app.prod"},
+		},
+		{
+			Description: "planning a regexp project only includes changed matching projects",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: ".*/shared",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles:   []string{"layers/cicd/shared/main.tf"},
+			ExpProjectNames: []string{"cicd/shared"},
+		},
+		{
+			Description: "planning a regexp project with non-default workspace clones the workspace before returning",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "staging",
+				ProjectName: ".*/shared",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+  workspace: staging
+- name: cicd/shared
+  dir: layers/cicd/shared
+  workspace: staging
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles:      []string{"layers/cicd/shared/main.tf"},
+			ExpProjectNames:    []string{"cicd/shared"},
+			ExpCloneWorkspaces: []string{"default", "staging"},
+		},
+		{
+			Description: "planning a regexp project outside of the changed files",
+			Cmd: events.CommentCommand{
+				Name:        command.Plan,
+				Workspace:   "default",
+				ProjectName: "athens/.*",
+			},
+			EnableRegExpCmd: true,
+			AtlantisYAML: `
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`,
+			DirectoryStructure: map[string]any{
+				"layers": map[string]any{
+					"athens": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+					"cicd": map[string]any{
+						"shared": map[string]any{
+							"main.tf": nil,
+						},
+					},
+				},
+			},
+			ModifiedFiles: []string{"layers/cicd/shared/main.tf"},
+			ExpErr:        "the following directories are present in the pull request but not in the requested project:\nlayers/cicd/shared",
+		},
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.RestrictFileList = true
 
@@ -790,7 +2857,7 @@ projects:
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -804,7 +2871,7 @@ projects:
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -817,36 +2884,142 @@ projects:
 				&events.DefaultPendingPlanFinder{},
 				&events.CommentParser{ExecutableName: "atlantis"},
 				userConfig.SkipCloneNoChanges,
-				userConfig.EnableRegExpCmd,
+				c.EnableRegExpCmd,
 				userConfig.EnableAutoMerge,
 				userConfig.EnableParallelPlan,
 				userConfig.EnableParallelApply,
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
 			var err error
 			cmd := c.Cmd
 			actCtxs, err = builder.BuildPlanCommands(&command.Context{
-				Log:   logger,
-				Scope: scope,
+				Log:                      logger,
+				Scope:                    scope,
+				API:                      c.API,
+				SkipPRModifiedFiles:      c.SkipPRModifiedFiles,
+				ExactProjectNameMatching: c.ExactProjectNames,
 			}, &cmd)
 
+			if c.ExpNoProjects {
+				Assert(t, errors.Is(err, events.ErrIgnoredTargetedDir), "expected ignored targeted dir error, got %v", err)
+				Equals(t, 0, len(actCtxs))
+				if c.ExpSkipFileList {
+					vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+				}
+				return
+			}
 			if c.ExpErr != "" {
 				ErrEquals(t, c.ExpErr, err)
 				return
 			}
 			Ok(t, err)
-			Equals(t, 1, len(actCtxs))
+			if len(c.ExpCloneWorkspaces) > 0 {
+				_, _, _, cloneWorkspaces := workingDir.VerifyWasCalled(Times(len(c.ExpCloneWorkspaces))).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]()).GetAllCapturedArguments()
+				Equals(t, c.ExpCloneWorkspaces, cloneWorkspaces)
+			}
+			if c.ExpSkipFileList {
+				vcsClient.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+			}
+			if len(c.ExpProjectNames) == 0 {
+				Equals(t, 1, len(actCtxs))
+				return
+			}
+			var actProjectNames []string
+			for _, actCtx := range actCtxs {
+				actProjectNames = append(actProjectNames, actCtx.ProjectName)
+			}
+			sort.Strings(actProjectNames)
+			Equals(t, c.ExpProjectNames, actProjectNames)
 		})
 	}
+}
+
+func TestDefaultProjectCommandBuilder_BuildPlanCommand_RegExpProjectWithoutRestrictFileList(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	tmpDir := DirStructure(t, map[string]any{
+		"layers": map[string]any{
+			"athens": map[string]any{
+				"shared": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			"cicd": map[string]any{
+				"shared": map[string]any{
+					"main.tf": nil,
+				},
+			},
+		},
+	})
+	err := os.WriteFile(filepath.Join(tmpDir, valid.DefaultAtlantisFile), []byte(`
+version: 3
+projects:
+- name: athens/shared
+  dir: layers/athens/shared
+- name: cicd/shared
+  dir: layers/cicd/shared
+`), 0600)
+	Ok(t, err)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsmocks.NewMockClient(),
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		defaultUserConfig.SkipCloneNoChanges,
+		true,
+		defaultUserConfig.EnableAutoMerge,
+		defaultUserConfig.EnableParallelPlan,
+		defaultUserConfig.EnableParallelApply,
+		defaultUserConfig.AutoDetectModuleFiles,
+		defaultUserConfig.AutoplanFileList,
+		false,
+		"",
+		defaultUserConfig.SilenceNoProjects,
+		defaultUserConfig.IncludeGitUntrackedFiles,
+		defaultUserConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&runtime.LocalPlanStore{},
+	)
+
+	actCtxs, err := builder.BuildPlanCommands(&command.Context{
+		Log:   logger,
+		Scope: scope,
+	}, &events.CommentCommand{
+		Name:        command.Plan,
+		Workspace:   "default",
+		ProjectName: ".*/shared",
+	})
+
+	Ok(t, err)
+	var actProjectNames []string
+	for _, actCtx := range actCtxs {
+		actProjectNames = append(actProjectNames, actCtx.ProjectName)
+	}
+	sort.Strings(actProjectNames)
+	Equals(t, []string{"athens/shared", "cicd/shared"}, actProjectNames)
 }
 
 func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
@@ -866,17 +3039,17 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 		AutoMergeUserCfg            bool
 		ParallelPlanEnabledUserCfg  bool
 		ParallelApplyEnabledUserCfg bool
-		DirStructure                map[string]interface{}
+		DirStructure                map[string]any
 		AtlantisYAML                string
 		ModifiedFiles               []string
 		Exp                         []expCtxFields
 	}{
 		"no atlantis.yaml": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -895,11 +3068,11 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands(t *testing.T) {
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations in atlantis.yaml": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -930,11 +3103,11 @@ parallel_apply: true
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations and automerge not in atlantis.yaml, but in user conf": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -965,11 +3138,11 @@ version: 3
 			},
 		},
 		"no projects in atlantis.yaml with parallel operations and automerge set to false in atlantis.yaml and true in user conf": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1003,21 +3176,21 @@ parallel_apply: false
 			},
 		},
 		"no modified files": {
-			DirStructure: map[string]interface{}{
+			DirStructure: map[string]any{
 				"main.tf": nil,
 			},
 			ModifiedFiles: []string{},
 			Exp:           []expCtxFields{},
 		},
 		"follow when_modified config": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1046,14 +3219,14 @@ projects:
 			},
 		},
 		"follow autodiscover enabled config": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1078,15 +3251,51 @@ projects:
 				},
 			},
 		},
+		"autodiscover enabled but ignoring explicit project": {
+			DirStructure: map[string]any{
+				"project1": map[string]any{
+					"main.tf": nil,
+				},
+				"project2": map[string]any{
+					"main.tf": nil,
+				},
+				"project3": map[string]any{
+					"main.tf": nil,
+				},
+			},
+			AtlantisYAML: `version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - project1
+projects:
+- name: project1-custom-name
+  dir: project1`,
+			ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
+			// project2 is autodiscover-ignored, but configured explicitly so added
+			// project1 is autodiscoverd as normal
+			Exp: []expCtxFields{
+				{
+					ProjectName: "project1-custom-name",
+					RepoRelDir:  "project1",
+					Workspace:   "default",
+				},
+				{
+					ProjectName: "",
+					RepoRelDir:  "project2",
+					Workspace:   "default",
+				},
+			},
+		},
 		"autodiscover enabled but project excluded by empty when_modified": {
-			DirStructure: map[string]interface{}{
-				"project1": map[string]interface{}{
+			DirStructure: map[string]any{
+				"project1": map[string]any{
 					"main.tf": nil,
 				},
-				"project2": map[string]interface{}{
+				"project2": map[string]any{
 					"main.tf": nil,
 				},
-				"project3": map[string]interface{}{
+				"project3": map[string]any{
 					"main.tf": nil,
 				},
 			},
@@ -1109,7 +3318,7 @@ projects:
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for name, c := range cases {
@@ -1119,7 +3328,7 @@ projects:
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -1133,7 +3342,7 @@ projects:
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1153,11 +3362,12 @@ projects:
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			ctxs, err := builder.BuildPlanCommands(
@@ -1192,25 +3402,25 @@ projects:
 // In this case we should apply all outstanding plans.
 func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+	tmpDir := DirStructure(t, map[string]any{
+		"workspace1": map[string]any{
+			"project1": map[string]any{
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"project2": map[string]any{
+				"main.tf":           nil,
+				"workspace1.tfplan": nil,
 			},
 		},
-		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+		"workspace2": map[string]any{
+			"project1": map[string]any{
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
-				"main.tf":          nil,
-				"workspace.tfplan": nil,
+			"project2": map[string]any{
+				"main.tf":           nil,
+				"workspace2.tfplan": nil,
 			},
 		},
 	})
@@ -1229,9 +3439,9 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{}
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1251,17 +3461,28 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildApplyCommands(
 		&command.Context{
 			Log:   logger,
 			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace1", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "workspace2", Status: models.PlannedPlanStatus},
+				},
+			},
 		},
 		&events.CommentCommand{
 			RepoRelDir:  "",
@@ -1281,6 +3502,546 @@ func TestDefaultProjectCommandBuilder_BuildMultiApply(t *testing.T) {
 	Equals(t, "workspace2", ctxs[2].Workspace)
 	Equals(t, "project2", ctxs[3].RepoRelDir)
 	Equals(t, "workspace2", ctxs[3].Workspace)
+	emptyFileHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	for _, ctx := range ctxs {
+		Equals(t, emptyFileHash, ctx.ExpectedPlanHash)
+	}
+}
+
+// Test that autodiscover.ignore_paths is respected during multi-apply.
+// Plans in ignored paths (e.g. .terraform/modules/) should not be applied.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePaths(t *testing.T) {
+	RegisterMockTestingT(t)
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Set ignore_paths on the global config's AutoDiscover so that
+	// isAutoDiscoverPathIgnored filters .terraform paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode:        valid.AutoDiscoverEnabledMode,
+		IgnorePaths: []string{".terraform/**"},
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test that autodiscover.ignore_paths set in repo-level atlantis.yaml (not
+// global config) is respected during multi-apply.
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnorePathsRepoCfg(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			"project2": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	// Initialize git repo so .tfplan files get picked up as untracked.
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	// No global-level ignore_paths — only the repo atlantis.yaml has it.
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+	Equals(t, "project2", ctxs[1].RepoRelDir)
+	Equals(t, "default", ctxs[1].Workspace)
+}
+
+// Test that when global AutoDiscover is set (mode enabled) but has no
+// IgnorePaths, isAutoDiscoverPathIgnored falls through to the repo config's
+// ignore_paths. This validates the guard change from "!= nil" to
+// "!= nil && IgnorePaths != nil".
+func TestDefaultProjectCommandBuilder_BuildMultiApply_GlobalAutoDiscoverFallthrough(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := `
+version: 3
+autodiscover:
+  mode: enabled
+  ignore_paths:
+  - ".terraform/**"
+`
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+			".terraform": map[string]any{
+				"modules": map[string]any{
+					"some_module": map[string]any{
+						"test-deployment": map[string]any{
+							"main.tf":        nil,
+							"default.tfplan": nil,
+						},
+					},
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	// Global AutoDiscover with mode set but NO IgnorePaths.
+	// The guard change means this falls through to repo config's ignore_paths.
+	globalCfg.Repos[0].AutoDiscover = &valid.AutoDiscover{
+		Mode: valid.AutoDiscoverEnabledMode,
+	}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	// .terraform/modules/some_module/test-deployment should be filtered by
+	// the repo config's ignore_paths, even though global AutoDiscover is set.
+	Equals(t, 1, len(ctxs))
+	Equals(t, "project1", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildMultiApply_ExplicitPlanInIgnoredPath(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nautodiscover:\n  mode: auto\n  ignore_paths:\n  - \"ignored/**\"\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"ignored": map[string]any{
+				"dir": map[string]any{
+					"main.tf":        nil,
+					"default.tfplan": nil,
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:  "default",
+						RepoRelDir: "ignored/dir",
+						Status:     models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "ignored/dir", ctxs[0].RepoRelDir)
+	Equals(t, "default", ctxs[0].Workspace)
+}
+
+func TestDefaultProjectCommandBuilder_BuildMultiApply_IgnoreStaleNamedPlanInIgnoredPath(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	atlantisYAML := "version: 3\nautodiscover:\n  mode: enabled\n  ignore_paths:\n  - \"ignored/**\"\nprojects:\n- name: app\n  dir: app\n"
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"atlantis.yaml": atlantisYAML,
+			"app": map[string]any{
+				"main.tf":            nil,
+				"app-default.tfplan": nil,
+			},
+			"ignored": map[string]any{
+				"stale": map[string]any{
+					"main.tf":            nil,
+					"app-default.tfplan": nil,
+				},
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(filepath.Join(tmpDir, "default"), nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+
+	globalCfgArgs := valid.GlobalCfgArgs{
+		AllowAllRepoSettings: true,
+	}
+	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	terraformClient := tfclientmocks.NewMockClient()
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient, &runtime.LocalPlanStore{},
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						Workspace:   "default",
+						RepoRelDir:  "app",
+						ProjectName: "app",
+						Status:      models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Equals(t, 1, len(ctxs))
+	Equals(t, "app", ctxs[0].RepoRelDir)
+	Equals(t, "app", ctxs[0].ProjectName)
+	Equals(t, "default", ctxs[0].Workspace)
 }
 
 // Test that if a directory has a list of workspaces configured then we don't
@@ -1289,9 +4050,9 @@ func TestDefaultProjectCommandBuilder_WrongWorkspaceName(t *testing.T) {
 	RegisterMockTestingT(t)
 	workingDir := mocks.NewMockWorkingDir()
 
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"pulldir": map[string]interface{}{
-			"notconfigured": map[string]interface{}{},
+	tmpDir := DirStructure(t, map[string]any{
+		"pulldir": map[string]any{
+			"notconfigured": map[string]any{},
 		},
 	})
 	repoDir := filepath.Join(tmpDir, "pulldir/notconfigured")
@@ -1307,17 +4068,17 @@ projects:
 	Ok(t, err)
 
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(repoDir, false, nil)
+		Any[string]())).ThenReturn(repoDir, nil)
 	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowAllRepoSettings: true,
 	}
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1337,11 +4098,12 @@ projects:
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctx := &command.Context{
@@ -1383,19 +4145,19 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for _, c := range cases {
 		t.Run(strings.Join(c.ExtraArgs, " "), func(t *testing.T) {
 			RegisterMockTestingT(t)
-			tmpDir := DirStructure(t, map[string]interface{}{
+			tmpDir := DirStructure(t, map[string]any{
 				"main.tf": nil,
 			})
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			vcsClient := vcsmocks.NewMockClient()
 			When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
@@ -1405,7 +4167,7 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false,
@@ -1425,11 +4187,12 @@ func TestDefaultProjectCommandBuilder_EscapeArgs(t *testing.T) {
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -1472,19 +4235,27 @@ projects:
   terraform_version: v0.12.6
 `
 
+	opentofuAtlantisYamlContent := `
+version: 3
+projects:
+- dir: project1
+  terraform_distribution: opentofu
+`
+
 	type testCase struct {
-		DirStructure  map[string]interface{}
-		AtlantisYAML  string
-		ModifiedFiles []string
-		Exp           map[string]string
+		DirStructure    map[string]any
+		AtlantisYAML    string
+		ModifiedFiles   []string
+		Exp             map[string]string
+		ExpDistribution map[string]string
 	}
 
 	testCases := make(map[string]testCase)
 
 	// atlantis.yaml should take precedence over terraform config
 	testCases["with project config and terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": baseVersionConfig,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
@@ -1496,8 +4267,8 @@ projects:
 	}
 
 	testCases["with project config only"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": nil,
 			},
 			valid.DefaultAtlantisFile: atlantisYamlContent,
@@ -1509,8 +4280,8 @@ projects:
 	}
 
 	testCases["neither project config or terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": nil,
 			},
 		},
@@ -1521,12 +4292,12 @@ projects:
 	}
 
 	testCases["project with different terraform config"] = testCase{
-		DirStructure: map[string]interface{}{
-			"project1": map[string]interface{}{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
 				"main.tf": baseVersionConfig,
 			},
-			"project2": map[string]interface{}{
-				"main.tf": strings.Replace(baseVersionConfig, "0.12.8", "0.12.9", -1),
+			"project2": map[string]any{
+				"main.tf": strings.ReplaceAll(baseVersionConfig, "0.12.8", "0.12.9"),
 			},
 		},
 		ModifiedFiles: []string{"project1/main.tf", "project2/main.tf"},
@@ -1536,8 +4307,24 @@ projects:
 		},
 	}
 
+	testCases["opentofu project detects version with opentofu distribution"] = testCase{
+		DirStructure: map[string]any{
+			"project1": map[string]any{
+				"main.tf": baseVersionConfig,
+			},
+			valid.DefaultAtlantisFile: opentofuAtlantisYamlContent,
+		},
+		ModifiedFiles: []string{"project1/main.tf"},
+		Exp: map[string]string{
+			"project1": "0.12.8",
+		},
+		ExpDistribution: map[string]string{
+			"project1": "tofu",
+		},
+	}
+
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	for name, testCase := range testCases {
@@ -1551,16 +4338,20 @@ projects:
 				Any[models.PullRequest]())).ThenReturn(testCase.ModifiedFiles, nil)
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 
 			globalCfgArgs := valid.GlobalCfgArgs{
 				AllowAllRepoSettings: true,
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
-			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[string]())).Then(func(params []Param) ReturnValues {
-				projectName := filepath.Base(params[1].(string))
+			terraformClient := tfclientmocks.NewMockClient()
+			detectedDistributions := map[string]string{}
+			When(terraformClient.DetectVersion(Any[logging.SimpleLogging](), Any[terraform.Distribution](), Any[string]())).Then(func(params []Param) ReturnValues {
+				projectName := filepath.Base(params[2].(string))
+				if params[1] != nil {
+					detectedDistributions[projectName] = params[1].(terraform.Distribution).BinName()
+				}
 				testVersion := testCase.Exp[projectName]
 				if testVersion != "" {
 					v, _ := version.NewVersion(testVersion)
@@ -1587,11 +4378,12 @@ projects:
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			actCtxs, err := builder.BuildPlanCommands(
@@ -1616,6 +4408,9 @@ projects:
 					Assert(t, actCtx.TerraformVersion == nil, "TerraformVersion is supposed to be nil.")
 				}
 			}
+			for project, expDistribution := range testCase.ExpDistribution {
+				Equals(t, expDistribution, detectedDistributions[project])
+			}
 		})
 	}
 }
@@ -1623,27 +4418,56 @@ projects:
 // Test that we don't clone the repo if there were no changes based on the atlantis.yaml file.
 func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 	cases := []struct {
-		AtlantisYAML   string
-		ExpectedCtxs   int
-		ExpectedClones InvocationCountMatcher
-		ModifiedFiles  []string
+		AtlantisYAML             string
+		IsFork                   bool
+		ExpectedCtxs             int
+		ExpectedClones           int
+		ExpectedGetFileContents  int
+		ModifiedFiles            []string
+		IncludeGitUntrackedFiles bool
 	}{
 		{
 			AtlantisYAML: `
 version: 3
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Never(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           0,
+			ExpectedGetFileContents:  1,
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			ExpectedCtxs:             0,
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  0,
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: true,
+		},
+		{
+			AtlantisYAML: `
+version: 3
+projects:
+- dir: dir1`,
+			IsFork:                  true,
+			ExpectedCtxs:            0,
+			ExpectedClones:          0,
+			ExpectedGetFileContents: 1,
+			ModifiedFiles:           []string{"dir2/main.tf"},
 		},
 		{
 			AtlantisYAML: `
 version: 3
 parallel_plan: true`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"README.md"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
+			ModifiedFiles:            []string{"README.md"},
+			IncludeGitUntrackedFiles: false,
 		},
 		{
 			AtlantisYAML: `
@@ -1652,9 +4476,11 @@ autodiscover:
   mode: enabled
 projects:
 - dir: dir1`,
-			ExpectedCtxs:   0,
-			ExpectedClones: Once(),
-			ModifiedFiles:  []string{"dir2/main.tf"},
+			ExpectedCtxs:             0,
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
+			ModifiedFiles:            []string{"dir2/main.tf"},
+			IncludeGitUntrackedFiles: false,
 		},
 	}
 
@@ -1668,7 +4494,7 @@ projects:
 			Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(c.ModifiedFiles, nil)
 		When(vcsClient.SupportsSingleFileDownload(Any[models.Repo]())).ThenReturn(true)
 		When(vcsClient.GetFileContent(
-			Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
+			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(true, []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
 
 		logger := logging.NewNoopLogger(t)
@@ -1676,8 +4502,8 @@ projects:
 		globalCfgArgs := valid.GlobalCfgArgs{
 			AllowAllRepoSettings: true,
 		}
-		scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
-		terraformClient := terraform_mocks.NewMockClient()
+		scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+		terraformClient := tfclientmocks.NewMockClient()
 
 		builder := events.NewProjectCommandBuilder(
 			false,
@@ -1697,45 +4523,61 @@ projects:
 			userConfig.AutoDetectModuleFiles,
 			userConfig.AutoplanFileList,
 			userConfig.RestrictFileList,
+			userConfig.DefaultTFDistribution,
 			userConfig.SilenceNoProjects,
-			userConfig.IncludeGitUntrackedFiles,
+			c.IncludeGitUntrackedFiles,
 			userConfig.AutoDiscoverMode,
 			scope,
-			terraformClient,
+			terraformClient, &runtime.LocalPlanStore{},
 		)
 
 		var actCtxs []command.ProjectContext
 		var err error
+
+		baseRepo := models.Repo{Owner: "owner"}
+		headRepo := baseRepo
+		if c.IsFork {
+			headRepo.Owner = "repoForker"
+		}
+
 		actCtxs, err = builder.BuildAutoplanCommands(&command.Context{
-			HeadRepo: models.Repo{},
-			Pull:     models.PullRequest{},
-			User:     models.User{},
-			Log:      logger,
-			Scope:    scope,
+			HeadRepo: headRepo,
+			Pull: models.PullRequest{
+				BaseRepo: baseRepo,
+			},
+			User:  models.User{},
+			Log:   logger,
+			Scope: scope,
 			PullRequestStatus: models.PullReqStatus{
-				Mergeable: true,
+				MergeableStatus: models.MergeableStatus{IsMergeable: true},
 			},
 		})
+
 		Ok(t, err)
 		Equals(t, c.ExpectedCtxs, len(actCtxs))
-		workingDir.VerifyWasCalled(c.ExpectedClones).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
+		workingDir.VerifyWasCalled(Times(c.ExpectedClones)).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
 			Any[models.PullRequest](), Any[string]())
+		res := vcsClient.VerifyWasCalled(Times(c.ExpectedGetFileContents)).GetFileContent(Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())
+		if c.ExpectedGetFileContents > 0 {
+			_, actRepo, _, _ := res.GetCapturedArguments()
+			Equals(t, headRepo, actRepo)
+		}
 	}
 }
 
 func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
 		"main.tf": nil,
 	})
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	workingDir := mocks.NewMockWorkingDir()
 	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-		Any[string]())).ThenReturn(tmpDir, false, nil)
+		Any[string]())).ThenReturn(tmpDir, nil)
 	vcsClient := vcsmocks.NewMockClient()
 	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
 		Any[models.PullRequest]())).ThenReturn([]string{"main.tf"}, nil)
@@ -1746,7 +4588,7 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 	}
 
 	globalCfg := valid.NewGlobalCfgFromArgs(globalCfgArgs)
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		true,
@@ -1766,16 +4608,17 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildAutoplanCommands(&command.Context{
 		PullRequestStatus: models.PullReqStatus{
-			Mergeable: true,
+			MergeableStatus: models.MergeableStatus{IsMergeable: true},
 		},
 		Log:   logger,
 		Scope: scope,
@@ -1794,23 +4637,23 @@ func TestDefaultProjectCommandBuilder_WithPolicyCheckEnabled_BuildAutoplanComman
 // Test building version command for multiple projects
 func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 	RegisterMockTestingT(t)
-	tmpDir := DirStructure(t, map[string]interface{}{
-		"workspace1": map[string]interface{}{
-			"project1": map[string]interface{}{
+	tmpDir := DirStructure(t, map[string]any{
+		"workspace1": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
 		},
-		"workspace2": map[string]interface{}{
-			"project1": map[string]interface{}{
+		"workspace2": map[string]any{
+			"project1": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
-			"project2": map[string]interface{}{
+			"project2": map[string]any{
 				"main.tf":          nil,
 				"workspace.tfplan": nil,
 			},
@@ -1828,13 +4671,13 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		ThenReturn(tmpDir, nil)
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 
 	globalCfgArgs := valid.GlobalCfgArgs{
 		AllowAllRepoSettings: false,
 	}
-	terraformClient := terraform_mocks.NewMockClient()
+	terraformClient := tfclientmocks.NewMockClient()
 
 	builder := events.NewProjectCommandBuilder(
 		false,
@@ -1854,11 +4697,12 @@ func TestDefaultProjectCommandBuilder_BuildVersionCommand(t *testing.T) {
 		userConfig.AutoDetectModuleFiles,
 		userConfig.AutoplanFileList,
 		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
 		userConfig.SilenceNoProjects,
 		userConfig.IncludeGitUntrackedFiles,
 		userConfig.AutoDiscoverMode,
 		scope,
-		terraformClient,
+		terraformClient, &runtime.LocalPlanStore{},
 	)
 
 	ctxs, err := builder.BuildVersionCommands(
@@ -1894,7 +4738,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
+		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		UntrackedFiles     []string
 		Cmd                events.CommentCommand
@@ -1908,8 +4752,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				RepoRelDir: testDir1 + "/ci-cdktf.out/stacks/test",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
 				},
 			},
@@ -1924,8 +4768,8 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				RepoRelDir: testDir2 + "/ci-cdktf.out/stacks/test",
 				Workspace:  "default",
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
 				},
 			},
@@ -1940,7 +4784,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.RestrictFileList = true
 	userConfig.IncludeGitUntrackedFiles = true
@@ -1952,7 +4796,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(c.UntrackedFiles, nil)
@@ -1964,7 +4808,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				Ok(t, err)
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
@@ -1984,11 +4828,12 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2016,7 +4861,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	cases := []struct {
 		Description        string
 		AtlantisYAML       string
-		DirectoryStructure map[string]interface{}
+		DirectoryStructure map[string]any
 		ModifiedFiles      []string
 		UntrackedFiles     []string
 		Cmd                events.CommentCommand
@@ -2028,12 +4873,12 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Cmd: events.CommentCommand{
 				Name: command.Plan,
 			},
-			DirectoryStructure: map[string]interface{}{
-				testDir1: map[string]interface{}{
+			DirectoryStructure: map[string]any{
+				testDir1: map[string]any{
 					"main.ts": nil,
-					"ci-cdktf.out": map[string]interface{}{
-						"stacks": map[string]interface{}{
-							"test": map[string]interface{}{
+					"ci-cdktf.out": map[string]any{
+						"stacks": map[string]any{
+							"test": map[string]any{
 								"cdk.tf.json": nil,
 							},
 						},
@@ -2051,7 +4896,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 	}
 
 	logger := logging.NewNoopLogger(t)
-	scope, _, _ := metrics.NewLoggingScope(logger, "atlantis")
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
 	userConfig := defaultUserConfig
 	userConfig.IncludeGitUntrackedFiles = true
 	userConfig.AutoplanFileList = "**/cdk.tf.json"
@@ -2063,7 +4908,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 
 			workingDir := mocks.NewMockWorkingDir()
 			When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
-				Any[string]())).ThenReturn(tmpDir, false, nil)
+				Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
 			When(workingDir.GetGitUntrackedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
 				Any[string]())).ThenReturn(c.UntrackedFiles, nil)
@@ -2075,7 +4920,7 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				Ok(t, err)
 			}
 
-			terraformClient := terraform_mocks.NewMockClient()
+			terraformClient := tfclientmocks.NewMockClient()
 
 			builder := events.NewProjectCommandBuilder(
 				false, // policyChecksSupported
@@ -2095,11 +4940,12 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 				userConfig.AutoDetectModuleFiles,
 				userConfig.AutoplanFileList,
 				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
 				userConfig.SilenceNoProjects,
 				userConfig.IncludeGitUntrackedFiles,
 				userConfig.AutoDiscoverMode,
 				scope,
-				terraformClient,
+				terraformClient, &runtime.LocalPlanStore{},
 			)
 
 			var actCtxs []command.ProjectContext
@@ -2119,4 +4965,1355 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_with_IncludeGitUntracked
 			Equals(t, c.ExpRepoRelDir, actCtx.RepoRelDir)
 		})
 	}
+}
+
+func TestValidatePlansForApply_NoPlansNoPullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: nil,
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected error when no PullStatus")
+	Assert(t, strings.Contains(err.Error(), "no current plan status"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansStalePullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected error for stale PullStatus")
+	Assert(t, strings.Contains(err.Error(), "current head"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsPlansFromDifferentBaseBranch(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected base branch mismatch error")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "release"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "main"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_AcceptsFreshReplanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_GenericRejectsLegacyOldBaseProjectAfterTargetedReplanNewBase(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default", ProjectName: "proj1"},
+		{RepoRelDir: "proj2", Workspace: "default", ProjectName: "proj2"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base project without current PullStatus to be rejected")
+	Assert(t, strings.Contains(err.Error(), "no matching plan status exists"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsOldBasePlanAfterBaseRetargetSameHead(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected old-base plan to be rejected")
+	Assert(t, strings.Contains(err.Error(), "base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "main"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected missing recorded base branch to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_RejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApply(ctx, plans)
+
+	Assert(t, err != nil, "expected missing recorded head commit to be rejected")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentEmptyProjectsPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentEmptyPullStatusPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyHeadPullStatusWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty head to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansRejectsEmptyBasePullStatusWhenCurrentBaseKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123", BaseBranch: "release"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.AppliedPlanStatus},
+			},
+		},
+	}
+
+	err := events.ValidatePlansForApply(ctx, nil)
+
+	Assert(t, err != nil, "expected no-plan PullStatus with empty base to fail")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded base branch"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithEmptyPullStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull:     models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block empty generic apply")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightEvenWithExistingPlanFiles(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{{RepoRelDir: "proj1", Workspace: "default"}}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, plans, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with existing files")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FailsWhenPlanInFlightWithNoChangeOrDiscardedStatus(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.DiscardedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApplyWithActivePlan(ctx, nil, true)
+	Assert(t, err != nil, "expected active in-flight plan to block generic apply with terminal statuses")
+	Assert(t, strings.Contains(err.Error(), "plan is currently running"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentAllNoChangesPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.AppliedPlanStatus},
+				{RepoRelDir: "proj3", Workspace: "default", Status: models.DiscardedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentApplyableStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected missing plan error")
+	Assert(t, strings.Contains(err.Error(), "plan file is missing"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "proj1"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_NoPlansCurrentErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	err := events.ValidatePlansForApply(ctx, nil)
+	Assert(t, err != nil, "expected errored plan status to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansButNoPullStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:        logging.NewNoopLogger(t),
+		Pull:       models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: nil,
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error when no pull status")
+	Assert(t, strings.Contains(err.Error(), "no recorded plan status"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansStaleCommitFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "new-sha"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "old-sha"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected stale plan error")
+	Assert(t, strings.Contains(err.Error(), "plans are from commit"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_GenericAcceptsPullStatusMatchingLiveHeadWhenCommandHeadIsStale(t *testing.T) {
+	oldHead := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	liveHead := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: oldHead},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: liveHead},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+
+	err := events.ValidatePlansForApplyWithCurrentHead(ctx, plans, false, liveHead)
+
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_PlanMissingFromStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error for unmatched plan")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_PlansMatchCurrentStatusPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "staging", Status: models.PassedPolicyCheckStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+		{RepoRelDir: "proj2", Workspace: "staging"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_FoundSubsetOfCurrentStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.PassedPolicyCheckStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected missing plan error for DB project without plan file")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FoundSubsetWithErroredPlanStatusFails(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "proj2", Workspace: "default", Status: models.ErroredPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected errored plan status without plan file to block generic apply")
+	Assert(t, strings.Contains(err.Error(), "proj2"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "errored"), "got: %s", err)
+	Assert(t, strings.Contains(err.Error(), "atlantis plan"), "got: %s", err)
+}
+
+func TestValidatePlansForApply_FoundNoChangePlanPasses(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedNoChangesPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_FoundPlanWithInvalidStatusFails(t *testing.T) {
+	invalidStatuses := []models.ProjectPlanStatus{
+		models.AppliedPlanStatus,
+		models.DiscardedPlanStatus,
+		models.ErroredPlanStatus,
+	}
+	for _, status := range invalidStatuses {
+		t.Run(status.String(), func(t *testing.T) {
+			ctx := &command.Context{
+				Log:  logging.NewNoopLogger(t),
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "proj1", Workspace: "default", Status: status},
+					},
+				},
+			}
+			plans := []events.PendingPlan{
+				{RepoRelDir: "proj1", Workspace: "default"},
+			}
+			err := events.ValidatePlansForApply(ctx, plans)
+			Assert(t, err != nil, "expected error for status %s", status.String())
+		})
+	}
+}
+
+func TestValidatePlansForApply_FoundPlanWithAllowedStatusPasses(t *testing.T) {
+	allowedStatuses := []models.ProjectPlanStatus{
+		models.PlannedPlanStatus,
+		models.PassedPolicyCheckStatus,
+		models.ErroredApplyStatus,
+		models.PlannedNoChangesPlanStatus,
+		models.ErroredPolicyCheckStatus,
+	}
+	for _, status := range allowedStatuses {
+		t.Run(status.String(), func(t *testing.T) {
+			ctx := &command.Context{
+				Log:  logging.NewNoopLogger(t),
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				PullStatus: &models.PullStatus{
+					Pull: models.PullRequest{HeadCommit: "abc123"},
+					Projects: []models.ProjectStatus{
+						{RepoRelDir: "proj1", Workspace: "default", Status: status},
+					},
+				},
+			}
+			plans := []events.PendingPlan{
+				{RepoRelDir: "proj1", Workspace: "default"},
+			}
+			err := events.ValidatePlansForApply(ctx, plans)
+			Ok(t, err)
+		})
+	}
+}
+
+func TestValidatePlansForApply_NamedProjectMustMatch(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Plan has different project name → no match
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected error for mismatched project name")
+}
+
+func TestValidatePlansForApply_NamedProjectsSameDirWorkspace(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA"},
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_NamedProjectUsesOwnStatusWhenSameDirWorkspace(t *testing.T) {
+	t.Run("pending plan for valid project passes when sibling project status is invalid", func(t *testing.T) {
+		ctx := &command.Context{
+			Log:  logging.NewNoopLogger(t),
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.AppliedPlanStatus},
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.PlannedPlanStatus},
+				},
+			},
+		}
+		plans := []events.PendingPlan{
+			{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+		}
+		err := events.ValidatePlansForApply(ctx, plans)
+		Ok(t, err)
+	})
+
+	t.Run("pending plan for invalid project fails when sibling project status is valid", func(t *testing.T) {
+		ctx := &command.Context{
+			Log:  logging.NewNoopLogger(t),
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			PullStatus: &models.PullStatus{
+				Pull: models.PullRequest{HeadCommit: "abc123"},
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB", Status: models.DiscardedPlanStatus},
+				},
+			},
+		}
+		plans := []events.PendingPlan{
+			{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projB"},
+		}
+		err := events.ValidatePlansForApply(ctx, plans)
+		Assert(t, err != nil, "expected projB invalid status error")
+		Assert(t, strings.Contains(err.Error(), "projB"), "got: %s", err)
+		Assert(t, strings.Contains(err.Error(), models.DiscardedPlanStatus.String()), "got: %s", err)
+	})
+}
+
+func TestValidatePlansForApply_UnnamedPlanDoesNotMatchNamedProject(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Unnamed plan should not match named project
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: ""},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "unnamed plan should not match named project")
+}
+
+func TestValidatePlansForApply_NamedPlanDoesNotMatchUnnamedProject(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "dir1", Workspace: "default", ProjectName: "", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	// Named plan should not match unnamed project
+	plans := []events.PendingPlan{
+		{RepoRelDir: "dir1", Workspace: "default", ProjectName: "projA"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "named plan should not match unnamed project")
+}
+
+func TestValidatePlansForApply_EmptyHeadCommitAllowsValidation(t *testing.T) {
+	// For backward compat: if HeadCommit is empty, skip head check
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: ""},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: ""},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_CurrentHeadEmptyAllowsValidation(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: ""},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: "abc123"},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Ok(t, err)
+}
+
+func TestValidatePlansForApply_StatusHeadEmptyFailsWhenCurrentHeadKnown(t *testing.T) {
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t),
+		Pull: models.PullRequest{HeadCommit: "abc123"},
+		PullStatus: &models.PullStatus{
+			Pull: models.PullRequest{HeadCommit: ""},
+			Projects: []models.ProjectStatus{
+				{RepoRelDir: "proj1", Workspace: "default", Status: models.PlannedPlanStatus},
+			},
+		},
+	}
+	plans := []events.PendingPlan{
+		{RepoRelDir: "proj1", Workspace: "default"},
+	}
+	err := events.ValidatePlansForApply(ctx, plans)
+	Assert(t, err != nil, "expected empty recorded head to fail when current head is known")
+	Assert(t, strings.Contains(err.Error(), "missing a recorded head commit"), "got: %s", err)
+}
+
+// Test that when GetPullDir returns os.ErrNotExist with an external PlanStore,
+// the builder re-clones and calls RestorePlans before discovering plans.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	// The directory that will exist after "re-clone".
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf":        nil,
+				"default.tfplan": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+
+	workingDir := mocks.NewMockWorkingDir()
+	// First GetPullDir call: directory missing (container restart).
+	// Second GetPullDir call: directory exists after re-clone.
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn("", os.ErrNotExist).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	restoreCalled := false
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default"},
+		restoreFn: func(pullDir, owner, repo string, pullNum int) error {
+			restoreCalled = true
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{
+						RepoRelDir: "project1",
+						Workspace:  "default",
+						Status:     models.PlannedPlanStatus,
+					},
+				},
+			},
+		},
+		&events.CommentCommand{
+			RepoRelDir:  "",
+			Flags:       nil,
+			Name:        command.Apply,
+			Verbose:     false,
+			Workspace:   "",
+			ProjectName: "",
+		})
+	Ok(t, err)
+	Assert(t, restoreCalled, "expected RestorePlans to be called")
+	Equals(t, 1, len(ctxs))
+}
+
+// mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
+// the external plan store recovery path.
+type mockExternalPlanStore struct {
+	workspaces []string
+	restoreFn  func(pullDir, owner, repo string, pullNum int) error
+}
+
+func (m *mockExternalPlanStore) Save(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) Load(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) Remove(ctx command.ProjectContext, planPath string) error {
+	return nil
+}
+func (m *mockExternalPlanStore) ListWorkspaces(owner, repo string, pullNum int) ([]string, error) {
+	return m.workspaces, nil
+}
+func (m *mockExternalPlanStore) RestorePlans(pullDir, owner, repo string, pullNum int) error {
+	// Capability probe uses empty pullDir; real stores no-op that path.
+	if pullDir == "" {
+		return nil
+	}
+	if m.restoreFn != nil {
+		return m.restoreFn(pullDir, owner, repo, pullNum)
+	}
+	return nil
+}
+func (m *mockExternalPlanStore) DeleteForPull(owner, repo string, pullNum int) error {
+	return nil
+}
+func (m *mockExternalPlanStore) DeletePlanForProject(owner, repo string, pullNum int, workspace, repoRelDir, projectName string) error {
+	return nil
+}
+
+// fakeWorkingDir mimics the parts of FileWorkspace.Clone that matter for the
+// regression test. Importantly, Clone simulates forceClone behavior — it wipes
+// the workspace dir before recreating it. This is exactly what caused the
+// pre-fix bug: if RestorePlans ran before Clone for a workspace, Clone would
+// blow away the freshly restored plans.
+type fakeWorkingDir struct {
+	mocks.MockWorkingDir // embedded so unused methods don't need stubs
+	pullDir              string
+	cloneCalls           []string
+	// onClone runs after a workspace is cloned, to seed files a real clone
+	// would have brought with it (e.g. atlantis.yaml).
+	onClone func(workspace, dir string) error
+}
+
+func (f *fakeWorkingDir) Clone(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, workspace string) (string, error) {
+	f.cloneCalls = append(f.cloneCalls, workspace)
+	workspaceDir := filepath.Join(f.pullDir, workspace)
+	// Wipe and recreate (mimics forceClone) — this is the behavior that wiped
+	// restored plans before the fix.
+	if err := os.RemoveAll(workspaceDir); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(workspaceDir, 0o700); err != nil {
+		return "", err
+	}
+	// Initialize a real git repo so PendingPlanFinder's `git ls-files --others`
+	// can pick up restored .tfplan files as untracked.
+	if err := exec.Command("git", "-C", workspaceDir, "init").Run(); err != nil {
+		return "", err
+	}
+	if f.onClone != nil {
+		if err := f.onClone(workspace, workspaceDir); err != nil {
+			return "", err
+		}
+	}
+	return workspaceDir, nil
+}
+
+func (f *fakeWorkingDir) GetPullDir(_ models.Repo, _ models.PullRequest) (string, error) {
+	if _, err := os.Stat(f.pullDir); err != nil {
+		return "", err
+	}
+	return f.pullDir, nil
+}
+
+func (f *fakeWorkingDir) GetWorkingDir(_ models.Repo, _ models.PullRequest, workspace string) (string, error) {
+	workspaceDir := filepath.Join(f.pullDir, workspace)
+	if _, err := os.Stat(workspaceDir); err != nil {
+		return "", err
+	}
+	return workspaceDir, nil
+}
+
+// Test that plans restored for non-default workspaces survive the Clone +
+// RestorePlans flow. This is the regression test for the bug where
+// cloneMissingWorkspaces ran after RestorePlans and wiped non-default
+// workspace plans via forceClone's os.RemoveAll.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_MultiWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	pullDir := t.TempDir()
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	// restoreFn writes a .tfplan into each workspace dir. With the bug,
+	// Clone for "staging" would run AFTER this and wipe the plan via
+	// os.RemoveAll. With the fix, Clone runs for both workspaces before
+	// this callback fires, so the plans land in already-initialized dirs.
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default", "staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			for _, ws := range []string{"default", "staging"} {
+				projDir := filepath.Join(pullDirArg, ws, "project1")
+				if err := os.MkdirAll(projDir, 0o700); err != nil {
+					return err
+				}
+				planFile := filepath.Join(projDir, ws+".tfplan")
+				if err := os.WriteFile(planFile, []byte("plan-data"), 0o600); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	// Trigger the missing-pullDir path: delete pullDir so the first
+	// GetPullDir errors with ErrNotExist.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	// Both workspaces must be cloned (in the order returned by ListWorkspaces).
+	Equals(t, []string{"default", "staging"}, workingDir.cloneCalls)
+
+	// Both plans must survive — the apply command builder discovers them via
+	// PendingPlanFinder. With the original bug, staging's plan would be wiped
+	// by the late Clone and only the default ctx would come back.
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to survive")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to survive")
+
+	// Verify the staging plan file bytes survived — this is the exact
+	// regression: under the old code, Clone(staging) after RestorePlans
+	// would RemoveAll the staging dir and the plan file would be gone.
+	stagingPlan, err := os.ReadFile(filepath.Join(pullDir, "staging", "project1", "staging.tfplan"))
+	Ok(t, err)
+	Equals(t, "plan-data", string(stagingPlan))
+}
+
+// When --share-plan-dir points somewhere other than --data-dir, an external
+// plan store must restore into the plan store tree, because that is the only
+// place PendingPlanFinder looks. Restoring into the clone pull dir instead
+// leaves the plans undiscoverable and apply reports "no plans found".
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_SeparateSharePlanDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{Num: 7, BaseRepo: repo}
+
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	pullDir := filepath.Join(dataDir, "repos", "owner", "repo", "7")
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	// Record where the store was told to restore, and write the plans there.
+	var restoreDir string
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default", "staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			restoreDir = pullDirArg
+			for _, ws := range []string{"default", "staging"} {
+				projDir := filepath.Join(pullDirArg, ws, "project1")
+				if err := os.MkdirAll(projDir, 0o700); err != nil {
+					return err
+				}
+				if err := os.WriteFile(filepath.Join(projDir, ws+".tfplan"), []byte("plan-data"), 0o600); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalSharePlanDir: sharePlanDir},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+	builder.LocalSharePlanDir = sharePlanDir
+
+	// Trigger the missing-pullDir path.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			Pull:  pull,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	// Restore must target the plan store tree, not the clone pull dir.
+	Equals(t, filepath.Join(sharePlanDir, "repos", "owner", "repo", "7"), restoreDir)
+
+	// Both restored plans must then be discoverable.
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+		Equals(t, sharePlanDir, c.LocalSharePlanDir)
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be found")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be found")
+}
+
+// Recovery must work when the store only holds plans for non-default
+// workspaces. The default workspace is still needed as the source of truth for
+// atlantis.yaml, so it has to be cloned even though it has no stored plans.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecovery_OnlyNonDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	pullDir := t.TempDir()
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	globalCfgArgs := valid.GlobalCfgArgs{}
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	terraformClient := tfclientmocks.NewMockClient()
+
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"staging"},
+		restoreFn: func(pullDirArg, _, _ string, _ int) error {
+			projDir := filepath.Join(pullDirArg, "staging", "project1")
+			if err := os.MkdirAll(projDir, 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(projDir, "staging.tfplan"), []byte("plan-data"), 0o600)
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(globalCfgArgs),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		terraformClient,
+		planStore,
+	)
+
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	Equals(t, 1, len(ctxs))
+	Equals(t, "staging", ctxs[0].Workspace)
+}
+
+// A separate --share-plan-dir already outlives the checkout, so losing the
+// working dir is recoverable without any external store: the plans are still on
+// disk and the workspaces just need re-cloning. Exercised end to end with a real
+// FileWorkspace because recovery depends on the clone not wiping the plans.
+func TestDefaultProjectCommandBuilder_LocalPlanStoreRecovery_SeparateSharePlanDir(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repoDir := initRepo(t)
+	dataDir := t.TempDir()
+	sharePlanDir := t.TempDir()
+	logger := logging.NewNoopLogger(t)
+
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 3, BaseRepo: repo, HeadBranch: "branch", BaseBranch: "main"}
+
+	workingDir := &events.FileWorkspace{
+		DataDir:                     dataDir,
+		LocalSharePlanDir:           sharePlanDir,
+		CheckoutMerge:               false,
+		TestingOverrideHeadCloneURL: fmt.Sprintf("file://%s", repoDir),
+		GpgNoSigningEnabled:         true,
+	}
+
+	// Plans survived the restart in the plan store; the checkout did not.
+	for _, ws := range []string{"default", "staging"} {
+		createPlanFile(t, filepath.Join(sharePlanDir, "repos", "owner", "repo", "3", ws, "project1", ws+".tfplan"))
+	}
+	assertPathMissing(t, filepath.Join(dataDir, "repos", "owner", "repo", "3"))
+
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+		&events.DefaultPendingPlanFinder{DataDir: dataDir, LocalSharePlanDir: sharePlanDir},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&runtime.LocalPlanStore{SeparatePlanDir: sharePlanDir},
+	)
+	builder.LocalSharePlanDir = sharePlanDir
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     pull,
+			HeadRepo: repo,
+			PullStatus: &models.PullStatus{
+				// Recovery still has to satisfy the staleness checks, which
+				// compare the recorded pull against the live one.
+				Pull: pull,
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project1", Workspace: "staging", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{Name: command.Apply})
+	Ok(t, err)
+
+	Equals(t, 2, len(ctxs))
+	gotWorkspaces := map[string]bool{}
+	for _, c := range ctxs {
+		gotWorkspaces[c.Workspace] = true
+		Equals(t, sharePlanDir, c.LocalSharePlanDir)
+	}
+	Assert(t, gotWorkspaces["default"], "expected default workspace plan to be recovered")
+	Assert(t, gotWorkspaces["staging"], "expected staging workspace plan to be recovered")
+}
+
+// `apply -p name` carries no workspace, so recovery can only clone the default
+// workspace up front — a project's workspace comes from atlantis.yaml, which
+// can't be read until that clone exists. A project pinned to a non-default
+// workspace must still get a checkout, or apply fails on the missing dir.
+func TestDefaultProjectCommandBuilder_TargetedApplyRecovery_NonDefaultWorkspace(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	repo := models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"}
+	pull := models.PullRequest{Num: 5, BaseRepo: repo}
+
+	pullDir := t.TempDir()
+	atlantisYAML := `version: 3
+projects:
+- name: myproject
+  dir: project1
+  workspace: staging
+`
+	workingDir := &fakeWorkingDir{
+		MockWorkingDir: *mocks.NewMockWorkingDir(),
+		pullDir:        pullDir,
+		onClone: func(_, dir string) error {
+			if err := os.MkdirAll(filepath.Join(dir, "project1"), 0o700); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte(atlantisYAML), 0o600)
+		},
+	}
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		&mockExternalPlanStore{},
+	)
+
+	// Working dir is gone, so the targeted apply has to recover.
+	Ok(t, os.RemoveAll(pullDir))
+
+	ctxs, err := builder.BuildApplyCommands(
+		&command.Context{
+			Log:      logger,
+			Scope:    scope,
+			Pull:     pull,
+			HeadRepo: repo,
+		},
+		&events.CommentCommand{Name: command.Apply, ProjectName: "myproject"})
+	Ok(t, err)
+
+	Equals(t, 1, len(ctxs))
+	Equals(t, "staging", ctxs[0].Workspace)
+	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
+		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }

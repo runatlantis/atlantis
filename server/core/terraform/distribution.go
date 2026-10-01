@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package terraform
 
 import (
@@ -16,6 +19,14 @@ type Distribution interface {
 	Downloader() Downloader
 	// ResolveConstraint gets the latest version for the given constraint
 	ResolveConstraint(context.Context, string) (*version.Version, error)
+}
+
+func NewDistribution(distribution string) Distribution {
+	tfDistribution := NewDistributionTerraform()
+	if distribution == "opentofu" {
+		tfDistribution = NewDistributionOpenTofu()
+	}
+	return tfDistribution
 }
 
 type DistributionOpenTofu struct {

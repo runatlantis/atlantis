@@ -11,11 +11,11 @@ This post was originally written on July 25th, 2018
 Original post: <https://medium.com/runatlantis/atlantis-0-4-4-now-supports-bitbucket-86c53a550b45>
 :::
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic1.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic1.webp)
 
 Atlantis is an [open source](https://github.com/runatlantis/atlantis) platform for using Terraform in teams. I'm happy to announce that the [latest release](https://github.com/runatlantis/atlantis/releases) of Atlantis (0.4.4) now supports both Bitbucket Cloud (bitbucket.org) **and** Bitbucket Server (aka Stash).
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic2.gif)
+![](atlantis-0-4-4-now-supports-bitbucket/pic2.gif)
 
 Atlantis now supports the three major Git hosts: GitHub, GitLab and Bitbucket. The rest of this post will talk about how to use Atlantis with Bitbucket.
 
@@ -40,15 +40,15 @@ Using the web editor, open up one of your Terraform files and add:
 resource "null_resource" "example" {}
 ```
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic3.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic3.webp)
 
 Click Commit and select **Create a pull request for this change**.
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic4.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic4.webp)
 
 Wait a few seconds and then refresh. Atlantis should have automatically run `terraform plan` and commented back on the pull request:
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic5.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic5.webp)
 
 Now it's easier for your colleagues to review the pull request because they can see the `terraform plan` output.
 
@@ -56,11 +56,11 @@ Now it's easier for your colleagues to review the pull request because they can 
 
 Since all we're doing is adding a null resource, I think it's safe to run `terraform apply`. To do so, I add a comment to the pull request: `atlantis apply`:
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic6.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic6.webp)
 
 Atlantis is listening for pull request comments and will run `terraform apply` remotely and comment back with the output:
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic7.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic7.webp)
 
 ### Pull Request Approvals
 
@@ -93,7 +93,7 @@ workflows:
 
 ### Locking For Coordination
 
-![](/blog/atlantis-0-4-4-now-supports-bitbucket/pic8.webp)
+![](atlantis-0-4-4-now-supports-bitbucket/pic8.webp)
 
 Atlantis will prevent other pull requests from running against the same directory as an open pull request so that each plan is applied atomically. Once the first pull request is merged, other pull requests are unlocked.
 

@@ -1,0 +1,7 @@
+{{ define "singleProjectVersionSuccess" -}}
+{{ $result := index .Results 0 -}}
+Se ejecutó {{ .Command }} para {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+
+{{ $result.Rendered }}
+{{- template "log" . -}}
+{{ end -}}

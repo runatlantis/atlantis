@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package testdrive
@@ -18,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v63/github"
+	"github.com/google/go-github/v88/github"
 )
 
 var githubUsername string
@@ -44,7 +35,7 @@ func (g *Client) CreateFork(owner string, repoName string) error {
 // CheckForkSuccess waits for github fork to complete.
 // Forks can take up to 5 minutes to complete according to GitHub.
 func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := g.CreateFork(ownerName, forkRepoName); err == nil {
 			return true
 		}
@@ -57,13 +48,13 @@ func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
 func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string) error {
 	contentType := "json"
 	hookConfig := &github.HookConfig{
-		ContentType: &contentType,
-		URL:         &hookURL,
+		ContentType: github.Ptr(contentType),
+		URL:         github.Ptr(hookURL),
 	}
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "pull_request_review", "push"},
 		Config: hookConfig,
-		Active: github.Bool(true),
+		Active: github.Ptr(true),
 	}
 	_, _, err := g.client.Repositories.CreateHook(g.ctx, ownerName, repoName, atlantisHook)
 	return err
@@ -87,10 +78,10 @@ func (g *Client) CreatePullRequest(ownerName string, repoName string, head strin
 
 	// If not, create it.
 	newPullRequest := &github.NewPullRequest{
-		Title: github.String("Welcome to Atlantis!"),
-		Head:  github.String(head),
-		Body:  github.String(pullRequestBody),
-		Base:  github.String(base),
+		Title: github.Ptr("Welcome to Atlantis!"),
+		Head:  github.Ptr(head),
+		Body:  github.Ptr(pullRequestBody),
+		Base:  github.Ptr(base),
 	}
 	pull, _, err := g.client.PullRequests.Create(g.ctx, ownerName, repoName, newPullRequest)
 	if err != nil {

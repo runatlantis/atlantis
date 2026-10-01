@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw_test
 
 import (
@@ -6,7 +9,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/config/raw"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	. "github.com/runatlantis/atlantis/testing"
-	yaml "gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 func TestWorkflowHook_YAMLMarshalling(t *testing.T) {
@@ -47,7 +50,7 @@ key: value`,
 key:
   value:
     another: map`,
-			expErr: "yaml: unmarshal errors:\n  line 3: cannot unmarshal !!map into string",
+			expErr: "yaml: construct errors: line 3: cannot construct !!map into string",
 		},
 	}
 
@@ -100,7 +103,7 @@ func TestGlobalConfigStep_Validate(t *testing.T) {
 		{
 			// For atlantis.yaml v2, this wouldn't parse, but now there should
 			// be no error.
-			description: "unparseable shell command",
+			description: "unparsable shell command",
 			input: raw.WorkflowHook{
 				StringVal: map[string]string{
 					"run": "my 'c",
