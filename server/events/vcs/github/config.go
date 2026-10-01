@@ -6,4 +6,8 @@ package github
 // GithubConfig allows for custom github-specific functionality and behavior
 type Config struct {
 	AllowMergeableBypassApply bool
+	// MergeQueueEnabled enables Atlantis-side merge queue handling: posting
+	// success on `merge_group` events and routing automerge through
+	// enablePullRequestAutoMerge for branches that require a queue.
+	MergeQueueEnabled bool
 }
