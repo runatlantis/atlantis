@@ -8,6 +8,7 @@ Architecture Decision Records (ADRs) preserve important design choices and their
 | --- | --- | --- |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-api-enhancement-drift-detection.md) | API Enhancement and Drift Detection | Proposed |
+| [0003](0003-govern-architecture-proposals.md) | Govern architecture proposals | Proposed |
 
 Update this table when adding or changing an ADR.
 
@@ -40,7 +41,7 @@ If unsure, open an issue before starting a large implementation.
 
 1. Agree on the problem in an issue.
 2. Copy [template.md](template.md) to `docs/adr/NNNN-short-title.md`.
-3. Use the next number across merged ADRs and open ADR pull requests. Renumber if another ADR merges first.
+3. Use the next number after the latest merged ADR. Numbers in open proposals are provisional; renumber the record, references, and index before merge if another ADR lands first.
 4. Open a pull request with status `Proposed` and update the index above.
 
 Keep the ADR focused on one decision. Put implementation details in the issue or implementation pull request.
