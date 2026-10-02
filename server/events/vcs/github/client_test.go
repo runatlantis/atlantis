@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	gogithub "github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
@@ -1729,6 +1730,128 @@ func TestClient_Retry404Files(t *testing.T) {
 	_, err = client.GetModifiedFiles(logger, repo, pr)
 	Ok(t, err)
 	Equals(t, 3, numCalls)
+}
+
+const notFoundBody = `{"message": "Not Found"}`
+
+// jsonResponse returns a GitHub API response with a JSON body.
+func jsonResponse(req *http.Request, status int, body string, header http.Header) *http.Response {
+	if header == nil {
+		header = http.Header{}
+	}
+	header.Set("Content-Type", "application/json")
+	return &http.Response{
+		StatusCode: status,
+		Status:     http.StatusText(status),
+		Header:     header,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}
+}
+
+// newTransportClient returns a client that sends every request to transport.
+func newTransportClient(t *testing.T, transport roundTripperFunc) *github.Client {
+	client, err := github.New("github.com", transportCredentials{
+		client: &http.Client{Transport: transport},
+	}, github.Config{}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	return client
+}
+
+// A 404 that does not go away, for example from a token that cannot see the
+// repo, must end the retries with that error. It must not start them again.
+func TestClient_GetModifiedFilesPermanentNotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for the full retry backoff, about 26 seconds")
+	}
+	t.Parallel()
+
+	calls := 0
+	client := newTransportClient(t, func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/repos/owner/repo/pulls/1/files" {
+			t.Fatalf("unexpected request path %q", req.URL.Path)
+		}
+		calls++
+		if calls > 5 {
+			// Past the last attempt, answer so that a loop that never ends
+			// stops here, and the test fails instead of hanging.
+			return jsonResponse(req, http.StatusOK, `[]`, nil), nil
+		}
+		return jsonResponse(req, http.StatusNotFound, notFoundBody, nil), nil
+	})
+
+	_, err := client.GetModifiedFiles(
+		logging.NewNoopLogger(t),
+		models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"},
+		models.PullRequest{Num: 1},
+	)
+
+	Equals(t, 5, calls)
+	var ghErr *gogithub.ErrorResponse
+	Assert(t, errors.As(err, &ghErr), "want the 404 from GitHub, got %v", err)
+	Equals(t, http.StatusNotFound, ghErr.Response.StatusCode)
+}
+
+// A 404 that clears must not fail a later page.
+func TestClient_GetModifiedFilesNotFoundThenNextPage(t *testing.T) {
+	var requests []string
+	client := newTransportClient(t, func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.URL.RequestURI())
+		switch {
+		case req.URL.RequestURI() == "/repos/owner/repo/pulls/1/files?page=2&per_page=300":
+			return jsonResponse(req, http.StatusOK, `[{"filename": "file2.txt", "status": "added"}]`, nil), nil
+		case len(requests) > 1:
+			next := http.Header{"Link": []string{`<https://api.github.com/repos/owner/repo/pulls/1/files?page=2&per_page=300>; rel="next"`}}
+			return jsonResponse(req, http.StatusOK, `[{"filename": "file1.txt", "status": "added"}]`, next), nil
+		default:
+			return jsonResponse(req, http.StatusNotFound, notFoundBody, nil), nil
+		}
+	})
+
+	files, err := client.GetModifiedFiles(
+		logging.NewNoopLogger(t),
+		models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"},
+		models.PullRequest{Num: 1},
+	)
+
+	Ok(t, err)
+	Equals(t, []string{"file1.txt", "file2.txt"}, files)
+	Equals(t, []string{
+		"/repos/owner/repo/pulls/1/files?per_page=300",
+		"/repos/owner/repo/pulls/1/files?per_page=300",
+		"/repos/owner/repo/pulls/1/files?page=2&per_page=300",
+	}, requests)
+}
+
+// A 404 that does not go away must end GetPullRequest with that error. It
+// must not return no pull request and no error, because callers then read
+// fields of a nil pull request.
+func TestClient_GetPullRequestPermanentNotFound(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for the full retry backoff, about 26 seconds")
+	}
+	t.Parallel()
+
+	calls := 0
+	client := newTransportClient(t, func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/repos/owner/repo/pulls/1" {
+			t.Fatalf("unexpected request path %q", req.URL.Path)
+		}
+		calls++
+		return jsonResponse(req, http.StatusNotFound, notFoundBody, nil), nil
+	})
+
+	pull, err := client.GetPullRequest(
+		logging.NewNoopLogger(t),
+		models.Repo{FullName: "owner/repo", Owner: "owner", Name: "repo"},
+		1,
+	)
+
+	Equals(t, 5, calls)
+	Assert(t, pull == nil, "want no pull request, got %v", pull)
+	var ghErr *gogithub.ErrorResponse
+	Assert(t, errors.As(err, &ghErr), "want the 404 from GitHub, got %v", err)
+	Equals(t, http.StatusNotFound, ghErr.Response.StatusCode)
 }
 
 // GetTeamNamesForUser returns a list of team names for a user.

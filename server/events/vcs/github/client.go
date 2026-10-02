@@ -184,6 +184,7 @@ listloop:
 		// up to 5 times for each page with exponential backoff.
 		maxAttempts := 5
 		attemptDelay := 0 * time.Second
+		var notFoundErr error
 		for i := range maxAttempts {
 			// First don't sleep, then sleep 1, 3, 7, etc.
 			time.Sleep(attemptDelay)
@@ -197,11 +198,13 @@ listloop:
 				ghErr, ok := err.(*github.ErrorResponse)
 				if ok && ghErr.Response != nil && ghErr.Response.StatusCode == 404 {
 					// (hopefully) transient 404, retry after backoff
+					notFoundErr = err
 					continue
 				}
 				// something else, give up
 				return files, err
 			}
+			notFoundErr = nil
 			for _, f := range pageFiles {
 				files = append(files, f.GetFilename())
 
@@ -216,6 +219,11 @@ listloop:
 			}
 			nextPage = resp.NextPage
 			break
+		}
+		// Every attempt returned a 404, so the 404 is not transient. Without
+		// this return, the outer loop would retry the same page forever.
+		if notFoundErr != nil {
+			return files, fmt.Errorf("listing modified files of pull request %d: still not found after %d attempts: %w", pull.Num, maxAttempts, notFoundErr)
 		}
 	}
 	return files, nil
@@ -948,6 +956,7 @@ func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 	logger.Debug("Getting GitHub pull request %d", num)
 	var err error
 	var pull *github.PullRequest
+	var resp *github.Response
 
 	// GitHub has started to return 404's here (#1019) even after they send the webhook.
 	// They've got some eventual consistency issues going on so we're just going
@@ -959,7 +968,8 @@ func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 		time.Sleep(attemptDelay)
 		attemptDelay = 2*attemptDelay + 1*time.Second
 
-		pull, resp, err := g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
+		// Plain assignment, so that the return after the loop sees the last 404.
+		pull, resp, err = g.client.PullRequests.Get(g.ctx, repo.Owner, repo.Name, num)
 		if resp != nil {
 			logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, num, resp.StatusCode)
 		}
