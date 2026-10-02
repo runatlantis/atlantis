@@ -69,7 +69,7 @@ require (
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/ProtonMail/go-crypto v1.4.1 // indirect
+	github.com/ProtonMail/go-crypto v1.5.2 // indirect
 	github.com/ProtonMail/go-mime v0.0.0-20230322103455-7d82a3887f2f // indirect
 	github.com/ProtonMail/gopenpgp/v2 v2.7.5 // indirect
 	github.com/alecthomas/kingpin/v2 v2.3.2 // indirect
@@ -171,3 +171,9 @@ tool (
 	github.com/petergtz/pegomock/v4/pegomock
 	go.uber.org/mock/mockgen
 )
+
+// Pin to local hc-install until a release includes Versions.ApiBaseURL and
+// HTTPClient passthrough (hashicorp/hc-install#364) used for --tf-download-url
+// version listing and --tf-download-username/-password/-token. Remove after
+// upgrading to that version.
+replace github.com/hashicorp/hc-install => ../hc-install
