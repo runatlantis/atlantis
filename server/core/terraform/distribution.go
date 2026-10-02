@@ -30,7 +30,8 @@ type APIAuth struct {
 // are never sent to any other host.
 //
 // It returns nil when no credentials are configured, or no mirror host can be
-// determined, so that hc-install falls back to its default client.
+// determined, so that hc-install falls back to its default client unmodified
+// (no Transport override, and hence no related overhead).
 func newMirrorHTTPClient(mirrorURL string, auth APIAuth) *http.Client {
 	if auth.BearerToken == "" && auth.Username == "" {
 		return nil
@@ -41,32 +42,56 @@ func newMirrorHTTPClient(mirrorURL string, auth APIAuth) *http.Client {
 	}
 
 	client := httpclient.New()
-	client.Transport = &apiAuthRoundTripper{
-		host:  u.Host,
-		auth:  auth,
-		inner: client.Transport,
+	switch {
+	case auth.BearerToken != "":
+		client.Transport = &bearerTokenRoundTripper{
+			host:  u.Host,
+			token: auth.BearerToken,
+			inner: client.Transport,
+		}
+	case auth.Username != "":
+		client.Transport = &basicAuthRoundTripper{
+			host:     u.Host,
+			username: auth.Username,
+			password: auth.Password,
+			inner:    client.Transport,
+		}
 	}
 	return client
 }
 
-type apiAuthRoundTripper struct {
+// bearerTokenRoundTripper injects a bearer token into requests made to host.
+type bearerTokenRoundTripper struct {
 	host  string
-	auth  APIAuth
+	token string
 	inner http.RoundTripper
 }
 
-func (rt *apiAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rt *bearerTokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Host != rt.host {
 		return rt.inner.RoundTrip(req)
 	}
 
 	req = req.Clone(req.Context())
-	switch {
-	case rt.auth.BearerToken != "":
-		req.Header.Set("Authorization", "Bearer "+rt.auth.BearerToken)
-	case rt.auth.Username != "":
-		req.SetBasicAuth(rt.auth.Username, rt.auth.Password)
+	req.Header.Set("Authorization", "Bearer "+rt.token)
+	return rt.inner.RoundTrip(req)
+}
+
+// basicAuthRoundTripper injects HTTP basic auth into requests made to host.
+type basicAuthRoundTripper struct {
+	host     string
+	username string
+	password string
+	inner    http.RoundTripper
+}
+
+func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Host != rt.host {
+		return rt.inner.RoundTrip(req)
 	}
+
+	req = req.Clone(req.Context())
+	req.SetBasicAuth(rt.username, rt.password)
 	return rt.inner.RoundTrip(req)
 }
 
