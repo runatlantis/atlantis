@@ -298,7 +298,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 				return
 			}
 		}
-		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
+		// Merge method precedence: the --auto-merge-method comment flag wins,
+		// then the repo's atlantis.yaml automerge_method, then the
+		// --automerge-method server default (applied inside automerge).
+		autoMergeMethod := cmd.AutoMergeMethod
+		if autoMergeMethod == "" {
+			autoMergeMethod = a.autoMerger.repoAutoMergeMethod(projectCmds)
+		}
+		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), autoMergeMethod)
 	}
 }
 

@@ -18,6 +18,7 @@ import (
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -345,9 +346,35 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 }
 
 // MergePull merges the pull request.
-func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, _ models.PullRequestOptions) error {
+func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest, pullOptions models.PullRequestOptions) error {
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/merge", b.BaseURL, pull.BaseRepo.FullName, pull.Num)
-	_, err := b.makeRequest("POST", path, nil)
+
+	// Translate the normalised merge method onto a Bitbucket merge strategy. An
+	// empty method sends no body so Bitbucket uses the repository default.
+	var strategy string
+	switch pullOptions.MergeMethod {
+	case "":
+	case models.MergeMethodMerge:
+		strategy = "merge_commit"
+	case models.MergeMethodSquash:
+		strategy = "squash"
+	case models.MergeMethodFastForward:
+		strategy = "fast_forward"
+	default:
+		return fmt.Errorf("merge method %q is not supported for Bitbucket Cloud, supported methods are: %s",
+			pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.BitbucketCloud)))
+	}
+
+	var body io.Reader
+	if strategy != "" {
+		bodyBytes, err := json.Marshal(map[string]string{"merge_strategy": strategy})
+		if err != nil {
+			return fmt.Errorf("json encoding: %w", err)
+		}
+		body = bytes.NewBuffer(bodyBytes)
+	}
+
+	_, err := b.makeRequest("POST", path, body)
 	return err
 }
 

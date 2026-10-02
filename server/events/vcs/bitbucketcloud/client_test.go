@@ -4,7 +4,9 @@
 package bitbucketcloud_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -558,6 +560,76 @@ func TestClient_GetComment(t *testing.T) {
 	Equals(t, len(v), 5)
 	exp := "Plan"
 	Assert(t, strings.Contains(v[1].Content.Raw, exp), "Comment should contain word \"%s\", has \"%s\"", exp, v[1].Content.Raw)
+}
+
+func TestClient_MergePull(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	repo := models.Repo{
+		FullName: "myorg/myrepo",
+		Owner:    "myorg",
+		Name:     "myrepo",
+		VCSHost:  models.VCSHost{Type: models.BitbucketCloud, Hostname: "bitbucket.org"},
+	}
+	pull := models.PullRequest{Num: 5, BaseRepo: repo}
+	const mergeURI = "/2.0/repositories/myorg/myrepo/pullrequests/5/merge"
+
+	t.Run("translates the normalised merge method to a merge_strategy", func(t *testing.T) {
+		var gotStrategy string
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.RequestURI != mergeURI {
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			var body map[string]string
+			Ok(t, json.NewDecoder(r.Body).Decode(&body))
+			gotStrategy = body["merge_strategy"]
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+		client.BaseURL = testServer.URL
+		err := client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: models.MergeMethodFastForward})
+		Ok(t, err)
+		Equals(t, "fast_forward", gotStrategy)
+	})
+
+	t.Run("sends no body so Bitbucket uses its default when no method is requested", func(t *testing.T) {
+		var gotBody string
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.RequestURI != mergeURI {
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+		client.BaseURL = testServer.URL
+		err := client.MergePull(logger, pull, models.PullRequestOptions{})
+		Ok(t, err)
+		Equals(t, "", gotBody)
+	})
+
+	t.Run("rejects an unsupported merge method without calling the API", func(t *testing.T) {
+		called := false
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer testServer.Close()
+
+		client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+		client.BaseURL = testServer.URL
+		err := client.MergePull(logger, pull, models.PullRequestOptions{MergeMethod: models.MergeMethodRebase})
+		Assert(t, err != nil, "expected an error for an unsupported merge method")
+		Assert(t, !called, "the merge API should not be called for an unsupported method")
+	})
 }
 
 func TestClient_DeleteComment(t *testing.T) {
