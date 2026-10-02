@@ -1995,6 +1995,87 @@ func TestRunCommentCommand_DisableAutoplanLabel_PullNotLabeled(t *testing.T) {
 	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
 }
 
+func TestRunCommentCommand_EnableAutoplanLabel(t *testing.T) {
+	t.Log("if autoplan is disabled globally and \"EnableAutoplanLabel\" is present and pull request has that label, auto plans run")
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
+	ch.DisableAutoplan = true
+	ch.EnableAutoplanLabel = "enable-auto-plan"
+	defer func() {
+		ch.DisableAutoplan = false
+		ch.EnableAutoplanLabel = ""
+	}()
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+			},
+			{
+				CommandName: command.Plan,
+			},
+		}, nil)
+	When(ch.VCSClient.GetPullLabels(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn([]string{"enable-auto-plan", "need-help"}, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	projectCommandBuilder.VerifyWasCalled(Once()).BuildAutoplanCommands(Any[*command.Context]())
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+}
+
+func TestRunCommentCommand_EnableAutoplanLabel_PullNotLabeled(t *testing.T) {
+	t.Log("if autoplan is disabled globally and \"EnableAutoplanLabel\" is present but pull request doesn't have that label, auto plans are disabled")
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
+	ch.DisableAutoplan = true
+	ch.EnableAutoplanLabel = "enable-auto-plan"
+	defer func() {
+		ch.DisableAutoplan = false
+		ch.EnableAutoplanLabel = ""
+	}()
+
+	When(ch.VCSClient.GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))).ThenReturn(nil, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
+	vcsClient.VerifyWasCalledOnce().GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+}
+
+func TestRunCommentCommand_EnableAutoplanLabel_NotSet(t *testing.T) {
+	t.Log("if autoplan is disabled globally and \"EnableAutoplanLabel\" is not configured, auto plans are disabled")
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
+	ch.DisableAutoplan = true
+	defer func() { ch.DisableAutoplan = false }()
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
+	vcsClient.VerifyWasCalled(Never()).GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+}
+
+func TestRunCommentCommand_EnableAutoplanLabel_AutoplanNotDisabled(t *testing.T) {
+	t.Log("if autoplan is not disabled globally, \"EnableAutoplanLabel\" has no effect and auto plans run without checking labels")
+	vcsClient := setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, BaseBranch: "main"}
+
+	ch.EnableAutoplanLabel = "enable-auto-plan"
+	defer func() { ch.EnableAutoplanLabel = "" }()
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName: command.Plan,
+			},
+		}, nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	projectCommandBuilder.VerifyWasCalled(Once()).BuildAutoplanCommands(Any[*command.Context]())
+	vcsClient.VerifyWasCalled(Never()).GetPullLabels(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull))
+}
+
 func TestRunCommentCommand_ClosedPull(t *testing.T) {
 	t.Log("if a command is run on a closed pull request atlantis should" +
 		" comment saying that this is not allowed")
