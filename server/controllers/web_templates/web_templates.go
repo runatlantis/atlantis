@@ -40,14 +40,15 @@ type TemplateWriter interface {
 
 // LockIndexData holds the fields needed to display the index view for locks.
 type LockIndexData struct {
-	LockPath      string
-	RepoFullName  string
-	PullNum       int
-	Path          string
-	Workspace     string
-	LockedBy      string
-	Time          time.Time
-	TimeFormatted string
+	LockPath       string
+	RepoFullName   string
+	PullNum        int
+	PullRequestURL string
+	Path           string
+	Workspace      string
+	LockedBy       string
+	Time           time.Time
+	TimeFormatted  string
 }
 
 // ApplyLockData holds the fields to display in the index view

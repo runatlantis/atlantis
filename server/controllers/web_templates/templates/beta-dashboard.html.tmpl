@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pull requests · Atlantis</title>
+  <link rel="icon" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/beta-dashboard.css">
+</head>
+<body>
+{{ $basePath := .CleanedBasePath }}
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="dashboard">
+  <aside class="sidebar">
+    <a class="brand" href="{{ .CleanedBasePath }}/beta" aria-label="Atlantis home">
+      <img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png" width="32" height="32" alt="">
+      <span>atlantis</span>
+    </a>
+    <nav aria-label="Dashboard">
+      <p class="nav-label">Workspace</p>
+      <a class="nav-link" href="#pull-requests" aria-current="location">Pull requests <span id="pull-count">{{ .Total }}</span></a>
+      <a class="nav-link" href="#locks">Locks <span id="lock-count">{{ len .Locks }}</span></a>
+      {{ if .ApplyLock.GlobalApplyLockEnabled }}
+      <p class="nav-label">General</p>
+      <a class="nav-link" href="#apply-controls">Apply controls</a>
+      {{ end }}
+    </nav>
+    <div class="sidebar-footer"><span class="connection-dot" aria-hidden="true"></span>Atlantis <span class="version">{{ .AtlantisVersion }}</span></div>
+  </aside>
+  <main id="main">
+    <header class="page-header">
+      <div><p class="eyebrow">Dashboard · Beta</p><h1>Pull requests</h1></div>
+      <a class="text-link" href="{{ .CleanedBasePath }}/?view=classic">Classic dashboard</a>
+    </header>
+    <form class="dashboard-filters" id="dashboard-filters" aria-label="Filter dashboard" hidden>
+      <div class="search-field">
+        <label for="metadata-search">Search</label>
+        <input type="search" id="metadata-search" placeholder="Search repos, workspaces, or users" aria-describedby="search-help" autocomplete="off">
+      </div>
+      <div class="filter-field"><label for="repo-filter">Repository</label><select id="repo-filter"><option value="">All repositories</option></select></div>
+      <div class="filter-field"><label for="workspace-filter">Workspace</label><select id="workspace-filter"><option value="">All workspaces</option></select></div>
+      <div class="filter-field"><label for="user-filter">User</label><select id="user-filter"><option value="">All users</option></select></div>
+      <button type="reset" id="clear-filters" disabled>Clear filters</button>
+      <p id="search-help">Partial names and abbreviations work. Combine terms with spaces. Users are known lock owners; some jobs have no user metadata.</p>
+      <p id="filter-results" role="status" aria-live="polite"></p>
+    </form>
+    <section id="pull-requests" aria-labelledby="pull-heading">
+      <div class="section-header"><h2 id="pull-heading">Pull requests</h2><p>Grouped by repository and workspace</p></div>
+      <p class="data-note">Tracked jobs and locks only. Operation results are not available in this beta.</p>
+      {{ range .Repositories }}
+      {{ $repo := .Name }}
+      <details class="repository" open>
+        <summary>{{ if .Name }}{{ .Name }}{{ else }}Repository unavailable{{ end }}<span class="repo-type">Repository</span></summary>
+        {{ range .Workspaces }}
+        {{ $workspace := .Name }}
+        <div class="workspace">
+          <h3>Workspace <code>{{ if .Name }}{{ .Name }}{{ else }}Workspace unavailable{{ end }}</code><span class="workspace-count">{{ len .Pulls }} entr{{ if eq (len .Pulls) 1 }}y{{ else }}ies{{ end }}</span></h3>
+          <ul class="pull-list">
+            {{ range .Pulls }}
+            <li class="pull-row" data-repo="{{ $repo }}" data-workspace="{{ $workspace }}" data-user="{{ .Author }}" data-request-id="{{ .ID }}">
+              <div class="pull-description">
+                <h4 class="pull-title">{{ if gt .Number 0 }}{{ if .URL }}<a href="{{ .URL }}">Pull / merge request <span class="pull-number">#{{ .Number }}</span></a>{{ else }}Pull / merge request <span class="pull-number">#{{ .Number }}</span>{{ end }}{{ else }}Workflow hooks{{ end }}</h4>
+                <p>{{ if .Author }}{{ .Author }}{{ else }}User unavailable{{ end }}</p>
+                {{ range .Projects }}
+                <div class="project-jobs">
+                  <p>{{ if .Name }}{{ .Name }} <span aria-hidden="true">·</span> {{ end }}<code>{{ if .Path }}{{ .Path }}{{ else }}Project path unavailable{{ end }}</code></p>
+                  <ul class="job-links">
+                  {{ range .Jobs }}
+                    <li><a href="{{ $basePath }}{{ .JobIDUrl }}">{{ if .JobDescription }}{{ .JobDescription }}{{ else if .JobStep }}{{ .JobStep }}{{ else }}View job output{{ end }}</a>{{ if .JobStep }} <span class="step">{{ .JobStep }}</span>{{ end }}{{ if .TimeFormatted }} <time>{{ .TimeFormatted }}</time>{{ end }}</li>
+                  {{ else }}
+                    <li class="data-note">No retained job output.</li>
+                  {{ end }}
+                  </ul>
+                </div>
+                {{ end }}
+              </div>
+            </li>
+            {{ end }}
+          </ul>
+        </div>
+        {{ end }}
+      </details>
+      {{ else }}
+      <div class="empty-state"><h3>No pull requests</h3><p>Pull requests appear here when Atlantis processes a plan or apply.</p></div>
+      {{ end }}
+      <div class="empty-state" id="no-pull-matches" hidden><h3>No matching pull requests</h3><p>Try another search or clear the filters above.</p></div>
+    </section>
+    <section id="locks" aria-labelledby="locks-heading">
+      <div class="section-header"><h2 id="locks-heading">Locks</h2><p>Projects with a reserved plan</p></div>
+      <ul class="lock-list">
+      {{ range .Locks }}
+        <li data-repo="{{ .RepoFullName }}" data-workspace="{{ .Workspace }}" data-user="{{ .LockedBy }}">
+          <div class="lock-description">
+            <a href="{{ $basePath }}{{ .LockPath }}" title="View project lock"><strong>{{ .RepoFullName }} <span class="pull-number">#{{ .PullNum }}</span></strong><span><code>{{ .Path }}</code> <span aria-hidden="true">·</span> {{ .Workspace }} <span aria-hidden="true">·</span> {{ .LockedBy }}</span></a>
+            {{ if and .PullRequestURL (gt .PullNum 0) }}<a class="lock-request-link" href="{{ .PullRequestURL }}">Open pull / merge request #{{ .PullNum }}</a>{{ end }}
+          </div>
+          <span class="lock-label">Locked</span>
+        </li>
+      {{ else }}
+        <li class="empty-state">No locks found.</li>
+      {{ end }}
+      </ul>
+      <div class="empty-state" id="no-lock-matches" hidden><h3>No matching locks</h3><p>Try another search or clear the filters above.</p></div>
+    </section>
+    {{ if .ApplyLock.GlobalApplyLockEnabled }}
+    <section id="apply-controls" aria-labelledby="apply-heading">
+      <div class="section-header"><h2 id="apply-heading">Apply controls</h2><p>Global controls for apply commands</p></div>
+      <div class="apply-panel">
+        <div><h3>Apply commands are {{ if .ApplyLock.Locked }}disabled{{ else }}enabled{{ end }}</h3><p>{{ if .ApplyLock.Locked }}The global apply lock is active.{{ else }}Apply commands can run when project requirements are met.{{ end }}</p></div>
+        <button type="button" id="apply-toggle" data-locked="{{ .ApplyLock.Locked }}" data-endpoint="{{ .CleanedBasePath }}/apply/{{ if .ApplyLock.Locked }}unlock{{ else }}lock{{ end }}">{{ if .ApplyLock.Locked }}Enable{{ else }}Disable{{ end }} apply commands</button>
+      </div>
+    </section>
+    {{ end }}
+    <footer>Atlantis beta dashboard · Existing workflows and permissions are unchanged.</footer>
+  </main>
+</div>
+{{ if .ApplyLock.GlobalApplyLockEnabled }}
+<dialog id="apply-dialog" aria-labelledby="dialog-heading">
+  <form method="dialog">
+    <h2 id="dialog-heading">{{ if .ApplyLock.Locked }}Enable{{ else }}Disable{{ end }} apply commands?</h2>
+    <p>{{ if .ApplyLock.Locked }}This releases the global apply lock.{{ else }}This creates a global lock and prevents apply commands from running.{{ end }}</p>
+    <p id="apply-error" role="alert" hidden>Could not update the apply lock. Please try again.</p>
+    <div class="dialog-actions"><button value="cancel" autofocus>Cancel</button><button type="button" class="button-primary" id="apply-confirm">{{ if .ApplyLock.Locked }}Enable{{ else }}Disable{{ end }} applies</button></div>
+  </form>
+</dialog>
+{{ end }}
+<script src="{{ .CleanedBasePath }}/static/js/beta-dashboard-filters.js"></script>
+<script>
+  const navigation = document.querySelectorAll('.nav-link');
+  function updateNavigation() {
+    const current = window.location.hash || '#pull-requests';
+    navigation.forEach(link => {
+      if (link.getAttribute('href') === current) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  }
+  window.addEventListener('hashchange', updateNavigation);
+  updateNavigation();
+  const dialog = document.getElementById('apply-dialog');
+  const toggle = document.getElementById('apply-toggle');
+  if (toggle && dialog) {
+  toggle.addEventListener('click', () => {
+    document.getElementById('apply-error').hidden = true;
+    document.getElementById('apply-confirm').disabled = false;
+    dialog.showModal();
+  });
+  document.getElementById('apply-confirm').addEventListener('click', async function () {
+    this.disabled = true;
+    const locked = toggle.dataset.locked === 'true';
+    try {
+      const response = await fetch(toggle.dataset.endpoint, { method: locked ? 'DELETE' : 'POST' });
+      if (!response.ok) throw new Error('Apply lock request failed');
+      window.location.reload();
+    } catch (error) {
+      document.getElementById('apply-error').hidden = false;
+      this.disabled = false;
+    }
+  });
+  }
+</script>
+</body>
+</html>
