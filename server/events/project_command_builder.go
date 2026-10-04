@@ -433,6 +433,10 @@ func (p *DefaultProjectCommandBuilder) shouldSkipClone(ctx *command.Context, mod
 	}
 	// We can only skip if we determine that none of the modified files belong to projects configured in a repo config
 	if !hasRepoCfg {
+		if !hasModifiedAutoplanFiles(ctx.Log, modifiedFiles, p.AutoplanFileList) {
+			ctx.Log.Info("skipping repo clone since no autoplan files were modified")
+			return true, nil
+		}
 		return false, nil
 	}
 	repoCfg, err := p.ParserValidator.ParseRepoCfgData(repoCfgData, p.GlobalCfg, ctx.Pull.BaseRepo.ID(), ctx.Pull.BaseBranch)
