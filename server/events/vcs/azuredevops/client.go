@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -190,7 +192,7 @@ func (g *Client) DiscardReviews(logger logging.SimpleLogging, repo models.Repo, 
 }
 
 // PullIsMergeable returns true if the merge request can be merged.
-func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) { //nolint: revive
+func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsStatusName string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	owner, project, repoName := SplitAzureDevopsRepoFullName(repo.FullName)
 
 	opts := azuredevops.PullRequestGetOptions{IncludeWorkItemRefs: true}
@@ -229,13 +231,24 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		}
 
-		// Ignore the Atlantis status, even if its set as a blocker.
-		// This status should not be considered when evaluating if the pull request can be applied.
-		settings := (policyEvaluation.Configuration.Settings).(map[string]any)
-		if genre, ok := settings["statusGenre"]; ok && genre == "Atlantis Bot/atlantis" {
-			if name, ok := settings["statusName"]; ok && name == "apply" {
-				continue
-			}
+		// Always ignore Atlantis' own apply status, even if it is set as a blocker:
+		// it must not gate the very apply that would satisfy it. Atlantis posts this
+		// status with the configured VCS status name, so the genre is
+		// "Atlantis Bot/<vcs-status-name>" and the name is "apply".
+		genre, name := "", ""
+		if settings, ok := policyEvaluation.Configuration.Settings.(map[string]any); ok {
+			genre, _ = settings["statusGenre"].(string)
+			name, _ = settings["statusName"].(string)
+		}
+		if genre == fmt.Sprintf("Atlantis Bot/%s", vcsStatusName) && name == command.Apply.String() {
+			continue
+		}
+
+		// Ignore operator-configured status genres/names (--ignore-vcs-status-names).
+		// This lets a blocking status-check branch policy act as a human-only merge
+		// gate that Atlantis does not treat as blocking its own apply.
+		if slices.Contains(ignoreVCSStatusNames, genre) || (name != "" && slices.Contains(ignoreVCSStatusNames, name)) {
+			continue
 		}
 
 		if *policyEvaluation.Configuration.IsBlocking && *policyEvaluation.Status != azuredevops.PolicyEvaluationApproved {
