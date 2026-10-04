@@ -64,6 +64,7 @@ section { margin-bottom: 32px; scroll-margin-top: 24px; }
 .repository summary:hover { background: #eef3f5; }
 .repo-type { float: right; font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px; }
 .workspace h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--subtle); border-top: 1px solid var(--border); color: var(--muted); font-weight: 400; font-size: 12px; }
+.workspace h3 code { min-width: 0; white-space: normal; }
 .workspace-count { margin-left: auto; font-size: 11px; }
 .pull-list, .lock-list { list-style: none; margin: 0; padding: 0; }
 .pull-row { padding: 10px 16px; margin: 0; border-bottom: 1px solid var(--border); }
