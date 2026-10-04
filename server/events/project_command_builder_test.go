@@ -4425,6 +4425,7 @@ func TestDefaultProjectCommandBuilder_SkipCloneNoChanges(t *testing.T) {
 		ExpectedGetFileContents  int
 		ModifiedFiles            []string
 		IncludeGitUntrackedFiles bool
+		AutoplanFileList         string
 	}{
 		{
 			AtlantisYAML: `
@@ -4496,6 +4497,21 @@ projects:
 			ModifiedFiles:            []string{"infra/main.tf"},
 			IncludeGitUntrackedFiles: false,
 		},
+		{
+			ExpectedCtxs:             0,
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
+			ModifiedFiles:            []string{"infra/vars.tfvars"},
+			IncludeGitUntrackedFiles: false,
+		},
+		{
+			ExpectedCtxs:             1,
+			ExpectedClones:           1,
+			ExpectedGetFileContents:  1,
+			ModifiedFiles:            []string{"README.md"},
+			IncludeGitUntrackedFiles: false,
+			AutoplanFileList:         "**/*.md",
+		},
 	}
 
 	userConfig := defaultUserConfig
@@ -4510,6 +4526,10 @@ projects:
 		When(vcsClient.GetFileContent(
 			Any[logging.SimpleLogging](), Any[models.Repo](), Any[string](), Any[string]())).ThenReturn(c.AtlantisYAML != "", []byte(c.AtlantisYAML), nil)
 		workingDir := mocks.NewMockWorkingDir()
+		autoplanFileList := userConfig.AutoplanFileList
+		if c.AutoplanFileList != "" {
+			autoplanFileList = c.AutoplanFileList
+		}
 
 		logger := logging.NewNoopLogger(t)
 
@@ -4535,7 +4555,7 @@ projects:
 			userConfig.EnableParallelPlan,
 			userConfig.EnableParallelApply,
 			userConfig.AutoDetectModuleFiles,
-			userConfig.AutoplanFileList,
+			autoplanFileList,
 			userConfig.RestrictFileList,
 			userConfig.DefaultTFDistribution,
 			userConfig.SilenceNoProjects,
