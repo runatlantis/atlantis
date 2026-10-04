@@ -549,7 +549,7 @@ If you set a workflow with the key `default`, it will override this.
 | policy_check | bool | false | no | Whether or not to run policy checks on this repository. |
 | custom_policy_check | bool | false | no | Whether or not to enable custom policy check tools outside of Conftest on this repository. |
 | autodiscover | AutoDiscover | none | no | Auto discover settings for this repo |
-| silence_pr_comments | []string | none | no | Silence PR comments from defined stages while preserving PR status checks. Useful in large environments with many Atlantis instances and/or projects, when the comments are too big and too many, therefore it is preferable to rely solely on PR status checks. Supported values are: `plan`, `apply`. |
+| silence_pr_comments | []string | none | no | Silence PR comments from defined stages while preserving PR status checks. Useful in large environments with many Atlantis instances and/or projects, when the comments are too big and too many, therefore it is preferable to rely solely on PR status checks. Supported values are: `plan`, `apply`. Failure messages, such as a project lock held by another pull request, are still posted. |
 
 :::tip Notes
 
