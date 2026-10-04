@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pull requests · Atlantis</title>
+  <title>Jobs · Atlantis</title>
   <link rel="icon" href="{{ .CleanedBasePath }}/static/images/atlantis-icon.png">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/normalize.css">
   <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/skeleton.css">
-  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/beta-dashboard.css">
+  <link rel="stylesheet" href="{{ .CleanedBasePath }}/static/css/beta-dashboard.css?v=3">
 </head>
 <body>
 {{ $basePath := .CleanedBasePath }}
@@ -16,24 +16,27 @@
   <aside class="sidebar">
     <a class="brand" href="{{ .CleanedBasePath }}/beta" aria-label="Atlantis home">
       <img src="{{ .CleanedBasePath }}/static/images/atlantis-icon.png" width="32" height="32" alt="">
-      <span>atlantis</span>
+      <span>Atlantis</span>
     </a>
     <nav aria-label="Dashboard">
       <p class="nav-label">Workspace</p>
-      <a class="nav-link" href="#pull-requests" aria-current="location">Pull requests <span id="pull-count">{{ .Total }}</span></a>
+      <a class="nav-link" href="#pull-requests" aria-current="location">Jobs <span id="pull-count">{{ .Total }}</span></a>
       <a class="nav-link" href="#locks">Locks <span id="lock-count">{{ len .Locks }}</span></a>
       {{ if .ApplyLock.GlobalApplyLockEnabled }}
       <p class="nav-label">General</p>
       <a class="nav-link" href="#apply-controls">Apply controls</a>
       {{ end }}
     </nav>
-    <div class="sidebar-footer"><span class="connection-dot" aria-hidden="true"></span>Atlantis <span class="version">{{ .AtlantisVersion }}</span></div>
+    <div class="sidebar-footer">
+      <a class="text-link" href="{{ .CleanedBasePath }}/?view=classic">Classic dashboard</a>
+      <div class="sidebar-build">
+        <div><span class="connection-dot" aria-hidden="true"></span>Atlantis</div>
+        <span class="version">{{ .AtlantisVersion }}</span>
+      </div>
+    </div>
   </aside>
   <main id="main">
-    <header class="page-header">
-      <div><p class="eyebrow">Dashboard · Beta</p><h1>Pull requests</h1></div>
-      <a class="text-link" href="{{ .CleanedBasePath }}/?view=classic">Classic dashboard</a>
-    </header>
+    <h1 class="visually-hidden">Atlantis dashboard</h1>
     <form class="dashboard-filters" id="dashboard-filters" aria-label="Filter dashboard" hidden>
       <div class="search-field">
         <label for="metadata-search">Search</label>
@@ -46,35 +49,39 @@
       <p id="search-help">Partial names and abbreviations work. Combine terms with spaces. Users are known lock owners; some jobs have no user metadata.</p>
       <p id="filter-results" role="status" aria-live="polite"></p>
     </form>
+    <div class="dashboard-content" role="region" aria-label="Dashboard results" tabindex="0">
     <section id="pull-requests" aria-labelledby="pull-heading">
-      <div class="section-header"><h2 id="pull-heading">Pull requests</h2><p>Grouped by repository and workspace</p></div>
-      <p class="data-note">Tracked jobs and locks only. Operation results are not available in this beta.</p>
+      <div class="section-header"><h2 id="pull-heading">Jobs</h2><p>Grouped by repository and workspace</p></div>
+      <p class="data-note">Tracked job output only. Lock-only projects are listed in Locks. Operation results are not available in this beta.</p>
       {{ range .Repositories }}
       {{ $repo := .Name }}
       <details class="repository" open>
         <summary>{{ if .Name }}{{ .Name }}{{ else }}Repository unavailable{{ end }}<span class="repo-type">Repository</span></summary>
         {{ range .Workspaces }}
         {{ $workspace := .Name }}
+        {{ $jobCount := .JobCount }}
         <div class="workspace">
-          <h3>Workspace <code>{{ if .Name }}{{ .Name }}{{ else }}Workspace unavailable{{ end }}</code><span class="workspace-count">{{ len .Pulls }} entr{{ if eq (len .Pulls) 1 }}y{{ else }}ies{{ end }}</span></h3>
+          <h3>Workspace <code>{{ if .Name }}{{ .Name }}{{ else }}Workspace unavailable{{ end }}</code><span class="workspace-count">{{ $jobCount }} job{{ if ne $jobCount 1 }}s{{ end }}</span></h3>
           <ul class="pull-list">
             {{ range .Pulls }}
             <li class="pull-row" data-repo="{{ $repo }}" data-workspace="{{ $workspace }}" data-user="{{ .Author }}" data-request-id="{{ .ID }}">
               <div class="pull-description">
+                <div class="request-info">
                 <h4 class="pull-title">{{ if gt .Number 0 }}{{ if .URL }}<a href="{{ .URL }}">Pull / merge request <span class="pull-number">#{{ .Number }}</span></a>{{ else }}Pull / merge request <span class="pull-number">#{{ .Number }}</span>{{ end }}{{ else }}Workflow hooks{{ end }}</h4>
                 <p>{{ if .Author }}{{ .Author }}{{ else }}User unavailable{{ end }}</p>
+                </div>
+                <div class="project-list">
                 {{ range .Projects }}
                 <div class="project-jobs">
                   <p>{{ if .Name }}{{ .Name }} <span aria-hidden="true">·</span> {{ end }}<code>{{ if .Path }}{{ .Path }}{{ else }}Project path unavailable{{ end }}</code></p>
                   <ul class="job-links">
                   {{ range .Jobs }}
-                    <li><a href="{{ $basePath }}{{ .JobIDUrl }}">{{ if .JobDescription }}{{ .JobDescription }}{{ else if .JobStep }}{{ .JobStep }}{{ else }}View job output{{ end }}</a>{{ if .JobStep }} <span class="step">{{ .JobStep }}</span>{{ end }}{{ if .TimeFormatted }} <time>{{ .TimeFormatted }}</time>{{ end }}</li>
-                  {{ else }}
-                    <li class="data-note">No retained job output.</li>
+                    <li class="job-link"><span class="job-description"><a href="{{ $basePath }}{{ .JobIDUrl }}">{{ if .JobDescription }}{{ .JobDescription }}{{ else if .JobStep }}{{ .JobStep }}{{ else }}View job output{{ end }}</a>{{ if and .JobStep .JobDescription (ne .JobDescription .JobStep) }} <span class="step">{{ .JobStep }}</span>{{ end }}</span>{{ if .TimeFormatted }} <time>{{ .TimeFormatted }}</time>{{ end }}</li>
                   {{ end }}
                   </ul>
                 </div>
                 {{ end }}
+                </div>
               </div>
             </li>
             {{ end }}
@@ -83,9 +90,9 @@
         {{ end }}
       </details>
       {{ else }}
-      <div class="empty-state"><h3>No pull requests</h3><p>Pull requests appear here when Atlantis processes a plan or apply.</p></div>
+      <div class="empty-state"><h3>No jobs</h3><p>Jobs appear here when Atlantis processes a plan or apply. Active locks remain in Locks.</p></div>
       {{ end }}
-      <div class="empty-state" id="no-pull-matches" hidden><h3>No matching pull requests</h3><p>Try another search or clear the filters above.</p></div>
+      <div class="empty-state" id="no-pull-matches" hidden><h3>No matching jobs</h3><p>Try another search or clear the filters above.</p></div>
     </section>
     <section id="locks" aria-labelledby="locks-heading">
       <div class="section-header"><h2 id="locks-heading">Locks</h2><p>Projects with a reserved plan</p></div>
@@ -93,7 +100,7 @@
       {{ range .Locks }}
         <li data-repo="{{ .RepoFullName }}" data-workspace="{{ .Workspace }}" data-user="{{ .LockedBy }}">
           <div class="lock-description">
-            <a href="{{ $basePath }}{{ .LockPath }}" title="View project lock"><strong>{{ .RepoFullName }} <span class="pull-number">#{{ .PullNum }}</span></strong><span><code>{{ .Path }}</code> <span aria-hidden="true">·</span> {{ .Workspace }} <span aria-hidden="true">·</span> {{ .LockedBy }}</span></a>
+            <a class="lock-detail-link" href="{{ $basePath }}{{ .LockPath }}" title="View project lock"><strong>{{ .RepoFullName }} <span class="pull-number">#{{ .PullNum }}</span></strong><span><code>{{ .Path }}</code> <span aria-hidden="true">·</span> {{ .Workspace }} <span aria-hidden="true">·</span> {{ .LockedBy }}</span></a>
             {{ if and .PullRequestURL (gt .PullNum 0) }}<a class="lock-request-link" href="{{ .PullRequestURL }}">Open pull / merge request #{{ .PullNum }}</a>{{ end }}
           </div>
           <span class="lock-label">Locked</span>
@@ -114,6 +121,7 @@
     </section>
     {{ end }}
     <footer>Atlantis beta dashboard · Existing workflows and permissions are unchanged.</footer>
+    </div>
   </main>
 </div>
 {{ if .ApplyLock.GlobalApplyLockEnabled }}
@@ -126,7 +134,7 @@
   </form>
 </dialog>
 {{ end }}
-<script src="{{ .CleanedBasePath }}/static/js/beta-dashboard-filters.js"></script>
+<script src="{{ .CleanedBasePath }}/static/js/beta-dashboard-filters.js?v=2"></script>
 <script>
   const navigation = document.querySelectorAll('.nav-link');
   function updateNavigation() {
@@ -135,8 +143,20 @@
       if (link.getAttribute('href') === current) link.setAttribute('aria-current', 'location');
       else link.removeAttribute('aria-current');
     });
+    // The apply panel can be taller than the results viewport on short screens.
+    // Reveal its action rather than leaving it below the section's heading.
+    const target = document.getElementById(current === '#apply-controls' ? 'apply-toggle' : current.slice(1));
+    if (target) target.scrollIntoView({ block: current === '#apply-controls' ? 'nearest' : 'start' });
   }
+  navigation.forEach(link => link.addEventListener('click', event => {
+    // Clicking the current section again does not emit a hashchange event.
+    if (link.getAttribute('href') === window.location.hash && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      updateNavigation();
+    }
+  }));
   window.addEventListener('hashchange', updateNavigation);
+  window.addEventListener('load', updateNavigation);
   updateNavigation();
   const dialog = document.getElementById('apply-dialog');
   const toggle = document.getElementById('apply-toggle');

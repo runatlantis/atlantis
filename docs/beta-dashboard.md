@@ -4,16 +4,35 @@ Use **Try the beta dashboard** on the classic Atlantis dashboard, or visit
 `<atlantis-url>/beta`. The classic dashboard remains available at `/` and the
 beta includes a link back to it. No new server flag or frontend build is needed.
 
-The beta groups tracked pull/merge requests by repository and workspace, with
-project job output and active locks. It does not enumerate all open VCS requests.
+The Jobs section groups tracked output by repository, workspace, and PR/MR.
+Lock-only projects appear exclusively in Locks, with their owner and management
+links. Locks may supply known owner and PR/MR metadata for existing Jobs entries,
+but never create them. Empty job mappings are omitted. The beta does not enumerate
+all open VCS requests.
 Requests with missing workspace metadata, including workflow hooks, are kept
 in an explicitly unavailable workspace group rather than assigned to `default`.
 
 Search supports partial names and segment-anchored abbreviations across
 repositories, workspaces and known lock owners. Space-separated terms and exact
 dropdown filters combine with AND. User metadata may be unavailable for jobs
-without locks. Request counts are unique by repository and request number,
-even when a request appears in several workspaces.
+without locks. The Jobs badge, filter summary, and workspace counts reflect
+individual tracked jobs, including workflow hooks, rather than request counts.
+Job output is held in memory; after a restart, Jobs may be empty while persisted
+Locks remain visible. This does not discard locks or plans.
+
+Navigation and search/filter controls stay within the viewport while the results
+scroll independently. The results region is keyboard-focusable. On short screens,
+the filter panel can scroll separately so controls remain reachable without
+covering the results.
+Job and lock rows use horizontal space for their details, wrapping on
+narrow screens. Repeated operation labels are omitted; each output link and its
+timestamp remain available. Section navigation scrolls
+the results panel; Apply controls brings its enable/disable button into view,
+including when the panel is too short to show the entire section.
+On desktop, the Atlantis version and build information stays in a separate
+sidebar footer while navigation scrolls. The Classic dashboard link sits above
+the build information, rather than in a page header. It remains available on
+mobile, where only the build information is hidden.
 
 Request headings use the stored PR/MR URL when available. Lock rows retain their
 project-lock detail link and offer a separate PR/MR link. No provider URL guessing

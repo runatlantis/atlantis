@@ -40,7 +40,7 @@
     });
   }
 
-  const requestCount = entries => new Set(entries.map(row => row.dataset.requestId).filter(Boolean)).size;
+  const jobCount = entries => entries.reduce((count, row) => count + row.querySelectorAll('.job-link').length, 0);
 
   function applyFilters() {
     const terms = normalize(search.value).trim().split(/\s+/).filter(Boolean);
@@ -55,9 +55,9 @@
 
     repositories.forEach(repo => {
       repo.querySelectorAll('.workspace').forEach(workspace => {
-        const count = [...workspace.querySelectorAll('.pull-row')].filter(row => !row.hidden).length;
+        const count = jobCount([...workspace.querySelectorAll('.pull-row')].filter(row => !row.hidden));
         workspace.hidden = count === 0;
-        workspace.querySelector('.workspace-count').textContent = `${count} entr${count === 1 ? 'y' : 'ies'}`;
+        workspace.querySelector('.workspace-count').textContent = `${count} job${count === 1 ? '' : 's'}`;
       });
       repo.hidden = ![...repo.querySelectorAll('.workspace')].some(workspace => !workspace.hidden);
       if (active && !repo.hidden) repo.open = true;
@@ -66,15 +66,13 @@
 
     const visiblePulls = pulls.filter(row => !row.hidden);
     const visibleLocks = locks.filter(row => !row.hidden);
-    document.getElementById('pull-count').textContent = requestCount(visiblePulls);
+    document.getElementById('pull-count').textContent = jobCount(visiblePulls);
     document.getElementById('lock-count').textContent = visibleLocks.length;
     document.getElementById('no-pull-matches').hidden = pulls.length === 0 || visiblePulls.length > 0;
     document.getElementById('no-lock-matches').hidden = locks.length === 0 || visibleLocks.length > 0;
     document.querySelector('.lock-list').hidden = locks.length > 0 && visibleLocks.length === 0;
     document.getElementById('clear-filters').disabled = !active;
-    const hookGroups = pulls.filter(row => !row.dataset.requestId);
-    const hookSummary = hookGroups.length ? ` and ${hookGroups.filter(row => !row.hidden).length} of ${hookGroups.length} workflow hook groups` : '';
-    document.getElementById('filter-results').textContent = `Showing ${requestCount(visiblePulls)} of ${requestCount(pulls)} pull requests and ${visibleLocks.length} of ${locks.length} locks${hookSummary}`;
+    document.getElementById('filter-results').textContent = `Showing ${jobCount(visiblePulls)} of ${jobCount(pulls)} jobs and ${visibleLocks.length} of ${locks.length} locks`;
     wasFiltering = active;
   }
 
