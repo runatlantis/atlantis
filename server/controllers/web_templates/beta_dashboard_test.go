@@ -175,6 +175,7 @@ func TestBetaDashboardVersionInSidebar(t *testing.T) {
 	var output bytes.Buffer
 	Ok(t, web_templates.BetaDashboardTemplate.Execute(&output, web_templates.IndexData{AtlantisVersion: version}))
 	sidebar := strings.SplitN(output.String(), "</aside>", 2)[0]
+	Assert(t, strings.Contains(sidebar, `<span>Atlantis</span>`), "sidebar brand must use the capitalized Atlantis name")
 	Assert(t, strings.Contains(sidebar, `class="sidebar-footer"`), "version must be in the sidebar footer")
 	Assert(t, strings.Contains(sidebar, `<span class="version">`+version+`</span>`), "sidebar must retain the complete version and build information")
 	Assert(t, strings.Contains(sidebar, `href="/?view=classic">Classic dashboard</a>`), "classic dashboard must remain available in the sidebar")
