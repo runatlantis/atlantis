@@ -1097,8 +1097,8 @@ ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 ```
 
 Include git untracked files in the Atlantis modified file list.
-Used for example with CDKTF pre-workflow hooks that dynamically generate
-Terraform files.
+Used for example with [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) pre-workflow hooks that
+dynamically generate Terraform files.
 
 ### `--language` <Badge text="v0.45.0+" type="info"/>
 

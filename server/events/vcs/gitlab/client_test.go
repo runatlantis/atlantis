@@ -1649,7 +1649,7 @@ func TestClient_gitlabIsMergeable(t *testing.T) {
 					BlockingDiscussionsResolved: true,
 					DetailedMergeStatus:         "mergeable",
 				},
-				WorkInProgress: true,
+				WorkInProgress: true, //nolint:staticcheck // Exercise compatibility with older GitLab JSON responses.
 			},
 			project:                     &gitlab.Project{},
 			supportsDetailedMergeStatus: true,

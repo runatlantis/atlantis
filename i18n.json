@@ -1,0 +1,24 @@
+{
+  "$schema": "https://lingo.dev/schema/i18n.json",
+  "version": "1.14",
+  "locale": {
+    "source": "en",
+    "targets": ["es"]
+  },
+  "buckets": {
+    "mdx": {
+      "include": [".lingo-src/[locale]/**/*.md"],
+      "lockedPatterns": [
+        "<Badge[^>]*>",
+        "^:::\\s*[a-z-]+",
+        "\\$[A-Z_]+",
+        "\\{\\{[^}]*\\}\\}"
+      ]
+    }
+  },
+  "provider": {
+    "id": "openai",
+    "model": "gpt-5.4",
+    "prompt": "You are translating the documentation for Atlantis, an open source Terraform pull request automation tool, from {source} to {target}.\n\nNever translate any of the following; reproduce them byte for byte:\n- CLI flag names (--gh-webhook-secret), environment variables (ATLANTIS_*), and their values\n- YAML and JSON keys, Terraform block names, HCL identifiers\n- file paths, URLs, link targets, and anchors\n- HTTP verbs and API endpoint paths\n- version strings and product names (Atlantis, Terraform, OpenTofu, GitHub, GitLab, Gitea, Bitbucket)\n- anything inside inline code or fenced code blocks\n\nVitePress specifics:\n- container markers such as ':::tip', ':::warning', ':::danger', ':::details' keep the English type keyword; translate only the title text that follows it\n- '<Badge text=\"v0.45.0+\" type=\"info\"/>' markup and its text value stay verbatim\n- keep relative links exactly as written, including the .md extension and any #anchor\n\nTranslate prose faithfully rather than idiomatically. This is reference documentation for engineers: prefer the plain, widely understood term over a regional one, and keep sentences close to the source structure so a reader can compare against the English page. Where an English technical term is normally left untranslated in this domain (plan, apply, workflow, pull request), leave it untranslated."
+  }
+}
