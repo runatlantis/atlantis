@@ -6,7 +6,7 @@ Date: 2026-10-02
 
 Proposed
 
-Related issue: TODO before publication.
+Related issue: [#6953](https://github.com/runatlantis/atlantis/issues/6953).
 
 Draft number is provisional; assign the next number after the latest merged ADR when this proposal lands.
 
@@ -32,7 +32,7 @@ Every ADR links to a primary public issue before publication. Reuse an existing 
 | Decide | Review the exact final text in a separate status-change pull request |
 | Record | Merge the status, decision date, rationale, and discussion links; update the primary issue |
 
-Publication does not establish acceptance. Meetings are optional; their outcomes inform public review and are recorded in the issue. Attendance is not required. Material changes discussed in a meeting must be published for asynchronous review.
+Publication does not establish acceptance or start a final review period. Meetings are optional; their outcomes inform public review and are recorded in the issue. Attendance is not required. Material changes discussed in a meeting must be published for asynchronous review.
 
 Contributors may request renewed review in the issue. Maintainers record requested revisions, further review, or deferral with a reason when responding. Review checkpoints may be agreed, but there is no mandatory meeting schedule or response deadline. Inactivity changes neither status nor delivery priority.
 
@@ -41,18 +41,20 @@ Contributors may request renewed review in the issue. Maintainers record request
 Acceptance requires all of the following on the status-change pull request:
 
 - Approval of the final text by two distinct maintainers whose role is Maintainer in [MAINTAINERS.md](https://github.com/runatlantis/atlantis/blob/main/MAINTAINERS.md). A listing as Core Contributor alone does not establish this authority.
-- A final comment period of 14 calendar days after the final text is posted. A maintainer announces the revision being reviewed and the start and end times in UTC on the pull request, with a link from the primary issue.
+- A final comment period of 14 calendar days on the status-change pull request. The proposer starts it by posting a comment identifying the final revision and the start and end times in UTC, and links that comment from the primary issue. The start cannot precede the announcement. Opening a proposal or merging it as Proposed does not start this period. No separate sponsorship or website countdown is required.
 - No outstanding objection from a maintainer. Each objection must be resolved with the objecting maintainer's agreement or explicitly withdrawn by that maintainer. A response or an approving review from someone else does not resolve it.
 
-Material revisions restart the comment period. Editorial corrections may retain it when maintainers record that they do not change the decision. Both required approvals must cover the final text.
+Material revisions restart the comment period. Editorial corrections may retain it only when both approving maintainers record that they do not change the decision. Both required approvals must cover the final text.
 
 Silence after the period means no additional objection; it does not supply either required approval. Reactions, approval of the publication PR, and meeting attendance do not count as acceptance. An outstanding maintainer objection cannot be overruled under this process; introducing an overrule mechanism requires a separate ADR.
+
+Approvers must be current maintainers and cannot approve their own proposal. With three maintainers, a maintainer-authored proposal requires both other maintainers. Inactivity alone does not withdraw an objection. If the objector leaves the Maintainer role, both approving maintainers must record a disposition of the concern before acceptance; the former maintainer's withdrawal is no longer required. There is no deadline for obtaining approvals.
 
 The decision record links the approvals and comment-period announcement, identifies resolved or withdrawn objections, and states the rationale. Non-maintainer feedback must receive a recorded disposition; maintainers remain responsible for the decision.
 
 ### Dispositions and implementation
 
-ADRs retain the existing statuses: Proposed, Accepted, Rejected, Superseded, and Deprecated. Rejection records the reasons in a reviewed status-change PR. Withdrawal is recorded as Rejected with the reason "withdrawn by proposer"; it does not reject the design's merits.
+ADRs retain the existing statuses: Proposed, Accepted, Rejected, Superseded, and Deprecated. Substantive rejection uses the same two-maintainer approval, 14-day final review, and objection-resolution requirements as acceptance, with the rejection rationale in the status-change PR. A proposer may instead withdraw a proposal; record it as Rejected with the reason "withdrawn by proposer" through normal document review, without requiring a substantive rejection decision.
 
 After a decision, close the primary issue or identify remaining implementation work. Exploratory implementation can inform discussion, but merging an architecture change requires acceptance of the applicable ADR. Acceptance does not promise implementation priority or delivery.
 
@@ -66,10 +68,10 @@ Rendering canonical `docs/adr/` records and their statuses on the website, and a
 
 ### Minimal example
 
-The following illustrates the record format; it does not accept or release the API gate.
+The following hypothetical example illustrates the record format without depending on feature lifecycle policy.
 
 ```markdown
-# N. Require explicit permission for the API
+# N. Store execution history in a relational database
 
 Date: YYYY-MM-DD
 
@@ -81,17 +83,17 @@ Related issue: <primary issue URL>
 
 ## Context
 
-Operators need to explicitly opt into the experimental API.
+Execution history needs transactional updates and queries across projects.
 
 ## Decision
 
-Require the server experiment permission `api` before configuring `api-secret`.
-Keep the existing authentication and plan/apply safety requirements.
+Store execution history in a relational database. Preserve existing locking
+and authorization requirements.
 
 ## Consequences
 
-Existing API installations must add `experiments: [api]` before upgrading
-to the first gated release. Permission alone does not activate the API.
+Operators need database configuration, migration instructions, and a
+rollback plan. Database operation adds maintenance work.
 ```
 
 Publishing this record leaves it Proposed. A later status-change PR sets Accepted and records the decision date, rationale, two approving review links, the final revision and 14-day comment period, and the disposition of objections. The implementation and release-specific lifecycle documentation follow separately.
