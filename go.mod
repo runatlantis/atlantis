@@ -30,7 +30,7 @@ require (
 	github.com/hashicorp/go-getter/v2 v2.2.4
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/hashicorp/hc-install v0.9.5
+	github.com/hashicorp/hc-install v0.10.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/hashicorp/terraform-config-inspect v0.0.0-20260904064934-75d64de68c31
 	github.com/jpillora/backoff v1.0.0
@@ -171,9 +171,3 @@ tool (
 	github.com/petergtz/pegomock/v4/pegomock
 	go.uber.org/mock/mockgen
 )
-
-// Pin to local hc-install until a release includes Versions.ApiBaseURL and
-// HTTPClient passthrough (hashicorp/hc-install#364) used for --tf-download-url
-// version listing and --tf-download-username/-password/-token. Remove after
-// upgrading to that version.
-replace github.com/hashicorp/hc-install => ../hc-install
