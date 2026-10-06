@@ -236,6 +236,22 @@ func TestConfig_Validate(t *testing.T) {
 			},
 			expErr: "version: only versions 2 and 3 are supported.",
 		},
+		{
+			description: "valid automerge_method",
+			input: raw.RepoCfg{
+				Version:         Int(3),
+				AutomergeMethod: String("fast-forward"),
+			},
+			expErr: "",
+		},
+		{
+			description: "invalid automerge_method",
+			input: raw.RepoCfg{
+				Version:         Int(3),
+				AutomergeMethod: String("fast-forward-only"),
+			},
+			expErr: "automerge_method: must be one of fast-forward, merge, rebase, squash.",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
@@ -291,9 +307,22 @@ func TestConfig_ToValid(t *testing.T) {
 			exp: valid.RepoCfg{
 				Version:                   2,
 				Automerge:                 nil,
+				AutomergeMethod:           nil,
 				ParallelApply:             nil,
 				AbortOnExecutionOrderFail: false,
 				Workflows:                 map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "automerge_method carried through",
+			input: raw.RepoCfg{
+				Version:         Int(2),
+				AutomergeMethod: String("squash"),
+			},
+			exp: valid.RepoCfg{
+				Version:         2,
+				AutomergeMethod: String("squash"),
+				Workflows:       map[string]valid.Workflow{},
 			},
 		},
 		{

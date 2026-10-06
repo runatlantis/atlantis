@@ -1487,6 +1487,24 @@ repos:
 
 // String is a helper routine that allocates a new string value
 // to store v and returns a pointer to it.
+func TestGlobalCfg_MergeProjectCfg_AutoMergeMethod(t *testing.T) {
+	log := logging.NewNoopLogger(t)
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+	repoID := "github.com/owner/repo"
+	proj := valid.Project{Dir: ".", Workspace: "default"}
+
+	t.Run("populated from the repo's automerge_method", func(t *testing.T) {
+		method := "fast-forward"
+		merged := globalCfg.MergeProjectCfg(log, repoID, proj, valid.RepoCfg{AutomergeMethod: &method})
+		Equals(t, "fast-forward", merged.AutoMergeMethod)
+	})
+
+	t.Run("empty when the repo does not set automerge_method", func(t *testing.T) {
+		merged := globalCfg.MergeProjectCfg(log, repoID, proj, valid.RepoCfg{})
+		Equals(t, "", merged.AutoMergeMethod)
+	})
+}
+
 func String(v string) *string { return &v }
 
 // Bool is a helper routine that allocates a new bool value

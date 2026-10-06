@@ -42,7 +42,7 @@ func (c *AutoMerger) automerge(ctx *command.Context, pullStatus models.PullStatu
 	ctx.Log.Info("automerging pull request")
 	var pullOptions models.PullRequestOptions
 	pullOptions.DeleteSourceBranchOnMerge = deleteSourceBranchOnMerge
-	pullOptions.MergeMethod = mergeMethod
+	pullOptions.MergeMethod = models.MergeMethod(mergeMethod)
 	err := c.VCSClient.MergePull(ctx.Log, ctx.Pull, pullOptions)
 
 	if err != nil {
@@ -69,4 +69,13 @@ func (c *AutoMerger) automergeEnabled(projectCmds []command.ProjectContext) bool
 func (c *AutoMerger) deleteSourceBranchOnMergeEnabled(projectCmds []command.ProjectContext) bool {
 	//check if this repo is configured for automerging.
 	return (len(projectCmds) > 0 && projectCmds[0].DeleteSourceBranchOnMerge)
+}
+
+// repoAutoMergeMethod returns the merge method configured via the repo's
+// atlantis.yaml automerge_method key, or "" if none is set.
+func (c *AutoMerger) repoAutoMergeMethod(projectCmds []command.ProjectContext) string {
+	if len(projectCmds) > 0 {
+		return projectCmds[0].AutoMergeMethod
+	}
+	return ""
 }
