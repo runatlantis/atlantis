@@ -109,6 +109,10 @@ type DefaultCommandRunner struct {
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
 	EventParser          EventParsing
+	// User config option: Fail an apply when a project depends_on a project with
+	// no recorded plan status for the pull request, rather than treating that
+	// dependency as satisfied.
+	FailOnMissingDependencies bool
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
 	Logger                     logging.SimpleLogging `validate:"required"`
@@ -184,13 +188,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	ctx := &command.Context{
-		User:       user,
-		Log:        log,
-		Scope:      scope,
-		Pull:       pull,
-		HeadRepo:   headRepo,
-		PullStatus: status,
-		Trigger:    command.AutoTrigger,
+		User:                      user,
+		Log:                       log,
+		Scope:                     scope,
+		Pull:                      pull,
+		HeadRepo:                  headRepo,
+		PullStatus:                status,
+		Trigger:                   command.AutoTrigger,
+		FailOnMissingDependencies: c.FailOnMissingDependencies,
 	}
 	if !c.validateCtxAndComment(ctx, command.Autoplan, true) {
 		return
@@ -493,16 +498,17 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	ctx := &command.Context{
-		User:                 user,
-		Log:                  log,
-		Pull:                 pull,
-		PullStatus:           status,
-		HeadRepo:             headRepo,
-		Scope:                scope,
-		Trigger:              command.CommentTrigger,
-		PolicySet:            cmd.PolicySet,
-		ClearPolicyApproval:  cmd.ClearPolicyApproval,
-		TeamAllowlistChecker: c.TeamAllowlistChecker,
+		User:                      user,
+		Log:                       log,
+		Pull:                      pull,
+		PullStatus:                status,
+		HeadRepo:                  headRepo,
+		Scope:                     scope,
+		Trigger:                   command.CommentTrigger,
+		PolicySet:                 cmd.PolicySet,
+		ClearPolicyApproval:       cmd.ClearPolicyApproval,
+		TeamAllowlistChecker:      c.TeamAllowlistChecker,
+		FailOnMissingDependencies: c.FailOnMissingDependencies,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name, true) {

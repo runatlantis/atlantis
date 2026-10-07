@@ -78,6 +78,7 @@ const (
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
+	FailOnMissingDependenciesFlag    = "fail-on-missing-dependencies"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
@@ -581,6 +582,11 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
+	FailOnMissingDependenciesFlag: {
+		description: "Fail an apply when a project's depends_on names a project that has no plan status recorded for the pull request." +
+			" By default such a dependency is treated as satisfied, so a project that was never planned does not block its dependents.",
 		defaultValue: false,
 	},
 	FailOnPreWorkflowHookError: {

@@ -1906,6 +1906,30 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
 }
 
+// The fail-on-missing-dependencies server flag has to reach the project
+// contexts, since that is where ValidateProjectDependencies reads it.
+func TestRunCommentCommand_PropagatesFailOnMissingDependencies(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			setup(t)
+			ch.FailOnMissingDependencies = enabled
+			defer func() { ch.FailOnMissingDependencies = false }()
+
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, modelPull.Num, &events.CommentCommand{Name: command.Apply})
+
+			capturedCtx, _ := projectCommandBuilder.VerifyWasCalledOnce().
+				BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+				GetCapturedArguments()
+			Equals(t, enabled, capturedCtx.FailOnMissingDependencies)
+		})
+	}
+}
+
 func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	t.Log("if \"atlantis apply\" is run and this is disabled atlantis should" +
 		" comment saying that this is not allowed")
