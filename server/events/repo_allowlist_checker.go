@@ -60,41 +60,47 @@ func (r *RepoAllowlistChecker) matchesAtLeastOneRule(rules []string, candidate s
 
 func (r *RepoAllowlistChecker) matchesRule(rule string, candidate string) bool {
 	// Case insensitive compare.
-	rule = strings.ToLower(rule)
-	candidate = strings.ToLower(candidate)
+	return globMatch(strings.ToLower(rule), strings.ToLower(candidate))
+}
 
-	wildcardIdx := strings.Index(rule, Wildcard)
-	if wildcardIdx == -1 {
-		// No wildcard so can do a straight up match.
-		return candidate == rule
-	}
-
-	// If the candidate length is less than where we found the wildcard
-	// then it can't be equal. For example:
-	//   rule: abc*
-	//   candidate: ab
-	if len(candidate) < wildcardIdx {
-		return false
-	}
-
-	// If wildcard is not the last character, substring both to compare what is after the wildcard.  Example:
-	// candidate: repo-abc
-	// rule: *-abc
-	// substr(candidate): -abc
-	// substr(rule): -abc
-	if wildcardIdx != len(rule)-1 {
-		// If the rule substring after wildcard does not exist in the candidate, then it is not a match.
-		idx := strings.LastIndex(candidate, rule[wildcardIdx+1:])
-		if idx == -1 {
+// globMatch reports whether candidate matches pattern, where Wildcard stands
+// for a run of zero or more characters. The match is anchored at both ends, so
+// every literal part of the pattern must appear, in order, including the part
+// before the first wildcard.
+//
+// Anchoring the prefix matters: a rule such as "github.com/myorg/*-prod" must
+// not admit "github.com/other-org/anything-prod". Matching only the text after
+// the wildcard would allow any repository, in any organisation, whose name
+// happens to end the right way.
+func globMatch(pattern string, candidate string) bool {
+	var (
+		p, c          int
+		starPat       = -1
+		starCandidate int
+	)
+	for c < len(candidate) {
+		switch {
+		case p < len(pattern) && pattern[p] == candidate[c]:
+			p++
+			c++
+		case p < len(pattern) && pattern[p] == Wildcard[0]:
+			// Record the wildcard position so we can backtrack, and start by
+			// matching it against the empty string.
+			starPat = p
+			starCandidate = c
+			p++
+		case starPat != -1:
+			// Backtrack: let the last wildcard consume one more character.
+			p = starPat + 1
+			starCandidate++
+			c = starCandidate
+		default:
 			return false
 		}
-		return candidate[idx:] == rule[wildcardIdx+1:]
 	}
-
-	// If wildcard is last character, substring both so they're comparing before the wildcard. Example:
-	// candidate: abcd
-	// rule: abc*
-	// substr(candidate): abc
-	// substr(rule): abc
-	return candidate[:wildcardIdx] == rule[:wildcardIdx]
+	// Any pattern left over must be wildcards, which can match the empty string.
+	for p < len(pattern) && pattern[p] == Wildcard[0] {
+		p++
+	}
+	return p == len(pattern)
 }
