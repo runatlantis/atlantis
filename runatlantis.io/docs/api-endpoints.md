@@ -88,10 +88,17 @@ Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified reposi
 | Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Projects   | []string | No       | List of project names to run the plan    |
 | Paths      | []Path   | No       | Paths to the projects to run the plan    |
+| group      | string   | No       | Run the plan for every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group) |
 | PR         | int      | No       | Pull Request number                      |
 
 ::: tip NOTE
-At least one of `Projects` or `Paths` must be specified.
+At least one of `Projects`, `Paths` or `group` must be specified.
+:::
+
+::: tip Group Selection
+`group` selects every project whose `group` key matches in the repo config, so it can't be combined with `Projects` or `Paths`. Projects that don't set a `group` belong to the `default` group.
+
+Unlike the `atlantis plan -g` pull request comment, which is limited to the projects modified in the pull request, the API selects all projects in the group — the same way `Projects` selects named projects regardless of modified files. A group that no project in the repo config uses is rejected with `400`.
 :::
 
 ::: tip No-PR API Requests
@@ -153,6 +160,20 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "Directory": ".",
       "Workspace": "default"
     }]
+}'
+```
+
+#### Sample Request (Group)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "group": "infra"
 }'
 ```
 
@@ -232,10 +253,15 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 | Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
 | Projects   | []string | No       | List of project names to run the apply   |
 | Paths      | []Path   | No       | Paths to the projects to run the apply   |
+| group      | string   | No       | Run the apply for every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group) |
 | PR         | int      | No       | Pull Request number                      |
 
 ::: tip NOTE
-At least one of `Projects` or `Paths` must be specified.
+At least one of `Projects`, `Paths` or `group` must be specified.
+:::
+
+::: tip Group Selection
+`group` behaves as it does for [`POST /api/plan`](#post-apiplan): it selects every project in the group and can't be combined with `Projects` or `Paths`. Since this endpoint plans before applying, both phases are limited to the group.
 :::
 
 #### Path
@@ -327,6 +353,7 @@ Execute drift remediation on the specified repository. This endpoint allows you 
 | action      | string               | No          | Remediation action: `plan` (default) or `apply`                         |
 | projects    | []string             | No          | List of project names to remediate. If empty, uses drift detection data |
 | paths       | []DriftDetectionPath | No          | List of repo-relative directories/workspaces to remediate               |
+| group       | string               | No          | Remediate the stored drift records of every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group). Mutually exclusive with `projects` and `paths` |
 | workspaces  | []string             | No          | Filter remediation to specific workspaces                               |
 | drift_only  | boolean              | No          | If true, only remediate projects with detected drift                    |
 
@@ -335,6 +362,12 @@ For remediation, a path selector without `workspace` targets the default Terrafo
 Use the top-level `workspaces` field or path-level `workspace` values to remediate non-default workspaces.
 Project selectors for remediation are exact project names. Regular expression project selectors are not supported for remediation; use explicit project names or path selectors when targeting multiple projects.
 API path selectors are literal normalized repo-relative paths; glob patterns such as `envs/*` are not supported.
+
+::: tip Group Remediation
+`group` narrows remediation to the stored drift records whose project belongs to that group, and can be combined with `workspaces` and `drift_only`.
+
+Group membership comes from the drift record written by detection, so **drift detection must have run for that ref since groups were introduced**. Records stored without a group have unknown membership and are skipped by a group request rather than being remediated. If no record matches, the request remediates nothing: a plan-only request completes empty, and an `apply` request fails with the usual cached-drift error.
+:::
 
 ::: tip Actions
 
@@ -619,6 +652,7 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 | projects             | []string             | No          | List of project names to check. If empty, all are checked                            |
 | paths                | []DriftDetectionPath | No          | List of paths to check. If empty, project names are used                             |
 | include_plan_output  | boolean              | No          | If true, include `plan_output` for each project in the response. Defaults to `false` |
+| group       | string               | No          | Check every project in this [group](repo-level-atlantis-yaml.md#planning-and-applying-by-group). Mutually exclusive with `projects` and `paths` |
 
 #### DriftDetectionPath
 
@@ -630,7 +664,15 @@ When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webh
 Path selectors are literal normalized repo-relative paths. Glob patterns such as `envs/*` are not supported.
 
 ::: tip NOTE
-At least one of `projects` or `paths` should be specified for targeted detection. If both are empty, drift detection may scan all discovered projects. `projects` and `paths` are mutually exclusive for drift detection; use one selector type per request.
+At least one of `projects`, `paths` or `group` should be specified for targeted detection. If all are empty, drift detection may scan all discovered projects. `projects`, `paths` and `group` are mutually exclusive for drift detection; use one selector type per request.
+:::
+
+::: tip Group Detection
+`group` scans every project whose `group` key matches in the repo config. Projects that don't set a `group` belong to the `default` group.
+
+Each stored drift record keeps the group of the project it came from, so `GET /api/drift/status?group=...` and remediation `group` requests can filter on it afterwards.
+
+A group detection is a **partial** detection: like `projects` and `paths` requests, it does not reconcile drift storage, so records for projects outside the group are left untouched instead of being resolved. Only an unfiltered detection reconciles storage.
 :::
 
 ::: tip Status Side Effects
@@ -685,6 +727,20 @@ Set `include_plan_output: true` on the request to have the response include `pla
 ::: warning Plan Output May Contain Sensitive Data
 Before this field existed, `POST /api/drift/detect` only returned numeric drift counts. With `include_plan_output: true`, responses can include resource attribute values and, for custom `run`-step workflows, arbitrary command output. The endpoint's auth boundary is unchanged (the same API token as other drift/remediation endpoints), so this is not a new authorization gap, but the data sensitivity of the response changes materially when this field is enabled. Only `run`-step filter-regex redaction (if configured) applies to plan output; it is not otherwise scrubbed.
 :::
+
+#### Sample Request (with group)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "repository": "owner/repo",
+    "ref": "main",
+    "type": "Github",
+    "group": "infra"
+}'
+```
 
 #### Sample Response (Success)
 
@@ -1010,8 +1066,13 @@ Drift detection storage must be enabled on the Atlantis server. If not enabled, 
 | project     | string | No       | Filter by project name                                        |
 | path        | string | No       | Filter by literal normalized repository-relative project path |
 | workspace   | string | No       | Filter by Terraform workspace                                 |
+| group       | string | No       | Filter by the group recorded when drift was detected          |
 | ref         | string | No       | Filter by git reference                                       |
 | base_branch | string | No       | Filter by branch context used when drift was detected         |
+
+::: tip Group Filter
+`group` matches the group stored on each drift record. Records written before groups existed have no group and are excluded by this filter; re-run drift detection to record groups.
+:::
 
 #### Sample Request
 
@@ -1024,6 +1085,13 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 
 ```shell
 curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github&project=vpc&path=modules/vpc&workspace=production&ref=main&base_branch=main' \
+  --header 'X-Atlantis-Token: <API_TOKEN>'
+```
+
+#### Sample Request (by group)
+
+```shell
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=owner/repo&type=Github&group=infra' \
   --header 'X-Atlantis-Token: <API_TOKEN>'
 ```
 

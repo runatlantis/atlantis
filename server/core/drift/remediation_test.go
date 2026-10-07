@@ -1111,3 +1111,93 @@ func TestInMemoryRemediationService_ReturnsResultSnapshots(t *testing.T) {
 	Ok(t, err)
 	Equals(t, models.RemediationStatusSuccess, listedAgain[0].Status)
 }
+
+// A group-scoped remediation only targets the stored drift records whose
+// project belongs to that group.
+func TestInMemoryRemediationService_GroupSelectsOnlyGroupProjects(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	projects := []models.ProjectDrift{
+		{
+			ProjectName: "network",
+			Path:        "network",
+			Workspace:   "default",
+			Group:       "infra",
+			Ref:         "main",
+			BaseBranch:  "main",
+			Drift:       models.DriftSummary{HasDrift: true},
+			LastChecked: time.Now(),
+		},
+		{
+			ProjectName: "app",
+			Path:        "app",
+			Workspace:   "default",
+			Group:       "apps",
+			Ref:         "main",
+			BaseBranch:  "main",
+			Drift:       models.DriftSummary{HasDrift: true},
+			LastChecked: time.Now(),
+		},
+		{
+			// Detected before groups existed, so its membership is unknown.
+			ProjectName: "legacy",
+			Path:        "legacy",
+			Workspace:   "default",
+			Ref:         "main",
+			BaseBranch:  "main",
+			Drift:       models.DriftSummary{HasDrift: true},
+			LastChecked: time.Now(),
+		},
+	}
+	for _, project := range projects {
+		Ok(t, storage.Store("github.com/owner/repo", project))
+	}
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository:        "owner/repo",
+		StorageRepository: "github.com/owner/repo",
+		Ref:               "main",
+		Type:              "Github",
+		Group:             "infra",
+		DriftOnly:         true,
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 1, len(executor.planCalls))
+	Equals(t, remediationExecutorCall{projectName: "network", path: "network", workspace: "default"}, executor.planCalls[0])
+}
+
+// Nothing to remediate must stay a no-op rather than falling through to
+// remediating every project.
+func TestInMemoryRemediationService_GroupWithoutStoredRecordsRemediatesNothing(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+	Ok(t, storage.Store("github.com/owner/repo", models.ProjectDrift{
+		ProjectName: "app",
+		Path:        "app",
+		Workspace:   "default",
+		Group:       "apps",
+		Ref:         "main",
+		BaseBranch:  "main",
+		Drift:       models.DriftSummary{HasDrift: true},
+		LastChecked: time.Now(),
+	}))
+
+	service := drift.NewInMemoryRemediationService(storage)
+	executor := &recordingRemediationExecutor{}
+
+	result, err := service.Remediate(models.RemediationRequest{
+		Repository:        "owner/repo",
+		StorageRepository: "github.com/owner/repo",
+		Ref:               "main",
+		Type:              "Github",
+		Group:             "infra",
+	}, executor)
+	Ok(t, err)
+
+	Equals(t, models.RemediationStatusSuccess, result.Status)
+	Equals(t, 0, result.TotalProjects)
+	Equals(t, 0, len(executor.planCalls))
+}

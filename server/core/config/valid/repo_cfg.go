@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -124,6 +126,78 @@ func (r RepoCfg) FindProjectsByName(name string) []Project {
 	return ps
 }
 
+// FindProjectsByGroup returns all projects that belong to group.
+func (r RepoCfg) FindProjectsByGroup(group string) []Project {
+	var ps []Project
+	for _, p := range r.Projects {
+		if p.GetGroup() == group {
+			ps = append(ps, p)
+		}
+	}
+	return ps
+}
+
+// ConfiguredGroups returns the sorted, de-duplicated list of groups that the
+// projects in this config belong to.
+func (r RepoCfg) ConfiguredGroups() []string {
+	seen := make(map[string]bool, len(r.Projects))
+	var groups []string
+	for _, p := range r.Projects {
+		group := p.GetGroup()
+		if seen[group] {
+			continue
+		}
+		seen[group] = true
+		groups = append(groups, group)
+	}
+	sort.Strings(groups)
+	return groups
+}
+
+// AllowedGroups returns the sorted set of groups that commands are allowed to
+// target: the groups configured on projects plus DefaultGroup, which projects
+// without a group and auto-discovered projects belong to.
+func (r RepoCfg) AllowedGroups() []string {
+	groups := r.ConfiguredGroups()
+	if !slices.Contains(groups, DefaultGroup) {
+		groups = append(groups, DefaultGroup)
+		sort.Strings(groups)
+	}
+	return groups
+}
+
+// GroupNotAllowedError is returned when a command targets a group that none of
+// the repo config's projects belong to. It's a distinct type so callers such as
+// the API can report it as a client error rather than a server error.
+type GroupNotAllowedError struct {
+	Group         string
+	AllowedGroups []string
+}
+
+func (e GroupNotAllowedError) Error() string {
+	return fmt.Sprintf(
+		"running commands for group %q is not allowed because this repo is"+
+			" only configured for the following groups: %s",
+		e.Group,
+		strings.Join(e.AllowedGroups, ", "),
+	)
+}
+
+// ValidateGroupAllowed returns an error if group isn't one of the groups that
+// this config's projects belong to. We want this to be an error because if a
+// user runs a command for a group that isn't defined then they've probably just
+// typed the group name wrong and we'd otherwise silently run nothing.
+func (r RepoCfg) ValidateGroupAllowed(group string) error {
+	if group == "" {
+		return nil
+	}
+	allowed := r.AllowedGroups()
+	if slices.Contains(allowed, group) {
+		return nil
+	}
+	return GroupNotAllowedError{Group: group, AllowedGroups: allowed}
+}
+
 func isRegexAllowed(name string, allowedRegexpPrefixes []string) bool {
 	if len(allowedRegexpPrefixes) == 0 {
 		return true
@@ -198,6 +272,10 @@ type Project struct {
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
 	SilencePRComments         []string
+	// Group is the name of the group this project belongs to. Projects can be
+	// planned/applied a group at a time with the -g/--group flag. If unset in
+	// the repo config it defaults to DefaultGroup.
+	Group string
 }
 
 // GetName returns the name of the project or an empty string if there is no
@@ -207,6 +285,15 @@ func (p Project) GetName() string {
 		return *p.Name
 	}
 	return ""
+}
+
+// GetGroup returns the group of the project, defaulting to DefaultGroup if the
+// project doesn't set one.
+func (p Project) GetGroup() string {
+	if p.Group == "" {
+		return DefaultGroup
+	}
+	return p.Group
 }
 
 type Autoplan struct {

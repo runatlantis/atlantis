@@ -137,6 +137,9 @@ type APIRequest struct {
 	PR         int
 	Projects   []string
 	Paths      []APIRequestPath
+	// Group selects every project belonging to that group in the repo config.
+	// Cannot be combined with Projects or Paths.
+	Group string `json:"group,omitempty"`
 	// DiscoverProjects enables all-project discovery when no projects or paths
 	// are specified. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
@@ -163,6 +166,18 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			ProjectName: path.ProjectName,
 			RepoRelDir:  strings.TrimRight(path.Directory, "/"),
 			Workspace:   path.Workspace,
+		})
+	}
+
+	// A group selects every project in that group, just like Projects selects
+	// every named project. API requests aren't driven by a pull request's
+	// modified files, so enumerate all projects and let the builder keep the
+	// ones in the group.
+	if len(cc) == 0 && a.Group != "" {
+		cc = append(cc, &events.CommentCommand{
+			Name:                cmdName,
+			Group:               a.Group,
+			DiscoverAllProjects: true,
 		})
 	}
 
@@ -244,9 +259,31 @@ func normalizeAPIBranchRef(ref string) string {
 	return models.NormalizeAPIRef(ref)
 }
 
+// validateAPIRequestGroup checks the group selector. A group selects a set of
+// projects so it can't be combined with the selectors that name projects, and
+// it has to match the group configured in the repo config so we apply the same
+// character restrictions the comment parser applies to project names.
+func validateAPIRequestGroup(request *APIRequest) error {
+	if request.Group == "" {
+		return nil
+	}
+	if len(request.Projects) > 0 || len(request.Paths) > 0 {
+		return fmt.Errorf("cannot use 'group' at the same time as 'projects' or 'paths'")
+	}
+	if err := valid.ValidateGroupName(request.Group); err != nil {
+		return fmt.Errorf("invalid group %q: %s", request.Group, err)
+	}
+	return nil
+}
+
 func apiErrorStatusCode(err error) int {
 	if errors.Is(err, events.ErrTeamAllowlistDenied) {
 		return http.StatusForbidden
+	}
+	var groupErr valid.GroupNotAllowedError
+	if errors.As(err, &groupErr) {
+		// The caller asked for a group that this repo's config doesn't define.
+		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
 }
@@ -487,10 +524,18 @@ func (a *APIController) DriftStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	groupFilter := r.URL.Query().Get("group")
+	if groupFilter != "" && !models.IsValidAPIGroup(groupFilter) {
+		responder.ValidationFailed(w, r, "invalid group filter",
+			ValidationError{Field: "group", Message: "group must contain only URL safe characters"})
+		return
+	}
+
 	opts := drift.GetOptions{
 		ProjectName: r.URL.Query().Get("project"),
 		Path:        pathFilter,
 		Workspace:   r.URL.Query().Get("workspace"),
+		Group:       groupFilter,
 		Ref:         apiRequestStorageRef(r.URL.Query().Get("ref")),
 		BaseBranch:  normalizeAPIBranchRef(r.URL.Query().Get("base_branch")),
 	}
@@ -698,19 +743,28 @@ func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, rem
 	return string(output), err
 }
 
+// apiPlan runs the plan phase for an API request.
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+	result, _, err := a.apiPlanWithSelection(request, ctx)
+	return result, err
+}
+
+// apiPlanWithSelection is apiPlan but also returns the plan contexts it
+// selected. Drift detection needs them to record which group each planned
+// project belongs to.
+func (a *APIController) apiPlanWithSelection(request *APIRequest, ctx *command.Context) (*command.Result, []command.ProjectContext, error) {
 	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
 	if events.IsIgnoredTargetedDir(err) {
 		ctx.CommandSkipped = true
-		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(cmds) == 0 {
 		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		ctx.Log.Info("determined there was no project to run plan in")
 		// When silence is enabled and no projects are found, don't set any VCS status
@@ -728,7 +782,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		} else {
 			ctx.Log.Debug("silence enabled and no projects found - not setting any VCS status")
 		}
-		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil
+		return &command.Result{ProjectResults: []command.ProjectResult{}}, nil, nil
 	}
 
 	// Update the combined plan commit status to pending
@@ -749,7 +803,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		case command.PolicyCheck:
 			policyCmds = append(policyCmds, cmd)
 		default:
-			return nil, fmt.Errorf("%s is not supported", cmd.CommandName)
+			return nil, nil, fmt.Errorf("%s is not supported", cmd.CommandName)
 		}
 	}
 
@@ -759,7 +813,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
 			if err != nil {
 				if a.FailOnPreWorkflowHookError {
-					return nil, err
+					return nil, nil, err
 				}
 			}
 		}
@@ -772,17 +826,17 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 
 	result := &command.Result{ProjectResults: projectResults}
 	if !ctx.RunPolicyChecks || result.HasErrors() || len(planCmds) == 0 {
-		return result, nil
+		return result, planCmds, nil
 	}
 
 	for _, cmd := range policyCmds {
 		if a.ProjectPolicyCheckCommandRunner == nil {
-			return nil, fmt.Errorf("policy check runner is not configured")
+			return nil, nil, fmt.Errorf("policy check runner is not configured")
 		}
 		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
 	}
-	return &command.Result{ProjectResults: projectResults}, nil
+	return &command.Result{ProjectResults: projectResults}, planCmds, nil
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
@@ -1028,6 +1082,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+	if err = validateAPIRequestGroup(&request); err != nil {
+		return nil, nil, http.StatusBadRequest, err
 	}
 
 	// A workspace becomes a Terraform command argument, which Atlantis runs
@@ -1997,6 +2054,45 @@ func driftProjectsFromCommandResult(result *command.Result, ref, baseBranch, res
 	return projects
 }
 
+// stampDriftProjectGroups records the group of each planned project on its
+// drift record so later drift status and remediation requests can filter by
+// group. Projects whose group we can't determine are left without one.
+func stampDriftProjectGroups(projectDrifts []models.ProjectDrift, plannedProjects []command.ProjectContext) {
+	if len(projectDrifts) == 0 || len(plannedProjects) == 0 {
+		return
+	}
+	groups := make(map[driftProjectSelector]string, len(plannedProjects))
+	for _, projCtx := range plannedProjects {
+		if projCtx.Group == "" {
+			continue
+		}
+		groups[driftProjectSelector{
+			projectName: projCtx.ProjectName,
+			path:        projCtx.RepoRelDir,
+			workspace:   projCtx.Workspace,
+		}] = projCtx.Group
+	}
+	for i := range projectDrifts {
+		group, ok := groups[driftProjectSelector{
+			projectName: projectDrifts[i].ProjectName,
+			path:        projectDrifts[i].Path,
+			workspace:   projectDrifts[i].Workspace,
+		}]
+		if ok {
+			projectDrifts[i].Group = group
+		}
+	}
+}
+
+// driftProjectSelector identifies a project within a single detection run.
+// Unlike driftProjectIdentity it has no ref, since every project in a run
+// shares the same ref.
+type driftProjectSelector struct {
+	projectName string
+	path        string
+	workspace   string
+}
+
 func newProjectDriftFromResult(pr command.ProjectResult, ref, baseBranch, resolvedCommit, detectionID string) models.ProjectDrift {
 	projectDrift := models.ProjectDrift{
 		ProjectName:    pr.ProjectName,
@@ -2142,7 +2238,10 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 	normalizedRef := apiRequestStorageRef(request.Ref)
 	normalizedBaseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
-	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
+	// A group-scoped detection only covers part of the repo, so it must not be
+	// treated as a full detection: that would let storage reconciliation delete
+	// the drift records of every project outside the group.
+	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0 && request.Group == ""
 	if fullDetection {
 		unlockFullDetection := a.lockFullDriftDetection(baseRepo.ID(), request.Type, normalizedRef, normalizedBaseBranch)
 		defer unlockFullDetection()
@@ -2165,6 +2264,8 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 			dir, _ := models.NormalizeAPIPath(p.Directory)
 			apiRequest.Paths = append(apiRequest.Paths, APIRequestPath{Directory: dir, Workspace: p.Workspace})
 		}
+	} else if request.Group != "" {
+		apiRequest.Group = request.Group
 	}
 
 	// Build the command context
@@ -2211,7 +2312,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx.PreWorkflowHooksAlreadyRun = true
 
-	result, err := a.apiPlan(apiRequest, ctx)
+	result, plannedProjects, err := a.apiPlanWithSelection(apiRequest, ctx)
 	if err != nil {
 		if errors.Is(err, events.ErrTeamAllowlistDenied) {
 			responder.Forbidden(w, r, err.Error())
@@ -2227,6 +2328,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	detectedProjects := map[driftProjectIdentity]struct{}{}
 	storeFailed := false
 	projectDrifts := driftProjectsFromCommandResult(result, normalizedRef, normalizedBaseBranch, ctx.Pull.HeadCommit, detectionResult.ID)
+	stampDriftProjectGroups(projectDrifts, plannedProjects)
 	for _, projectDrift := range projectDrifts {
 		detectedProjects[newDriftProjectIdentity(projectDrift)] = struct{}{}
 		// PlanOutput is only ever returned in the immediate detect response;
