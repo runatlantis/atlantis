@@ -14,7 +14,7 @@ import (
 
 	giteasdk "code.gitea.io/sdk/gitea"
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	"github.com/mohae/deepcopy"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -61,12 +61,12 @@ func TestParseGithubIssueCommentEvent(t *testing.T) {
 	comment := github.IssueCommentEvent{
 		Repo: &githubtestdata.Repo,
 		Issue: &github.Issue{
-			Number:  github.Ptr(1),
-			User:    &github.User{Login: github.Ptr("issue_user")},
-			HTMLURL: github.Ptr("https://github.com/runatlantis/atlantis/issues/1"),
+			Number:  new(1),
+			User:    &github.User{Login: new("issue_user")},
+			HTMLURL: new("https://github.com/runatlantis/atlantis/issues/1"),
 		},
 		Comment: &github.IssueComment{
-			User: &github.User{Login: github.Ptr("comment_user")},
+			User: &github.User{Login: new("comment_user")},
 		},
 	}
 
@@ -164,8 +164,8 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	// verify that close event treated as 'close' events by default
 	closeEvent := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
-	closeEvent.Action = github.Ptr("closed")
-	closeEvent.PullRequest.Draft = github.Ptr(true)
+	closeEvent.Action = new("closed")
+	closeEvent.PullRequest.Draft = new(true)
 
 	_, evType, _, _, _, err := parser.ParseGithubPullEvent(logger, &closeEvent)
 	Ok(t, err)
@@ -173,7 +173,7 @@ func TestParseGithubPullEventFromDraft(t *testing.T) {
 
 	// verify that draft PRs are treated as 'other' events by default
 	testEvent := deepcopy.Copy(githubtestdata.PullEvent).(github.PullRequestEvent)
-	testEvent.PullRequest.Draft = github.Ptr(true)
+	testEvent.PullRequest.Draft = new(true)
 	_, evType, _, _, _, err = parser.ParseGithubPullEvent(logger, &testEvent)
 	Ok(t, err)
 	Equals(t, models.OtherPullEvent, evType)

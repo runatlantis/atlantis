@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
@@ -229,7 +229,7 @@ func (g *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 
 	comments := common.SplitComment(logger, comment, maxCommentLength, g.maxCommentsPerCommand, command)
 	for i := range comments {
-		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueComment{Body: &comments[i]})
+		_, resp, err := g.client.Issues.CreateComment(g.ctx, repo.Owner, repo.Name, pullNum, github.IssueCommentRequest{Body: comments[i]})
 		if resp != nil {
 			logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
 		}
@@ -256,8 +256,8 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 	nextPage := 0
 	for {
 		comments, resp, err := g.client.Issues.ListComments(g.ctx, repo.Owner, repo.Name, pullNum, &github.IssueListCommentsOptions{
-			Sort:        github.Ptr("created"),
-			Direction:   github.Ptr("asc"),
+			Sort:        new("created"),
+			Direction:   new("asc"),
 			ListOptions: github.ListOptions{Page: nextPage},
 		})
 		if resp != nil {
@@ -990,9 +990,9 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	logger.Info("Updating GitHub Check status for '%s' to '%s'", src, ghState)
 
 	status := github.RepoStatus{
-		State:       github.Ptr(ghState),
-		Description: github.Ptr(description),
-		Context:     github.Ptr(src),
+		State:       new(ghState),
+		Description: new(description),
+		Context:     new(src),
 		TargetURL:   &url,
 	}
 	_, resp, err := g.client.Repositories.CreateStatus(g.ctx, repo.Owner, repo.Name, pull.HeadCommit, status)
@@ -1272,7 +1272,7 @@ func (g *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 	var labels []string
 
 	for _, label := range pullDetails.Labels {
-		labels = append(labels, *label.Name)
+		labels = append(labels, label.Name)
 	}
 
 	return labels, nil

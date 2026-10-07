@@ -13,43 +13,43 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 )
 
 var PullEvent = github.PullRequestEvent{
 	Sender: &github.User{
-		Login: github.Ptr("user"),
+		Login: new("user"),
 	},
 	Repo:        &Repo,
 	PullRequest: &Pull,
-	Action:      github.Ptr("opened"),
+	Action:      new("opened"),
 }
 
 var Pull = github.PullRequest{
 	Head: &github.PullRequestBranch{
-		SHA:  github.Ptr("sha256"),
-		Ref:  github.Ptr("ref"),
+		SHA:  new("sha256"),
+		Ref:  new("ref"),
 		Repo: &Repo,
 	},
 	Base: &github.PullRequestBranch{
-		SHA:  github.Ptr("sha256"),
+		SHA:  new("sha256"),
 		Repo: &Repo,
-		Ref:  github.Ptr("basebranch"),
+		Ref:  new("basebranch"),
 	},
-	HTMLURL: github.Ptr("html-url"),
+	HTMLURL: new("html-url"),
 	User: &github.User{
-		Login: github.Ptr("user"),
+		Login: new("user"),
 	},
-	Body:   github.Ptr("body"),
-	Number: github.Ptr(1),
-	State:  github.Ptr("open"),
+	Body:   new("body"),
+	Number: new(1),
+	State:  new("open"),
 }
 
 var Repo = github.Repository{
-	FullName: github.Ptr("owner/repo"),
-	Owner:    &github.User{Login: github.Ptr("owner")},
-	Name:     github.Ptr("repo"),
-	CloneURL: github.Ptr("https://github.com/owner/repo.git"),
+	FullName: new("owner/repo"),
+	Owner:    &github.User{Login: new("owner")},
+	Name:     new("repo"),
+	CloneURL: new("https://github.com/owner/repo.git"),
 }
 
 const PrivateKey = `-----BEGIN RSA PRIVATE KEY-----
