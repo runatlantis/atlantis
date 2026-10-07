@@ -419,10 +419,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		return nil, err
 	}
 
-	cacheDir, err := mkSubDir(userConfig.DataDir, TerraformPluginCacheDirName)
-
-	if err != nil {
-		return nil, err
+	var cacheDir string
+	if userConfig.TFPluginCacheDir != "" {
+		// Terraform does not create TF_PLUGIN_CACHE_DIR itself so ensure the
+		// override directory exists before handing it to terraform.
+		if err := os.MkdirAll(userConfig.TFPluginCacheDir, 0700); err != nil {
+			return nil, fmt.Errorf("creating tf-plugin-cache-dir %q: %w", userConfig.TFPluginCacheDir, err)
+		}
+		cacheDir = userConfig.TFPluginCacheDir
+	} else {
+		var mkErr error
+		cacheDir, mkErr = mkSubDir(userConfig.DataDir, TerraformPluginCacheDirName)
+		if mkErr != nil {
+			return nil, mkErr
+		}
 	}
 
 	parsedURL, err := ParseAtlantisURL(userConfig.AtlantisURL)
@@ -811,6 +821,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
 			DefaultTFVersion:      defaultTfVersion,
+			PluginCache:           userConfig.AtlantisPluginCache,
 		},
 		PlanStepRunner:        runtime.NewPlanStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, commitStatusUpdater, terraformClient, planStore),
 		ShowStepRunner:        showStepRunner,
