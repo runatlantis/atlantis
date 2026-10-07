@@ -112,7 +112,7 @@ jobs:
           path: .cover
 
       - name: Upload coverage report
-        uses: actions/upload-code-coverage@1c15be36fc3733ba839b1dd643bd9556e4426dc1 # v1
+        uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1
         with:
           file: .cover/coverage.xml
           language: Go
