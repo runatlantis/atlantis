@@ -488,6 +488,25 @@ func TestDetermineProjects(t *testing.T) {
 	}
 }
 
+// TestDetermineProjects_GhostDir verifies directories with only untracked artifacts
+// (e.g. .terraform/) left after a branch reset are skipped (issue #6940).
+func TestDetermineProjects_GhostDir(t *testing.T) {
+	noopLogger := logging.NewNoopLogger(t)
+	defaultAutoplanFileList := "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+
+	// Simulate deleted project where only untracked .terraform/ remains on disk.
+	repoDir := t.TempDir()
+	ghostDir := filepath.Join(repoDir, "apps", "foo")
+	Ok(t, os.MkdirAll(filepath.Join(ghostDir, ".terraform"), 0700))
+
+	modifiedFiles := []string{"apps/foo/main.tf"}
+
+	projects := m.DetermineProjects(noopLogger, modifiedFiles, modifiedRepo, repoDir, defaultAutoplanFileList, nil)
+
+	Assert(t, len(projects) == 0,
+		"expected no projects for a directory that only has untracked .terraform/ artifacts, got %v", projects)
+}
+
 func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 	// Create dir structure:
 	// main.tf
