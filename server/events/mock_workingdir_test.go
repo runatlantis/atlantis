@@ -200,34 +200,42 @@ func (mock *MockWorkingDir) GitReadLock(r models.Repo, p models.PullRequest, wor
 	return _ret0
 }
 
-func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+func (mock *MockWorkingDir) HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
 	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDiverged", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDiverged", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 bool
+	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
 			_ret0 = _result[0].(bool)
 		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
 	}
-	return _ret0
+	return _ret0, _ret1
 }
 
-func (mock *MockWorkingDir) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+func (mock *MockWorkingDir) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) (bool, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDir().")
 	}
 	_params := []pegomock.Param{logger, cloneDir, projectPath, autoplanWhenModified, pullRequest}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDivergedFromPullHead", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("HasDivergedFromPullHead", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 bool
+	var _ret1 error
 	if len(_result) != 0 {
 		if _result[0] != nil {
 			_ret0 = _result[0].(bool)
 		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
 	}
-	return _ret0
+	return _ret0, _ret1
 }
 
 func (mock *MockWorkingDir) MergeAgain(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (bool, error) {
