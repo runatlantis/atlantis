@@ -16,6 +16,9 @@ import (
 
 // Database is an implementation of the database API we require.
 type Database interface {
+	BeginPlanGeneration(pull models.PullRequest, generation string, projects []command.ProjectContext, replace bool) (PlanGenerationBeginResult, error)
+	DiscardPlanStatus(pull models.PullRequest, expected models.ProjectStatus) (bool, error)
+
 	TryLock(lock models.ProjectLock) (bool, models.ProjectLock, error)
 	Unlock(project models.Project, workspace string) (*models.ProjectLock, error)
 	UnlockIfOwnedByPull(project models.Project, workspace string, pullNum int) (*models.ProjectLock, error)

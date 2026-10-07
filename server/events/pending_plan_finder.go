@@ -149,7 +149,7 @@ func (p *DefaultPendingPlanFinder) findInGitWorkspaces(pullDir string) ([]Pendin
 		for file := range strings.SplitSeq(string(lsOut), "\n") {
 			if filepath.Ext(file) == ".tfplan" {
 				// Ignore .terragrunt-cache dirs (#487)
-				if strings.Contains(file, ".terragrunt-cache/") {
+				if strings.Contains(file, ".terragrunt-cache/") || strings.Contains(file, ".atlantis-managed/") {
 					continue
 				}
 
@@ -245,7 +245,7 @@ func (p *DefaultPendingPlanFinder) findInPlanStore(clonePullDir string, planPull
 				return walkErr
 			}
 			if entry.IsDir() {
-				if entry.Name() == ".terragrunt-cache" {
+				if entry.Name() == ".terragrunt-cache" || strings.HasSuffix(entry.Name(), ".atlantis-managed") {
 					return filepath.SkipDir
 				}
 				return nil

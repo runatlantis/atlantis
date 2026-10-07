@@ -11,8 +11,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -116,6 +118,11 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 		)
 	}
+	if proj.PlanGeneration != "" || ctx.PlanGeneration != "" {
+		if proj.PlanGenerationActive || proj.PlanGeneration != ctx.PlanGeneration || proj.AcceptedPlanGeneration == "" || proj.AcceptedPlanGeneration != ctx.AcceptedPlanGeneration || proj.AcceptedPlanGeneration != proj.PlanGeneration || (requiresManagedPlanFileForApply(ctx) && (proj.ManagedPlanHash == "" || proj.ManagedPlanHash != ctx.ExpectedPlanHash)) {
+			return fmt.Errorf("%w for dir %q workspace %q project %q", db.ErrPlanGenerationSuperseded, ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+		}
+	}
 	if !statusAllowedForApplyExecution(proj.Status) {
 		if proj.Status == models.ErroredPolicyCheckStatus {
 			return rejectionErrorf(
@@ -196,12 +203,17 @@ func validateCommandStartIdentity(ctx command.ProjectContext, livePull models.Pu
 }
 
 func (v *DefaultApplyPlanValidator) pullStatusForApply(ctx command.ProjectContext) (*models.PullStatus, error) {
-	if ctx.API && ctx.PullStatus != nil {
+	if ctx.API && ctx.Pull.Num <= 0 && ctx.PullStatus != nil {
 		return ctx.PullStatus, nil
 	}
 	pullStatus, err := v.PullStatusFetcher.GetPullStatus(ctx.Pull)
 	if err != nil {
 		return nil, err
+	}
+	if ctx.API && ctx.PlanGeneration == "" && ctx.PullStatus != nil && (pullStatus == nil || !slices.ContainsFunc(pullStatus.Projects, func(project models.ProjectStatus) bool { return project.PlanGeneration != "" })) {
+		// Preserve legacy API plan/apply's freshly seeded state, but never let
+		// it bypass a generation already installed by a PR command.
+		return ctx.PullStatus, nil
 	}
 	if pullStatus != nil {
 		return pullStatus, nil

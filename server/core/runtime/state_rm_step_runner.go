@@ -53,7 +53,7 @@ func (p *stateRmStepRunner) Run(ctx command.ProjectContext, extraArgs []string, 
 	// If the state rm was successful and a plan file exists, delete the plan.
 	planPath := GetPlanFilePath(ctx, path)
 	if err == nil {
-		if _, planPathErr := os.Stat(planPath); !os.IsNotExist(planPathErr) {
+		if _, planPathErr := os.Stat(planPath); ctx.AcceptedPlanGeneration != "" || !os.IsNotExist(planPathErr) {
 			ctx.Log.Info("state rm successful, deleting planfile")
 			if removeErr := p.planStore.Remove(ctx, planPath); removeErr != nil {
 				ctx.Log.Warn("failed to delete planfile after successful state rm: %s", removeErr)

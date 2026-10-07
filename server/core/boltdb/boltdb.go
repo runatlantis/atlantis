@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -405,118 +406,11 @@ func (b *BoltDB) GetLock(p models.Project, workspace string) (*models.ProjectLoc
 // UpdatePullWithResults updates pull's status with the latest project results.
 // It returns the new PullStatus object.
 func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []command.ProjectResult) (models.PullStatus, error) {
-	key, err := b.pullKey(pull)
-	if err != nil {
-		return models.PullStatus{}, err
-	}
-
-	var newStatus models.PullStatus
-	err = b.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(b.pullsBucketName)
-		currStatus, err := b.getPullFromBucket(bucket, key)
-		if err != nil {
-			// Tolerate an unreadable prior entry (e.g. after a PullStatus
-			// schema change). It will be overwritten with fresh data below;
-			// in-flight policy approvals captured in the old blob are lost.
-			log.Printf("warning: discarding unreadable pull status at %q: %v", key, err)
-			currStatus = nil
-		}
-
-		// If there is no pull OR if the pull we have is out of date, we
-		// just write a new pull.
-		if currStatus == nil || pullStatusOutdatedForPull(currStatus.Pull, pull) {
-			var statuses []models.ProjectStatus
-			for _, r := range newResults {
-				statuses = append(statuses, b.projectResultToProject(r))
-			}
-			// Preserve policy status from the previous commit so approvals
-			// survive between the plan DB write and the subsequent policy
-			// check DB write. doPolicyCheck applies sticky filtering and
-			// overwrites these when it writes its own results.
-			if currStatus != nil {
-				for i := range statuses {
-					for _, old := range currStatus.Projects {
-						if statuses[i].Workspace == old.Workspace &&
-							statuses[i].RepoRelDir == old.RepoRelDir &&
-							statuses[i].ProjectName == old.ProjectName &&
-							len(old.PolicyStatus) > 0 {
-							statuses[i].PolicyStatus = old.PolicyStatus
-							break
-						}
-					}
-				}
-			}
-			newStatus = models.PullStatus{
-				Pull:     pull,
-				Projects: statuses,
-			}
-		} else {
-			// If there's an existing pull at the right commit then we have to
-			// merge our project results with the existing ones. We do a merge
-			// because it's possible a user is just applying a single project
-			// in this command and so we don't want to delete our data about
-			// other projects that aren't affected by this command.
-			newStatus = *currStatus
-			for _, res := range newResults {
-				// First, check if we should update any existing projects.
-				updatedExisting := false
-				for i := range newStatus.Projects {
-					// NOTE: We're using a reference here because we are
-					// in-place updating its Status field.
-					proj := &newStatus.Projects[i]
-					if res.Workspace == proj.Workspace &&
-						res.RepoRelDir == proj.RepoRelDir &&
-						res.ProjectName == proj.ProjectName {
-
-						proj.Status = res.PlanStatus()
-
-						// Updating only policy sets which are included in results; keeping the rest.
-						if len(proj.PolicyStatus) > 0 {
-							for i, oldPolicySet := range proj.PolicyStatus {
-								for _, newPolicySet := range res.PolicyStatus() {
-									if oldPolicySet.PolicySetName == newPolicySet.PolicySetName {
-										proj.PolicyStatus[i] = newPolicySet
-									}
-								}
-							}
-						} else {
-							proj.PolicyStatus = res.PolicyStatus()
-						}
-
-						updatedExisting = true
-						break
-					}
-				}
-
-				if !updatedExisting {
-					// If we didn't update an existing project, then we need to
-					// add this because it's a new one.
-					newStatus.Projects = append(newStatus.Projects, b.projectResultToProject(res))
-				}
-			}
-		}
-
-		// Now, we overwrite the key with our new status.
-		return b.writePullToBucket(bucket, key, newStatus)
+	return b.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.MergePullResults(current, pull, newResults)
 	})
-	if err != nil {
-		return models.PullStatus{}, fmt.Errorf("DB transaction failed: %w", err)
-	}
-	return newStatus, nil
 }
 
-func pullStatusOutdatedForPull(statusPull models.PullRequest, pull models.PullRequest) bool {
-	if statusPull.HeadCommit != pull.HeadCommit {
-		return true
-	}
-	if pull.BaseBranch == "" {
-		return false
-	}
-	return statusPull.BaseBranch == "" || statusPull.BaseBranch != pull.BaseBranch
-}
-
-// GetPullStatus returns the status for pull.
-// If there is no status, returns a nil pointer.
 func (b *BoltDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
 	key, err := b.pullKey(pull)
 	if err != nil {
@@ -553,37 +447,13 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 
 // UpdateProjectStatus updates project status.
 func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
-	key, err := b.pullKey(pull)
-	if err != nil {
-		return err
-	}
-	err = b.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(b.pullsBucketName)
-		currStatusPtr, err := b.getPullFromBucket(bucket, key)
-		if err != nil {
-			return err
-		}
-		if currStatusPtr == nil {
-			return nil
-		}
-		currStatus := *currStatusPtr
-
-		// Update the status.
-		for i := range currStatus.Projects {
-			// NOTE: We're using a reference here because we are
-			// in-place updating its Status field.
-			proj := &currStatus.Projects[i]
-			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
-				proj.Status = newStatus
-				break
-			}
-		}
-		return b.writePullToBucket(bucket, key, currStatus)
+	_, err := b.mutatePullStatus(pull, false, func(current *models.PullStatus) (models.PullStatus, error) {
+		return db.UpdateLegacyProjectStatus(current, pull, workspace, repoRelDir, newStatus)
 	})
-	if err != nil {
-		return fmt.Errorf("DB transaction failed: %w", err)
+	if errors.Is(err, db.ErrPlanStatusNotFound) {
+		return nil
 	}
-	return nil
+	return err
 }
 
 func (b *BoltDB) pullKey(pull models.PullRequest) ([]byte, error) {
@@ -629,17 +499,6 @@ func (b *BoltDB) writePullToBucket(bucket *bolt.Bucket, key []byte, pull models.
 	return bucket.Put(key, serialized)
 }
 
-func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectStatus {
-	return models.ProjectStatus{
-		Workspace:    p.Workspace,
-		RepoRelDir:   p.RepoRelDir,
-		ProjectName:  p.ProjectName,
-		PolicyStatus: p.PolicyStatus(),
-		Status:       p.PlanStatus(),
-	}
-}
-
-// Ping checks the database connection health.
 func (b *BoltDB) Ping() error {
 	return b.db.View(func(tx *bolt.Tx) error {
 		return nil

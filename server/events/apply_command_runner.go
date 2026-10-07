@@ -231,39 +231,22 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
-		ctx.Log.Err("fetching live pull request after apply: %s", err)
-		ctx.CommandHasErrors = true
-		result.Error = fmt.Errorf("fetching live pull request after apply: %w", err)
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, result)
+		a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("fetching live pull request after apply: %w", err), true)
 		return
 	}
 	if err := livePullIdentityChangedDuringApply(livePull, finalLivePull); err != nil {
-		ctx.Log.Warn("apply result is stale because %s", err)
-		ctx.CommandHasErrors = true
-		result.Error = err
-		a.publishDeferredApplyStatuses(projectCmds, result, models.FailedCommitStatus)
-		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-			ctx.Log.Warn("unable to update commit status: %s", statusErr)
-		}
-		a.pullUpdater.updatePull(ctx, cmd, result)
+		a.failApplyResult(ctx, cmd, projectCmds, result, err, true)
 		return
 	}
 	livePull = finalLivePull
 	ctx.CommandHasErrors = result.HasErrors()
 
-	a.pullUpdater.updatePull(
-		ctx,
-		cmd,
-		result)
-
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
-		ctx.Log.Err("writing results: %s", err)
+		a.failApplyResult(ctx, cmd, projectCmds, result, fmt.Errorf("persisting apply results: %w", err), false)
 		return
 	}
+	a.pullUpdater.updatePull(ctx, cmd, result)
 
 	currentPull := applyPullWithLiveIdentity(pull, livePull)
 	if err := applyResultStatusUpdateError(result, pullStatus, pull, currentPull, preApplyPullStatus); err != nil {
@@ -366,8 +349,16 @@ func applyResultStatusUpdateError(result command.Result, pullStatus models.PullS
 	if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded apply status"); err != nil {
 		return err
 	}
-	if result.HasErrors() && pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {
-		return errors.New("apply result has errors but no errored apply status was recorded")
+	for _, projectResult := range result.ProjectResults {
+		if projectResult.Error == nil && projectResult.Failure == "" {
+			continue
+		}
+		if _, ok := errors.AsType[DirNotExistErr](projectResult.Error); ok {
+			continue
+		}
+		if pullStatus.StatusCount(models.ErroredApplyStatus) == 0 {
+			return errors.New("apply result has errors but no errored apply status was recorded")
+		}
 	}
 	return nil
 }
@@ -502,3 +493,32 @@ var applyDisabledComment = "**Error:** Running `atlantis apply` is disabled."
 
 // applyLockCheckFailedComment is posted when the global apply lock check fails (e.g. database unreachable).
 var applyLockCheckFailedComment = "**Error:** Failed to check global apply lock. Running `atlantis apply` is not allowed until the lock backend is reachable."
+
+// failApplyResult makes the outcome visible even when persistence or the final
+// live-head refresh fails. Successful execution is never presented as safe to
+// retry after its authorization becomes ambiguous.
+func (a *ApplyCommandRunner) failApplyResult(ctx *command.Context, cmd *CommentCommand, projects []command.ProjectContext, result command.Result, failure error, recordAmbiguousExecution bool) {
+	ctx.CommandHasErrors = true
+	publication := result
+	result.ProjectResults = slices.Clone(result.ProjectResults)
+	if recordAmbiguousExecution {
+		changed := false
+		for i := range result.ProjectResults {
+			project := &result.ProjectResults[i]
+			if project.PlanGeneration != "" && project.ApplyExecuted {
+				project.Error = fmt.Errorf("%w: %w", db.ErrApplyExecutionAmbiguous, failure)
+				changed = true
+			}
+		}
+		if changed {
+			_, persistErr := a.dbUpdater.updateDB(ctx, ctx.Pull, result.ProjectResults)
+			failure = errors.Join(db.ErrApplyExecutionAmbiguous, failure, persistErr)
+		}
+	}
+	result.Error = failure
+	a.publishDeferredApplyStatuses(projects, publication, models.FailedCommitStatus)
+	if err := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Apply); err != nil {
+		ctx.Log.Warn("updating apply failure status %v", err)
+	}
+	a.pullUpdater.updatePull(ctx, cmd, result)
+}

@@ -4,6 +4,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -115,9 +116,13 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lock, err := l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
+	lock, discarded, err := l.DeleteLockCommand.DeleteLock(l.Logger, idUnencoded)
 	if err != nil {
-		l.respond(w, logging.Error, http.StatusInternalServerError, "deleting lock failed with: '%s'", err)
+		code := http.StatusInternalServerError
+		if errors.Is(err, db.ErrPlanStatusNotFound) || errors.Is(err, db.ErrPlanGenerationSuperseded) {
+			code = http.StatusConflict
+		}
+		l.respond(w, logging.Error, code, "deleting lock failed with: '%s'", err)
 		return
 	}
 
@@ -129,10 +134,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 	// NOTE: Because BaseRepo was added to the PullRequest model later, previous
 	// installations of Atlantis will have locks in their DB that do not have
 	// this field on PullRequest. We skip commenting in this case.
-	if lock.Pull.BaseRepo != (models.Repo{}) {
-		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, models.DiscardedPlanStatus); err != nil {
-			l.Logger.Err("unable to update project status: %s", err)
-		}
+	if discarded && lock.Pull.BaseRepo != (models.Repo{}) {
 
 		// Once the lock has been deleted, comment back on the pull request.
 		comment := fmt.Sprintf("**Warning**: The plan for dir: `%s` workspace: `%s` was **discarded** via the Atlantis UI.\n\n"+
@@ -141,7 +143,7 @@ func (l *LocksController) DeleteLock(w http.ResponseWriter, r *http.Request) {
 			l.Logger.Warn("failed commenting on pull request: %s", err)
 		}
 	} else {
-		l.Logger.Debug("skipping commenting on pull request and deleting workspace because BaseRepo field is empty")
+		l.Logger.Debug("skipping discard comment because the plan was already applied or repository metadata is unavailable")
 	}
 	l.respond(w, logging.Info, http.StatusOK, "Deleted lock id '%s'", id)
 }

@@ -266,26 +266,17 @@ func newProjectCommandContext(ctx *command.Context,
 
 	var projectPlanStatus models.ProjectPlanStatus
 	var projectPolicyStatus []models.PolicySetStatus
+	var observed *models.ProjectStatus
 
 	if ctx.PullStatus != nil {
-		for _, project := range ctx.PullStatus.Projects {
-
-			// if name is not used, let's match the directory
-			if projCfg.Name == "" && project.RepoRelDir == projCfg.RepoRelDir {
-				projectPlanStatus = project.Status
-				projectPolicyStatus = project.PolicyStatus
-				break
-			}
-
-			if projCfg.Name != "" && project.ProjectName == projCfg.Name {
-				projectPlanStatus = project.Status
-				projectPolicyStatus = project.PolicyStatus
-				break
-			}
+		observed = findProjectInPullStatus(ctx.PullStatus, projCfg.Workspace, projCfg.RepoRelDir, projCfg.Name)
+		if observed != nil {
+			projectPlanStatus = observed.Status
+			projectPolicyStatus = observed.PolicyStatus
 		}
 	}
 
-	return command.ProjectContext{
+	result := command.ProjectContext{
 		CommandName:                     cmd,
 		SubCommand:                      subCommand,
 		ApplyCmd:                        applyCmd,
@@ -341,6 +332,12 @@ func newProjectCommandContext(ctx *command.Context,
 		SuppressApplyWebhooks:           ctx.SuppressApplyWebhooks,
 		FailOnMissingDependencies:       ctx.FailOnMissingDependencies,
 	}
+	if observed != nil {
+		result.PlanGeneration = observed.PlanGeneration
+		result.AcceptedPlanGeneration = observed.AcceptedPlanGeneration
+		result.ExpectedPlanHash = observed.ManagedPlanHash
+	}
+	return result
 }
 
 func escapeArgs(args []string) []string {

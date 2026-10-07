@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -68,6 +69,15 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	planFile := GetPlanFilePath(ctx, path)
 	if err := EnsurePlanFileDir(ctx, path); err != nil {
 		return "", err
+	}
+	if ctx.PlanGeneration != "" {
+		ctx.CanonicalPlanPath = planFile
+		staged, cleanup, err := planstore.StagePlan(ctx, planFile)
+		if err != nil {
+			return "", err
+		}
+		defer cleanup()
+		planFile = staged
 	}
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)

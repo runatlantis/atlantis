@@ -96,8 +96,19 @@ type ProjectContext struct {
 	// CurrentProjectPlanStatus is the status of the current project prior to this command.
 	ProjectPlanStatus models.ProjectPlanStatus
 	// ExpectedPlanHash is the SHA-256 hash of the plan file apply will use.
-	// The runner sets it after PlanStore.Load. A later change fails apply.
+	// For durable generations it comes from accepted status; legacy plans set it
+	// after PlanStore.Load. A later change fails apply.
 	ExpectedPlanHash string
+	// PlanGeneration is the identity admitted for this command's project.
+	PlanGeneration string
+	// AcceptedPlanGeneration selects the immutable artifact authorized by durable status.
+	AcceptedPlanGeneration string
+	// CanonicalPlanPath retains the public PLANFILE location when a built-in
+	// plan writes to its private staging path instead.
+	CanonicalPlanPath string
+	// SavedPlanHash is set by the store only after the exact bytes are saved.
+	// Each project command owns a separate pointer; sequential steps share it.
+	SavedPlanHash *string
 	// RequiresAtlantisManagedPlanFile is true when this project's workflow uses
 	// the built-in plan or apply step, meaning Atlantis owns the convention plan
 	// artifact (<workspace>.tfplan). Workflows built only from custom run steps
@@ -194,6 +205,9 @@ type ProjectContext struct {
 	// RemoteApplyRunURL receives the Terraform Cloud/Enterprise run URL found by
 	// remote apply execution so deferred final status publication can use it.
 	RemoteApplyRunURL *string
+	// ApplyExecutionSucceeded records successful infrastructure execution even
+	// when subsequent status validation or a later workflow step fails.
+	ApplyExecutionSucceeded *bool
 
 	// FailOnMissingDependencies makes apply dependency validation fail when a
 	// configured dependency is not present in PullStatus.

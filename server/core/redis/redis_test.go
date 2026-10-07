@@ -1474,3 +1474,35 @@ func generateLocalhostCert() ([]byte, []byte, error) {
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	return certBytes, keyBytes, err
 }
+
+// Unreadable generation state can only be replaced by explicit fail-closed
+// admission; ordinary completion must not erase its authorization boundary.
+func TestPlanGeneration_UnreadableStatusRecovery(t *testing.T) {
+	for name, corrupt := range map[string]string{
+		"malformed":                     `{"Projects":[`,
+		"generation with legacy policy": `{"Projects":[{"Workspace":"default","RepoRelDir":".","PlanGeneration":"G1","PolicyStatus":[{"Approvals":2}]}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			pull := models.PullRequest{Num: 1, HeadCommit: "same-head", BaseRepo: models.Repo{FullName: "owner/repo"}}
+			key := fmt.Sprintf("%s::%s::%d", pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+			s := miniredis.RunT(t)
+			rdb := newTestRedis(s)
+			t.Cleanup(func() { Ok(t, rdb.Close()) })
+			Ok(t, s.Set(key, corrupt))
+
+			_, writeErr := rdb.UpdatePullWithResults(pull, []command.ProjectResult{{Command: command.Plan, Workspace: "default", RepoRelDir: ".", ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+			Assert(t, writeErr != nil, "ordinary writer must reject unreadable generation state")
+			admitted, beginErr := rdb.BeginPlanGeneration(pull, "G2", []command.ProjectContext{{Workspace: "default", RepoRelDir: ".", RequiresAtlantisManagedPlanFile: true}}, false)
+			Ok(t, beginErr)
+			Equals(t, 1, len(admitted.Projects))
+			Equals(t, "G2", admitted.Projects[0].PlanGeneration)
+			Equals(t, true, admitted.Projects[0].PlanGenerationActive)
+			Equals(t, "", admitted.Projects[0].AcceptedPlanGeneration)
+			Equals(t, "", admitted.Projects[0].ManagedPlanHash)
+			Equals(t, models.ErroredPlanStatus, admitted.Projects[0].Status)
+			stored, readErr := rdb.GetPullStatus(pull)
+			Ok(t, readErr)
+			Equals(t, admitted.PullStatus, *stored)
+		})
+	}
+}
