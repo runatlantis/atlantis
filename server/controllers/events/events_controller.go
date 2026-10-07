@@ -84,6 +84,9 @@ type VCSEventsController struct {
 	// UI that identifies this call as coming from Bitbucket. If empty, no
 	// request validation is done.
 	BitbucketWebhookSecret []byte
+	// StackedPullPlanner plans the next pull request of a GitHub stack when a
+	// pull request is merged. It is nil unless stack aware planning is enabled.
+	StackedPullPlanner events.StackedPullPlanner
 	// AzureDevopsWebhookUser is the Basic authentication username added to this
 	// webhook via the Azure DevOps UI that identifies this call as coming from your
 	// Azure DevOps Team Project. If empty, no request validation is done.
@@ -557,7 +560,19 @@ func (e *VCSEventsController) HandleGithubPullRequestEvent(logger logging.Simple
 	)
 
 	logger.Info("Handling GitHub Pull Request '%s' event", pullEventType.String())
-	return e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
+	resp := e.handlePullRequestEvent(logger, baseRepo, headRepo, pull, user, pullEventType)
+
+	// Once a pull request is merged and its locks are released, the next pull
+	// request of its stack can be planned.
+	if pullEventType == models.ClosedPullEvent && pullEvent.GetPullRequest().GetMerged() &&
+		e.StackedPullPlanner != nil && resp.err.code == 0 {
+		if !e.TestingMode {
+			go e.StackedPullPlanner.PlanNextPull(logger, baseRepo, pull)
+		} else {
+			e.StackedPullPlanner.PlanNextPull(logger, baseRepo, pull)
+		}
+	}
+	return resp
 }
 
 func (e *VCSEventsController) handlePullRequestEvent(logger logging.SimpleLogging, baseRepo models.Repo, headRepo models.Repo, pull models.PullRequest, user models.User, eventType models.PullRequestEventType) HTTPResponse {

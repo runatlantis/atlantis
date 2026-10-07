@@ -7,6 +7,7 @@ package github
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -1053,6 +1054,12 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		}
 	}
 
+	// Stacked pull requests can only be merged through the asynchronous merge
+	// endpoint.
+	if pull.Stack != nil {
+		return g.mergeStackedPull(logger, pull, method)
+	}
+
 	// Now we're ready to make our API call to merge the pull request.
 	options := &github.PullRequestOptions{
 		MergeMethod: method,
@@ -1077,6 +1084,108 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		return fmt.Errorf("could not merge pull request: %s", mergeResult.GetMessage())
 	}
 	return nil
+}
+
+// mergeStackedPull merges a stacked pull request through the asynchronous
+// merge endpoint and waits for the merge to complete. GitHub merges every pull
+// request below it in the stack as well, so callers must make sure those are
+// safe to merge.
+// See https://docs.github.com/en/pull-requests/reference/stacked-pull-requests-apis-and-webhooks
+func (g *Client) mergeStackedPull(logger logging.SimpleLogging, pull models.PullRequest, method string) error {
+	owner, name := pull.BaseRepo.Owner, pull.BaseRepo.Name
+	body := github.PullRequestMergeAsyncRequest{
+		MergeMethod: new(method),
+	}
+	// Only merge the commit that was applied.
+	if pull.HeadCommit != "" {
+		body.SHA = new(pull.HeadCommit)
+	}
+
+	logger.Debug("PUT /repos/%v/%v/pulls/%d/merge-async", owner, name, pull.Num)
+	result, resp, err := g.client.PullRequests.MergeAsync(g.ctx, owner, name, pull.Num, body)
+	if resp != nil {
+		logger.Debug("PUT /repos/%v/%v/pulls/%d/merge-async returned: %v", owner, name, pull.Num, resp.StatusCode)
+	}
+	result, err = asyncMergeResult(result, err)
+	if err != nil {
+		return fmt.Errorf("merging stacked pull request: %w", err)
+	}
+
+	uuid := result.GetDetails().GetUUID()
+	deadline := time.Now().Add(g.config.asyncMergeTimeout())
+	for result.GetStatus() == "pending" {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timed out after %s waiting for GitHub to merge stacked pull request (merge request %s is still pending)", g.config.asyncMergeTimeout(), uuid)
+		}
+		time.Sleep(g.config.asyncMergePollInterval())
+
+		logger.Debug("GET /repos/%v/%v/pulls/%d/merge-async/%s", owner, name, pull.Num, uuid)
+		result, resp, err = g.client.PullRequests.GetMergeAsyncResult(g.ctx, owner, name, pull.Num, uuid)
+		if resp != nil {
+			logger.Debug("GET /repos/%v/%v/pulls/%d/merge-async/%s returned: %v", owner, name, pull.Num, uuid, resp.StatusCode)
+		}
+		result, err = asyncMergeResult(result, err)
+		if err != nil {
+			return fmt.Errorf("fetching status of stacked pull request merge %s: %w", uuid, err)
+		}
+	}
+
+	switch result.GetStatus() {
+	case "merged":
+		return nil
+	case "enqueued":
+		logger.Info("stacked pull request %d was added to the merge queue", pull.Num)
+		return nil
+	default:
+		return fmt.Errorf("could not merge stacked pull request: %s: %s", result.GetStatus(), result.GetDetails().GetMessage())
+	}
+}
+
+// asyncMergeResult returns the result of an asynchronous merge request.
+// go-github reports a 202 Accepted response, which GitHub returns while the
+// merge is pending, as an error with the response body attached.
+func asyncMergeResult(result *github.PullRequestMergeAsyncResult, err error) (*github.PullRequestMergeAsyncResult, error) {
+	var accepted *github.AcceptedError
+	if !errors.As(err, &accepted) {
+		return result, err
+	}
+	result = &github.PullRequestMergeAsyncResult{}
+	if err := json.Unmarshal(accepted.Raw, result); err != nil {
+		return nil, fmt.Errorf("parsing asynchronous merge response: %w", err)
+	}
+	return result, nil
+}
+
+// GetPullRequestStack returns the pull requests of the stack that pull request
+// num belongs to, ordered from the bottom of the stack to the top. It returns
+// nil if the pull request is not part of a stack.
+func (g *Client) GetPullRequestStack(logger logging.SimpleLogging, repo models.Repo, num int) ([]models.StackedPull, error) {
+	logger.Debug("GET /repos/%v/%v/stacks?pull_request=%d", repo.Owner, repo.Name, num)
+	stacks, resp, err := g.client.PullRequests.ListStacks(g.ctx, repo.Owner, repo.Name, &github.PullRequestListStacksOptions{PullRequest: num})
+	if resp != nil {
+		logger.Debug("GET /repos/%v/%v/stacks?pull_request=%d returned: %v", repo.Owner, repo.Name, num, resp.StatusCode)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("listing stacks for pull request %d: %w", num, err)
+	}
+	if len(stacks) == 0 {
+		return nil, nil
+	}
+
+	var pulls []models.StackedPull
+	for _, p := range stacks[0].PullRequests {
+		entry := models.StackedPull{
+			Num:    p.Number,
+			Open:   p.State == "open",
+			Merged: p.MergedAt != nil,
+			Draft:  p.Draft,
+		}
+		if p.Head != nil {
+			entry.HeadCommit = p.Head.SHA
+		}
+		pulls = append(pulls, entry)
+	}
+	return pulls, nil
 }
 
 // MarkdownPullLink specifies the string used in a pull request comment to reference another pull request.

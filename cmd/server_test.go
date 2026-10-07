@@ -83,6 +83,7 @@ var testFlags = map[string]any{
 	ExecutableName:                   "atlantis",
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
+	GHStackAwarePlanningFlag:         false,
 	GHHostnameFlag:                   "ghhostname",
 	GHTeamAllowlistFlag:              "",
 	GHTokenFlag:                      "token",

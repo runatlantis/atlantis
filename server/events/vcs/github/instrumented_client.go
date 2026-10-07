@@ -26,6 +26,7 @@ func NewInstrumentedGithubClient(client *Client, statsScope tally.Scope, logger 
 	return &InstrumentedGithubClient{
 		InstrumentedClient: instrumentedGHClient,
 		PullRequestGetter:  client,
+		StackGetter:        client,
 		StatsScope:         scope,
 		Logger:             logger,
 	}
@@ -37,11 +38,20 @@ type GithubPullRequestGetter interface {
 	GetPullRequest(logger logging.SimpleLogging, repo models.Repo, pullNum int) (*github.PullRequest, error)
 }
 
+// GithubPullRequestStackGetter fetches the stack a pull request belongs to.
+type GithubPullRequestStackGetter interface {
+	// GetPullRequestStack returns the pull requests of the stack that pull
+	// request pullNum belongs to, ordered from the bottom of the stack to the
+	// top. It returns nil if the pull request is not part of a stack.
+	GetPullRequestStack(logger logging.SimpleLogging, repo models.Repo, pullNum int) ([]models.StackedPull, error)
+}
+
 // IGithubClient exists to bridge the gap between GithubPullRequestGetter and Client interface to allow
 // for a single instrumented client
 type IGithubClient interface {
 	vcs.Client
 	GithubPullRequestGetter
+	GithubPullRequestStackGetter
 }
 
 // InstrumentedGithubClient should delegate to the underlying InstrumentedClient for vcs provider-agnostic
@@ -49,6 +59,7 @@ type IGithubClient interface {
 type InstrumentedGithubClient struct {
 	*common.InstrumentedClient
 	PullRequestGetter GithubPullRequestGetter
+	StackGetter       GithubPullRequestStackGetter
 	StatsScope        tally.Scope
 	Logger            logging.SimpleLogging
 }
@@ -74,4 +85,26 @@ func (c *InstrumentedGithubClient) GetPullRequest(logger logging.SimpleLogging, 
 
 	return pull, err
 
+}
+
+func (c *InstrumentedGithubClient) GetPullRequestStack(logger logging.SimpleLogging, repo models.Repo, pullNum int) ([]models.StackedPull, error) {
+	scope := c.StatsScope.SubScope("get_pull_request_stack")
+	scope = common.SetGitScopeTags(scope, repo.FullName, pullNum)
+
+	executionTime := scope.Timer(metrics.ExecutionTimeMetric).Start()
+	defer executionTime.Stop()
+
+	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
+	executionError := scope.Counter(metrics.ExecutionErrorMetric)
+
+	pulls, err := c.StackGetter.GetPullRequestStack(logger, repo, pullNum)
+
+	if err != nil {
+		executionError.Inc(1)
+		logger.Err("Unable to get pull request stack, error: %s", err.Error())
+	} else {
+		executionSuccess.Inc(1)
+	}
+
+	return pulls, err
 }

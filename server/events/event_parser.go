@@ -641,6 +641,14 @@ func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github
 		BaseRepo:   baseRepo,
 		BaseBranch: baseBranch,
 	}
+	if stack := pull.GetStack(); stack != nil {
+		pullModel.Stack = &models.PullRequestStack{
+			Number:     stack.GetNumber(),
+			Position:   stack.GetPosition(),
+			Size:       stack.GetSize(),
+			BaseBranch: stack.GetBase().GetRef(),
+		}
+	}
 	return
 }
 

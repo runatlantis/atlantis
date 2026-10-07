@@ -1034,3 +1034,52 @@ func setup(t *testing.T) (events_controllers.VCSEventsController, *mocks.MockGit
 	}
 	return e, v, gl, ado, p, cr, c, vcsmock, cp
 }
+
+func TestHandleGithubPullRequestEvent_PlansNextStackedPullOnMerge(t *testing.T) {
+	cases := map[string]struct {
+		eventType  models.PullRequestEventType
+		merged     bool
+		cleanupErr error
+		expPlanned bool
+	}{
+		"merged": {
+			eventType:  models.ClosedPullEvent,
+			merged:     true,
+			expPlanned: true,
+		},
+		"closed without merging": {
+			eventType: models.ClosedPullEvent,
+		},
+		"cleanup failed": {
+			eventType:  models.ClosedPullEvent,
+			merged:     true,
+			cleanupErr: errors.New("err"),
+		},
+		"updated": {
+			eventType: models.UpdatedPullEvent,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			e, _, _, _, p, _, cleaner, _, _ := setup(t)
+			planner := emocks.NewMockStackedPullPlanner()
+			e.StackedPullPlanner = planner
+			logger := logging.NewNoopLogger(t)
+
+			repo := models.Repo{FullName: "owner/repo"}
+			pull := models.PullRequest{Num: 1, State: models.ClosedPullState, BaseRepo: repo}
+			event := &github.PullRequestEvent{PullRequest: &github.PullRequest{Merged: new(c.merged)}}
+			When(p.ParseGithubPullEvent(Any[logging.SimpleLogging](), Eq(event))).ThenReturn(pull, c.eventType, repo, repo, models.User{}, nil)
+			When(cleaner.CleanUpPull(Any[logging.SimpleLogging](), Eq(repo), Eq(pull))).ThenReturn(c.cleanupErr)
+
+			e.HandleGithubPullRequestEvent(logger, event, "req-id")
+
+			times := Never()
+			if c.expPlanned {
+				times = Once()
+			}
+			planner.VerifyWasCalled(times).PlanNextPull(Any[logging.SimpleLogging](), Eq(repo), Eq(pull))
+		})
+	}
+}

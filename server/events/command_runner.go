@@ -139,6 +139,10 @@ type DefaultCommandRunner struct {
 	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
 	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
+	// User config option: only autoplan the lowest open pull request of a
+	// GitHub stack. Pull requests above it are planned once it is merged.
+	StackAwarePlanning bool
+	GithubStackGetter  GithubStackGetter
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -204,6 +208,17 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)
 		} else if slices.Contains(labels, c.DisableAutoplanLabel) {
 			ctx.Log.Info("Pull/merge request has disable auto plan label '%s' so not running autoplan.", c.DisableAutoplanLabel)
+			return
+		}
+	}
+
+	if c.StackAwarePlanning && pull.Stack != nil && pull.Stack.Position > 1 {
+		if waitingOn := c.openPullsBelowInStack(ctx); len(waitingOn) > 0 {
+			ctx.Log.Info("not running autoplan because pull requests below it in the stack are still open: %s", formatStackedPulls(waitingOn))
+			comment := fmt.Sprintf(stackedAutoplanDeferredComment, pull.Stack.Position, pull.Stack.Size, formatStackedPulls(waitingOn))
+			if err := c.VCSClient.CreateComment(ctx.Log, baseRepo, pull.Num, comment, command.Plan.String()); err != nil {
+				ctx.Log.Err("unable to comment that autoplan was deferred: %s", err)
+			}
 			return
 		}
 	}
@@ -732,3 +747,27 @@ func (c *DefaultCommandRunner) logPanics(baseRepo models.Repo, pullNum int, logg
 }
 
 var automergeComment = `Automatically merging because all plans have been successfully applied.`
+
+var stackedAutoplanDeferredComment = "Autoplan deferred: this pull request is %d of %d in its stack and will be planned " +
+	"automatically once the pull requests below it are merged (waiting on %s). Run `atlantis plan` to plan it now."
+
+// openPullsBelowInStack returns the open pull requests below the stacked pull
+// request of ctx. If the stack can't be fetched it returns nil, so that
+// autoplan runs as it would for any other pull request.
+func (c *DefaultCommandRunner) openPullsBelowInStack(ctx *command.Context) []models.StackedPull {
+	// A pull request targeting the base of its stack has nothing open below it.
+	if ctx.Pull.BaseBranch == ctx.Pull.Stack.BaseBranch || c.GithubStackGetter == nil {
+		return nil
+	}
+	stack, err := c.GithubStackGetter.GetPullRequestStack(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num)
+	if err != nil {
+		ctx.Log.Warn("unable to fetch pull request stack, running autoplan: %s", err)
+		return nil
+	}
+	below, err := pullsBelowInStack(stack, ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to find pull request in its stack, running autoplan: %s", err)
+		return nil
+	}
+	return openStackedPulls(below)
+}

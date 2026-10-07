@@ -334,6 +334,27 @@ func TestParseGithubPull(t *testing.T) {
 	Equals(t, expBaseRepo, actHeadRepo)
 }
 
+func TestParseGithubPull_Stacked(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	testPull := deepcopy.Copy(githubtestdata.Pull).(github.PullRequest)
+	testPull.Stack = &github.PullRequestStack{
+		Base:     &github.PullRequestStackBase{Ref: "main"},
+		Size:     new(3),
+		Position: new(2),
+		ID:       new(int64(10)),
+		Number:   new(4),
+	}
+
+	pullRes, _, _, err := parser.ParseGithubPull(logger, &testPull)
+	Ok(t, err)
+	Equals(t, &models.PullRequestStack{
+		Number:     4,
+		Position:   2,
+		Size:       3,
+		BaseBranch: "main",
+	}, pullRes.Stack)
+}
+
 func TestParseGitlabMergeEvent(t *testing.T) {
 	t.Log("should properly parse a gitlab merge event")
 	path := filepath.Join("testdata", "gitlab-merge-request-event.json")

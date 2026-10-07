@@ -84,6 +84,25 @@ autoplan. Then I will be able to apply both plans.
 If multiple projects/dirs/workspaces are configured to be planned automatically,
 then they should all be applied before Atlantis automatically merges the PR.
 
+## Stacked Pull Requests
+
+GitHub [stacked pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs)
+can only be merged through GitHub's asynchronous merge API, which Atlantis uses
+automatically for pull requests that are part of a stack. Atlantis waits for the
+merge to complete (or for the pull request to be added to a merge queue) and
+only merges the commit that was applied.
+
+GitHub merges a stacked pull request **together with every open pull request
+below it** in the stack. Atlantis therefore only automerges a stacked pull request
+when every open pull request below it has also had all of its plans applied at its
+current commit. Otherwise automerge is skipped with a comment listing the pull
+requests that still need to be applied.
+
+To work through a stack one pull request at a time, enable
+[`--gh-stack-aware-planning`](server-configuration.md#gh-stack-aware-planning):
+Atlantis then plans each pull request of the stack once the one below it has been
+merged.
+
 ## Permissions
 
 The Atlantis VCS user must have the ability to merge pull requests.
