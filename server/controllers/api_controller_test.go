@@ -193,6 +193,82 @@ func TestAPIController_PlanSortsByExecutionOrder(t *testing.T) {
 	Equals(t, []string{"first-group", "second-group"}, planOrder)
 }
 
+func TestAPIController_PlanHookAndPlanOrder(t *testing.T) {
+	cases := []struct {
+		name         string
+		parallelPlan bool
+		check        func(t *testing.T, calls []string)
+	}{
+		{
+			name: "sequential runs each project's hooks around its plan",
+			check: func(t *testing.T, calls []string) {
+				Equals(t, []string{"pre a", "plan a", "post a", "pre b", "plan b", "post b"}, calls)
+			},
+		},
+		{
+			name:         "parallel runs hooks around the whole batch",
+			parallelPlan: true,
+			check: func(t *testing.T, calls []string) {
+				Assert(t, len(calls) == 6, "expected 6 calls, got %v", calls)
+				Equals(t, []string{"pre a", "pre b"}, calls[:2])
+				Assert(t, (calls[2] == "plan a" && calls[3] == "plan b") || (calls[2] == "plan b" && calls[3] == "plan a"), "expected both plans after the pre hooks, got %v", calls)
+				Equals(t, []string{"post a", "post b"}, calls[4:])
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			ac.ParallelPoolSize = 2
+			var mu sync.Mutex
+			var calls []string
+			record := func(call string) {
+				mu.Lock()
+				defer mu.Unlock()
+				calls = append(calls, call)
+			}
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					commentCommand := args[1].(*events.CommentCommand)
+					return ReturnValues{[]command.ProjectContext{{
+						CommandName:         command.Plan,
+						ProjectName:         commentCommand.ProjectName,
+						ParallelPlanEnabled: c.parallelPlan,
+					}}, nil}
+				})
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+				Then(func(args []Param) ReturnValues {
+					record("plan " + args[0].(command.ProjectContext).ProjectName)
+					return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+				})
+			When(ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					record("pre " + args[1].(*events.CommentCommand).ProjectName)
+					return ReturnValues{nil}
+				})
+			When(ac.PostWorkflowHooksCommandRunner.(*MockPostWorkflowHooksCommandRunner).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					record("post " + args[1].(*events.CommentCommand).ProjectName)
+					return ReturnValues{nil}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"a", "b"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			Equals(t, http.StatusOK, w.Code)
+			c.check(t, calls)
+		})
+	}
+}
+
 func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	ac, _, projectCommandRunner := setup(t)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{
@@ -3802,6 +3878,68 @@ func TestAPIController_DetectDrift(t *testing.T) {
 	var result controllers.DriftDetectionResultAPI
 	parseAPIResponse(t, response, &result)
 	Equals(t, "Repo", result.Repository)
+}
+
+func TestAPIController_DetectDriftPlansParallelPlanProjectsConcurrently(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	ac.ParallelPoolSize = 2
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			commentCommand := args[1].(*events.CommentCommand)
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:         command.Plan,
+				ProjectName:         commentCommand.ProjectName,
+				ParallelPlanEnabled: true,
+			}}, nil}
+		})
+	started := make(chan string, 2)
+	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(releaseOnce)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			started <- args[0].(command.ProjectContext).ProjectName
+			<-release
+			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+		})
+	driftStorage := driftmocks.NewMockStorage()
+	When(driftStorage.Store(Any[string](), Any[models.ProjectDrift]())).ThenReturn(nil)
+	ac.DriftStorage = driftStorage
+
+	body, _ := json.Marshal(models.DriftDetectionRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"first", "second"},
+	})
+	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ac.DetectDrift(w, req)
+	}()
+
+	var running []string
+	for len(running) < 2 {
+		select {
+		case name := <-started:
+			running = append(running, name)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for both plans to run at once; running=%v", running)
+		}
+	}
+	releaseOnce()
+	<-done
+
+	Equals(t, http.StatusOK, w.Code)
+	response, _ := io.ReadAll(w.Result().Body)
+	var result controllers.DriftDetectionResultAPI
+	parseAPIResponse(t, response, &result)
+	Equals(t, 2, len(result.Projects))
+	Equals(t, "first", result.Projects[0].ProjectName)
+	Equals(t, "second", result.Projects[1].ProjectName)
 }
 
 func TestAPIController_DetectDrift_TeamAllowlistDeniedReturnsForbidden(t *testing.T) {

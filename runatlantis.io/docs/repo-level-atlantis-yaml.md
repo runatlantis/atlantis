@@ -185,6 +185,8 @@ Use the `--parallel-pool-size` to configure the max number of plans and applies 
 
 Parallel plans and applies work across both multiple directories and multiple workspaces.
 
+`parallel_plan` also applies to plans and policy checks started through the [API](api-endpoints.md), such as `POST /api/plan` and `POST /api/drift/detect`. Applies started through the API still run one project at a time.
+
 ### Configuring Planning
 
 Given the directory structure:

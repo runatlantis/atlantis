@@ -145,6 +145,112 @@ func TestRunProjectCmds_Sequential(t *testing.T) {
 	assert.Equal(t, []string{"p1", "p2", "p3"}, order)
 }
 
+func TestRunProjectCmdsParallelInOrder_RunsGroupConcurrently(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan string, 2)
+		release := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+		}
+		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(cmds, runner, 2)
+		}()
+
+		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
+		close(release)
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, 2)
+		assert.False(t, result.HasErrors())
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_RespectsPoolSize(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const poolSize = 2
+		started := make(chan string, 4)
+		release := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{
+			makeProjectContext("p1"),
+			makeProjectContext("p2"),
+			makeProjectContext("p3"),
+			makeProjectContext("p4"),
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(cmds, runner, poolSize)
+		}()
+
+		synctest.Wait()
+		assert.Len(t, started, poolSize)
+		close(release)
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, len(cmds))
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_WaitsForEarlierGroups(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan string, 3)
+		release := map[string]chan struct{}{"p1": make(chan struct{}), "p2": make(chan struct{}), "p3": make(chan struct{})}
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release[ctx.ProjectName]
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{
+			{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0},
+			{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
+			{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 1},
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(cmds, runner, 3)
+		}()
+
+		Equals(t, "p1", <-started)
+		synctest.Wait()
+		assert.Empty(t, started, "group 1 must not start while group 0 runs")
+
+		close(release["p1"])
+		require.ElementsMatch(t, []string{"p2", "p3"}, []string{<-started, <-started})
+		close(release["p2"])
+		close(release["p3"])
+		<-finished
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_ReturnsResultsInCmdsOrder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p2Done := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			if ctx.ProjectName == "p1" {
+				<-p2Done
+			} else {
+				close(p2Done)
+			}
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+
+		result := RunProjectCmdsParallelInOrder(cmds, runner, 2)
+
+		require.Len(t, result.ProjectResults, 2)
+		Equals(t, "p1", result.ProjectResults[0].ProjectName)
+		Equals(t, "p2", result.ProjectResults[1].ProjectName)
+	})
+}
+
 func TestSplitByExecutionOrderGroup(t *testing.T) {
 	cmds := []command.ProjectContext{
 		{ProjectName: "a", ExecutionOrderGroup: 1},
