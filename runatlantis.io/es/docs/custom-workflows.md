@@ -191,23 +191,23 @@ workflows:
 ### CDK Terrain (CDKTN)
 
 [CDK Terrain](https://cdktn.io) (CDKTN) es la continuación comunitaria de CDK for Terraform (CDKTF), que
-HashiCorp archivó en diciembre de 2025. Sintetiza configuración de Terraform a partir de TypeScript, Python, Go,
-Java o C#, y soporta tanto Terraform como OpenTofu.
+HashiCorp archivó en diciembre de 2025. Sintetiza configuración de Terraform a partir de TypeScript, Python, Go, Java
+o C#, y soporta tanto Terraform como OpenTofu.
 
 Aquí están los requisitos para habilitar [CDKTN](https://cdktn.io/docs)
 
 * Una imagen personalizada con `cdktn-cli` instalado
-* Agrega `**/cdk.tf.json` a la lista de archivos autoplan de Atlantis.
-* Establece la flag `atlantis-include-git-untracked-files` para que los archivos Terraform generados dinámicamente
+* Agregue `**/cdk.tf.json` a la lista de archivos de autoplan de Atlantis.
+* Establezca el flag `atlantis-include-git-untracked-files` para que los archivos Terraform generados dinámicamente
 por CDKTN se agreguen a la lista de archivos modificados de Atlantis.
-* Usa `pre_workflow_hooks` para ejecutar `cdktn synth`
-* Opcional: No hay un requisito de usar un repositorio `atlantis.yaml` pero se puede aprovechar si es necesario.
+* Use `pre_workflow_hooks` para ejecutar `cdktn synth`
+* Opcional: No hay un requisito de usar un repo `atlantis.yaml`, pero se puede aprovechar uno si es necesario.
 
-::: tip Migrar desde CDKTF
-La migración es en su mayor parte un renombrado: instala `cdktn-cli` en lugar de `cdktf-cli`, y reemplaza los
-paquetes `cdktf` y `@cdktf/provider-*` por `cdktn` y `@cdktn/provider-*`. El manifiesto del proyecto sigue siendo
-`cdktf.json`, los archivos sintetizados siguen siendo `cdk.tf.json`, y las variables de entorno `CDKTF_*` no
-cambian, por lo que la configuración de Atlantis que aparece a continuación aplica a ambos. Consulta la
+::: tip Migración desde CDKTF
+La migración es mayormente un cambio de nombre: instale `cdktn-cli` en lugar de `cdktf-cli`, e intercambie los paquetes `cdktf` y
+`@cdktf/provider-*` por `cdktn` y `@cdktn/provider-*`. El manifiesto del proyecto sigue siendo `cdktf.json`,
+los archivos sintetizados siguen siendo `cdk.tf.json`, y las variables de entorno `CDKTF_*` no cambian, por lo que la
+configuración de Atlantis a continuación aplica a ambos. Vea la
 [guía de migración](https://cdktn.io/docs/release/upgrade-guide-v0-22).
 :::
 
@@ -239,9 +239,9 @@ autoplan-file-list: "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/cdk.tf.json"
 include-git-untracked-files: true
 ```
 
-#### Server Repo Config
+#### Configuración del repo del servidor
 
-Usa `pre_workflow_hooks`
+Use `pre_workflow_hooks`
 
 `atlantis server --repo-config="repos.yaml"`
 
@@ -253,10 +253,10 @@ repos:
       - run: npm i && cdktn get && cdktn synth --output ci-cdktn.out
 ```
 
-**Nota:** no uses el directorio predeterminado `cdktf.out` que usa CDKTN, ya que este debería estar en la lista `.gitignore` del
-repo, para que los archivos generados localmente no se confirmen.
+**Nota:** no use el directorio predeterminado `cdktf.out` que usa CDKTN, ya que este debería estar en la lista `.gitignore` del
+repo, para que los archivos generados localmente no se registren.
 
-#### Estructura del repositorio
+#### Estructura del repo
 
 Esta es la estructura del repo git después de ejecutar `cdktn synth`. Los archivos `cdk.tf.json` contienen la configuración de Terraform
 que atlantis puede ejecutar.
@@ -274,9 +274,8 @@ $ tree --gitignore
 
 #### Terraform u OpenTofu
 
-CDKTN soporta ambas distribuciones. Atlantis ejecuta `plan` y `apply` por su cuenta con la que selecciona
-[`--default-tf-distribution`](server-configuration.md#default-tf-distribution), así que declara las versiones
-correspondientes en `cdktf.json`:
+CDKTN soporta ambas distribuciones. Atlantis ejecuta por sí mismo `plan` e `apply` con la que se selecciona mediante
+[`--default-tf-distribution`](server-configuration.md#default-tf-distribution), así que declare las versiones coincidentes en `cdktf.json`:
 
 ```json
 {
@@ -287,22 +286,21 @@ correspondientes en `cdktf.json`:
 }
 ```
 
-CDKTN valida la configuración que genera contra estos rangos en tiempo de synth, sin ejecutar ningún binario.
-Las funciones core y las capacidades de provider que solo existen en versiones más nuevas — funciones definidas
-por el provider, recursos ephemeral, atributos write-only — hacen fallar `cdktn synth` en el paso de
-`pre_workflow_hooks` en lugar de aparecer como un error de Terraform durante `plan`. Consulta la
-[matriz de disponibilidad de funciones](https://cdktn.io/docs/release/function-availability) para saber qué
-versión introdujo cada cosa.
+CDKTN valida la configuración que genera contra estos rangos en el momento de synth, sin ejecutar un binario.
+Las funciones core y las capacidades del provider que solo existen en versiones más nuevas — provider-defined functions,
+recursos efímeros, atributos de solo escritura — entonces hacen fallar `cdktn synth` en el paso `pre_workflow_hooks` en lugar
+de aparecer como un error de Terraform durante `plan`. Vea la
+[matriz de disponibilidad de funciones](https://cdktn.io/docs/release/function-availability) para saber qué versión
+introdujo qué.
 
-Para que `cdktn` use OpenTofu en lugar de Terraform, establece `TERRAFORM_BINARY_NAME=tofu` en el entorno de
-Atlantis.
+Para hacer que `cdktn` mismo controle OpenTofu en lugar de Terraform, establezca `TERRAFORM_BINARY_NAME=tofu` en el entorno de Atlantis.
 
 #### Workflow
 
 1. El orquestador de contenedores (k8s/fargate/ecs/etc) usa la imagen docker personalizada de atlantis con `cdktn` instalado con
-`--autoplan-file-list` para activar en archivos `cdk.tf.json` y `--include-git-untracked-files` configurado para incluir los
+the `--autoplan-file-list` para activarse en archivos `cdk.tf.json` y `--include-git-untracked-files` configurado para incluir los
 archivos Terraform generados dinámicamente por CDKTN en el plan de Atlantis.
-1. Se hace push de la rama del PR que contiene cambios de código `cdktn`.
+1. Se hace push de la rama del PR que contiene cambios de código de `cdktn`.
 1. Atlantis hace checkout de la rama en el repo.
 1. Atlantis ejecuta el comando `npm i && cdktn get && cdktn synth` en la raíz del repo como un paso en `pre_workflow_hooks`,
 generando los archivos Terraform `cdk.tf.json`.
@@ -311,14 +309,14 @@ generando los archivos Terraform `cdk.tf.json`.
 
 ### Terragrunt
 
-Atlantis admite ejecutar comandos personalizados en lugar de los comandos predeterminados de Atlantis. Podemos usar esta funcionalidad para habilitar
+Atlantis soporta ejecutar comandos personalizados en lugar de los comandos predeterminados de Atlantis. Podemos usar esta funcionalidad para habilitar
 [Terragrunt](https://github.com/gruntwork-io/terragrunt).
 
-Puedes usar el archivo `atlantis.yaml` de tu repo o el archivo `repos.yaml` del servidor Atlantis.
+Puede usar ya sea el archivo `atlantis.yaml` de su repo o el archivo `repos.yaml` del servidor Atlantis.
 
-Atlantis selecciona la distribución y versión de Terraform de cada proyecto. En los workflows siguientes,
-`ATLANTIS_TERRAFORM_DISTRIBUTION` se expande al prefijo del ejecutable (`terraform` o `tofu`), y combinarlo con
-`ATLANTIS_TERRAFORM_VERSION` dirige Terragrunt al mismo binario versionado. Esto también admite repositorios que contienen
+Atlantis selecciona la distribución y versión de Terraform de cada proyecto. En los workflows a continuación,
+`ATLANTIS_TERRAFORM_DISTRIBUTION` se expande al prefijo ejecutable (`terraform` o `tofu`), y al combinarlo con
+`ATLANTIS_TERRAFORM_VERSION` apunta Terragrunt al mismo binario versionado. Esto también soporta repositorios que contienen
 tanto proyectos Terraform como OpenTofu.
 
 Dada una estructura de directorios:
@@ -332,7 +330,7 @@ Dada una estructura de directorios:
         └── terragrunt.hcl
 ```
 
-Si usas el archivo `repos.yaml` del servidor, usarías la siguiente configuración:
+Si usa el archivo `repos.yaml` del servidor, usaría la siguiente configuración:
 
 ```yaml
 # repos.yaml
@@ -386,7 +384,7 @@ workflows:
       - run: terragrunt state rm $(printf '%s' $COMMENT_ARGS | sed 's/,/ /' | tr -d '\\')
 ```
 
-Si usas el archivo `atlantis.yaml` del repo, usarías la siguiente configuración:
+Si usa el archivo `atlantis.yaml` de su repo, usaría la siguiente configuración:
 
 ```yaml
 version: 3
@@ -421,20 +419,20 @@ workflows:
       - run: terragrunt apply $PLANFILE
 ```
 
-**NOTA:** Si usas el archivo `atlantis.yaml` del repo, necesitarás especificar cada directorio que sea un proyecto Terragrunt.
+**NOTA:** Si usa el archivo `atlantis.yaml` de su repo, necesitará especificar cada directorio que sea un proyecto Terragrunt.
 
 ::: warning
 Atlantis necesitará tener el binario `terragrunt` en su PATH.
-Si estás usando Docker puedes construir tu propia imagen, consulta [Personalización](deployment.md#customization).
+Si está usando Docker puede construir su propia imagen, vea [Customization](deployment.md#customization).
 :::
 
-Si no quieres crear/gestionar tú mismo el archivo `atlantis.yaml` del repo, puedes usar la herramienta [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config) para generarlo.
+Si no quiere crear/administrar usted mismo el archivo `atlantis.yaml` del repo, puede usar la herramienta [terragrunt-atlantis-config](https://github.com/transcend-io/terragrunt-atlantis-config) para generarlo.
 
-La herramienta `terragrunt-atlantis-config` es un proyecto de la comunidad y no recibe mantenimiento del equipo de Atlantis.
+La herramienta `terragrunt-atlantis-config` es un proyecto de la comunidad y no es mantenido por el equipo de Atlantis.
 
-### Ejecutar comandos personalizados
+### Ejecución de comandos personalizados
 
-Atlantis admite ejecutar comandos completamente personalizados. En este ejemplo, queremos ejecutar
+Atlantis soporta ejecutar comandos completamente personalizados. En este ejemplo, queremos ejecutar
 un script después de cada `apply`:
 
 ```yaml
@@ -450,20 +448,20 @@ workflows:
 ::: tip Notas
 
 * No necesitamos escribir una clave `plan` bajo `myworkflow`. Si `plan`
-no está establecida, Atlantis usará el workflow plan predeterminado, que es lo que queremos en este caso.
+no está establecido, Atlantis usará el workflow plan predeterminado, que es lo que queremos en este caso.
 * Un comando personalizado solo terminará si todos los descriptores de archivo de salida están cerrados.
-Por lo tanto, un comando personalizado solo se puede enviar al background (p. ej. para un túnel SSH durante
+Por lo tanto, un comando personalizado solo puede enviarse al background (p. ej. para un túnel SSH durante
 la ejecución de terraform) cuando su salida se redirige a una ubicación diferente. Por ejemplo, Atlantis
-ejecutará correctamente un script personalizado que contenga el siguiente código para crear un túnel SSH:
+ejecutará correctamente un script personalizado que contiene el siguiente código para crear un túnel SSH:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Sin
 la redirección, el script bloquearía el workflow de Atlantis.
 :::
 
-### Configuración personalizada de backend
+### Configuración backend personalizada
 
-Si necesitas especificar la flag `-backend-config` para `terraform init`, necesitarás usar un workflow personalizado.
+Si necesita especificar el flag `-backend-config` para `terraform init`, necesitará usar un workflow personalizado.
 En este ejemplo, estamos usando archivos backend personalizados para configurar dos estados remotos, uno para cada entorno.
-Luego estamos usando archivos `.tfvars` para cargar variables diferentes para cada entorno.
+Luego estamos usando archivos `.tfvars` para cargar diferentes variables para cada entorno.
 
 ```yaml
 # repos.yaml or atlantis.yaml
@@ -491,7 +489,7 @@ Tenemos que usar un paso personalizado `run` para `rm -rf .terraform` porque de 
 se quejará entre comandos ya que la configuración del backend ha cambiado.
 :::
 
-Luego referenciarías los workflows en tu archivo `atlantis.yaml` de nivel de repositorio:
+Luego referenciaría los workflows en su `atlantis.yaml` a nivel de repo:
 
 ```yaml
 version: 3
@@ -504,16 +502,16 @@ projects:
   workflow: production
 ```
 
-### Agregar contexto de directorio y repo para recursos aws usando tags predeterminados
+### Agregar contexto de directorio y repo para recursos aws usando default tags
 
-Esto solo está disponible en la versión del proveedor AWS [5.62.0](https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0) y superiores.
+Esto solo está disponible en la versión del provider AWS [5.62.0](https://github.com/hashicorp/terraform-provider-aws/releases/tag/v5.62.0) y superiores.
 
-Esta configuración creará las siguientes tags
+Esta configuración creará los siguientes tags
 
-* `repository` igual a `github.com/<owner>/<repo>` que puede cambiarse para gitlab u otro VCS
+* `repository` igual a `github.com/<owner>/<repo>`, que se puede cambiar para gitlab u otro VCS
 * `repository_dir` igual al directorio relativo
 
-Se pueden agregar otras variables predeterminadas, como para workspace. Consulta abajo para más variables de entorno disponibles.
+Se pueden agregar otras variables predeterminadas, como para workspace. Vea abajo más variables de entorno disponibles.
 
 ```yaml
 workflows:
@@ -538,7 +536,7 @@ workflows:
 
 NOTA:
 
-* Anexar tags a cada recurso puede regenerar fuentes de datos como `aws_iam_policy_document`, lo que hará que muchos recursos se modifiquen. Consulta el problema conocido en el proveedor aws [#29421](https://github.com/hashicorp/terraform-provider-aws/issues/29421).
+* Agregar tags a cada recurso puede regenerar data sources como `aws_iam_policy_document`, lo que hará que muchos recursos se modifiquen. Vea el problema conocido en el provider aws [#29421](https://github.com/hashicorp/terraform-provider-aws/issues/29421).
 
 * Para ejecutar un plan local fuera de terraform, será necesario crear las mismas variables de entorno.
 
@@ -553,7 +551,7 @@ NOTA:
     terraform plan
     ```
 
-    Si se usa dos puntos en el nombre de la tag, usa el comando `env` en lugar de `export`.
+    Si se usa dos puntos en el nombre del tag, use el comando `env` en lugar de `export`.
 
     ```bash
     tfvars
@@ -593,7 +591,7 @@ steps:
 
 | Key   | Type                 | Default | Required | Description                                                                                           |
 | ----- | -------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------- |
-| steps | array[[Step](#step)] | `[]`    | no       | Lista de pasos para esta etapa. Si la clave steps está vacía, no se ejecutarán pasos para esta etapa. |
+| steps | array[[Step](#step)] | `[]`    | no       | Lista de pasos para este stage. Si la clave steps está vacía, no se ejecutarán pasos para este stage. |
 
 ### Step
 
@@ -609,13 +607,13 @@ Los pasos pueden ser una sola cadena para un comando integrado.
 - state_rm
 ```
 
-| Key                             | Type   | Default | Required | Description                                                                                                               |
-| ------------------------------- | ------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| init/plan/apply/import/state_rm | string | none    | no       | Usa un comando integrado sin configuración adicional. Solo `init`, `plan`, `apply`, `import` y `state_rm` son compatibles |
+| Key                             | Type   | Default | Required | Description                                                                                                              |
+| ------------------------------- | ------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| init/plan/apply/import/state_rm | string | none    | no       | Use un comando integrado sin configuración adicional. Solo `init`, `plan`, `apply`, `import` y `state_rm` son soportados |
 
-#### Comando integrado con args extra
+#### Comando integrado con argumentos extra
 
-Un mapa de string a `extra_args` para un comando integrado con argumentos extra.
+Un map de string a `extra_args` para un comando integrado con argumentos extra.
 
 ```yaml
 - init:
@@ -632,11 +630,11 @@ Un mapa de string a `extra_args` para un comando integrado con argumentos extra.
 
 | Key                             | Type                                   | Default | Required | Description                                                                                                                                                                 |
 | ------------------------------- | -------------------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Usa un comando integrado y anexa `extra_args`. Solo `init`, `plan`, `apply`, `import` y `state_rm` son compatibles como claves y solo `extra_args` es compatible como valor |
+| init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none    | no       | Use un comando integrado y agregue `extra_args`. Solo `init`, `plan`, `apply`, `import` y `state_rm` son soportados como claves y solo `extra_args` es soportado como valor |
 
-#### Comando personalizado `run`
+#### Comando `run` personalizado
 
-Un comando personalizado se puede escribir de 2 maneras
+Un comando personalizado puede escribirse de 2 maneras
 
 Compacto:
 
@@ -674,57 +672,57 @@ Ejemplo completo, filtrando la salida y enmascarando el texto coincidente (`mySe
       - filter_regex: "((?i)secret:\\s\")[^\"]*"
 ```
 
-| Key           | Type                        | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------- | --------------------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| run           | map\[string -> string\]     | none    | no       | Ejecuta un comando personalizado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| run.command   | string                      | none    | yes      | Comando de shell a ejecutar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| run.shell     | string                      | "sh"    | no       | Nombre del shell que se usará para la ejecución del comando                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| run.shellArgs | string or []string          | "-c"    | no       | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| run.output    | string or []string or []any | "show"  | no       | Cómo postprocesar la salida de este comando cuando se publique en el comentario del PR. Las opciones son:<br/>*`show` - conservar la salida completa<br/>* `hide` - ocultar la salida del comentario (sigue siendo visible en la salida de streaming en tiempo real)<br/> `strip_refreshing` - ocultar toda la salida hasta e incluyendo la última línea que contiene "Refreshing...". Esto coincide con el comportamiento del comando integrado `plan` <br/> `filter_regex: "<regex_pattern>"` - enmascara texto sensible en los comentarios de Atlantis reemplazando coincidencias de regex con &lt;redacted&gt;. Se puede usar varias veces (se procesa en orden). Solo filtra comentarios inline - los enlaces al plan completo aún muestran resultados sin filtrar. |
+| Key           | Type                        | Default | Required | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------- | --------------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| run           | map\[string -> string\]     | none    | no       | Ejecuta un comando personalizado                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| run.command   | string                      | none    | yes      | Comando shell a ejecutar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| run.shell     | string                      | "sh"    | no       | Nombre de la shell que se usará para la ejecución del comando                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| run.shellArgs | string or []string          | "-c"    | no       | Argumentos de línea de comandos que se pasarán a la shell. No puede establecerse sin `shell`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| run.output    | string or []string or []any | "show"  | no       | Cómo posprocesar la salida de este comando cuando se publique en el comentario del PR. Las opciones son:<br/>*`show` - preservar la salida completa<br/>* `hide` - ocultar la salida del comentario (sigue siendo visible en la salida de streaming en tiempo real)<br/> `strip_refreshing` - ocultar toda la salida hasta e incluyendo la última línea que contenga "Refreshing...". Esto coincide con el comportamiento del comando integrado `plan` <br/> `filter_regex: "<regex_pattern>"` - enmascara texto sensible en los comentarios de Atlantis reemplazando coincidencias de regex por &lt;redacted&gt;. Puede usarse varias veces (se procesa en orden). Solo filtra comentarios inline: los enlaces completos al plan siguen mostrando resultados sin filtrar. |
 
 #### Variables de entorno nativas
 
 * Los pasos `run` en el `workflow` principal se ejecutan con las siguientes variables de entorno:
-  nota: estas variables no están disponibles para workflows `pre` o `post`
-  * `WORKSPACE` - El workspace de Terraform usado para este proyecto, p. ej. `default`.
-      NOTA: si el paso se ejecuta antes de `init` entonces Atlantis aún no habrá cambiado a este workspace.
-  * `ATLANTIS_TERRAFORM_VERSION` - La versión de Terraform usada para este proyecto, p. ej. `0.11.0`.
+  nota: estas variables no están disponibles para los workflows `pre` o `post`
+  * `WORKSPACE` - El workspace de Terraform usado para este proyecto, ej. `default`.
+      NOTA: si el paso se ejecuta antes de `init` entonces Atlantis todavía no habrá cambiado a este workspace.
+  * `ATLANTIS_TERRAFORM_VERSION` - La versión de Terraform usada para este proyecto, ej. `0.11.0`.
   * `DIR` - Ruta absoluta al directorio actual.
   * `PLANFILE` - Ruta absoluta a la ubicación donde Atlantis espera que el plan
-      se genere (por plan) o ya exista (si se está ejecutando apply). Se puede usar para
-      sobrescribir los comandos integrados `plan`/`apply`, p. ej. `run: terraform plan -out $PLANFILE`.
-      Un workflow cuyos `plan` y `apply` estén compuestos enteramente por pasos personalizados `run`
+      sea generado (por plan) o ya exista (si se ejecuta apply). Puede usarse para
+      sobrescribir los comandos integrados `plan`/`apply`, ej. `run: terraform plan -out $PLANFILE`.
+      Un workflow cuyos `plan` e `apply` estén compuestos enteramente de pasos `run` personalizados
       puede escribir su plan en una ruta de su propia elección en lugar de `$PLANFILE`. Atlantis
-      no requiere, no hashea ni elimina un artefacto de plan para tal workflow; aun así
+      no requiere, hashea ni elimina un artefacto de plan para tal workflow; aun así
       valida el estado de plan registrado del proyecto antes de ejecutar `apply`. Tan pronto como un
-      workflow use el paso integrado `plan` o `apply`, el plan debe estar en `$PLANFILE`.
+      workflow usa el paso integrado `plan` o `apply`, el plan debe estar en `$PLANFILE`.
   * `SHOWFILE` - Ruta absoluta a la ubicación donde Atlantis espera que el plan en formato json
-      se genere (por show) o ya exista (si se ejecutan policy checks). Se puede usar para
-      sobrescribir los comandos integrados `plan`/`apply`, p. ej. `run: terraform show -json $PLANFILE > $SHOWFILE`.
+      sea generado (por show) o ya exista (si se ejecutan policy checks). Puede usarse para
+      sobrescribir los comandos integrados `plan`/`apply`, ej. `run: terraform show -json $PLANFILE > $SHOWFILE`.
   * `POLICYCHECKFILE` - Ruta absoluta a la ubicación de la salida de policy check si Atlantis ejecuta policy checks.
-      Consulta [policy checking](policy-checking.md#data-for-custom-run-steps) para información sobre la estructura de datos.
-  * `BASE_REPO_NAME` - Nombre del repositorio en el que se fusionará el pull request, p. ej. `atlantis`.
-  * `BASE_REPO_OWNER` - Propietario del repositorio en el que se fusionará el pull request, p. ej. `runatlantis`.
-  * `HEAD_REPO_NAME` - Nombre del repositorio que se está fusionando en el repositorio base, p. ej. `atlantis`.
-  * `HEAD_REPO_OWNER` - Propietario del repositorio que se está fusionando en el repositorio base, p. ej. `acme-corp`.
-  * `HEAD_BRANCH_NAME` - Nombre de la rama head del pull request (la rama que se está fusionando en la base)
-  * `HEAD_COMMIT` - El sha256 que apunta a la head de la rama que se está enviando como pull request hacia la base. Si el pull request es de Bitbucket Cloud, la cadena tendrá solo 12 caracteres porque Bitbucket Cloud trunca sus IDs de commit.
-  * `BASE_BRANCH_NAME` - Nombre de la rama base del pull request (la rama en la que se está fusionando el pull request)
-  * `PROJECT_NAME` - Nombre del proyecto configurado en `atlantis.yaml`. Si no se configura ningún nombre de proyecto esto será una cadena vacía.
-  * `PULL_NUM` - Número o ID del pull request, p. ej. `2`.
-  * `PULL_URL` - URL del pull request, p. ej. `https://github.com/runatlantis/atlantis/pull/2`.
-  * `PULL_AUTHOR` - Nombre de usuario del autor del pull request, p. ej. `acme-user`.
-  * `REPO_REL_DIR` - La ruta relativa del proyecto en el repositorio. Por ejemplo, si tu proyecto está en `dir1/dir2/` entonces esto se establecerá en `"dir1/dir2"`. Si tu proyecto está en la raíz esto será `"."`.
-  * `USER_NAME` - Nombre de usuario del usuario de VCS que ejecuta el comando, p. ej. `acme-user`. Durante un autoplan, el usuario será el usuario API de Atlantis, p. ej. `atlantis`.
-  * `COMMENT_ARGS` - Cualquier flag adicional pasada en el comentario del pull request. Las flags están separadas por comas y
-      cada carácter se escapa, p. ej. `atlantis plan -- arg1 arg2` dará como resultado `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
+      Vea [policy checking](policy-checking.md#data-for-custom-run-steps) para información sobre la estructura de datos.
+  * `BASE_REPO_NAME` - Nombre del repositorio en el que se hará merge del pull request, ej. `atlantis`.
+  * `BASE_REPO_OWNER` - Propietario del repositorio en el que se hará merge del pull request, ej. `runatlantis`.
+  * `HEAD_REPO_NAME` - Nombre del repositorio que se está haciendo merge en el repositorio base, ej. `atlantis`.
+  * `HEAD_REPO_OWNER` - Propietario del repositorio que se está haciendo merge en el repositorio base, ej. `acme-corp`.
+  * `HEAD_BRANCH_NAME` - Nombre de la rama head del pull request (la rama que se está haciendo merge en la base)
+  * `HEAD_COMMIT` - El sha256 que apunta al head de la rama que está siendo enviada como pull request a la base. Si el pull request es de Bitbucket Cloud, la cadena tendrá solo 12 caracteres porque Bitbucket Cloud trunca sus IDs de commit.
+  * `BASE_BRANCH_NAME` - Nombre de la rama base del pull request (la rama en la que se hará merge del pull request)
+  * `PROJECT_NAME` - Nombre del proyecto configurado en `atlantis.yaml`. Si no se configura ningún nombre de proyecto, esto será una cadena vacía.
+  * `PULL_NUM` - Número o ID del pull request, ej. `2`.
+  * `PULL_URL` - URL del pull request, ej. `https://github.com/runatlantis/atlantis/pull/2`.
+  * `PULL_AUTHOR` - Nombre de usuario del autor del pull request, ej. `acme-user`.
+  * `REPO_REL_DIR` - La ruta relativa del proyecto en el repositorio. Por ejemplo, si su proyecto está en `dir1/dir2/` entonces esto se establecerá en `"dir1/dir2"`. Si su proyecto está en la raíz, esto será `"."`.
+  * `USER_NAME` - Nombre de usuario del usuario VCS que ejecuta el comando, ej. `acme-user`. Durante un autoplan, el usuario será el usuario API de Atlantis, ej. `atlantis`.
+  * `COMMENT_ARGS` - Cualquier flag adicional pasado en el comentario del pull request. Los flags están separados por comas y
+      cada carácter está escapado, ej. `atlantis plan -- arg1 arg2` dará como resultado `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `ATLANTIS_PR_APPROVED` - "true" si el PR está aprobado
-  * `ATLANTIS_PR_MERGEABLE` - "true" si el PR se puede fusionar
+  * `ATLANTIS_PR_MERGEABLE` - "true" si el PR es mergeable
 
 * Un comando personalizado solo terminará si todos los descriptores de archivo de salida están cerrados.
-Por lo tanto, un comando personalizado solo se puede enviar al background (p. ej. para un túnel SSH durante
+Por lo tanto, un comando personalizado solo puede enviarse al background (p. ej. para un túnel SSH durante
 la ejecución de terraform) cuando su salida se redirige a una ubicación diferente. Por ejemplo, Atlantis
-ejecutará correctamente un script personalizado que contenga el siguiente código para crear un túnel SSH:
+ejecutará correctamente un script personalizado que contiene el siguiente código para crear un túnel SSH:
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Sin
 la redirección, el script bloquearía el workflow de Atlantis.
 * Si un paso del workflow devuelve un código de salida distinto de cero, el workflow se detendrá.
@@ -732,12 +730,12 @@ la redirección, el script bloquearía el workflow de Atlantis.
 
 #### Comando de variable de entorno `env`
 
-El comando `env` te permite establecer variables de entorno que estarán disponibles
+El comando `env` le permite establecer variables de entorno que estarán disponibles
 para todos los pasos definidos **debajo** del paso `env`.
 
-Puedes establecer valores codificados de forma fija mediante la clave `value`, o establecer valores dinámicos mediante
-la clave `command` que te permite ejecutar cualquier comando y usa la salida
-como el valor de la variable de entorno.
+Puede establecer valores codificados de forma fija mediante la clave `value`, o establecer valores dinámicos mediante
+la clave `command`, que le permite ejecutar cualquier comando y usar la salida
+como valor de la variable de entorno.
 
 ```yaml
 - env:
@@ -755,24 +753,24 @@ como el valor de la variable de entorno.
       - "-c"
 ```
 
-| Key           | Type                    | Default | Required | Description                                                                                                                               |
-| ------------- | ----------------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| env           | map\[string -> string\] | none    | no       | Establece variables de entorno para pasos posteriores                                                                                     |
-| env.name      | string                  | none    | yes      | Nombre de la variable de entorno                                                                                                          |
-| env.value     | string                  | none    | no       | Establece el valor de la variable de entorno en una cadena codificada de forma fija. No se puede establecer al mismo tiempo que `command` |
-| env.command   | string                  | none    | no       | Establece el valor de la variable de entorno a la salida de un comando. No se puede establecer al mismo tiempo que `value`                |
-| env.shell     | string                  | "sh"    | no       | Nombre del shell que se usará para la ejecución del comando. No se puede establecer sin `command`                                         |
-| env.shellArgs | string or []string      | "-c"    | no       | Argumentos de línea de comandos que se pasarán al shell. No se puede establecer sin `shell`                                               |
+| Key           | Type                    | Default | Required | Description                                                                                                                              |
+| ------------- | ----------------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| env           | map\[string -> string\] | none    | no       | Establece variables de entorno para pasos posteriores                                                                                    |
+| env.name      | string                  | none    | yes      | Nombre de la variable de entorno                                                                                                         |
+| env.value     | string                  | none    | no       | Establece el valor de la variable de entorno en una cadena codificada de forma fija. No puede establecerse al mismo tiempo que `command` |
+| env.command   | string                  | none    | no       | Establece el valor de la variable de entorno en la salida de un comando. No puede establecerse al mismo tiempo que `value`               |
+| env.shell     | string                  | "sh"    | no       | Nombre de la shell que se usará para la ejecución del comando. No puede establecerse sin `command`                                       |
+| env.shellArgs | string or []string      | "-c"    | no       | Argumentos de línea de comandos que se pasarán a la shell. No puede establecerse sin `shell`                                             |
 
 ::: tip Notas
 
 * Los `command` de `env` pueden usar cualquiera de las variables de entorno integradas disponibles
-  para comandos `run`.
+  para los comandos `run`.
 :::
 
-#### Comando de múltiples variables de entorno `multienv`
+#### Comando `multienv` de múltiples variables de entorno
 
-El comando `multienv` te permite establecer un número dinámico de múltiples variables de entorno que estarán disponibles
+El comando `multienv` le permite establecer un número dinámico de múltiples variables de entorno que estarán disponibles
 para todos los pasos definidos **debajo** del paso `multienv`.
 
 Compacto:
