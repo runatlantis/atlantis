@@ -16,7 +16,7 @@ Nothing shares identifiers, so each new feature has to work out where its data g
 
 ### One relational database
 
-Application state lives in 1 relational database, accessed through GORM behind Atlantis's own interfaces. We support SQLite (embedded, single instance) and PostgreSQL (shared, multi-instance). Other engines need testing first.
+Application state lives in 1 relational database, accessed through GORM behind Atlantis's own interfaces. We support SQLite (embedded, single instance) and PostgreSQL (shared, multi-instance). SQLite must use a pure-Go driver compatible with `CGO_ENABLED=0` on all supported release targets. Other engines need testing first.
 
 Schema changes are versioned SQL migrations run with Goose. Transactions stay short and never wrap a Terraform run or VCS call.
 
@@ -30,6 +30,8 @@ Records link by foreign key, and each has 1 identity:
 | Project | Repository, directory, name, workspace |
 | Job | Its own ID, linked to PR, project, command, and revision |
 | Artifact | Its own ID, linked to its job |
+
+Identity fields are non-null and enforced by database uniqueness constraints. An unnamed project's name is `''`.
 
 `platform/infrastructure` on `github.com` and on `github.corp.example` are 2 repos. The provider lives on the instance because 1 instance only ever serves 1 VCS. Each plan run is a new job, even at the same commit, and apply uses the specific plan recorded as pending.
 
@@ -45,10 +47,10 @@ SQLite is single-instance only. We call multi-instance supported once tests cove
 
 Plans, showfiles, and logs go to a separately configured store: a directory, object storage like S3, or the database. The database records each artifact's job, kind, location, size, and checksum.
 
-Working directories add the instance, so same-named repos on different hosts stop sharing a clone: `repos/<instance>/<owner>/<repo>/<pr>/<workspace>`. Artifacts follow the same layout, plus the project directory and job ID:
+Working directories use the persisted VCS instance ID, so same-named repos on different instances stop sharing a clone: `repos/<instance-id>/<owner>/<repo>/<pr>/<workspace>`. Artifacts follow the same layout, plus the project directory and job ID. For instance ID `42`:
 
 ```text
-artifacts/github.com/platform/infrastructure/6920/production/envs/prod/
+artifacts/42/platform/infrastructure/6920/production/envs/prod/
   9c1f497e-285a-4f13-81ed-6c35570746db/
     networking.tfplan
     networking.json
@@ -59,7 +61,9 @@ Files take the project name, or the workspace if there's no name. The job ID kee
 
 Before a command runs, Atlantis copies the artifacts it needs into the working directory, so `$PLANFILE` and `$SHOWFILE` still work.
 
-Content is written before the database references it, and writes and deletes can be retried. Logs are saved as they stream. Closing a PR invalidates its plans but keeps jobs, logs, and artifacts until retention removes them.
+Content is written before the database references it, and writes and deletes can be retried. Reconciliation removes unreferenced content left by interrupted writes without deleting uploads still in progress.
+
+Logs are flushed periodically as they stream, with a final flush when a job ends. Backends without append support persist ordered chunks. Closing a PR invalidates its plans but keeps jobs, logs, and artifacts until retention removes them.
 
 ### Deployment
 
@@ -81,6 +85,8 @@ Delivery:
 2. Jobs, claims, cancellation, filesystem artifacts, durable logs, retention.
 3. PostgreSQL, more artifact backends, multi-instance testing.
 4. Graduation.
+
+Delivery step 2 covers the job-output persistence proposed in [#6928](https://github.com/runatlantis/atlantis/pull/6928), using shared job identities, artifact storage, and retention. This ADR replaces that proposal; its buffered-flush design can inform the implementation.
 
 Changing the default or retiring BoltDB and Redis are separate decisions.
 
