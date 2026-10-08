@@ -188,16 +188,28 @@ workflows:
       - run: terraform apply $PLANFILE
 ```
 
-### CDKTF
+### CDK Terrain (CDKTN)
 
-Aquí están los requisitos para habilitar [CDKTF](https://developer.hashicorp.com/terraform/cdktf)
+[CDK Terrain](https://cdktn.io) (CDKTN) es la continuación comunitaria de CDK for Terraform (CDKTF), que
+HashiCorp archivó en diciembre de 2025. Sintetiza configuración de Terraform a partir de TypeScript, Python, Go,
+Java o C#, y soporta tanto Terraform como OpenTofu.
 
-* Una imagen personalizada con `CDKTF` instalado
+Aquí están los requisitos para habilitar [CDKTN](https://cdktn.io/docs)
+
+* Una imagen personalizada con `cdktn-cli` instalado
 * Agrega `**/cdk.tf.json` a la lista de archivos autoplan de Atlantis.
 * Establece la flag `atlantis-include-git-untracked-files` para que los archivos Terraform generados dinámicamente
-por CDKTF se agreguen a la lista de archivos modificados de Atlantis.
-* Usa `pre_workflow_hooks` para ejecutar `cdktf synth`
+por CDKTN se agreguen a la lista de archivos modificados de Atlantis.
+* Usa `pre_workflow_hooks` para ejecutar `cdktn synth`
 * Opcional: No hay un requisito de usar un repositorio `atlantis.yaml` pero se puede aprovechar si es necesario.
+
+::: tip Migrar desde CDKTF
+La migración es en su mayor parte un renombrado: instala `cdktn-cli` en lugar de `cdktf-cli`, y reemplaza los
+paquetes `cdktf` y `@cdktf/provider-*` por `cdktn` y `@cdktn/provider-*`. El manifiesto del proyecto sigue siendo
+`cdktf.json`, los archivos sintetizados siguen siendo `cdk.tf.json`, y las variables de entorno `CDKTF_*` no
+cambian, por lo que la configuración de Atlantis que aparece a continuación aplica a ambos. Consulta la
+[guía de migración](https://cdktn.io/docs/release/upgrade-guide-v0-22).
+:::
 
 #### Imagen personalizada
 
@@ -206,7 +218,7 @@ por CDKTF se agreguen a la lista de archivos modificados de Atlantis.
 FROM ghcr.io/runatlantis/atlantis:v0.19.7
 
 USER root
-RUN apk add npm && npm i -g cdktf-cli
+RUN apk add npm && npm i -g cdktn-cli
 ```
 
 #### Configuración del servidor
@@ -236,38 +248,63 @@ Usa `pre_workflow_hooks`
 ```yaml
 # repos.yaml
 repos:
-  - id: /.*cdktf.*/
+  - id: /.*cdktn.*/
     pre_workflow_hooks:
-      - run: npm i && cdktf get && cdktf synth --output ci-cdktf.out
+      - run: npm i && cdktn get && cdktn synth --output ci-cdktn.out
 ```
 
-**Nota:** no uses el directorio predeterminado `cdktf.out` que usa CDKTF, ya que este debería estar en la lista `.gitignore` del
+**Nota:** no uses el directorio predeterminado `cdktf.out` que usa CDKTN, ya que este debería estar en la lista `.gitignore` del
 repo, para que los archivos generados localmente no se confirmen.
 
 #### Estructura del repositorio
 
-Esta es la estructura del repo git después de ejecutar `cdktf synth`. Los archivos `cdk.tf.json` contienen la configuración de Terraform
+Esta es la estructura del repo git después de ejecutar `cdktn synth`. Los archivos `cdk.tf.json` contienen la configuración de Terraform
 que atlantis puede ejecutar.
 
 ```bash
 $ tree --gitignore
 .
 ├── cdktf.json
-├── ci-cdktf.out
+├── ci-cdktn.out
 │   ├── manifest.json
 │   └── stacks
 │       └── eks
 │           └── cdk.tf.json
 ```
 
+#### Terraform u OpenTofu
+
+CDKTN soporta ambas distribuciones. Atlantis ejecuta `plan` y `apply` por su cuenta con la que selecciona
+[`--default-tf-distribution`](server-configuration.md#default-tf-distribution), así que declara las versiones
+correspondientes en `cdktf.json`:
+
+```json
+{
+  "targetVersions": {
+    "terraform": ">=1.5.7",
+    "opentofu": ">=1.6.0"
+  }
+}
+```
+
+CDKTN valida la configuración que genera contra estos rangos en tiempo de synth, sin ejecutar ningún binario.
+Las funciones core y las capacidades de provider que solo existen en versiones más nuevas — funciones definidas
+por el provider, recursos ephemeral, atributos write-only — hacen fallar `cdktn synth` en el paso de
+`pre_workflow_hooks` en lugar de aparecer como un error de Terraform durante `plan`. Consulta la
+[matriz de disponibilidad de funciones](https://cdktn.io/docs/release/function-availability) para saber qué
+versión introdujo cada cosa.
+
+Para que `cdktn` use OpenTofu en lugar de Terraform, establece `TERRAFORM_BINARY_NAME=tofu` en el entorno de
+Atlantis.
+
 #### Workflow
 
-1. El orquestador de contenedores (k8s/fargate/ecs/etc) usa la imagen docker personalizada de atlantis con `cdktf` instalado con
+1. El orquestador de contenedores (k8s/fargate/ecs/etc) usa la imagen docker personalizada de atlantis con `cdktn` instalado con
 `--autoplan-file-list` para activar en archivos `cdk.tf.json` y `--include-git-untracked-files` configurado para incluir los
-archivos Terraform generados dinámicamente por CDKTF en el plan de Atlantis.
-1. Se hace push de la rama del PR que contiene cambios de código `cdktf`.
+archivos Terraform generados dinámicamente por CDKTN en el plan de Atlantis.
+1. Se hace push de la rama del PR que contiene cambios de código `cdktn`.
 1. Atlantis hace checkout de la rama en el repo.
-1. Atlantis ejecuta el comando `npm i && cdktf get && cdktf synth` en la raíz del repo como un paso en `pre_workflow_hooks`,
+1. Atlantis ejecuta el comando `npm i && cdktn get && cdktn synth` en la raíz del repo como un paso en `pre_workflow_hooks`,
 generando los archivos Terraform `cdk.tf.json`.
 1. Atlantis detecta los archivos no rastreados `cdk.tf.json` en varios directorios.
 1. Atlantis luego ejecuta workflows `terraform` en los directorios respectivos como de costumbre.
