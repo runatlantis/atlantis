@@ -114,6 +114,7 @@ const (
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
+	LockAllProjectsBeforePlanFlag    = "lock-all-projects-before-plan"
 	LockingDBType                    = "locking-db-type"
 	LogLevelFlag                     = "log-level"
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
@@ -606,6 +607,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	IncludeGitUntrackedFiles: {
 		description:  "Include git untracked files in the Atlantis modified file scope.",
+		defaultValue: false,
+	},
+	LockAllProjectsBeforePlanFlag: {
+		description:  "Acquire the Atlantis lock for every project in a plan run before running any plan. If any project cannot be locked, no plans are run and the locks taken by this run are released.",
 		defaultValue: false,
 	},
 	ParallelPlanFlag: {
