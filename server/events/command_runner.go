@@ -108,6 +108,7 @@ type DefaultCommandRunner struct {
 	// User config option: Disables autoplan when a pull request is opened or updated.
 	DisableAutoplan      bool
 	DisableAutoplanLabel string
+	EnableAutoplanLabel  string
 	EventParser          EventParsing
 	// User config option: Fail and do not run the Atlantis command request if any of the pre workflow hooks error
 	FailOnPreWorkflowHookError bool
@@ -196,9 +197,19 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 	if c.DisableAutoplan {
-		return
-	}
-	if len(c.DisableAutoplanLabel) > 0 {
+		if len(c.EnableAutoplanLabel) == 0 {
+			return
+		}
+		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
+		if err != nil {
+			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Not running autoplan.", err)
+			return
+		}
+		if !slices.Contains(labels, c.EnableAutoplanLabel) {
+			return
+		}
+		ctx.Log.Info("Pull/merge request has enable auto plan label '%s' so running autoplan despite autoplan being disabled globally.", c.EnableAutoplanLabel)
+	} else if len(c.DisableAutoplanLabel) > 0 {
 		labels, err := c.VCSClient.GetPullLabels(ctx.Log, baseRepo, pull)
 		if err != nil {
 			ctx.Log.Err("Unable to get VCS pull/merge request labels: %s. Proceeding with autoplan.", err)

@@ -79,6 +79,7 @@ const (
 	DisableUnlockLabelFlag           = "disable-unlock-label"
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
+	EnableAutoplanLabelFlag          = "enable-autoplan-label"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
@@ -321,6 +322,10 @@ var stringFlags = map[string]stringFlag{
 	EmojiReaction: {
 		description:  "Emoji Reaction to use to react to comments.",
 		defaultValue: DefaultEmojiReaction,
+	},
+	EnableAutoplanLabelFlag: {
+		description:  "Pull request label to enable atlantis auto planning only if present, when autoplan is otherwise disabled via --disable-autoplan.",
+		defaultValue: "",
 	},
 	ExecutableName: {
 		description:  "Comment command executable name.",
@@ -1104,6 +1109,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
 		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
+	}
+
+	if userConfig.EnableAutoplanLabel != "" && !userConfig.DisableAutoplan {
+		s.Logger.Warn("--%s is set but --%s is not, so it has no effect", EnableAutoplanLabelFlag, DisableAutoplanFlag)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
