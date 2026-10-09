@@ -140,6 +140,8 @@ type APIRequest struct {
 	// DiscoverProjects enables all-project discovery when no projects or paths
 	// are specified. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
+	// ExcludeProjects drops discovered projects by name during DiscoverProjects.
+	ExcludeProjects []string `json:"-"`
 }
 
 type APIRequestPath struct {
@@ -196,6 +198,24 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	}
 	if ignoredCommands > 0 && nonIgnoredCommands == 0 {
 		return nil, nil, events.ErrIgnoredTargetedDir
+	}
+
+	if a.DiscoverProjects && len(a.ExcludeProjects) > 0 {
+		excluded := make(map[string]struct{}, len(a.ExcludeProjects))
+		for _, name := range a.ExcludeProjects {
+			excluded[name] = struct{}{}
+		}
+		keptCmds := cmds[:0]
+		keptCC := keptCommentCommands[:0]
+		for i, cmd := range cmds {
+			if _, skip := excluded[cmd.ProjectName]; skip {
+				continue
+			}
+			keptCmds = append(keptCmds, cmd)
+			keptCC = append(keptCC, keptCommentCommands[i])
+		}
+		cmds = keptCmds
+		keptCommentCommands = keptCC
 	}
 
 	if ctx.SortByExecutionOrder {
@@ -2049,7 +2069,7 @@ func driftDetectionHasErrors(result *models.DriftDetectionResult) bool {
 	return false
 }
 
-func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string, detected map[driftProjectIdentity]struct{}, startedAt time.Time) error {
+func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string, detected map[driftProjectIdentity]struct{}, excluded map[string]struct{}, startedAt time.Time) error {
 	existing, err := a.DriftStorage.Get(repository, drift.GetOptions{Ref: ref, BaseBranch: baseBranch})
 	if err != nil {
 		return err
@@ -2057,6 +2077,10 @@ func (a *APIController) reconcileDriftStorage(repository, ref, baseBranch string
 
 	for _, project := range existing {
 		if _, ok := detected[newDriftProjectIdentity(project)]; ok {
+			continue
+		}
+		// Preserve records for excluded projects, they are intentionally not planned.
+		if _, ok := excluded[project.ProjectName]; ok {
 			continue
 		}
 		if project.LastChecked.After(startedAt) {
@@ -2156,6 +2180,7 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		BaseBranch:       normalizedBaseBranch,
 		Type:             request.Type,
 		DiscoverProjects: true, // Enable auto-discovery when no projects/paths specified
+		ExcludeProjects:  request.ExcludeProjects,
 	}
 
 	if len(request.Projects) > 0 {
@@ -2240,7 +2265,11 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if fullDetection && !storeFailed && !preHookFailed && !driftDetectionHasErrors(detectionResult) {
-		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects, detectionStartedAt); err != nil {
+		excludedProjects := make(map[string]struct{}, len(request.ExcludeProjects))
+		for _, name := range request.ExcludeProjects {
+			excludedProjects[name] = struct{}{}
+		}
+		if err := a.reconcileDriftStorage(baseRepo.ID(), normalizedRef, normalizedBaseBranch, detectedProjects, excludedProjects, detectionStartedAt); err != nil {
 			a.Logger.Warn("failed to reconcile drift data: %v", err)
 		}
 	}
