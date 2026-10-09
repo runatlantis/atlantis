@@ -12,6 +12,25 @@ type Stage struct {
 	Steps []Step `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
+func (s Stage) hasStep(name string) bool {
+	for _, step := range s.Steps {
+		if step.name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (s Stage) countPlanStoreMode(mode string) int {
+	count := 0
+	for _, step := range s.Steps {
+		if step.planStoreMode() == mode {
+			count++
+		}
+	}
+	return count
+}
+
 func (s Stage) Validate() error {
 	return validation.ValidateStruct(&s,
 		validation.Field(&s.Steps),

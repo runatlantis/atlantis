@@ -635,6 +635,58 @@ A map from string to `extra_args` for a built-in command with extra arguments.
 | --- | --- | --- | --- | --- |
 | init/plan/apply/import/state_rm | map\[`extra_args` -> array\[string\]\] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import` and `state_rm` are supported as keys and only `extra_args` is supported as a value |
 
+#### Custom Plan Storage
+
+Custom `run` steps can use Atlantis's plan store by writing the plan to
+`$PLANFILE` and marking the exact command that produces or consumes it with
+`plan_store`. Atlantis restores a stored plan before the apply workflow starts,
+validates it immediately before the consuming command, and removes it after
+that command succeeds. Put the `save` annotation on the final command that
+writes or mutates `$PLANFILE`; Atlantis removes any older local plan immediately
+before running that command and requires the command to recreate a regular file.
+
+```yaml
+workflows:
+  terragrunt:
+    plan:
+      steps:
+        - run:
+            command: terragrunt plan -out $PLANFILE
+            plan_store:
+              mode: save
+    apply:
+      steps:
+        - run:
+            command: terragrunt apply $PLANFILE
+            plan_store:
+              mode: consume
+```
+
+The `save` mode fails when `$PLANFILE` does not exist, is not a regular file, or
+the configured plan store cannot save it. If a custom plan command intentionally
+creates a zero-byte placeholder for a project that will not be applied, enable
+empty-plan cleanup on that command:
+
+```yaml
+- run:
+    command: custom-plan-command
+    plan_store:
+      mode: save
+      skip_if_empty: true
+```
+
+Atlantis first stores the empty file, replacing any older executable plan for
+the same project, and then removes it. This ordering prevents a failed cleanup
+from leaving an older plan available. `skip_if_empty` does not ignore a missing
+file, and it is only valid with `mode: save`. Remote removal is best-effort; if
+it fails, the stored replacement is the non-executable zero-byte file.
+
+Each workflow stage can mark only one plan-producing or plan-consuming command.
+`save` is valid only in the plan stage and `consume` only in the apply stage.
+Do not combine a marked custom command with the corresponding built-in `plan`
+or `apply` step because those steps already manage plan storage. Atlantis
+rejects invalid combinations during configuration validation.
+
 #### Custom `run` Command
 
 A custom command can be written in 2 ways
@@ -682,6 +734,9 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
 | run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
 | run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
+| run.plan_store | map | none | no | Mark this command as producing or consuming Atlantis's canonical plan file. |
+| run.plan_store.mode | string | none | yes | `save` for the custom plan command or `consume` for the custom apply command. |
+| run.plan_store.skip_if_empty | boolean | `false` | no | With `save`, replace and remove a zero-byte plan instead of retaining it. |
 
 #### Native Environment Variables
 
@@ -698,7 +753,8 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
       may write its plan to a path of its own choosing instead of `$PLANFILE`. Atlantis
       does not require, hash, or delete a plan artifact for such a workflow; it still
       validates the project's recorded plan state before running `apply`. As soon as a
-      workflow uses the built-in `plan` or `apply` step, the plan must be at `$PLANFILE`.
+      workflow uses the built-in `plan`/`apply` steps or a `run` step marked with
+      `plan_store`, the plan must be at `$PLANFILE`.
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
