@@ -87,3 +87,20 @@ then they should all be applied before Atlantis automatically merges the PR.
 ## Permissions
 
 The Atlantis VCS user must have the ability to merge pull requests.
+
+## GitHub Merge Queue
+
+If the PR's base branch requires a [merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue), Atlantis cannot merge the PR directly via the REST API (GitHub returns `405 Method Not Allowed`). When [`--gh-merge-queue-enabled`](server-configuration.md#--gh-merge-queue-enabled) is set, Atlantis routes automerge through the GraphQL `enablePullRequestAutoMerge` mutation, which adds the PR to the merge queue. GitHub then runs the queue's required checks against the merge candidate commit and merges the PR once they pass.
+
+Detection runs in two layers:
+
+- A pre-flight GraphQL query reads both `branchProtectionRule.requiresMergeQueue` (classic branch protection) and the base ref's rulesets, looking for an active `MERGE_QUEUE` rule. Either signal short-circuits to `enablePullRequestAutoMerge`.
+- If the direct REST merge later returns `405` with a merge-queue indication, Atlantis falls back to `enablePullRequestAutoMerge`. This is a safety net for edge cases such as a token without ruleset read scope or repos with more than 100 ruleset rules on the base ref.
+
+For this to work end-to-end:
+
+- Set [`--gh-merge-queue-enabled`](server-configuration.md#--gh-merge-queue-enabled) so Atlantis (a) posts `success` for `plan`/`apply`/`policy_check` on `merge_group` events, and (b) takes the queue-aware automerge path. With the flag off, Atlantis uses direct REST merge for all repos and surfaces a clear error if the base branch enforces a queue.
+- Subscribe the GitHub webhook to the `merge_group` event (see [Configuring Webhooks](configuring-webhooks.md#github)).
+- The Atlantis VCS user / GitHub App must have permission to enable auto-merge on the repo.
+
+The `--auto-merge-method` setting is honored for non-queue branches; for branches enforcing a merge queue GitHub uses the queue's configured method and ignores any per-PR override.

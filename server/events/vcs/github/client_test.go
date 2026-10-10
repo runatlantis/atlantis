@@ -1400,6 +1400,313 @@ func TestClient_MergePullCorrectMethod(t *testing.T) {
 	}
 }
 
+// Test that when the base branch requires a merge queue, MergePull enables
+// auto-merge via GraphQL instead of issuing a direct REST merge.
+func TestClient_MergePullMergeQueue(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	jsBytes, err := os.ReadFile("testdata/repo.json")
+	Ok(t, err)
+
+	var sawEnableAutoMerge bool
+	var directMergeAttempted bool
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo":
+				w.Write(jsBytes) // nolint: errcheck
+				return
+			case "/api/graphql":
+				body, err := io.ReadAll(r.Body)
+				Ok(t, err)
+				defer r.Body.Close() // nolint: errcheck
+				bodyStr := string(body)
+				if strings.Contains(bodyStr, "enablePullRequestAutoMerge") {
+					sawEnableAutoMerge = true
+					// Verify it includes our PR node ID and a merge method.
+					Assert(t, strings.Contains(bodyStr, `"pullRequestId":"PR_mergequeue"`), "mutation should target the PR node ID, got: %s", bodyStr)
+					Assert(t, strings.Contains(bodyStr, `"mergeMethod"`), "mutation should include mergeMethod, got: %s", bodyStr)
+					w.Write([]byte(`{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"id":"PR_mergequeue"}}}}`)) // nolint: errcheck
+					return
+				}
+				// Otherwise it's the merge-queue-status query.
+				w.Write([]byte(`{"data":{"repository":{"pullRequest":{"id":"PR_mergequeue","baseRef":{"branchProtectionRule":{"requiresMergeQueue":true},"rules":{"nodes":[]}}}}}}`)) // nolint: errcheck
+				return
+			case "/api/v3/repos/owner/repo/pulls/1/merge":
+				directMergeAttempted = true
+				t.Errorf("direct REST merge should not be called for merge-queue branches")
+				http.Error(w, "should not be called", http.StatusInternalServerError)
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{MergeQueueEnabled: true}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.MergePull(
+		logger,
+		models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName:          "owner/repo",
+				Owner:             "owner",
+				Name:              "repo",
+				CloneURL:          "",
+				SanitizedCloneURL: "",
+				VCSHost: models.VCSHost{
+					Type:     models.Github,
+					Hostname: "github.com",
+				},
+			},
+			Num: 1,
+		}, models.PullRequestOptions{})
+	Ok(t, err)
+	Assert(t, sawEnableAutoMerge, "expected enablePullRequestAutoMerge mutation to be invoked")
+	Assert(t, !directMergeAttempted, "direct merge should not be attempted")
+}
+
+// Test that when the base branch enforces a merge queue via a ruleset (so
+// classic branchProtectionRule.requiresMergeQueue is false but BaseRef.Rules
+// contains an active MERGE_QUEUE rule), MergePull detects it in the pre-flight
+// GraphQL query and routes directly to enablePullRequestAutoMerge — without
+// ever attempting the REST merge.
+func TestClient_MergePullRulesetMergeQueuePreflight(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	jsBytes, err := os.ReadFile("testdata/repo.json")
+	Ok(t, err)
+
+	var sawEnableAutoMerge bool
+	var directMergeAttempted bool
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo":
+				w.Write(jsBytes) // nolint: errcheck
+				return
+			case "/api/graphql":
+				body, err := io.ReadAll(r.Body)
+				Ok(t, err)
+				defer r.Body.Close() // nolint: errcheck
+				bodyStr := string(body)
+				if strings.Contains(bodyStr, "enablePullRequestAutoMerge") {
+					sawEnableAutoMerge = true
+					Assert(t, strings.Contains(bodyStr, `"pullRequestId":"PR_rulesetpre"`), "mutation should target the PR node ID, got: %s", bodyStr)
+					w.Write([]byte(`{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"id":"PR_rulesetpre"}}}}`)) // nolint: errcheck
+					return
+				}
+				// Pre-flight: classic protection absent, but an ACTIVE
+				// MERGE_QUEUE ruleset rule is present alongside an unrelated
+				// rule (to confirm the loop ignores non-merge-queue rules).
+				w.Write([]byte(`{"data":{"repository":{"pullRequest":{"id":"PR_rulesetpre","baseRef":{"branchProtectionRule":{"requiresMergeQueue":false},"rules":{"nodes":[{"type":"REQUIRED_STATUS_CHECKS","repositoryRuleset":{"enforcement":"ACTIVE"}},{"type":"MERGE_QUEUE","repositoryRuleset":{"enforcement":"ACTIVE"}}]}}}}}}`)) // nolint: errcheck
+				return
+			case "/api/v3/repos/owner/repo/pulls/1/merge":
+				directMergeAttempted = true
+				t.Errorf("direct REST merge should not be called when ruleset enforces merge queue")
+				http.Error(w, "should not be called", http.StatusInternalServerError)
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{MergeQueueEnabled: true}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.MergePull(
+		logger,
+		models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				Owner:    "owner",
+				Name:     "repo",
+				VCSHost:  models.VCSHost{Type: models.Github, Hostname: "github.com"},
+			},
+			Num: 1,
+		}, models.PullRequestOptions{})
+	Ok(t, err)
+	Assert(t, sawEnableAutoMerge, "expected enablePullRequestAutoMerge mutation from pre-flight")
+	Assert(t, !directMergeAttempted, "direct merge should not be attempted when ruleset detected pre-flight")
+}
+
+// Test that when the GraphQL pre-flight detection fails (e.g. token lacks
+// scope or transient API error), MergePull logs a warning and falls back to
+// the direct REST merge. This locks in the documented fallback contract.
+func TestClient_MergePullStatusQueryFailureFallsBackToDirectMerge(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	jsBytes, err := os.ReadFile("testdata/repo.json")
+	Ok(t, err)
+
+	var directMergeCalled bool
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo":
+				w.Write(jsBytes) // nolint: errcheck
+				return
+			case "/api/graphql":
+				// Simulate a token-scope failure / transient error.
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(`{"message":"Bad credentials"}`)) // nolint: errcheck
+				return
+			case "/api/v3/repos/owner/repo/pulls/1/merge":
+				directMergeCalled = true
+				body, err := io.ReadAll(r.Body)
+				Ok(t, err)
+				defer r.Body.Close() // nolint: errcheck
+				Equals(t, "{\"merge_method\":\"merge\"}\n", string(body))
+				w.Write([]byte(`{"sha":"abc","merged":true,"message":"ok"}`)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{MergeQueueEnabled: true}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.MergePull(
+		logger,
+		models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				Owner:    "owner",
+				Name:     "repo",
+				VCSHost:  models.VCSHost{Type: models.Github, Hostname: "github.com"},
+			},
+			Num: 1,
+		}, models.PullRequestOptions{})
+	Ok(t, err)
+	Assert(t, directMergeCalled, "expected fallback to direct REST merge after GraphQL failure")
+}
+
+// Test that when the base branch enforces a merge queue via a ruleset (so the
+// classic branchProtectionRule check returns false but the REST merge gets a
+// 405 with a merge-queue body), MergePull falls back to enableAutoMerge.
+func TestClient_MergePullRulesetMergeQueueFallback(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	jsBytes, err := os.ReadFile("testdata/repo.json")
+	Ok(t, err)
+
+	var sawEnableAutoMerge bool
+	graphqlCallCount := 0
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo":
+				w.Write(jsBytes) // nolint: errcheck
+				return
+			case "/api/graphql":
+				graphqlCallCount++
+				body, err := io.ReadAll(r.Body)
+				Ok(t, err)
+				defer r.Body.Close() // nolint: errcheck
+				bodyStr := string(body)
+				if strings.Contains(bodyStr, "enablePullRequestAutoMerge") {
+					sawEnableAutoMerge = true
+					Assert(t, strings.Contains(bodyStr, `"pullRequestId":"PR_ruleset"`), "mutation should target the PR node ID, got: %s", bodyStr)
+					w.Write([]byte(`{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"id":"PR_ruleset"}}}}`)) // nolint: errcheck
+					return
+				}
+				// Pre-flight returns no MERGE_QUEUE rule visible to this
+				// query (e.g. token without ruleset read scope, or rule past
+				// the first 100). Pre-flight returns false; the 405 below is
+				// what catches the merge queue.
+				w.Write([]byte(`{"data":{"repository":{"pullRequest":{"id":"PR_ruleset","baseRef":{"branchProtectionRule":{"requiresMergeQueue":false},"rules":{"nodes":[]}}}}}}`)) // nolint: errcheck
+				return
+			case "/api/v3/repos/owner/repo/pulls/1/merge":
+				// Simulate the 405 GitHub returns when a ruleset enforces a
+				// merge queue.
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				w.Write([]byte(`{"message":"Required status check is failing or the branch is protected by a merge queue and cannot be merged directly"}`)) // nolint: errcheck
+				return
+			default:
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{MergeQueueEnabled: true}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.MergePull(
+		logger,
+		models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				Owner:    "owner",
+				Name:     "repo",
+				VCSHost:  models.VCSHost{Type: models.Github, Hostname: "github.com"},
+			},
+			Num: 1,
+		}, models.PullRequestOptions{})
+	Ok(t, err)
+	Assert(t, sawEnableAutoMerge, "expected enablePullRequestAutoMerge mutation after 405 fallback")
+}
+
+// Test that with the merge queue flag off, MergePull does not perform the
+// GraphQL preflight call at all — preserving the existing single-REST-call
+// behavior for users who haven't opted into merge queue support.
+func TestClient_MergePullSkipsGraphQLWhenFlagOff(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	jsBytes, err := os.ReadFile("testdata/repo.json")
+	Ok(t, err)
+
+	testServer := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.RequestURI {
+			case "/api/v3/repos/owner/repo":
+				w.Write(jsBytes) // nolint: errcheck
+				return
+			case "/api/v3/repos/owner/repo/pulls/1/merge":
+				w.Write([]byte(`{"sha":"abc","merged":true,"message":"ok"}`)) // nolint: errcheck
+				return
+			default:
+				// /api/graphql here would be wrong — fail loudly.
+				t.Errorf("got unexpected request at %q", r.RequestURI)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		}))
+
+	testServerURL, err := url.Parse(testServer.URL)
+	Ok(t, err)
+	client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+	Ok(t, err)
+	defer disableSSLVerification()()
+
+	err = client.MergePull(
+		logger,
+		models.PullRequest{
+			BaseRepo: models.Repo{
+				FullName: "owner/repo",
+				Owner:    "owner",
+				Name:     "repo",
+				VCSHost:  models.VCSHost{Type: models.Github, Hostname: "github.com"},
+			},
+			Num: 1,
+		}, models.PullRequestOptions{})
+	Ok(t, err)
+}
+
 func TestClient_GetFileContent(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	repo := models.Repo{

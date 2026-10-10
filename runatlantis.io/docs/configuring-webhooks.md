@@ -38,6 +38,7 @@ If installing on a single repository, navigate to the repository home page and c
   * **Pushes**
   * **Issue comments**
   * **Pull requests**
+  * **Merge groups** (only required if you use [GitHub merge queue](server-configuration.md#--gh-merge-queue-enabled) and have set `--gh-merge-queue-enabled`)
 * leave **Active** checked
 * click **Add webhook**
 * See [Next Steps](#next-steps)
