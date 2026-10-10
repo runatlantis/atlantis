@@ -235,6 +235,35 @@ type PullRequest struct {
 	State PullRequestState
 	// BaseRepo is the repository that the pull request will be merged into.
 	BaseRepo Repo
+	// Stack is set when the pull request is part of a GitHub stacked pull
+	// request. It is nil for pull requests that are not stacked and for other
+	// VCS hosts.
+	Stack *PullRequestStack
+}
+
+// PullRequestStack describes the position of a pull request within a GitHub
+// stack. See https://docs.github.com/en/pull-requests/get-started/about-stacked-prs
+type PullRequestStack struct {
+	// Number is the number of the stack within the repository.
+	Number int
+	// Position is the one-based position of the pull request within the stack,
+	// where 1 is the bottom of the stack.
+	Position int
+	// Size is the total number of pull requests in the stack.
+	Size int
+	// BaseBranch is the branch the whole stack ultimately targets. It can
+	// differ from the pull request's own BaseBranch, which is the branch of the
+	// pull request below it.
+	BaseBranch string
+}
+
+// StackedPull is a pull request entry within a stack.
+type StackedPull struct {
+	Num        int
+	HeadCommit string
+	Open       bool
+	Merged     bool
+	Draft      bool
 }
 
 // PullRequestOptions is used to set optional paralmeters for PullRequest

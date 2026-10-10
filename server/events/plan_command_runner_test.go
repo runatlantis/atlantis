@@ -11,7 +11,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/events"
@@ -545,7 +545,7 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.Ptr("open"),
+				State: new("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 

@@ -99,6 +99,7 @@ const (
 	GHOrganizationFlag               = "gh-org"
 	GHWebhookSecretFlag              = "gh-webhook-secret"               // nolint: gosec
 	GHAllowMergeableBypassApply      = "gh-allow-mergeable-bypass-apply" // nolint: gosec
+	GHStackAwarePlanningFlag         = "gh-stack-aware-planning"
 	GiteaBaseURLFlag                 = "gitea-base-url"
 	GiteaTokenFlag                   = "gitea-token"
 	GiteaUserFlag                    = "gitea-user"
@@ -589,6 +590,11 @@ var boolFlags = map[string]boolFlag{
 	},
 	GHAllowMergeableBypassApply: {
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
+		defaultValue: false,
+	},
+	GHStackAwarePlanningFlag: {
+		description: "Plan GitHub stacked pull requests in stack order. Only the lowest open pull request of a stack is autoplanned;" +
+			" each pull request above it is planned automatically once the pull requests below it are merged.",
 		defaultValue: false,
 	},
 	GitlabStatusRetryEnabledFlag: {

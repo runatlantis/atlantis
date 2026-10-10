@@ -17,7 +17,7 @@ import (
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -640,6 +640,14 @@ func (e *EventParser) ParseGithubPull(logger logging.SimpleLogging, pull *github
 		State:      pullState,
 		BaseRepo:   baseRepo,
 		BaseBranch: baseBranch,
+	}
+	if stack := pull.GetStack(); stack != nil {
+		pullModel.Stack = &models.PullRequestStack{
+			Number:     stack.GetNumber(),
+			Position:   stack.GetPosition(),
+			Size:       stack.GetSize(),
+			BaseBranch: stack.GetBase().GetRef(),
+		}
 	}
 	return
 }
