@@ -80,6 +80,10 @@ type APIController struct {
 	DriftWebhookSender *webhooks.DriftWebhookSender
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
+	// ParallelPoolSize is the max number of projects of one request that plan
+	// or policy check at once when their parallel_plan setting is enabled.
+	// Values below 2 keep the projects sequential.
+	ParallelPoolSize int
 
 	// apiMiddleware provides common authentication and response utilities.
 	// Initialized lazily via getAPIMiddleware() with sync.Once for thread safety.
@@ -754,20 +758,27 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 
 	var projectResults []command.ProjectResult
-	for i, cmd := range planCmds {
-		if !ctx.PreWorkflowHooksAlreadyRun {
-			err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
-			if err != nil {
-				if a.FailOnPreWorkflowHookError {
-					return nil, err
+	if a.ParallelPoolSize > 1 && len(planCmds) > 1 && planCmds[0].ParallelPlanEnabled {
+		projectResults, err = a.apiPlanParallel(ctx, planCmds, planCC)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		for i, cmd := range planCmds {
+			if !ctx.PreWorkflowHooksAlreadyRun {
+				err = a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, planCC[i])
+				if err != nil {
+					if a.FailOnPreWorkflowHookError {
+						return nil, err
+					}
 				}
 			}
+
+			res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+			projectResults = append(projectResults, res)
+
+			a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
 		}
-
-		res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
-		projectResults = append(projectResults, res)
-
-		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
 	}
 
 	result := &command.Result{ProjectResults: projectResults}
@@ -775,6 +786,11 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		return result, nil
 	}
 
+	if a.ParallelPoolSize > 1 && len(policyCmds) > 1 && policyCmds[0].ParallelPolicyCheckEnabled && a.ProjectPolicyCheckCommandRunner != nil {
+		ctx.Log.Info("running %d policy checks in parallel", len(policyCmds))
+		policyResult := events.RunProjectCmdsParallelInOrder(policyCmds, a.ProjectPolicyCheckCommandRunner.PolicyCheck, a.ParallelPoolSize)
+		return &command.Result{ProjectResults: append(projectResults, policyResult.ProjectResults...)}, nil
+	}
 	for _, cmd := range policyCmds {
 		if a.ProjectPolicyCheckCommandRunner == nil {
 			return nil, fmt.Errorf("policy check runner is not configured")
@@ -783,6 +799,27 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 		projectResults = append(projectResults, res)
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
+}
+
+// apiPlanParallel plans planCmds through the parallel pool. Hooks share the
+// working dir with the plans, so they run before and after the whole batch
+// instead of between projects.
+func (a *APIController) apiPlanParallel(ctx *command.Context, planCmds []command.ProjectContext, planCC []*events.CommentCommand) ([]command.ProjectResult, error) {
+	if !ctx.PreWorkflowHooksAlreadyRun {
+		for _, cc := range planCC {
+			if err := a.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cc); err != nil && a.FailOnPreWorkflowHookError {
+				return nil, err
+			}
+		}
+	}
+
+	ctx.Log.Info("running %d plans in parallel", len(planCmds))
+	result := events.RunProjectCmdsParallelInOrder(planCmds, a.ProjectPlanCommandRunner.Plan, a.ParallelPoolSize)
+
+	for _, cc := range planCC {
+		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc) // nolint: errcheck
+	}
+	return result.ProjectResults, nil
 }
 
 func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*command.Result, error) {
