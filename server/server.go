@@ -1203,6 +1203,7 @@ func (s *Server) SetupRoutes() {
 		return r.URL.Path == "/" || r.URL.Path == "/index.html"
 	})
 	s.Router.HandleFunc("/healthz", s.Healthz).Methods("GET")
+	s.Router.HandleFunc("/beta", s.BetaDashboard).Methods("GET")
 	s.Router.HandleFunc("/readyz", s.Readyz).Methods("GET")
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
@@ -1348,6 +1349,11 @@ func (s *Server) closeDatabase(timeout time.Duration) error {
 
 // Index is the / route.
 func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
+	s.renderIndex(w, s.IndexTemplate)
+}
+
+// renderIndex shares the existing dashboard reads and failure behavior between views.
+func (s *Server) renderIndex(w http.ResponseWriter, view web_templates.TemplateWriter) {
 	locks, err := s.Locker.List()
 	if err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -1361,14 +1367,15 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 		lockResults = append(lockResults, web_templates.LockIndexData{
 			// NOTE: must use .String() instead of .Path because we need the
 			// query params as part of the lock URL.
-			LockPath:      lockURL.String(),
-			RepoFullName:  v.Project.RepoFullName,
-			LockedBy:      v.Pull.Author,
-			PullNum:       v.Pull.Num,
-			Path:          v.Project.Path,
-			Workspace:     v.Workspace,
-			Time:          v.Time,
-			TimeFormatted: v.Time.Format("2006-01-02 15:04:05"),
+			LockPath:       lockURL.String(),
+			RepoFullName:   v.Project.RepoFullName,
+			LockedBy:       v.Pull.Author,
+			PullNum:        v.Pull.Num,
+			PullRequestURL: v.Pull.URL,
+			Path:           v.Project.Path,
+			Workspace:      v.Workspace,
+			Time:           v.Time,
+			TimeFormatted:  v.Time.Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1389,7 +1396,7 @@ func (s *Server) Index(w http.ResponseWriter, _ *http.Request) {
 	//Sort by date - newest to oldest.
 	sort.SliceStable(lockResults, func(i, j int) bool { return lockResults[i].Time.After(lockResults[j].Time) })
 
-	err = s.IndexTemplate.Execute(w, web_templates.IndexData{
+	err = view.Execute(w, web_templates.IndexData{
 		Locks:            lockResults,
 		PullToJobMapping: preparePullToJobMappings(s),
 		ApplyLock:        applyLockData,
