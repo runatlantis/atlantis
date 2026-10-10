@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="./runatlantis.io/public/hero.png" alt="Atlantis Logo"/><br><br>
-  <b>Terraform Pull Request Automation</b>
+  <b>Terraform & OpenTofu Pull Request Automation</b>
 </p>
 
 - [Resources](#resources)
@@ -20,22 +20,27 @@
 - [Stargazers over time](#stargazers-over-time)
 
 ## Resources
-* How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
-* Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
-* Download the latest release: [github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest)
-* Get help in our [Slack channel](https://slack.cncf.io/) in channel #atlantis and development in #atlantis-contributors
-* Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+
+- How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
+- Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
+- Download the latest release: [github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest)
+- Get help in our [Slack channel](https://slack.cncf.io/) in channel #atlantis and development in #atlantis-contributors
+- Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What is Atlantis?
-A self-hosted golang application that listens for Terraform pull request events via webhooks.
+
+A self-hosted Go application that listens for Terraform and OpenTofu pull request events via webhooks.
 
 ## What does it do?
-Runs `terraform plan`, `import`, `apply` remotely and comments back on the pull request with the output.
+
+Runs `terraform plan`, `import`, `apply` (or `tofu plan`, `import`, `apply`) remotely and comments back on the pull request with the output.
 
 ## Why should you use it?
-* Make Terraform changes visible to your whole team.
-* Enable non-operations engineers to collaborate on Terraform.
-* Standardize your Terraform workflows.
+
+- Make Terraform and OpenTofu changes visible to your whole team.
+- Enable non-operations engineers to collaborate on infrastructure as code.
+- Standardize your Terraform and OpenTofu workflows.
+- Support both Terraform and OpenTofu in the same instance.
 
 ## Stargazers over time
 
