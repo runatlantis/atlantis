@@ -2492,6 +2492,66 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
 }
 
+// Test that if one plan from a generic plan comment fails and we are using
+// automerge, the successful plan is kept so it can still be applied on its own.
+func TestRunGenericPlanCommandWithError_KeepsSuccessfulPlans(t *testing.T) {
+	setup(t)
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
+	autoMerger.GlobalAutomerge = true
+	defer func() { autoMerger.GlobalAutomerge = false }()
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{
+			{
+				CommandName:      command.Plan,
+				ProjectName:      "succeeds",
+				Workspace:        "default",
+				BaseRepo:         testdata.GithubRepo,
+				Pull:             testdata.Pull,
+				AutomergeEnabled: true,
+			},
+			{
+				CommandName:      command.Plan,
+				ProjectName:      "fails",
+				Workspace:        "default",
+				BaseRepo:         testdata.GithubRepo,
+				Pull:             testdata.Pull,
+				AutomergeEnabled: true,
+			},
+		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(params []Param) ReturnValues {
+		if params[0].(command.ProjectContext).ProjectName == "succeeds" {
+			return ReturnValues{
+				command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			}
+		}
+		return ReturnValues{
+			command.ProjectCommandOutput{
+				Error: errors.New("err"),
+			},
+		}
+	})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	testdata.Pull.BaseRepo = testdata.GithubRepo
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+	// only called once, to discard stale plans before planning starts. The
+	// successful project's plan/lock must survive the other project's error.
+	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+}
+
 func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	setup(t)
 	tmp := t.TempDir()
@@ -2512,9 +2572,11 @@ func TestRunSpecificPlanCommandDoesnt_DeletePlans(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalled(Never()).Find(tmp)
 }
 
-// Test that if one plan fails and we are using automerge, that
-// we delete the plans.
-func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
+// Test that if one plan fails and we are using automerge, the successful
+// plan is kept (not deleted) so it can still be applied on its own. Automerge
+// itself is still blocked because it requires every project to have applied
+// successfully.
+func TestRunAutoplanCommandWithError_KeepsSuccessfulPlans(t *testing.T) {
 	vcsClient := setup(t)
 
 	tmp := t.TempDir()
@@ -2561,8 +2623,9 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 		ThenReturn(tmp, nil)
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
-	// gets called twice: the first time before the plan starts, the second time after the plan errors
-	pendingPlanFinder.VerifyWasCalled(Times(2)).Find(tmp)
+	// only called once, to discard stale plans before planning starts. The
+	// successful project's plan/lock must survive the other project's error.
+	pendingPlanFinder.VerifyWasCalled(Times(1)).Find(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
