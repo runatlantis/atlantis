@@ -33,7 +33,13 @@ type RepoCfg struct {
 	EmojiReaction             string
 	AllowedRegexpPrefixes     []string
 	AbortOnExecutionOrderFail bool
-	SilencePRComments         []string
+	// ReplanBetweenExecutionOrderGroups, when true, causes apply to re-run plan
+	// (and policy_check when configured) for projects in later execution order
+	// groups after earlier groups have been applied. This refreshes planfiles that
+	// were produced with Terragrunt mock_outputs or other dependency placeholders.
+	// Default is false so existing plan-then-apply review semantics stay unchanged.
+	ReplanBetweenExecutionOrderGroups bool
+	SilencePRComments                 []string
 }
 
 func (r RepoCfg) FindProjectsByDirWorkspace(repoRelDir string, workspace string) []Project {
