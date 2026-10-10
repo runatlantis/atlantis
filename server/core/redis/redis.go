@@ -106,20 +106,22 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 			return nil, errors.New("redis cluster addresses provided but all are empty")
 		}
 		rdb = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:     addrs,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			TLSConfig: tlsConfig,
+			Addrs:                 addrs,
+			Username:              cfg.Username,
+			Password:              cfg.Password,
+			TLSConfig:             tlsConfig,
+			ContextTimeoutEnabled: true,
 		})
 		connDesc = fmt.Sprintf("cluster nodes %s", strings.Join(addrs, ", "))
 	default:
 		address := fmt.Sprintf("%s:%d", cfg.Hostname, cfg.Port)
 		rdb = redis.NewClient(&redis.Options{
-			Addr:      address,
-			Username:  cfg.Username,
-			Password:  cfg.Password,
-			DB:        cfg.DB,
-			TLSConfig: tlsConfig,
+			Addr:                  address,
+			Username:              cfg.Username,
+			Password:              cfg.Password,
+			DB:                    cfg.DB,
+			TLSConfig:             tlsConfig,
+			ContextTimeoutEnabled: true,
 		})
 		connDesc = address
 	}
