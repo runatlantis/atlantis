@@ -12,7 +12,7 @@
     "vite": "8.3.3",
     "vitepress": "1.6.4",
     "vitepress-plugin-mermaid": "2.0.17",
-    "vue": "3.5.42"
+    "vue": "3.5.43"
   },
   "overrides": {
     "minimatch": "^10.2.1",
