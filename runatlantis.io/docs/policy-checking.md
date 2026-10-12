@@ -200,7 +200,8 @@ Note that authentication may need to be configured separately if pulling policie
 
 ### Running policy check against Terraform source code
 
-By default, Atlantis runs the policy check against the [`SHOWFILE`](custom-workflows.md#custom-run-command). In order to run the policy test against Terraform files directly, override the default `conftest` command used and pass in `*.tf` as one of the inputs to `conftest`. The `show` step is required so that Atlantis will generate the `SHOWFILE`.
+By default, Atlantis runs the policy check against the [`SHOWFILE`](custom-workflows.md#custom-run-command). In order to run the policy test against Terraform files directly, override the default `conftest` command used and pass in `*.tf` as one of the inputs to `conftest`. The `show` step is required so that Atlantis will generate the `SHOWFILE`. Conftest output in JSON form is parsed
+by atlantis to determine the result, other formats may lead to errors like `unable to unmarshal conftest output`.
 
 ```yaml
 workflows:
@@ -208,7 +209,7 @@ workflows:
     policy_check:
       steps:
         - show
-        - run: conftest test $SHOWFILE *.tf --no-fail
+        - run: conftest test $SHOWFILE *.tf --no-fail --output=json
 ```
 
 ### Quiet policy checks
