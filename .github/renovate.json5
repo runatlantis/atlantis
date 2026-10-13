@@ -123,6 +123,26 @@
       matchCurrentValue: '/^1\\.16\\./',
       allowedVersions: '<1.17.0',
     },
+    // Registries for the Dockerfile apk/apt pins. Keep the Alpine branch and
+    // Debian suite in sync with ALPINE_TAG / DEBIAN_TAG in Dockerfile.
+    // Only the trixie `main` suite is listed: Debian point releases fold
+    // security updates into it, and it is the only suite that still publishes
+    // the Packages.gz index the deb datasource reads (trixie-updates and
+    // trixie-security ship Packages.xz only).
+    {
+      matchFileNames: ['Dockerfile'],
+      matchDatasources: ['apk'],
+      registryUrls: [
+        'https://dl-cdn.alpinelinux.org/alpine?branch=v3.24&components=main,community&arch=x86_64',
+      ],
+    },
+    {
+      matchFileNames: ['Dockerfile'],
+      matchDatasources: ['deb'],
+      registryUrls: [
+        'https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64',
+      ],
+    },
     // Include testdata files for go-github updates
     {
       "matchPackageNames": [
@@ -135,11 +155,13 @@
     }
   ],
   customManagers: [
-    // Dockerfile pins backed by repology (apk/apt distro packages).
-    // Repology returns raw distro versions like "8.19.0-r0" or
-    // "1:9.2p1-2+deb12u10" — no "v" prefix, no semver shape — so we must
-    // NOT apply the GitHub-release-style extractVersionTemplate that the
-    // other manager below uses, otherwise Renovate filters every update out.
+    // Dockerfile apk/apt pins. Alpine pins use the native `apk` datasource,
+    // Debian pins the native `deb` datasource (repology.org, used before, went
+    // offline in 2026-09). Both return raw distro versions ("8.22.0-r0",
+    // "1:2.47.3-0+deb13u1"), so no extractVersionTemplate here; each
+    // datasource's default versioning (`apk` / `deb`) understands them.
+    // The registry URLs (Alpine branch, Debian suite) live in packageRules
+    // below and must be bumped together with ALPINE_TAG / DEBIAN_TAG.
     {
       customType: 'regex',
       managerFilePatterns: [
@@ -147,9 +169,9 @@
         '/(^|/)Dockerfile\\.[^/]*$/',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>repology) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION="?(?<currentValue>[^"\\s]+)"?',
+        'renovate: datasource=(?<datasource>apk|deb) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION="?(?<currentValue>[^"\\s]+)"?',
       ],
-      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}loose{{/if}}',
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}{{{datasource}}}{{/if}}',
     },
     // Dockerfile pins backed by github-releases / docker / other
     // vX.Y.Z sources. Renovate's regex engine is RE2 — no lookahead —
