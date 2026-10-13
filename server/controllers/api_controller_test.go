@@ -227,15 +227,7 @@ func TestAPIController_PlanHookAndPlanOrder(t *testing.T) {
 				defer mu.Unlock()
 				calls = append(calls, call)
 			}
-			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-				Then(func(args []Param) ReturnValues {
-					commentCommand := args[1].(*events.CommentCommand)
-					return ReturnValues{[]command.ProjectContext{{
-						CommandName:         command.Plan,
-						ProjectName:         commentCommand.ProjectName,
-						ParallelPlanEnabled: c.parallelPlan,
-					}}, nil}
-				})
+			stubPlanCommandPerProject(projectCommandBuilder, c.parallelPlan)
 			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
 				Then(func(args []Param) ReturnValues {
 					record("plan " + args[0].(command.ProjectContext).ProjectName)
@@ -267,6 +259,91 @@ func TestAPIController_PlanHookAndPlanOrder(t *testing.T) {
 			c.check(t, calls)
 		})
 	}
+}
+
+func TestAPIController_PlanPreWorkflowHookError(t *testing.T) {
+	cases := []struct {
+		name               string
+		parallelPlan       bool
+		failOnPreHookError bool
+		expCode            int
+		expPlans           int
+	}{
+		{name: "sequential stops when FailOnPreWorkflowHookError is set", failOnPreHookError: true, expCode: http.StatusInternalServerError, expPlans: 0},
+		{name: "sequential continues otherwise", expCode: http.StatusOK, expPlans: 2},
+		{name: "parallel stops when FailOnPreWorkflowHookError is set", parallelPlan: true, failOnPreHookError: true, expCode: http.StatusInternalServerError, expPlans: 0},
+		{name: "parallel continues otherwise", parallelPlan: true, expCode: http.StatusOK, expPlans: 2},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			ac.ParallelPoolSize = 2
+			ac.FailOnPreWorkflowHookError = c.failOnPreHookError
+			stubPlanCommandPerProject(projectCommandBuilder, c.parallelPlan)
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+				ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+			When(ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				ThenReturn(errors.New("hook failed"))
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"a", "b"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			Equals(t, c.expCode, w.Code)
+			projectCommandRunner.VerifyWasCalled(Times(c.expPlans)).Plan(Any[command.ProjectContext]())
+		})
+	}
+}
+
+func TestAPIController_PlanRunsParallelPolicyChecksConcurrently(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	ac.ParallelPoolSize = 2
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			projectName := args[1].(*events.CommentCommand).ProjectName
+			return ReturnValues{[]command.ProjectContext{
+				{CommandName: command.Plan, ProjectName: projectName, ParallelPlanEnabled: true, ParallelPolicyCheckEnabled: true},
+				{CommandName: command.PolicyCheck, ProjectName: projectName, ParallelPlanEnabled: true, ParallelPolicyCheckEnabled: true},
+			}, nil}
+		})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	barrier := newConcurrencyBarrier(t, 2)
+	When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+		Then(func([]Param) ReturnValues {
+			barrier()
+			return ReturnValues{command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+				PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+			}}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"a", "b"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	var result command.Result
+	Ok(t, json.Unmarshal(responseBody, &result))
+	var got []string
+	for _, r := range result.ProjectResults {
+		got = append(got, r.Command.String()+" "+r.ProjectName)
+	}
+	Equals(t, []string{"plan a", "plan b", "policy_check a", "policy_check b"}, got)
 }
 
 func TestAPIController_PlanProjectFailureReturnsLegacyNon2xx(t *testing.T) {
@@ -2494,6 +2571,40 @@ func parseAPIError(t *testing.T, body []byte) *controllers.APIError {
 	return envelope.Error
 }
 
+// stubPlanCommandPerProject makes BuildPlanCommands return one plan command
+// for each requested project, with parallel_plan set to parallelPlan.
+func stubPlanCommandPerProject(builder *MockProjectCommandBuilder, parallelPlan bool) {
+	When(builder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		Then(func(args []Param) ReturnValues {
+			return ReturnValues{[]command.ProjectContext{{
+				CommandName:         command.Plan,
+				ProjectName:         args[1].(*events.CommentCommand).ProjectName,
+				ParallelPlanEnabled: parallelPlan,
+			}}, nil}
+		})
+}
+
+// newConcurrencyBarrier returns a func that blocks until n callers are inside
+// it at once. It fails the test if they don't all arrive within 5 seconds,
+// which is what happens when the calls run one at a time.
+func newConcurrencyBarrier(t *testing.T, n int) func() {
+	var arrived sync.WaitGroup
+	arrived.Add(n)
+	allArrived := make(chan struct{})
+	go func() {
+		arrived.Wait()
+		close(allArrived)
+	}()
+	return func() {
+		arrived.Done()
+		select {
+		case <-allArrived:
+		case <-time.After(5 * time.Second):
+			t.Errorf("timed out waiting for %d calls to run at once", n)
+		}
+	}
+}
+
 func TestAPIResponseEnvelopeIncludesNullInactiveFields(t *testing.T) {
 	ac, _, _ := setup(t)
 	driftStorage := driftmocks.NewMockStorage()
@@ -3883,23 +3994,11 @@ func TestAPIController_DetectDrift(t *testing.T) {
 func TestAPIController_DetectDriftPlansParallelPlanProjectsConcurrently(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	ac.ParallelPoolSize = 2
-	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-		Then(func(args []Param) ReturnValues {
-			commentCommand := args[1].(*events.CommentCommand)
-			return ReturnValues{[]command.ProjectContext{{
-				CommandName:         command.Plan,
-				ProjectName:         commentCommand.ProjectName,
-				ParallelPlanEnabled: true,
-			}}, nil}
-		})
-	started := make(chan string, 2)
-	release := make(chan struct{})
-	releaseOnce := sync.OnceFunc(func() { close(release) })
-	t.Cleanup(releaseOnce)
+	stubPlanCommandPerProject(projectCommandBuilder, true)
+	barrier := newConcurrencyBarrier(t, 2)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
-		Then(func(args []Param) ReturnValues {
-			started <- args[0].(command.ProjectContext).ProjectName
-			<-release
+		Then(func([]Param) ReturnValues {
+			barrier()
 			return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
 		})
 	driftStorage := driftmocks.NewMockStorage()
@@ -3915,23 +4014,7 @@ func TestAPIController_DetectDriftPlansParallelPlanProjectsConcurrently(t *testi
 	req, _ := http.NewRequest("POST", "/api/drift/detect", bytes.NewBuffer(body))
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		ac.DetectDrift(w, req)
-	}()
-
-	var running []string
-	for len(running) < 2 {
-		select {
-		case name := <-started:
-			running = append(running, name)
-		case <-time.After(5 * time.Second):
-			t.Fatalf("timed out waiting for both plans to run at once; running=%v", running)
-		}
-	}
-	releaseOnce()
-	<-done
+	ac.DetectDrift(w, req)
 
 	Equals(t, http.StatusOK, w.Code)
 	response, _ := io.ReadAll(w.Result().Body)
