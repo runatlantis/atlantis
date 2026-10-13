@@ -334,6 +334,10 @@ func (p *DefaultProjectFinder) filterToFileList(log logging.SimpleLogging, files
 	return filtered
 }
 
+func hasModifiedAutoplanFiles(log logging.SimpleLogging, files []string, fileList string) bool {
+	return len((&DefaultProjectFinder{}).filterToFileList(log, files, fileList)) > 0
+}
+
 // shouldIgnore returns true if we shouldn't trigger a plan on changes to this file.
 func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
 	for _, s := range ignoredFilenameFragments {
