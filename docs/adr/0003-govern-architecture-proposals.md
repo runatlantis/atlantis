@@ -4,13 +4,11 @@ Date: 2026-10-02
 
 ## Status
 
-Proposed
+Accepted
 
 Related issue: [#6953](https://github.com/runatlantis/atlantis/issues/6953).
 
-Draft number is provisional; assign the next number after the latest merged ADR when this proposal lands.
-
-This ADR extends [ADR 0001](0001-record-architecture-decisions.md), which remains Accepted. Its adoption follows the process in force at acceptance. Until then, the [current ADR process](https://github.com/runatlantis/atlantis/blob/main/docs/adr/README.md) applies.
+This ADR extends [ADR 0001](0001-record-architecture-decisions.md).
 
 ## Context
 

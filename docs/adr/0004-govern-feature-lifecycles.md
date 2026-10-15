@@ -4,9 +4,9 @@ Date: 2026-10-02
 
 ## Status
 
-Proposed
+Accepted
 
-Related issue: [#6953](https://github.com/runatlantis/atlantis/issues/6953). The number is provisional. Adoption follows [ADR 0003](0003-govern-architecture-proposals.md) if it's accepted, otherwise the [current ADR process](README.md).
+Related issue: [#6953](https://github.com/runatlantis/atlantis/issues/6953).
 
 ## Context
 
