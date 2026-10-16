@@ -6,6 +6,7 @@ package events
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -33,6 +34,9 @@ type DefaultProjectLocker struct {
 	NoOpLocker     locking.Locker
 	VCSClient      vcs.Client
 	ExecutableName string
+	// LockURLGenerator, if set, is used to link to the lock in the Atlantis UI
+	// so it can be discarded with one click.
+	LockURLGenerator LockURLGenerator
 }
 
 // TryLockResponse is the result of trying to lock a project.
@@ -66,11 +70,7 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		if err != nil {
 			return nil, err
 		}
-		failureMsg := fmt.Sprintf(
-			"This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `%s plan` here to re-plan.",
-			link,
-			link,
-			p.ExecutableName)
+		failureMsg := p.lockedFailureMessage(link, lockAttempt.LockKey)
 		return &TryLockResponse{
 			LockAcquired:      false,
 			LockFailureReason: failureMsg,
@@ -85,4 +85,17 @@ func (p *DefaultProjectLocker) TryLock(log logging.SimpleLogging, pull models.Pu
 		},
 		LockKey: lockAttempt.LockKey,
 	}, nil
+}
+
+func (p *DefaultProjectLocker) lockedFailureMessage(pullLink string, lockKey string) string {
+	var msg strings.Builder
+	fmt.Fprintf(&msg, "This project is currently locked by an unapplied plan from pull %s.\n\n", pullLink)
+	msg.WriteString("To continue, release the lock in one of these ways:\n")
+	fmt.Fprintf(&msg, "* Comment `%s unlock` on pull %s to delete all of its plans and locks.\n", p.ExecutableName, pullLink)
+	if p.LockURLGenerator != nil && lockKey != "" {
+		fmt.Fprintf(&msg, "* [Delete only this project's plan and lock in the Atlantis UI](%s).\n", p.LockURLGenerator.GenerateLockURL(lockKey))
+	}
+	fmt.Fprintf(&msg, "* Apply that plan and merge pull %s.\n\n", pullLink)
+	fmt.Fprintf(&msg, "Once the lock is released, comment `%s plan` here to re-plan.", p.ExecutableName)
+	return msg.String()
 }

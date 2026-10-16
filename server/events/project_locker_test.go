@@ -52,7 +52,7 @@ func TestDefaultProjectLocker_TryLockWhenLocked(t *testing.T) {
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
 		LockAcquired:      false,
-		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link),
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s.\n\nTo continue, release the lock in one of these ways:\n* Comment `atlantis unlock` on pull %s to delete all of its plans and locks.\n* Apply that plan and merge pull %s.\n\nOnce the lock is released, comment `atlantis plan` here to re-plan.", link, link, link),
 	}, res)
 }
 
@@ -90,7 +90,7 @@ func TestDefaultProjectLocker_TryLockWhenLockedCustomExecutableName(t *testing.T
 	Ok(t, err)
 	Equals(t, &events.TryLockResponse{
 		LockAcquired:      false,
-		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s. To continue, delete the lock from %s or apply that plan and merge the pull request.\n\nOnce the lock is released, comment `%s plan` here to re-plan.", link, link, customExecutableName),
+		LockFailureReason: fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s.\n\nTo continue, release the lock in one of these ways:\n* Comment `%s unlock` on pull %s to delete all of its plans and locks.\n* Apply that plan and merge pull %s.\n\nOnce the lock is released, comment `%s plan` here to re-plan.", link, customExecutableName, link, link, customExecutableName),
 	}, res)
 }
 
@@ -270,4 +270,42 @@ func TestDefaultProjectLocker_RepoLocking(t *testing.T) {
 			Equals(t, true, res.LockAcquired)
 		})
 	}
+}
+
+type fakeLockURLGenerator struct{}
+
+func (fakeLockURLGenerator) GenerateLockURL(lockID string) string {
+	return "https://atlantis.example.com/lock?id=" + lockID
+}
+
+func TestDefaultProjectLocker_TryLockWhenLockedLinksToLockInUI(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	var githubClient *github.Client
+	mockClient := vcs.NewClientProxy(githubClient, nil, nil, nil, nil, nil)
+	mockLocker := mocks.NewMockLocker(ctrl)
+	locker := events.DefaultProjectLocker{
+		Locker:           mockLocker,
+		VCSClient:        mockClient,
+		ExecutableName:   "atlantis-staging",
+		LockURLGenerator: fakeLockURLGenerator{},
+	}
+	expProject := models.Project{}
+	expWorkspace := "default"
+	expPull := models.PullRequest{Num: 5}
+	expUser := models.User{}
+
+	lockingPull := models.PullRequest{Num: 2}
+	mockLocker.EXPECT().TryLock(expProject, expWorkspace, expPull, expUser).Return(
+		locking.TryLockResponse{
+			LockAcquired: false,
+			CurrLock:     models.ProjectLock{Pull: lockingPull},
+			LockKey:      "repo/dir/default",
+		},
+		nil,
+	)
+	res, err := locker.TryLock(logging.NewNoopLogger(t), expPull, expUser, expWorkspace, expProject, true)
+	link, _ := mockClient.MarkdownPullLink(lockingPull)
+	Ok(t, err)
+	Equals(t, false, res.LockAcquired)
+	Equals(t, fmt.Sprintf("This project is currently locked by an unapplied plan from pull %s.\n\nTo continue, release the lock in one of these ways:\n* Comment `atlantis-staging unlock` on pull %s to delete all of its plans and locks.\n* [Delete only this project's plan and lock in the Atlantis UI](https://atlantis.example.com/lock?id=repo/dir/default).\n* Apply that plan and merge pull %s.\n\nOnce the lock is released, comment `atlantis-staging plan` here to re-plan.", link, link, link), res.LockFailureReason)
 }
