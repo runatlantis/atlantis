@@ -108,6 +108,27 @@ func TestAutoMerger_automerge_NoRetryByDefault(t *testing.T) {
 	vcsClient.VerifyWasCalled(Once()).MergePull(l, p, o)
 }
 
+// TestAutoMerger_automerge_NegativeRetryCount verifies that a negative
+// AutomergeRetryCount is treated as 0 so the merge is still attempted exactly
+// once instead of being skipped, and a failed merge is reported rather than
+// silently treated as a success.
+func TestAutoMerger_automerge_NegativeRetryCount(t *testing.T) {
+	RegisterMockTestingT(t)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.MergePull(anyMergePullArgs())).ThenReturn(errors.New("boom"))
+
+	am := &AutoMerger{VCSClient: vcsClient, AutomergeRetryCount: -1}
+	ctx, pullStatus := newAutomergeTestContext(t)
+
+	am.automerge(ctx, pullStatus, false, "")
+
+	l, p, o := anyMergePullArgs()
+	vcsClient.VerifyWasCalled(Once()).MergePull(l, p, o)
+	// Initial "automerging" comment plus a failure comment.
+	cl, cr, cn, cc, ck := anyCreateCommentArgs()
+	vcsClient.VerifyWasCalled(Times(2)).CreateComment(cl, cr, cn, cc, ck)
+}
+
 func anyCreateCommentArgs() (logging.SimpleLogging, models.Repo, int, string, string) {
 	return Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()
 }
