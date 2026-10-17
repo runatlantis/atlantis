@@ -143,6 +143,11 @@ type MergedProjectCfg struct {
 	SilencePRComments         []string
 }
 
+const (
+	WorkflowHookScopeRepo    = "repo"
+	WorkflowHookScopeProject = "project"
+)
+
 // WorkflowHook is a map of custom run commands to run before or after workflows.
 type WorkflowHook struct {
 	StepName        string
@@ -151,6 +156,11 @@ type WorkflowHook struct {
 	Shell           string
 	ShellArgs       string
 	Commands        string
+	Scope           string
+}
+
+func (h WorkflowHook) RunsPerProject() bool {
+	return h.Scope == WorkflowHookScopeProject
 }
 
 // DefaultApplyStage is the Atlantis default apply stage.
