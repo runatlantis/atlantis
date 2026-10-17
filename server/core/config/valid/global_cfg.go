@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -61,8 +62,15 @@ type ExternalStores struct {
 
 // PlanStoreConfig holds the type and backend-specific config for plan storage.
 type PlanStoreConfig struct {
-	Type string
-	S3   S3StoreConfig
+	Type  string
+	S3    S3StoreConfig
+	Redis RedisStoreConfig
+}
+
+// RedisStoreConfig holds redis-specific config for the plan store. Connection
+// settings come from the server's redis flags; TTL of 0 disables expiry.
+type RedisStoreConfig struct {
+	TTL time.Duration
 }
 
 // S3StoreConfig holds S3-specific configuration for the plan store.
