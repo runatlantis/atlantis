@@ -61,6 +61,12 @@ var DefaultBlockedExtraArgs = []string{
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
+// htmlCommentRegex matches HTML comments, which render as nothing in the VCS UI.
+// Third-party integrations (Linear, for example) append them as metadata trailers
+// to comments a user typed, which would otherwise make an ordinary command look
+// like a multi-line comment and get ignored.
+var htmlCommentRegex = regexp.MustCompile(`(?s)<!--.*?-->`)
+
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
@@ -154,7 +160,7 @@ type CommentParseResult struct {
 // - atlantis approve_policies
 // - atlantis import ADDRESS ID
 func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) CommentParseResult {
-	comment := strings.TrimSpace(rawComment)
+	comment := strings.TrimSpace(htmlCommentRegex.ReplaceAllString(rawComment, ""))
 	comment = strings.Trim(comment, "`")
 
 	if multiLineRegex.MatchString(comment) {
