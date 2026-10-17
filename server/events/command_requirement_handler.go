@@ -114,7 +114,7 @@ func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir st
 				diverged = a.hasDiverged(repoDir, ctx, cmd, nil)
 			}
 			if diverged {
-				return fmt.Sprintf("Default branch must be rebased onto pull request before running %s.", cmd), nil
+				return fmt.Sprintf("Pull request branch must include the latest default branch commit before running %s.", cmd), nil
 			}
 		}
 	}
