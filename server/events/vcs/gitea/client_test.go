@@ -4,6 +4,7 @@
 package gitea_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/events/vcs/gitea"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -336,6 +338,83 @@ func TestClient_GetModifiedFilesPaginationEmergencyBreak(t *testing.T) {
 	Equals(t, []string{}, files)
 	Equals(t, 500, len(pages))
 	Equals(t, 500, pages[len(pages)-1])
+}
+
+func TestClient_HidePrevCommandCommentsNamespace(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	edited := make([]string, 0, 2)
+
+	client := newTestClient(t, 10, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/owner/repo/issues/1/comments":
+			_, _ = w.Write([]byte(`[
+				{"id":1,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->","user":{"login":"user"}},
+				{"id":2,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-b command=plan -->","user":{"login":"user"}},
+				{"id":3,"body":"Ran Plan for dir: stack1","user":{"login":"user"}},
+				{"id":4,"body":"Ran Plan for dir: stack2\n<!-- atlantis-comment:v1 namespace=instance-a command=plan -->","user":{"login":"user"}},
+				{"id":5,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-a command= -->","user":{"login":"user"}},
+				{"id":6,"body":"Ran Plan for dir: stack1\n<!-- atlantis-comment:v1 namespace=instance-a command=apply -->","user":{"login":"user"}}
+			]`))
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			_, _ = w.Write([]byte(`{"login":"user"}`))
+		case r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/repos/owner/repo/issues/comments/"):
+			edited = append(edited, strings.TrimPrefix(r.URL.Path, "/repos/owner/repo/issues/comments/"))
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+	client.CommentNamespace = common.NewCommentNamespace("instance-a")
+
+	err := client.HidePrevCommandComments(logger, models.Repo{Owner: "owner", Name: "repo"}, 1, "plan", "stack1")
+	Ok(t, err)
+	Equals(t, []string{"1", "5"}, edited)
+}
+
+func TestClient_HidePrevCommandCommentsLegacySkipsUnrelatedAndSuperseded(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	comments := map[string]string{
+		"1": "Ran Plan for 2 projects:",
+		"2": "Ran Apply for 2 projects:",
+		"3": "<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis plan</summary>\nRan Plan for 2 projects:\n</details>\n",
+	}
+	edited := make([]string, 0, 1)
+
+	client := newTestClient(t, 10, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/owner/repo/issues/1/comments":
+			_, _ = fmt.Fprintf(w, `[
+				{"id":1,"body":%q,"user":{"login":"user"}},
+				{"id":2,"body":%q,"user":{"login":"user"}},
+				{"id":3,"body":%q,"user":{"login":"user"}}
+			]`, comments["1"], comments["2"], comments["3"])
+		case r.Method == http.MethodGet && r.URL.Path == "/user":
+			_, _ = w.Write([]byte(`{"login":"user"}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/repos/owner/repo/issues/comments/1":
+			var request struct {
+				Body string `json:"body"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Errorf("decode edit request: %v", err)
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			comments["1"] = request.Body
+			edited = append(edited, "1")
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+
+	repo := models.Repo{Owner: "owner", Name: "repo"}
+	Ok(t, client.HidePrevCommandComments(logger, repo, 1, "plan", ""))
+	Ok(t, client.HidePrevCommandComments(logger, repo, 1, "plan", ""))
+
+	Equals(t, []string{"1"}, edited)
+	Equals(t, 1, strings.Count(comments["1"], "<details>"))
 }
 
 func newTestClient(t *testing.T, pageSize int, apiHandler http.HandlerFunc) *gitea.Client {
