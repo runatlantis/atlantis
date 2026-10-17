@@ -1209,6 +1209,162 @@ func TestMergeAgain_ConcurrentDiverged(t *testing.T) {
 	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
 }
 
+// TestMergeAgain_RemoteUpdateFails verifies that when recheckDiverged's "git
+// remote update" fails (e.g. the base repo's clone URL is no longer reachable),
+// MergeAgain propagates that error instead of swallowing it, so the caller
+// aborts the plan rather than running against a working tree it couldn't
+// confirm was up to date.
+func TestMergeAgain_RemoteUpdateFails(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// Create a PR branch with a PR-specific commit.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	// Build the Atlantis merge-checkout workspace: clone main, fetch the PR
+	// branch, and merge — exactly what Atlantis does on first clone.
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Point the base repo's clone URL at a path that isn't a git remote at all,
+	// so recheckDiverged's "git remote update" fails when it tries to fetch.
+	bogusCloneURL := filepath.Join(t.TempDir(), "does-not-exist")
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: bogusCloneURL},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+
+	merged, err := wd.MergeAgain(logging.NewNoopLogger(t), models.Repo{CloneURL: repoDir}, pullRequest, "default")
+	ErrContains(t, "getting remote update failed", err)
+	Assert(t, merged == true, "MergeAgain should report merged=true when the divergence check fails so callers treat the working tree as stale")
+}
+
+// buildMergeCheckoutWorkspace sets up a merge-checkout workspace the way Atlantis
+// does on first clone: clone main, fetch the PR branch from "source", and merge.
+// Returns the workspace dir. Used by the credential-sanitization tests below.
+func buildMergeCheckoutWorkspace(t *testing.T, repoDir string) string {
+	t.Helper()
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	return workspaceDir
+}
+
+// TestMergeAgain_RemoteUpdateFailureSanitizesCredentials verifies that when
+// recheckDiverged's "git remote update" fails, the raw command output — which git
+// echoes the failing remote's URL into (e.g. "fatal: '<url>' does not appear to be
+// a git repository") - is sanitized before it's embedded in the returned error.
+// That error is surfaced all the way to the PR's job output, so a credentialed
+// clone URL (base or head/fork) must never appear in it verbatim.
+func TestMergeAgain_RemoteUpdateFailureSanitizesCredentials(t *testing.T) {
+	repoDir := initRepo(t)
+	buildMergeCheckoutWorkspace(t, repoDir)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Bogus clone URLs standing in for credentialed URLs. Each embeds a unique
+	// marker so we can assert it's stripped from the returned error, regardless
+	// of which remote(s) git's fatal output happens to mention.
+	secretBaseURL := filepath.Join(t.TempDir(), "base-secret-token-AKIABASE")
+	secretHeadURL := filepath.Join(t.TempDir(), "head-secret-token-AKIAHEAD")
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+	headRepo := models.Repo{CloneURL: secretHeadURL, SanitizedCloneURL: "***head-sanitized***"}
+
+	_, err := wd.MergeAgain(logging.NewNoopLogger(t), headRepo, pullRequest, "default")
+	assert.Error(t, err)
+	assert.NotContains(t, err.Error(), secretBaseURL, "returned error must not leak the base repo's credentialed clone URL")
+	assert.NotContains(t, err.Error(), secretHeadURL, "returned error must not leak the head repo's credentialed clone URL")
+}
+
+// TestHasDiverged_FetchFailureSanitizesCredentials verifies that a "git fetch"
+// failure against the "origin" remote, hit via the plain (non-pattern) path in
+// both HasDiverged and HasDivergedFromPullHead, never leaks the base repo's
+// credentialed clone URL into the returned error — git echoes the failing
+// remote's URL verbatim into its fatal output, so hasDiverged's returned error
+// must be sanitized by its callers before it escapes this package.
+func TestHasDiverged_FetchFailureSanitizesCredentials(t *testing.T) {
+	repoDir := initRepo(t)
+	workspaceDir := buildMergeCheckoutWorkspace(t, repoDir)
+
+	// The "origin" remote must actually be set to the same value reported as
+	// BaseRepo.CloneURL below, since that's what recheckDiverged/production code
+	// would have configured — otherwise there'd be nothing for sanitization to match.
+	secretBaseURL := filepath.Join(t.TempDir(), "base-secret-token-AKIABASE")
+	runCmd(t, workspaceDir, "git", "remote", "set-url", "origin", secretBaseURL)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	logger := logging.NewNoopLogger(t)
+
+	t.Run("HasDiverged, no patterns", func(t *testing.T) {
+		pullRequest := models.PullRequest{
+			BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+			HeadBranch: "pr-branch",
+			BaseBranch: "main",
+		}
+		_, err := wd.HasDiverged(logger, workspaceDir, ".", nil, pullRequest)
+		assert.Error(t, err)
+		assert.NotContains(t, err.Error(), secretBaseURL, "HasDiverged error must not leak the base repo's credentialed clone URL")
+	})
+
+	t.Run("HasDivergedFromPullHead, no patterns, empty BaseBranch", func(t *testing.T) {
+		// An empty BaseBranch routes HasDivergedFromPullHead into hasDiverged's
+		// plain git-status fallback instead of the getDivergedFilesFromPullHead path.
+		pullRequest := models.PullRequest{
+			BaseRepo:   models.Repo{CloneURL: secretBaseURL, SanitizedCloneURL: "***base-sanitized***"},
+			HeadBranch: "pr-branch",
+		}
+		_, err := wd.HasDivergedFromPullHead(logger, workspaceDir, ".", nil, pullRequest)
+		assert.Error(t, err)
+		assert.NotContains(t, err.Error(), secretBaseURL, "HasDivergedFromPullHead error must not leak the base repo's credentialed clone URL")
+	})
+}
+
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)
@@ -1268,13 +1424,15 @@ func TestHasDiverged_MasterHasDiverged(t *testing.T) {
 		CheckoutDepth:       50,
 		GpgNoSigningEnabled: true,
 	}
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	assert.NoError(t, err)
 	Equals(t, hasDiverged, true)
 
 	// Run it again but without the checkout merge strategy. It should return
 	// false.
 	wd.CheckoutMerge = false
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", nil, models.PullRequest{})
+	assert.NoError(t, err)
 	Equals(t, hasDiverged, false)
 }
 
@@ -1373,7 +1531,8 @@ func TestHasDiverged_WithPatterns_CheckoutMergeDisabled(t *testing.T) {
 	}
 
 	// Should return false when CheckoutMerge is disabled.
-	hasDiverged := wd.HasDiverged(logger, firstPRDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, firstPRDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1460,7 +1619,8 @@ func TestHasDiverged_WithEmptyPatterns(t *testing.T) {
 	}
 
 	// With empty patterns, should fall back to regular HasDiverged which should return true.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1508,19 +1668,24 @@ func TestHasDivergedFromPullHead_FreshMergeCheckoutUsesPullHead(t *testing.T) {
 		HeadCommit: headCommit,
 	}
 
-	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, prDir, ".", []string{}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 
-	hasDiverged = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
-	hasDiverged = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDivergedFromPullHead(logger, prDir, ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1593,7 +1758,8 @@ func TestHasDiverged_PatternHasDiverged(t *testing.T) {
 	}
 
 	// Pattern matches files that have diverged (project1 was modified in first-pr and merged to main).
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1654,7 +1820,8 @@ func TestHasDiverged_PatternHasNotDiverged(t *testing.T) {
 
 	// Pattern matches project1 files. Main's last commit for project1 is in second-pr's history (since it branched from main).
 	// So it has not diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1715,7 +1882,8 @@ func TestHasDiverged_MultiplePatterns(t *testing.T) {
 
 	// Both patterns match files. Main's commits for these patterns are in feature-pr's history.
 	// So neither has diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**", "project3/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**", "project3/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1759,7 +1927,8 @@ func TestHasDiverged_PatternMatchesNothing(t *testing.T) {
 	}
 
 	// Pattern matches no files (project2 doesn't exist), should not be considered diverged.
-	hasDiverged := wd.HasDiverged(logger, firstPRDir, ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, firstPRDir, ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1807,7 +1976,8 @@ func TestHasDiverged_BrandNewFiles(t *testing.T) {
 
 	// Pattern matches brand new files that main has never touched.
 	// Main hasn't "diverged" - we're just adding new content.
-	hasDiverged := wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, prDir, ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -1870,7 +2040,8 @@ func TestHasDiverged_FilesDeletedFromMain(t *testing.T) {
 
 	// Pattern matches project1 which has been deleted from main.
 	// This IS divergence - main has moved forward by deleting the files.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -1940,11 +2111,13 @@ func TestHasDiverged_MixedPatternsOneDiverged(t *testing.T) {
 
 	// Check with both patterns: project1 (diverged) and project2 (not diverged).
 	// Should return true because at least one pattern has diverged.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**", "project2/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**", "project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
 	// Check with only project2 pattern (not diverged).
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -2015,7 +2188,8 @@ func TestHasDiverged_PRDidNotTouchPattern(t *testing.T) {
 	// first-pr never touched project1, but main has moved forward on it.
 	// This IS considered diverged - the pattern is in autoplanWhenModified,
 	// and we want to ensure plans stay current with main's changes.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -2092,12 +2266,14 @@ func TestHasDiverged_WithStaleOriginMain(t *testing.T) {
 	// Test 1: Pattern matching project1 should detect divergence.
 	// Even though HEAD has a merge commit, origin/main has a new commit touching project1/**
 	// that isn't in HEAD. The fetch should pick this up.
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project1/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 
 	// Test 2: Pattern matching project2 should NOT detect divergence.
 	// Main has no new commits touching project2/**, so it hasn't diverged for this pattern.
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{"project2/**"}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged)
 }
 
@@ -2179,17 +2355,20 @@ func TestHasDiverged_ProjectInSubdirectory(t *testing.T) {
 	// When adjusted, it should become "modules/**/*.tf" relative to repo root.
 	projectPath := "deployments/staging/app"
 	pattern := "../../../modules/**/*.tf" // 3 levels up from deployments/staging/app
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{pattern}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{pattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged) // Should detect that modules/database/main.tf changed
 
 	// Test 2: Pattern that matches files within the project directory itself
 	projectPattern := "*.tf"
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{projectPattern}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{projectPattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, false, hasDiverged) // No .tf files changed in the project directory in divergent commits
 
 	// Test 3: Pattern at repo root should also work
 	absolutePattern := "modules/**/*.tf"
-	hasDiverged = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{absolutePattern}, pullRequest)
+	hasDiverged, err = wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", []string{absolutePattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged)
 }
 
@@ -2266,7 +2445,8 @@ func TestHasDiverged_DeepProjectPath(t *testing.T) {
 	projectPath := deepPath
 
 	whenModifiedPattern := "../../../../../../../config/**"
-	hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{whenModifiedPattern}, pullRequest)
+	hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", projectPath, []string{whenModifiedPattern}, pullRequest)
+	assert.NoError(t, err)
 	Equals(t, true, hasDiverged) // Should detect that config/settings.yaml changed
 }
 
@@ -2387,13 +2567,67 @@ func TestHasDiverged_PatternMatching(t *testing.T) {
 				HeadCommit: prHeadCommit,
 			}
 
-			hasDiverged := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", tt.patterns, pullRequest)
+			hasDiverged, err := wd.HasDiverged(logger, repoDir+"/repos/0/default", ".", tt.patterns, pullRequest)
+			assert.NoError(t, err)
 			if hasDiverged != tt.expectDivergence {
 				t.Errorf("expected divergence=%v, got=%v for patterns=%v and changedFiles=%v",
 					tt.expectDivergence, hasDiverged, tt.patterns, tt.changedFiles)
 			}
 		})
 	}
+}
+
+// TestHasDiverged_WithPatterns_FetchFails verifies that when autoplanWhenModified
+// patterns are set, a "git fetch" failure inside the targeted divergence check
+// (hasDivergedForPatterns) is propagated as a real error instead of being silently
+// converted into an indistinguishable diverged=true result.
+func TestHasDiverged_WithPatterns_FetchFails(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// Create a PR branch with a PR-specific commit.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "PR change")
+	runCmd(t, repoDir, "git", "checkout", "main")
+
+	// Build the Atlantis merge-checkout workspace: clone main, fetch the PR
+	// branch, and merge — exactly what Atlantis does on first clone.
+	workspaceDir := filepath.Join(repoDir, "repos", "0", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "0", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "main", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Break the origin remote so the "git fetch" inside getDivergedFiles fails.
+	bogusRemote := filepath.Join(t.TempDir(), "does-not-exist")
+	runCmd(t, workspaceDir, "git", "remote", "set-url", "origin", bogusRemote)
+
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+	}
+	logger := logging.NewNoopLogger(t)
+	patterns := []string{"*.tf"}
+
+	hasDiverged, err := wd.HasDiverged(logger, workspaceDir, ".", patterns, pullRequest)
+	ErrContains(t, "fetching repo", err)
+	Assert(t, hasDiverged == true, "HasDiverged should assume divergence when the underlying fetch fails")
+
+	hasDivergedFromPullHead, err := wd.HasDivergedFromPullHead(logger, workspaceDir, ".", patterns, pullRequest)
+	ErrContains(t, "fetching repo", err)
+	Assert(t, hasDivergedFromPullHead == true, "HasDivergedFromPullHead should assume divergence when the underlying fetch fails")
 }
 
 func initRepo(t *testing.T) string {
