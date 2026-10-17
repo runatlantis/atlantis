@@ -1499,6 +1499,19 @@ ATLANTIS_SILENCE_FORK_PR_ERRORS=true
 Normally, if Atlantis receives a pull request webhook from a fork and --allow-fork-prs is not set,
 it will comment back with an error. This flag disables that commenting.
 
+### `--silence-closed-pr-errors`
+
+```bash
+atlantis server --silence-closed-pr-errors
+# or
+ATLANTIS_SILENCE_CLOSED_PR_ERRORS=true
+```
+
+Normally, if Atlantis receives a command on a closed pull request, it will comment back with an error.
+This flag disables that commenting. This is useful when several Atlantis servers watch the same
+repository, so that a single command on a closed pull request does not produce one error comment per
+server.
+
 ### `--silence-no-projects` <Badge text="v0.17.0" type="info"/>
 
 ```bash

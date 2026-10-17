@@ -138,6 +138,7 @@ const (
 	RepoAllowlistFlag                = "repo-allowlist"
 	SilenceNoProjectsFlag            = "silence-no-projects"
 	SilenceForkPRErrorsFlag          = "silence-fork-pr-errors"
+	SilenceClosedPRErrorsFlag        = "silence-closed-pr-errors"
 	SilenceVCSStatusNoPlans          = "silence-vcs-status-no-plans"
 	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
@@ -642,6 +643,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	SilenceForkPRErrorsFlag: {
 		description:  "Silences the posting of fork pull requests not allowed error comments.",
+		defaultValue: false,
+	},
+	SilenceClosedPRErrorsFlag: {
+		description:  "Silences the posting of closed pull requests not allowed error comments.",
 		defaultValue: false,
 	},
 	SilenceVCSStatusNoPlans: {
