@@ -41,14 +41,16 @@ type UnderlyingSlackClient interface {
 }
 
 type DefaultSlackClient struct {
-	Slack UnderlyingSlackClient
-	Token string
+	Slack       UnderlyingSlackClient
+	Token       string
+	IncludeBody bool
 }
 
-func NewSlackClient(token string) SlackClient {
+func NewSlackClient(token string, includeBody bool) SlackClient {
 	return &DefaultSlackClient{
-		Slack: slack.New(token),
-		Token: token,
+		Slack:       slack.New(token),
+		Token:       token,
+		IncludeBody: includeBody,
 	}
 }
 
@@ -167,10 +169,10 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 		},
 	}
 
-	// Include the pull request description when present, rendered as a
-	// full-width field and truncated so a long description can't exceed Slack's
+	// If desired, include the pull request description when present, rendered as
+	// a full-width field and truncated so a long description can't exceed Slack's
 	// message size limits.
-	if applyResult.Pull.Body != "" {
+	if d.IncludeBody && applyResult.Pull.Body != "" {
 		attachment.Fields = append(attachment.Fields, slack.AttachmentField{
 			Title: "Description",
 			Value: truncateGraphemeClusters(applyResult.Pull.Body, maxDescriptionGraphemeClusters),
