@@ -120,6 +120,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 * Follow: [GitLab: Create a personal access token](https://docs.gitlab.com/user/profile/personal_access_tokens/#create-a-personal-access-token)
 * Create a token with **api** scope
 * Record the access token
+* In gitlab 19.0 Fine-grained tokens are introduced, create a legacy token to follow the directions above.
 
 ### Gitea
 
