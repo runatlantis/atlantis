@@ -37,7 +37,9 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	if len(res.ProjectResults) > 0 {
 		var commentOnProjects []command.ProjectResult
 		for _, result := range res.ProjectResults {
-			if slices.Contains(result.SilencePRComments, cmd.CommandName().String()) {
+			// Failures such as a project lock held by another pull request are short
+			// and explain why the command stopped, so post them even when silenced.
+			if result.Failure == "" && slices.Contains(result.SilencePRComments, cmd.CommandName().String()) {
 				ctx.Log.Debug("silenced command '%s' comment for project '%s'", cmd.CommandName().String(), result.ProjectName)
 				continue
 			}
