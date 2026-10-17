@@ -4,20 +4,54 @@
 package runtime
 
 import (
+	"encoding/json"
+	"fmt"
+	"maps"
+	"net/http"
+	"net/url"
 	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
+	"time"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/runtime/common"
 	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/utils"
 )
+
+// defaultProviderCacheMirrorWaitTimeout is used when
+// InitStepRunner.ProviderCacheMirrorWaitTimeout is unset.
+const defaultProviderCacheMirrorWaitTimeout = 5 * time.Minute
+
+// mirrorRetryBackoff is the fixed backoff schedule between phase-2
+// (filesystem_mirror) retries: short at first, since installing a single
+// provider typically finishes well under a second, capped so a run needing
+// many providers still gets checked reasonably often without hammering the
+// filesystem.
+var mirrorRetryBackoff = []time.Duration{
+	1 * time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 15 * time.Second,
+}
 
 // InitStep runs `terraform init`.
 type InitStepRunner struct {
 	TerraformExecutor     TerraformExec
 	DefaultTFDistribution terraform.Distribution
 	DefaultTFVersion      *version.Version
+
+	// ProviderCache is set when the provider cache proxy (see the
+	// providercache package) is enabled. When set, Run follows its
+	// two-phase discovery/mirror protocol instead of running `terraform
+	// init` once - see runWithProviderCache.
+	ProviderCache *tfclient.ProviderCacheConfig
+	// ProviderCacheMirrorWaitTimeout bounds how long the phase-2 retry loop
+	// waits for the proxy to finish installing into the mirror before
+	// giving up and surfacing the last error. Defaults to
+	// defaultProviderCacheMirrorWaitTimeout when zero.
+	ProviderCacheMirrorWaitTimeout time.Duration
 }
 
 func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
@@ -75,11 +109,204 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	// If the project's own config (e.g. an `env` step) already set
+	// TF_CLI_CONFIG_FILE, that's an explicit, more specific choice than the
+	// provider cache proxy's own generated config - honor it rather than
+	// silently overwriting it, even though that means this one init runs
+	// without the provider cache.
+	_, explicitCLIConfig := envs["TF_CLI_CONFIG_FILE"]
+
+	var out string
+	if i.ProviderCache != nil && !explicitCLIConfig {
+		out, err = i.runWithProviderCache(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	} else {
+		out, err = i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	}
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {
 		return out, err
 	}
 	return "", nil
+}
+
+// runWithProviderCache runs `terraform init` against the provider cache
+// proxy's two-phase protocol (see the providercache package doc comment):
+//  1. A discovery pass, routed through the proxy via a `host` block. The
+//     proxy never lets Terraform install a provider itself, so this pass is
+//     expected to fail whenever a required provider isn't already warm in
+//     the mirror - that's how the proxy learns what's needed and starts
+//     installing it, not a fatal error.
+//  2. If phase 1 failed for a provider-cache-related reason, retries
+//     `terraform init` against the proxy's filesystem mirror (read-only,
+//     safe to retry concurrently) until it succeeds or
+//     ProviderCacheMirrorWaitTimeout is exhausted - periodically rerunning
+//     the discovery pass too (see runWithMirrorRetries), so a transient
+//     install failure gets retried rather than leaving the mirror
+//     permanently empty for that provider.
+func (i *InitStepRunner) runWithProviderCache(ctx command.ProjectContext, path string, args []string, envs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
+	discoveryFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheDiscoveryPhase, i.ProviderCache)
+	if err != nil {
+		return "", fmt.Errorf("writing provider cache discovery CLI config: %w", err)
+	}
+	discoveryEnvs := envWith(envs, "TF_CLI_CONFIG_FILE", discoveryFile)
+
+	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, discoveryEnvs, d, v, workspace)
+	if err == nil {
+		// Nothing needed installing (e.g. no providers required at all).
+		return out, nil
+	}
+	if !mentionsAnyHost(out, i.ProviderCache.RegistryHosts) {
+		// A failure unrelated to the provider cache (bad config, a version
+		// constraint nothing satisfies, ...): retrying against the mirror
+		// would just fail the same way, so surface it as-is rather than
+		// wasting the retry budget.
+		return out, err
+	}
+	ctx.Log.Info("terraform init needs providers the cache proxy is installing; retrying against its filesystem mirror")
+
+	// Only written once actually needed - phase 1 alone covers the common
+	// case where everything's already warm or nothing needs installing.
+	mirrorFile, err := tfclient.WriteProviderCacheCLIConfig(path, tfclient.ProviderCacheMirrorPhase, i.ProviderCache)
+	if err != nil {
+		return "", fmt.Errorf("writing provider cache mirror CLI config: %w", err)
+	}
+	mirrorEnvs := envWith(envs, "TF_CLI_CONFIG_FILE", mirrorFile)
+
+	return i.runWithMirrorRetries(ctx, path, args, discoveryEnvs, mirrorEnvs, d, v, workspace)
+}
+
+// runWithMirrorRetries alternates between rechecking the proxy's filesystem
+// mirror (phase 2 - fast and safe, since it never triggers a write to the
+// shared mirror directory) and rerunning the discovery pass (phase 1 - the
+// only thing that actually asks the proxy to install something). Rerunning
+// discovery each cycle matters: a completed install attempt, successful or
+// not, is forgotten by the proxy once done (see installer.EnsureInstalled),
+// so a transient failure (a network blip fetching the archive, an upstream
+// 5xx, ...) is only ever retried if something asks again - otherwise the
+// mirror would stay empty for that provider for the rest of this operation.
+//
+// Retries with a short backoff until the mirror check succeeds or the retry
+// budget is exhausted. On giving up, appends any install failure the proxy
+// has recorded for the configured registry hosts (see installer.LastErrors)
+// to the returned output, so the real cause - not just Terraform's generic
+// "provider not found" - reaches the user instead of only the server log.
+func (i *InitStepRunner) runWithMirrorRetries(ctx command.ProjectContext, path string, args []string, discoveryEnvs, mirrorEnvs map[string]string, d terraform.Distribution, v *version.Version, workspace string) (string, error) {
+	timeout := i.ProviderCacheMirrorWaitTimeout
+	if timeout <= 0 {
+		timeout = defaultProviderCacheMirrorWaitTimeout
+	}
+	deadline := time.Now().Add(timeout)
+
+	// previousErrors is what installerErrors() returned after the previous
+	// cycle's discovery re-trigger, used below to recognize a stuck (not
+	// merely still-transient) install.
+	var previousErrors []string
+	for attempt := 0; ; attempt++ {
+		out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, mirrorEnvs, d, v, workspace)
+		if err == nil {
+			return out, nil
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return appendErrors(out, i.installerErrors()), err
+		}
+
+		wait := min(mirrorRetryBackoff[min(attempt, len(mirrorRetryBackoff)-1)], remaining)
+		ctx.Log.Debug("provider mirror not ready yet, retrying terraform init in %s", wait)
+		time.Sleep(wait)
+
+		// Re-trigger installation of whatever's still missing before the next
+		// mirror check. Its own result is not otherwise used here - success
+		// shows up as the mirror now having the provider on the next
+		// iteration; failure is picked up via installerErrors below.
+		_, _ = i.TerraformExecutor.RunCommandWithVersion(ctx, path, args, discoveryEnvs, d, v, workspace)
+
+		// Bail out now, rather than waiting out the rest of the budget, if
+		// the proxy reported the exact same failure after both this cycle's
+		// re-trigger and the previous one. Two consecutive identical errors
+		// is a reasonable signal the install is stuck for good (e.g. a
+		// verification failure that will never resolve itself) rather than
+		// merely still in progress - one repeat is required (not zero)
+		// so a single still-transient failure always gets at least one real
+		// retry.
+		currentErrors := i.installerErrors()
+		if len(currentErrors) > 0 && slices.Equal(currentErrors, previousErrors) {
+			return appendErrors(out, currentErrors), err
+		}
+		previousErrors = currentErrors
+	}
+}
+
+// installerErrors queries the provider cache proxy directly (not through
+// Terraform) for the most recent install failure, if any, on each configured
+// registry host - see installer.LastErrors. Best-effort: any failure to
+// reach the proxy is silently ignored (returns nil), since the caller
+// already has Terraform's own error and this is only meant to add context to
+// it. Sorted so two calls returning the same set of errors compare equal
+// regardless of the underlying map's iteration order.
+func (i *InitStepRunner) installerErrors() []string {
+	if i.ProviderCache == nil || i.ProviderCache.MirrorBaseURL == "" {
+		return nil
+	}
+	client := http.Client{Timeout: 5 * time.Second}
+	var errs []string
+	for _, host := range i.ProviderCache.RegistryHosts {
+		resp, err := client.Get(i.ProviderCache.MirrorBaseURL + "status/" + url.PathEscape(host))
+		if err != nil {
+			continue
+		}
+		var body struct {
+			Errors []string `json:"errors"`
+		}
+		decodeErr := json.NewDecoder(resp.Body).Decode(&body)
+		resp.Body.Close()
+		if decodeErr == nil {
+			errs = append(errs, body.Errors...)
+		}
+	}
+	sort.Strings(errs)
+	return errs
+}
+
+// appendErrors appends errs (from installerErrors), if any, to out.
+func appendErrors(out string, errs []string) string {
+	if len(errs) == 0 {
+		return out
+	}
+	return out + "\n\nprovider cache proxy reports:\n" + strings.Join(errs, "\n")
+}
+
+// envWith returns a copy of envs with key set to value. envs itself is left
+// untouched, since the caller may reuse it (e.g. for a later phase-2 retry
+// against a different CLI config file).
+func envWith(envs map[string]string, key, value string) map[string]string {
+	out := make(map[string]string, len(envs)+1)
+	maps.Copy(out, envs)
+	out[key] = value
+	return out
+}
+
+// mentionsAnyHost reports whether output names one of hosts, used to tell a
+// provider-cache-related init failure (Terraform's error names the registry
+// host it couldn't install a provider from) apart from an unrelated one.
+//
+// This is a plain substring match on Terraform's own error text, not a
+// structured signal - Terraform has no other way to tell us "this failure
+// was about installing from this registry". That makes it fragile in both
+// directions: a wording change in a future Terraform version could produce a
+// false negative (a real cache-related failure surfaced immediately instead
+// of retried), and a genuine user config error whose message happens to
+// name the host (e.g. "no available releases match the given constraints
+// (registry.terraform.io)") is a false positive that wastes the full mirror
+// retry budget - at up to two terraform init invocations per backoff cycle -
+// before the real, unrelated cause is surfaced. Deliberately accepted:
+// there's no structured alternative without Terraform itself exposing one.
+func mentionsAnyHost(output string, hosts []string) bool {
+	for _, h := range hosts {
+		if h != "" && strings.Contains(output, h) {
+			return true
+		}
+	}
+	return false
 }
