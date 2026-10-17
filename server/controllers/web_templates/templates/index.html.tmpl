@@ -13,7 +13,7 @@
         $("p.js-discard-success").show();
         setTimeout(function() {
           $("p.js-discard-success").fadeOut('slow',function(){
-            window.location.href = "/";
+            window.location.href = "{{ .CleanedBasePath }}/";
           })
         }, 5000); // <-- time in milliseconds
       }
