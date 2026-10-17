@@ -323,6 +323,89 @@ func TestClient_MergePull(t *testing.T) {
 	}
 }
 
+// GitLab only lets the squash behaviour be selected at accept time, so the
+// supported merge methods map onto the AcceptMergeRequest "squash" option.
+func TestClient_MergePullMergeMethod(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	mergeSuccess, err := os.ReadFile("testdata/pull-request.json")
+	Ok(t, err)
+	pipelineSuccess, err := os.ReadFile("testdata/pipeline-success.json")
+	Ok(t, err)
+	projectSuccess, err := os.ReadFile("testdata/project-success.json")
+	Ok(t, err)
+
+	cases := []struct {
+		description string
+		method      models.MergeMethod
+		expSquash   *bool
+		expErr      string
+	}{
+		{"squash sets the squash option", models.MergeMethodSquash, boolPtr(true), ""},
+		{"merge clears the squash option", models.MergeMethodMerge, boolPtr(false), ""},
+		{"no method leaves the squash option unset", "", nil, ""},
+		{"unsupported method is rejected", models.MergeMethodRebase, nil, `merge method "rebase" is not supported for GitLab`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var gotSquash *bool
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
+						var body struct {
+							Squash *bool `json:"squash"`
+						}
+						Ok(t, json.NewDecoder(r.Body).Decode(&body))
+						gotSquash = body.Squash
+						w.WriteHeader(http.StatusOK)
+						w.Write(mergeSuccess) // nolint: errcheck
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+						w.WriteHeader(http.StatusOK)
+						w.Write(pipelineSuccess) // nolint: errcheck
+					case "/api/v4/projects/4580910":
+						w.WriteHeader(http.StatusOK)
+						w.Write(projectSuccess) // nolint: errcheck
+					case "/api/v4/":
+						w.WriteHeader(http.StatusOK)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			defer testServer.Close()
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &Client{Client: internalClient, Version: nil}
+
+			err = client.MergePull(
+				logger,
+				models.PullRequest{
+					Num: 1,
+					BaseRepo: models.Repo{
+						FullName: "runatlantis/atlantis",
+						Owner:    "runatlantis",
+						Name:     "atlantis",
+					},
+				}, models.PullRequestOptions{MergeMethod: c.method})
+
+			if c.expErr != "" {
+				ErrContains(t, c.expErr, err)
+				return
+			}
+			Ok(t, err)
+			if c.expSquash == nil {
+				Assert(t, gotSquash == nil, "expected squash to be unset, got %v", gotSquash)
+			} else {
+				Assert(t, gotSquash != nil && *gotSquash == *c.expSquash, "expected squash %v, got %v", *c.expSquash, gotSquash)
+			}
+		})
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+
 func TestClient_UpdateStatus(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 
