@@ -5,6 +5,9 @@ package raw
 
 import (
 	"errors"
+	"fmt"
+	"sort"
+	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -45,11 +48,117 @@ func (r RepoCfg) Validate() error {
 		}
 		return nil
 	}
-	return validation.ValidateStruct(&r,
+	if err := validation.ValidateStruct(&r,
 		validation.Field(&r.Version, validation.By(equals2)),
 		validation.Field(&r.Projects),
 		validation.Field(&r.Workflows),
+	); err != nil {
+		return err
+	}
+	// Validated separately from the struct fields because it needs to see all
+	// the projects at once, not one at a time.
+	return r.validateDependsOn()
+}
+
+// validateDependsOn checks the depends_on graph. Dependencies are matched
+// against project names when an apply runs, and an unmatched name is not an
+// error at apply time unless the server sets fail-on-missing-dependencies, so a
+// typo would otherwise silently drop the dependency instead of enforcing it. A
+// project depending on itself, or a cycle, can never satisfy its dependencies
+// and would block those applies forever, so both are rejected too.
+//
+// This runs before projects are filtered by the pull request's base branch, so
+// depending on a project that only exists on another branch is still valid.
+func (r RepoCfg) validateDependsOn() error {
+	names := make(map[string]bool, len(r.Projects))
+	for _, p := range r.Projects {
+		if p.Name != nil && *p.Name != "" {
+			names[*p.Name] = true
+		}
+	}
+
+	dependsOn := make(map[string][]string, len(r.Projects))
+	for _, p := range r.Projects {
+		for _, dep := range p.DependsOn {
+			if !names[dep] {
+				return fmt.Errorf("depends_on: %s depends on %q which is not a project name defined in this repo config", describeProject(p), dep)
+			}
+			if p.Name != nil && *p.Name == dep {
+				return fmt.Errorf("depends_on: project %q cannot depend on itself", dep)
+			}
+		}
+		if p.Name != nil && *p.Name != "" {
+			dependsOn[*p.Name] = append(dependsOn[*p.Name], p.DependsOn...)
+		}
+	}
+
+	if cycle := findDependsOnCycle(dependsOn); len(cycle) > 0 {
+		return fmt.Errorf("depends_on: projects cannot depend on each other in a cycle: %s", strings.Join(cycle, " -> "))
+	}
+	return nil
+}
+
+// findDependsOnCycle returns the projects forming a dependency cycle, starting
+// and ending at the same project, or nil if the graph is acyclic.
+func findDependsOnCycle(dependsOn map[string][]string) []string {
+	const (
+		visiting = 1
+		done     = 2
 	)
+	state := make(map[string]int, len(dependsOn))
+	var path []string
+
+	var walk func(name string) []string
+	walk = func(name string) []string {
+		switch state[name] {
+		case done:
+			return nil
+		case visiting:
+			// Trim the path to where the cycle starts so the message only
+			// contains the projects in it.
+			for i, p := range path {
+				if p == name {
+					return append(append([]string{}, path[i:]...), name)
+				}
+			}
+			return []string{name, name}
+		}
+		state[name] = visiting
+		path = append(path, name)
+		for _, dep := range dependsOn[name] {
+			if cycle := walk(dep); cycle != nil {
+				return cycle
+			}
+		}
+		path = path[:len(path)-1]
+		state[name] = done
+		return nil
+	}
+
+	// Sorted so the reported cycle is deterministic across runs.
+	names := make([]string, 0, len(dependsOn))
+	for name := range dependsOn {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if cycle := walk(name); cycle != nil {
+			return cycle
+		}
+	}
+	return nil
+}
+
+// describeProject identifies a project in an error message, falling back to its
+// dir when it has no name.
+func describeProject(p Project) string {
+	if p.Name != nil && *p.Name != "" {
+		return fmt.Sprintf("project %q", *p.Name)
+	}
+	if p.Dir != nil {
+		return fmt.Sprintf("the project in dir %q", *p.Dir)
+	}
+	return "a project"
 }
 
 func (r RepoCfg) ToValid() valid.RepoCfg {

@@ -378,6 +378,23 @@ If there's one or more projects in the dependency list which is not in applied s
 `Can't apply your project unless you apply its dependencies`
 :::
 
+::: warning Dependencies are matched by project name, against the pull request's status
+Every `depends_on` entry must name a project defined in the same `atlantis.yaml`. Atlantis rejects the config if a name
+matches no project, if a project depends on itself, or if the dependencies form a cycle — those can never be satisfied.
+Names are checked before projects are filtered by the pull request's base branch, so depending on a project that only
+exists on another branch is allowed.
+
+Dependencies are evaluated at **apply** time, against the plan statuses recorded for that pull request. A dependency that
+A dependency whose recorded status is neither applied nor `no changes` blocks its dependents. A dependency with **no recorded status at all** — because its
+`when_modified` didn't match this pull request — is treated as satisfied by default; set
+[`--fail-on-missing-dependencies`](server-configuration.md#fail-on-missing-dependencies) to block instead.
+
+This is what makes `depends_on` the right tool for guarding a higher environment when you apply group by group with
+`-g`: `execution_order_group` only orders projects *within* one command, so it cannot hold production back when
+production is applied by a separate `atlantis apply -g production`. A dependency can, because it consults the pull
+request's recorded state rather than the current command's project set.
+:::
+
 ### Autodiscovery Config
 
 ```yaml
