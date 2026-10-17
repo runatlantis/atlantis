@@ -23,6 +23,9 @@ const (
 	CommandArgKey       = "command"
 	ValueArgKey         = "value"
 	OutputArgKey        = "output"
+	PlanStoreArgKey     = "plan_store"
+	ModeArgKey          = "mode"
+	SkipIfEmptyArgKey   = "skip_if_empty"
 	RunStepName         = "run"
 	PlanStepName        = "plan"
 	ShowStepName        = "show"
@@ -88,6 +91,78 @@ type Step struct {
 	Map map[string]map[string][]string
 	// CommandMap will be set in case #2 above.
 	CommandMap map[string]map[string]any
+}
+
+func (s Step) name() string {
+	if s.Key != nil {
+		return *s.Key
+	}
+	for name := range s.StringVal {
+		return name
+	}
+	for name := range s.Map {
+		return name
+	}
+	for name := range s.CommandMap {
+		return name
+	}
+	return ""
+}
+
+func (s Step) planStoreMode() string {
+	for stepName, args := range s.CommandMap {
+		if stepName != RunStepName {
+			return ""
+		}
+		config, ok := args[PlanStoreArgKey].(map[string]any)
+		if !ok {
+			return ""
+		}
+		mode, _ := config[ModeArgKey].(string)
+		return mode
+	}
+	return ""
+}
+
+func validateRunPlanStore(value any) error {
+	config, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf("run step %q option must be a map", PlanStoreArgKey)
+	}
+
+	var keys []string
+	for key := range config {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if key != ModeArgKey && key != SkipIfEmptyArgKey {
+			return fmt.Errorf("run step %q option only supports keys %q and %q, found %q",
+				PlanStoreArgKey, ModeArgKey, SkipIfEmptyArgKey, key)
+		}
+	}
+
+	mode, ok := config[ModeArgKey].(string)
+	if !ok || mode == "" {
+		return fmt.Errorf("run step %q option must have a string %q key set", PlanStoreArgKey, ModeArgKey)
+	}
+	if mode != string(valid.RunPlanStoreSaveMode) && mode != string(valid.RunPlanStoreConsumeMode) {
+		return fmt.Errorf("run step %q option %q must be %q or %q, found %q",
+			PlanStoreArgKey, ModeArgKey, valid.RunPlanStoreSaveMode, valid.RunPlanStoreConsumeMode, mode)
+	}
+
+	if skipIfEmpty, exists := config[SkipIfEmptyArgKey]; exists {
+		if _, ok := skipIfEmpty.(bool); !ok {
+			return fmt.Errorf("run step %q option %q must be a boolean, found %v",
+				PlanStoreArgKey, SkipIfEmptyArgKey, skipIfEmpty)
+		}
+		if mode != string(valid.RunPlanStoreSaveMode) {
+			return fmt.Errorf("run step %q option %q is only valid with mode %q",
+				PlanStoreArgKey, SkipIfEmptyArgKey, valid.RunPlanStoreSaveMode)
+		}
+	}
+
+	return nil
 }
 
 func (s *Step) UnmarshalYAML(unmarshal func(any) error) error {
@@ -343,6 +418,12 @@ func (s Step) Validate() error {
 				}
 			}
 			delete(argMap, OutputArgKey)
+			if planStore, ok := argMap[PlanStoreArgKey]; ok {
+				if err := validateRunPlanStore(planStore); err != nil {
+					return err
+				}
+			}
+			delete(argMap, PlanStoreArgKey)
 		default:
 			return fmt.Errorf("%q is not a valid step type", stepName)
 		}
@@ -354,8 +435,8 @@ func (s Step) Validate() error {
 			}
 			// Sort so tests can be deterministic.
 			sort.Strings(argKeys)
-			return fmt.Errorf("%q steps only support keys %q, %q, %q and %q, found extra keys %q",
-				stepName, CommandArgKey, OutputArgKey, ShellArgKey, ShellArgsArgKey, strings.Join(argKeys, ","))
+			return fmt.Errorf("%q steps only support keys %q, %q, %q, %q and %q, found extra keys %q",
+				stepName, CommandArgKey, OutputArgKey, ShellArgKey, ShellArgsArgKey, PlanStoreArgKey, strings.Join(argKeys, ","))
 		}
 
 		return nil
@@ -419,6 +500,13 @@ func (s Step) ToValid() valid.Step {
 			}
 			if value, ok := stepArgs[ValueArgKey].(string); ok {
 				step.EnvVarValue = value
+			}
+			if planStore, ok := stepArgs[PlanStoreArgKey].(map[string]any); ok {
+				skipIfEmpty, _ := planStore[SkipIfEmptyArgKey].(bool)
+				step.PlanStore = &valid.RunPlanStore{
+					Mode:        valid.RunPlanStoreMode(planStore[ModeArgKey].(string)),
+					SkipIfEmpty: skipIfEmpty,
+				}
 			}
 			if shell, ok := stepArgs[ShellArgKey].(string); ok {
 				step.RunShell = &valid.CommandShell{
