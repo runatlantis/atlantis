@@ -93,6 +93,30 @@ func runProjectCmdsParallel(
 	return command.Result{ProjectResults: results}
 }
 
+// RunProjectCmdsParallelInOrder runs up to poolSize cmds at once. A cmd starts
+// only after every earlier cmd from a different execution order group has
+// finished, and every cmd gets a result, returned in cmds order.
+func RunProjectCmdsParallelInOrder(
+	cmds []command.ProjectContext,
+	runnerFunc prjCmdRunnerFunc,
+	poolSize int,
+) command.Result {
+	results := make([]command.ProjectResult, len(cmds))
+	wg := sizedwaitgroup.New(poolSize)
+	for i, cmd := range cmds {
+		if i > 0 && cmd.ExecutionOrderGroup != cmds[i-1].ExecutionOrderGroup {
+			wg.Wait()
+		}
+		wg.Add()
+		go func() {
+			defer wg.Done()
+			results[i] = RunOneProjectCmd(runnerFunc, cmd)
+		}()
+	}
+	wg.Wait()
+	return command.Result{ProjectResults: results}
+}
+
 func runProjectCmds(
 	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
