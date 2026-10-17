@@ -97,7 +97,17 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	panic("PlanStatus() missing a combination")
 }
 
-// IsSuccessful returns true if this project result had no errors.
+// IsSuccessful reports whether a plan, policy check, policy approval, or apply
+// result satisfies its command-specific success criteria.
 func (p ProjectResult) IsSuccessful() bool {
-	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
+	switch p.Command {
+	case Plan:
+		return p.PlanSuccess != nil
+	case PolicyCheck, ApprovePolicies:
+		return p.PolicyCheckResults != nil && p.Error == nil && p.Failure == ""
+	case Apply:
+		return p.Error == nil && p.Failure == ""
+	default:
+		return false
+	}
 }
