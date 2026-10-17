@@ -244,7 +244,9 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 
 	autoPlanRunner.Run(ctx, nil)
 
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	if !ctx.SuppressVCSStatus {
+		c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	}
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -560,7 +562,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 
 	cmdRunner.Run(ctx, cmd)
-	if ctx.CommandSkipped {
+	if ctx.CommandSkipped || ctx.SuppressVCSStatus {
 		return
 	}
 
