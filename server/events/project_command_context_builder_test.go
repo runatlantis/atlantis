@@ -59,6 +59,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 		pullStatus.Projects = []models.ProjectStatus{
 			{
 				Status:      models.ErroredPolicyCheckStatus,
+				Workspace:   projWorkspace,
 				ProjectName: "project1",
 				RepoRelDir:  "dir1",
 			},
@@ -66,6 +67,19 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 
 		result := subject.BuildProjectContext(commandCtx, command.Plan, "", projCfg, []string{}, "some/dir", false, false, false, false, false, terraformClient)
 		assert.Equal(t, models.ErroredPolicyCheckStatus, result[0].ProjectPlanStatus)
+	})
+
+	t.Run("accepted identity matches workspace directory and name", func(t *testing.T) {
+		When(mockCommentBuilder.BuildPlanComment(projRepoRelDir, projWorkspace, projName, []string{})).ThenReturn(expectedPlanCmt)
+		When(mockCommentBuilder.BuildApplyComment(projRepoRelDir, projWorkspace, projName, false, "")).ThenReturn(expectedApplyCmt)
+		pullStatus.Projects = []models.ProjectStatus{
+			{Workspace: "other", RepoRelDir: projRepoRelDir, ProjectName: projName, Status: models.PlannedPlanStatus},
+			{Workspace: projWorkspace, RepoRelDir: projRepoRelDir, ProjectName: projName, Status: models.PlannedPlanStatus, PlanGeneration: "G2", AcceptedPlanGeneration: "G2", ManagedPlanHash: "accepted digest"},
+		}
+		result := subject.BuildProjectContext(commandCtx, command.Apply, "", projCfg, []string{}, "some/dir", false, false, false, false, false, terraformClient)
+		assert.Equal(t, "G2", result[0].PlanGeneration)
+		assert.Equal(t, "G2", result[0].AcceptedPlanGeneration)
+		assert.Equal(t, "accepted digest", result[0].ExpectedPlanHash)
 	})
 
 	t.Run("with no project name defined", func(t *testing.T) {
@@ -79,6 +93,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 			{
 				Status:     models.ErroredPolicyCheckStatus,
+				Workspace:  projWorkspace,
 				RepoRelDir: "dir1",
 			},
 		}
@@ -99,6 +114,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 			{
 				Status:     models.ErroredPolicyCheckStatus,
+				Workspace:  projWorkspace,
 				RepoRelDir: "dir1",
 			},
 		}
@@ -120,6 +136,7 @@ func TestProjectCommandContextBuilder_PullStatus(t *testing.T) {
 			},
 			{
 				Status:     models.ErroredPolicyCheckStatus,
+				Workspace:  projWorkspace,
 				RepoRelDir: "dir1",
 			},
 		}

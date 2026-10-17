@@ -97,6 +97,9 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 
 	// If the apply was successful, delete the plan.
 	if err == nil {
+		if ctx.ApplyExecutionSucceeded != nil {
+			*ctx.ApplyExecutionSucceeded = true
+		}
 		ctx.Log.Info("apply successful, deleting planfile")
 		if removeErr := a.PlanStore.Remove(ctx, planPath); removeErr != nil {
 			ctx.Log.Warn("failed to delete planfile after successful apply: %s", removeErr)

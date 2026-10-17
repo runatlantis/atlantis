@@ -829,6 +829,22 @@ type ProjectCounts struct {
 
 // ProjectStatus is the status of a specific project.
 type ProjectStatus struct {
+	// PlanGeneration identifies the most recently admitted plan operation.
+	// It remains present after failure so ordinary writers cannot erase it.
+	PlanGeneration string
+	// PlanGenerationActive is true only between admission and the first
+	// completion or supersession. Failed completion cannot later be retried
+	// under the same identity.
+	PlanGenerationActive bool
+	// AcceptedPlanGeneration is installed only by a successful matching plan
+	// completion. An empty value makes a generation-backed project non-applyable.
+	AcceptedPlanGeneration string
+	// ManagedPlan records whether this generation must produce an Atlantis-managed
+	// artifact. Custom run-only workflows do not acquire managed hash semantics.
+	ManagedPlan bool
+	// ManagedPlanHash identifies the exact durably saved accepted artifact bytes.
+	ManagedPlanHash string
+
 	Workspace   string
 	RepoRelDir  string
 	ProjectName string
