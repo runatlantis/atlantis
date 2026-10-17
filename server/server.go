@@ -861,6 +861,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		VCSClient:             vcsClient,
 		GlobalAutomerge:       userConfig.Automerge,
 		GlobalAutomergeMethod: userConfig.AutomergeMethod,
+		GithubStackGetter:     githubClient,
+		PullStatusFetcher:     database,
 	}
 
 	projectOutputWrapper := &events.ProjectOutputWrapper{
@@ -1040,6 +1042,19 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		StackAwarePlanning:             userConfig.GithubStackAwarePlanning,
+		GithubStackGetter:              githubClient,
+	}
+	var stackedPullPlanner events.StackedPullPlanner
+	if userConfig.GithubStackAwarePlanning && githubClient != nil {
+		stackedPullPlanner = &events.DefaultStackedPullPlanner{
+			GithubPullGetter:  githubClient,
+			GithubStackGetter: githubClient,
+			EventParser:       eventParser,
+			CommandRunner:     commandRunner,
+			PullStatusFetcher: database,
+			AllowDraftPRs:     userConfig.PlanDrafts,
+		}
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
@@ -1120,6 +1135,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	eventsController := &events_controllers.VCSEventsController{
 		CommandRunner:                   commandRunner,
 		PullCleaner:                     pullClosedExecutor,
+		StackedPullPlanner:              stackedPullPlanner,
 		Parser:                          eventParser,
 		CommentParser:                   commentParser,
 		Logger:                          logger,

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 )
 
 var githubUsername string
@@ -48,13 +48,13 @@ func (g *Client) CheckForkSuccess(ownerName string, forkRepoName string) bool {
 func (g *Client) CreateWebhook(ownerName string, repoName string, hookURL string) error {
 	contentType := "json"
 	hookConfig := &github.HookConfig{
-		ContentType: github.Ptr(contentType),
-		URL:         github.Ptr(hookURL),
+		ContentType: new(contentType),
+		URL:         new(hookURL),
 	}
 	atlantisHook := &github.Hook{
 		Events: []string{"issue_comment", "pull_request", "pull_request_review", "push"},
 		Config: hookConfig,
-		Active: github.Ptr(true),
+		Active: new(true),
 	}
 	_, _, err := g.client.Repositories.CreateHook(g.ctx, ownerName, repoName, atlantisHook)
 	return err
@@ -77,11 +77,11 @@ func (g *Client) CreatePullRequest(ownerName string, repoName string, head strin
 	}
 
 	// If not, create it.
-	newPullRequest := &github.NewPullRequest{
-		Title: github.Ptr("Welcome to Atlantis!"),
-		Head:  github.Ptr(head),
-		Body:  github.Ptr(pullRequestBody),
-		Base:  github.Ptr(base),
+	newPullRequest := github.CreatePullRequest{
+		Title: new("Welcome to Atlantis!"),
+		Head:  head,
+		Body:  new(pullRequestBody),
+		Base:  base,
 	}
 	pull, _, err := g.client.PullRequests.Create(g.ctx, ownerName, repoName, newPullRequest)
 	if err != nil {
