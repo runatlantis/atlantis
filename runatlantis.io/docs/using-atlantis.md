@@ -69,6 +69,9 @@ atlantis plan -p project1
 
 # Runs plan in the root directory of the repo with workspace `staging`
 atlantis plan -w staging
+
+# Runs plan for every modified project in the `infra` group
+atlantis plan -g infra
 ```
 
 ### Options
@@ -77,10 +80,12 @@ atlantis plan -w staging
   * Ex. `atlantis plan -d child/dir`
 * `-p project` Which project to run plan for. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w` because the project defines this already.
 * `-w workspace` Switch to this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) before planning. Defaults to `default`. Ignore this if Terraform workspaces are unused. Workspace names cannot contain `/`, `\\`, `..`, `$`, whitespace or control characters, and cannot start with `-` or `~`.
+* `-g group` Which group of projects to run plan for. Refers to the `group` key of the projects configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md#planning-and-applying-by-group). Projects without a `group` belong to the `default` group. Cannot be used at same time as `-p`, `-d` or `-w` because those target a single project.
 * `--verbose` Append Atlantis log to comment.
 
 ::: warning NOTE
-An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`
+An `atlantis plan` (without flags), like autoplans, discards all plans previously created with `atlantis plan` `-p`/`-d`/`-w`/`-g`.
+An `atlantis plan -g group` only replans the projects in that group and leaves the plans for other groups alone.
 :::
 
 ### Additional Terraform flags
@@ -171,6 +176,9 @@ atlantis apply -p project1
 
 # Runs apply in the root directory of the repo with workspace `staging`
 atlantis apply -w staging
+
+# Runs apply for the unapplied plans of every project in the `infra` group
+atlantis apply -g infra
 ```
 
 ### Options
@@ -178,6 +186,7 @@ atlantis apply -w staging
 * `-d directory` Apply the plan for this directory, relative to root of repo. Use `.` for root.
 * `-p project` Apply the plan for this project. Refers to the name of the project configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md). Cannot be used at same time as `-d` or `-w`.
 * `-w workspace` Apply the plan for this [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces). Ignore this if Terraform workspaces are unused. Workspace names cannot contain `/`, `\\`, `..`, `$`, whitespace or control characters, and cannot start with `-` or `~`.
+* `-g group` Apply the unapplied plans of every project in this group. Refers to the `group` key of the projects configured in the repo's [`atlantis.yaml` file](repo-level-atlantis-yaml.md#planning-and-applying-by-group). Projects without a `group` belong to the `default` group. Cannot be used at same time as `-p`, `-d` or `-w`. Rejected when the server runs with [`--disable-apply-all`](server-configuration.md#disable-apply-all).
 * `--auto-merge-disabled` Disable [automerge](automerging.md) for this apply command.
 * `--auto-merge-method method` Specify which [merge method](automerging.md#how-to-set-the-merge-method-for-automerge) use for the apply command if [automerge](automerging.md) is enabled. Implemented only for GitHub.
 * `--verbose` Append Atlantis log to comment.

@@ -556,6 +556,49 @@ func TestProject_Validate(t *testing.T) {
 			},
 			expErr: "",
 		},
+		{
+			description: "valid group",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("my-group_1"),
+			},
+			expErr: "",
+		},
+		{
+			description: "empty group",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String(""),
+			},
+			expErr: "group: cannot be empty.",
+		},
+		{
+			description: "group with glob pattern",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("my*group"),
+			},
+			expErr: "group: cannot contain glob pattern characters ('*', '?', '[').",
+		},
+		{
+			description: "group with unsafe characters",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("my group"),
+			},
+			expErr: "group: must contain only URL safe characters.",
+		},
+		{
+			// Regression: validProjectName replaces '/' before checking, so
+			// this parsed while every selector rejected it verbatim, leaving
+			// the group unreachable with no error raised anywhere.
+			description: "group with a slash is unreachable by selectors",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("infra/prod"),
+			},
+			expErr: "group: must contain only URL safe characters.",
+		},
 	}
 	validation.ErrorTag = "yaml"
 	for _, c := range cases {
@@ -587,6 +630,7 @@ func TestProject_ToValid(t *testing.T) {
 				Dir:              ".",
 				BranchRegex:      nil,
 				Workspace:        "default",
+				Group:            "default",
 				WorkflowName:     nil,
 				TerraformVersion: nil,
 				Autoplan: valid.Autoplan{
@@ -595,6 +639,38 @@ func TestProject_ToValid(t *testing.T) {
 				},
 				ApplyRequirements: nil,
 				Name:              nil,
+			},
+		},
+		{
+			description: "group set",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String("mygroup"),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Group:     "mygroup",
+				Autoplan: valid.Autoplan{
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
+					Enabled:      true,
+				},
+			},
+		},
+		{
+			description: "empty group defaults",
+			input: raw.Project{
+				Dir:   String("."),
+				Group: String(""),
+			},
+			exp: valid.Project{
+				Dir:       ".",
+				Workspace: "default",
+				Group:     "default",
+				Autoplan: valid.Autoplan{
+					WhenModified: raw.DefaultAutoPlanWhenModified(),
+					Enabled:      true,
+				},
 			},
 		},
 		{
@@ -618,6 +694,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "myworkspace",
+				Group:            "default",
 				WorkflowName:     String("myworkflow"),
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
@@ -641,6 +718,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:              ".",
 				Workspace:        "default",
+				Group:            "default",
 				TerraformVersion: tfVersionPointEleven,
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
@@ -657,6 +735,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -671,6 +750,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "a/b/c",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -685,6 +765,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -700,6 +781,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       "mydir",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -714,6 +796,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -728,6 +811,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -742,6 +826,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,
@@ -758,6 +843,7 @@ func TestProject_ToValid(t *testing.T) {
 			exp: valid.Project{
 				Dir:       ".",
 				Workspace: "default",
+				Group:     "default",
 				Autoplan: valid.Autoplan{
 					WhenModified: raw.DefaultAutoPlanWhenModified(),
 					Enabled:      true,

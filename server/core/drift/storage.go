@@ -45,6 +45,10 @@ type GetOptions struct {
 	Path string
 	// Workspace filters by Terraform workspace (exact match).
 	Workspace string
+	// Group filters by the group the project belonged to when drift was
+	// detected (exact match). Records stored without a group don't match a
+	// group filter since their membership is unknown.
+	Group string
 	// Ref filters by git reference (exact match). Drift records are keyed
 	// by ref, so callers that want to act on a specific branch/commit
 	// should set this to avoid mixing data across refs.
@@ -146,6 +150,9 @@ func matchesGetOptions(drift models.ProjectDrift, opts GetOptions, now time.Time
 		return false
 	}
 	if opts.Workspace != "" && drift.Workspace != opts.Workspace {
+		return false
+	}
+	if opts.Group != "" && drift.Group != opts.Group {
 		return false
 	}
 	if opts.Ref != "" && drift.Ref != opts.Ref {

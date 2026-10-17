@@ -150,6 +150,9 @@ type DriftProjectAPI struct {
 	Directory string `json:"directory"`
 	// Workspace is the Terraform workspace.
 	Workspace string `json:"workspace"`
+	// Group is the group the project belonged to when drift was detected.
+	// Absent for records stored before groups existed.
+	Group string `json:"group,omitempty"`
 	// Ref is the git reference that was checked.
 	Ref string `json:"ref"`
 	// BaseBranch is the branch context used for repo config branch filters.
@@ -203,6 +206,7 @@ func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 		ProjectName:    pd.ProjectName,
 		Directory:      pd.Path,
 		Workspace:      pd.Workspace,
+		Group:          pd.Group,
 		Ref:            pd.Ref,
 		BaseBranch:     pd.BaseBranch,
 		ResolvedCommit: pd.ResolvedCommit,

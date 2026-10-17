@@ -6,3 +6,8 @@
 package valid
 
 const DefaultAutoPlanEnabled = true
+
+// DefaultGroup is the group a project belongs to when the repo config doesn't
+// set one. Projects can be planned/applied a group at a time with the
+// -g/--group flag.
+const DefaultGroup = "default"

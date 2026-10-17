@@ -515,6 +515,12 @@ func (s *InMemoryRemediationService) matchesFilters(proj models.ProjectDrift, re
 		}
 	}
 
+	// Check group filter. Drift records stored before groups existed have no
+	// group, so their membership can't be proven and they're left alone.
+	if req.Group != "" && proj.Group != req.Group {
+		return false
+	}
+
 	// Check workspace filter
 	if len(req.Workspaces) > 0 {
 		if !slices.Contains(req.Workspaces, proj.Workspace) {

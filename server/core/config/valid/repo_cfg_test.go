@@ -434,3 +434,57 @@ func TestContainsDirGlobPattern(t *testing.T) {
 		})
 	}
 }
+
+func TestProject_GetGroup(t *testing.T) {
+	Equals(t, valid.DefaultGroup, valid.Project{Dir: "."}.GetGroup())
+	Equals(t, "mygroup", valid.Project{Dir: ".", Group: "mygroup"}.GetGroup())
+}
+
+func TestConfig_FindProjectsByGroup(t *testing.T) {
+	cfg := valid.RepoCfg{
+		Projects: []valid.Project{
+			{Dir: "project1", Group: "infra"},
+			{Dir: "project2", Group: "apps"},
+			{Dir: "project3", Group: "infra"},
+			{Dir: "project4"},
+		},
+	}
+
+	infra := cfg.FindProjectsByGroup("infra")
+	Equals(t, 2, len(infra))
+	Equals(t, "project1", infra[0].Dir)
+	Equals(t, "project3", infra[1].Dir)
+
+	// Projects without an explicit group belong to the default group.
+	def := cfg.FindProjectsByGroup(valid.DefaultGroup)
+	Equals(t, 1, len(def))
+	Equals(t, "project4", def[0].Dir)
+
+	Equals(t, 0, len(cfg.FindProjectsByGroup("nope")))
+	Equals(t, []string{"apps", "default", "infra"}, cfg.ConfiguredGroups())
+	Equals(t, []string{"apps", "default", "infra"}, cfg.AllowedGroups())
+	Equals(t, []string{"default", "infra"},
+		valid.RepoCfg{Projects: []valid.Project{{Dir: "project1", Group: "infra"}}}.AllowedGroups())
+}
+
+func TestConfig_ValidateGroupAllowed(t *testing.T) {
+	cfg := valid.RepoCfg{
+		Projects: []valid.Project{
+			{Dir: "project1", Group: "infra"},
+			{Dir: "project2"},
+		},
+	}
+
+	Ok(t, cfg.ValidateGroupAllowed(""))
+	Ok(t, cfg.ValidateGroupAllowed("infra"))
+	Ok(t, cfg.ValidateGroupAllowed(valid.DefaultGroup))
+	ErrEquals(t, "running commands for group \"nope\" is not allowed because this repo is only configured for the following groups: default, infra",
+		cfg.ValidateGroupAllowed("nope"))
+
+	// Auto-discovered projects always belong to the default group, so the
+	// default group is allowed even when no project configures it.
+	Ok(t, valid.RepoCfg{}.ValidateGroupAllowed(valid.DefaultGroup))
+	Ok(t, valid.RepoCfg{Projects: []valid.Project{{Dir: "project1", Group: "infra"}}}.ValidateGroupAllowed(valid.DefaultGroup))
+	ErrEquals(t, "running commands for group \"anything\" is not allowed because this repo is only configured for the following groups: default",
+		valid.RepoCfg{}.ValidateGroupAllowed("anything"))
+}
