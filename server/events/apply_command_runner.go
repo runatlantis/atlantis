@@ -129,6 +129,17 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
+	if a.SilenceNoProjects && cmd.ProjectName != "" {
+		// A running plan may replace the checkout or regenerate its config, so
+		// keep the normal lock conflict handling until planning is complete.
+		planInFlight := a.workingDirLocker != nil && a.workingDirLocker.HasCommandLock(baseRepo.FullName, pull.Num, command.Plan)
+		if !planInFlight && a.prjCmdBuilder.ShouldSilenceTargetedApply(ctx, cmd) {
+			ctx.Log.Debug("ignoring apply command for project %q because it does not match the repo config", cmd.ProjectName)
+			ctx.CommandSkipped = true
+			return
+		}
+	}
+
 	var unlockPullApply func()
 	if a.workingDirLocker != nil {
 		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
