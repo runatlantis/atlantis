@@ -142,6 +142,7 @@ const (
 	SilenceVCSStatusNoProjectsFlag   = "silence-vcs-status-no-projects"
 	SilenceAllowlistErrorsFlag       = "silence-allowlist-errors"
 	SkipCloneNoChanges               = "skip-clone-no-changes"
+	SlackIncludeBody                 = "slack-include-body"
 	SlackTokenFlag                   = "slack-token"
 	SSLCertFileFlag                  = "ssl-cert-file"
 	SSLKeyFileFlag                   = "ssl-key-file"
@@ -668,6 +669,10 @@ var boolFlags = map[string]boolFlag{
 	SkipCloneNoChanges: {
 		description:  "Skips cloning the PR repo if there are no projects were changed in the PR.",
 		defaultValue: false,
+	},
+	SlackIncludeBody: {
+		description:  "Whether to include the body of the pull request as an extra \"description\" field in Slack output.",
+		defaultValue: true,
 	},
 	TFDownloadFlag: {
 		description:  "Allow Atlantis to list & download Terraform versions. Setting this to false can be helpful in air-gapped environments.",
