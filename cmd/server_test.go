@@ -59,6 +59,7 @@ var testFlags = map[string]any{
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	BlockedExtraArgsFlag:             "-chdir,--chdir,-plugin-dir,--plugin-dir",
 	AllowForkPRsFlag:                 true,
+	AllowPartialApplyFlag:            true,
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
