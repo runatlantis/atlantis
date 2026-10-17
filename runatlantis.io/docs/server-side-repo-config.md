@@ -22,6 +22,37 @@ If you don't wish to write a config file to disk, you can use the
 to specify your config as JSON. See [--repo-config-json](server-configuration.md#repo-config-json)
 for an example.
 
+## External Plan Storage
+
+Atlantis can store plan files in an S3 bucket instead of the local filesystem.
+Configure the plan store in the server-side repo config file passed with
+`--repo-config`, then start Atlantis with
+[`--enable-external-stores`](server-configuration.md#enable-external-stores).
+This setting is server-wide and does not belong in a repository's `atlantis.yaml`.
+
+```yaml
+external_stores:
+  plan_store:
+    type: s3
+    s3:
+      bucket: "my-atlantis-plans"
+      region: "us-east-1"
+      # Optional key prefix for all stored plan files.
+      prefix: "plans"
+      # Optional custom S3-compatible endpoint, such as MinIO.
+      # endpoint: "https://minio.example.com"
+      # Set to true when the endpoint requires path-style URLs.
+      # force_path_style: true
+      # Optional AWS shared config profile name.
+      # profile: "atlantis"
+```
+
+The `type`, S3 `bucket`, and `region` are required. The `prefix`, `endpoint`,
+`force_path_style`, and `profile` fields are optional. Atlantis uses the AWS
+SDK credential chain to authenticate unless you select a named profile with
+`profile`. See [`--enable-external-stores`](server-configuration.md#enable-external-stores)
+for the server flag that enables this configuration.
+
 ## Example Server Side Repo
 
 ```yaml
