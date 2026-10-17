@@ -8,6 +8,7 @@ Architecture Decision Records (ADRs) preserve important design choices and their
 | --- | --- | --- |
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-api-enhancement-drift-detection.md) | API Enhancement and Drift Detection | Proposed |
+| [0005](0005-use-durable-storage-with-one-data-model.md) | Use durable storage with one data model | Proposed |
 
 Update this table when adding or changing an ADR.
 
