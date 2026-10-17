@@ -106,6 +106,28 @@ ATLANTIS_API_SECRET="secret"
 
 Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.md).
 
+### `--atlantis-plugin-cache` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --atlantis-plugin-cache
+# or
+ATLANTIS_ATLANTIS_PLUGIN_CACHE=true
+```
+
+Declare that this Atlantis instance uses a Terraform plugin cache (e.g. via `TF_PLUGIN_CACHE_DIR`). Because
+`terraform init` is not concurrency safe against the plugin cache
+(see [hashicorp/terraform#25849](https://github.com/hashicorp/terraform/issues/25849)), enabling this serializes all
+`terraform init` commands within this Atlantis process so only one runs at a time, while plan and apply operations keep
+using [`--parallel-plan`](#parallel-plan), [`--parallel-apply`](#parallel-apply) and
+[`--parallel-pool-size`](#parallel-pool-size). Defaults to `false`. Use
+[`--tf-plugin-cache-dir`](#tf-plugin-cache-dir) to control where the cache lives.
+
+::: warning
+Serialization is in-process only, so it protects a single Atlantis instance against itself. If you run multiple
+Atlantis replicas, give each replica its own private plugin cache directory rather than sharing one directory
+between them — the plugin cache cannot be safely shared across separate processes.
+:::
+
 ### `--atlantis-url` <Badge text="v0.1.3+" type="info"/>
 
 ```bash
@@ -1618,6 +1640,25 @@ endpoint should match that of releases.hashicorp.com.
 This has no impact if `--tf-download` is set to `false`.
 
 This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
+
+### `--tf-plugin-cache-dir`
+
+```bash
+atlantis server --tf-plugin-cache-dir="/atlantis-data/plugin-cache"
+# or
+ATLANTIS_TF_PLUGIN_CACHE_DIR="/atlantis-data/plugin-cache"
+```
+
+Override the directory used as the Terraform plugin cache (`TF_PLUGIN_CACHE_DIR`). By default Atlantis uses
+`<data-dir>/plugin-cache`, created only when [`--use-tf-plugin-cache`](#use-tf-plugin-cache) is enabled.
+
+Use this to place the cache on a persistent volume so it survives restarts and is reused across an instance's runs
+(e.g. a per-replica mounted volume). The directory is created if it does not exist. Because the Terraform plugin
+cache is not concurrency safe, pair it with [`--atlantis-plugin-cache`](#atlantis-plugin-cache) so this instance's
+`terraform init` commands are serialized against the cache.
+
+Give each Atlantis replica its own cache directory. A directory shared between replicas is not protected by
+`--atlantis-plugin-cache` (serialization is in-process only) and can still corrupt the cache.
 
 ### `--tfe-hostname` <Badge text="v0.8.3+" type="info"/>
 
