@@ -302,6 +302,49 @@ func TestAPIController_PlanPreWorkflowHookError(t *testing.T) {
 	}
 }
 
+func TestAPIController_PlanLaterPreWorkflowHookErrorRunsEarlierPostHooksAndUnlocks(t *testing.T) {
+	for _, parallelPlan := range []bool{false, true} {
+		t.Run(fmt.Sprintf("parallel=%t", parallelPlan), func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+				config.allowUnlockByPull = false
+			})
+			ac.ParallelPoolSize = 2
+			ac.FailOnPreWorkflowHookError = true
+			ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+			stubPlanCommandPerProject(projectCommandBuilder, parallelPlan)
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+				ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+			When(ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					if args[1].(*events.CommentCommand).ProjectName == "b" {
+						return ReturnValues{errors.New("hook failed")}
+					}
+					return ReturnValues{nil}
+				})
+			var postHooks []string
+			When(ac.PostWorkflowHooksCommandRunner.(*MockPostWorkflowHooksCommandRunner).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					postHooks = append(postHooks, args[1].(*events.CommentCommand).ProjectName)
+					return ReturnValues{nil}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"a", "b"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			Equals(t, http.StatusInternalServerError, w.Code)
+			Equals(t, []string{"a"}, postHooks)
+		})
+	}
+}
+
 func TestAPIController_PlanRunsParallelPolicyChecksConcurrently(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	ac.ParallelPoolSize = 2

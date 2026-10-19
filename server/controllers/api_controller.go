@@ -702,7 +702,15 @@ func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, rem
 	return string(output), err
 }
 
-func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*command.Result, error) {
+func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *command.Result, err error) {
+	// The callers only unlock after a successful apiPlan, so an error after
+	// some plans ran would leave their project locks behind.
+	defer func() {
+		if err != nil && !ctx.CommandSkipped {
+			a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+		}
+	}()
+
 	cmds, cc, err := request.getCommands(ctx, command.Plan, a.ProjectCommandBuilder.BuildPlanCommands)
 	if events.IsIgnoredTargetedDir(err) {
 		ctx.CommandSkipped = true
@@ -800,8 +808,11 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 // working dir with the plans, so they run before and after the whole batch
 // instead of between projects.
 func (a *APIController) apiPlanParallel(ctx *command.Context, planCmds []command.ProjectContext, planCC []*events.CommentCommand) ([]command.ProjectResult, error) {
-	for _, cc := range planCC {
+	for i, cc := range planCC {
 		if err := a.runPreHooks(ctx, cc); err != nil {
+			// Sequential mode has already run the post hooks of the earlier
+			// projects by now, so do the same to let their hooks tear down.
+			a.runPostHooks(ctx, planCC[:i])
 			return nil, err
 		}
 	}
@@ -809,10 +820,14 @@ func (a *APIController) apiPlanParallel(ctx *command.Context, planCmds []command
 	ctx.Log.Info("running %d plans in parallel", len(planCmds))
 	result := events.RunProjectCmdsParallelInOrder(ctx.Log, planCmds, a.ProjectPlanCommandRunner.Plan, a.ParallelPoolSize)
 
-	for _, cc := range planCC {
+	a.runPostHooks(ctx, planCC)
+	return result.ProjectResults, nil
+}
+
+func (a *APIController) runPostHooks(ctx *command.Context, ccs []*events.CommentCommand) {
+	for _, cc := range ccs {
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc) // nolint: errcheck
 	}
-	return result.ProjectResults, nil
 }
 
 // isParallelEnabled reports whether cmds run through the parallel pool. Like
