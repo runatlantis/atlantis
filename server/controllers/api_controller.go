@@ -786,7 +786,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (*com
 	}
 	if a.isParallelEnabled(policyCmds) {
 		ctx.Log.Info("running %d policy checks in parallel", len(policyCmds))
-		policyResult := events.RunProjectCmdsParallelInOrder(policyCmds, a.ProjectPolicyCheckCommandRunner.PolicyCheck, a.ParallelPoolSize)
+		policyResult := events.RunProjectCmdsParallelInOrder(ctx.Log, policyCmds, a.ProjectPolicyCheckCommandRunner.PolicyCheck, a.ParallelPoolSize)
 		return &command.Result{ProjectResults: append(projectResults, policyResult.ProjectResults...)}, nil
 	}
 	for _, cmd := range policyCmds {
@@ -807,7 +807,7 @@ func (a *APIController) apiPlanParallel(ctx *command.Context, planCmds []command
 	}
 
 	ctx.Log.Info("running %d plans in parallel", len(planCmds))
-	result := events.RunProjectCmdsParallelInOrder(planCmds, a.ProjectPlanCommandRunner.Plan, a.ParallelPoolSize)
+	result := events.RunProjectCmdsParallelInOrder(ctx.Log, planCmds, a.ProjectPlanCommandRunner.Plan, a.ParallelPoolSize)
 
 	for _, cc := range planCC {
 		a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cc) // nolint: errcheck

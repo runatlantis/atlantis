@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -157,7 +158,7 @@ func TestRunProjectCmdsParallelInOrder_RunsGroupConcurrently(t *testing.T) {
 		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
 		finished := make(chan command.Result, 1)
 		go func() {
-			finished <- RunProjectCmdsParallelInOrder(cmds, runner, 2)
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
 		}()
 
 		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
@@ -187,7 +188,7 @@ func TestRunProjectCmdsParallelInOrder_RespectsPoolSize(t *testing.T) {
 		}
 		finished := make(chan command.Result, 1)
 		go func() {
-			finished <- RunProjectCmdsParallelInOrder(cmds, runner, poolSize)
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, poolSize)
 		}()
 
 		synctest.Wait()
@@ -215,7 +216,7 @@ func TestRunProjectCmdsParallelInOrder_WaitsForEarlierGroups(t *testing.T) {
 		}
 		finished := make(chan command.Result, 1)
 		go func() {
-			finished <- RunProjectCmdsParallelInOrder(cmds, runner, 3)
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 3)
 		}()
 
 		Equals(t, "p1", <-started)
@@ -243,12 +244,71 @@ func TestRunProjectCmdsParallelInOrder_ReturnsResultsInCmdsOrder(t *testing.T) {
 		}
 		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
 
-		result := RunProjectCmdsParallelInOrder(cmds, runner, 2)
+		result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
 
 		require.Len(t, result.ProjectResults, 2)
 		Equals(t, "p1", result.ProjectResults[0].ProjectName)
 		Equals(t, "p2", result.ProjectResults[1].ProjectName)
 	})
+}
+
+func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
+	cases := []struct {
+		name     string
+		abort    bool
+		expRuns  []string
+		expError string
+	}{
+		{name: "aborts when set", abort: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
+		{name: "keeps going otherwise", expRuns: []string{"p1", "p2", "p3"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var ran []string
+			runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				mu.Lock()
+				ran = append(ran, ctx.ProjectName)
+				mu.Unlock()
+				return command.ProjectCommandOutput{Error: errors.New("plan failed")}
+			}
+			cmds := []command.ProjectContext{
+				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort},
+				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
+				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2},
+			}
+
+			result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+
+			Equals(t, c.expRuns, ran)
+			require.Len(t, result.ProjectResults, len(cmds))
+			for i, res := range result.ProjectResults {
+				Equals(t, cmds[i].ProjectName, res.ProjectName)
+				Assert(t, res.Error != nil, "expected an error for %s", res.ProjectName)
+			}
+			if c.expError != "" {
+				Equals(t, c.expError, result.ProjectResults[1].Error.Error())
+				Equals(t, c.expError, result.ProjectResults[2].Error.Error())
+			}
+		})
+	}
+}
+
+func TestRunProjectCmdsParallelInOrder_RecoversFromPanic(t *testing.T) {
+	runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+		if ctx.ProjectName == "p1" {
+			panic("boom")
+		}
+		return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	}
+	cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+
+	result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+
+	require.Len(t, result.ProjectResults, 2)
+	Equals(t, "p1", result.ProjectResults[0].ProjectName)
+	Equals(t, "panic: boom", result.ProjectResults[0].Error.Error())
+	assert.NoError(t, result.ProjectResults[1].Error)
 }
 
 func TestSplitByExecutionOrderGroup(t *testing.T) {

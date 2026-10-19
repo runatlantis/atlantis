@@ -5,12 +5,14 @@ package events
 
 import (
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"sync"
 
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
@@ -96,25 +98,60 @@ func runProjectCmdsParallel(
 // RunProjectCmdsParallelInOrder runs up to poolSize cmds at once. A cmd starts
 // only after every earlier cmd from a different execution order group has
 // finished, and every cmd gets a result, returned in cmds order.
+//
+// Like the PR path, it stops running groups once a group with
+// AbortOnExecutionOrderFail set has an error. The cmds that did not run get an
+// errored result, so callers still see one result per cmd. A panic in a runner
+// becomes an errored result for that cmd instead of crashing the server.
 func RunProjectCmdsParallelInOrder(
+	log logging.SimpleLogging,
 	cmds []command.ProjectContext,
 	runnerFunc prjCmdRunnerFunc,
 	poolSize int,
 ) command.Result {
 	results := make([]command.ProjectResult, len(cmds))
 	wg := sizedwaitgroup.New(poolSize)
+	groupStart := 0
+	aborted := false
 	for i, cmd := range cmds {
 		if i > 0 && cmd.ExecutionOrderGroup != cmds[i-1].ExecutionOrderGroup {
 			wg.Wait()
+			if !aborted && cmds[i-1].AbortOnExecutionOrderFail && (command.Result{ProjectResults: results[groupStart:i]}).HasErrors() {
+				log.Info("abort on execution order when failed")
+				aborted = true
+			}
+			groupStart = i
+		}
+		if aborted {
+			results[i] = errorProjectResult(cmd, fmt.Errorf("skipped because an earlier execution order group failed"))
+			continue
 		}
 		wg.Add()
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					log.Err("panic running %s for project %q (dir %q, workspace %q): %v\n%s", cmd.CommandName, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, r, debug.Stack())
+					results[i] = errorProjectResult(cmd, fmt.Errorf("panic: %v", r))
+				}
+			}()
 			results[i] = RunOneProjectCmd(runnerFunc, cmd)
 		}()
 	}
 	wg.Wait()
 	return command.Result{ProjectResults: results}
+}
+
+func errorProjectResult(cmd command.ProjectContext, err error) command.ProjectResult {
+	return command.ProjectResult{
+		ProjectCommandOutput: command.ProjectCommandOutput{Error: err},
+		Command:              cmd.CommandName,
+		SubCommand:           cmd.SubCommand,
+		RepoRelDir:           cmd.RepoRelDir,
+		Workspace:            cmd.Workspace,
+		ProjectName:          cmd.ProjectName,
+		SilencePRComments:    cmd.SilencePRComments,
+	}
 }
 
 func runProjectCmds(
