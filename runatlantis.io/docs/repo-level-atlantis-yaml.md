@@ -185,6 +185,8 @@ Use the `--parallel-pool-size` to configure the max number of plans and applies 
 
 Parallel plans and applies work across both multiple directories and multiple workspaces.
 
+`parallel_plan` also applies to plans and policy checks started through the [API](api-endpoints.md), such as `POST /api/plan` and `POST /api/drift/detect`. Applies started through the API still run one project at a time.
+
 ### Configuring Planning
 
 Given the directory structure:
@@ -482,7 +484,7 @@ workflow: myworkflow
 | name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                       |
 | branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                     |
 | dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
-| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for this project. Atlantis will switch to this workspace when planning/applying and will create it if it doesn't exist. Cannot contain `/`, `\\`, `..`, `$`, whitespace or control characters, and cannot start with `-` or `~`.                  |
+| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for the project. Atlantis switches to it at plan/apply. No `/`, `\\`, `..`, `$`, whitespace or control chars, nor start with `-` or `~`. |
 | execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                         |
 | delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
 | repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |

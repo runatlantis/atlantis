@@ -162,6 +162,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredPlanStatusPublisher interface {
+	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus)
+}
+
 type DeferredApplyStatusPublisher interface {
 	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
 }
@@ -221,7 +225,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
-	if commandName == command.Apply {
+	if commandName == command.Apply || (commandName == command.Plan && !ctx.API) {
 		return result
 	}
 
@@ -939,6 +943,23 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// artifact, so Atlantis cannot require or hash a convention plan file for
 	// them. Their durable plan state is still validated.
 	managedPlanFile := requiresManagedPlanFileForApply(ctx)
+	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
+	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
+		planPath, err := safePlanFilePath(ctx, absPath)
+		if err != nil {
+			return "", "", "", err
+		}
+		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+			}
+		} else {
+			// Overwrite builder hash. Load may have replaced leftover disk.
+			ctx.ExpectedPlanHash = planHash
+		}
+	}
+
 	if p.ApplyPlanValidator != nil {
 		if managedPlanFile {
 			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
@@ -947,18 +968,6 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		} else if err := p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx); err != nil {
 			return "", "", "", err
 		}
-	}
-	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && managedPlanFile && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
-		planPath, err := safePlanFilePath(ctx, absPath)
-		if err != nil {
-			return "", "", "", err
-		}
-		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
-		if err != nil {
-			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
-		}
-		ctx.ExpectedPlanHash = planHash
 	}
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
@@ -1217,4 +1226,25 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 // built-in apply step will read it.
 func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, res := range result.ProjectResults {
+		if res.Command != command.Plan || res.PlanSuccess == nil || res.Error != nil || res.Failure != "" {
+			continue
+		}
+		for _, ctx := range projectCmds {
+			if ctx.CommandName != command.Plan || ctx.RepoRelDir != res.RepoRelDir || ctx.Workspace != res.Workspace || ctx.ProjectName != res.ProjectName || ctx.SuppressVCSStatus {
+				continue
+			}
+			output := res.ProjectCommandOutput
+			if result.Error != nil {
+				output = command.ProjectCommandOutput{Error: result.Error}
+			}
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &output); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+			}
+			break
+		}
+	}
 }

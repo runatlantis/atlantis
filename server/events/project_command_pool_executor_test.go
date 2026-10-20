@@ -4,8 +4,10 @@
 package events
 
 import (
+	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -69,49 +71,56 @@ func TestRunProjectCmdsParallel_CancelledBeforeExecution(t *testing.T) {
 // When the number of commands exceeds the pool size, commands queued behind a full pool
 // must be cancelled rather than left waiting indefinitely.
 //
-// The slow runner simulates real workload by sleeping, keeping the pool saturated long
-// enough for the cancellation to be registered before any worker finishes. Queued
-// commands (p3–p5) pick up the cancellation in the post-wg.Add() check.
+// Block both workers until cancellation, so queued commands must observe the
+// cancellation after acquiring a pool slot.
 func TestRunProjectCmdsParallel_CancelledWhileExceedingPoolSize(t *testing.T) {
-	const poolSize = 2
-	const totalCmds = 5
-	const expectedCancelled = totalCmds - poolSize
-
-	tracker := NewCancellationTracker()
-	pull := models.PullRequest{Num: 1}
-
-	slowRunner := func(_ command.ProjectContext) command.ProjectCommandOutput {
-		time.Sleep(500 * time.Millisecond)
-		return command.ProjectCommandOutput{}
-	}
-
-	cmds := []command.ProjectContext{
-		makeProjectContext("p1"),
-		makeProjectContext("p2"),
-		makeProjectContext("p3"),
-		makeProjectContext("p4"),
-		makeProjectContext("p5"),
-	}
-
-	go func() {
-		// Cancel after a short delay, while p1 and p2 are still running
-		// and p3–p5 are queued waiting for a free pool slot.
-		time.Sleep(50 * time.Millisecond)
-		tracker.Cancel(pull)
-	}()
-
-	result := runProjectCmdsParallel(cmds, slowRunner, poolSize, tracker, pull)
-
-	require.Len(t, result.ProjectResults, totalCmds)
-
-	cancelledCount := 0
-	for _, r := range result.ProjectResults {
-		if r.Error != nil {
-			assert.Contains(t, r.Error.Error(), "cancelled")
-			cancelledCount++
+	synctest.Test(t, func(t *testing.T) {
+		const poolSize = 2
+		tracker := NewCancellationTracker()
+		pull := models.PullRequest{Num: 1}
+		started := make(chan string, poolSize)
+		release := make(chan struct{})
+		cancelAndRelease := sync.OnceFunc(func() {
+			tracker.Cancel(pull)
+			close(release)
+		})
+		defer cancelAndRelease()
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{}
 		}
-	}
-	assert.Equal(t, expectedCancelled, cancelledCount)
+		cmds := []command.ProjectContext{
+			makeProjectContext("p1"),
+			makeProjectContext("p2"),
+			makeProjectContext("p3"),
+			makeProjectContext("p4"),
+			makeProjectContext("p5"),
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- runProjectCmdsParallel(cmds, runner, poolSize, tracker, pull)
+		}()
+
+		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
+		// Both workers and the submission waiting for a pool slot must be blocked.
+		synctest.Wait()
+		cancelAndRelease()
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, len(cmds))
+		var completed, cancelled []string
+		for _, r := range result.ProjectResults {
+			if r.Error != nil {
+				assert.Contains(t, r.Error.Error(), "cancelled")
+				cancelled = append(cancelled, r.ProjectName)
+			} else {
+				completed = append(completed, r.ProjectName)
+			}
+		}
+		assert.ElementsMatch(t, []string{"p1", "p2"}, completed)
+		assert.ElementsMatch(t, []string{"p3", "p4", "p5"}, cancelled)
+	})
 }
 
 func TestRunProjectCmds_Sequential(t *testing.T) {
@@ -135,6 +144,171 @@ func TestRunProjectCmds_Sequential(t *testing.T) {
 
 	require.Len(t, result.ProjectResults, 3)
 	assert.Equal(t, []string{"p1", "p2", "p3"}, order)
+}
+
+func TestRunProjectCmdsParallelInOrder_RunsGroupConcurrently(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan string, 2)
+		release := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+		}
+		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+		}()
+
+		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
+		close(release)
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, 2)
+		assert.False(t, result.HasErrors())
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_RespectsPoolSize(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const poolSize = 2
+		started := make(chan string, 4)
+		release := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{
+			makeProjectContext("p1"),
+			makeProjectContext("p2"),
+			makeProjectContext("p3"),
+			makeProjectContext("p4"),
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, poolSize)
+		}()
+
+		synctest.Wait()
+		assert.Len(t, started, poolSize)
+		close(release)
+		result := <-finished
+
+		require.Len(t, result.ProjectResults, len(cmds))
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_WaitsForEarlierGroups(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan string, 3)
+		release := map[string]chan struct{}{"p1": make(chan struct{}), "p2": make(chan struct{}), "p3": make(chan struct{})}
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			started <- ctx.ProjectName
+			<-release[ctx.ProjectName]
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{
+			{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0},
+			{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
+			{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 1},
+		}
+		finished := make(chan command.Result, 1)
+		go func() {
+			finished <- RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 3)
+		}()
+
+		Equals(t, "p1", <-started)
+		synctest.Wait()
+		assert.Empty(t, started, "group 1 must not start while group 0 runs")
+
+		close(release["p1"])
+		require.ElementsMatch(t, []string{"p2", "p3"}, []string{<-started, <-started})
+		close(release["p2"])
+		close(release["p3"])
+		<-finished
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_ReturnsResultsInCmdsOrder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		p2Done := make(chan struct{})
+		runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+			if ctx.ProjectName == "p1" {
+				<-p2Done
+			} else {
+				close(p2Done)
+			}
+			return command.ProjectCommandOutput{}
+		}
+		cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+
+		result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+
+		require.Len(t, result.ProjectResults, 2)
+		Equals(t, "p1", result.ProjectResults[0].ProjectName)
+		Equals(t, "p2", result.ProjectResults[1].ProjectName)
+	})
+}
+
+func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
+	cases := []struct {
+		name     string
+		abort    bool
+		expRuns  []string
+		expError string
+	}{
+		{name: "aborts when set", abort: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
+		{name: "keeps going otherwise", expRuns: []string{"p1", "p2", "p3"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var mu sync.Mutex
+			var ran []string
+			runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				mu.Lock()
+				ran = append(ran, ctx.ProjectName)
+				mu.Unlock()
+				return command.ProjectCommandOutput{Error: errors.New("plan failed")}
+			}
+			cmds := []command.ProjectContext{
+				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort},
+				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
+				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2},
+			}
+
+			result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+
+			Equals(t, c.expRuns, ran)
+			require.Len(t, result.ProjectResults, len(cmds))
+			for i, res := range result.ProjectResults {
+				Equals(t, cmds[i].ProjectName, res.ProjectName)
+				Assert(t, res.Error != nil, "expected an error for %s", res.ProjectName)
+			}
+			if c.expError != "" {
+				Equals(t, c.expError, result.ProjectResults[1].Error.Error())
+				Equals(t, c.expError, result.ProjectResults[2].Error.Error())
+			}
+		})
+	}
+}
+
+func TestRunProjectCmdsParallelInOrder_RecoversFromPanic(t *testing.T) {
+	runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+		if ctx.ProjectName == "p1" {
+			panic("boom")
+		}
+		return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	}
+	cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+
+	result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+
+	require.Len(t, result.ProjectResults, 2)
+	Equals(t, "p1", result.ProjectResults[0].ProjectName)
+	Equals(t, "panic: boom", result.ProjectResults[0].Error.Error())
+	assert.NoError(t, result.ProjectResults[1].Error)
 }
 
 func TestSplitByExecutionOrderGroup(t *testing.T) {

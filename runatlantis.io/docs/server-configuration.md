@@ -1097,8 +1097,8 @@ ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 ```
 
 Include git untracked files in the Atlantis modified file list.
-Used for example with CDKTF pre-workflow hooks that dynamically generate
-Terraform files.
+Used for example with [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) pre-workflow hooks that
+dynamically generate Terraform files.
 
 ### `--language` <Badge text="v0.45.0+" type="info"/>
 
@@ -1238,6 +1238,8 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 ```
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
+
+The limit is per command: it also caps the projects of one API plan or drift detection request that plan at once.
 
 ### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
 

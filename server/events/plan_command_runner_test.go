@@ -5,7 +5,11 @@ package events_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
+
+	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/events/mocks"
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
@@ -1145,5 +1149,90 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// A callback at the durable write boundary makes ordering deterministic without
+// racing a VCS poll against the plan command.
+type observingPlanDatabase struct {
+	db.Database
+	beforeWrite func()
+	writeErr    error
+	persisted   bool
+}
+
+func (d *observingPlanDatabase) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	d.beforeWrite()
+	if d.writeErr != nil {
+		return models.PullStatus{}, d.writeErr
+	}
+	status, err := d.Database.UpdatePullWithResults(pull, results)
+	d.persisted = err == nil
+	return status, err
+}
+
+func TestPlanCommandRunner_PersistenceBeforePublication(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		for _, fail := range []bool{false, true} {
+			name := "manual"
+			if auto {
+				name = "autoplan"
+			}
+			if fail {
+				name += "_write_failure"
+			}
+			t.Run(name, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				storage, err := boltdb.New(t.TempDir())
+				Ok(t, err)
+				t.Cleanup(func() { storage.Close() })
+				database := &observingPlanDatabase{Database: storage}
+				if fail {
+					database.writeErr = errors.New("disk full")
+				}
+				setter := mocks.NewMockJobURLSetter()
+				messages := mocks.NewMockJobMessageSender()
+				vcsClient := setup(t, func(tc *TestConfig) {
+					tc.database = database
+					tc.planRunnerWrapper = func(r events.ProjectCommandRunner) events.ProjectPlanCommandRunner {
+						return events.NewInstrumentedProjectCommandRunner(metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"), &events.ProjectOutputWrapper{ProjectCommandRunner: r, JobURLSetter: setter, JobMessageSender: messages})
+					}
+				})
+				ctx := &command.Context{Log: logging.NewNoopLogger(t), Pull: testdata.Pull, HeadRepo: testdata.GithubRepo, Scope: metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")}
+				if auto {
+					ctx.Trigger = command.AutoTrigger
+				} else {
+					ctx.Trigger = command.CommentTrigger
+				}
+				cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "project"}
+				project := command.ProjectContext{CommandName: command.Plan, RepoRelDir: "project", Workspace: "default", Log: ctx.Log}
+				When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{project}, nil)
+				When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{project}, nil)
+				When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+				database.beforeWrite = func() {
+					setter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())
+					vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+					commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+				}
+				When(setter.SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())).Then(func([]Param) ReturnValues {
+					Assert(t, database.persisted, "project success must follow persistence")
+					return ReturnValues{nil}
+				})
+				planCommandRunner.Run(ctx, cmd)
+				Equals(t, !fail, database.persisted)
+				if fail {
+					Assert(t, ctx.CommandHasErrors, "persistence failure must fail the command")
+					setter.VerifyWasCalledOnce().SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.FailedCommitStatus), Any[*command.ProjectCommandOutput]())
+					setter.VerifyWasCalled(Never()).SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())
+					for _, name := range []command.Name{command.Plan, command.Apply} {
+						commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.FailedCommitStatus), Eq(name))
+					}
+					_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+					Assert(t, strings.Contains(comment, "disk full") && strings.Contains(comment, "atlantis plan"), "expected actionable persistence error: %s", comment)
+				} else {
+					setter.VerifyWasCalledOnce().SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())
+				}
+			})
+		}
 	}
 }

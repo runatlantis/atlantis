@@ -68,6 +68,7 @@ var postWorkflowHooksCommandRunner events.PostWorkflowHooksCommandRunner
 var cancellationTracker *mocks.MockCancellationTracker
 
 type TestConfig struct {
+	planRunnerWrapper          func(events.ProjectCommandRunner) events.ProjectPlanCommandRunner
 	parallelPoolSize           int
 	SilenceNoProjects          bool
 	silenceVCSStatusNoPlans    bool
@@ -177,6 +178,10 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	if workingDirLocker == nil {
 		workingDirLocker = events.NewDefaultWorkingDirLocker()
 	}
+	var planRunner events.ProjectPlanCommandRunner = projectCommandRunner
+	if testConfig.planRunnerWrapper != nil {
+		planRunner = testConfig.planRunnerWrapper(projectCommandRunner)
+	}
 	planCommandRunner = events.NewPlanCommandRunner(
 		testConfig.silenceVCSStatusNoPlans,
 		testConfig.silenceVCSStatusNoProjects,
@@ -186,7 +191,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		workingDirLocker,
 		commitUpdater,
 		projectCommandBuilder,
-		projectCommandRunner,
+		planRunner,
 		cancellationTracker,
 		dbUpdater,
 		pullUpdater,
