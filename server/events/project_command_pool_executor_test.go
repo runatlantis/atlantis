@@ -302,6 +302,9 @@ func TestRunProjectCmdsParallelInOrder_RecoversFromPanic(t *testing.T) {
 		return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
 	}
 	cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+	for i := range cmds {
+		cmds[i].Log = logging.NewNoopLogger(t)
+	}
 
 	result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
 
@@ -309,6 +312,29 @@ func TestRunProjectCmdsParallelInOrder_RecoversFromPanic(t *testing.T) {
 	Equals(t, "p1", result.ProjectResults[0].ProjectName)
 	Equals(t, "panic: boom", result.ProjectResults[0].Error.Error())
 	assert.NoError(t, result.ProjectResults[1].Error)
+}
+
+func TestRunProjectCmdsParallel_RecoversFromPanic(t *testing.T) {
+	runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+		if ctx.ProjectName == "p1" {
+			panic("boom")
+		}
+		return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+	}
+	cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+	for i := range cmds {
+		cmds[i].Log = logging.NewNoopLogger(t)
+	}
+
+	result := runProjectCmdsParallel(cmds, runner, 2, nil, models.PullRequest{})
+
+	require.Len(t, result.ProjectResults, 2)
+	p1Result := findResult(result, "p1")
+	require.NotNil(t, p1Result)
+	Equals(t, "panic: boom", p1Result.Error.Error())
+	p2Result := findResult(result, "p2")
+	require.NotNil(t, p2Result)
+	assert.NoError(t, p2Result.Error)
 }
 
 func TestSplitByExecutionOrderGroup(t *testing.T) {
