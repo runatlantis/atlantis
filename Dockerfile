@@ -60,7 +60,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
 # renovate: datasource=deb depName=ca-certificates
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419+deb13u1"
 # renovate: datasource=deb depName=curl
 ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u7"
 # renovate: datasource=deb depName=git
@@ -208,7 +208,7 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=apk depName=ca-certificates
-ENV CA_CERTIFICATES_VERSION="20260909-r0"
+ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
 ENV CURL_VERSION="8.22.0-r0"
 # renovate: datasource=apk depName=git
