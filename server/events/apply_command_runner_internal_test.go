@@ -73,6 +73,30 @@ func (r staticProjectApplyRunner) Apply(command.ProjectContext) command.ProjectC
 	return r.output
 }
 
+func (r staticProjectApplyRunner) Plan(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r staticProjectApplyRunner) PolicyCheck(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r staticProjectApplyRunner) ApprovePolicies(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r staticProjectApplyRunner) Version(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r staticProjectApplyRunner) Import(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r staticProjectApplyRunner) StateRm(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
 type recordingDeferredApplyRunner struct {
 	output   command.ProjectCommandOutput
 	statuses []models.CommitStatus
@@ -80,6 +104,30 @@ type recordingDeferredApplyRunner struct {
 
 func (r *recordingDeferredApplyRunner) Apply(command.ProjectContext) command.ProjectCommandOutput {
 	return r.output
+}
+
+func (r *recordingDeferredApplyRunner) Plan(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r *recordingDeferredApplyRunner) PolicyCheck(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r *recordingDeferredApplyRunner) ApprovePolicies(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r *recordingDeferredApplyRunner) Version(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r *recordingDeferredApplyRunner) Import(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
+}
+
+func (r *recordingDeferredApplyRunner) StateRm(command.ProjectContext) command.ProjectCommandOutput {
+	return command.ProjectCommandOutput{}
 }
 
 func (r *recordingDeferredApplyRunner) PublishDeferredApplyStatuses(_ []command.ProjectContext, _ command.Result, status models.CommitStatus) {
@@ -193,7 +241,7 @@ func TestApplyCommandRunner_DeferredApplySuccessFailsWhenFinalFreshnessFails(t *
 	}
 }
 
-func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyCommandRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
+func newInternalApplyCommandRunner(t *testing.T, database *boltdb.BoltDB, builder ProjectApplyCommandBuilder, projectRunner ProjectApplyWithReplanRunner, liveFetcher LivePullHeadFetcher) *ApplyCommandRunner {
 	t.Helper()
 	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
 	pullUpdater := &PullUpdater{
