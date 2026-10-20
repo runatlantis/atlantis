@@ -1239,6 +1239,8 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 
 Max size of the wait group that runs parallel plans and applies (if enabled). Defaults to `15`
 
+The limit is per command: it also caps the projects of one API plan or drift detection request that plan at once.
+
 ### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
 
 ```bash
