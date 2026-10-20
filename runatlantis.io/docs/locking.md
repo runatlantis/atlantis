@@ -74,4 +74,6 @@ level because it prevents multiple pull requests from working on the same state.
 
 ## Locking and Drift Detection
 
-When drift detection or remediation runs via the [API](api-endpoints.md) with `PR: 0` (non-PR workflow), Atlantis still acquires and releases working directory locks to prevent concurrent operations on the same project. However, since these operations are not associated with a pull request, they do not create PR-level locks visible in the Locks UI. The working directory lock is released automatically after each drift detection or remediation operation completes.
+When a plan, apply, drift detection or remediation runs via the [API](api-endpoints.md) with `PR: 0` (non-PR workflow), Atlantis locks each project it plans under a negative pull number, so a pull request can't plan the same project while the request runs. These locks show up in the Locks UI and `GET /api/locks` with a negative `PullID`, and Atlantis releases them when the request completes.
+
+If the Atlantis process is killed while such a request is running, its locks are left behind. With [`--locking-db-type=boltdb`](server-configuration.md#locking-db-type) (the default), only one Atlantis process can use the database, so Atlantis deletes these leftover locks at startup. With Redis, another Atlantis instance might still own them, so delete them from the Locks UI.
