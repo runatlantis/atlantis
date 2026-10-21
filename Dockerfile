@@ -8,7 +8,7 @@ ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG TERRAFORM_1_15_VERSION=1.15.9
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG TERRAFORM_1_16_VERSION=1.16.5
+ARG TERRAFORM_1_16_VERSION=1.16.6
 ARG DEFAULT_TERRAFORM_VERSION=${TERRAFORM_1_16_VERSION}
 # renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
 ARG DEFAULT_OPENTOFU_VERSION=1.12.6
