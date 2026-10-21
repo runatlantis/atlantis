@@ -28,7 +28,7 @@ ENV GOPATH=/go \
 # Terraform and conftest, as testing/Dockerfile installs them. The integration tests in
 # server/controllers/events look terraform up on PATH; policy-check tests call conftest.
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV TERRAFORM_VERSION=1.16.5
+ENV TERRAFORM_VERSION=1.16.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ENV CONFTEST_VERSION=0.69.0
 RUN case "$(uname -m)" in x86_64) TF_ARCH=amd64 CFT_ARCH=x86_64 ;; aarch64) TF_ARCH=arm64 CFT_ARCH=arm64 ;; \
