@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.27.1-alpine3.24@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414
+ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
 
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
 ARG TERRAFORM_1_15_VERSION=1.15.9
@@ -60,7 +60,7 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
 # renovate: datasource=deb depName=ca-certificates
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419+deb13u1"
 # renovate: datasource=deb depName=curl
 ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u7"
 # renovate: datasource=deb depName=git
@@ -208,7 +208,7 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=apk depName=ca-certificates
-ENV CA_CERTIFICATES_VERSION="20260909-r0"
+ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
 ENV CURL_VERSION="8.22.0-r0"
 # renovate: datasource=apk depName=git
