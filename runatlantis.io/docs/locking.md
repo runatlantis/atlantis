@@ -15,6 +15,8 @@ Only the directory in the repo and Terraform workspace are locked, not the whole
 
 Atlantis also checks the global apply lock before running `atlantis apply`. If Atlantis cannot reach the lock backend while checking that global lock, it fails closed and rejects the apply until the backend is reachable again.
 
+Within one pull request, `atlantis plan` and an untargeted `atlantis apply` run one at a time. Targeted applies (`-p`, `-d` or `-w`) of different projects can run at the same time, such as `atlantis apply -w staging` and `atlantis apply -w qa`. A second apply of a project that is already being applied is rejected until the first one finishes.
+
 ## Why
 
 1. Because `atlantis apply` is being done before the pull request is merged, after

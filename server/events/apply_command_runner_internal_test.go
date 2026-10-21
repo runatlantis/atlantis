@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -468,4 +469,33 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 
 func containsCommitStatus(statuses []models.CommitStatus, expected models.CommitStatus) bool {
 	return slices.Contains(statuses, expected)
+}
+
+func TestPullResultLockerSerializesPerPull(t *testing.T) {
+	var locker pullResultLocker
+	unlock := locker.lock("owner/repo", 1)
+
+	acquired := make(chan struct{})
+	go func() {
+		locker.lock("owner/repo", 1)()
+		close(acquired)
+	}()
+
+	// A different pull request does not wait.
+	locker.lock("owner/repo", 2)()
+	select {
+	case <-acquired:
+		t.Fatal("expected a second lock on the same pull request to wait")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	unlock()
+	select {
+	case <-acquired:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected the second lock to be acquired after unlock")
+	}
+	if len(locker.locks) != 0 {
+		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
+	}
 }

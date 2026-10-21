@@ -2830,6 +2830,15 @@ func (l *trackingWorkingDirLocker) TryLockPull(string, int, command.Name, events
 	return func() { l.locked = false }, nil
 }
 
+func (l *trackingWorkingDirLocker) TryLockPullShared(string, int, command.Name, events.WorkingDirLockMetadata) (func(), error) {
+	l.locked = true
+	return func() { l.locked = false }, nil
+}
+
+func (l *trackingWorkingDirLocker) TryLockProjectApply(string, int, string, string, string, events.WorkingDirLockMetadata) (func(), error) {
+	return func() {}, nil
+}
+
 func (l *trackingWorkingDirLocker) HasCommandLock(string, int, command.Name) bool {
 	return l.locked
 }

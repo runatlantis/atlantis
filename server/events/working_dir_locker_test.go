@@ -302,3 +302,132 @@ func TestWorkingDirLocker_ProjectLocksStillUseExactWorkspaceDirProjectIdentity(t
 	_, err = locker.TryLock("group/repo/1", 2, "default", "dir", "other", command.Apply, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 }
+
+func TestTryLockPullSharedAllowsOtherSharedHolders(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlockFirst, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlockSecond, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+
+	unlockFirst()
+	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	ErrContains(t, "currently locked by \"apply\"", err)
+
+	unlockSecond()
+	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+func TestTryLockPullSharedBlocksExclusivePullLock(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{HeadCommit: sha})
+	Ok(t, err)
+	defer unlock()
+
+	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrEquals(t, "cannot run \"apply\": pull request 1 is currently locked by \"apply\" for commit 0123456.\n"+
+		"Wait until the previous command is complete and try again", err)
+	_, err = locker.TryLockPull(repo, 2, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+func TestTryLockPullBlocksSharedPullLock(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+
+	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "pull request 1 is currently locked by \"plan\"", err)
+
+	unlock()
+	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+func TestTryLockPullSharedBlocksWhenPlanInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLock(repo, 1, workspace, path, projectName, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlock()
+
+	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "pull request 1 is currently locked by \"plan\"", err)
+}
+
+func TestTryLockProjectApply(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlock, err := locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+
+	_, err = locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	ErrEquals(t, "cannot run \"apply\": the daily-1 workspace at path . is currently locked for this pull request by \"apply\".\n"+
+		"Wait until the previous command is complete and try again", err)
+	_, err = locker.TryLockProjectApply(repo, 1, "daily-2", path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+
+	unlock()
+	_, err = locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+// The project runner takes its own working dir lock while a project apply
+// claim is held, so the two must not conflict.
+func TestTryLockProjectApplyDoesNotBlockWorkingDirLock(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	unlockClaim, err := locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlockClaim()
+
+	unlock, err := locker.TryLock(repo, 1, workspace, path, projectName, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlock()
+	Assert(t, !locker.HasCommandLock(repo, 1, command.Plan), "did not expect an apply claim to look like a plan")
+}
+
+func TestUnlockByPullReleasesSharedPullLocksAndApplyClaims(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	_, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+
+	locker.UnlockByPull(repo, 1)
+
+	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+// atlantis cancel releases every lock on the pull request while running
+// commands continue. Their later releases must not drop newer holders' locks.
+func TestStaleUnlockAfterUnlockByPullKeepsNewerHolders(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	staleUnlockShared, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	staleUnlockClaim, err := locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	locker.UnlockByPull(repo, 1)
+
+	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	staleUnlockShared()
+	staleUnlockClaim()
+
+	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	ErrContains(t, "currently locked", err)
+	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	ErrContains(t, "currently locked by \"apply\"", err)
+}

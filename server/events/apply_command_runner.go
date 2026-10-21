@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -74,6 +75,7 @@ type ApplyCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	livePullHeadFetcher   LivePullHeadFetcher
 	disableAutomergeLabel string
+	resultLocker          pullResultLocker
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -131,7 +133,13 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var unlockPullApply func()
 	if a.workingDirLocker != nil {
-		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
+		lockPull := a.workingDirLocker.TryLockPull
+		if cmd.IsForSpecificProject() {
+			// Targeted applies share the pull lock so different projects can
+			// apply in parallel. Each project is claimed once resolved below.
+			lockPull = a.workingDirLocker.TryLockPullShared
+		}
+		unlockPullApply, err = lockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			ctx.CommandHasErrors = true
 			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -194,11 +202,30 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: projectCmdsErr})
 		return
 	}
+	unlockProjects, err := a.claimProjects(ctx, projectCmds)
+	if err != nil {
+		ctx.CommandHasErrors = true
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		return
+	}
+	defer unlockProjects()
 
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !a.silenceVCSStatusNoProjects {
+			// A parallel targeted apply may have recorded results since this
+			// command read the plan status.
+			unlockResults := a.resultLocker.lock(baseRepo.FullName, pull.Num)
+			defer unlockResults()
+			if err := a.refreshPullStatus(ctx, pull); err != nil {
+				ctx.Log.Warn("not publishing no-project apply status because fetching current plan status failed: %s", err)
+				ctx.CommandHasErrors = true
+				return
+			}
 			currentPull := applyPullWithLiveIdentity(pull, livePull)
 			pullStatus, err := a.currentNoProjectApplyPullStatus(ctx, pull, currentPull)
 			if err != nil {
@@ -259,6 +286,12 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		cmd,
 		result)
 
+	// Targeted applies on this pull request can finish together. Record
+	// results, publish the combined status and automerge one apply at a time
+	// so each works from the others' recorded results.
+	unlockResults := a.resultLocker.lock(baseRepo.FullName, pull.Num)
+	defer unlockResults()
+
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
@@ -300,6 +333,36 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+// claimProjects claims each project for the rest of this apply. Targeted
+// applies share the pull lock, so this stops two of them applying the same
+// project.
+func (a *ApplyCommandRunner) claimProjects(ctx *command.Context, projectCmds []command.ProjectContext) (func(), error) {
+	var unlocks []func()
+	unlockAll := func() {
+		for _, unlock := range unlocks {
+			unlock()
+		}
+	}
+	if a.workingDirLocker == nil {
+		return unlockAll, nil
+	}
+	claimed := make(map[applyPlanKey]bool)
+	for _, projectCmd := range projectCmds {
+		key := applyPlanKey{workspace: projectCmd.Workspace, repoRelDir: projectCmd.RepoRelDir, projectName: projectCmd.ProjectName}
+		if claimed[key] {
+			continue
+		}
+		unlock, err := a.workingDirLocker.TryLockProjectApply(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, projectCmd.Workspace, projectCmd.RepoRelDir, projectCmd.ProjectName, WorkingDirLockMetadataForPull(ctx.Pull))
+		if err != nil {
+			unlockAll()
+			return func() {}, err
+		}
+		claimed[key] = true
+		unlocks = append(unlocks, unlock)
+	}
+	return unlockAll, nil
 }
 
 func (a *ApplyCommandRunner) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
@@ -489,6 +552,51 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+}
+
+// pullResultLocker serializes apply result recording per pull request. Its
+// zero value is ready to use.
+type pullResultLocker struct {
+	mutex sync.Mutex
+	locks map[pullResultKey]*pullResultLock
+}
+
+type pullResultKey struct {
+	repoFullName string
+	pullNum      int
+}
+
+type pullResultLock struct {
+	sync.Mutex
+	// refs counts holders and waiters so the entry is dropped once unused.
+	refs int
+}
+
+// lock blocks until no other apply on this pull request holds the lock.
+func (l *pullResultLocker) lock(repoFullName string, pullNum int) func() {
+	key := pullResultKey{repoFullName: repoFullName, pullNum: pullNum}
+	l.mutex.Lock()
+	if l.locks == nil {
+		l.locks = make(map[pullResultKey]*pullResultLock)
+	}
+	entry, ok := l.locks[key]
+	if !ok {
+		entry = &pullResultLock{}
+		l.locks[key] = entry
+	}
+	entry.refs++
+	l.mutex.Unlock()
+
+	entry.Lock()
+	return func() {
+		entry.Unlock()
+		l.mutex.Lock()
+		defer l.mutex.Unlock()
+		entry.refs--
+		if entry.refs == 0 {
+			delete(l.locks, key)
+		}
 	}
 }
 
