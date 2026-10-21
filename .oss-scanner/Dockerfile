@@ -10,7 +10,7 @@
 
 # Go toolchain matching go.mod. Renovate groups golang with go.mod, so they bump together: the
 # tests below run with GOTOOLCHAIN=local and fail if this falls behind go.mod.
-FROM golang:1.27.1-trixie
+FROM golang:1.27.2@sha256:820153096fda4de6ac1b7194d12e416b7dd8f4e9a33d17e0345b111b945162d8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates git make unzip curl \
