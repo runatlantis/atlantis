@@ -1,7 +1,8 @@
 # Image for Anthropic's OSS Scanner (https://github.com/anthropics/oss-scanner, projects/atlantis).
 # It lives here, not in that repository, so Renovate keeps its pins in step with go.mod and
-# testing/Dockerfile. The scanner builds it with the repository root as context and deletes
-# .dockerignore first, so COPY sees the whole checkout.
+# testing/Dockerfile. The scanner builds it with the repository root as context. The root
+# .dockerignore only allows what the release image needs, so Dockerfile.dockerignore next to this
+# file replaces it and COPY sees the whole checkout.
 # Atlantis is a Go server that receives VCS webhooks (GitHub, GitLab, Bitbucket, Azure DevOps, Gitea),
 # clones pull requests and runs Terraform/OpenTofu on them. While the network is available this build
 # fetches every Go module, installs the Terraform and conftest binaries the tests call, builds the
