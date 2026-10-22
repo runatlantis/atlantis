@@ -4,6 +4,7 @@
 package bitbucketcloud_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -593,6 +595,42 @@ func TestClient_DeleteComment(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestClient_CreateCommentNamespaceDoesNotExposeMarker(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	const comment = "Ran Plan for 2 projects:"
+	postedComment := ""
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.RequestURI != "/2.0/repositories/myorg/myrepo/pullrequests/5/comments" {
+			t.Errorf("unexpected request %s %s", r.Method, r.RequestURI)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		var request struct {
+			Content struct {
+				Raw string `json:"raw"`
+			} `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode create request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		postedComment = request.Content.Raw
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	client.CommentNamespace = common.NewCommentNamespace("instance-a")
+
+	err := client.CreateComment(logger, models.Repo{FullName: "myorg/myrepo"}, 5, comment, "plan")
+	Ok(t, err)
+	Equals(t, comment, postedComment)
+	Assert(t, !strings.Contains(postedComment, "atlantis-comment:v1"), "Bitbucket Cloud must not expose the namespace marker")
+}
+
 func TestClient_HidePRComments(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	comments, err := os.ReadFile(filepath.Join("testdata", "comments.json"))
@@ -654,4 +692,31 @@ func TestClient_HidePRComments(t *testing.T) {
 		}, 5, "plan", "")
 	Ok(t, err)
 	Equals(t, 2, called)
+}
+
+func TestClient_HidePRCommentsNamespaceFailsClosed(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	requests := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		t.Errorf("namespaced hiding should not call Bitbucket Cloud: %s %s", r.Method, r.RequestURI)
+		http.Error(w, "unexpected request", http.StatusInternalServerError)
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	client.CommentNamespace = common.NewCommentNamespace("instance-a")
+
+	err := client.HidePrevCommandComments(logger, models.Repo{
+		FullName: "myorg/myrepo",
+		Owner:    "owner",
+		Name:     "myrepo",
+		VCSHost: models.VCSHost{
+			Type:     models.BitbucketCloud,
+			Hostname: "bitbucket.org",
+		},
+	}, 5, "plan", "")
+	Ok(t, err)
+	Equals(t, 0, requests)
 }
