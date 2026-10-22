@@ -68,6 +68,14 @@ To require **certain people** to approve the pull request, look at the
 [mergeable](#mergeable) requirement.
 :::
 
+::: warning An approval is not tied to a plan
+Atlantis asks the VCS whether the pull request is approved at the moment `apply` runs. It does not
+check whether the approval was given before or after the latest plan or push. If new commits can be
+pushed after an approval, enable your provider's "dismiss stale reviews on push" branch protection,
+or run Atlantis with `--discard-approval-on-plan` so every plan clears existing approvals.
+Otherwise an approval given for one plan also satisfies the requirement for a later, different plan.
+:::
+
 ### Mergeable
 
 The `mergeable` requirement will prevent applies unless a pull request is able to be merged.
