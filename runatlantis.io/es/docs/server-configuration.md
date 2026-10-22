@@ -1150,6 +1150,30 @@ command_titles:
 Para una personalización completa del texto markdown, siga usando
 `--markdown-template-overrides-dir`.
 
+### `--lock-all-projects-before-plan`
+
+```bash
+atlantis server --lock-all-projects-before-plan
+# or
+ATLANTIS_LOCK_ALL_PROJECTS_BEFORE_PLAN=true
+```
+
+Adquiere el bloqueo de Atlantis para todos los proyectos de una ejecución de plan
+_antes_ de ejecutar cualquier plan, en lugar de bloquear cada proyecto justo antes
+de planificarlo. Si no se puede bloquear un proyecto, por ejemplo porque otro pull
+request tiene su bloqueo, no se ejecuta ningún plan. Esta ejecución libera los
+bloqueos que ya había adquirido.
+
+Esto ayuda en repositorios con mucha actividad y pull requests grandes, por
+ejemplo un cambio de versión de provider que afecta a todos los proyectos, donde
+de otro modo un pull request competidor podría tomar un bloqueo a mitad de una
+ejecución larga e invalidar los planes que ya se habían completado.
+
+Los proyectos configurados con `repo_locks: {mode: on_apply}` o `mode: disabled`
+no se bloquean por adelantado. Los proyectos que terminan sin producir un plan
+tienen su bloqueo liberado cuando la ejecución termina. Vea
+[Bloqueo](locking.md#locking-all-projects-before-planning) para más detalles.
+
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
 
 ```bash
