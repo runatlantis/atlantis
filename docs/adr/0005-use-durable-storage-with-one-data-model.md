@@ -1,10 +1,10 @@
 # 5. Use durable storage with one data model
 
-Date: 2026-09-23
+Date: 2026-10-22
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Context
 
