@@ -105,9 +105,10 @@ type planResultData struct {
 type applyResultData struct {
 	Results []projectResultTmplData
 	commonData
-	NumApplySuccesses int
-	NumApplyFailures  int
-	NumApplyErrors    int
+	NumApplySuccesses           int
+	NumApplyFailures            int
+	NumApplyErrors              int
+	ApplyExecutionOrderProgress *command.ApplyExecutionOrderProgress
 }
 
 type planSuccessData struct {
@@ -227,15 +228,26 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 	templates := m.markdownTemplates
 
 	if res.Error != nil {
-		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), newErrData(res.Error, "", common))
+		renderedContext := ""
+		if cmd.CommandName() == command.Apply && len(res.ProjectResults) > 0 {
+			projectResultsCommon := common
+			projectResultsCommon.Verbose = false
+			renderedContext = m.renderProjectResults(ctx, res.ProjectResults, projectResultsCommon, res.ApplyExecutionOrderProgress)
+		}
+		return m.renderTemplateTrimSpace(templates.Lookup("unwrappedErrWithLog"), newErrData(res.Error, renderedContext, common))
 	}
 	if res.Failure != "" {
 		return m.renderTemplateTrimSpace(templates.Lookup("failureWithLog"), failureData{res.Failure, "", common})
 	}
-	return m.renderProjectResults(ctx, res.ProjectResults, common)
+	return m.renderProjectResults(ctx, res.ProjectResults, common, res.ApplyExecutionOrderProgress)
 }
 
-func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []command.ProjectResult, common commonData) string {
+func (m *MarkdownRenderer) renderProjectResults(
+	ctx *command.Context,
+	results []command.ProjectResult,
+	common commonData,
+	applyExecutionOrderProgress *command.ApplyExecutionOrderProgress,
+) string {
 	vcsHost := ctx.Pull.BaseRepo.VCSHost.Type
 
 	var resultsTmplData []projectResultTmplData
@@ -430,7 +442,14 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 		numPlanFailures := len(results) - numPlanSuccesses
 		return m.renderTemplateTrimSpace(tmpl, planResultData{resultsTmplData, common, numPlansWithChanges, numPlansWithNoChanges, numPlanFailures})
 	case applyCommandTitle:
-		return m.renderTemplateTrimSpace(tmpl, applyResultData{resultsTmplData, common, numApplySuccesses, numApplyFailures, numApplyErrors})
+		return m.renderTemplateTrimSpace(tmpl, applyResultData{
+			Results:                     resultsTmplData,
+			commonData:                  common,
+			NumApplySuccesses:           numApplySuccesses,
+			NumApplyFailures:            numApplyFailures,
+			NumApplyErrors:              numApplyErrors,
+			ApplyExecutionOrderProgress: applyExecutionOrderProgress,
+		})
 	}
 	return m.renderTemplateTrimSpace(tmpl, resultData{resultsTmplData, common})
 }
