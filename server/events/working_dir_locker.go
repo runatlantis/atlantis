@@ -30,6 +30,8 @@ type workingDirLockError struct {
 	message      string
 	metadata     WorkingDirLockMetadata
 	multipleJobs bool
+	// holder is the command holding the lock.
+	holder command.Name
 }
 
 func (e *workingDirLockError) Error() string {
@@ -249,7 +251,7 @@ func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int
 	}
 	message := fmt.Sprintf("cannot run %q: pull request %d is currently locked by %q%s.\n"+
 		"Wait until the previous command is complete and try again", cmdName, pullNum, currentLock.Command, formatCommitSuffix(currentLock))
-	return &workingDirLockError{message: message, metadata: metadata, multipleJobs: multipleJobs}
+	return &workingDirLockError{message: message, metadata: metadata, multipleJobs: multipleJobs, holder: currentLock.Command}
 }
 
 func workspaceLockError(cmdName command.Name, workspace string, path string, currentLock workingDirLock) *workingDirLockError {
@@ -257,6 +259,7 @@ func workspaceLockError(cmdName command.Name, workspace string, path string, cur
 		message: fmt.Sprintf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q%s.\n"+
 			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock.Command, formatCommitSuffix(currentLock)),
 		metadata: currentLock.WorkingDirLockMetadata,
+		holder:   currentLock.Command,
 	}
 }
 

@@ -239,8 +239,8 @@ func TestTryLockApplyDirConflictLinksRunningJobs(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected typed lock error, got %T", err)
 	}
-	if lockErr.metadata != running || lockErr.multipleJobs {
-		t.Fatalf("expected running job metadata %#v, got %#v", running, lockErr)
+	if lockErr.metadata != running || lockErr.multipleJobs || lockErr.holder != command.Apply {
+		t.Fatalf("expected running job metadata %#v held by apply, got %#v", running, lockErr)
 	}
 
 	// Projects sharing the directory can run together in one apply.

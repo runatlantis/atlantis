@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
@@ -506,18 +507,18 @@ func receiveWithin[T any](t *testing.T, ch <-chan T, what string) T {
 
 func TestPullResultLockerSerializesPerPull(t *testing.T) {
 	var locker pullResultLocker
-	unlock := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1)
+	unlock := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1, "test")
 
 	secondLog := NewResultLockWaitLogger(t)
 	acquired := make(chan struct{})
 	go func() {
-		locker.lock(secondLog, "owner/repo", 1)()
+		locker.lock(secondLog, "owner/repo", 1, "test")()
 		close(acquired)
 	}()
 
 	// A different pull request does not wait.
 	otherLog := NewResultLockWaitLogger(t)
-	locker.lock(otherLog, "owner/repo", 2)()
+	locker.lock(otherLog, "owner/repo", 2, "test")()
 	select {
 	case <-otherLog.Waiting:
 		t.Fatal("expected a lock on another pull request not to wait")
@@ -542,12 +543,12 @@ func TestPullResultLockerSerializesPerPull(t *testing.T) {
 // lock alongside the waiter.
 func TestPullResultLockerKeepsEntryWhileCallersWait(t *testing.T) {
 	var locker pullResultLocker
-	unlockFirst := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1)
+	unlockFirst := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1, "test")
 
 	secondLog := NewResultLockWaitLogger(t)
 	secondHolds := make(chan func())
 	go func() {
-		secondHolds <- locker.lock(secondLog, "owner/repo", 1)
+		secondHolds <- locker.lock(secondLog, "owner/repo", 1, "test")
 	}()
 	receiveWithin(t, secondLog.Waiting, "the second caller to wait")
 	unlockFirst()
@@ -556,7 +557,7 @@ func TestPullResultLockerKeepsEntryWhileCallersWait(t *testing.T) {
 	thirdLog := NewResultLockWaitLogger(t)
 	thirdHolds := make(chan func())
 	go func() {
-		thirdHolds <- locker.lock(thirdLog, "owner/repo", 1)
+		thirdHolds <- locker.lock(thirdLog, "owner/repo", 1, "test")
 	}()
 	receiveWithin(t, thirdLog.Waiting, "the third caller to wait while the second holds the lock")
 	unlockSecond()
@@ -567,15 +568,71 @@ func TestPullResultLockerKeepsEntryWhileCallersWait(t *testing.T) {
 	}
 }
 
+// warnCapturingLogger records Warn messages.
+type warnCapturingLogger struct {
+	logging.SimpleLogging
+	mutex sync.Mutex
+	warns []string
+}
+
+func (l *warnCapturingLogger) Warn(format string, a ...any) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	l.warns = append(l.warns, fmt.Sprintf(format, a...))
+}
+
+func (l *warnCapturingLogger) warnings() []string {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	return slices.Clone(l.warns)
+}
+
+// atlantis cancel cannot release the result lock, so a waiter names the
+// holder at intervals in case its VCS calls hang.
+func TestPullResultLockerWarnsWhileWaiting(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var locker pullResultLocker
+		unlock := locker.lock(logging.NewNoopLogger(t), "owner/repo", 1, `apply by "alice"`)
+		log := &warnCapturingLogger{SimpleLogging: logging.NewNoopLogger(t)}
+		acquired := make(chan struct{})
+		go func() {
+			locker.lock(log, "owner/repo", 1, `apply by "bob"`)()
+			close(acquired)
+		}()
+
+		time.Sleep(resultLockWaitWarnInterval - time.Second)
+		synctest.Wait()
+		early := log.warnings()
+		time.Sleep(time.Second)
+		synctest.Wait()
+		warns := log.warnings()
+		// Release before asserting, so a failure does not leave the waiter
+		// blocked in the bubble.
+		unlock()
+		<-acquired
+
+		if len(early) != 0 {
+			t.Fatalf("expected no warning before the interval, got %q", early)
+		}
+		want := `still waiting after 2m0s for apply by "alice" to record its results, which has held the lock on this pull request for 2m0s`
+		if len(warns) != 1 || warns[0] != want {
+			t.Fatalf("expected warning %q, got %q", want, warns)
+		}
+		if len(locker.locks) != 0 {
+			t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
+		}
+	})
+}
+
 func TestPullResultLockerReleaseIsIdempotent(t *testing.T) {
 	var locker pullResultLocker
 	log := logging.NewNoopLogger(t)
-	unlock := locker.lock(log, "owner/repo", 1)
+	unlock := locker.lock(log, "owner/repo", 1, "test")
 	unlock()
 	unlock()
 
 	if len(locker.locks) != 0 {
 		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
 	}
-	locker.lock(log, "owner/repo", 1)()
+	locker.lock(log, "owner/repo", 1, "test")()
 }

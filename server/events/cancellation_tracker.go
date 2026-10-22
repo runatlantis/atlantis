@@ -16,23 +16,25 @@ import (
 // commands that started before it: each command takes a Mark when it starts
 // and passes it to IsCancelled.
 type CancellationTracker interface {
-	// Cancel cancels every command on the pull request that took its mark
-	// before this call.
+	// Cancel makes every command on the pull request that took its mark
+	// before this call skip work it has not started. Commands check
+	// IsCancelled between execution order groups and before each queued
+	// parallel project, so work already running finishes.
 	Cancel(pull models.PullRequest)
 	// Mark returns a value identifying the cancels issued so far.
 	Mark() uint64
 	// IsCancelled reports whether the pull request was cancelled after since
 	// was returned by Mark.
 	IsCancelled(pull models.PullRequest, since uint64) bool
-	// Clear forgets cancels for the pull request (called when a PR is closed).
-	Clear(pull models.PullRequest)
 }
 
 type DefaultCancellationTracker struct {
 	mutex sync.RWMutex
 	// seq increases with every Cancel, across all pull requests.
 	seq uint64
-	// cancelledAt holds the seq of each pull request's latest Cancel.
+	// cancelledAt holds the seq of each pull request's latest Cancel. It keeps
+	// one entry per cancelled or closed pull request until restart: dropping
+	// an entry would un-cancel commands still running on that pull request.
 	cancelledAt map[string]uint64
 }
 
@@ -64,13 +66,6 @@ func (p *DefaultCancellationTracker) IsCancelled(pull models.PullRequest, since 
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 	return p.cancelledAt[pullKey(pull)] > since
-}
-
-// Clear removes cancellation for a pull request (called when a PR is closed)
-func (p *DefaultCancellationTracker) Clear(pull models.PullRequest) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	delete(p.cancelledAt, pullKey(pull))
 }
 
 func pullKey(pull models.PullRequest) string {

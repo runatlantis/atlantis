@@ -123,9 +123,10 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		logger.Err("deleting pull from db: %s", err)
 	}
 
-	// Clear any operations to avoid unbounded growth.
+	// Cancel commands still running on the pull request, so they do not
+	// start more work in the working dirs deleted above.
 	if p.CancellationTracker != nil {
-		p.CancellationTracker.Clear(pull)
+		p.CancellationTracker.Cancel(pull)
 	}
 
 	// If there are no locks then there's no need to comment.

@@ -33,14 +33,6 @@ func (mock *MockCancellationTracker) Cancel(pull models.PullRequest) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Cancel", _params, []reflect.Type{})
 }
 
-func (mock *MockCancellationTracker) Clear(pull models.PullRequest) {
-	if mock == nil {
-		panic("mock must not be nil. Use myMock := NewMockCancellationTracker().")
-	}
-	_params := []pegomock.Param{pull}
-	pegomock.GetGenericMockFrom(mock).Invoke("Clear", _params, []reflect.Type{})
-}
-
 func (mock *MockCancellationTracker) IsCancelled(pull models.PullRequest, since uint64) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCancellationTracker().")
@@ -125,35 +117,6 @@ func (c *MockCancellationTracker_Cancel_OngoingVerification) GetCapturedArgument
 }
 
 func (c *MockCancellationTracker_Cancel_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
-	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
-	if len(_params) > 0 {
-		if len(_params) > 0 {
-			_param0 = make([]models.PullRequest, len(c.methodInvocations))
-			for u, param := range _params[0] {
-				_param0[u] = param.(models.PullRequest)
-			}
-		}
-	}
-	return
-}
-
-func (verifier *VerifierMockCancellationTracker) Clear(pull models.PullRequest) *MockCancellationTracker_Clear_OngoingVerification {
-	_params := []pegomock.Param{pull}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Clear", _params, verifier.timeout)
-	return &MockCancellationTracker_Clear_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
-}
-
-type MockCancellationTracker_Clear_OngoingVerification struct {
-	mock              *MockCancellationTracker
-	methodInvocations []pegomock.MethodInvocation
-}
-
-func (c *MockCancellationTracker_Clear_OngoingVerification) GetCapturedArguments() models.PullRequest {
-	pull := c.GetAllCapturedArguments()
-	return pull[len(pull)-1]
-}
-
-func (c *MockCancellationTracker_Clear_OngoingVerification) GetAllCapturedArguments() (_param0 []models.PullRequest) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {

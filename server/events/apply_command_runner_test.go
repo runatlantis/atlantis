@@ -1908,7 +1908,12 @@ func TestApplyCommandRunner_TargetedAppliesForDifferentWorkspacesRunInParallel(t
 			applyCommandRunner.Run(ctxs[ws], cmds[ws])
 		})
 	}
-	wg.Wait()
+	allDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(allDone)
+	}()
+	waitClosed(t, allDone, "both applies to finish")
 
 	for _, ws := range workspaces {
 		Assert(t, !ctxs[ws].CommandHasErrors, "expected apply for workspace %s to succeed", ws)
@@ -1980,18 +1985,15 @@ func TestApplyCommandRunner_TargetedApplyBlocksWhileProjectInSameDirectoryApplie
 		defer close(stagingDone)
 		applyCommandRunner.Run(stagingCtx, stagingCmd)
 	}()
-	select {
-	case <-stagingStarted:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for the staging apply to start")
-	}
-	applyCommandRunner.Run(productionCtx, productionCmd)
+	waitClosed(t, stagingStarted, "the staging apply to start")
+	productionDone := make(chan struct{})
+	go func() {
+		defer close(productionDone)
+		applyCommandRunner.Run(productionCtx, productionCmd)
+	}()
+	waitClosed(t, productionDone, "the production apply to be rejected")
 	close(releaseStaging)
-	select {
-	case <-stagingDone:
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for the staging apply to finish")
-	}
+	waitClosed(t, stagingDone, "the staging apply to finish")
 
 	Assert(t, productionCtx.CommandHasErrors, "expected the apply of a project in the same directory to be rejected")
 	Assert(t, !stagingCtx.CommandHasErrors, "expected the staging apply to succeed")
@@ -2040,8 +2042,9 @@ func TestApplyCommandRunner_ApplyClaimsSharedDirectoryOnce(t *testing.T) {
 }
 
 // Plans record results without the result lock, so an apply must still hold
-// the pull lock while it records its own.
-func TestApplyCommandRunner_HoldsPullLockWhileRecordingResults(t *testing.T) {
+// the pull lock while it records its own. It must also hold its directory
+// claims, or another apply could run there before these results are recorded.
+func TestApplyCommandRunner_HoldsPullLockAndClaimsWhileRecordingResults(t *testing.T) {
 	for _, cmd := range []*events.CommentCommand{
 		{Name: command.Apply, Workspace: "daily-1"},
 		{Name: command.Apply},
@@ -2084,6 +2087,8 @@ func TestApplyCommandRunner_HoldsPullLockWhileRecordingResults(t *testing.T) {
 			}
 			_, err := locker.TryLockPull(repoFullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
 			ErrContains(t, "currently locked by \"apply\"", err)
+			_, err = locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-1", ".", events.WorkingDirLockMetadata{})
+			ErrContains(t, "currently locked for this pull request by \"apply\"", err)
 			close(database.releaseWrite)
 			select {
 			case <-done:
@@ -2397,9 +2402,9 @@ func (d *gatedResultsDB) GetPullStatus(pull models.PullRequest) (*models.PullSta
 	return d.Database.GetPullStatus(pull)
 }
 
-// Every exit after an apply takes the pull lock must release the pull lock and
-// any directory claims, including exits on errors. Exits before the claims are
-// taken check that none leaked anyway.
+// Every exit after an apply takes the pull lock must release the pull lock,
+// any directory claims and the result lock, including exits on errors. Exits
+// before the claims are taken check that none leaked anyway.
 func TestApplyCommandRunner_ReleasesLocksOnErrorExits(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -2470,8 +2475,26 @@ func TestApplyCommandRunner_ReleasesLocksOnErrorExits(t *testing.T) {
 					Ok(t, err)
 					unlockClaim()
 				}
+				// A leaked result lock would leave the next apply waiting.
+				nextCtx := *ctx
+				nextCtx.CommandHasErrors = false
+				nextDone := make(chan struct{})
+				go func() {
+					defer close(nextDone)
+					applyCommandRunner.Run(&nextCtx, cmd)
+				}()
+				waitClosed(t, nextDone, "the next apply to finish")
 			})
 		}
+	}
+}
+
+func waitClosed(t *testing.T, done <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
 	}
 }
 

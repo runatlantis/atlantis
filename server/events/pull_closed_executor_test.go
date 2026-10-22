@@ -126,9 +126,10 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
-// Commands no longer clear the cancellation tracker when they finish, so
-// closing the pull request is what forgets its cancels.
-func TestCleanUpPullClearsCancellations(t *testing.T) {
+// Closing a pull request deletes its working dirs, so commands still running
+// on it must skip work they have not started, including ones already
+// cancelled.
+func TestCleanUpPullCancelsRunningCommands(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	RegisterMockTestingT(t)
 	ctrl := gomock.NewController(t)
@@ -146,13 +147,17 @@ func TestCleanUpPullClearsCancellations(t *testing.T) {
 		Database:            db,
 		CancellationTracker: tracker,
 	}
+	cancelledCommand := tracker.Mark()
 	tracker.Cancel(testdata.Pull)
+	runningCommand := tracker.Mark()
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 
 	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 
 	Ok(t, err)
-	Assert(t, !tracker.IsCancelled(testdata.Pull, 0), "expected closing the pull request to forget its cancels")
+	Assert(t, tracker.IsCancelled(testdata.Pull, cancelledCommand), "expected a cancelled command to stay cancelled after the pull request closes")
+	Assert(t, tracker.IsCancelled(testdata.Pull, runningCommand), "expected closing the pull request to cancel commands running on it")
+	Assert(t, !tracker.IsCancelled(testdata.Pull, tracker.Mark()), "expected commands after the close, such as on a reopened pull request, to run")
 }
 
 func TestCleanUpPullComments(t *testing.T) {

@@ -141,8 +141,10 @@ type DefaultCommandRunner struct {
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
 	// CancellationTracker stamps each command with the cancels issued before
 	// it arrived, so `atlantis cancel` skips the remaining work only of
-	// commands already running. Work in progress runs to completion.
-	CancellationTracker CancellationTracker
+	// commands already running. Work in progress runs to completion. Without
+	// it every command gets mark 0, so one cancel would stop every later
+	// command on the pull request.
+	CancellationTracker CancellationTracker `validate:"required"`
 }
 
 func (c *DefaultCommandRunner) cancellationMark() uint64 {

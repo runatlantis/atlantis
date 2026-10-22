@@ -137,8 +137,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if a.workingDirLocker != nil {
 		lockPull := a.workingDirLocker.TryLockPull
 		if cmd.IsForSpecificProject() {
-			// Targeted applies share the pull lock so different projects can
-			// apply in parallel. Each project is claimed once resolved below.
+			// Targeted applies share the pull lock so projects in different
+			// directories or workspaces can apply in parallel. Each project's
+			// workspace and directory is claimed once resolved below.
 			lockPull = a.workingDirLocker.TryLockPullShared
 		}
 		unlockPullApply, err = lockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
@@ -221,7 +222,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		if !a.silenceVCSStatusNoProjects {
 			// A parallel targeted apply may have recorded results since this
 			// command read the plan status.
-			unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
+			unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num, resultLockHolder(ctx, cmd))
 			defer unlockResults()
 			if err := a.refreshPullStatus(ctx, pull); err != nil {
 				// This apply changed nothing, so leave the status as it is.
@@ -294,9 +295,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	// so each works from the others' recorded results. Keep holding the pull
 	// lock here: plans record results without this lock, and the pull lock
 	// keeps them out. Lock order is pull lock, directory claims, then this
-	// lock. Nothing below takes a working dir lock, so holders cannot
-	// deadlock.
-	unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
+	// lock. It is the only lock here that waits, and it is not reentrant, so
+	// nothing below may take it again.
+	unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num, resultLockHolder(ctx, cmd))
 	defer unlockResults()
 
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
@@ -565,6 +566,14 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	}
 }
 
+// resultLockHolder describes an apply for the wait logs of other applies.
+func resultLockHolder(ctx *command.Context, cmd *CommentCommand) string {
+	if !cmd.IsForSpecificProject() {
+		return fmt.Sprintf("apply by %q", ctx.User.Username)
+	}
+	return fmt.Sprintf("apply by %q of project %q, dir %q, workspace %q", ctx.User.Username, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace)
+}
+
 // pullResultLocker serializes, per pull request, the part of an apply that
 // records results: the DB write, the combined commit status and automerge. It
 // is in-process only and does not coordinate Atlantis replicas. Its zero value
@@ -579,16 +588,27 @@ type pullResultKey struct {
 	pullNum      int
 }
 
+// pullResultLock fields other than sem are guarded by pullResultLocker.mutex.
 type pullResultLock struct {
-	sync.Mutex
+	// sem holds a token while a caller holds the lock. A channel lets waiters
+	// wake up to log who they are waiting for.
+	sem chan struct{}
 	// refs counts holders and waiters so the entry is dropped once unused.
 	refs int
+	// holder and heldSince describe the current holder for waiters' logs.
+	holder    string
+	heldSince time.Time
 }
 
-// lock blocks until no other apply on this pull request holds the lock. The
-// holder makes VCS calls, so lock logs when it has to wait. The returned
+// resultLockWaitWarnInterval is how often a waiter warns while another apply
+// holds the lock. The holder makes VCS calls, which can hang, and atlantis
+// cancel cannot release this lock.
+const resultLockWaitWarnInterval = 2 * time.Minute
+
+// lock blocks until no other apply on this pull request holds the lock.
+// holder describes the caller in other callers' wait logs. The returned
 // release is safe to call more than once.
-func (l *pullResultLocker) lock(log logging.SimpleLogging, repoFullName string, pullNum int) func() {
+func (l *pullResultLocker) lock(log logging.SimpleLogging, repoFullName string, pullNum int, holder string) func() {
 	key := pullResultKey{repoFullName: repoFullName, pullNum: pullNum}
 	l.mutex.Lock()
 	if l.locks == nil {
@@ -596,27 +616,58 @@ func (l *pullResultLocker) lock(log logging.SimpleLogging, repoFullName string, 
 	}
 	entry, ok := l.locks[key]
 	if !ok {
-		entry = &pullResultLock{}
+		entry = &pullResultLock{sem: make(chan struct{}, 1)}
 		l.locks[key] = entry
 	}
 	entry.refs++
 	l.mutex.Unlock()
 
-	if !entry.TryLock() {
-		log.Info("waiting for another apply on this pull request to record its results")
-		waitStart := time.Now()
-		entry.Lock()
-		log.Info("waited %s for another apply on this pull request to record its results", time.Since(waitStart).Round(time.Millisecond))
+	select {
+	case entry.sem <- struct{}{}:
+	default:
+		l.wait(log, entry)
 	}
+	l.mutex.Lock()
+	entry.holder = holder
+	entry.heldSince = time.Now()
+	l.mutex.Unlock()
 	return sync.OnceFunc(func() {
-		entry.Unlock()
 		l.mutex.Lock()
 		defer l.mutex.Unlock()
+		entry.holder = ""
+		<-entry.sem
 		entry.refs--
 		if entry.refs == 0 {
 			delete(l.locks, key)
 		}
 	})
+}
+
+// wait blocks until the caller takes entry's token, warning at intervals with
+// the holder's description.
+func (l *pullResultLocker) wait(log logging.SimpleLogging, entry *pullResultLock) {
+	log.Info("waiting for another apply on this pull request to record its results")
+	waitStart := time.Now()
+	ticker := time.NewTicker(resultLockWaitWarnInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case entry.sem <- struct{}{}:
+			log.Info("waited %s for another apply on this pull request to record its results", time.Since(waitStart).Round(time.Millisecond))
+			return
+		case <-ticker.C:
+			l.mutex.Lock()
+			holder, heldFor := entry.holder, time.Since(entry.heldSince).Round(time.Second)
+			l.mutex.Unlock()
+			waited := time.Since(waitStart).Round(time.Second)
+			if holder == "" {
+				// The holder has taken the token but not yet recorded itself.
+				log.Warn("still waiting after %s for another apply on this pull request to record its results", waited)
+				continue
+			}
+			log.Warn("still waiting after %s for %s to record its results, which has held the lock on this pull request for %s", waited, holder, heldFor)
+		}
+	}
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")

@@ -24,16 +24,3 @@ func TestCancellationTracker_CancelReachesOnlyEarlierMarks(t *testing.T) {
 	assert.False(t, tracker.IsCancelled(pull, after))
 	assert.False(t, tracker.IsCancelled(otherPull, before))
 }
-
-func TestCancellationTracker_ClearForgetsCancels(t *testing.T) {
-	tracker := events.NewCancellationTracker()
-	pull := models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}}
-
-	before := tracker.Mark()
-	tracker.Cancel(pull)
-	tracker.Clear(pull)
-	assert.False(t, tracker.IsCancelled(pull, before))
-
-	tracker.Cancel(pull)
-	assert.True(t, tracker.IsCancelled(pull, before), "a cancel after Clear must still reach commands that started before it")
-}

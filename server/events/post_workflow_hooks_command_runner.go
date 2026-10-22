@@ -4,6 +4,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -57,9 +58,14 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
-		// The caller discards this error, so log it here. The lock error asks
-		// the reader to retry, which means nothing for a hook, so leave it out.
-		ctx.Log.Warn("skipping post-workflow hooks because another command on this pull request holds the default workspace lock")
+		// The caller discards this error, so log it here. The lock error's
+		// message asks the reader to retry, which means nothing for a hook, so
+		// log only the holder.
+		if lockErr, ok := errors.AsType[*workingDirLockError](err); ok {
+			ctx.Log.Warn("skipping post-workflow hooks because %q holds the default workspace lock on this pull request", lockErr.holder.String())
+		} else {
+			ctx.Log.Warn("skipping post-workflow hooks because the default workspace lock could not be taken: %s", err)
+		}
 		return err
 	}
 	ctx.Log.Debug("got workspace lock")

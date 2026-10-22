@@ -53,7 +53,8 @@ func (c *CancelCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	// Cancel the entire pull request to prevent future execution order groups from running
+	// Cancel commands already running, so they skip work they have not
+	// started. Commands that arrive later are unaffected.
 	defaultRunner.CancellationTracker.Cancel(ctx.Pull)
 
 	// Clean up working directory locks for this pull request
