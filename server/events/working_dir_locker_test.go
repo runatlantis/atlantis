@@ -431,3 +431,49 @@ func TestStaleUnlockAfterUnlockByPullKeepsNewerHolders(t *testing.T) {
 	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
 	ErrContains(t, "currently locked by \"apply\"", err)
 }
+
+func TestStaleUnlockAfterUnlockByPullKeepsNewerExclusiveAndWorkspaceLocks(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+
+	staleUnlockPull, err := locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	staleUnlockWorkspace, err := locker.TryLock(repo, 1, workspace, path, projectName, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	locker.UnlockByPull(repo, 1)
+
+	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	_, err = locker.TryLock(repo, 1, workspace, path, projectName, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	staleUnlockPull()
+	staleUnlockWorkspace()
+
+	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "currently locked by \"plan\"", err)
+	_, err = locker.TryLock(repo, 1, workspace, path, projectName, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "currently locked for this pull request by \"plan\"", err)
+}
+
+// Workspace names such as ".shared-pull" and ".apply-claim" are legal, so
+// workspace locks must not be able to reach the keys of pull-level locks or
+// apply claims.
+func TestWorkspaceLocksDoNotCollideWithReservedLockKeys(t *testing.T) {
+	metadata := events.WorkingDirLockMetadata{}
+	locker := events.NewDefaultWorkingDirLocker()
+
+	// The first shared lock on a new locker has owner 1, so a key built from
+	// the workspace ".shared-pull" and path "1" would spell it.
+	unlockShared, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
+	Ok(t, err)
+	unlockWorkspace, err := locker.TryLock(repo, 1, ".shared-pull", "1", "", command.Apply, metadata)
+	Ok(t, err)
+	unlockWorkspace()
+	_, err = locker.TryLockPull(repo, 1, command.Plan, metadata)
+	ErrContains(t, "currently locked by \"apply\"", err)
+	unlockShared()
+
+	_, err = locker.TryLock(repo, 1, ".apply-claim", workspace+"/"+path, projectName, command.Apply, metadata)
+	Ok(t, err)
+	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, metadata)
+	Ok(t, err)
+}

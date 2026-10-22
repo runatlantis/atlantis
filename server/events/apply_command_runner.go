@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 func NewApplyCommandRunner(
@@ -219,11 +221,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		if !a.silenceVCSStatusNoProjects {
 			// A parallel targeted apply may have recorded results since this
 			// command read the plan status.
-			unlockResults := a.resultLocker.lock(baseRepo.FullName, pull.Num)
+			unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
 			defer unlockResults()
 			if err := a.refreshPullStatus(ctx, pull); err != nil {
-				ctx.Log.Warn("not publishing no-project apply status because fetching current plan status failed: %s", err)
+				ctx.Log.Err("fetching current plan status: %s", err)
 				ctx.CommandHasErrors = true
+				if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+					ctx.Log.Warn("unable to update commit status: %s", statusErr)
+				}
 				return
 			}
 			currentPull := applyPullWithLiveIdentity(pull, livePull)
@@ -288,8 +293,10 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	// Targeted applies on this pull request can finish together. Record
 	// results, publish the combined status and automerge one apply at a time
-	// so each works from the others' recorded results.
-	unlockResults := a.resultLocker.lock(baseRepo.FullName, pull.Num)
+	// so each works from the others' recorded results. Lock order is pull
+	// lock, project claims, then this lock. Nothing below takes a working dir
+	// lock, so holders cannot deadlock.
+	unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
 	defer unlockResults()
 
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
@@ -350,11 +357,11 @@ func (a *ApplyCommandRunner) claimProjects(ctx *command.Context, projectCmds []c
 	}
 	claimed := make(map[applyPlanKey]bool)
 	for _, projectCmd := range projectCmds {
-		key := applyPlanKey{workspace: projectCmd.Workspace, repoRelDir: projectCmd.RepoRelDir, projectName: projectCmd.ProjectName}
+		key := newApplyPlanKey(projectCmd.Workspace, projectCmd.RepoRelDir, projectCmd.ProjectName)
 		if claimed[key] {
 			continue
 		}
-		unlock, err := a.workingDirLocker.TryLockProjectApply(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, projectCmd.Workspace, projectCmd.RepoRelDir, projectCmd.ProjectName, WorkingDirLockMetadataForPull(ctx.Pull))
+		unlock, err := a.workingDirLocker.TryLockProjectApply(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, key.workspace, key.repoRelDir, key.projectName, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			unlockAll()
 			return func() {}, err
@@ -555,8 +562,10 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 	}
 }
 
-// pullResultLocker serializes apply result recording per pull request. Its
-// zero value is ready to use.
+// pullResultLocker serializes, per pull request, the part of an apply that
+// records results: the DB write, the combined commit status and automerge. It
+// is in-process only and does not coordinate Atlantis replicas. Its zero value
+// is ready to use.
 type pullResultLocker struct {
 	mutex sync.Mutex
 	locks map[pullResultKey]*pullResultLock
@@ -573,8 +582,10 @@ type pullResultLock struct {
 	refs int
 }
 
-// lock blocks until no other apply on this pull request holds the lock.
-func (l *pullResultLocker) lock(repoFullName string, pullNum int) func() {
+// lock blocks until no other apply on this pull request holds the lock. The
+// holder makes VCS calls, so lock logs when it has to wait. The returned
+// release is safe to call more than once.
+func (l *pullResultLocker) lock(log logging.SimpleLogging, repoFullName string, pullNum int) func() {
 	key := pullResultKey{repoFullName: repoFullName, pullNum: pullNum}
 	l.mutex.Lock()
 	if l.locks == nil {
@@ -588,8 +599,13 @@ func (l *pullResultLocker) lock(repoFullName string, pullNum int) func() {
 	entry.refs++
 	l.mutex.Unlock()
 
-	entry.Lock()
-	return func() {
+	if !entry.TryLock() {
+		log.Info("waiting for another apply on this pull request to record its results")
+		waitStart := time.Now()
+		entry.Lock()
+		log.Info("waited %s for another apply on this pull request to record its results", time.Since(waitStart).Round(time.Millisecond))
+	}
+	return sync.OnceFunc(func() {
 		entry.Unlock()
 		l.mutex.Lock()
 		defer l.mutex.Unlock()
@@ -597,7 +613,7 @@ func (l *pullResultLocker) lock(repoFullName string, pullNum int) func() {
 		if entry.refs == 0 {
 			delete(l.locks, key)
 		}
-	}
+	})
 }
 
 // applyAllDisabledComment is posted when apply all commands (i.e. "atlantis apply")

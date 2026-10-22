@@ -473,16 +473,17 @@ func containsCommitStatus(statuses []models.CommitStatus, expected models.Commit
 
 func TestPullResultLockerSerializesPerPull(t *testing.T) {
 	var locker pullResultLocker
-	unlock := locker.lock("owner/repo", 1)
+	log := logging.NewNoopLogger(t)
+	unlock := locker.lock(log, "owner/repo", 1)
 
 	acquired := make(chan struct{})
 	go func() {
-		locker.lock("owner/repo", 1)()
+		locker.lock(log, "owner/repo", 1)()
 		close(acquired)
 	}()
 
 	// A different pull request does not wait.
-	locker.lock("owner/repo", 2)()
+	locker.lock(log, "owner/repo", 2)()
 	select {
 	case <-acquired:
 		t.Fatal("expected a second lock on the same pull request to wait")
@@ -498,4 +499,17 @@ func TestPullResultLockerSerializesPerPull(t *testing.T) {
 	if len(locker.locks) != 0 {
 		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
 	}
+}
+
+func TestPullResultLockerReleaseIsIdempotent(t *testing.T) {
+	var locker pullResultLocker
+	log := logging.NewNoopLogger(t)
+	unlock := locker.lock(log, "owner/repo", 1)
+	unlock()
+	unlock()
+
+	if len(locker.locks) != 0 {
+		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
+	}
+	locker.lock(log, "owner/repo", 1)()
 }

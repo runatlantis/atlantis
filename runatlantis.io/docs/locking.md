@@ -15,7 +15,13 @@ Only the directory in the repo and Terraform workspace are locked, not the whole
 
 Atlantis also checks the global apply lock before running `atlantis apply`. If Atlantis cannot reach the lock backend while checking that global lock, it fails closed and rejects the apply until the backend is reachable again.
 
-Within one pull request, `atlantis plan` and an untargeted `atlantis apply` run one at a time. Targeted applies (`-p`, `-d` or `-w`) of different projects can run at the same time, such as `atlantis apply -w staging` and `atlantis apply -w qa`. A second apply of a project that is already being applied is rejected until the first one finishes.
+Within one pull request, `atlantis plan` and an untargeted `atlantis apply` do not run alongside another plan or apply. Atlantis rejects the second command rather than queueing it, so comment it again once the first one finishes. Targeted applies (`-p`, `-d` or `-w`) of different projects can run at the same time, such as `atlantis apply -w staging` and `atlantis apply -w qa`. A second apply of a project that is already being applied is rejected.
+
+Targeted applies can still reject each other in these cases:
+
+- Two targeted applies in the same workspace briefly lock that workspace while Atlantis prepares them. An apply of a project at the repository root holds that lock for its whole run.
+- With [pre-workflow hooks](pre-workflow-hooks.md), each command locks the default workspace while its hooks run. A command that arrives meanwhile skips its pre-workflow hooks, or fails if [`--fail-on-pre-workflow-hook-error`](server-configuration.md#fail-on-pre-workflow-hook-error) is set.
+- With [post-workflow hooks](post-workflow-hooks.md), a command that finishes while another command's post-workflow hooks run skips its own post-workflow hooks.
 
 ## Why
 

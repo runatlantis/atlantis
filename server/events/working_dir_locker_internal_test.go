@@ -5,6 +5,7 @@
 package events
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -201,5 +202,51 @@ func TestTryLockPullSelectsActiveProjectJobs(t *testing.T) {
 				t.Fatalf("unexpected lock error message: %s", lockErr)
 			}
 		})
+	}
+}
+
+func TestTryLockProjectApplyConflictUsesRunningJobURL(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	claim := WorkingDirLockMetadata{HeadCommit: "owner-sha", CommitURL: "owner-commit"}
+	_, err := locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Before the claim holder starts the project there is no job to link.
+	_, err = locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", WorkingDirLockMetadata{})
+	lockErr, ok := err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != claim {
+		t.Fatalf("expected claim metadata %#v, got %#v", claim, lockErr.metadata)
+	}
+
+	running := claim
+	running.JobURL = "owner-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, running); err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", WorkingDirLockMetadata{})
+	lockErr, ok = err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != running {
+		t.Fatalf("expected running job metadata %#v, got %#v", running, lockErr.metadata)
+	}
+}
+
+func TestTryLockPullSharedRefusesToOverwriteALock(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	key := fmt.Sprintf("%s%d", locker.sharedPullKeyPrefix("owner/repo", 1), locker.ownerSeq+1)
+	locker.locks[key] = workingDirLock{Command: command.Version, owner: 99}
+
+	if _, err := locker.TryLockPullShared("owner/repo", 1, command.Apply, WorkingDirLockMetadata{}); err == nil {
+		t.Fatal("expected an error when the shared lock key is already held")
+	}
+	if locker.locks[key].owner != 99 {
+		t.Fatalf("expected the existing lock to be kept, got %#v", locker.locks[key])
 	}
 }

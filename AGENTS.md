@@ -83,6 +83,8 @@
 
 **Apply locks:** Global apply lock check errors must reject `atlantis apply`, set the command as errored, update the apply status to failed, and comment that the lock backend must be reachable. Do not fall back to allowing applies when the lock backend is unavailable.
 
+**Locks within a pull request:** Plan and untargeted apply take the exclusive `TryLockPull`. Targeted apply takes `TryLockPullShared`, then claims each resolved project with `TryLockProjectApply` until its results are recorded, and records results, the combined status and automerge under the per-pull `pullResultLocker`. Keep that lock order. Pull-level lock and claim keys start with `$`, which workspace names cannot contain, so workspace locks cannot collide with them. Several commands can run on one pull request, so `atlantis cancel` is scoped with `CancellationTracker.Mark`; do not clear the tracker when a command finishes.
+
 **Plan statistics:** `models.NewPlanSuccessStats` parses Terraform/OpenTofu summary lines including `to forget`. Preserve import/add/change/destroy/forget counts when changing plan rendering or parser regexes.
 
 **GitHub App merge checkout:** In `server/events/working_dir.go`, `CheckoutMerge` with `GithubAppEnabled` and a PR number fetches `pull/<n>/head` from `origin` and intentionally skips the `source` remote. Preserve this fork-safe behavior when changing clone, fetch, or divergence logic.

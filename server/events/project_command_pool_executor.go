@@ -40,6 +40,7 @@ func runProjectCmdsParallel(
 	poolSize int,
 	cancellationTracker CancellationTracker,
 	pull models.PullRequest,
+	cancellationMark uint64,
 ) command.Result {
 	var results []command.ProjectResult
 	mux := &sync.Mutex{}
@@ -48,14 +49,14 @@ func runProjectCmdsParallel(
 	cancelledAt := -1
 
 	for i, pCmd := range cmds {
-		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
+		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull, cancellationMark) {
 			cancelledAt = i
 			break
 		}
 
 		wg.Add()
 
-		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull) {
+		if cancellationTracker != nil && cancellationTracker.IsCancelled(pull, cancellationMark) {
 			// because wg.Add() is a blocking call, we check for cancellation again after it returns
 			// to avoid waiting for another goroutine to finish before we can exit early.
 			// see used sizedwaitgroup package:
@@ -196,7 +197,7 @@ func runProjectCmdsParallelGroups(
 	var results []command.ProjectResult
 	groups := splitByExecutionOrderGroup(cmds)
 	for _, group := range groups {
-		res := runProjectCmdsParallel(group, runnerFunc, poolSize, cancellationTracker, ctx.Pull)
+		res := runProjectCmdsParallel(group, runnerFunc, poolSize, cancellationTracker, ctx.Pull, ctx.CancellationMark)
 		results = append(results, res.ProjectResults...)
 		if res.HasErrors() && group[0].AbortOnExecutionOrderFail {
 			ctx.Log.Info("abort on execution order when failed")
@@ -219,14 +220,13 @@ func runProjectCmdsWithCancellationTracker(
 		ctx.Log.Info("Running commands in parallel")
 	}
 
+	// The tracker is not cleared here: other commands on this pull request
+	// may still be running and must keep seeing the cancel.
 	groups := prepareExecutionGroups(projectCmds, isParallel)
-	if cancellationTracker != nil {
-		defer cancellationTracker.Clear(ctx.Pull)
-	}
 
 	var results []command.ProjectResult
 	for i, group := range groups {
-		if i > 0 && cancellationTracker != nil && cancellationTracker.IsCancelled(ctx.Pull) {
+		if i > 0 && cancellationTracker != nil && cancellationTracker.IsCancelled(ctx.Pull, ctx.CancellationMark) {
 			ctx.Log.Info("Skipping execution order group %d and all subsequent groups due to cancellation", group[0].ExecutionOrderGroup)
 			results = append(results, createCancelledResults(groups[i:])...)
 			break
@@ -234,7 +234,7 @@ func runProjectCmdsWithCancellationTracker(
 
 		var groupResult command.Result
 		if isParallel && len(group) > 1 {
-			groupResult = runProjectCmdsParallel(group, runnerFunc, parallelPoolSize, cancellationTracker, ctx.Pull)
+			groupResult = runProjectCmdsParallel(group, runnerFunc, parallelPoolSize, cancellationTracker, ctx.Pull, ctx.CancellationMark)
 		} else {
 			groupResult = runProjectCmds(group, runnerFunc)
 		}

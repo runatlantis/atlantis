@@ -1040,6 +1040,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		CancellationTracker:            cancellationTracker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {

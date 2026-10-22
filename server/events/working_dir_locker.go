@@ -39,15 +39,15 @@ func (e *workingDirLockError) Error() string {
 type workingDirLock struct {
 	Command command.Name
 	WorkingDirLockMetadata
-	// owner identifies a shared pull lock or apply claim holder. It is zero for
-	// other locks.
+	// owner identifies the holder, so only its own release deletes the lock.
 	owner uint64
 }
 
 type WorkingDirLocker interface {
 	// TryLockPull tries to acquire an exclusive pull-level lock for a command. It
 	// is used to coordinate commands that can make pull-wide plan state
-	// inconsistent, and conflicts with every other pull-level lock.
+	// inconsistent. It conflicts with every other pull-level lock and with
+	// in-flight plans.
 	TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLockPullShared tries to acquire a pull-level lock that other shared
 	// holders can hold at the same time. Targeted apply uses it so applies of
@@ -56,7 +56,8 @@ type WorkingDirLocker interface {
 	TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLockProjectApply claims a project for an apply command until the
 	// command has recorded its results, so applies sharing the pull lock cannot
-	// apply the same project. It does not conflict with TryLock.
+	// apply the same project. Callers must already hold a pull-level lock. It
+	// does not conflict with TryLock.
 	TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
@@ -76,8 +77,8 @@ type DefaultWorkingDirLocker struct {
 	mutex sync.Mutex
 	// locks is a map of workspaces and their owning command metadata.
 	locks map[string]workingDirLock
-	// ownerSeq gives each shared pull lock and apply claim holder its own owner,
-	// so a release after UnlockByPull cannot drop a newer holder's lock.
+	// ownerSeq gives each lock holder its own owner, so a release after
+	// UnlockByPull cannot drop a newer holder's lock.
 	ownerSeq uint64
 }
 
@@ -94,10 +95,7 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	if currentLock, exists := d.locks[workspaceKey]; exists {
 		return func() {}, workspaceLockError(cmdName, workspace, path, currentLock)
 	}
-	d.locks[workspaceKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
-	return func() {
-		d.unlock(repoFullName, pullNum, workspace, path, projectName)
-	}, nil
+	return d.lockOwned(workspaceKey, d.nextOwner(), cmdName, metadata), nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -110,10 +108,7 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	if currentLock, exists := d.findSharedPullLock(repoFullName, pullNum); exists {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	d.locks[d.pullKey(repoFullName, pullNum)] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
-	return func() {
-		d.unlockPull(repoFullName, pullNum)
-	}, nil
+	return d.lockOwned(d.pullKey(repoFullName, pullNum), d.nextOwner(), cmdName, metadata), nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -123,13 +118,13 @@ func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum
 	if err := d.pullLockConflict(repoFullName, pullNum, cmdName, metadata); err != nil {
 		return func() {}, err
 	}
-	d.ownerSeq++
-	owner := d.ownerSeq
+	owner := d.nextOwner()
 	sharedKey := fmt.Sprintf("%s%d", d.sharedPullKeyPrefix(repoFullName, pullNum), owner)
-	d.locks[sharedKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: owner}
-	return func() {
-		d.unlockOwned(sharedKey, owner)
-	}, nil
+	if currentLock, exists := d.locks[sharedKey]; exists {
+		// Unreachable while reserved keys stay outside the workspace key space.
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+	}
+	return d.lockOwned(sharedKey, owner, cmdName, metadata), nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata WorkingDirLockMetadata) (func(), error) {
@@ -138,14 +133,29 @@ func (d *DefaultWorkingDirLocker) TryLockProjectApply(repoFullName string, pullN
 
 	claimKey := d.applyClaimKey(repoFullName, pullNum, workspace, path, projectName)
 	if currentLock, exists := d.locks[claimKey]; exists {
+		// The claim holder has no job URL. While it applies the project, the
+		// project runner's lock carries the job URL.
+		if runningLock, running := d.locks[d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)]; running && runningLock.JobURL != "" {
+			currentLock.JobURL = runningLock.JobURL
+		}
 		return func() {}, workspaceLockError(command.Apply, workspace, path, currentLock)
 	}
+	return d.lockOwned(claimKey, d.nextOwner(), command.Apply, metadata), nil
+}
+
+// nextOwner returns a new lock owner. The caller must hold d.mutex.
+func (d *DefaultWorkingDirLocker) nextOwner() uint64 {
 	d.ownerSeq++
-	owner := d.ownerSeq
-	d.locks[claimKey] = workingDirLock{Command: command.Apply, WorkingDirLockMetadata: metadata, owner: owner}
+	return d.ownerSeq
+}
+
+// lockOwned stores a lock for owner and returns a release that deletes the
+// lock only while owner still holds it. The caller must hold d.mutex.
+func (d *DefaultWorkingDirLocker) lockOwned(key string, owner uint64, cmdName command.Name, metadata WorkingDirLockMetadata) func() {
+	d.locks[key] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: owner}
 	return func() {
-		d.unlockOwned(claimKey, owner)
-	}, nil
+		d.unlockOwned(key, owner)
+	}
 }
 
 // pullLockConflict returns an error when an exclusive pull lock or an
@@ -272,22 +282,6 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 	}
 }
 
-// Unlock unlocks the workspace for this pull.
-func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string, projectName string) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
-	delete(d.locks, workspaceKey)
-}
-
-func (d *DefaultWorkingDirLocker) unlockPull(repoFullName string, pullNum int) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	delete(d.locks, d.pullKey(repoFullName, pullNum))
-}
-
 func (d *DefaultWorkingDirLocker) unlockOwned(key string, owner uint64) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -301,16 +295,21 @@ func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace 
 	return strings.TrimRight(fmt.Sprintf("%s%s/%s/%s", d.pullLockPrefix(repo, pull), workspace, path, projectName), "/")
 }
 
+// Pull-level locks and apply claims use reserved keys that start with '$'.
+// valid.ValidateWorkspaceName rejects '$', and a workspace key starts with the
+// workspace name, so no workspace key can collide with a reserved key.
+const reservedKeyMarker = "$"
+
 func (d *DefaultWorkingDirLocker) pullKey(repo string, pull int) string {
-	return d.pullLockPrefix(repo, pull) + ".pull"
+	return d.pullLockPrefix(repo, pull) + reservedKeyMarker + "pull"
 }
 
 func (d *DefaultWorkingDirLocker) sharedPullKeyPrefix(repo string, pull int) string {
-	return d.pullLockPrefix(repo, pull) + ".shared-pull/"
+	return d.pullLockPrefix(repo, pull) + reservedKeyMarker + "shared-pull/"
 }
 
 func (d *DefaultWorkingDirLocker) applyClaimKey(repo string, pull int, workspace string, path string, projectName string) string {
-	return fmt.Sprintf("%s.apply-claim/%s/%s/%s", d.pullLockPrefix(repo, pull), workspace, path, projectName)
+	return fmt.Sprintf("%s%sapply-claim/%s/%s/%s", d.pullLockPrefix(repo, pull), reservedKeyMarker, workspace, path, projectName)
 }
 
 func (d *DefaultWorkingDirLocker) pullLockPrefix(repo string, pull int) string {
