@@ -166,6 +166,7 @@ var testFlags = map[string]any{
 	DisableAutoplanLabelFlag:         "no-auto-plan",
 	DisableAutomergeLabelFlag:        "no-auto-merge",
 	DisableUnlockLabelFlag:           "do-not-unlock",
+	EnableAutoplanLabelFlag:          "auto-plan",
 	EnablePolicyChecksFlag:           false,
 	EnableRegExpCmdFlag:              false,
 	EnableDiffMarkdownFormat:         false,
