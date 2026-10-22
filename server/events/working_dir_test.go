@@ -2699,8 +2699,30 @@ func assertPathMissing(t *testing.T, path string) {
 	Assert(t, os.IsNotExist(err), "expected %q to be deleted, got %v", path, err)
 }
 
+func TestIgnorePlanFiles(t *testing.T) {
+	cloneDir := t.TempDir()
+	t.Setenv("GIT_TEMPLATE_DIR", t.TempDir())
+	runCmd(t, cloneDir, "git", "init")
+	_, err := os.Stat(filepath.Join(cloneDir, ".git", "info"))
+	Assert(t, os.IsNotExist(err), "expected no .git/info with an empty template, got %v", err)
+
+	ignorePlanFiles(t, cloneDir)
+
+	contents, err := os.ReadFile(filepath.Join(cloneDir, ".git", "info", "exclude"))
+	Ok(t, err)
+	Equals(t, "*.tfplan\n", string(contents))
+
+	ignorePlanFiles(t, cloneDir)
+
+	contents, err = os.ReadFile(filepath.Join(cloneDir, ".git", "info", "exclude"))
+	Ok(t, err)
+	Equals(t, "*.tfplan\n", string(contents))
+}
+
 func ignorePlanFiles(t *testing.T, cloneDir string) {
 	t.Helper()
 
-	Ok(t, os.WriteFile(filepath.Join(cloneDir, ".git/info/exclude"), []byte("*.tfplan\n"), 0600))
+	excludePath := filepath.Join(cloneDir, ".git", "info", "exclude")
+	Ok(t, os.MkdirAll(filepath.Dir(excludePath), 0700))
+	Ok(t, os.WriteFile(excludePath, []byte("*.tfplan\n"), 0600))
 }
