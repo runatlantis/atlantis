@@ -1085,7 +1085,13 @@ Lista separada por comas de nombres de estado VCS de otros servicios atlantis.
 Cuando `gh-allow-mergeable-bypass-apply` es true, ignorará status checks
 (p. ej. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
 de otros servicios Atlantis al comprobar si el PR puede fusionarse.
-Actualmente solo implementado para GitHub.
+
+En GitHub, las entradas se comparan con el primer segmento del nombre de un
+check requerido. En Azure DevOps, cada entrada se compara con el `genre` del
+estado de una branch policy (p. ej. `Atlantis Bot/atlantis`) o con su `name`;
+una branch policy bloqueante que coincida no se considera que bloquee el apply,
+lo que permite usarla como una compuerta de fusión solo para humanos junto a
+Atlantis.
 
 ### `--include-git-untracked-files` <Badge text="v0.27.0+" type="info"/>
 
