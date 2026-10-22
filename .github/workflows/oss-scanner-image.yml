@@ -1,0 +1,92 @@
+name: oss-scanner-image
+
+# Anthropic's OSS Scanner builds .oss-scanner/Dockerfile from main with the repository root as
+# context, so a change that breaks this build stops the scanner. Build it the same way here.
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    permissions:
+      contents: read  # for dorny/paths-filter to fetch a list of changed files
+      pull-requests: read  # for dorny/paths-filter to read pull requests
+    outputs:
+      should-run-build: ${{ steps.changes.outputs.src == 'true' }}
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
+        id: changes
+        with:
+          filters: |
+            src:
+              - '.oss-scanner/**'
+              - '.dockerignore'
+              - '**/go.mod'
+              - '**/go.sum'
+              - 'Makefile'
+              - 'testing/**'
+              - '.github/workflows/oss-scanner-image.yml'
+
+  build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'true'
+    name: Build OSS Scanner Image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45  # the scanner's limit for the whole build
+    steps:
+    - name: Harden Runner
+      uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    # Plain docker build, as the scanner runs it: the root .dockerignore stays in place, so this also
+    # checks that .oss-scanner/Dockerfile.dockerignore still overrides it.
+    - name: Build image
+      run: docker build --progress=plain -f .oss-scanner/Dockerfile -t oss-scanner-check .
+
+    # The scanner audits the image with no network, so every module must already be in the cache.
+    - name: Build offline
+      run: |
+        docker run --rm --network=none oss-scanner-check \
+          sh -ec 'go build ./...
+            find . -name go.mod -not -path ./go.mod | while read -r mod; do
+              (cd "$(dirname "$mod")" && go build ./...)
+            done'
+
+  skip-build:
+    needs: [changes]
+    if: needs.changes.outputs.should-run-build == 'false'
+    name: Build OSS Scanner Image
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - run: 'echo "No build required"'
