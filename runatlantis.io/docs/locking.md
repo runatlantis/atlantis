@@ -15,6 +15,20 @@ Only the directory in the repo and Terraform workspace are locked, not the whole
 
 Atlantis also checks the global apply lock before running `atlantis apply`. If Atlantis cannot reach the lock backend while checking that global lock, it fails closed and rejects the apply until the backend is reachable again.
 
+Within one pull request, `atlantis plan` and an untargeted `atlantis apply` do not run alongside another plan or apply. Atlantis rejects the second command rather than queueing it, so comment it again once the first one finishes. Targeted applies (`-p`, `-d` or `-w`) can run at the same time when their projects are in different directories or workspaces, such as `atlantis apply -w staging` and `atlantis apply -w qa`. Projects that share a directory and workspace share it on disk, so an apply of one is rejected while another is being applied, and so is a second apply of the same project.
+
+`atlantis cancel` releases these locks while running commands carry on, so after a cancel a second apply of a project that is still being applied can start. Closing or merging a pull request cancels the commands still running on it, so they skip work they have not started.
+
+Some steps also take the lock on a workspace's root directory (`.`), so they can reject or skip part of another command:
+
+- Preparing a `-d` or `-w` apply takes the root lock briefly, and the apply is rejected if the lock is held. `-p` applies don't take it.
+- Preparing a plan takes the root lock of its workspace while Atlantis clones the repository and finds projects. That is the default workspace for autoplan and for `atlantis plan` without flags. `-p` plans don't take it.
+- Planning or applying an unnamed project at the repository root holds the root lock for that project's whole run.
+- With [pre-workflow hooks](pre-workflow-hooks.md), each command holds the default workspace's root lock while its hooks run. A command that cannot take the lock skips its pre-workflow hooks, or fails if [`--fail-on-pre-workflow-hook-error`](server-configuration.md#fail-on-pre-workflow-hook-error) is set.
+- With [post-workflow hooks](post-workflow-hooks.md), a command that cannot take the default workspace's root lock skips its post-workflow hooks.
+
+So other commands on the pull request skip their hooks while an autoplan or a plan without flags is being prepared, and while an unnamed project at the repository root is planned or applied in the default workspace.
+
 ## Why
 
 1. Because `atlantis apply` is being done before the pull request is merged, after

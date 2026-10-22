@@ -139,6 +139,19 @@ type DefaultCommandRunner struct {
 	TeamAllowlistChecker           command.TeamAllowlistChecker          `validate:"required"`
 	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
+	// CancellationTracker stamps each command with the cancels issued before
+	// it arrived, so `atlantis cancel` skips the remaining work only of
+	// commands already running. Work in progress runs to completion. Without
+	// it every command gets mark 0, so one cancel would stop every later
+	// command on the pull request.
+	CancellationTracker CancellationTracker `validate:"required"`
+}
+
+func (c *DefaultCommandRunner) cancellationMark() uint64 {
+	if c.CancellationTracker == nil {
+		return 0
+	}
+	return c.CancellationTracker.Mark()
 }
 
 // RunAutoplanCommand runs plan and policy_checks when a pull request is opened or updated.
@@ -150,6 +163,7 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 		return
 	}
 	defer c.Drainer.OpDone()
+	cancellationMark := c.cancellationMark()
 
 	log := c.buildLogger(baseRepo.FullName, pull.Num)
 	defer c.logPanics(baseRepo, pull.Num, log)
@@ -184,13 +198,14 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	ctx := &command.Context{
-		User:       user,
-		Log:        log,
-		Scope:      scope,
-		Pull:       pull,
-		HeadRepo:   headRepo,
-		PullStatus: status,
-		Trigger:    command.AutoTrigger,
+		User:             user,
+		Log:              log,
+		Scope:            scope,
+		Pull:             pull,
+		HeadRepo:         headRepo,
+		PullStatus:       status,
+		Trigger:          command.AutoTrigger,
+		CancellationMark: cancellationMark,
 	}
 	if !c.validateCtxAndComment(ctx, command.Autoplan, true) {
 		return
@@ -469,6 +484,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 	defer c.Drainer.OpDone()
+	cancellationMark := c.cancellationMark()
 
 	log := c.buildLogger(baseRepo.FullName, pullNum)
 	defer c.logPanics(baseRepo, pullNum, log)
@@ -503,6 +519,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		PolicySet:            cmd.PolicySet,
 		ClearPolicyApproval:  cmd.ClearPolicyApproval,
 		TeamAllowlistChecker: c.TeamAllowlistChecker,
+		CancellationMark:     cancellationMark,
 	}
 
 	if !c.validateCtxAndComment(ctx, cmd.Name, true) {

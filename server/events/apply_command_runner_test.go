@@ -5,10 +5,14 @@ package events_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
@@ -1841,4 +1845,681 @@ func (a assertApplyLockDB) GetPullStatus(pull models.PullRequest) (*models.PullS
 	*a.called = true
 	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Apply), "expected apply lock during pull status refresh")
 	return a.Database.GetPullStatus(pull)
+}
+
+// Targeted applies for different workspaces of one pull request run in
+// parallel. Each blocks inside its project apply until the other has started.
+func TestApplyCommandRunner_TargetedAppliesForDifferentWorkspacesRunInParallel(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	database := &overlapDetectingDB{Database: newTestBoltDB(t)}
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		plannedProjectResult(".", "daily-1", ""),
+		plannedProjectResult(".", "daily-2", ""),
+	})
+	Ok(t, err)
+
+	workspaces := []string{"daily-1", "daily-2"}
+	started := map[string]chan struct{}{}
+	for _, ws := range workspaces {
+		started[ws] = make(chan struct{})
+	}
+	ctxs := map[string]*command.Context{}
+	cmds := map[string]*events.CommentCommand{}
+	for _, ws := range workspaces {
+		ctxs[ws] = &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+		cmds[ws] = &events.CommentCommand{Name: command.Apply, Workspace: ws}
+	}
+	// Any matchers keep pegomock from deep-comparing a context that the other
+	// apply is mutating.
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
+		ws := params[1].(*events.CommentCommand).Workspace
+		return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply, RepoRelDir: ".", Workspace: ws}}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(params []Param) ReturnValues {
+		ws := params[0].(command.ProjectContext).Workspace
+		other := workspaces[0]
+		if ws == other {
+			other = workspaces[1]
+		}
+		close(started[ws])
+		select {
+		case <-started[other]:
+		case <-time.After(5 * time.Second):
+			t.Errorf("apply for workspace %s did not start while workspace %s was applying", other, ws)
+		}
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	var wg sync.WaitGroup
+	for _, ws := range workspaces {
+		wg.Go(func() {
+			applyCommandRunner.Run(ctxs[ws], cmds[ws])
+		})
+	}
+	allDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(allDone)
+	}()
+	waitClosed(t, allDone, "both applies to finish")
+
+	for _, ws := range workspaces {
+		Assert(t, !ctxs[ws].CommandHasErrors, "expected apply for workspace %s to succeed", ws)
+	}
+	Assert(t, !database.overlapped.Load(), "expected apply results to be recorded one apply at a time")
+	pullStatus, err := database.GetPullStatus(modelPull)
+	Ok(t, err)
+	Equals(t, 2, pullStatus.StatusCount(models.AppliedPlanStatus))
+	_, _, _, statuses, _, counts := commitUpdater.VerifyWasCalled(Times(2)).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]()).GetAllCapturedArguments()
+	Equals(t, 2, len(statuses))
+	Equals(t, models.SuccessCommitStatus, statuses[1])
+	Equals(t, models.ProjectCounts{Success: 2, Total: 2}, counts[1])
+
+	unlock, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlock()
+	// TryLockPull ignores directory claims, so check them separately.
+	for _, ws := range workspaces {
+		unlockClaim, err := locker.TryLockApplyDir(modelPull.BaseRepo.FullName, modelPull.Num, ws, ".", events.WorkingDirLockMetadata{})
+		Ok(t, err)
+		unlockClaim()
+	}
+}
+
+// Projects that share a directory and workspace share it on disk, so a
+// targeted apply of one is rejected while another is applying.
+func TestApplyCommandRunner_TargetedApplyBlocksWhileProjectInSameDirectoryApplies(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	database := newTestBoltDB(t)
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		plannedProjectResult("project1", "default", "project1-staging"),
+		plannedProjectResult("project1", "default", "project1-production"),
+	})
+	Ok(t, err)
+	newCtx := func() *command.Context {
+		return &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+	}
+	stagingCtx, stagingCmd := newCtx(), &events.CommentCommand{Name: command.Apply, ProjectName: "project1-staging"}
+	productionCtx, productionCmd := newCtx(), &events.CommentCommand{Name: command.Apply, ProjectName: "project1-production"}
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
+		name := params[1].(*events.CommentCommand).ProjectName
+		return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply, RepoRelDir: "project1", Workspace: "default", ProjectName: name}}, nil}
+	})
+	stagingStarted := make(chan struct{})
+	releaseStaging := make(chan struct{})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).Then(func(params []Param) ReturnValues {
+		if params[0].(command.ProjectContext).ProjectName == "project1-staging" {
+			close(stagingStarted)
+			<-releaseStaging
+		}
+		return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "applied"}}
+	})
+
+	stagingDone := make(chan struct{})
+	go func() {
+		defer close(stagingDone)
+		applyCommandRunner.Run(stagingCtx, stagingCmd)
+	}()
+	waitClosed(t, stagingStarted, "the staging apply to start")
+	productionDone := make(chan struct{})
+	go func() {
+		defer close(productionDone)
+		applyCommandRunner.Run(productionCtx, productionCmd)
+	}()
+	waitClosed(t, productionDone, "the production apply to be rejected")
+	close(releaseStaging)
+	waitClosed(t, stagingDone, "the staging apply to finish")
+
+	Assert(t, productionCtx.CommandHasErrors, "expected the apply of a project in the same directory to be rejected")
+	Assert(t, !stagingCtx.CommandHasErrors, "expected the staging apply to succeed")
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+	_, _, _, comments, _ := vcsClient.VerifyWasCalled(AtLeast(1)).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+	Assert(t, strings.Contains(comments[0], "the default workspace at path project1 is currently locked for this pull request by \"apply\""), "got comment: %s", comments[0])
+}
+
+// One apply covering several projects in a directory claims the directory
+// once, so it does not reject itself.
+func TestApplyCommandRunner_ApplyClaimsSharedDirectoryOnce(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	database := newTestBoltDB(t)
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+		tc.database = database
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		plannedProjectResult("project1", "default", "project1-staging"),
+		plannedProjectResult("project1", "default", "project1-production"),
+	})
+	Ok(t, err)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
+		{CommandName: command.Apply, RepoRelDir: "project1", Workspace: "default", ProjectName: "project1-staging"},
+		{CommandName: command.Apply, RepoRelDir: "project1", Workspace: "default", ProjectName: "project1-production"},
+	}, nil)
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+
+	Assert(t, !ctx.CommandHasErrors, "expected the apply to succeed")
+	projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
+	unlock, err := locker.TryLockApplyDir(modelPull.BaseRepo.FullName, modelPull.Num, "default", "project1", events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlock()
+}
+
+// Plans record results without the result lock, so an apply must still hold
+// the pull lock while it records its own. It must also hold its directory
+// claims, or another apply could run there before these results are recorded.
+func TestApplyCommandRunner_HoldsPullLockAndClaimsWhileRecordingResults(t *testing.T) {
+	for _, cmd := range []*events.CommentCommand{
+		{Name: command.Apply, Workspace: "daily-1"},
+		{Name: command.Apply},
+	} {
+		t.Run(fmt.Sprintf("targeted=%t", cmd.IsForSpecificProject()), func(t *testing.T) {
+			locker := events.NewDefaultWorkingDirLocker()
+			database := &gatedResultsDB{
+				Database:     newTestBoltDB(t),
+				writeStarted: make(chan struct{}),
+				releaseWrite: make(chan struct{}),
+			}
+			setup(t, func(tc *TestConfig) {
+				tc.workingDirLocker = locker
+				tc.database = database
+			})
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+			repoFullName := modelPull.BaseRepo.FullName
+			ctx := &command.Context{
+				User:     testdata.User,
+				Log:      logging.NewNoopLogger(t),
+				Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+				Pull:     modelPull,
+				HeadRepo: testdata.GithubRepo,
+				Trigger:  command.CommentTrigger,
+			}
+			When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
+				{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-1"},
+			}, nil)
+			When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				applyCommandRunner.Run(ctx, cmd)
+			}()
+			select {
+			case <-database.writeStarted:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for the apply to record its results")
+			}
+			_, err := locker.TryLockPull(repoFullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
+			ErrContains(t, "currently locked by \"apply\"", err)
+			_, err = locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-1", ".", events.WorkingDirLockMetadata{})
+			ErrContains(t, "currently locked for this pull request by \"apply\"", err)
+			close(database.releaseWrite)
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("timed out waiting for the apply to finish")
+			}
+
+			unlock, err := locker.TryLockPull(repoFullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
+			Ok(t, err)
+			unlock()
+		})
+	}
+}
+
+func TestApplyCommandRunner_GenericApplyBlocksWhileTargetedApplyInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	unlockApply, err := locker.TryLockPullShared(modelPull.BaseRepo.FullName, modelPull.Num, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlockApply()
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+
+	applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply})
+
+	Assert(t, ctx.CommandHasErrors, "expected generic apply to fail while a targeted apply is in flight")
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "currently locked by \"apply\""), "got comment: %s", comment)
+}
+
+func TestApplyCommandRunner_TargetedApplyBlocksWhenSameProjectApplyInFlight(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	repoFullName := modelPull.BaseRepo.FullName
+	unlockApply, err := locker.TryLockPullShared(repoFullName, modelPull.Num, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlockClaim, err := locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-1", ".", events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, Workspace: "daily-1"}
+	projectCtx := command.ProjectContext{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-1"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{projectCtx}, nil)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected targeted apply to fail while the same project is being applied")
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	_, _, _, comment, _ := vcsClient.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "the daily-1 workspace at path . is currently locked for this pull request by \"apply\""), "got comment: %s", comment)
+
+	unlockClaim()
+	unlockApply()
+	unlock, err := locker.TryLockPull(repoFullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlock()
+}
+
+func TestApplyCommandRunner_ReleasesClaimsWhenLaterProjectIsClaimed(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	repoFullName := modelPull.BaseRepo.FullName
+	unlockClaim, err := locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-2", ".", events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	defer unlockClaim()
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, Workspace: "daily-1"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{
+		{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-1"},
+		{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-2"},
+	}, nil)
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, ctx.CommandHasErrors, "expected apply to fail when one of its projects is already claimed")
+	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+	unlock, err := locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-1", ".", events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	unlock()
+}
+
+func TestApplyCommandRunner_NoProjectTargetedApplyPublishesCurrentStatus(t *testing.T) {
+	database := newTestBoltDB(t)
+	setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.SilenceNoProjects = true
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		plannedProjectResult(".", "daily-1", ""),
+		plannedProjectResult(".", "daily-2", ""),
+	})
+	Ok(t, err)
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	cmd := &events.CommentCommand{Name: command.Apply, ProjectName: "unowned"}
+	When(projectCommandBuilder.BuildApplyCommands(ctx, cmd)).Then(func([]Param) ReturnValues {
+		// A parallel targeted apply records its result after this command
+		// read the plan status.
+		_, err := database.UpdatePullWithResults(modelPull, []command.ProjectResult{{
+			Command:              command.Apply,
+			RepoRelDir:           ".",
+			Workspace:            "daily-2",
+			ProjectCommandOutput: command.ProjectCommandOutput{ApplySuccess: "applied"},
+		}})
+		Ok(t, err)
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+
+	applyCommandRunner.Run(ctx, cmd)
+
+	Assert(t, !ctx.CommandHasErrors, "expected no-project apply to succeed")
+	_, _, _, status, _, counts := commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]()).GetCapturedArguments()
+	Equals(t, models.PendingCommitStatus, status)
+	Equals(t, models.ProjectCounts{Success: 1, Total: 2}, counts)
+}
+
+// A silenced targeted apply that matches no project publishes the combined
+// status. It must wait while a parallel apply records its results, or it
+// publishes the status from before them.
+func TestApplyCommandRunner_NoProjectTargetedApplyWaitsForParallelResults(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	database := &gatedResultsDB{
+		Database:     newTestBoltDB(t),
+		writeStarted: make(chan struct{}),
+		releaseWrite: make(chan struct{}),
+	}
+	setup(t, func(tc *TestConfig) {
+		tc.workingDirLocker = locker
+		tc.database = database
+		tc.SilenceNoProjects = true
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	_, err := database.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		plannedProjectResult(".", "daily-1", ""),
+		plannedProjectResult(".", "daily-2", ""),
+	})
+	Ok(t, err)
+	newCtx := func() *command.Context {
+		return &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+			Pull:     modelPull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+	}
+	applyCtx, applyCmd := newCtx(), &events.CommentCommand{Name: command.Apply, Workspace: "daily-1"}
+	noProjectCtx, noProjectCmd := newCtx(), &events.CommentCommand{Name: command.Apply, ProjectName: "unowned"}
+	noProjectLog := events.NewResultLockWaitLogger(t)
+	noProjectCtx.Log = noProjectLog
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(params []Param) ReturnValues {
+		if params[1].(*events.CommentCommand).Workspace == "daily-1" {
+			return ReturnValues{[]command.ProjectContext{{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-1"}}, nil}
+		}
+		// Reads from here on are the no-project apply's status refresh.
+		database.watchReads.Store(true)
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{ApplySuccess: "applied"})
+
+	applyDone := make(chan struct{})
+	go func() {
+		defer close(applyDone)
+		applyCommandRunner.Run(applyCtx, applyCmd)
+	}()
+	select {
+	case <-database.writeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the targeted apply to record its results")
+	}
+	noProjectDone := make(chan struct{})
+	go func() {
+		defer close(noProjectDone)
+		applyCommandRunner.Run(noProjectCtx, noProjectCmd)
+	}()
+	select {
+	case <-noProjectLog.Waiting:
+	case <-noProjectDone:
+		t.Fatal("no-project apply finished while a parallel apply was recording its results")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the no-project apply to wait for the parallel apply")
+	}
+	close(database.releaseWrite)
+	for _, done := range []chan struct{}{applyDone, noProjectDone} {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for the applies to finish")
+		}
+	}
+
+	Assert(t, !applyCtx.CommandHasErrors, "expected the targeted apply to succeed")
+	Assert(t, !noProjectCtx.CommandHasErrors, "expected the no-project apply to succeed")
+	Assert(t, !database.readDuringWrite.Load(), "expected the no-project apply to read plan status only after the parallel apply recorded its results")
+	_, _, _, statuses, _, counts := commitUpdater.VerifyWasCalled(Times(2)).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]()).GetAllCapturedArguments()
+	Equals(t, 2, len(statuses))
+	Equals(t, models.PendingCommitStatus, statuses[1])
+	Equals(t, models.ProjectCounts{Success: 1, Total: 2}, counts[1])
+}
+
+// A silenced no-project apply that cannot re-read the plan status changed
+// nothing, so it leaves the commit status as it was and does not comment.
+func TestApplyCommandRunner_NoProjectApplyLeavesStatusWhenRefreshFails(t *testing.T) {
+	database := &failLaterGetPullStatusDB{Database: newTestBoltDB(t), succeed: 1}
+	vcsClient := setup(t, func(tc *TestConfig) {
+		tc.database = database
+		tc.SilenceNoProjects = true
+	})
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+
+	applyCommandRunner.Run(ctx, &events.CommentCommand{Name: command.Apply, ProjectName: "unowned"})
+
+	Assert(t, ctx.CommandHasErrors, "expected the failed plan status refresh to fail the apply")
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+	vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+}
+
+// failLaterGetPullStatusDB serves the first succeed plan status reads and
+// fails the rest.
+type failLaterGetPullStatusDB struct {
+	db.Database
+	succeed int32
+	reads   atomic.Int32
+}
+
+func (d *failLaterGetPullStatusDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	if d.reads.Add(1) > d.succeed {
+		return nil, errors.New("db unavailable")
+	}
+	return d.Database.GetPullStatus(pull)
+}
+
+// gatedResultsDB holds apply result writes open until releaseWrite is closed,
+// and records reads of the plan status made while a write is open once
+// watchReads is set.
+type gatedResultsDB struct {
+	db.Database
+	writeStarted     chan struct{}
+	releaseWrite     chan struct{}
+	writeStartedOnce sync.Once
+	writing          atomic.Bool
+	watchReads       atomic.Bool
+	readDuringWrite  atomic.Bool
+}
+
+func (d *gatedResultsDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	d.writing.Store(true)
+	defer d.writing.Store(false)
+	d.writeStartedOnce.Do(func() { close(d.writeStarted) })
+	<-d.releaseWrite
+	return d.Database.UpdatePullWithResults(pull, results)
+}
+
+func (d *gatedResultsDB) GetPullStatus(pull models.PullRequest) (*models.PullStatus, error) {
+	if d.watchReads.Load() && d.writing.Load() {
+		d.readDuringWrite.Store(true)
+	}
+	return d.Database.GetPullStatus(pull)
+}
+
+// Every exit after an apply takes the pull lock must release the pull lock,
+// any directory claims and the result lock, including exits on errors. Exits
+// before the claims are taken check that none leaked anyway.
+func TestApplyCommandRunner_ReleasesLocksOnErrorExits(t *testing.T) {
+	cases := []struct {
+		name        string
+		failRefresh bool
+		buildErr    error
+		preClaim    bool
+		failWrite   bool
+	}{
+		{name: "plan status refresh fails", failRefresh: true},
+		{name: "command build fails", buildErr: errors.New("build failed")},
+		{name: "a project is already claimed", preClaim: true},
+		{name: "recording results fails", failWrite: true},
+	}
+	for _, tc := range cases {
+		for _, cmd := range []*events.CommentCommand{
+			{Name: command.Apply, Workspace: "daily-1"},
+			{Name: command.Apply},
+		} {
+			t.Run(fmt.Sprintf("%s/targeted=%t", tc.name, cmd.IsForSpecificProject()), func(t *testing.T) {
+				locker := events.NewDefaultWorkingDirLocker()
+				var database db.Database = newTestBoltDB(t)
+				if tc.failRefresh {
+					database = failingGetPullStatusDB{Database: database, err: errors.New("db unavailable")}
+				}
+				if tc.failWrite {
+					database = failingResultsDB{Database: database}
+				}
+				setup(t, func(config *TestConfig) {
+					config.workingDirLocker = locker
+					config.database = database
+				})
+				modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+				repoFullName := modelPull.BaseRepo.FullName
+				if tc.preClaim {
+					unlockClaim, err := locker.TryLockApplyDir(repoFullName, modelPull.Num, "daily-2", ".", events.WorkingDirLockMetadata{})
+					Ok(t, err)
+					defer unlockClaim()
+				}
+				When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{
+					{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-1"},
+					{CommandName: command.Apply, RepoRelDir: ".", Workspace: "daily-2"},
+				}, tc.buildErr)
+				ctx := &command.Context{
+					User:     testdata.User,
+					Log:      logging.NewNoopLogger(t),
+					Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+					Pull:     modelPull,
+					HeadRepo: testdata.GithubRepo,
+					Trigger:  command.CommentTrigger,
+				}
+
+				applyCommandRunner.Run(ctx, cmd)
+
+				if tc.failWrite {
+					projectCommandRunner.VerifyWasCalled(Times(2)).Apply(Any[command.ProjectContext]())
+				} else {
+					projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+				}
+				unlockPull, err := locker.TryLockPull(repoFullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{})
+				Ok(t, err)
+				unlockPull()
+				for _, ws := range []string{"daily-1", "daily-2"} {
+					if tc.preClaim && ws == "daily-2" {
+						// This test holds that claim.
+						continue
+					}
+					unlockClaim, err := locker.TryLockApplyDir(repoFullName, modelPull.Num, ws, ".", events.WorkingDirLockMetadata{})
+					Ok(t, err)
+					unlockClaim()
+				}
+				// A leaked result lock would leave the next apply waiting.
+				nextCtx := *ctx
+				nextCtx.CommandHasErrors = false
+				nextDone := make(chan struct{})
+				go func() {
+					defer close(nextDone)
+					applyCommandRunner.Run(&nextCtx, cmd)
+				}()
+				waitClosed(t, nextDone, "the next apply to finish")
+			})
+		}
+	}
+}
+
+func waitClosed(t *testing.T, done <-chan struct{}, what string) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
+// failingResultsDB fails every apply result write.
+type failingResultsDB struct {
+	db.Database
+}
+
+func (failingResultsDB) UpdatePullWithResults(models.PullRequest, []command.ProjectResult) (models.PullStatus, error) {
+	return models.PullStatus{}, errors.New("db unavailable")
+}
+
+// overlapDetectingDB records whether apply result writes overlap. The sleep
+// widens the window a non-atomic read-modify-write store such as Redis has.
+type overlapDetectingDB struct {
+	db.Database
+	inFlight   atomic.Int32
+	overlapped atomic.Bool
+}
+
+func (d *overlapDetectingDB) UpdatePullWithResults(pull models.PullRequest, results []command.ProjectResult) (models.PullStatus, error) {
+	if d.inFlight.Add(1) > 1 {
+		d.overlapped.Store(true)
+	}
+	defer d.inFlight.Add(-1)
+	time.Sleep(50 * time.Millisecond)
+	return d.Database.UpdatePullWithResults(pull, results)
 }

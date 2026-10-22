@@ -39,7 +39,7 @@ func TestRunProjectCmdsParallel_AllComplete(t *testing.T) {
 		makeProjectContext("p3"),
 	}
 
-	result := runProjectCmdsParallel(cmds, successRunner, 3, nil, models.PullRequest{})
+	result := runProjectCmdsParallel(cmds, successRunner, 3, nil, models.PullRequest{}, 0)
 
 	require.Len(t, result.ProjectResults, 3)
 	assert.False(t, result.HasErrors())
@@ -56,7 +56,7 @@ func TestRunProjectCmdsParallel_CancelledBeforeExecution(t *testing.T) {
 		makeProjectContext("p3"),
 	}
 
-	result := runProjectCmdsParallel(cmds, successRunner, 3, tracker, pull)
+	result := runProjectCmdsParallel(cmds, successRunner, 3, tracker, pull, 0)
 
 	require.Len(t, result.ProjectResults, 3)
 	for _, r := range result.ProjectResults {
@@ -99,7 +99,7 @@ func TestRunProjectCmdsParallel_CancelledWhileExceedingPoolSize(t *testing.T) {
 		}
 		finished := make(chan command.Result, 1)
 		go func() {
-			finished <- runProjectCmdsParallel(cmds, runner, poolSize, tracker, pull)
+			finished <- runProjectCmdsParallel(cmds, runner, poolSize, tracker, pull, 0)
 		}()
 
 		require.ElementsMatch(t, []string{"p1", "p2"}, []string{<-started, <-started})
@@ -507,18 +507,100 @@ func TestRunProjectCmdsWithCancellationTracker_CancelBetweenGroups(t *testing.T)
 	assert.Contains(t, p3Result.Error.Error(), "cancelled")
 }
 
-func TestRunProjectCmdsWithCancellationTracker_ClearsTrackerOnDone(t *testing.T) {
+// A cancel issued while nothing was running must not cancel the next command.
+func TestRunProjectCmdsWithCancellationTracker_IgnoresCancelBeforeCommandArrived(t *testing.T) {
 	tracker := NewCancellationTracker()
 	pull := models.PullRequest{Num: 3}
-	ctx := makeCtx(t, pull)
-
 	tracker.Cancel(pull)
-	assert.True(t, tracker.IsCancelled(pull))
 
-	cmds := []command.ProjectContext{makeProjectContext("p1")}
-	runProjectCmdsWithCancellationTracker(ctx, cmds, tracker, 2, false, successRunner)
+	ctx := makeCtx(t, pull)
+	ctx.CancellationMark = tracker.Mark()
+	cmds := []command.ProjectContext{
+		{CommandName: command.Plan, ProjectName: "p1", RepoRelDir: "p1", Workspace: "default", ExecutionOrderGroup: 0},
+		{CommandName: command.Plan, ProjectName: "p2", RepoRelDir: "p2", Workspace: "default", ExecutionOrderGroup: 1},
+	}
+	result := runProjectCmdsWithCancellationTracker(ctx, cmds, tracker, 2, true, successRunner)
 
-	assert.False(t, tracker.IsCancelled(pull), "tracker should be cleared after execution")
+	require.Len(t, result.ProjectResults, 2)
+	assert.False(t, result.HasErrors())
+}
+
+// The parallel path checks the cancel for each project of a group, so it must
+// use the command's mark too.
+func TestRunProjectCmdsWithCancellationTracker_ParallelGroupIgnoresCancelBeforeCommandArrived(t *testing.T) {
+	tracker := NewCancellationTracker()
+	pull := models.PullRequest{Num: 4}
+	tracker.Cancel(pull)
+
+	ctx := makeCtx(t, pull)
+	ctx.CancellationMark = tracker.Mark()
+	cmds := []command.ProjectContext{
+		{CommandName: command.Plan, ProjectName: "p1", RepoRelDir: "p1", Workspace: "default"},
+		{CommandName: command.Plan, ProjectName: "p2", RepoRelDir: "p2", Workspace: "default"},
+	}
+	result := runProjectCmdsWithCancellationTracker(ctx, cmds, tracker, 2, true, successRunner)
+
+	require.Len(t, result.ProjectResults, 2)
+	assert.False(t, result.HasErrors())
+}
+
+// Two commands on one pull request can run at once, as parallel targeted
+// applies do. One finishing after `atlantis cancel` must not un-cancel the
+// other's remaining execution order groups.
+func TestRunProjectCmdsWithCancellationTracker_FinishingCommandKeepsOtherCommandCancelled(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		tracker := NewCancellationTracker()
+		pull := models.PullRequest{Num: 5}
+		ctxA := makeCtx(t, pull)
+		ctxA.CancellationMark = tracker.Mark()
+		ctxB := makeCtx(t, pull)
+		ctxB.CancellationMark = tracker.Mark()
+
+		started := make(chan string, 3)
+		releaseA := make(chan struct{})
+		releaseB := make(chan struct{})
+		runner := func(cmd command.ProjectContext) command.ProjectCommandOutput {
+			started <- cmd.ProjectName
+			switch cmd.ProjectName {
+			case "a1":
+				<-releaseA
+			case "b1":
+				<-releaseB
+			}
+			return command.ProjectCommandOutput{ApplySuccess: "success"}
+		}
+		cmdsA := []command.ProjectContext{
+			{CommandName: command.Apply, ProjectName: "a1", RepoRelDir: "a1", Workspace: "staging", ExecutionOrderGroup: 0},
+			{CommandName: command.Apply, ProjectName: "a2", RepoRelDir: "a2", Workspace: "staging", ExecutionOrderGroup: 1},
+		}
+		cmdsB := []command.ProjectContext{
+			{CommandName: command.Apply, ProjectName: "b1", RepoRelDir: "b1", Workspace: "qa"},
+		}
+		resultA := make(chan command.Result, 1)
+		resultB := make(chan command.Result, 1)
+		go func() {
+			resultA <- runProjectCmdsWithCancellationTracker(ctxA, cmdsA, tracker, 2, false, runner)
+		}()
+		go func() {
+			resultB <- runProjectCmdsWithCancellationTracker(ctxB, cmdsB, tracker, 2, false, runner)
+		}()
+		require.ElementsMatch(t, []string{"a1", "b1"}, []string{<-started, <-started})
+
+		tracker.Cancel(pull)
+		close(releaseB)
+		require.False(t, (<-resultB).HasErrors())
+		close(releaseA)
+		result := <-resultA
+
+		require.Len(t, result.ProjectResults, 2)
+		a1 := findResult(result, "a1")
+		require.NotNil(t, a1)
+		require.NoError(t, a1.Error)
+		a2 := findResult(result, "a2")
+		require.NotNil(t, a2)
+		require.Error(t, a2.Error)
+		assert.Contains(t, a2.Error.Error(), "cancelled")
+	})
 }
 
 func TestCreateCancelledResults(t *testing.T) {

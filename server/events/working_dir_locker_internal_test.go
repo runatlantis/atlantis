@@ -5,6 +5,7 @@
 package events
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -201,5 +202,72 @@ func TestTryLockPullSelectsActiveProjectJobs(t *testing.T) {
 				t.Fatalf("unexpected lock error message: %s", lockErr)
 			}
 		})
+	}
+}
+
+func TestTryLockApplyDirConflictLinksRunningJobs(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	claim := WorkingDirLockMetadata{HeadCommit: "owner-sha", CommitURL: "owner-commit"}
+	_, err := locker.TryLockApplyDir("owner/repo", 1, "default", "project1", claim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A job in another directory is not linked.
+	elsewhere := claim
+	elsewhere.JobURL = "other-dir-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project2", "", command.Apply, elsewhere); err != nil {
+		t.Fatal(err)
+	}
+
+	// Before the claim holder starts a project there is no job to link.
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
+	lockErr, ok := err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != claim {
+		t.Fatalf("expected claim metadata %#v, got %#v", claim, lockErr.metadata)
+	}
+
+	running := claim
+	running.JobURL = "staging-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project1", "project1-staging", command.Apply, running); err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
+	lockErr, ok = err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != running || lockErr.multipleJobs || lockErr.holder != command.Apply {
+		t.Fatalf("expected running job metadata %#v held by apply, got %#v", running, lockErr)
+	}
+
+	// Projects sharing the directory can run together in one apply.
+	sibling := claim
+	sibling.JobURL = "production-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project1", "project1-production", command.Apply, sibling); err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
+	lockErr, ok = err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != claim || !lockErr.multipleJobs {
+		t.Fatalf("expected claim metadata %#v with several jobs, got %#v", claim, lockErr)
+	}
+}
+
+func TestTryLockPullSharedRefusesToOverwriteALock(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	key := fmt.Sprintf("%s%d", locker.sharedPullKeyPrefix("owner/repo", 1), locker.ownerSeq+1)
+	locker.locks[key] = workingDirLock{Command: command.Version, owner: 99}
+
+	if _, err := locker.TryLockPullShared("owner/repo", 1, command.Apply, WorkingDirLockMetadata{}); err == nil {
+		t.Fatal("expected an error when the shared lock key is already held")
+	}
+	if locker.locks[key].owner != 99 {
+		t.Fatalf("expected the existing lock to be kept, got %#v", locker.locks[key])
 	}
 }

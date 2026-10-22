@@ -98,6 +98,11 @@ type Context struct {
 	// TeamAllowlistChecker is used to check authorization on a project-level
 	TeamAllowlistChecker TeamAllowlistChecker
 
+	// CancellationMark is the CancellationTracker mark taken when the command
+	// arrived. The command honors only cancels issued after it. Zero honors
+	// every cancel recorded for the pull request.
+	CancellationMark uint64
+
 	// Set true if there were any errors during the command execution
 	CommandHasErrors bool
 

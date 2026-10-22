@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/db"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
+	"github.com/runatlantis/atlantis/server/logging"
 )
 
 func NewApplyCommandRunner(
@@ -74,6 +77,7 @@ type ApplyCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	livePullHeadFetcher   LivePullHeadFetcher
 	disableAutomergeLabel string
+	resultLocker          pullResultLocker
 	// SilenceNoProjects is whether Atlantis should respond to PRs if no projects
 	// are found
 	SilenceNoProjects bool
@@ -131,7 +135,14 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var unlockPullApply func()
 	if a.workingDirLocker != nil {
-		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
+		lockPull := a.workingDirLocker.TryLockPull
+		if cmd.IsForSpecificProject() {
+			// Targeted applies share the pull lock so projects in different
+			// directories or workspaces can apply in parallel. Each project's
+			// workspace and directory is claimed once resolved below.
+			lockPull = a.workingDirLocker.TryLockPullShared
+		}
+		unlockPullApply, err = lockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			ctx.CommandHasErrors = true
 			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -194,11 +205,31 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: projectCmdsErr})
 		return
 	}
+	unlockProjects, err := a.claimProjectDirs(ctx, projectCmds)
+	if err != nil {
+		ctx.CommandHasErrors = true
+		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
+			ctx.Log.Warn("unable to update commit status: %s", statusErr)
+		}
+		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: err})
+		return
+	}
+	defer unlockProjects()
 
 	// If there are no projects to apply, don't respond to the PR and ignore
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run plan in")
 		if !a.silenceVCSStatusNoProjects {
+			// A parallel targeted apply may have recorded results since this
+			// command read the plan status.
+			unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num, resultLockHolder(ctx, cmd))
+			defer unlockResults()
+			if err := a.refreshPullStatus(ctx, pull); err != nil {
+				// This apply changed nothing, so leave the status as it is.
+				ctx.Log.Err("not publishing no-project apply status because re-reading plan status failed: %s", err)
+				ctx.CommandHasErrors = true
+				return
+			}
 			currentPull := applyPullWithLiveIdentity(pull, livePull)
 			pullStatus, err := a.currentNoProjectApplyPullStatus(ctx, pull, currentPull)
 			if err != nil {
@@ -259,6 +290,16 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		cmd,
 		result)
 
+	// Targeted applies on this pull request can finish together. Record
+	// results, publish the combined status and automerge one apply at a time
+	// so each works from the others' recorded results. Keep holding the pull
+	// lock here: plans record results without this lock, and the pull lock
+	// keeps them out. Lock order is pull lock, directory claims, then this
+	// lock. It is the only lock here that waits, and it is not reentrant, so
+	// nothing below may take it again.
+	unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num, resultLockHolder(ctx, cmd))
+	defer unlockResults()
+
 	pullStatus, err := a.dbUpdater.updateDB(ctx, pull, result.ProjectResults)
 	if err != nil {
 		ctx.Log.Err("writing results: %s", err)
@@ -300,6 +341,39 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		}
 		a.autoMerger.automerge(ctx, pullStatus, a.autoMerger.deleteSourceBranchOnMergeEnabled(projectCmds), cmd.AutoMergeMethod)
 	}
+}
+
+// claimProjectDirs claims the workspace and directory of each project for the
+// rest of this apply. Targeted applies share the pull lock, so this stops two
+// of them running Terraform in one directory. Projects that share a directory
+// share its claim, so an apply covering several of them claims it once.
+func (a *ApplyCommandRunner) claimProjectDirs(ctx *command.Context, projectCmds []command.ProjectContext) (func(), error) {
+	var unlocks []func()
+	unlockAll := func() {
+		for _, unlock := range unlocks {
+			unlock()
+		}
+	}
+	if a.workingDirLocker == nil {
+		return unlockAll, nil
+	}
+	claimed := make(map[applyPlanKey]bool)
+	for _, projectCmd := range projectCmds {
+		// The key leaves out the project name: the directory is what
+		// projects share on disk.
+		key := newApplyPlanKey(projectCmd.Workspace, projectCmd.RepoRelDir, "")
+		if claimed[key] {
+			continue
+		}
+		unlock, err := a.workingDirLocker.TryLockApplyDir(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, key.workspace, key.repoRelDir, WorkingDirLockMetadataForPull(ctx.Pull))
+		if err != nil {
+			unlockAll()
+			return func() {}, err
+		}
+		claimed[key] = true
+		unlocks = append(unlocks, unlock)
+	}
+	return unlockAll, nil
 }
 
 func (a *ApplyCommandRunner) publishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
@@ -489,6 +563,110 @@ func (a *ApplyCommandRunner) updateCommitStatus(ctx *command.Context, pullStatus
 		models.ProjectCounts{Success: numSuccess, Total: len(pullStatus.Projects), Errored: numErrored, NoChanges: numNoChanges},
 	); err != nil {
 		ctx.Log.Warn("unable to update commit status: %s", err)
+	}
+}
+
+// resultLockHolder describes an apply for the wait logs of other applies.
+func resultLockHolder(ctx *command.Context, cmd *CommentCommand) string {
+	if !cmd.IsForSpecificProject() {
+		return fmt.Sprintf("apply by %q", ctx.User.Username)
+	}
+	return fmt.Sprintf("apply by %q of project %q, dir %q, workspace %q", ctx.User.Username, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace)
+}
+
+// pullResultLocker serializes, per pull request, the part of an apply that
+// records results: the DB write, the combined commit status and automerge. It
+// is in-process only and does not coordinate Atlantis replicas. Its zero value
+// is ready to use.
+type pullResultLocker struct {
+	mutex sync.Mutex
+	locks map[pullResultKey]*pullResultLock
+}
+
+type pullResultKey struct {
+	repoFullName string
+	pullNum      int
+}
+
+// pullResultLock fields other than sem are guarded by pullResultLocker.mutex.
+type pullResultLock struct {
+	// sem holds a token while a caller holds the lock. A channel lets waiters
+	// wake up to log who they are waiting for.
+	sem chan struct{}
+	// refs counts holders and waiters so the entry is dropped once unused.
+	refs int
+	// holder and heldSince describe the current holder for waiters' logs.
+	holder    string
+	heldSince time.Time
+}
+
+// resultLockWaitWarnInterval is how often a waiter warns while another apply
+// holds the lock. The holder makes VCS calls, which can hang, and atlantis
+// cancel cannot release this lock.
+const resultLockWaitWarnInterval = 2 * time.Minute
+
+// lock blocks until no other apply on this pull request holds the lock.
+// holder describes the caller in other callers' wait logs. The returned
+// release is safe to call more than once.
+func (l *pullResultLocker) lock(log logging.SimpleLogging, repoFullName string, pullNum int, holder string) func() {
+	key := pullResultKey{repoFullName: repoFullName, pullNum: pullNum}
+	l.mutex.Lock()
+	if l.locks == nil {
+		l.locks = make(map[pullResultKey]*pullResultLock)
+	}
+	entry, ok := l.locks[key]
+	if !ok {
+		entry = &pullResultLock{sem: make(chan struct{}, 1)}
+		l.locks[key] = entry
+	}
+	entry.refs++
+	l.mutex.Unlock()
+
+	select {
+	case entry.sem <- struct{}{}:
+	default:
+		l.wait(log, entry)
+	}
+	l.mutex.Lock()
+	entry.holder = holder
+	entry.heldSince = time.Now()
+	l.mutex.Unlock()
+	return sync.OnceFunc(func() {
+		l.mutex.Lock()
+		defer l.mutex.Unlock()
+		entry.holder = ""
+		<-entry.sem
+		entry.refs--
+		if entry.refs == 0 {
+			delete(l.locks, key)
+		}
+	})
+}
+
+// wait blocks until the caller takes entry's token, warning at intervals with
+// the holder's description.
+func (l *pullResultLocker) wait(log logging.SimpleLogging, entry *pullResultLock) {
+	log.Info("waiting for another apply on this pull request to record its results")
+	waitStart := time.Now()
+	ticker := time.NewTicker(resultLockWaitWarnInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case entry.sem <- struct{}{}:
+			log.Info("waited %s for another apply on this pull request to record its results", time.Since(waitStart).Round(time.Millisecond))
+			return
+		case <-ticker.C:
+			l.mutex.Lock()
+			holder, heldFor := entry.holder, time.Since(entry.heldSince).Round(time.Second)
+			l.mutex.Unlock()
+			waited := time.Since(waitStart).Round(time.Second)
+			if holder == "" {
+				// The holder has taken the token but not yet recorded itself.
+				log.Warn("still waiting after %s for another apply on this pull request to record its results", waited)
+				continue
+			}
+			log.Warn("still waiting after %s for %s to record its results, which has held the lock on this pull request for %s", waited, holder, heldFor)
+		}
 	}
 }
 

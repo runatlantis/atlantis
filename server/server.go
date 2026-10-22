@@ -727,6 +727,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	deleteLockCommand.PlanStore = planStore
 
+	cancellationTracker := events.NewCancellationTracker()
+
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(
 		statsScope,
 		logger,
@@ -738,6 +740,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			LogStreamResourceCleaner: projectCmdOutputHandler,
 			VCSClient:                vcsClient,
 			PlanStore:                planStore,
+			CancellationTracker:      cancellationTracker,
 		},
 	)
 
@@ -799,8 +802,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			userConfig.AutoDiscoverModeFlag,
 		),
 	}
-
-	cancellationTracker := events.NewCancellationTracker()
 
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
 		VcsClient:        vcsClient,
@@ -1040,6 +1041,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		TeamAllowlistChecker:           teamAllowlistChecker,
 		VarFileAllowlistChecker:        varFileAllowlistChecker,
 		CommitStatusUpdater:            commitStatusUpdater,
+		CancellationTracker:            cancellationTracker,
 	}
 	repoAllowlist, err := events.NewRepoAllowlistChecker(userConfig.RepoAllowlist)
 	if err != nil {
