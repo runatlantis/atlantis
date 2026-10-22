@@ -1150,6 +1150,84 @@ func (p *DefaultProjectCommandRunner) ensurePlanLoaded(ctx command.ProjectContex
 	return nil
 }
 
+func (p *DefaultProjectCommandRunner) storePlan(ctx command.ProjectContext, absPath string, skipIfEmpty bool) error {
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(planPath)
+	if err != nil {
+		return fmt.Errorf("finding plan file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("plan file %q is not a regular file", planPath)
+	}
+	store := p.PlanStore
+	if store == nil {
+		store = &runtime.LocalPlanStore{}
+	}
+	if err := store.Save(ctx, planPath); err != nil {
+		return fmt.Errorf("saving plan: %w", err)
+	}
+	if skipIfEmpty && info.Size() == 0 {
+		ctx.Log.Debug("stored empty plan file %q before removing it", planPath)
+		if err := store.Remove(ctx, planPath); err != nil {
+			ctx.Log.Warn("could not delete stored empty plan file, continuing - %v", err)
+		}
+	}
+	return nil
+}
+
+func removeLocalPlanBeforeCustomPlan(ctx command.ProjectContext, absPath string) error {
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	if err := utils.RemoveIgnoreNonExistent(planPath); err != nil {
+		return fmt.Errorf("removing stale local plan file: %w", err)
+	}
+	return nil
+}
+
+func (p *DefaultProjectCommandRunner) removePlan(ctx command.ProjectContext, absPath string) error {
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	store := p.PlanStore
+	if store == nil {
+		store = &runtime.LocalPlanStore{}
+	}
+	ctx.Log.Info("custom apply successful, deleting planfile")
+	if err := store.Remove(ctx, planPath); err != nil {
+		ctx.Log.Warn("could not delete planfile after successful custom apply, continuing - %v", err)
+	}
+	return nil
+}
+
+func (p *DefaultProjectCommandRunner) validateCustomApplyPlan(ctx command.ProjectContext, absPath string) error {
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(planPath)
+	if err != nil {
+		return fmt.Errorf("finding plan file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("plan file %q is not a regular file", planPath)
+	}
+	if err := ValidateNonPRAPIRefUnchanged(ctx, absPath); err != nil {
+		return err
+	}
+	if ctx.CommandName == command.Apply && p.ApplyPlanValidator != nil {
+		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.ProjectContext, absPath string) ([]string, error) {
 	var outputs []string
 
@@ -1187,7 +1265,25 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":
+			if step.PlanStore != nil && step.PlanStore.Mode == valid.RunPlanStoreSaveMode {
+				if err = removeLocalPlanBeforeCustomPlan(ctx, absPath); err != nil {
+					return outputs, err
+				}
+			}
+			if step.PlanStore != nil && step.PlanStore.Mode == valid.RunPlanStoreConsumeMode {
+				if err = p.validateCustomApplyPlan(ctx, absPath); err != nil {
+					return outputs, err
+				}
+			}
 			out, err = p.RunStepRunner.Run(ctx, step.RunShell, step.RunCommand, absPath, envs, !ctx.SuppressJobOutput, step.Output, step.FilterRegexes)
+			if err == nil && step.PlanStore != nil {
+				switch step.PlanStore.Mode {
+				case valid.RunPlanStoreSaveMode:
+					err = p.storePlan(ctx, absPath, step.PlanStore.SkipIfEmpty)
+				case valid.RunPlanStoreConsumeMode:
+					err = p.removePlan(ctx, absPath)
+				}
+			}
 		case "env":
 			out, err = p.EnvStepRunner.Run(ctx, step.RunShell, step.RunCommand, step.EnvVarValue, absPath, envs)
 			envs[step.EnvVarName] = out
@@ -1223,7 +1319,7 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 // Atlantis convention plan artifact. It fails closed: the steps being executed
 // are authoritative, so a context that never had
 // RequiresAtlantisManagedPlanFile populated still validates the plan file when a
-// built-in apply step will read it.
+// built-in apply or custom plan-consuming run step will read it.
 func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
 	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
 }
