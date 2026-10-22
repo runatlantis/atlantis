@@ -57,8 +57,9 @@ func (w *DefaultPostWorkflowHooksCommandRunner) RunPostHooks(ctx *command.Contex
 
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
-		// The caller discards this error, so log it here.
-		ctx.Log.Err("skipping post-workflow hooks: %s", err)
+		// The caller discards this error, so log it here. The lock error asks
+		// the reader to retry, which means nothing for a hook, so leave it out.
+		ctx.Log.Warn("skipping post-workflow hooks because another command on this pull request holds the default workspace lock")
 		return err
 	}
 	ctx.Log.Debug("got workspace lock")

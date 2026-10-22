@@ -525,6 +525,25 @@ func TestRunProjectCmdsWithCancellationTracker_IgnoresCancelBeforeCommandArrived
 	assert.False(t, result.HasErrors())
 }
 
+// The parallel path checks the cancel for each project of a group, so it must
+// use the command's mark too.
+func TestRunProjectCmdsWithCancellationTracker_ParallelGroupIgnoresCancelBeforeCommandArrived(t *testing.T) {
+	tracker := NewCancellationTracker()
+	pull := models.PullRequest{Num: 4}
+	tracker.Cancel(pull)
+
+	ctx := makeCtx(t, pull)
+	ctx.CancellationMark = tracker.Mark()
+	cmds := []command.ProjectContext{
+		{CommandName: command.Plan, ProjectName: "p1", RepoRelDir: "p1", Workspace: "default"},
+		{CommandName: command.Plan, ProjectName: "p2", RepoRelDir: "p2", Workspace: "default"},
+	}
+	result := runProjectCmdsWithCancellationTracker(ctx, cmds, tracker, 2, true, successRunner)
+
+	require.Len(t, result.ProjectResults, 2)
+	assert.False(t, result.HasErrors())
+}
+
 // Two commands on one pull request can run at once, as parallel targeted
 // applies do. One finishing after `atlantis cancel` must not un-cancel the
 // other's remaining execution order groups.

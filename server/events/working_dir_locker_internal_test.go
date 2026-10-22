@@ -205,16 +205,22 @@ func TestTryLockPullSelectsActiveProjectJobs(t *testing.T) {
 	}
 }
 
-func TestTryLockProjectApplyConflictUsesRunningJobURL(t *testing.T) {
+func TestTryLockApplyDirConflictLinksRunningJobs(t *testing.T) {
 	locker := NewDefaultWorkingDirLocker()
 	claim := WorkingDirLockMetadata{HeadCommit: "owner-sha", CommitURL: "owner-commit"}
-	_, err := locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", claim)
+	_, err := locker.TryLockApplyDir("owner/repo", 1, "default", "project1", claim)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A job in another directory is not linked.
+	elsewhere := claim
+	elsewhere.JobURL = "other-dir-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project2", "", command.Apply, elsewhere); err != nil {
+		t.Fatal(err)
+	}
 
-	// Before the claim holder starts the project there is no job to link.
-	_, err = locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", WorkingDirLockMetadata{})
+	// Before the claim holder starts a project there is no job to link.
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
 	lockErr, ok := err.(*workingDirLockError)
 	if !ok {
 		t.Fatalf("expected typed lock error, got %T", err)
@@ -224,17 +230,32 @@ func TestTryLockProjectApplyConflictUsesRunningJobURL(t *testing.T) {
 	}
 
 	running := claim
-	running.JobURL = "owner-job"
-	if _, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, running); err != nil {
+	running.JobURL = "staging-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project1", "project1-staging", command.Apply, running); err != nil {
 		t.Fatal(err)
 	}
-	_, err = locker.TryLockProjectApply("owner/repo", 1, "default", ".", "project", WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
 	lockErr, ok = err.(*workingDirLockError)
 	if !ok {
 		t.Fatalf("expected typed lock error, got %T", err)
 	}
-	if lockErr.metadata != running {
-		t.Fatalf("expected running job metadata %#v, got %#v", running, lockErr.metadata)
+	if lockErr.metadata != running || lockErr.multipleJobs {
+		t.Fatalf("expected running job metadata %#v, got %#v", running, lockErr)
+	}
+
+	// Projects sharing the directory can run together in one apply.
+	sibling := claim
+	sibling.JobURL = "production-job"
+	if _, err := locker.TryLock("owner/repo", 1, "default", "project1", "project1-production", command.Apply, sibling); err != nil {
+		t.Fatal(err)
+	}
+	_, err = locker.TryLockApplyDir("owner/repo", 1, "default", "project1", WorkingDirLockMetadata{})
+	lockErr, ok = err.(*workingDirLockError)
+	if !ok {
+		t.Fatalf("expected typed lock error, got %T", err)
+	}
+	if lockErr.metadata != claim || !lockErr.multipleJobs {
+		t.Fatalf("expected claim metadata %#v with several jobs, got %#v", claim, lockErr)
 	}
 }
 

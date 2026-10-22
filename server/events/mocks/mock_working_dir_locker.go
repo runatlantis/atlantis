@@ -60,12 +60,12 @@ func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	return _ret0, _ret1
 }
 
-func (mock *MockWorkingDirLocker) TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata events.WorkingDirLockMetadata) (func(), error) {
+func (mock *MockWorkingDirLocker) TryLockApplyDir(repoFullName string, pullNum int, workspace string, path string, metadata events.WorkingDirLockMetadata) (func(), error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
 	}
-	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName, metadata}
-	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLockProjectApply", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, metadata}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLockApplyDir", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 func()
 	var _ret1 error
 	if len(_result) != 0 {
@@ -268,23 +268,23 @@ func (c *MockWorkingDirLocker_TryLock_OngoingVerification) GetAllCapturedArgumen
 	return
 }
 
-func (verifier *VerifierMockWorkingDirLocker) TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata events.WorkingDirLockMetadata) *MockWorkingDirLocker_TryLockProjectApply_OngoingVerification {
-	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, projectName, metadata}
-	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLockProjectApply", _params, verifier.timeout)
-	return &MockWorkingDirLocker_TryLockProjectApply_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+func (verifier *VerifierMockWorkingDirLocker) TryLockApplyDir(repoFullName string, pullNum int, workspace string, path string, metadata events.WorkingDirLockMetadata) *MockWorkingDirLocker_TryLockApplyDir_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, workspace, path, metadata}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLockApplyDir", _params, verifier.timeout)
+	return &MockWorkingDirLocker_TryLockApplyDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
 
-type MockWorkingDirLocker_TryLockProjectApply_OngoingVerification struct {
+type MockWorkingDirLocker_TryLockApplyDir_OngoingVerification struct {
 	mock              *MockWorkingDirLocker
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockWorkingDirLocker_TryLockProjectApply_OngoingVerification) GetCapturedArguments() (string, int, string, string, string, events.WorkingDirLockMetadata) {
-	repoFullName, pullNum, workspace, path, projectName, metadata := c.GetAllCapturedArguments()
-	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], workspace[len(workspace)-1], path[len(path)-1], projectName[len(projectName)-1], metadata[len(metadata)-1]
+func (c *MockWorkingDirLocker_TryLockApplyDir_OngoingVerification) GetCapturedArguments() (string, int, string, string, events.WorkingDirLockMetadata) {
+	repoFullName, pullNum, workspace, path, metadata := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], workspace[len(workspace)-1], path[len(path)-1], metadata[len(metadata)-1]
 }
 
-func (c *MockWorkingDirLocker_TryLockProjectApply_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []string, _param3 []string, _param4 []string, _param5 []events.WorkingDirLockMetadata) {
+func (c *MockWorkingDirLocker_TryLockApplyDir_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []string, _param3 []string, _param4 []events.WorkingDirLockMetadata) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -312,15 +312,9 @@ func (c *MockWorkingDirLocker_TryLockProjectApply_OngoingVerification) GetAllCap
 			}
 		}
 		if len(_params) > 4 {
-			_param4 = make([]string, len(c.methodInvocations))
+			_param4 = make([]events.WorkingDirLockMetadata, len(c.methodInvocations))
 			for u, param := range _params[4] {
-				_param4[u] = param.(string)
-			}
-		}
-		if len(_params) > 5 {
-			_param5 = make([]events.WorkingDirLockMetadata, len(c.methodInvocations))
-			for u, param := range _params[5] {
-				_param5[u] = param.(events.WorkingDirLockMetadata)
+				_param4[u] = param.(events.WorkingDirLockMetadata)
 			}
 		}
 	}

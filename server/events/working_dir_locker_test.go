@@ -360,29 +360,31 @@ func TestTryLockPullSharedBlocksWhenPlanInFlight(t *testing.T) {
 	ErrContains(t, "pull request 1 is currently locked by \"plan\"", err)
 }
 
-func TestTryLockProjectApply(t *testing.T) {
+func TestTryLockApplyDir(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 
-	unlock, err := locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	unlock, err := locker.TryLockApplyDir(repo, 1, "daily-1", path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 
-	_, err = locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, "daily-1", path, events.WorkingDirLockMetadata{})
 	ErrEquals(t, "cannot run \"apply\": the daily-1 workspace at path . is currently locked for this pull request by \"apply\".\n"+
 		"Wait until the previous command is complete and try again", err)
-	_, err = locker.TryLockProjectApply(repo, 1, "daily-2", path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, "daily-2", path, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+	_, err = locker.TryLockApplyDir(repo, 1, "daily-1", "other", events.WorkingDirLockMetadata{})
 	Ok(t, err)
 
 	unlock()
-	_, err = locker.TryLockProjectApply(repo, 1, "daily-1", path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, "daily-1", path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 }
 
-// The project runner takes its own working dir lock while a project apply
-// claim is held, so the two must not conflict.
-func TestTryLockProjectApplyDoesNotBlockWorkingDirLock(t *testing.T) {
+// The project runner takes its own working dir lock while its apply claim is
+// held, so the two must not conflict.
+func TestTryLockApplyDirDoesNotBlockWorkingDirLock(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 
-	unlockClaim, err := locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	unlockClaim, err := locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	defer unlockClaim()
 
@@ -397,14 +399,14 @@ func TestUnlockByPullReleasesSharedPullLocksAndApplyClaims(t *testing.T) {
 
 	_, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
 	Ok(t, err)
-	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 
 	locker.UnlockByPull(repo, 1)
 
 	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
 	Ok(t, err)
-	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 }
 
@@ -415,18 +417,18 @@ func TestStaleUnlockAfterUnlockByPullKeepsNewerHolders(t *testing.T) {
 
 	staleUnlockShared, err := locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
 	Ok(t, err)
-	staleUnlockClaim, err := locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	staleUnlockClaim, err := locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	locker.UnlockByPull(repo, 1)
 
 	_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
 	Ok(t, err)
-	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	Ok(t, err)
 	staleUnlockShared()
 	staleUnlockClaim()
 
-	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, events.WorkingDirLockMetadata{})
+	_, err = locker.TryLockApplyDir(repo, 1, workspace, path, events.WorkingDirLockMetadata{})
 	ErrContains(t, "currently locked", err)
 	_, err = locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{})
 	ErrContains(t, "currently locked by \"apply\"", err)
@@ -461,8 +463,8 @@ func TestWorkspaceLocksDoNotCollideWithReservedLockKeys(t *testing.T) {
 	metadata := events.WorkingDirLockMetadata{}
 	locker := events.NewDefaultWorkingDirLocker()
 
-	// The first shared lock on a new locker has owner 1, so a key built from
-	// the workspace ".shared-pull" and path "1" would spell it.
+	// The first shared lock on a new locker has owner 1. With a "." marker,
+	// the workspace ".shared-pull" and path "1" would spell its key.
 	unlockShared, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
 	Ok(t, err)
 	unlockWorkspace, err := locker.TryLock(repo, 1, ".shared-pull", "1", "", command.Apply, metadata)
@@ -472,8 +474,10 @@ func TestWorkspaceLocksDoNotCollideWithReservedLockKeys(t *testing.T) {
 	ErrContains(t, "currently locked by \"apply\"", err)
 	unlockShared()
 
-	_, err = locker.TryLock(repo, 1, ".apply-claim", workspace+"/"+path, projectName, command.Apply, metadata)
+	// With a "." marker, the workspace ".apply-claim" would spell the claim's
+	// key.
+	_, err = locker.TryLock(repo, 1, ".apply-claim", workspace, path, command.Apply, metadata)
 	Ok(t, err)
-	_, err = locker.TryLockProjectApply(repo, 1, workspace, path, projectName, metadata)
+	_, err = locker.TryLockApplyDir(repo, 1, workspace, path, metadata)
 	Ok(t, err)
 }

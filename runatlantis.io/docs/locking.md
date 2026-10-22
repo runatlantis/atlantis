@@ -15,13 +15,18 @@ Only the directory in the repo and Terraform workspace are locked, not the whole
 
 Atlantis also checks the global apply lock before running `atlantis apply`. If Atlantis cannot reach the lock backend while checking that global lock, it fails closed and rejects the apply until the backend is reachable again.
 
-Within one pull request, `atlantis plan` and an untargeted `atlantis apply` do not run alongside another plan or apply. Atlantis rejects the second command rather than queueing it, so comment it again once the first one finishes. Targeted applies (`-p`, `-d` or `-w`) of different projects can run at the same time, such as `atlantis apply -w staging` and `atlantis apply -w qa`. A second apply of a project that is already being applied is rejected.
+Within one pull request, `atlantis plan` and an untargeted `atlantis apply` do not run alongside another plan or apply. Atlantis rejects the second command rather than queueing it, so comment it again once the first one finishes. Targeted applies (`-p`, `-d` or `-w`) can run at the same time when their projects are in different directories or workspaces, such as `atlantis apply -w staging` and `atlantis apply -w qa`. Projects that share a directory and workspace share it on disk, so an apply of one is rejected while another is being applied, and so is a second apply of the same project.
 
-Targeted applies can still reject each other in these cases:
+`atlantis cancel` releases these locks while running commands carry on, so after a cancel a second apply of a project that is still being applied can start.
 
-- Two targeted applies in the same workspace briefly lock that workspace while Atlantis prepares them. An apply of a project at the repository root holds that lock for its whole run.
-- With [pre-workflow hooks](pre-workflow-hooks.md), each command locks the default workspace while its hooks run. A command that arrives meanwhile skips its pre-workflow hooks, or fails if [`--fail-on-pre-workflow-hook-error`](server-configuration.md#fail-on-pre-workflow-hook-error) is set.
-- With [post-workflow hooks](post-workflow-hooks.md), a command that finishes while another command's post-workflow hooks run skips its own post-workflow hooks.
+Some steps also take the lock on a workspace's root directory (`.`), so they can reject or skip part of another command:
+
+- Preparing a `-d` or `-w` apply takes the root lock briefly, and the apply is rejected if the lock is held. `-p` applies don't take it.
+- Planning or applying an unnamed project at the repository root holds the root lock for that project's whole run.
+- With [pre-workflow hooks](pre-workflow-hooks.md), each command holds the default workspace's root lock while its hooks run. A command that cannot take the lock skips its pre-workflow hooks, or fails if [`--fail-on-pre-workflow-hook-error`](server-configuration.md#fail-on-pre-workflow-hook-error) is set.
+- With [post-workflow hooks](post-workflow-hooks.md), a command that cannot take the default workspace's root lock skips its post-workflow hooks.
+
+So while an unnamed project at the repository root is planned or applied in the default workspace, other commands on the pull request skip their hooks.
 
 ## Why
 

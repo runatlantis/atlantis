@@ -126,6 +126,35 @@ func TestCleanUpPullNoLocks(t *testing.T) {
 	cp.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
+// Commands no longer clear the cancellation tracker when they finish, so
+// closing the pull request is what forgets its cancels.
+func TestCleanUpPullClearsCancellations(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	RegisterMockTestingT(t)
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
+	db, err := boltdb.New(t.TempDir())
+	t.Cleanup(func() {
+		db.Close()
+	})
+	Ok(t, err)
+	tracker := events.NewCancellationTracker()
+	pce := events.PullClosedExecutor{
+		Locker:              l,
+		VCSClient:           vcsmocks.NewMockClient(),
+		WorkingDir:          mocks.NewMockWorkingDir(),
+		Database:            db,
+		CancellationTracker: tracker,
+	}
+	tracker.Cancel(testdata.Pull)
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+
+	err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+
+	Ok(t, err)
+	Assert(t, !tracker.IsCancelled(testdata.Pull, 0), "expected closing the pull request to forget its cancels")
+}
+
 func TestCleanUpPullComments(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	t.Log("should comment correctly")

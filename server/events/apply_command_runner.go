@@ -204,7 +204,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 		a.pullUpdater.updatePull(ctx, cmd, command.Result{Error: projectCmdsErr})
 		return
 	}
-	unlockProjects, err := a.claimProjects(ctx, projectCmds)
+	unlockProjects, err := a.claimProjectDirs(ctx, projectCmds)
 	if err != nil {
 		ctx.CommandHasErrors = true
 		if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
@@ -224,11 +224,9 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 			unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
 			defer unlockResults()
 			if err := a.refreshPullStatus(ctx, pull); err != nil {
-				ctx.Log.Err("fetching current plan status: %s", err)
+				// This apply changed nothing, so leave the status as it is.
+				ctx.Log.Err("not publishing no-project apply status because re-reading plan status failed: %s", err)
 				ctx.CommandHasErrors = true
-				if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
-					ctx.Log.Warn("unable to update commit status: %s", statusErr)
-				}
 				return
 			}
 			currentPull := applyPullWithLiveIdentity(pull, livePull)
@@ -293,9 +291,11 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	// Targeted applies on this pull request can finish together. Record
 	// results, publish the combined status and automerge one apply at a time
-	// so each works from the others' recorded results. Lock order is pull
-	// lock, project claims, then this lock. Nothing below takes a working dir
-	// lock, so holders cannot deadlock.
+	// so each works from the others' recorded results. Keep holding the pull
+	// lock here: plans record results without this lock, and the pull lock
+	// keeps them out. Lock order is pull lock, directory claims, then this
+	// lock. Nothing below takes a working dir lock, so holders cannot
+	// deadlock.
 	unlockResults := a.resultLocker.lock(ctx.Log, baseRepo.FullName, pull.Num)
 	defer unlockResults()
 
@@ -342,10 +342,11 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 }
 
-// claimProjects claims each project for the rest of this apply. Targeted
-// applies share the pull lock, so this stops two of them applying the same
-// project.
-func (a *ApplyCommandRunner) claimProjects(ctx *command.Context, projectCmds []command.ProjectContext) (func(), error) {
+// claimProjectDirs claims the workspace and directory of each project for the
+// rest of this apply. Targeted applies share the pull lock, so this stops two
+// of them running Terraform in one directory. Projects that share a directory
+// share its claim, so an apply covering several of them claims it once.
+func (a *ApplyCommandRunner) claimProjectDirs(ctx *command.Context, projectCmds []command.ProjectContext) (func(), error) {
 	var unlocks []func()
 	unlockAll := func() {
 		for _, unlock := range unlocks {
@@ -357,11 +358,13 @@ func (a *ApplyCommandRunner) claimProjects(ctx *command.Context, projectCmds []c
 	}
 	claimed := make(map[applyPlanKey]bool)
 	for _, projectCmd := range projectCmds {
-		key := newApplyPlanKey(projectCmd.Workspace, projectCmd.RepoRelDir, projectCmd.ProjectName)
+		// The key leaves out the project name: the directory is what
+		// projects share on disk.
+		key := newApplyPlanKey(projectCmd.Workspace, projectCmd.RepoRelDir, "")
 		if claimed[key] {
 			continue
 		}
-		unlock, err := a.workingDirLocker.TryLockProjectApply(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, key.workspace, key.repoRelDir, key.projectName, WorkingDirLockMetadataForPull(ctx.Pull))
+		unlock, err := a.workingDirLocker.TryLockApplyDir(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, key.workspace, key.repoRelDir, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			unlockAll()
 			return func() {}, err

@@ -6,6 +6,8 @@ package events
 import (
 	"fmt"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -471,31 +473,95 @@ func containsCommitStatus(statuses []models.CommitStatus, expected models.Commit
 	return slices.Contains(statuses, expected)
 }
 
+// ResultLockWaitLogger closes Waiting once the pull result lock makes its
+// caller wait for another apply. A test waits on it instead of sleeping. It is
+// exported for the events_test package.
+type ResultLockWaitLogger struct {
+	logging.SimpleLogging
+	Waiting chan struct{}
+	once    sync.Once
+}
+
+func NewResultLockWaitLogger(t *testing.T) *ResultLockWaitLogger {
+	return &ResultLockWaitLogger{SimpleLogging: logging.NewNoopLogger(t), Waiting: make(chan struct{})}
+}
+
+func (l *ResultLockWaitLogger) Info(format string, a ...any) {
+	if strings.HasPrefix(format, "waiting for another apply") {
+		l.once.Do(func() { close(l.Waiting) })
+	}
+	l.SimpleLogging.Info(format, a...)
+}
+
+func receiveWithin[T any](t *testing.T, ch <-chan T, what string) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for %s", what)
+		panic("unreachable")
+	}
+}
+
 func TestPullResultLockerSerializesPerPull(t *testing.T) {
 	var locker pullResultLocker
-	log := logging.NewNoopLogger(t)
-	unlock := locker.lock(log, "owner/repo", 1)
+	unlock := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1)
 
+	secondLog := NewResultLockWaitLogger(t)
 	acquired := make(chan struct{})
 	go func() {
-		locker.lock(log, "owner/repo", 1)()
+		locker.lock(secondLog, "owner/repo", 1)()
 		close(acquired)
 	}()
 
 	// A different pull request does not wait.
-	locker.lock(log, "owner/repo", 2)()
+	otherLog := NewResultLockWaitLogger(t)
+	locker.lock(otherLog, "owner/repo", 2)()
 	select {
-	case <-acquired:
-		t.Fatal("expected a second lock on the same pull request to wait")
-	case <-time.After(50 * time.Millisecond):
+	case <-otherLog.Waiting:
+		t.Fatal("expected a lock on another pull request not to wait")
+	default:
 	}
 
-	unlock()
+	receiveWithin(t, secondLog.Waiting, "a second lock on the same pull request to wait")
 	select {
 	case <-acquired:
-	case <-time.After(5 * time.Second):
-		t.Fatal("expected the second lock to be acquired after unlock")
+		t.Fatal("expected the second lock to wait until unlock")
+	default:
 	}
+	unlock()
+	receiveWithin(t, acquired, "the second lock to be acquired after unlock")
+	if len(locker.locks) != 0 {
+		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
+	}
+}
+
+// A holder's release must keep the pull's entry while another caller waits on
+// it. Dropping it would let a later caller create a new entry and hold the
+// lock alongside the waiter.
+func TestPullResultLockerKeepsEntryWhileCallersWait(t *testing.T) {
+	var locker pullResultLocker
+	unlockFirst := locker.lock(NewResultLockWaitLogger(t), "owner/repo", 1)
+
+	secondLog := NewResultLockWaitLogger(t)
+	secondHolds := make(chan func())
+	go func() {
+		secondHolds <- locker.lock(secondLog, "owner/repo", 1)
+	}()
+	receiveWithin(t, secondLog.Waiting, "the second caller to wait")
+	unlockFirst()
+	unlockSecond := receiveWithin(t, secondHolds, "the second caller to take the lock")
+
+	thirdLog := NewResultLockWaitLogger(t)
+	thirdHolds := make(chan func())
+	go func() {
+		thirdHolds <- locker.lock(thirdLog, "owner/repo", 1)
+	}()
+	receiveWithin(t, thirdLog.Waiting, "the third caller to wait while the second holds the lock")
+	unlockSecond()
+	receiveWithin(t, thirdHolds, "the third caller to take the lock")()
+
 	if len(locker.locks) != 0 {
 		t.Fatalf("expected unused pull result locks to be dropped, got %d", len(locker.locks))
 	}

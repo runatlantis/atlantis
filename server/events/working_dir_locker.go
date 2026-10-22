@@ -41,6 +41,10 @@ type workingDirLock struct {
 	WorkingDirLockMetadata
 	// owner identifies the holder, so only its own release deletes the lock.
 	owner uint64
+	// workspace and path are set on workspace locks, so an apply claim
+	// conflict can link the jobs running in the claimed directory.
+	workspace string
+	path      string
 }
 
 type WorkingDirLocker interface {
@@ -50,15 +54,17 @@ type WorkingDirLocker interface {
 	// in-flight plans.
 	TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLockPullShared tries to acquire a pull-level lock that other shared
-	// holders can hold at the same time. Targeted apply uses it so applies of
-	// different projects on one pull request can run in parallel. It conflicts
-	// with TryLockPull holders and in-flight plans.
+	// holders can hold at the same time. Targeted apply uses it so applies in
+	// different directories or workspaces of one pull request can run in
+	// parallel. It conflicts with TryLockPull holders and in-flight plans.
 	TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
-	// TryLockProjectApply claims a project for an apply command until the
-	// command has recorded its results, so applies sharing the pull lock cannot
-	// apply the same project. Callers must already hold a pull-level lock. It
-	// does not conflict with TryLock.
-	TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata WorkingDirLockMetadata) (func(), error)
+	// TryLockApplyDir claims a workspace and directory for an apply command
+	// until the command has recorded its results. Every apply claims the
+	// directories of its projects. Projects that share a directory and
+	// workspace share one directory on disk, so applies sharing the pull lock
+	// cannot run Terraform there at the same time. Callers must already hold a
+	// pull-level lock. It does not conflict with TryLock.
+	TryLockApplyDir(repoFullName string, pullNum int, workspace string, path string, metadata WorkingDirLockMetadata) (func(), error)
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
@@ -95,7 +101,7 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 	if currentLock, exists := d.locks[workspaceKey]; exists {
 		return func() {}, workspaceLockError(cmdName, workspace, path, currentLock)
 	}
-	return d.lockOwned(workspaceKey, d.nextOwner(), cmdName, metadata), nil
+	return d.lockOwned(workspaceKey, workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: d.nextOwner(), workspace: workspace, path: path}), nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -108,7 +114,7 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	if currentLock, exists := d.findSharedPullLock(repoFullName, pullNum); exists {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	return d.lockOwned(d.pullKey(repoFullName, pullNum), d.nextOwner(), cmdName, metadata), nil
+	return d.lockOwned(d.pullKey(repoFullName, pullNum), workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: d.nextOwner()}), nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -124,23 +130,38 @@ func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum
 		// Unreachable while reserved keys stay outside the workspace key space.
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	return d.lockOwned(sharedKey, owner, cmdName, metadata), nil
+	return d.lockOwned(sharedKey, workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: owner}), nil
 }
 
-func (d *DefaultWorkingDirLocker) TryLockProjectApply(repoFullName string, pullNum int, workspace string, path string, projectName string, metadata WorkingDirLockMetadata) (func(), error) {
+func (d *DefaultWorkingDirLocker) TryLockApplyDir(repoFullName string, pullNum int, workspace string, path string, metadata WorkingDirLockMetadata) (func(), error) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	claimKey := d.applyClaimKey(repoFullName, pullNum, workspace, path, projectName)
+	claimKey := d.applyClaimKey(repoFullName, pullNum, workspace, path)
 	if currentLock, exists := d.locks[claimKey]; exists {
-		// The claim holder has no job URL. While it applies the project, the
-		// project runner's lock carries the job URL.
-		if runningLock, running := d.locks[d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)]; running && runningLock.JobURL != "" {
-			currentLock.JobURL = runningLock.JobURL
-		}
-		return func() {}, workspaceLockError(command.Apply, workspace, path, currentLock)
+		return func() {}, d.applyClaimError(repoFullName, pullNum, workspace, path, currentLock)
 	}
-	return d.lockOwned(claimKey, d.nextOwner(), command.Apply, metadata), nil
+	return d.lockOwned(claimKey, workingDirLock{Command: command.Apply, WorkingDirLockMetadata: metadata, owner: d.nextOwner()}), nil
+}
+
+// applyClaimError links the jobs applying in the claimed directory. The claim
+// holder has no job URL; the project runners' workspace locks carry them.
+func (d *DefaultWorkingDirLocker) applyClaimError(repoFullName string, pullNum int, workspace string, path string, currentLock workingDirLock) error {
+	jobURLs := make(map[string]struct{})
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	for key, lock := range d.locks {
+		if strings.HasPrefix(key, prefix) && lock.workspace == workspace && lock.path == path && lock.JobURL != "" {
+			jobURLs[lock.JobURL] = struct{}{}
+		}
+	}
+	lockErr := workspaceLockError(command.Apply, workspace, path, currentLock)
+	lockErr.multipleJobs = len(jobURLs) > 1
+	if len(jobURLs) == 1 {
+		for jobURL := range jobURLs {
+			lockErr.metadata.JobURL = jobURL
+		}
+	}
+	return lockErr
 }
 
 // nextOwner returns a new lock owner. The caller must hold d.mutex.
@@ -149,12 +170,12 @@ func (d *DefaultWorkingDirLocker) nextOwner() uint64 {
 	return d.ownerSeq
 }
 
-// lockOwned stores a lock for owner and returns a release that deletes the
-// lock only while owner still holds it. The caller must hold d.mutex.
-func (d *DefaultWorkingDirLocker) lockOwned(key string, owner uint64, cmdName command.Name, metadata WorkingDirLockMetadata) func() {
-	d.locks[key] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata, owner: owner}
+// lockOwned stores lock and returns a release that deletes it only while its
+// owner still holds the key. The caller must hold d.mutex.
+func (d *DefaultWorkingDirLocker) lockOwned(key string, lock workingDirLock) func() {
+	d.locks[key] = lock
 	return func() {
-		d.unlockOwned(key, owner)
+		d.unlockOwned(key, lock.owner)
 	}
 }
 
@@ -231,7 +252,7 @@ func (d *DefaultWorkingDirLocker) pullLockError(repoFullName string, pullNum int
 	return &workingDirLockError{message: message, metadata: metadata, multipleJobs: multipleJobs}
 }
 
-func workspaceLockError(cmdName command.Name, workspace string, path string, currentLock workingDirLock) error {
+func workspaceLockError(cmdName command.Name, workspace string, path string, currentLock workingDirLock) *workingDirLockError {
 	return &workingDirLockError{
 		message: fmt.Sprintf("cannot run %q: the %s workspace at path %s is currently locked for this pull request by %q%s.\n"+
 			"Wait until the previous command is complete and try again", cmdName, workspace, path, currentLock.Command, formatCommitSuffix(currentLock)),
@@ -308,8 +329,8 @@ func (d *DefaultWorkingDirLocker) sharedPullKeyPrefix(repo string, pull int) str
 	return d.pullLockPrefix(repo, pull) + reservedKeyMarker + "shared-pull/"
 }
 
-func (d *DefaultWorkingDirLocker) applyClaimKey(repo string, pull int, workspace string, path string, projectName string) string {
-	return fmt.Sprintf("%s%sapply-claim/%s/%s/%s", d.pullLockPrefix(repo, pull), reservedKeyMarker, workspace, path, projectName)
+func (d *DefaultWorkingDirLocker) applyClaimKey(repo string, pull int, workspace string, path string) string {
+	return fmt.Sprintf("%s%sapply-claim/%s/%s", d.pullLockPrefix(repo, pull), reservedKeyMarker, workspace, path)
 }
 
 func (d *DefaultWorkingDirLocker) pullLockPrefix(repo string, pull int) string {

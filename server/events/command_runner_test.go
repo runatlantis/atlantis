@@ -1954,6 +1954,23 @@ func TestRunCommentCommand_HonorsOnlyCancelsAfterCommandArrives(t *testing.T) {
 	Assert(t, tracker.IsCancelled(modelPull, applyRunner.ctx.CancellationMark), "a cancel issued after the command arrived must cancel it")
 }
 
+func TestRunAutoplanCommand_HonorsOnlyCancelsAfterCommandArrives(t *testing.T) {
+	setup(t)
+	tracker := events.NewCancellationTracker()
+	ch.CancellationTracker = tracker
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	planRunner := &contextCapturingCommandRunner{}
+	ch.CommentCommandRunnerByCmd[command.Plan] = planRunner
+
+	tracker.Cancel(modelPull)
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+
+	Assert(t, planRunner.ctx != nil, "plan runner was not called")
+	Assert(t, !tracker.IsCancelled(modelPull, planRunner.ctx.CancellationMark), "a cancel issued before the autoplan arrived must not cancel it")
+	tracker.Cancel(modelPull)
+	Assert(t, tracker.IsCancelled(modelPull, planRunner.ctx.CancellationMark), "a cancel issued after the autoplan arrived must cancel it")
+}
+
 func TestRunCommentCommand_DisableAutoplan(t *testing.T) {
 	t.Log("if \"DisableAutoplan\" is true, auto plans are disabled and we are silencing return and do not comment with error")
 	setup(t)

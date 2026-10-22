@@ -2835,7 +2835,7 @@ func (l *trackingWorkingDirLocker) TryLockPullShared(string, int, command.Name, 
 	return func() { l.locked = false }, nil
 }
 
-func (l *trackingWorkingDirLocker) TryLockProjectApply(string, int, string, string, string, events.WorkingDirLockMetadata) (func(), error) {
+func (l *trackingWorkingDirLocker) TryLockApplyDir(string, int, string, string, events.WorkingDirLockMetadata) (func(), error) {
 	return func() {}, nil
 }
 

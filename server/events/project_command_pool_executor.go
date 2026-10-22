@@ -220,8 +220,6 @@ func runProjectCmdsWithCancellationTracker(
 		ctx.Log.Info("Running commands in parallel")
 	}
 
-	// The tracker is not cleared here: other commands on this pull request
-	// may still be running and must keep seeing the cancel.
 	groups := prepareExecutionGroups(projectCmds, isParallel)
 
 	var results []command.ProjectResult

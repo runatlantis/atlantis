@@ -140,7 +140,8 @@ type DefaultCommandRunner struct {
 	VarFileAllowlistChecker        *VarFileAllowlistChecker              `validate:"required"`
 	CommitStatusUpdater            CommitStatusUpdater                   `validate:"required"`
 	// CancellationTracker stamps each command with the cancels issued before
-	// it arrived, so `atlantis cancel` stops only commands already running.
+	// it arrived, so `atlantis cancel` skips the remaining work only of
+	// commands already running. Work in progress runs to completion.
 	CancellationTracker CancellationTracker
 }
 
