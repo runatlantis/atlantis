@@ -96,6 +96,26 @@ Atlantis will automatically run `terraform plan`
 which can run arbitrary code if given a malicious Terraform configuration.
 :::
 
+### `--allow-partial-apply` <Badge text="v0.47.0+" type="info"/>
+
+```bash
+atlantis server --allow-partial-apply
+# or
+ATLANTIS_ALLOW_PARTIAL_APPLY=true
+```
+
+Allow `atlantis apply` (without flags) to apply the subset of projects that have
+valid plans, skipping projects whose plans errored or are missing, instead of
+failing the whole command. Defaults to `false`.
+
+This is useful for workflows with inter-project dependencies (e.g. Terragrunt)
+where dependent projects cannot plan successfully until their upstream projects
+have been applied, requiring iterative plan/apply cycles within one pull request.
+
+Skipped projects are logged as warnings. Staleness checks still apply: plans are
+rejected if the pull request head or base branch changed since they were created,
+and applies are blocked while a plan is running.
+
 ### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
