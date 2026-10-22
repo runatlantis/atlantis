@@ -362,8 +362,15 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	if err != nil {
 		return nil, err
 	}
-	// Use ApiUser for API authentication, Username is for git operations
-	req.SetBasicAuth(b.apiUser, b.password)
+
+	// Bitbucket access tokens (workspace/project/repo) begin with "ATCT".
+	if strings.HasPrefix(b.password, "ATCT") {
+		// Bitbucket Access Tokens Use Bearer Token Auth
+		req.Header.Set("Authorization", "Bearer "+b.password)
+	} else {
+		// Bitbucket API tokens and app passwords (deprecated) use basic auth.
+		req.SetBasicAuth(b.apiUser, b.password)
+	}
 	if body != nil {
 		req.Header.Add("Content-Type", "application/json")
 	}
