@@ -42,7 +42,7 @@ func (r *RunStepRunner) Run(
 	tfDistribution := r.DefaultTFDistribution
 	tfVersion := r.DefaultTFVersion
 	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution, "", terraform.APIAuth{})
 	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
