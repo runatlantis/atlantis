@@ -651,7 +651,7 @@ atlantis server --enable-external-stores
 ATLANTIS_ENABLE_EXTERNAL_STORES=true
 ```
 
-Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
+Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence. See [External Plan Storage](server-side-repo-config.md#external-plan-storage) for the configuration syntax.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 

@@ -24,6 +24,8 @@ more details.
 
 - By default, repo root `atlantis.yaml` file is used.
 - You can change this behaviour by setting [Server Side Repo Config](server-side-repo-config.md)
+- External plan storage is configured in the server-side repo config, not in `atlantis.yaml`.
+  See [External Plan Storage](server-side-repo-config.md#external-plan-storage).
 
 ::: danger DANGER
 Atlantis uses the `atlantis.yaml` version from the pull request, similar to other
