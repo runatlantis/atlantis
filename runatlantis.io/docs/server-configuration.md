@@ -828,6 +828,28 @@ ATLANTIS_GH_ORG="myorgname"
 
 GitHub organization name. Set to enable creating a private GitHub app for this organization.
 
+### `--gh-stack-aware-planning` <Badge text="v0.49.0+" type="info"/>
+
+```bash
+atlantis server --gh-stack-aware-planning
+# or
+ATLANTIS_GH_STACK_AWARE_PLANNING=true
+```
+
+Plan GitHub [stacked pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs)
+in stack order. Defaults to `false`.
+
+When enabled:
+
+* Only the lowest open pull request of a stack is autoplanned. Autoplan of a pull
+  request higher up the stack is deferred with a comment until the pull requests
+  below it are merged. `atlantis plan` can still be run on it manually.
+* When a stacked pull request is merged and its locks are released, the next pull
+  request of the stack is autoplanned.
+
+See [Automerging stacked pull requests](automerging.md#stacked-pull-requests) for
+how automerge handles stacks, which does not depend on this flag.
+
 ### `--gh-team-allowlist` <Badge text="v0.41.0+" type="info"/>
 
 ```bash
