@@ -138,8 +138,18 @@ func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo
 	if _, err := os.Stat(cloneDir); err == nil {
 		gitReadUnlockFn := w.gitReadLock(cloneDir)
 		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
+		// The head commit being current is not enough: the pull request may have
+		// been retargeted onto a base branch this checkout never fetched, which
+		// leaves the working tree merged into the old base. Callers that use the
+		// checkout without going through MergeAgain — pre-workflow hooks and
+		// project discovery among them — would otherwise run against it. Fall
+		// through to the slow path, where attemptReuseCloneDir re-clones.
+		// Only meaningful for the merge strategy: branch-strategy clones track
+		// the head branch and synthetic API refs (Num < 0) are checked out
+		// detached, so neither has a base remote-tracking branch to find.
+		baseRefOK := !w.CheckoutMerge || p.Num <= 0 || w.remoteHasBranch(logger, c, p.BaseBranch)
 		gitReadUnlockFn()
-		if err == nil && isUpToDate {
+		if err == nil && isUpToDate && baseRefOK {
 			logger.Info("repo is at correct commit %q so will not re-clone (fast path)", p.HeadCommit)
 			return cloneDir, nil
 		}
@@ -174,6 +184,22 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 	}
 	logger.Debug("clone directory '%s' already exists, checking if it's at the right commit", cloneDir)
 
+	// A missing base remote-tracking branch means the checkout cannot serve this
+	// pull request: it was cloned with --single-branch against a base branch the
+	// pull request no longer targets. Only meaningful for the merge strategy;
+	// branch-strategy clones track the head branch and never have this ref.
+	baseBranchMissing := w.CheckoutMerge && !w.remoteHasBranch(logger, c, c.pr.BaseBranch)
+
+	// For a pull request this has to be decided before the commit check: the
+	// working tree can be at the right head commit and still be merged into the
+	// old base, which the commit check alone would happily accept. Synthetic API
+	// refs (Num < 0) are checked out detached and have no base branch to track,
+	// so they keep the original ordering below.
+	if baseBranchMissing && c.pr.Num > 0 {
+		logger.Info("repo appears to have changed base branch, must reclone")
+		return false, nil
+	}
+
 	isUpToDate, err := w.isBranchAtTargetRef(logger, c, c.pr.HeadCommit)
 	if err != nil {
 		return false, err
@@ -182,7 +208,7 @@ func (w *FileWorkspace) attemptReuseCloneDir(logger logging.SimpleLogging, c wra
 		logger.Info("repo is at correct commit %q so will not re-clone", c.pr.HeadCommit)
 		return true, nil
 	}
-	if w.CheckoutMerge && !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+	if baseBranchMissing {
 		logger.Info("repo appears to have changed base branch, must reclone")
 		return false, nil
 	}
@@ -222,7 +248,19 @@ func (w *FileWorkspace) MergeAgain(
 	}
 	c := wrappedGitContext{cloneDir, headRepo, p}
 
-	if !w.recheckDiverged(logger, p, headRepo, cloneDir) {
+	// A base branch the checkout does not have means the pull request was
+	// retargeted onto a branch that was never fetched, e.g. a user changed the
+	// target branch by hand. recheckDiverged compares the working tree against
+	// its *old* base branch, so when that branch still exists and has not moved
+	// it reports no divergence and we would leave the checkout merged into the
+	// wrong base. Detect the missing ref up front so that case refreshes too.
+	// git show-ref only reads, so the read lock is enough here; mergeAgain
+	// repeats the check under the write lock before acting on it.
+	gitReadUnlockFn := w.gitReadLock(cloneDir)
+	baseRefMissing := !w.remoteHasBranch(logger, c, p.BaseBranch)
+	gitReadUnlockFn()
+
+	if !baseRefMissing && !w.recheckDiverged(logger, p, headRepo, cloneDir) {
 		return false, nil
 	}
 
@@ -810,8 +848,31 @@ func nonPRTargetRef(p models.PullRequest) string {
 }
 
 // There is a new upstream update that we need, and we want to update to it
-// without deleting any existing plans
+// without deleting any existing plans.
+//
+// One exception: if the pull request was retargeted onto a base branch this
+// checkout never fetched, the working tree cannot be updated in place and is
+// re-cloned instead, which does delete its plans. Callers must not rely on plan
+// preservation in that case. Those plans were made against a different base
+// branch, so they no longer describe what would be applied.
 func (w *FileWorkspace) mergeAgain(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// The base branch can change after the checkout was created, e.g. when a
+	// stacked pull request is retargeted because its original base branch was
+	// merged and deleted. forceClone clones with --single-branch, so the
+	// checkout only has a remote-tracking ref for the *old* base branch and the
+	// reset below would fail with "unknown revision or path not in the working
+	// tree". Re-clone instead, the same way Clone does when it notices the base
+	// branch changed. This discards existing plans, but that is unavoidable:
+	// the checkout cannot be updated to a base branch it never fetched.
+	//
+	// MergeAgain performs this check too, to decide whether to refresh at all.
+	// It is repeated here under the write lock so a concurrent re-clone between
+	// the two cannot leave us resetting to a ref that is missing.
+	if !w.remoteHasBranch(logger, c, c.pr.BaseBranch) {
+		logger.Info("base branch %q is not in the checkout, must reclone", c.pr.BaseBranch)
+		return w.forceClone(logger, c)
+	}
+
 	// Reset branch as if it was cloned again
 	if err := w.wrappedGit(logger, c, "reset", "--hard", fmt.Sprintf("refs/remotes/origin/%s", c.pr.BaseBranch)); err != nil {
 		return err
