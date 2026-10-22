@@ -2701,7 +2701,10 @@ func assertPathMissing(t *testing.T, path string) {
 
 func TestIgnorePlanFiles(t *testing.T) {
 	cloneDir := t.TempDir()
-	Ok(t, os.Mkdir(filepath.Join(cloneDir, ".git"), 0700))
+	t.Setenv("GIT_TEMPLATE_DIR", t.TempDir())
+	runCmd(t, cloneDir, "git", "init")
+	_, err := os.Stat(filepath.Join(cloneDir, ".git", "info"))
+	Assert(t, os.IsNotExist(err), "expected no .git/info with an empty template, got %v", err)
 
 	ignorePlanFiles(t, cloneDir)
 
@@ -2710,6 +2713,10 @@ func TestIgnorePlanFiles(t *testing.T) {
 	Equals(t, "*.tfplan\n", string(contents))
 
 	ignorePlanFiles(t, cloneDir)
+
+	contents, err = os.ReadFile(filepath.Join(cloneDir, ".git", "info", "exclude"))
+	Ok(t, err)
+	Equals(t, "*.tfplan\n", string(contents))
 }
 
 func ignorePlanFiles(t *testing.T, cloneDir string) {
