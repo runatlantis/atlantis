@@ -9,10 +9,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1027,19 +1025,24 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		squashMergeMethod:  repo.GetAllowSquashMerge,
 	}
 
-	mergeMethodsName := slices.Collect(maps.Keys(mergeMethodsAllow))
-	sort.Strings(mergeMethodsName)
-
 	var method string
 	if pullOptions.MergeMethod != "" {
-		method = pullOptions.MergeMethod
-
-		isMethodAllowed, isMethodExist := mergeMethodsAllow[method]
-		if !isMethodExist {
-			return fmt.Errorf("merge method '%s' is unknown. Specify one of the valid values: '%s'", method, strings.Join(mergeMethodsName, ", "))
+		// Translate the normalised merge method onto a GitHub merge method.
+		// GitHub has no fast-forward option, so that method (and any other the
+		// provider cannot perform) falls through to the unsupported error.
+		switch pullOptions.MergeMethod {
+		case models.MergeMethodMerge:
+			method = defaultMergeMethod
+		case models.MergeMethodRebase:
+			method = rebaseMergeMethod
+		case models.MergeMethodSquash:
+			method = squashMergeMethod
+		default:
+			return fmt.Errorf("merge method %q is not supported for GitHub, supported methods are: %s",
+				pullOptions.MergeMethod, common.FormatMergeMethods(common.SupportedMergeMethods(models.Github)))
 		}
 
-		if !isMethodAllowed() {
+		if !mergeMethodsAllow[method]() {
 			return fmt.Errorf("merge method '%s' is not allowed by the repository Pull Request settings", method)
 		}
 	} else {

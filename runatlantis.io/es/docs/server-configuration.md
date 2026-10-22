@@ -161,9 +161,11 @@ ATLANTIS_AUTOMERGE_METHOD="squash"
 ```
 
 Método de merge predeterminado para usar al hacer automerging de pull requests. Los valores válidos son
-`merge`, `rebase`, y `squash`. Cuando no se establece, se usa el método de merge
+`merge`, `rebase`, `squash`, y `fast-forward`. Cuando no se establece, se usa el método de merge
 predeterminado del proveedor VCS. Esto puede sobrescribirse por comando con el flag de comentario `--auto-merge-method`.
-Actualmente solo está implementado para GitHub.
+No todos los proveedores VCS soportan todos los métodos; vea
+[Automerging](automerging.md#how-to-set-the-merge-method-for-automerge)
+para los métodos que cada proveedor puede realizar.
 
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
