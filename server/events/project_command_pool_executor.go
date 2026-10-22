@@ -22,8 +22,14 @@ func RunOneProjectCmd(
 	cmd command.ProjectContext,
 ) command.ProjectResult {
 	projectCommandOutput := runnerFunc(cmd)
+	var savedHash string
+	if cmd.SavedPlanHash != nil {
+		savedHash = *cmd.SavedPlanHash
+	}
 
 	return command.ProjectResult{
+		PlanGeneration:       cmd.PlanGeneration,
+		ManagedPlanHash:      savedHash,
 		ProjectCommandOutput: projectCommandOutput,
 		Command:              cmd.CommandName,
 		SubCommand:           cmd.SubCommand,
@@ -81,7 +87,8 @@ func runProjectCmdsParallel(
 	if cancelledAt != -1 {
 		for _, pCmd := range cmds[cancelledAt:] {
 			results = append(results, command.ProjectResult{
-				Command: pCmd.CommandName,
+				Command:        pCmd.CommandName,
+				PlanGeneration: pCmd.PlanGeneration,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},
@@ -195,11 +202,18 @@ func runProjectCmdsParallelGroups(
 ) command.Result {
 	var results []command.ProjectResult
 	groups := splitByExecutionOrderGroup(cmds)
-	for _, group := range groups {
+	for i, group := range groups {
 		res := runProjectCmdsParallel(group, runnerFunc, poolSize, cancellationTracker, ctx.Pull)
 		results = append(results, res.ProjectResults...)
 		if res.HasErrors() && group[0].AbortOnExecutionOrderFail {
 			ctx.Log.Info("abort on execution order when failed")
+			if group[0].PlanGeneration != "" {
+				skipped := createCancelledResults(groups[i+1:])
+				for j := range skipped {
+					skipped[j].Error = fmt.Errorf("not run because an earlier execution order group failed")
+				}
+				results = append(results, skipped...)
+			}
 			break
 		}
 	}
@@ -242,6 +256,13 @@ func runProjectCmdsWithCancellationTracker(
 
 		if groupResult.HasErrors() && group[0].AbortOnExecutionOrderFail && isParallel {
 			ctx.Log.Info("abort on execution order when failed")
+			if group[0].PlanGeneration != "" {
+				skipped := createCancelledResults(groups[i+1:])
+				for j := range skipped {
+					skipped[j].Error = fmt.Errorf("not run because an earlier execution order group failed")
+				}
+				results = append(results, skipped...)
+			}
 			break
 		}
 
@@ -286,7 +307,8 @@ func createCancelledResults(remainingGroups [][]command.ProjectContext) []comman
 	for _, group := range remainingGroups {
 		for _, cmd := range group {
 			cancelledResults = append(cancelledResults, command.ProjectResult{
-				Command: cmd.CommandName,
+				Command:        cmd.CommandName,
+				PlanGeneration: cmd.PlanGeneration,
 				ProjectCommandOutput: command.ProjectCommandOutput{
 					Error: fmt.Errorf("operation cancelled via `atlantis cancel` command"),
 				},

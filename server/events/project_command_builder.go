@@ -1240,6 +1240,11 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 // buildAllProjectCommandsByPlan builds contexts for a command for every project that has
 // pending plans in this ctx.
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
+	if commentCmd.Name == command.Apply {
+		if err := p.restoreAcceptedGenerationPlans(ctx); err != nil {
+			return nil, err
+		}
+	}
 	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -1362,7 +1367,9 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 				return nil, fmt.Errorf("hashing plan for dir '%s': %w", plan.RepoRelDir, err)
 			}
 			for i := range commentCmds {
-				commentCmds[i].ExpectedPlanHash = planHash
+				if commentCmds[i].PlanGeneration == "" {
+					commentCmds[i].ExpectedPlanHash = planHash
+				}
 			}
 		}
 		cmds = append(cmds, commentCmds...)
@@ -1678,6 +1685,13 @@ func (p *DefaultProjectCommandBuilder) cloneMissingWorkspaces(ctx *command.Conte
 
 func (p *DefaultProjectCommandBuilder) setExpectedPlanHashes(ctx *command.Context, projCtxs []command.ProjectContext) error {
 	for i := range projCtxs {
+		if projCtxs[i].PlanGeneration != "" {
+			if projCtxs[i].AcceptedPlanGeneration != projCtxs[i].PlanGeneration || (requiresManagedPlanFileForApply(projCtxs[i]) && projCtxs[i].ExpectedPlanHash == "") {
+				return fmt.Errorf("no accepted plan for dir %q workspace %q project %q; run `atlantis plan` again", projCtxs[i].RepoRelDir, projCtxs[i].Workspace, projCtxs[i].ProjectName)
+			}
+			// The digest came from durable acceptance, never a canonical cache.
+			continue
+		}
 		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, projCtxs[i].Workspace)
 		if err != nil {
 			return fmt.Errorf("getting working directory for workspace %q: %w", projCtxs[i].Workspace, err)
@@ -1883,4 +1897,65 @@ func (p *DefaultProjectCommandBuilder) validateWorkspaceAllowed(repoCfg *valid.R
 	}
 
 	return repoCfg.ValidateWorkspaceAllowed(repoRelDir, workspace)
+}
+
+// restoreAcceptedGenerationPlans uses durable accepted identities as inventory.
+// A fresh replica must not select whichever same-head plan last wrote a generic
+// discovery key. Local convention files are only recoverable caches here.
+func (p *DefaultProjectCommandBuilder) restoreAcceptedGenerationPlans(ctx *command.Context) error {
+	if ctx.PullStatus == nil {
+		return nil
+	}
+	var accepted []models.ProjectStatus
+	for _, project := range ctx.PullStatus.Projects {
+		if project.PlanGenerationActive {
+			return fmt.Errorf("a plan generation is still active; run `atlantis plan` again after the running command finishes")
+		}
+		if project.PlanGeneration != "" && project.ManagedPlan && project.AcceptedPlanGeneration != "" && statusAllowedForDiscoveredPlan(project.Status) {
+			accepted = append(accepted, project)
+		}
+	}
+	if len(accepted) == 0 {
+		return nil
+	}
+	if err := pullStatusApplyEligibilityError(ctx.Pull, ctx.PullStatus.Pull, "accepted plans"); err != nil {
+		return err
+	}
+	workspaces := []string{DefaultWorkspace}
+	for _, project := range accepted {
+		workspaces = append(workspaces, project.Workspace)
+	}
+	cloned := make(map[string]bool)
+	for _, workspace := range workspaces {
+		if cloned[workspace] {
+			continue
+		}
+		cloned[workspace] = true
+		if _, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, workspace); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+			if _, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); err != nil {
+				return fmt.Errorf("cloning accepted plan workspace %q: %w", workspace, err)
+			}
+		}
+	}
+	for _, project := range accepted {
+		repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, project.Workspace)
+		if err != nil {
+			return err
+		}
+		projectCtx := command.ProjectContext{BaseRepo: ctx.Pull.BaseRepo, Pull: ctx.Pull, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, ProjectName: project.ProjectName, LocalSharePlanDir: p.LocalSharePlanDir, PlanGeneration: project.PlanGeneration, AcceptedPlanGeneration: project.AcceptedPlanGeneration, ExpectedPlanHash: project.ManagedPlanHash}
+		planPath, err := safePlanFilePath(projectCtx, filepath.Join(repoDir, project.RepoRelDir))
+		if err != nil {
+			return err
+		}
+		if err := runtime.EnsurePlanFileDir(projectCtx, filepath.Join(repoDir, project.RepoRelDir)); err != nil {
+			return err
+		}
+		if err := p.PlanStore.Load(projectCtx, planPath); err != nil {
+			return fmt.Errorf("restoring accepted plan for dir %q workspace %q project %q: %w", project.RepoRelDir, project.Workspace, project.ProjectName, err)
+		}
+	}
+	return nil
 }

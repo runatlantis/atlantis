@@ -7,6 +7,14 @@ import "github.com/runatlantis/atlantis/server/events/models"
 
 // ProjectResult is the result of executing a plan/policy_check/apply for a specific project.
 type ProjectResult struct {
+	// PlanGeneration is the durable identity observed before execution.
+	PlanGeneration string
+	// ManagedPlanHash is populated only after saving the exact plan bytes succeeds.
+	ManagedPlanHash string
+	// ExcludeFromPlanStatus completes admission without retaining a status for
+	// a directory that no longer exists. The original error remains in output.
+	ExcludeFromPlanStatus bool
+
 	ProjectCommandOutput
 	Command           Name
 	SubCommand        string
@@ -22,6 +30,7 @@ type ProjectCommandOutput struct {
 	Failure            string
 	PlanSuccess        *models.PlanSuccess
 	PolicyCheckResults *models.PolicyCheckResults
+	ApplyExecuted      bool
 	ApplySuccess       string
 	ApplySuccessURL    string `json:"-"`
 	VersionSuccess     string

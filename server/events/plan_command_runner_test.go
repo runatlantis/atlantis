@@ -5,10 +5,14 @@ package events_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/core/db"
+	"github.com/runatlantis/atlantis/server/core/planstore"
 	"github.com/runatlantis/atlantis/server/events/mocks"
 
 	"github.com/google/go-github/v88/github"
@@ -568,13 +572,13 @@ func TestPlanCommandRunner_ExecutionOrder(t *testing.T) {
 			// 	return ReturnValues{[]command.ProjectContext{{CommandName: command.Plan}}, nil}
 			// })
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutputs[i])
+				When(projectCommandRunner.Plan(matchPlanInvocation(c.ProjectContexts[i]))).ThenReturn(c.ProjectCommandOutputs[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
 
 			for i := range c.ProjectContexts {
-				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(c.ProjectContexts[i])
+				projectCommandRunner.VerifyWasCalled(c.RunnerInvokeMatch[i]).Plan(matchPlanInvocation(c.ProjectContexts[i]))
 			}
 
 			require.Equal(t, c.PlanFailed, ctx.CommandHasErrors)
@@ -800,7 +804,7 @@ func TestPlanCommandRunner_AtlantisApplyStatus(t *testing.T) {
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(c.ProjectContexts, nil)
 
 			for i := range c.ProjectContexts {
-				When(projectCommandRunner.Plan(c.ProjectContexts[i])).ThenReturn(c.ProjectCommandOutput[i])
+				When(projectCommandRunner.Plan(matchPlanInvocation(c.ProjectContexts[i]))).ThenReturn(c.ProjectCommandOutput[i])
 			}
 
 			planCommandRunner.Run(ctx, cmd)
@@ -1123,7 +1127,7 @@ func TestPlanCommandRunner_PendingApplyStatus(t *testing.T) {
 			}
 
 			When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn(projectContexts, nil)
-			When(projectCommandRunner.Plan(projectContexts[0])).ThenReturn(c.ProjectResults[0])
+			When(projectCommandRunner.Plan(matchPlanInvocation(projectContexts[0]))).ThenReturn(c.ProjectResults[0])
 
 			planCommandRunner.Run(ctx, cmd)
 
@@ -1231,6 +1235,98 @@ func TestPlanCommandRunner_PersistenceBeforePublication(t *testing.T) {
 					Assert(t, strings.Contains(comment, "disk full") && strings.Contains(comment, "atlantis plan"), "expected actionable persistence error: %s", comment)
 				} else {
 					setter.VerifyWasCalledOnce().SetJobURLWithStatus(Any[command.ProjectContext](), Eq(command.Plan), Eq(models.SuccessCommitStatus), Any[*command.ProjectCommandOutput]())
+				}
+			})
+		}
+	}
+}
+
+// Admission adds runtime identity to an otherwise unchanged planned invocation.
+// These existing runner tests compare the command configuration; generation
+// correctness is exercised separately through the actual DB transition.
+type planInvocationMatcher struct{ expected command.ProjectContext }
+
+func (m planInvocationMatcher) String() string { return "plan command configuration" }
+func (m planInvocationMatcher) Matches(param Param) bool {
+	actual, ok := param.(command.ProjectContext)
+	if !ok {
+		return false
+	}
+	clear := func(ctx command.ProjectContext) command.ProjectContext {
+		ctx.PlanGeneration, ctx.AcceptedPlanGeneration, ctx.ExpectedPlanHash = "", "", ""
+		ctx.SavedPlanHash, ctx.PullStatus = nil, nil
+		return ctx
+	}
+	return reflect.DeepEqual(clear(m.expected), clear(actual))
+}
+func matchPlanInvocation(expected command.ProjectContext) command.ProjectContext {
+	return ArgThat[command.ProjectContext](planInvocationMatcher{expected})
+}
+
+func TestPlanCommandRunner_GenerationAdmissionAndObsoleteCompletion(t *testing.T) {
+	for _, auto := range []bool{false, true} {
+		for _, superseded := range []bool{false, true} {
+			name := "manual"
+			if auto {
+				name = "autoplan"
+			}
+			if superseded {
+				name += "_superseded"
+			}
+			t.Run(name, func(t *testing.T) {
+				storage := newTestBoltDB(t)
+				vcsClient := setup(t, func(tc *TestConfig) { tc.database = storage })
+				ctx := &command.Context{Log: logging.NewNoopLogger(t), Pull: testdata.Pull, HeadRepo: testdata.GithubRepo, Scope: metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis")}
+				if auto {
+					ctx.Trigger = command.AutoTrigger
+				} else {
+					ctx.Trigger = command.CommentTrigger
+				}
+				cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "project"}
+				project := command.ProjectContext{CommandName: command.Plan, Workspace: "default", RepoRelDir: "project", RequiresAtlantisManagedPlanFile: true, BaseRepo: ctx.Pull.BaseRepo, Pull: ctx.Pull, Log: ctx.Log}
+				When(projectCommandBuilder.BuildPlanCommands(ctx, cmd)).ThenReturn([]command.ProjectContext{project}, nil)
+				When(projectCommandBuilder.BuildAutoplanCommands(ctx)).ThenReturn([]command.ProjectContext{project}, nil)
+				canonical := filepath.Join(t.TempDir(), "default.tfplan")
+				store := &planstore.LocalPlanStore{}
+				var expectedGeneration string
+				When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(args []Param) ReturnValues {
+					admitted := args[0].(command.ProjectContext)
+					status, err := storage.GetPullStatus(ctx.Pull)
+					require.NoError(t, err)
+					require.NotEmpty(t, admitted.PlanGeneration)
+					require.Equal(t, admitted.PlanGeneration, status.Projects[0].PlanGeneration)
+					require.True(t, status.Projects[0].PlanGenerationActive)
+					require.Empty(t, status.Projects[0].AcceptedPlanGeneration)
+					vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+					expectedGeneration = admitted.PlanGeneration
+					if superseded {
+						expectedGeneration = "newer-generation"
+						_, err := storage.BeginPlanGeneration(ctx.Pull, expectedGeneration, []command.ProjectContext{project}, false)
+						require.NoError(t, err)
+						newer := admitted
+						newer.PlanGeneration = expectedGeneration
+						newer.SavedPlanHash = new(string)
+						require.NoError(t, os.WriteFile(canonical, []byte("newer bytes"), 0o600))
+						require.NoError(t, store.Save(newer, canonical))
+						_, err = storage.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{{Command: command.Plan, Workspace: project.Workspace, RepoRelDir: project.RepoRelDir, PlanGeneration: expectedGeneration, ManagedPlanHash: *newer.SavedPlanHash, ProjectCommandOutput: command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}})
+						require.NoError(t, err)
+					}
+					require.NoError(t, os.WriteFile(canonical, []byte("original command bytes"), 0o600))
+					require.NoError(t, store.Save(admitted, canonical))
+					return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+				})
+				planCommandRunner.Run(ctx, cmd)
+				status, err := storage.GetPullStatus(ctx.Pull)
+				require.NoError(t, err)
+				require.Equal(t, expectedGeneration, status.Projects[0].AcceptedPlanGeneration)
+				require.False(t, status.Projects[0].PlanGenerationActive)
+				if superseded {
+					require.True(t, ctx.CommandHasErrors)
+					vcsClient.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+					commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.SuccessCommitStatus), Eq(command.Plan), Any[models.ProjectCounts]())
+				} else {
+					require.False(t, ctx.CommandHasErrors)
+					vcsClient.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 				}
 			})
 		}
