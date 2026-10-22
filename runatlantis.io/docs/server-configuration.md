@@ -710,6 +710,27 @@ This is useful when running multiple Atlantis servers against a single repositor
 
 Note: the "did you mean" misspelling warning only applies to the default executable name (`atlantis`). If you set a custom `--executable-name`, Atlantis won't warn about comments that are Levenshtein-close to it — this avoids spurious warnings when multiple servers with similar names (e.g. `atlantis-dev` and `atlantis-prod`) receive the same comment.
 
+### `--fail-on-missing-dependencies`
+
+```bash
+atlantis server --fail-on-missing-dependencies
+# or
+ATLANTIS_FAIL_ON_MISSING_DEPENDENCIES=true
+```
+
+Fail an apply when a project's [`depends_on`](repo-level-atlantis-yaml.md#project) names a project that has no plan status
+recorded for the pull request.
+
+By default a dependency that Atlantis cannot find in the pull request's status is treated as satisfied, so a project that
+was never planned — because a typo in `depends_on`, or because its `when_modified` didn't match the pull request — does not
+block its dependents. Enable this when you rely on `depends_on` as a guard, for example to hold a production tier until a
+staging tier has been applied.
+
+::: tip NOTE
+Dependencies are only enforced at apply time, and only against projects recorded in the pull request's status. A dependency
+that is planned but not yet applied always blocks its dependents regardless of this setting.
+:::
+
 ### `--fail-on-pre-workflow-hook-error` <Badge text="v0.27.0+" type="info"/>
 
 ```bash

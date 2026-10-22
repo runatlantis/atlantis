@@ -1183,6 +1183,60 @@ workflows:
 	}
 }
 
+// depends_on is validated before projects are filtered by the pull request's
+// base branch, so a project may depend on one that only exists on another
+// branch. Validating after filtering would reject a config that applies fine.
+func TestParseRepoCfg_DependsOnAcrossBranchFilters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	repoCfg := `
+version: 3
+projects:
+- name: staging-gate
+  dir: staging
+  branch: /staging/
+- name: prod-gate
+  dir: prod
+  branch: /main/
+  depends_on: [staging-gate]`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+
+	// On main only prod-gate survives filtering, yet its dependency on the
+	// staging-only project must still be accepted.
+	act, err := r.ParseRepoCfg(tmpDir, globalCfg, "repo_id", "main")
+	Ok(t, err)
+	Equals(t, 1, len(act.Projects))
+	Equals(t, "prod-gate", act.Projects[0].GetName())
+	Equals(t, []string{"staging-gate"}, act.Projects[0].DependsOn)
+}
+
+// A depends_on name that matches no project at all is rejected, so a typo fails
+// the config instead of silently dropping the dependency at apply time.
+func TestParseRepoCfg_DependsOnUnknownProject(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	repoCfg := `
+version: 3
+projects:
+- name: staging-gate
+  dir: staging
+- name: prod-gate
+  dir: prod
+  depends_on: [staging-gat]`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(repoCfg), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
+
+	_, err = r.ParseRepoCfg(tmpDir, globalCfg, "repo_id", "main")
+	ErrEquals(t, "depends_on: project \"prod-gate\" depends on \"staging-gat\" which is not a project name defined in this repo config", err)
+}
+
 // Test that we fail if the global validation fails. We test global validation
 // more completely in GlobalCfg.ValidateRepoCfg().
 func TestParseRepoCfg_GlobalValidation(t *testing.T) {
