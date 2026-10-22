@@ -1,0 +1,3 @@
+# BuildKit uses this file instead of the root .dockerignore when building .oss-scanner/Dockerfile.
+# The root one only allows the files the release image needs, but the scanner needs the whole checkout
+# (testing/, e2e/, nested modules) to compile and run the tests. Exclude nothing.
