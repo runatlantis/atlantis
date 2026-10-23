@@ -107,6 +107,6 @@ For explicitly configured projects in `atlantis.yaml`, set the `workspace:` fiel
 — workspace HCL scanning is not used for configured projects regardless of distribution.
 :::
 
-::: tip NOTE
-The Atlantis [latest docker image](https://github.com/runatlantis/atlantis/pkgs/container/atlantis/9854680?tag=latest) tends to have recent versions of Terraform, but there may be a delay as new versions are released. The highest version of Terraform allowed in your code is the version specified by `DEFAULT_TERRAFORM_VERSION` in the image your server is running.
+::: warning Changed in v0.49.0
+Before v0.49.0, the Atlantis Docker images bundled recent Terraform and OpenTofu releases, and the highest version of Terraform allowed in your code was the version specified by `DEFAULT_TERRAFORM_VERSION` in the image your server was running. Now the images ship no Terraform or OpenTofu binaries, and Atlantis downloads whichever version the server default, `atlantis.yaml`, or `required_version` asks for. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis knows which version to download by default, or mount or copy a binary into the image when downloads are blocked. See [Image variants](deployment.md#image-variants).
 :::

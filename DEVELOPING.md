@@ -36,6 +36,9 @@ NGROK_AUTHTOKEN=1234567890
 ATLANTIS_GH_APP_ID=123
 ATLANTIS_GH_APP_KEY_FILE="/.ssh/somekey.pem"
 ATLANTIS_GH_WEBHOOK_SECRET=12345
+# The Atlantis images ship no Terraform binary since v0.49.0; Atlantis
+# downloads this version on startup.
+ATLANTIS_DEFAULT_TF_VERSION=1.16.6
 ```
 
 Note: `~/.ssh` is mounted to allow for referencing any local ssh keys.
