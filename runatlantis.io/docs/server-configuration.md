@@ -161,9 +161,11 @@ ATLANTIS_AUTOMERGE_METHOD="squash"
 ```
 
 Default merge method to use when automerging pull requests. Valid values are
-`merge`, `rebase`, and `squash`. When not set, the VCS provider's default merge
-method is used. This can be overridden per command with the `--auto-merge-method`
-comment flag. Currently only implemented for GitHub.
+`merge`, `rebase`, `squash`, and `merge-queue`. When not set, the VCS provider's
+default merge method is used. `merge-queue` adds the pull request to the base
+branch's [GitHub merge queue](automerging.md#how-to-merge-via-the-github-merge-queue)
+instead of merging it directly. This can be overridden per command with the
+`--auto-merge-method` comment flag. Currently only implemented for GitHub.
 
 ### `--autoplan-file-list` <Badge text="v0.15.0+" type="info"/>
 
