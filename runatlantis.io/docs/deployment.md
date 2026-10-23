@@ -654,10 +654,10 @@ Every release is published as an Alpine and a Debian image. The unsuffixed tag (
 | `-debian`           | Debian | no                             |
 
 ::: warning Changed in v0.49.0
-Before v0.49.0, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and the binary-free images were published separately with `-alpine-slim` and `-debian-slim` tags. Now the default images ship no Terraform or OpenTofu binaries, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
+Before v0.49.0, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and v0.48 also published binary-free `-alpine-slim` and `-debian-slim` images as an intermediate step. Now the default images ship no Terraform or OpenTofu binaries and the `-slim` images are no longer published, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
 :::
 
-The `-alpine-slim` and `-debian-slim` tags are deprecated. In v0.49.0 they are published as aliases of the `-alpine` and `-debian` images so existing pins keep working; they will stop being published in a later release, so switch to the unsuffixed, `-alpine` or `-debian` tags.
+If you pinned a `-alpine-slim` or `-debian-slim` tag, switch to the unsuffixed, `-alpine` or `-debian` tag. They contain the same thing.
 
 Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is still in the image. Atlantis downloads the Terraform version it needs on first use, so it needs to be told which version that is:
 

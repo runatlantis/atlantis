@@ -118,17 +118,11 @@ jobs:
     # release tag also has the image type appended i.e. latest-alpine
     # if it's v0.10.0 and alpine, it will do v0.10.0, v0.10.0-alpine, latest, latest-alpine
     # if it's v0.10.0 and debian, it will do v0.10.0-debian, latest-debian
-    #
-    # Deprecated: until v0.49.0 the -alpine-slim and -debian-slim tags were
-    # separate images without Terraform or OpenTofu. The default images are now
-    # the same thing, so each one also carries its -slim tags (SLIM_SUFFIX) for
-    # one more release so existing pins keep pulling. Remove in v0.50.0.
     - name: Docker meta
       id: meta
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
       env:
         SUFFIX: ${{ format('-{0}', matrix.image_type) }}
-        SLIM_SUFFIX: ${{ format('-{0}-slim', matrix.image_type) }}
       with:
         images: |
           ${{ env.DOCKER_REPO }}
@@ -140,23 +134,16 @@ jobs:
           type=semver,pattern={{version}},prefix=v,suffix=${{ env.SUFFIX }}
           type=semver,pattern={{version}},prefix=v,enable=${{ matrix.image_type == 'alpine' }}
           type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SUFFIX }}
-          # deprecated -slim aliases of the same image
-          type=semver,pattern={{version}},prefix=v,suffix=${{ env.SLIM_SUFFIX }}
-          type=semver,pattern={{major}}.{{minor}},prefix=v,suffix=${{ env.SLIM_SUFFIX }}
           # dev
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}
           type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SUFFIX }}-{{ sha }}
-          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SLIM_SUFFIX }}
-          type=raw,event=push,value=dev,enable={{is_default_branch}},suffix=${{ env.SLIM_SUFFIX }}-{{ sha }}
           type=raw,event=push,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'main') && matrix.image_type == 'alpine' }},suffix=
           # prerelease
           type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
           type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
-          type=raw,event=tag,value=prerelease-latest,enable=${{ startsWith(github.ref, 'refs/tags/') && contains(github.ref, 'pre') }},suffix=${{ env.SLIM_SUFFIX }}
           # latest
           type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') && matrix.image_type == 'alpine' }},suffix=
           type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ env.SUFFIX }}
-          type=raw,event=tag,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'pre') }},suffix=${{ env.SLIM_SUFFIX }}
           # pr
           type=ref,event=pr,suffix=${{ env.SUFFIX }}
         flavor: |
