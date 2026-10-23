@@ -27,6 +27,12 @@ type RedisDB struct { // nolint: revive
 	client redis.Cmdable
 }
 
+// Client returns the shared redis handle so other stores reuse the locking
+// DB's connection pool and configuration.
+func (r *RedisDB) Client() redis.Cmdable {
+	return r.client
+}
+
 const (
 	pullKeySeparator = "::"
 )
