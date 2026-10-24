@@ -30,10 +30,12 @@ import (
 )
 
 func TestCleanUpPullWorkspaceErr(t *testing.T) {
-	t.Log("when workspace.Delete returns an error, we return it")
+	t.Log("when workspace.Delete returns an error, we return it after releasing the locks")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
@@ -41,11 +43,13 @@ func TestCleanUpPullWorkspaceErr(t *testing.T) {
 	})
 	Ok(t, err)
 	pce := events.PullClosedExecutor{
+		Locker:             l,
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 		Database:           db,
 	}
 	err = errors.New("err")
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning workspace: err", actualErr.Error())
@@ -56,6 +60,8 @@ func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
+	ctrl := gomock.NewController(t)
+	l := lockmocks.NewMockLocker(ctrl)
 	tmp := t.TempDir()
 	db, err := boltdb.New(tmp)
 	t.Cleanup(func() {
@@ -64,11 +70,13 @@ func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
 	Ok(t, err)
 	store := &countingPlanStore{}
 	pce := events.PullClosedExecutor{
+		Locker:             l,
 		WorkingDir:         w,
 		PullClosedTemplate: &events.PullClosedEventTemplate{},
 		Database:           db,
 		PlanStore:          store,
 	}
+	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
 	When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(errors.New("disk full"))
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning workspace: disk full", actualErr.Error())
