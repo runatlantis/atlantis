@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1348,7 +1349,7 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	// that the current Go types cannot unmarshal.
 	key := fmt.Appendf(nil, "%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1,"BaseRepo":{"CloneURL":"https://atlantis:secret-token@github.com/runatlantis/atlantis.git"}}}`)
 	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
 	Ok(t, err)
 	err = raw.Update(func(tx *bolt.Tx) error {
@@ -1362,6 +1363,11 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	b, err = boltdb.New(tmp)
 	Ok(t, err)
 	defer b.Close()
+
+	// Reading it fails without echoing the stored blob, which holds the clone URL token.
+	_, err = b.GetPullStatus(pull)
+	ErrContains(t, "deserializing pull", err)
+	Assert(t, !strings.Contains(err.Error(), "secret-token"), "error leaks clone URL: %s", err)
 
 	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
 		{
