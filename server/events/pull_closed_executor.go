@@ -95,10 +95,7 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 
 	// Delete locks before the working directory so other pulls are not
 	// blocked while it is removed, which can take minutes on slow filesystems.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
-	if err != nil {
-		return fmt.Errorf("cleaning up locks: %w", err)
-	}
+	locks, lockErr := p.Locker.UnlockByPull(repo.FullName, pull.Num)
 
 	var workspaceErr error
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
@@ -113,6 +110,9 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	if lockErr != nil {
+		return fmt.Errorf("cleaning up locks: %w", lockErr)
+	}
 	if workspaceErr != nil {
 		return workspaceErr
 	}

@@ -84,7 +84,7 @@ func TestCleanUpPullWorkspaceErrStillDeletesExternalPlans(t *testing.T) {
 }
 
 func TestCleanUpPullUnlockErr(t *testing.T) {
-	t.Log("when locker.UnlockByPull returns an error, we return it")
+	t.Log("when locker.UnlockByPull returns an error, we still clean the workspace and return it")
 	RegisterMockTestingT(t)
 	logger := logging.NewNoopLogger(t)
 	w := mocks.NewMockWorkingDir()
@@ -106,6 +106,7 @@ func TestCleanUpPullUnlockErr(t *testing.T) {
 	l.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, err)
 	actualErr := pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
 	Equals(t, "cleaning up locks: err", actualErr.Error())
+	w.VerifyWasCalledOnce().Delete(logger, testdata.GithubRepo, testdata.Pull)
 }
 
 func TestCleanUpPullNoLocks(t *testing.T) {
