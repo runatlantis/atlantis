@@ -55,11 +55,13 @@ type MarkdownRenderer struct {
 
 // commonData is data that all responses have.
 type commonData struct {
-	Command                   string
-	CommandName               string
-	SubCommand                string
-	Verbose                   bool
-	Log                       string
+	Command     string
+	CommandName string
+	SubCommand  string
+	Verbose     bool
+	Log         string
+	// Deprecated: always false. Kept so custom template overrides that
+	// reference it still render.
 	PlansDeleted              bool
 	DisableApplyAll           bool
 	DisableApply              bool
@@ -112,7 +114,9 @@ type applyResultData struct {
 
 type planSuccessData struct {
 	models.PlanSuccess
-	PlanSummary              string
+	PlanSummary string
+	// Deprecated: always false. Kept so custom template overrides that
+	// reference it still render.
 	PlanWasDeleted           bool
 	DisableApply             bool
 	DisableRepoLocking       bool
@@ -213,7 +217,6 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		SubCommand:                cmd.SubCommandName(),
 		Verbose:                   cmd.IsVerbose(),
 		Log:                       ctx.Log.GetHistory(),
-		PlansDeleted:              res.PlansDeleted,
 		DisableApplyAll:           m.disableApplyAll || m.disableApply,
 		DisableApply:              m.disableApply,
 		DisableRepoLocking:        m.disableRepoLocking,
@@ -262,7 +265,6 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			data := planSuccessData{
 				PlanSuccess:              *result.PlanSuccess,
-				PlanWasDeleted:           common.PlansDeleted,
 				DisableApply:             common.DisableApply,
 				DisableRepoLocking:       common.DisableRepoLocking,
 				EnableDiffMarkdownFormat: common.EnableDiffMarkdownFormat,
