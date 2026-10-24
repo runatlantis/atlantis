@@ -653,8 +653,8 @@ Every release is published as an Alpine and a Debian image. The unsuffixed tag (
 | none or `-alpine`   | Alpine | no                             |
 | `-debian`           | Debian | no                             |
 
-::: warning Changed in v0.49.0
-Before v0.49.0, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and v0.48 also published binary-free `-alpine-slim` and `-debian-slim` images as an intermediate step. Now the default images ship no Terraform or OpenTofu binaries and the `-slim` images are no longer published, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
+::: warning Behavior change
+Previously, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and an earlier release also published binary-free `-alpine-slim` and `-debian-slim` images as an intermediate step. Now the default images ship no Terraform or OpenTofu binaries and the `-slim` images are no longer published, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
 :::
 
 If you pinned a `-alpine-slim` or `-debian-slim` tag, switch to the unsuffixed, `-alpine` or `-debian` tag. They contain the same thing.

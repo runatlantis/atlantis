@@ -480,8 +480,8 @@ ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
 Terraform version to default to. Will download to `<data-dir>/bin/terraform<version>`
 if not in `PATH`. See [Terraform Versions](terraform-versions.md) for more details.
 
-::: warning Changed in v0.49.0
-Before v0.49.0, the official Docker images put a bundled `terraform` on `PATH`, so the server started without this flag. Now the images ship no Terraform or OpenTofu binaries, and the server refuses to start with `terraform not found in $PATH` unless this flag is set. Set it (and [`--default-tf-distribution`](#default-tf-distribution) for OpenTofu) so Atlantis downloads that version, or mount or copy a binary onto `PATH` when downloads are blocked. See [Image variants](deployment.md#image-variants).
+::: warning Behavior change
+Previously, the official Docker images put a bundled `terraform` on `PATH`, so the server started without this flag. Now the images ship no Terraform or OpenTofu binaries, and the server refuses to start with `terraform not found in $PATH` unless this flag is set. Set it (and [`--default-tf-distribution`](#default-tf-distribution) for OpenTofu) so Atlantis downloads that version, or mount or copy a binary onto `PATH` when downloads are blocked. See [Image variants](deployment.md#image-variants).
 :::
 
 ### `--disable-apply-all` <Badge text="v0.9.0+" type="info"/>
