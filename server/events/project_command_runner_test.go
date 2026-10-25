@@ -100,15 +100,21 @@ func TestDefaultProjectCommandRunner_Plan(t *testing.T) {
 		RepoRelDir: ".",
 	}
 
-	// Each step will output its step name.
+	// Each step will output its step name. The mocked plan step writes no
+	// plan file, so stand in for it: the built-in plan step always leaves one
+	// and doPlan records its hash.
+	planContents := []byte("plan output")
+	Ok(t, os.WriteFile(filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName)), planContents, 0600))
 	When(mockInit.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("init", nil)
 	When(mockPlan.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("plan", nil)
 	When(mockApply.Run(ctx, nil, repoDir, expEnvs)).ThenReturn("apply", nil)
 	When(mockRun.Run(ctx, nil, "", repoDir, expEnvs, true, nil, nil)).ThenReturn("run", nil)
 	res := runner.Plan(ctx)
 
+	Ok(t, res.Error)
 	Assert(t, res.PlanSuccess != nil, "exp plan success")
 	Equals(t, "https://lock-key", res.PlanSuccess.LockURL)
+	Equals(t, planHashForContent(planContents), res.PlanSuccess.PlanHash)
 	t.Logf("output is %s", res.PlanSuccess.TerraformOutput)
 	Equals(t, "run\napply\nplan\ninit", res.PlanSuccess.TerraformOutput)
 	expSteps := []string{"run", "apply", "plan", "init", "env"}
@@ -5609,4 +5615,207 @@ func TestDefaultProjectCommandRunner_ApplyManagedPlanFileStillRequired(t *testin
 	Assert(t, res.Error != nil, "expected missing managed plan file to be rejected")
 	Assert(t, strings.Contains(res.Error.Error(), "plan file is missing"), "got: %s", res.Error)
 	mockApply.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+}
+
+// planFileWritingStepRunner stands in for the built-in plan step: it writes
+// contents to the convention plan path for the project.
+type planFileWritingStepRunner struct {
+	contents []byte
+}
+
+func (r *planFileWritingStepRunner) Run(ctx command.ProjectContext, _ []string, path string, _ map[string]string) (string, error) {
+	return "plan", os.WriteFile(runtime.GetPlanFilePath(ctx, path), r.contents, 0600)
+}
+
+// hashCapturingStepRunner records the ExpectedPlanHash the apply step is
+// handed, which is what the built-in apply step verifies the file against.
+type hashCapturingStepRunner struct {
+	seenHash *string
+	calls    *[]string
+}
+
+func (r *hashCapturingStepRunner) Run(ctx command.ProjectContext, _ []string, _ string, _ map[string]string) (string, error) {
+	*r.seenHash = ctx.ExpectedPlanHash
+	*r.calls = append(*r.calls, "apply")
+	return "apply", nil
+}
+
+func newPlanHashTestRunner(t *testing.T, planStep events.StepRunner, repoDir string) events.DefaultProjectCommandRunner {
+	t.Helper()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](),
+		Any[models.Project](), AnyBool())).ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	return events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		PlanStepRunner:            planStep,
+		RunStepRunner:             mocks.NewMockCustomStepRunner(),
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: mocks.NewMockCommandRequirementHandler(),
+	}
+}
+
+func planHashTestContext(t *testing.T, steps []valid.Step) command.ProjectContext {
+	t.Helper()
+	return command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		CommandName: command.Plan,
+		Steps:       steps,
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		ProjectName: "projA",
+	}
+}
+
+func TestDefaultProjectCommandRunner_PlanRecordsHashOfWrittenPlanFile(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	planContents := []byte("reviewed plan")
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: planContents}, repoDir)
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Equals(t, planHashForContent(planContents), res.PlanSuccess.PlanHash)
+}
+
+func TestDefaultProjectCommandRunner_PlanFailsWhenBuiltInPlanStepLeavesNoPlanFile(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &recordingStepRunner{name: "plan"}, repoDir)
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Assert(t, res.Error != nil, "expected missing plan file error")
+	Assert(t, strings.Contains(res.Error.Error(), "did not write a plan file"), "got: %s", res.Error)
+	Assert(t, res.PlanSuccess == nil, "expected no plan success")
+}
+
+func TestDefaultProjectCommandRunner_PlanWithoutBuiltInPlanStepRecordsNoHash(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &recordingStepRunner{name: "plan"}, repoDir)
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "run", RunCommand: "echo plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Equals(t, "", res.PlanSuccess.PlanHash)
+}
+
+func newRecordedHashApplyRunner(t *testing.T, applyStep events.StepRunner, repoDir string, ctx command.ProjectContext) (*events.DefaultProjectCommandRunner, *boltdb.BoltDB) {
+	t.Helper()
+	mockWorkingDir := mocks.NewMockWorkingDir()
+	mockLocker := mocks.NewMockProjectLocker()
+	db := newTestBoltDB(t)
+	When(mockWorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(repoDir, nil)
+	When(mockWorkingDir.GitReadLock(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)).ThenReturn(func() {})
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Eq(ctx.Pull), Any[models.User](), Eq(ctx.Workspace), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key"}, nil)
+	return &events.DefaultProjectCommandRunner{
+		Locker:                    mockLocker,
+		LockURLGenerator:          mockURLGenerator{},
+		ApplyStepRunner:           applyStep,
+		WorkingDir:                mockWorkingDir,
+		WorkingDirLocker:          events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{WorkingDir: mockWorkingDir},
+		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: db},
+	}, db
+}
+
+// A plan file swapped between `atlantis plan` and `atlantis apply` must not be
+// applied, even though the hash the builder took at apply time matches disk.
+func TestProjectCommandRunner_ApplyRejectsPlanDifferingFromRecordedHash(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	replaced := []byte("replaced plan")
+	ctx := recordedHashApplyContext(t)
+	ctx.Steps = valid.DefaultApplyStage.Steps
+	ctx.ExpectedPlanHash = planHashForContent(replaced)
+	calls := []string{}
+	seenHash := ""
+	runner, db := newRecordedHashApplyRunner(t, &hashCapturingStepRunner{seenHash: &seenHash, calls: &calls}, repoDir, ctx)
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		plannedProjectResultWithHash(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, planHashForContent([]byte("reviewed plan"))),
+	})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, replaced, 0600))
+
+	res := runner.Apply(ctx)
+
+	Assert(t, res.Error != nil, "expected recorded plan hash rejection")
+	Assert(t, strings.Contains(res.Error.Error(), "does not match the plan that was recorded"), "got: %s", res.Error)
+	Equals(t, []string{}, calls)
+	_, statErr := os.Stat(planPath)
+	Assert(t, os.IsNotExist(statErr), "expected rejected plan file to be deleted, stat err: %v", statErr)
+}
+
+// The recorded hash is what the apply step verifies the file against, not the
+// hash the builder took from disk at apply time.
+func TestProjectCommandRunner_ApplyBindsApplyStepToRecordedHash(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	reviewed := []byte("reviewed plan")
+	recordedHash := planHashForContent(reviewed)
+	ctx := recordedHashApplyContext(t)
+	ctx.Steps = valid.DefaultApplyStage.Steps
+	ctx.ExpectedPlanHash = recordedHash
+	calls := []string{}
+	seenHash := ""
+	runner, db := newRecordedHashApplyRunner(t, &hashCapturingStepRunner{seenHash: &seenHash, calls: &calls}, repoDir, ctx)
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		plannedProjectResultWithHash(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, recordedHash),
+	})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, reviewed, 0600))
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, "apply", res.ApplySuccess)
+	Equals(t, []string{"apply"}, calls)
+	Equals(t, recordedHash, seenHash)
+}
+
+// With an external plan store the file restored by Load is the file saved
+// right after plan, so it matches the recorded hash even when a stale local
+// copy was hashed by the builder.
+func TestProjectCommandRunner_ApplyRecordedHashMatchesPlanRestoredFromStore(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	stored := []byte("external-store-plan")
+	leftover := []byte("leftover-local-plan")
+	recordedHash := planHashForContent(stored)
+	ctx := recordedHashApplyContext(t)
+	ctx.Steps = valid.DefaultApplyStage.Steps
+	ctx.ExpectedPlanHash = planHashForContent(leftover)
+	calls := []string{}
+	seenHash := ""
+	runner, db := newRecordedHashApplyRunner(t, &hashCapturingStepRunner{seenHash: &seenHash, calls: &calls}, repoDir, ctx)
+	store := &restoringPlanStore{contents: stored}
+	runner.PlanStore = store
+	_, err := db.UpdatePullWithResults(ctx.Pull, []command.ProjectResult{
+		plannedProjectResultWithHash(ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, recordedHash),
+	})
+	Ok(t, err)
+	planPath := filepath.Join(repoDir, runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName))
+	Ok(t, os.WriteFile(planPath, leftover, 0600))
+
+	res := runner.Apply(ctx)
+
+	Ok(t, res.Error)
+	Equals(t, []string{"apply"}, calls)
+	Equals(t, recordedHash, seenHash)
+	Assert(t, store.loadCalls == 1, "expected one PlanStore.Load, got %d", store.loadCalls)
 }

@@ -983,6 +983,7 @@ func updatePullStatusFromProjectResult(ctx *command.Context, result command.Proj
 			result.RepoRelDir == project.RepoRelDir &&
 			result.ProjectName == project.ProjectName {
 			project.Status = result.PlanStatus()
+			project.PlanHash = result.PlanHashAfterMerge(project.PlanHash)
 			return
 		}
 	}
@@ -1008,6 +1009,7 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 				ProjectName:  projectResult.ProjectName,
 				PolicyStatus: projectResult.PolicyStatus(),
 				Status:       projectResult.PlanStatus(),
+				PlanHash:     projectResult.PlanHashAfterMerge(""),
 			})
 		case command.PolicyCheck, command.ApprovePolicies:
 			upsertProjectPolicyStatus(ctx.PullStatus, projectResult)
@@ -1054,6 +1056,7 @@ func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectSta
 			status.RepoRelDir == project.RepoRelDir &&
 			status.ProjectName == project.ProjectName {
 			project.Status = status.Status
+			project.PlanHash = status.PlanHash
 			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
 			return
 		}

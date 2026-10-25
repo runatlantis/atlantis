@@ -458,6 +458,12 @@ type PlanSuccess struct {
 	// branch we're merging into had been updated, and we had to merge again
 	// before planning
 	MergedAgain bool
+	// PlanHash is the lowercase hex SHA-256 of the plan file the built-in plan
+	// step wrote. Apply verifies the plan file it is given against it, so a
+	// file replaced after planning is not applied as the reviewed plan. It is
+	// empty when the plan stage is built only from custom run steps, which
+	// manage their own plan file.
+	PlanHash string
 }
 
 func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
@@ -853,6 +859,12 @@ type ProjectStatus struct {
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
+	// PlanHash is the SHA-256 recorded for the plan file when this project was
+	// last planned (see PlanSuccess.PlanHash). It is kept while the plan can
+	// still be applied and cleared once it has been applied or discarded.
+	// Empty for statuses written before hashes were recorded and for
+	// workflows whose plan stage manages its own plan file.
+	PlanHash string
 }
 
 // ProjectPlanStatus is the status of where this project is at in the planning

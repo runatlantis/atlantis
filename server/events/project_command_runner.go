@@ -878,13 +878,45 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
+	planHash, err := planStagePlanHash(ctx, projAbsPath)
+	if err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return nil, "", errorWithStepOutput(err, outputs)
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,
+		PlanHash:        planHash,
 	}, "", nil
+}
+
+// planStagePlanHash hashes the convention plan file the built-in plan step
+// wrote so that apply can verify the file it is handed is the one produced
+// here. The hash is recorded with the project's plan status. A plan stage
+// without a built-in plan step manages its own plan file, so there is nothing
+// for Atlantis to bind and the hash is empty.
+func planStagePlanHash(ctx command.ProjectContext, absPath string) (string, error) {
+	if !hasAtlantisManagedPlanStep(ctx.Steps) {
+		return "", nil
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return "", err
+	}
+	planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("plan step did not write a plan file for dir %q workspace %q project %q", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+		}
+		return "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+	}
+	return planHash, nil
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
@@ -945,20 +977,34 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	// artifact, so Atlantis cannot require or hash a convention plan file for
 	// them. Their durable plan state is still validated.
 	managedPlanFile := requiresManagedPlanFileForApply(ctx)
-	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
+	defaultApplyPlanValidator, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
 	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
-		planPath, err := safePlanFilePath(ctx, absPath)
+		recordedHash, err := defaultApplyPlanValidator.RecordedPlanHash(ctx)
 		if err != nil {
 			return "", "", "", err
 		}
-		planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
-			}
+		if recordedHash != "" {
+			// The plan step recorded this hash when it wrote the file. Bind
+			// the apply step to it rather than to whatever is on disk now, so
+			// a file replaced after planning fails the apply step's final
+			// check as well as the validation below.
+			ctx.ExpectedPlanHash = recordedHash
 		} else {
-			// Overwrite builder hash. Load may have replaced leftover disk.
-			ctx.ExpectedPlanHash = planHash
+			planPath, err := safePlanFilePath(ctx, absPath)
+			if err != nil {
+				return "", "", "", err
+			}
+			planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+				}
+			} else {
+				// No hash was recorded at plan time (status written by an
+				// older version, or a custom plan stage). Overwrite builder
+				// hash. Load may have replaced leftover disk.
+				ctx.ExpectedPlanHash = planHash
+			}
 		}
 	}
 
