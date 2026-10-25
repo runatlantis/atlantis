@@ -63,6 +63,28 @@ Each VCS provider has different rules around who can approve:
   is not the author of the pull request
 * **Azure DevOps** – **All builtin groups include the "Contribute to pull requests"** permission and can approve a pull request
 
+On GitHub and Gitea, Atlantis reads every review on the pull request and uses each
+reviewer's latest approving or changes-requested review. The requirement is met when at
+least one reviewer's latest such review is a current approval. Comment-only reviews are
+ignored. Changes requested by a different reviewer do not cancel someone else's approval;
+use the [mergeable](#mergeable) requirement with branch protection if you need that.
+
+* **GitHub** – an approval stops counting if the same reviewer later requests changes, or
+  if it is dismissed.
+* **Gitea** – an approval stops counting if the same reviewer later requests changes, if it
+  is dismissed, or if Gitea marks it stale. Gitea marks a review stale when a push to the
+  pull request changes its diff against the base after the review was submitted. This
+  happens whether or not the branch protection setting "Dismiss stale approvals" is enabled.
+  Reviewers must approve again after such a push.
+
+::: warning Behavior change
+Previously, on GitHub, any `APPROVED` review satisfied `approved`, even if the same reviewer later requested changes. Now only each reviewer's latest approve or request-changes review counts, so a later "Request changes" or a dismissal by that reviewer cancels their approval. If Atlantis replies `Pull request must be approved according to the project's approval rules before running apply.` on a pull request that shows an approval, check for a later "Request changes" or a dismissal by that approver.
+:::
+
+::: warning Behavior change
+Previously, on Gitea, any review with state `APPROVED` satisfied `approved`, including dismissed approvals and approvals given before later pushes changed the diff. Now dismissed and stale approvals do not count, and a later "Request changes" by the same reviewer cancels their approval. After a push that changes the pull request's diff, a reviewer must approve again; until then Atlantis replies `Pull request must be approved according to the project's approval rules before running apply.`
+:::
+
 :::tip Tip
 To require **certain people** to approve the pull request, look at the
 [mergeable](#mergeable) requirement.
