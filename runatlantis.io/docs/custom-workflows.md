@@ -840,7 +840,7 @@ The name-value pairs in the output are added as environment variables if command
 If the output cannot be parsed, the step fails with an error that names the problem and the byte offset where parsing stopped, for example `invalid environment variable definition: misquoted at offset 8`. The output itself is never included in this error.
 
 ::: warning Behavior change
-Previously, a failing `multienv` command's output was included in the error even with `output: hide`, and an unparseable line was quoted in full, as in `invalid environment variable definition: <line> (misquoted)`. Now `output: hide` also removes the command's output from the error when the command fails, and parse errors never quote the line, reading `invalid environment variable definition: <reason> at offset <n>` where the reason is `invalid syntax`, `invalid key syntax`, `misquoted` or `remaining unparsed data`. Update any tooling that matched the old parse-error text, and use the offset to find the bad entry in your command's output.
+Previously, a failing `multienv` command's output was included in the error even with `output: hide`, and an unparsable line was quoted in full, as in `invalid environment variable definition: <line> (misquoted)`. Now `output: hide` also removes the command's output from the error when the command fails, and parse errors never quote the line, reading `invalid environment variable definition: <reason> at offset <n>` where the reason is `invalid syntax`, `invalid key syntax`, `misquoted` or `remaining unparsed data`. Update any tooling that matched the old parse-error text, and use the offset to find the bad entry in your command's output.
 :::
 
 ::: tip Notes
