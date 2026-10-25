@@ -369,6 +369,21 @@ type DefaultProjectCommandRunner struct {
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
 	PlanStore                 runtime.PlanStore
+	// VarFileAllowlistChecker re-checks comment var-file arguments once the
+	// repository is cloned, so that a committed symlink cannot point a
+	// repository-relative path at a file outside the clone.
+	VarFileAllowlistChecker *VarFileAllowlistChecker
+}
+
+// checkVarFilesResolved rejects comment var-file arguments that resolve, with
+// symlinks in the cloned repository followed, to a file outside both the
+// repository and the allowlist. The comment parser already checked the paths
+// as written; this is the half of the check that needs the clone on disk.
+func (p *DefaultProjectCommandRunner) checkVarFilesResolved(ctx command.ProjectContext, repoDir, projAbsPath string) error {
+	if p.VarFileAllowlistChecker == nil || len(ctx.CommentArgs) == 0 {
+		return nil
+	}
+	return p.VarFileAllowlistChecker.CheckResolved(repoDir, projAbsPath, ctx.CommentArgs)
 }
 
 func (p *DefaultProjectCommandRunner) workingDirLockMetadata(ctx command.ProjectContext) WorkingDirLockMetadata {
@@ -854,6 +869,12 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		}
 		return nil, "", err
 	}
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return nil, "", err
+	}
 
 	// Validate requirements after refreshing the merge checkout so project path
 	// checks and plan execution use the same tree.
@@ -936,6 +957,9 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", "", "", err
+	}
+	if err := p.checkVarFilesResolved(ctx, repoDir, absPath); err != nil {
 		return "", "", "", err
 	}
 
@@ -1092,6 +1116,9 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 	if err = checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
 		return nil, "", err
 	}
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
+	}
 
 	failure, err = p.CommandRequirementHandler.ValidateImportProject(repoDir, ctx)
 	if failure != "" || err != nil {
@@ -1142,6 +1169,9 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 	failure, err = p.CommandRequirementHandler.ValidateStateRmProject(repoDir, ctx)
 	if failure != "" || err != nil {
 		return nil, failure, err
+	}
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.

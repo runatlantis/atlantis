@@ -408,9 +408,13 @@ func (c *DefaultCommandRunner) checkUserPermissions(repo models.Repo, user *mode
 	return false, nil
 }
 
-// checkVarFilesInPlanCommandAllowlisted checks if paths in a 'plan' command are allowlisted.
-func (c *DefaultCommandRunner) checkVarFilesInPlanCommandAllowlisted(cmd *CommentCommand) error {
-	if cmd == nil || cmd.CommandName() != command.Plan {
+// checkVarFilesInCommandAllowlisted checks that every var-file path in the
+// command's extra args is allowlisted. It runs for every command, not only
+// plan: Terraform honours -var-file on import and state rm as well, and apply
+// accepts it when run without a saved plan, so limiting the check to plan
+// would leave the same file read reachable through the other commands.
+func (c *DefaultCommandRunner) checkVarFilesInCommandAllowlisted(cmd *CommentCommand) error {
+	if cmd == nil {
 		return nil
 	}
 
@@ -442,8 +446,8 @@ func (c *DefaultCommandRunner) validateCommentCommand(ctx *command.Context, base
 		ctx.User = user
 	}
 
-	// Check if the provided var files in a 'plan' command are allowlisted
-	if err := c.checkVarFilesInPlanCommandAllowlisted(cmd); err != nil {
+	// Check if the provided var files are allowlisted
+	if err := c.checkVarFilesInCommandAllowlisted(cmd); err != nil {
 		if shouldComment {
 			errMsg := fmt.Sprintf("```\n%s\n```", err.Error())
 			if commentErr := c.VCSClient.CreateComment(c.Logger, baseRepo, pullNum, errMsg, ""); commentErr != nil {

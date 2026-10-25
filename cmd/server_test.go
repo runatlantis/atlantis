@@ -57,7 +57,7 @@ var testFlags = map[string]any{
 	AutoplanModules:                  false,
 	AutoplanModulesFromProjects:      "",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
-	BlockedExtraArgsFlag:             "-chdir,--chdir,-plugin-dir,--plugin-dir",
+	BlockedExtraArgsFlag:             "-no-color,-lock-timeout",
 	AllowForkPRsFlag:                 true,
 	APISecretFlag:                    "",
 	AutoDiscoverModeFlag:             "auto",

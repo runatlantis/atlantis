@@ -406,19 +406,28 @@ This means that an attacker could spoof calls to Atlantis and cause it to perfor
 ### `--blocked-extra-args`
 
 ```bash
-atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+atlantis server --blocked-extra-args="-lock-timeout,-parallelism"
 # or
-ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+ATLANTIS_BLOCKED_EXTRA_ARGS='-lock-timeout,-parallelism'
 ```
 
-Comma-separated list of Terraform CLI flag prefixes that are not allowed in comment extra args (the flags after `--`).
-Defaults to `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+Comma-separated list of additional Terraform CLI flags that are not allowed in comment extra args (the flags after `--`).
+These flags are always blocked, whether or not this flag is set: `-chdir,-plugin-dir,-out,-generate-config-out,-state,-state-out,-backup`.
 
 Notes:
 
-- These flags are blocked to prevent security issues such as working-directory traversal (`-chdir`) or loading malicious providers (`-plugin-dir`).
-- Setting this flag **replaces** the default list entirely. To extend the defaults, include them along with your custom flags, e.g. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- `-chdir` and `-plugin-dir` are blocked because they move Terraform's working directory or provider source to a location the commenter controls.
+- `-out`, `-generate-config-out`, `-state`, `-state-out` and `-backup` are blocked because they make Terraform write a file, or read state, at a path the commenter chooses. Atlantis manages the plan and state file locations itself.
+- Setting this flag **adds** to the always-blocked list; it cannot unblock any of them.
+- A comment that uses a blocked flag is rejected with `flag "<arg>" is not allowed in extra args`.
+- To generate configuration for `import` blocks, which needs `-generate-config-out`, define a server-side [custom workflow](custom-workflows.md) whose `plan` step passes the flag in `extra_args`, for example `- plan: {extra_args: ["-generate-config-out=generated.tf"]}`, and select it for the project only while generating config.
+- A flag is matched by name, so listing `-lock-timeout` blocks `-lock-timeout`, `--lock-timeout`, `-lock-timeout=VALUE` and `--lock-timeout=VALUE`. You do not need to list both dash spellings.
+- Only comment extra args are checked. Flags set by the server operator, such as `extra_args` in a server-side workflow or in a repo-level workflow that the server allows, are passed to Terraform unchanged.
 - Accepts a comma separated list, ex. `-flag1,-flag2`.
+
+::: warning Behavior change
+Previously, only `-chdir` and `-plugin-dir` were blocked by default, an entry matched only the dash spelling listed (`-foo` did not block `--foo`), and setting `--blocked-extra-args` replaced the defaults. Now `-out`, `-generate-config-out`, `-state`, `-state-out` and `-backup` are also always blocked, both dash spellings are matched, and `--blocked-extra-args` only adds flags. Comments such as `atlantis plan -- -generate-config-out=generated.tf` or `atlantis state rm ADDRESS -- -backup=FILE` now fail with `flag "<arg>" is not allowed in extra args`; move flags you still need into a server-side workflow's `extra_args`. An existing custom list keeps working and now also gets the built-in protections.
+:::
 
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
@@ -1696,6 +1705,16 @@ ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
 Comma-separated list of additional directory paths where [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) can be read from.
 The paths in this argument should be absolute paths. Relative paths and globbing are currently not supported.
 If this argument is not provided, it defaults to Atlantis' data directory, determined by the `--data-dir` argument.
+
+Notes:
+
+- The allowlist is enforced for every comment command that passes `-var-file` to Terraform (`plan`, `apply`, `import` and `state rm`), and for both the `-var-file` and `--var-file` spellings.
+- Only `-var-file` values given in comment extra args are checked. Var files named in workflow `extra_args` are not.
+- A path inside the repository is always allowed as written, but once the repository is cloned the file is resolved with symbolic links followed. A link committed to the repository that points outside both the repository and the allowlisted directories is rejected, and so is a link whose target does not exist. A var file path may not contain a `..` element, because the operating system follows a symbolic link before applying `..`.
+
+::: warning Behavior change
+Previously, the allowlist was checked only for `atlantis plan`, only for the single-dash `-var-file` spelling, and only against the path as written. Now it is checked for `plan`, `apply`, `import` and `state rm`, for every spelling (`-var-file`, `--var-file`, with a space or `=`), and again after cloning with symbolic links resolved. Rejected paths fail with `var file path <path> is not allowed by the current allowlist: [<dirs>]`, `var file path <path> resolves to <target>, which is not allowed by the current allowlist: [<dirs>]`, `var file path <path> is a symbolic link whose target does not exist` or `var file path <path> must not contain '..' elements`. Move shared var files into the repository or an allowlisted directory, and replace links that point outside them with real files.
+:::
 
 ### `--vcs-status-name` <Badge text="v0.42.0+" type="info"/>
 

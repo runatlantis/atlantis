@@ -2961,3 +2961,29 @@ func TestRunCommentCommand_HeadRepoHostMustMatchBase(t *testing.T) {
 		})
 	}
 }
+
+func TestRunCommentCommand_VarFileOutsideAllowlistRejectedForEveryCommand(t *testing.T) {
+	t.Log("a var file outside the allowlist is rejected whichever command carries it, not only plan")
+	for _, name := range []command.Name{command.Plan, command.Apply, command.Import, command.State} {
+		t.Run(name.String(), func(t *testing.T) {
+			vcsClient := setup(t)
+			checker, err := events.NewVarFileAllowlistChecker("")
+			Ok(t, err)
+			ch.VarFileAllowlistChecker = checker
+			var pull github.PullRequest
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+			cmd := &events.CommentCommand{Name: name, Flags: []string{"-var-file=/etc/passwd"}}
+			if name == command.State {
+				cmd.SubName = "rm"
+			}
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, cmd)
+
+			vcsClient.VerifyWasCalledOnce().CreateComment(
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num),
+				Eq("```\nvar file path /etc/passwd is not allowed by the current allowlist: []\n```"), Eq(""))
+		})
+	}
+}

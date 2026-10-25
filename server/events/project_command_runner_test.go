@@ -5896,3 +5896,53 @@ func TestProjectCommandRunner_ApplyRecordedHashMatchesPlanRestoredFromStore(t *t
 	Equals(t, recordedHash, seenHash)
 	Assert(t, store.loadCalls == 1, "expected one PlanStore.Load, got %d", store.loadCalls)
 }
+
+func TestDefaultProjectCommandRunner_PlanRejectsVarFileSymlinkOutsideRepo(t *testing.T) {
+	t.Log("a -var-file comment arg that is a repository symlink to a file outside the clone is rejected once the clone exists")
+	RegisterMockTestingT(t)
+	mockLocker := mocks.NewMockProjectLocker()
+	root := t.TempDir()
+	repoDir := filepath.Join(root, "repo")
+	projectDir := filepath.Join(repoDir, "project1")
+	Ok(t, os.MkdirAll(projectDir, 0o755))
+	secret := filepath.Join(root, "secret.tfvars")
+	Ok(t, os.WriteFile(secret, []byte("x = 1\n"), 0o600))
+	Ok(t, os.Symlink(secret, filepath.Join(projectDir, "evil.tfvars")))
+	workingDir := &mergeCreatesProjectWorkingDir{
+		repoDir:     repoDir,
+		projectPath: "project1",
+	}
+	checker, err := events.NewVarFileAllowlistChecker("")
+	Ok(t, err)
+	unlocked := false
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:                  mockLocker,
+		LockURLGenerator:        mockURLGenerator{},
+		WorkingDir:              workingDir,
+		WorkingDirLocker:        events.NewDefaultWorkingDirLocker(),
+		VarFileAllowlistChecker: checker,
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
+			WorkingDir: workingDir,
+		},
+	}
+	ctx := command.ProjectContext{
+		Log:         logging.NewNoopLogger(t),
+		RepoRelDir:  "project1",
+		Workspace:   "default",
+		CommentArgs: []string{"-var-file=evil.tfvars"},
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { unlocked = true; return nil }}, nil)
+
+	res := runner.Plan(ctx)
+
+	Assert(t, res.Error != nil, "expected an error, got plan success %v", res.PlanSuccess)
+	Assert(t, strings.Contains(res.Error.Error(), "var file path evil.tfvars resolves to"),
+		"unexpected error: %s", res.Error)
+	Assert(t, unlocked, "expected the project lock to be released after the rejection")
+}
