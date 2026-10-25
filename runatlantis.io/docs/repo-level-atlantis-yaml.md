@@ -504,6 +504,29 @@ have multiple states in the same directory using `terraform init -backend-config
 Atlantis supports this but requires the `name` key to be specified. See [Custom Backend Config](custom-workflows.md#custom-backend-config) for more details.
 :::
 
+#### Symlinked project directories
+
+Atlantis resolves symlinks in a project's `dir` before running any command in
+it. A `dir` that is, or passes through, a symlink to another directory inside
+the repo works as before. A `dir` that resolves to a location outside the
+cloned repo is rejected with `project path traversal detected: path escapes base directory`.
+A `dir` whose symlink target does not exist fails with `dir "<dir>" does not exist`,
+and a `dir` that cannot be resolved for any other reason fails with
+`resolving project path: <error>`. If a plan file path inside the project
+directory is a symlink or anything other than a regular file, Atlantis deletes
+it before writing the new plan.
+
+::: warning Behavior change
+Previously, Atlantis checked the project `dir` as text only, so a symlink
+in the repo could point the project at a directory outside the clone, and a
+symlink at the plan file path was followed when the plan was written. Now
+symlinks are resolved first, a `dir` outside the clone is refused with
+`project path traversal detected: path escapes base directory`, a `dir` that
+cannot be resolved now fails instead of the error being ignored, and a symlinked plan file
+is replaced with a regular file. Repos whose project `dir` links outside the
+repo must move that code into the repo or use a real directory.
+:::
+
 ### Autoplan
 
 ```yaml

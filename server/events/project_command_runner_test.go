@@ -33,6 +33,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/webhooks"
 	jobmocks "github.com/runatlantis/atlantis/server/jobs/mocks"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/utils"
 	. "github.com/runatlantis/atlantis/testing"
 )
 
@@ -786,6 +787,128 @@ func TestDefaultProjectCommandRunner_PlanChecksProjectPathAfterMergeAgain(t *tes
 	Ok(t, res.Error)
 	Assert(t, res.PlanSuccess != nil, "expected plan success")
 	Assert(t, workingDir.mergeCalled, "expected merge checkout refresh")
+}
+
+// Test that a project directory which is a committed symlink pointing outside
+// the clone is rejected before any step runs, even though its lexical path is
+// inside the clone.
+func TestDefaultProjectCommandRunner_PlanRejectsSymlinkedProjectDirOutsideRepo(t *testing.T) {
+	cases := []struct {
+		desc   string
+		target func(repoDir, outsideDir string) string
+	}{
+		{
+			desc:   "absolute target",
+			target: func(_, outsideDir string) string { return outsideDir },
+		},
+		{
+			desc: "relative target into a sibling directory",
+			target: func(repoDir, outsideDir string) string {
+				rel, err := filepath.Rel(repoDir, outsideDir)
+				if err != nil {
+					panic(err)
+				}
+				return rel
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.desc, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockLocker := mocks.NewMockProjectLocker()
+			mockPlan := mocks.NewMockStepRunner()
+			parent := t.TempDir()
+			repoDir := filepath.Join(parent, "1", "default")
+			outsideDir := filepath.Join(parent, "2", "default")
+			Ok(t, os.MkdirAll(repoDir, 0o755))
+			Ok(t, os.MkdirAll(outsideDir, 0o755))
+			Ok(t, os.Symlink(c.target(repoDir, outsideDir), filepath.Join(repoDir, "evil")))
+			workingDir := &mergeCreatesProjectWorkingDir{
+				repoDir:     repoDir,
+				projectPath: ".",
+			}
+			runner := &events.DefaultProjectCommandRunner{
+				Locker:           mockLocker,
+				LockURLGenerator: mockURLGenerator{},
+				PlanStepRunner:   mockPlan,
+				WorkingDir:       workingDir,
+				WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
+					WorkingDir: workingDir,
+				},
+			}
+			ctx := command.ProjectContext{
+				Log:        logging.NewNoopLogger(t),
+				RepoRelDir: "evil",
+				Workspace:  "default",
+				Steps:      []valid.Step{{StepName: "plan"}},
+				Pull: models.PullRequest{
+					Num:      1,
+					BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+				},
+			}
+			When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+				Any[string](), Any[models.Project](), AnyBool())).
+				ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+
+			res := runner.Plan(ctx)
+
+			Assert(t, res.Error != nil, "expected traversal error")
+			Assert(t, strings.Contains(res.Error.Error(), "project path traversal detected"), "unexpected error: %v", res.Error)
+			Assert(t, errors.Is(res.Error, utils.ErrPathEscapesBase), "expected ErrPathEscapesBase, got %v", res.Error)
+			Assert(t, !strings.Contains(res.Error.Error(), parent), "error should not expose paths: %q", res.Error.Error())
+			mockPlan.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+		})
+	}
+}
+
+// Test that a project directory which is a symlink resolving inside the clone
+// keeps working.
+func TestDefaultProjectCommandRunner_PlanAllowsSymlinkedProjectDirInsideRepo(t *testing.T) {
+	RegisterMockTestingT(t)
+	mockLocker := mocks.NewMockProjectLocker()
+	mockPlan := mocks.NewMockStepRunner()
+	repoDir := t.TempDir()
+	Ok(t, os.MkdirAll(filepath.Join(repoDir, "modules", "real"), 0o755))
+	Ok(t, os.Symlink(filepath.Join("modules", "real"), filepath.Join(repoDir, "link")))
+	workingDir := &mergeCreatesProjectWorkingDir{
+		repoDir:     repoDir,
+		projectPath: ".",
+	}
+	runner := &events.DefaultProjectCommandRunner{
+		Locker:           mockLocker,
+		LockURLGenerator: mockURLGenerator{},
+		PlanStepRunner:   mockPlan,
+		WorkingDir:       workingDir,
+		WorkingDirLocker: events.NewDefaultWorkingDirLocker(),
+		CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
+			WorkingDir: workingDir,
+		},
+	}
+	ctx := command.ProjectContext{
+		Log:        logging.NewNoopLogger(t),
+		RepoRelDir: "link",
+		Workspace:  "default",
+		Steps:      []valid.Step{{StepName: "plan"}},
+		Pull: models.PullRequest{
+			Num:      1,
+			BaseRepo: models.Repo{FullName: "runatlantis/atlantis"},
+		},
+	}
+	When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](),
+		Any[string](), Any[models.Project](), AnyBool())).
+		ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+	When(mockPlan.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).
+		ThenReturn("plan", nil)
+	// The mocked plan step writes nothing, so put the plan file where it would.
+	Ok(t, os.WriteFile(filepath.Join(repoDir, "link", runtime.GetPlanFilename(ctx.Workspace, ctx.ProjectName)), []byte("plan"), 0o600))
+
+	res := runner.Plan(ctx)
+
+	Equals(t, "", res.Failure)
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "expected plan success")
+	mockPlan.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Eq(filepath.Join(repoDir, "link")), Any[map[string]string]())
 }
 
 func TestDefaultProjectCommandRunner_PlanValidationFailureKeepsLockWhenDeletePlanFails(t *testing.T) {

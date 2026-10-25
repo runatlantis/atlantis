@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,6 +35,25 @@ type DirNotExistErr struct {
 // Error implements the error interface.
 func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
+}
+
+// checkProjectDir verifies that the project directory for ctx exists inside
+// repoDir once symlinks are resolved. A pull request can commit a symlink
+// named as the project directory whose target lies outside the clone, so a
+// lexical check alone is not enough. It returns DirNotExistErr when the
+// directory is missing so callers keep their existing behaviour.
+func checkProjectDir(ctx command.ProjectContext, repoDir, absPath string) error {
+	err := utils.EnsureSubPathResolved(repoDir, absPath)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, fs.ErrNotExist):
+		return DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	case errors.Is(err, utils.ErrPathEscapesBase):
+		return fmt.Errorf("project path traversal detected: %w", err)
+	default:
+		return fmt.Errorf("resolving project path: %w", err)
+	}
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
@@ -583,23 +603,14 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
 
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
-
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", err
 	}
 
 	var failure string
@@ -837,17 +848,11 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
+	if err := checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", err
 	}
 
 	// Validate requirements after refreshing the merge checkout so project path
@@ -898,11 +903,8 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-		return "", "", "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", "", "", err
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)
@@ -1015,11 +1017,8 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-		return "", "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", "", err
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
@@ -1044,11 +1043,8 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err = checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateImportProject(repoDir, ctx)
@@ -1093,11 +1089,8 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err = checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
