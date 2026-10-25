@@ -349,6 +349,44 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			repoID: "github.com/owner/repo",
 			expErr: "",
 		},
+		"repo uses allowed repo-local workflow then forbidden server-side workflow (with custom workflows)": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
+						AllowAllRepoSettings: true,
+					}).Repos[0],
+					{
+						ID:                   "github.com/owner/repo",
+						AllowCustomWorkflows: Bool(true),
+						AllowedOverrides:     []string{"workflow"},
+						AllowedWorkflows:     []string{"allowed"},
+					},
+				},
+				Workflows: map[string]valid.Workflow{
+					"allowed":   {},
+					"forbidden": {},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Workflows: map[string]valid.Workflow{
+					"local": {},
+				},
+				Projects: []valid.Project{
+					{
+						Dir:          "first",
+						Workspace:    "default",
+						WorkflowName: String("local"),
+					},
+					{
+						Dir:          "second",
+						Workspace:    "default",
+						WorkflowName: String("forbidden"),
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "workflow 'forbidden' is not allowed for this repo",
+		},
 		"workflow not allowed": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
 				AllowAllRepoSettings: false,

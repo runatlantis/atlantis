@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/runatlantis/atlantis/server"
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
@@ -81,9 +80,9 @@ func TestUserConfig_ToBlockedExtraArgs(t *testing.T) {
 		want             []string
 	}{
 		{
-			name:             "empty returns defaults",
+			name:             "empty adds nothing to the always-blocked defaults",
 			blockedExtraArgs: "",
-			want:             events.DefaultBlockedExtraArgs,
+			want:             nil,
 		},
 		{
 			name:             "single flag",
@@ -96,7 +95,7 @@ func TestUserConfig_ToBlockedExtraArgs(t *testing.T) {
 			want:             []string{"-chdir", "--chdir", "-plugin-dir", "--plugin-dir"},
 		},
 		{
-			name:             "custom flag list overrides defaults",
+			name:             "custom flags are returned as given",
 			blockedExtraArgs: "-no-color,--no-color",
 			want:             []string{"-no-color", "--no-color"},
 		},

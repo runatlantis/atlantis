@@ -681,7 +681,11 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
 | run.command | string | none | yes | Shell command to run |
 | run.shell | string | "sh" | no | Name of the shell to use for command execution |
 | run.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
-| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
+| run.output | string or []string or []any | "show" | no | How to post-process the output of this command when posted in the PR comment. The options are:<br/>*`show` - preserve the full output<br/>* `hide` - hide output from comment, including when the command fails (still visible in the real-time streaming output)<br/> `strip_refreshing` - hide all output up until and including the last line containing "Refreshing...". This matches the behavior of the built-in `plan` command <br/> `filter_regex: "<regex_pattern>"` - masks sensitive text in Atlantis comments by replacing regex matches with &lt;redacted&gt;. Can be used multiple times (processed in order). Only filters inline comments - full plan links still show unfiltered results. |
+
+::: warning Behavior change
+Previously, `output: hide` only hid a `run` step's output when the command succeeded; if the command failed, its output was included in the error posted to the pull request. Now the output is hidden on failure too, and the error shows only the exit status, command and directory, ending in `running "<command>" in "<dir>":` with no output after it. Use the real-time streaming output to debug a failing hidden step. `show`, `strip_refreshing` and `filter_regex` behave as before.
+:::
 
 #### Native Environment Variables
 
@@ -699,6 +703,9 @@ Full example, filtering output and masking matching text (`mySecret: "foo"` -> `
       does not require, hash, or delete a plan artifact for such a workflow; it still
       validates the project's recorded plan state before running `apply`. As soon as a
       workflow uses the built-in `plan` or `apply` step, the plan must be at `$PLANFILE`.
+      When the `plan` stage uses the built-in `plan` step, Atlantis records a hash of
+      `$PLANFILE` after all `plan` stage steps finish, and `apply` only runs a plan file with
+      that hash. See [Plan file integrity](#plan-file-integrity).
   * `SHOWFILE` - Absolute path to the location where Atlantis expects the plan in json format to
       either be generated (by show) or already exist (if running policy checks). Can be used to
       override the built-in `plan`/`apply` commands, ex. `run: terraform show -json $PLANFILE > $SHOWFILE`.
@@ -729,6 +736,25 @@ will execute a custom script containing the following code to create an SSH tunn
 `ssh -f -M -S /tmp/ssh_tunnel -L 3306:database:3306 -N bastion 1>/dev/null 2>&1`. Without
 the redirect, the script would block the Atlantis workflow.
 * If a workflow step returns a non-zero exit code, the workflow will stop.
+:::
+
+#### Plan file integrity
+
+When a project's `plan` stage contains the built-in `plan` step, Atlantis hashes the plan
+file at `$PLANFILE` once every `plan` stage step has run, and stores the hash with the
+project's plan status. Before `apply`, Atlantis compares the plan file on disk with that
+hash. A file that does not match is deleted and the apply is refused. `plan` stages made
+only of custom `run` steps record no hash, and their plan files are not checked this way.
+
+Custom `run` steps in the `plan` stage may still rewrite `$PLANFILE`, because the hash is
+taken after they finish. Anything that moves, replaces or edits `$PLANFILE` after the
+`plan` stage ends, such as a `pre_workflow_hooks` script or an `apply` stage step that runs
+before the built-in `apply`, will make `apply` fail. In the second case the error is
+``plan file changed for dir "<dir>" workspace "<workspace>" project "<project>"; run `atlantis plan` before apply``.
+A `plan` stage step that moves the plan file away from `$PLANFILE` makes the plan itself fail.
+
+::: warning Behavior change
+Previously, `apply` ran whatever plan file was at `$PLANFILE` when the apply command started, and a built-in `plan` step that left no plan file only failed later at `apply`. Now `apply` refuses and deletes a plan file whose hash differs from the one recorded at plan time, with ``plan file for dir "<dir>" workspace "<workspace>" project "<project>" does not match the plan that was recorded when it was created; run `atlantis plan` ``. A `plan` stage with the built-in `plan` step that leaves no file at `$PLANFILE` now fails the plan with `plan step did not write a plan file for dir "<dir>" workspace "<workspace>" project "<project>"`. If your workflows or hooks move, replace or edit `$PLANFILE` outside the `plan` stage, move that work into the `plan` stage and run `atlantis plan` again. Plans created before the upgrade have no recorded hash and are applied as before.
 :::
 
 #### Environment Variable `env` Command
@@ -804,12 +830,18 @@ Full:
 | multienv.command | string | none | yes | Name of the custom script to run |
 | multienv.shell | string | "sh" | no | Name of the shell to use for command execution |
 | multienv.shellArgs | string or []string | "-c" | no | Command line arguments to be passed to the shell. Cannot be set without `shell` |
-| multienv.output | string | "show" | no | Setting output to "hide" will suppress the message about added environment variables |
+| multienv.output | string | "show" | no | Setting output to "hide" will suppress the message about added environment variables, and the command's output when it fails |
 
 The output of the command execution must have the following format:
 `EnvVar1Name=value1,EnvVar2Name=value2,EnvVar3Name=value3`
 
 The name-value pairs in the output are added as environment variables if command execution is successful, otherwise the workflow execution is interrupted with an error and the errorMessage is returned.
+
+If the output cannot be parsed, the step fails with an error that names the problem and the byte offset where parsing stopped, for example `invalid environment variable definition: misquoted at offset 8`. The output itself is never included in this error.
+
+::: warning Behavior change
+Previously, a failing `multienv` command's output was included in the error even with `output: hide`, and an unparseable line was quoted in full, as in `invalid environment variable definition: <line> (misquoted)`. Now `output: hide` also removes the command's output from the error when the command fails, and parse errors never quote the line, reading `invalid environment variable definition: <reason> at offset <n>` where the reason is `invalid syntax`, `invalid key syntax`, `misquoted` or `remaining unparsed data`. Update any tooling that matched the old parse-error text, and use the offset to find the bad entry in your command's output.
+:::
 
 ::: tip Notes
 
