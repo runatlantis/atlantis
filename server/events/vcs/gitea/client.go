@@ -267,6 +267,10 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		},
 	}
 
+	// Every page must be read before deciding: a later page can hold a
+	// REQUEST_CHANGES that supersedes an approval on an earlier page.
+	effective := newEffectiveReviews()
+
 	for page < nextPage {
 		page++
 		listOptions.Page = page
@@ -282,13 +286,7 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 
 		for _, review := range pullReviews {
-			if review.State == gitea.ReviewStateApproved {
-				approvalStatus.IsApproved = true
-				approvalStatus.ApprovedBy = review.Reviewer.UserName
-				approvalStatus.Date = review.Submitted
-
-				return approvalStatus, nil
-			}
+			effective.record(review)
 		}
 
 		nextPage = resp.NextPage
@@ -299,7 +297,79 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 	}
 
+	if review := effective.firstApproval(); review != nil {
+		approvalStatus.IsApproved = true
+		approvalStatus.ApprovedBy = review.Reviewer.UserName
+		approvalStatus.Date = review.Submitted
+	}
+
 	return approvalStatus, nil
+}
+
+// effectiveReviews tracks, for each reviewer, the review that currently
+// determines their stance on a pull request.
+//
+// Gitea keeps every review a user ever submitted and leaves State as
+// APPROVED on reviews that were later dismissed or went stale, so a review
+// row on its own says nothing about whether the approval is still in force.
+// The reviewer's latest APPROVED or REQUEST_CHANGES review (by Submitted,
+// falling back to API order for equal times) is their effective stance, and
+// it grants approval only when it is APPROVED and neither:
+//
+//   - dismissed (Dismissed), because Gitea explicitly revoked it; nor
+//   - stale (Stale), because the pull request changed after the review was
+//     submitted and the approval no longer covers the current head.
+//
+// A dismissed or stale latest review is a tombstone: it grants nothing and
+// still supersedes every earlier review by the same user, so an older
+// approval is never revived when a newer one is revoked. COMMENT, PENDING,
+// REQUEST_REVIEW and unknown states neither grant nor revoke approval and
+// are ignored, as are reviews with no reviewer (team review requests).
+type effectiveReviews struct {
+	latestByReviewer map[string]*gitea.PullReview
+	// reviewers holds reviewer names in the order they were first seen so
+	// that the reported approver is deterministic.
+	reviewers []string
+}
+
+func newEffectiveReviews() *effectiveReviews {
+	return &effectiveReviews{latestByReviewer: make(map[string]*gitea.PullReview)}
+}
+
+func (e *effectiveReviews) record(review *gitea.PullReview) {
+	if review == nil || review.Reviewer == nil {
+		return
+	}
+	if review.State != gitea.ReviewStateApproved && review.State != gitea.ReviewStateRequestChanges {
+		return
+	}
+
+	key := review.Reviewer.UserName
+	existing, seen := e.latestByReviewer[key]
+	if seen && review.Submitted.Before(existing.Submitted) {
+		return
+	}
+	if !seen {
+		e.reviewers = append(e.reviewers, key)
+	}
+	e.latestByReviewer[key] = review
+}
+
+// firstApproval returns the first reviewer's effective review that is an
+// approval, or nil when no reviewer currently approves the pull request.
+func (e *effectiveReviews) firstApproval() *gitea.PullReview {
+	for _, key := range e.reviewers {
+		if review := e.latestByReviewer[key]; grantsApproval(review) {
+			return review
+		}
+	}
+	return nil
+}
+
+// grantsApproval reports whether a reviewer's effective review is an
+// approval that is still in force.
+func grantsApproval(review *gitea.PullReview) bool {
+	return review.State == gitea.ReviewStateApproved && !review.Dismissed && !review.Stale
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
