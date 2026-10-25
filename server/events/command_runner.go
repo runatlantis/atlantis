@@ -684,6 +684,14 @@ func (c *DefaultCommandRunner) fetchUserTeams(logger logging.SimpleLogging, repo
 }
 
 func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, commandName command.Name, shouldComment bool) bool {
+	// Fail closed: once head repo metadata is present its host must match the
+	// base repo host. An empty head host (e.g. a file:// or bare-path clone URL)
+	// is rejected rather than treated as "unknown".
+	if ctx.HeadRepo.FullName != "" && !strings.EqualFold(ctx.HeadRepo.VCSHost.Hostname, ctx.Pull.BaseRepo.VCSHost.Hostname) {
+		ctx.Log.Warn("head repo host %q does not match base repo host %q, not running command", ctx.HeadRepo.VCSHost.Hostname, ctx.Pull.BaseRepo.VCSHost.Hostname)
+		return false
+	}
+
 	if !c.AllowForkPRs && ctx.HeadRepo.Owner != ctx.Pull.BaseRepo.Owner {
 		if c.SilenceForkPRErrors || !shouldComment {
 			return false

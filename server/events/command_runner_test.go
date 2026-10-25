@@ -1122,6 +1122,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 			headRepo: models.Repo{
 				Owner:    "forkrepo",
 				FullName: "forkrepo/atlantis",
+				VCSHost:  testdata.GithubRepo.VCSHost,
 			},
 			wantComment: fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", "allow-fork-prs-flag", ""),
 		},
@@ -2854,4 +2855,85 @@ func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
 	Equals(t, 0, drainer.GetStatus().InProgressOps)
+}
+
+// headRepoHostCases returns head repos paired with whether a command run
+// against the base repo testdata.GithubRepo should be allowed to proceed.
+func headRepoHostCases(t *testing.T) []struct {
+	name     string
+	headRepo models.Repo
+	allowed  bool
+} {
+	t.Helper()
+	caseVariant := testdata.GithubRepo
+	caseVariant.VCSHost.Hostname = "GitHub.com"
+
+	forged := testdata.GithubRepo
+	forged.VCSHost.Hostname = "192.168.16.1:8001"
+
+	fileURLHead, err := models.NewRepo(models.Github, testdata.GithubRepo.FullName,
+		fmt.Sprintf("file:///%s.git", testdata.GithubRepo.FullName), "", "", "")
+	Ok(t, err)
+	Equals(t, "", fileURLHead.VCSHost.Hostname)
+
+	barePathHead, err := models.NewRepo(models.Github, testdata.GithubRepo.FullName,
+		fmt.Sprintf("/%s.git", testdata.GithubRepo.FullName), "", "", "")
+	Ok(t, err)
+	Equals(t, "", barePathHead.VCSHost.Hostname)
+
+	return []struct {
+		name     string
+		headRepo models.Repo
+		allowed  bool
+	}{
+		{name: "same host", headRepo: testdata.GithubRepo, allowed: true},
+		{name: "case variant host", headRepo: caseVariant, allowed: true},
+		{name: "forged host", headRepo: forged, allowed: false},
+		{name: "empty host from file url", headRepo: fileURLHead, allowed: false},
+		{name: "empty host from bare path", headRepo: barePathHead, allowed: false},
+	}
+}
+
+func verifyPreHooksRan(t *testing.T, allowed bool) {
+	t.Helper()
+	hooks := preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner)
+	if allowed {
+		hooks.VerifyWasCalledOnce().RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+		return
+	}
+	hooks.VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+func TestRunAutoplanCommand_HeadRepoHostMustMatchBase(t *testing.T) {
+	for _, c := range headRepoHostCases(t) {
+		t.Run(c.name, func(t *testing.T) {
+			setup(t)
+			tmp := t.TempDir()
+			When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+			pull := testdata.Pull
+			pull.BaseRepo = testdata.GithubRepo
+			pull.State = models.OpenPullState
+
+			ch.RunAutoplanCommand(testdata.GithubRepo, c.headRepo, pull, testdata.User)
+
+			verifyPreHooksRan(t, c.allowed)
+		})
+	}
+}
+
+func TestRunCommentCommand_HeadRepoHostMustMatchBase(t *testing.T) {
+	for _, c := range headRepoHostCases(t) {
+		t.Run(c.name, func(t *testing.T) {
+			setup(t)
+			var pull github.PullRequest
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, c.headRepo, nil)
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+
+			verifyPreHooksRan(t, c.allowed)
+		})
+	}
 }

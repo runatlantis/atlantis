@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	paths "path"
 	"regexp"
@@ -130,6 +131,22 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
 			}
 			expClonePath = basePath + expClonePath
+		}
+
+		// The clone URL of a GitHub repository comes straight from the webhook
+		// payload. Checking only its path lets a forged payload keep the
+		// expected owner/name while pointing the host at a server the
+		// attacker controls, which Atlantis would then fetch from and plan.
+		// Require the host to be the configured GitHub hostname, as is already
+		// done for GitLab.
+		if vcsHostType == Github && vcsHostname != "" {
+			expectedHost := vcsHostname
+			if host, _, splitErr := net.SplitHostPort(vcsHostname); splitErr == nil {
+				expectedHost = host
+			}
+			if !strings.EqualFold(cloneURLParsed.Hostname(), expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Hostname())
+			}
 		}
 
 		if expClonePath != cloneURLParsed.Path {

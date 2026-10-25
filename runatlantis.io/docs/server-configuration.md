@@ -96,6 +96,13 @@ Atlantis will automatically run `terraform plan`
 which can run arbitrary code if given a malicious Terraform configuration.
 :::
 
+Independently of this flag, Atlantis only runs commands for a pull request whose head
+repository is on the same host as its base repository.
+
+::: warning Behavior change
+Previously, Atlantis did not compare the hosts of the head and base repositories. Now, if the head repository's clone URL host differs from the base repository's (case-insensitive), or has no host, Atlantis does not run the command and posts no comment. Look for the server log line `head repo host "<head>" does not match base repo host "<base>", not running command`. For GitHub, see also [`--gh-hostname`](#gh-hostname).
+:::
+
 ### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
@@ -817,6 +824,13 @@ Hostname of your GitHub Enterprise installation. If using [GitHub.com](https://g
 don't set. Defaults to `github.com`.
 
 For GitHub Enterprise Cloud, use the tenant hostname, for example `tenant.ghe.com`. Do not include a scheme or an `api.` prefix; Atlantis derives the REST and GraphQL API endpoints from the hostname.
+
+Atlantis requires the clone URL of every GitHub repository it receives, in webhooks
+or from the GitHub API, to be on this host. The comparison ignores case and ports.
+
+::: warning Behavior change
+Previously, Atlantis checked only the path of a GitHub clone URL (`/owner/repo.git`) and accepted any host. Now the clone URL host of both the base and head repository must equal `--gh-hostname`, and a clone URL with no host is rejected. A mismatched pull request webhook is answered with HTTP 400 and the body contains `expected clone url host "<gh-hostname>" but had "<host>"`; nothing is planned. If you run GitHub Enterprise, set `--gh-hostname` to the host that appears in your repositories' clone URLs (the `clone_url` field in webhook payloads), and check webhook deliveries in GitHub for 400 responses after upgrading.
+:::
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 

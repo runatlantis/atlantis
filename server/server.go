@@ -606,6 +606,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GitlabHostname:     userConfig.GitlabHostname,
+		GithubHostname:     userConfig.GithubHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
