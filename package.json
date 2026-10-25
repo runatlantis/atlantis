@@ -16,7 +16,12 @@
   },
   "overrides": {
     "minimatch": "^10.2.1",
-    "markdown-it": "^14.2.0"
+    "markdown-it": "^14.2.0",
+    "dompurify": "^3.4.17",
+    "katex": "^0.18.2",
+    "vitepress": {
+      "vite": "^6.4.5"
+    }
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
