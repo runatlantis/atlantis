@@ -74,24 +74,52 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlanStatus(ctx command.Projec
 	if v == nil || v.PullStatusFetcher == nil {
 		return nil
 	}
-	return v.validateProjectPlanStatus(ctx)
+	_, err := v.validateProjectPlanStatus(ctx)
+	return err
+}
+
+// RecordedPlanHash returns the hash recorded for this project's plan file when
+// it was planned. It is empty when no plan status exists or the status carries
+// no hash: a status written before hashes were recorded, or a workflow whose
+// plan stage manages its own plan file. It does not judge whether the status
+// is current; ValidateProjectPlan does that. It only surfaces the hash so the
+// apply step can be bound to the reviewed plan instead of whatever is on disk
+// when apply starts.
+func (v *DefaultApplyPlanValidator) RecordedPlanHash(ctx command.ProjectContext) (string, error) {
+	if v == nil || v.PullStatusFetcher == nil {
+		return "", nil
+	}
+	pullStatus, err := v.pullStatusForApply(ctx)
+	if err != nil {
+		return "", fmt.Errorf("fetching current plan status: %w", err)
+	}
+	if pullStatus == nil {
+		return "", nil
+	}
+	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
+	if proj == nil {
+		return "", nil
+	}
+	return proj.PlanHash, nil
 }
 
 // validateProjectPlanStatus only validates durable state. Failures that should
 // also discard a convention-managed plan artifact are wrapped in
 // planRejectionError; the caller decides whether an artifact exists to remove.
-func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) error {
+// On success it returns the plan hash recorded for the project, which is empty
+// when none was recorded.
+func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.ProjectContext) (string, error) {
 	pullStatus, err := v.pullStatusForApply(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching current plan status: %w", err)
+		return "", fmt.Errorf("fetching current plan status: %w", err)
 	}
 	if pullStatus == nil {
-		return rejectionErrorf("no current plan status found; run `atlantis plan` before apply")
+		return "", rejectionErrorf("no current plan status found; run `atlantis plan` before apply")
 	}
 
 	livePull, err := v.getLivePullIdentity(ctx)
 	if err != nil {
-		return fmt.Errorf("fetching live pull request: %w", err)
+		return "", fmt.Errorf("fetching live pull request: %w", err)
 	}
 	if livePull.HeadCommit != "" || livePull.BaseBranch != "" {
 		currentPull := ctx.Pull
@@ -100,35 +128,35 @@ func (v *DefaultApplyPlanValidator) validateProjectPlanStatus(ctx command.Projec
 			currentPull.BaseBranch = livePull.BaseBranch
 		}
 		if err := pullStatusApplyEligibilityError(currentPull, pullStatus.Pull, "recorded plan status"); err != nil {
-			return err
+			return "", err
 		}
 		if err := validateCommandStartIdentity(ctx, livePull); err != nil {
-			return err
+			return "", err
 		}
 	} else if err := pullStatusApplyEligibilityError(ctx.Pull, pullStatus.Pull, "recorded plan status"); err != nil {
-		return rejectionErrorf("%s", err)
+		return "", rejectionErrorf("%s", err)
 	}
 
 	proj := findProjectInPullStatus(pullStatus, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName)
 	if proj == nil {
-		return rejectionErrorf(
+		return "", rejectionErrorf(
 			"no matching plan status exists for dir %q workspace %q project %q; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 		)
 	}
 	if !statusAllowedForApplyExecution(proj.Status) {
 		if proj.Status == models.ErroredPolicyCheckStatus {
-			return rejectionErrorf(
+			return "", rejectionErrorf(
 				"policy checks have errored for dir %q workspace %q project %q and cannot be applied; run `atlantis plan`",
 				ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
 			)
 		}
-		return rejectionErrorf(
+		return "", rejectionErrorf(
 			"plan for dir %q workspace %q project %q has status %q and cannot be applied; run `atlantis plan`",
 			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, proj.Status.String(),
 		)
 	}
-	return nil
+	return proj.PlanHash, nil
 }
 
 func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectContext, absPath string) error {
@@ -140,7 +168,8 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		return err
 	}
 
-	if err := v.validateProjectPlanStatus(ctx); err != nil {
+	recordedHash, err := v.validateProjectPlanStatus(ctx)
+	if err != nil {
 		if rejection, ok := errors.AsType[planRejectionError](err); ok {
 			return rejectProjectPlan(planPath, "%s", rejection.err)
 		}
@@ -157,11 +186,30 @@ func (v *DefaultApplyPlanValidator) ValidateProjectPlan(ctx command.ProjectConte
 		return fmt.Errorf("checking plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
 	}
 
-	if ctx.ExpectedPlanHash != "" {
-		actualHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
-		if err != nil {
-			return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+	if recordedHash == "" && ctx.ExpectedPlanHash == "" {
+		return nil
+	}
+	actualHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+	if err != nil {
+		return fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+	}
+
+	// The hash recorded at plan time binds apply to the plan that was
+	// reviewed. A file that differs from it is not that plan, whatever the
+	// apply-time hash says, so it is rejected and removed.
+	if recordedHash == "" {
+		if ctx.Log != nil {
+			ctx.Log.Debug("no plan hash recorded for dir %q workspace %q project %q; skipping recorded plan hash check", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
 		}
+	} else if actualHash != recordedHash {
+		return rejectProjectPlan(
+			planPath,
+			"plan file for dir %q workspace %q project %q does not match the plan that was recorded when it was created; run `atlantis plan`",
+			ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName,
+		)
+	}
+
+	if ctx.ExpectedPlanHash != "" {
 		if actualHash != ctx.ExpectedPlanHash {
 			return fmt.Errorf(
 				"plan file changed for dir %q workspace %q project %q; run `atlantis plan` before apply",

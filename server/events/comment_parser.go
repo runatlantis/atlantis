@@ -42,16 +42,29 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
-// DefaultBlockedExtraArgs is the default set of Terraform CLI flag prefixes
-// that are rejected when supplied as comment extra args (after "--"). These
-// flags could be used to bypass security controls (e.g. working-directory
-// traversal via -chdir, or loading of malicious providers via -plugin-dir).
-// Operators may override this list via the --blocked-extra-args server flag.
+// DefaultBlockedExtraArgs is the set of Terraform CLI flags that are always
+// rejected when supplied as comment extra args (after "--").
+//
+// Two groups are blocked. -chdir and -plugin-dir move Terraform's working
+// directory or provider source somewhere the commenter controls. The rest
+// name a file Terraform will write to, or read state from, at a path the
+// commenter chooses: Atlantis passes its own -out before the comment args,
+// and Terraform keeps the last value it sees, so an unblocked -out would let
+// a comment drop the plan file anywhere the service account can write (for
+// example over another pull request's stored plan).
+//
+// Each flag is listed once because matching is done on the flag name (see
+// isBlockedExtraArg), which covers every dash spelling. These flags cannot be
+// unblocked: the --blocked-extra-args server flag adds to this list rather
+// than replacing it.
 var DefaultBlockedExtraArgs = []string{
 	"-chdir",
-	"--chdir",
 	"-plugin-dir",
-	"--plugin-dir",
+	"-out",
+	"-generate-config-out",
+	"-state",
+	"-state-out",
+	"-backup",
 }
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -91,8 +104,9 @@ type CommentParser struct {
 	AzureDevopsUser string
 	ExecutableName  string
 	AllowCommands   []command.Name
-	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
-	// rejected when supplied as comment extra args (after "--").
+	// BlockedExtraArgs is the set of Terraform CLI flags, on top of
+	// DefaultBlockedExtraArgs, that are rejected when supplied as comment
+	// extra args (after "--").
 	// Populated by NewCommentParser from UserConfig.ToBlockedExtraArgs().
 	BlockedExtraArgs []string
 }
@@ -433,14 +447,43 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 }
 
 // isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
-// permitted in comment extra args for security reasons.
+// permitted in comment extra args: one of DefaultBlockedExtraArgs, which are
+// always enforced, or one the operator added through BlockedExtraArgs.
+//
+// The comparison is on the flag name with leading dashes removed and any
+// "=value" suffix dropped, so "-out", "--out" and "-out=path" all match a
+// blocklist entry of "-out". Terraform accepts both dash spellings for every
+// flag, and a blocklist that had to be told each spelling separately would be
+// bypassed by whichever one the operator forgot. Any dash count is treated as
+// the flag: Terraform would reject "---out" itself, so over-matching there
+// only ever blocks an argument that could not have worked anyway.
 func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+	name := extraArgFlagName(arg)
+	if name == "" {
+		return false
+	}
+	for _, blocked := range DefaultBlockedExtraArgs {
+		if name == extraArgFlagName(blocked) {
+			return true
+		}
+	}
 	for _, blocked := range e.BlockedExtraArgs {
-		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
+		if name == extraArgFlagName(blocked) {
 			return true
 		}
 	}
 	return false
+}
+
+// extraArgFlagName returns the bare flag name of a Terraform CLI argument:
+// leading dashes stripped and anything from the first "=" onwards removed.
+// It returns "" for an argument that is not a flag.
+func extraArgFlagName(arg string) string {
+	if !strings.HasPrefix(arg, "-") {
+		return ""
+	}
+	name, _, _ := strings.Cut(arg, "=")
+	return strings.TrimLeft(name, "-")
 }
 
 // BuildPlanComment builds a plan comment for the specified args.

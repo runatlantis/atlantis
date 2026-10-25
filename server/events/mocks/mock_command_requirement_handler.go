@@ -101,6 +101,25 @@ func (mock *MockCommandRequirementHandler) ValidateProjectDependencies(ctx comma
 	return _ret0, _ret1
 }
 
+func (mock *MockCommandRequirementHandler) ValidateStateRmProject(repoDir string, ctx command.ProjectContext) (string, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockCommandRequirementHandler().")
+	}
+	_params := []pegomock.Param{repoDir, ctx}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("ValidateStateRmProject", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 string
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(string)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockCommandRequirementHandler) VerifyWasCalledOnce() *VerifierMockCommandRequirementHandler {
 	return &VerifierMockCommandRequirementHandler{
 		mock:                   mock,
@@ -266,6 +285,41 @@ func (c *MockCommandRequirementHandler_ValidateProjectDependencies_OngoingVerifi
 			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
 			for u, param := range _params[0] {
 				_param0[u] = param.(command.ProjectContext)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockCommandRequirementHandler) ValidateStateRmProject(repoDir string, ctx command.ProjectContext) *MockCommandRequirementHandler_ValidateStateRmProject_OngoingVerification {
+	_params := []pegomock.Param{repoDir, ctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ValidateStateRmProject", _params, verifier.timeout)
+	return &MockCommandRequirementHandler_ValidateStateRmProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockCommandRequirementHandler_ValidateStateRmProject_OngoingVerification struct {
+	mock              *MockCommandRequirementHandler
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockCommandRequirementHandler_ValidateStateRmProject_OngoingVerification) GetCapturedArguments() (string, command.ProjectContext) {
+	repoDir, ctx := c.GetAllCapturedArguments()
+	return repoDir[len(repoDir)-1], ctx[len(ctx)-1]
+}
+
+func (c *MockCommandRequirementHandler_ValidateStateRmProject_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []command.ProjectContext) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(command.ProjectContext)
 			}
 		}
 	}

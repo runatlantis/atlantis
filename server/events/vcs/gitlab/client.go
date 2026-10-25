@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -563,6 +564,33 @@ func (g *Client) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool
 	return cons.Check(v), nil
 }
 
+// adoptablePipelineRefs returns the pipeline refs that belong to the merge
+// request: the bare source branch name, its fully qualified form, and the ref
+// GitLab uses for merge request pipelines.
+func adoptablePipelineRefs(pull models.PullRequest) []string {
+	return []string{
+		pull.HeadBranch,
+		"refs/heads/" + pull.HeadBranch,
+		fmt.Sprintf("refs/merge-requests/%d/head", pull.Num),
+	}
+}
+
+// isPipelineAdoptable reports whether UpdateStatus may attach its commit status
+// to the given pipeline. The pipeline must run for the pull request's head
+// commit and one of its refs. An external pipeline (created through the commit
+// status API rather than by CI) is only adopted on the bare branch ref, which
+// is the ref Atlantis itself uses when no pipeline exists yet; an external
+// pipeline on any other ref was created by another commit status poster.
+func isPipelineAdoptable(pipeline *gitlab.PipelineInfo, pull models.PullRequest) bool {
+	if pipeline == nil || pipeline.SHA != pull.HeadCommit {
+		return false
+	}
+	if pipeline.Source == "external" {
+		return pipeline.Ref == pull.HeadBranch
+	}
+	return slices.Contains(adoptablePipelineRefs(pull), pipeline.Ref)
+}
+
 // UpdateStatus updates the build status of a commit.
 func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	gitlabState := gitlab.Pending
@@ -614,6 +642,18 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 			return err
 		}
 		if commit.LastPipeline != nil {
+			if !isPipelineAdoptable(commit.LastPipeline, pull) {
+				// A pipeline exists but it does not belong to this merge request's
+				// ref, or it was created by another commit status poster. Retrying
+				// would not change that, so fall back to the Ref straight away.
+				// See https://github.com/runatlantis/atlantis/issues/6871 and
+				// https://github.com/runatlantis/atlantis/issues/5228.
+				logger.Info("ignoring pipeline %d for commit %q (sha %q, ref %q, source %q) since it does not belong to this pull request, setting Ref to %q (an external pipeline is adopted only on ref %q, any other on one of %q)",
+					commit.LastPipeline.ID, pull.HeadCommit, commit.LastPipeline.SHA, commit.LastPipeline.Ref, commit.LastPipeline.Source,
+					pull.HeadBranch, pull.HeadBranch, adoptablePipelineRefs(pull))
+				setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
+				break
+			}
 			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
 			// Set the pipeline ID to the last pipeline that ran for the commit
 			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
