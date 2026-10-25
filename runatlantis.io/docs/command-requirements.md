@@ -72,8 +72,11 @@ To require **certain people** to approve the pull request, look at the
 Atlantis asks the VCS whether the pull request is approved at the moment `apply` runs. It does not
 check whether the approval was given before or after the latest plan or push. If new commits can be
 pushed after an approval, enable your provider's "dismiss stale reviews on push" branch protection,
-or run Atlantis with `--discard-approval-on-plan` so every plan clears existing approvals.
-Otherwise an approval given for one plan also satisfies the requirement for a later, different plan.
+or, on GitHub and GitLab, run Atlantis with
+[`--discard-approval-on-plan`](server-configuration.md#discard-approval-on-plan) so every plan
+clears existing approvals. Otherwise an approval given for one plan also satisfies the requirement
+for a later, different plan. On Gitea, an approval stops counting once a push changes the pull
+request's diff.
 :::
 
 ### Mergeable
