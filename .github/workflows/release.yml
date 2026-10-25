@@ -7,10 +7,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write  # for goreleaser to create releases and upload release assets
+  contents: read
 
 jobs:
   goreleaser:
+    permissions:
+      contents: write  # for goreleaser to create releases and upload release assets
     runs-on: ubuntu-24.04
     steps:
     - name: Harden Runner
