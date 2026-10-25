@@ -1389,6 +1389,57 @@ func TestAPIController_Plan_SkipsIgnoredPathsWithoutShiftingHookCommands(t *test
 	Equals(t, "kept-workspace", capturedCmd.Workspace)
 }
 
+func TestAPIController_Plan_InvalidPathDirectory(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	for _, dir := range []string{"../../etc", "/etc", "sub/../../x"} {
+		body, _ := json.Marshal(controllers.APIRequest{
+			Repository: "Repo",
+			Ref:        "main",
+			Type:       "Gitlab",
+			Paths: []controllers.APIRequestPath{
+				{Directory: dir, Workspace: "default"},
+			},
+		})
+
+		req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+		req.Header.Set(atlantisTokenHeader, atlantisToken)
+		w := httptest.NewRecorder()
+		ac.Plan(w, req)
+
+		Equals(t, http.StatusBadRequest, w.Code)
+		Assert(t, strings.Contains(w.Body.String(), "invalid directory"),
+			"expected invalid directory error for %q, got: %s", dir, w.Body.String())
+	}
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_Plan_ValidPathDirectory(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []controllers.APIRequestPath{
+			{Directory: "project1", Workspace: "default"},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedCmd := projectCommandBuilder.VerifyWasCalledOnce().
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "project1", capturedCmd.RepoRelDir)
+	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+}
+
 func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
 		config.allowUnlockByPull = false

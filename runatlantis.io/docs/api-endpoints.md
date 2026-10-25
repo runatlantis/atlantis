@@ -118,8 +118,22 @@ At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
 |-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
+| Directory | string | No       | Which directory to run plan in relative to root of repo. Must be a literal repo-relative path; see [Directory validation](#directory-validation).         |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+
+##### Directory validation
+
+`Directory` must be a literal path relative to the repository root, such as `.` or `modules/vpc`. It is cleaned before use, so `./modules/vpc/` becomes `modules/vpc`. An empty `Directory` is the same as omitting it. The request is rejected with HTTP 400 and a top-level `{ "error": "..." }` body if `Directory` is absolute (including a bare `/`), resolves outside the repository through `..`, contains a backslash, or contains a glob character (`*`, `?`, `[`, `]`, `{`, `}`). The same rule applies to `POST /api/apply`.
+
+```json
+{
+  "error": "invalid directory \"/modules/vpc\": directory must be a clean repo-relative path"
+}
+```
+
+::: warning Behavior change
+Previously, `Directory` only had trailing slashes removed. A leading slash was not rejected: `/modules/vpc` ran in `modules/vpc` under the clone but did not match that directory's `atlantis.yaml` project, so it ran with default settings; a bare `/` meant the repository root; glob patterns matched configured projects by pattern; and paths escaping the repository failed later during execution. Now all of these are rejected up front with HTTP 400 and `invalid directory "<value>": directory must be a clean repo-relative path`. Drop the leading slash (`modules/vpc`), use `.` for the repository root, and list each project directory explicitly instead of using a glob.
+:::
 
 #### Sample Request (with PR)
 
@@ -250,7 +264,7 @@ At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
 |-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run apply in relative to root of repo                                                                                                  |
+| Directory | string | No       | Which directory to run apply in relative to root of repo. Must be a literal repo-relative path; see [Directory validation](#directory-validation).        |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
 
 #### Sample Request

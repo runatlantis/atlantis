@@ -165,7 +165,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		cc = append(cc, &events.CommentCommand{
 			Name:        cmdName,
 			ProjectName: path.ProjectName,
-			RepoRelDir:  strings.TrimRight(path.Directory, "/"),
+			RepoRelDir:  path.Directory,
 			Workspace:   path.Workspace,
 		})
 	}
@@ -1114,10 +1114,24 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	// A workspace becomes a Terraform command argument, which Atlantis runs
 	// through `sh -c`, and a path component of the files it writes. Validate it
 	// the same way as a workspace named in a pull request comment.
-	for _, path := range request.Paths {
-		if err = valid.ValidateWorkspaceName(path.Workspace); err != nil {
-			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", path.Workspace, err)
+	//
+	// A directory becomes the repo-relative dir of the project. The project
+	// runner already confines it to the clone with utils.EnsureSubPath; reject
+	// absolute and parent-escaping paths here as well so a bad request fails at
+	// the API boundary with a clear error instead of deep inside command
+	// execution. Directory is optional, so an empty value is left alone.
+	for i, p := range request.Paths {
+		if err = valid.ValidateWorkspaceName(p.Workspace); err != nil {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", p.Workspace, err)
 		}
+		if strings.TrimSpace(p.Directory) == "" {
+			continue
+		}
+		dir, ok := models.NormalizeAPIPath(p.Directory)
+		if !ok {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid directory %q: directory must be a clean repo-relative path", p.Directory)
+		}
+		request.Paths[i].Directory = dir
 	}
 
 	VCSHostType, err := models.NewVCSHostType(request.Type)
