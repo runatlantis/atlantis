@@ -113,6 +113,8 @@ ATLANTIS_API_SECRET="secret"
 
 Required secret used to validate requests made to the [`/api/*` endpoints](api-endpoints.md).
 
+When set, it is also required by the read-only [`GET /api/locks`](api-endpoints.md#get-api-locks) endpoint.
+
 ### `--atlantis-url` <Badge text="v0.1.3+" type="info"/>
 
 ```bash

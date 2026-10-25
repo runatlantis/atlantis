@@ -957,7 +957,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 ## Other Endpoints
 
-Most endpoints listed in this section are non-destructive and therefore don't require authentication nor a special secret token. `GET /api/drift/status` is an authenticated drift API read endpoint and requires `X-Atlantis-Token`.
+The endpoints listed in this section are non-destructive, but they are not exempt from authentication. `GET /api/locks` requires `X-Atlantis-Token` whenever an API secret is configured on the server and stays open only when no secret is configured, because the `/api/` prefix is not covered by web basic auth. `GET /api/drift/status` is an authenticated drift API read endpoint and always requires `X-Atlantis-Token`.
 
 ### GET /api/locks
 
@@ -965,10 +965,14 @@ Most endpoints listed in this section are non-destructive and therefore don't re
 
 List the currently held project locks.
 
+::: warning Behavior change
+Previously, `GET /api/locks` returned the lock list to any caller, even when `--api-secret` was set. Now, when an API secret is configured, the request must send it in the `X-Atlantis-Token` header; with no API secret configured the endpoint stays open. Update scripts and dashboards that poll this endpoint to send the header. A missing or wrong token returns HTTP 401 with error code `UNAUTHORIZED` and message `invalid or missing API token`.
+:::
+
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks' --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
 #### Sample Response

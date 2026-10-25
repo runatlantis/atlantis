@@ -384,9 +384,18 @@ type ListLocksResult struct {
 	Locks []LockDetail
 }
 
+// ListLocks returns the currently held project locks. When an API secret is
+// configured the request must carry it in X-Atlantis-Token: the /api/ prefix
+// is exempt from web basic auth, so without this check the lock metadata
+// (repo, path, PR, workspace, user) would be readable by anyone who can reach
+// the server. Deployments without an API secret keep the endpoint open.
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
+
+	if len(a.APISecret) > 0 && !middleware.RequireAuth(w, r) {
+		return
+	}
 
 	locks, err := a.Locker.List()
 	if err != nil {
