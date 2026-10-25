@@ -82,6 +82,14 @@ To install:
     ```
 
     **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead.
+1. Edit `values.yaml` and set `defaultTFVersion` to the Terraform version Atlantis should download and use by default (see [Image variants](#image-variants))
+
+    ```yaml
+    defaultTFVersion: "1.16.6" # for example
+    # for OpenTofu, also set
+    # defaultTFDistribution: opentofu
+    ```
+
 1. Configure any other variables (see [Atlantis Helm Chart: Customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
@@ -124,6 +132,8 @@ Next, edit the manifests below as follows:
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
 for your Terraform repos. See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
+    * Replace `<TF_VERSION>` under `name: ATLANTIS_DEFAULT_TF_VERSION` with the Terraform version Atlantis should download and use by default.
+    The image ships no Terraform binary, so the server will not start without it. See [Image variants](#image-variants).
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
@@ -173,6 +183,8 @@ spec:
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+        - name: ATLANTIS_DEFAULT_TF_VERSION
+          value: <TF_VERSION> # 2. Replace this with the Terraform version to download and use by default.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -342,6 +354,8 @@ spec:
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+        - name: ATLANTIS_DEFAULT_TF_VERSION
+          value: <TF_VERSION> # 2. Replace this with the Terraform version to download and use by default.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -515,6 +529,8 @@ patchesStrategicMerge:
     env:
       - name: ATLANTIS_REPO_ALLOWLIST
         value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+      - name: ATLANTIS_DEFAULT_TF_VERSION
+        value: <TF_VERSION> # Replace this with the Terraform version to download and use by default.
 ```
 
 #### GitLab
@@ -630,23 +646,25 @@ Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `
 
 #### Image variants
 
-Every release is published in four variants. The unsuffixed tag (for example `v0.47.1` or `latest`) is the Alpine image.
+Every release is published as an Alpine and a Debian image. The unsuffixed tag (for example `v0.49.0` or `latest`) is the Alpine image.
 
-| Tag suffix     | Base   | Bundled Terraform and OpenTofu |
-|----------------|--------|--------------------------------|
-| `-alpine`      | Alpine | yes                            |
-| `-debian`      | Debian | yes                            |
-| `-alpine-slim` | Alpine | no                             |
-| `-debian-slim` | Debian | no                             |
+| Tag suffix          | Base   | Bundled Terraform and OpenTofu |
+|---------------------|--------|--------------------------------|
+| none or `-alpine`   | Alpine | no                             |
+| `-debian`           | Debian | no                             |
 
-The full images bundle the last few Terraform minor releases and the current OpenTofu release, and `terraform` on `PATH` points at the newest of them.
+::: warning Behavior change
+Previously, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and an earlier release also published binary-free `-alpine-slim` and `-debian-slim` images as an intermediate step. Now the default images ship no Terraform or OpenTofu binaries and the `-slim` images are no longer published, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
+:::
 
-The slim images ship without either binary, so vulnerability scanners do not report advisories against Terraform or OpenTofu versions you may not even use. Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is the same as the full image. Atlantis downloads the Terraform version it needs on first use, so the slim image needs to be told which version that is:
+If you pinned a `-alpine-slim` or `-debian-slim` tag, switch to the unsuffixed, `-alpine` or `-debian` tag. They contain the same thing.
 
-* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The slim image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
+Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is still in the image. Atlantis downloads the Terraform version it needs on first use, so it needs to be told which version that is:
+
+* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
 * Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
-* For OpenTofu, set `ATLANTIS_TF_DISTRIBUTION=opentofu` and give an OpenTofu version as the default.
-* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead. See [Customization](#customization) below.
+* For OpenTofu, set [`--default-tf-distribution=opentofu`](server-configuration.md#default-tf-distribution) (`ATLANTIS_DEFAULT_TF_DISTRIBUTION=opentofu`) and give an OpenTofu version as the default.
+* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead, for example by putting `terraform` on `PATH` in a custom image. See [Customization](#customization) below.
 
 #### Customization
 
@@ -657,9 +675,11 @@ If you need to modify the Docker image that we provide, for instance to add the 
     ```dockerfile
     FROM ghcr.io/runatlantis/atlantis:{latest version}
 
-    # copy a terraform binary of the version you need
+    # copy the extra binaries you need, for example terragrunt, or a terraform
+    # binary when Atlantis cannot download one (--tf-download=false)
     USER root
     COPY terragrunt /usr/local/bin/terragrunt
+    COPY terraform /usr/local/bin/terraform
     USER atlantis
     ```
 
