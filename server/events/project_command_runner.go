@@ -1139,6 +1139,11 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		return nil, "", err
 	}
 
+	failure, err = p.CommandRequirementHandler.ValidateStateRmProject(repoDir, ctx)
+	if failure != "" || err != nil {
+		return nil, failure, err
+	}
+
 	// Acquire Atlantis lock for this repo/dir/workspace.
 	lockAttempt, err := p.Locker.TryLock(ctx.Log, ctx.Pull, ctx.User, ctx.Workspace, models.NewProject(ctx.Pull.BaseRepo.FullName, ctx.RepoRelDir, ctx.ProjectName), ctx.RepoLocksMode != valid.RepoLocksDisabledMode)
 	if err != nil {

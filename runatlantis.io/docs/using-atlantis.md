@@ -289,6 +289,7 @@ atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 
 Runs `terraform state rm` that matches the directory/project/workspace.
 This command discards the terraform plan result. After running `state rm` and before an apply, another `atlantis plan` must be run again.
+Because it changes state without a reviewed plan, `state rm` must satisfy both the project's `apply_requirements` and `import_requirements` (see [Command Requirements](command-requirements.md)).
 
 To allow the `state` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 

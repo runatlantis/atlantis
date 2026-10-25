@@ -2,12 +2,27 @@
 
 ## Intro
 
-Atlantis requires certain conditions be satisfied **before** `atlantis apply` and `atlantis import`
-commands can be run:
+Atlantis requires certain conditions be satisfied **before** `atlantis apply`, `atlantis import`
+and `atlantis state rm` commands can be run:
 
 * [Approved](#approved) – requires pull requests to be approved by at least one user other than the author
 * [Mergeable](#mergeable) – requires pull requests to be able to be merged
 * [UnDiverged](#undiverged) - requires project files in pull requests to be ahead of the base branch
+
+`atlantis state rm` rewrites Terraform state without a reviewed plan, so it must satisfy
+**both** the project's `apply_requirements` and its `import_requirements`. There is no
+separate `state_rm_requirements` key.
+
+::: warning Behavior change
+Previously, `atlantis state rm` ignored all command requirements and ran for
+any user allowed to comment. Now it must meet every requirement listed in the
+project's `apply_requirements` and `import_requirements`, including
+`policies_passed` if set. If either list is set, expect `state rm` to be refused
+on pull requests that do not meet it, with messages such as
+`Pull request must be approved according to the project's approval rules before running state.`
+or `Pull request must be mergeable before running state.` Get the pull request
+approved or mergeable first, or adjust those lists if `state rm` should be allowed earlier.
+:::
 
 ## What Happens If The Requirement Is Not Met?
 

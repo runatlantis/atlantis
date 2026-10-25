@@ -968,6 +968,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)

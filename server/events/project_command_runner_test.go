@@ -662,6 +662,83 @@ func TestProjectOutputWrapperPreservesNonStreamedEnvStepOutput(t *testing.T) {
 
 // Test what happens if there's no working dir. This signals that the project
 // was never planned.
+func TestDefaultProjectCommandRunner_StateRmHonoursRequirements(t *testing.T) {
+	t.Log("state rm must satisfy the project's apply and import requirements before any step runs")
+	cases := []struct {
+		description string
+		applyReqs   []string
+		importReqs  []string
+		approved    bool
+		expFailure  string
+		expRan      bool
+	}{
+		{
+			description: "apply requirement blocks an unapproved state rm",
+			applyReqs:   []string{"approved"},
+			expFailure:  "Pull request must be approved according to the project's approval rules before running state.",
+		},
+		{
+			description: "import requirement blocks an unapproved state rm",
+			importReqs:  []string{"approved"},
+			expFailure:  "Pull request must be approved according to the project's approval rules before running state.",
+		},
+		{
+			description: "state rm runs once the requirements are met",
+			applyReqs:   []string{"approved"},
+			importReqs:  []string{"approved"},
+			approved:    true,
+			expRan:      true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			mockStateRm := mocks.NewMockStepRunner()
+			mockWorkingDir := mocks.NewMockWorkingDir()
+			mockLocker := mocks.NewMockProjectLocker()
+			runner := events.DefaultProjectCommandRunner{
+				Locker:            mockLocker,
+				LockURLGenerator:  mockURLGenerator{},
+				InitStepRunner:    mocks.NewMockStepRunner(),
+				StateRmStepRunner: mockStateRm,
+				WorkingDir:        mockWorkingDir,
+				Webhooks:          mocks.NewMockWebhooksSender(),
+				WorkingDirLocker:  events.NewDefaultWorkingDirLocker(),
+				CommandRequirementHandler: &events.DefaultCommandRequirementHandler{
+					WorkingDir: mockWorkingDir,
+				},
+			}
+			ctx := command.ProjectContext{
+				Log:                logging.NewNoopLogger(t),
+				Steps:              valid.DefaultStateRmStage.Steps,
+				Workspace:          "default",
+				RepoRelDir:         ".",
+				ApplyRequirements:  c.applyReqs,
+				ImportRequirements: c.importReqs,
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: c.approved},
+				},
+			}
+			repoDir := t.TempDir()
+			When(mockWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+			When(mockWorkingDir.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+			When(mockLocker.TryLock(Any[logging.SimpleLogging](), Any[models.PullRequest](), Any[models.User](), Any[string](), Any[models.Project](), AnyBool())).
+				ThenReturn(&events.TryLockResponse{LockAcquired: true, LockKey: "lock-key", UnlockFn: func() error { return nil }}, nil)
+			When(mockStateRm.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("removed", nil)
+
+			res := runner.StateRm(ctx)
+
+			Equals(t, c.expFailure, res.Failure)
+			Ok(t, res.Error)
+			if c.expRan {
+				mockStateRm.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+			} else {
+				mockStateRm.VerifyWasCalled(Never()).Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+			}
+		})
+	}
+}
+
 func TestDefaultProjectCommandRunner_ApplyNotCloned(t *testing.T) {
 	mockWorkingDir := mocks.NewMockWorkingDir()
 	runner := &events.DefaultProjectCommandRunner{

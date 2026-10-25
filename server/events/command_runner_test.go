@@ -265,6 +265,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 	stateCommandRunner = events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)
@@ -429,6 +430,29 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	commentMessage := fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(commentMessage), Eq(""))
+}
+
+func TestStateCommandRunner_RmFetchesPullStatus(t *testing.T) {
+	t.Log("state rm fetches the pull request's approval and mergeable status before building project commands, as import does, so requirement checks see real values")
+	setup(t)
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	cmd := events.CommentCommand{Name: command.State, SubName: "rm"}
+	ctx := &command.Context{
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+		Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+		Pull:     modelPull,
+		HeadRepo: testdata.GithubRepo,
+		Trigger:  command.CommentTrigger,
+	}
+	expStatus := models.PullReqStatus{ApprovalStatus: models.ApprovalStatus{IsApproved: true}}
+	When(pullReqStatusFetcher.FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))).ThenReturn(expStatus, nil)
+	When(projectCommandBuilder.BuildStateRmCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn([]command.ProjectContext{}, nil)
+
+	stateCommandRunner.Run(ctx, &cmd)
+
+	pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(modelPull))
+	Equals(t, expStatus, ctx.PullRequestStatus)
 }
 
 func TestRunCommentCommand_ForkPRDisabled_SilenceEnabled(t *testing.T) {
