@@ -240,8 +240,9 @@ async function sourceFiles() {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
 // Without history every file looks like it was added in the same commit, so
-// staleness cannot be told apart. translate-docs runs this in a shallow clone
-// on freshly generated pages, which must all be checked anyway.
+// staleness cannot be told apart and every translation is checked. CI checks
+// out full history: translate-docs restores pages that fail to their committed
+// translation, which is stale against the new source and must be skipped.
 const shallow = git('rev-parse', '--is-shallow-repository') === 'true';
 
 /**
