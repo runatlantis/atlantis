@@ -69,7 +69,7 @@ func startInternalSetup(t *testing.T, c *GithubAppController) (string, *http.Coo
 func callback(c *GithubAppController, state string, cookie *http.Cookie) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r, _ := http.NewRequest("GET", "/github-app/exchange-code?code=abc123&state="+state, nil)
-	r.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value})
+	r.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value}) //nolint:gosec // G124: request cookies carry no attributes
 	c.ExchangeCode(w, r)
 	return w
 }
@@ -123,7 +123,7 @@ func TestGithubAppController_New_LimitsPendingFlows(t *testing.T) {
 func TestGithubAppController_New_PrunesExpiredFlows(t *testing.T) {
 	now := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 	c, _ := newClockedController(t, &now)
-	for i := 0; i < githubAppMaxPendingFlows; i++ {
+	for range githubAppMaxPendingFlows {
 		startInternalSetup(t, c)
 	}
 

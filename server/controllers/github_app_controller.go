@@ -363,7 +363,9 @@ func (g *GithubAppController) exchange(code string) (*github.GithubAppTemporaryS
 // setBindingCookie writes the flow-binding cookie. SameSite=Lax is required
 // because GitHub sends the browser back with a top-level cross-site GET.
 func (g *GithubAppController) setBindingCookie(w http.ResponseWriter, r *http.Request, value string, maxAge int) {
-	http.SetCookie(w, &http.Cookie{
+	// Secure follows the deployment scheme so the setup flow still works on a
+	// plain-HTTP Atlantis; it is set whenever the request or URL is HTTPS.
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure is conditional on HTTPS, see above
 		Name:     GithubAppSetupCookieName,
 		Value:    value,
 		Path:     strings.TrimSuffix(g.AtlantisURL.Path, "/") + "/github-app/",
