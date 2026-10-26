@@ -103,7 +103,9 @@ head está en el mismo host que su repositorio base.
 Anteriormente, Atlantis no comparaba los hosts de los repositorios head y base. Ahora, si el host de la clone URL del repositorio head difiere del del repositorio base (sin distinguir mayúsculas de minúsculas), o no tiene host, Atlantis no ejecuta el comando y no publica ningún comentario. Busque la línea del log del servidor `head repo host "<head>" does not match base repo host "<base>", not running command`. Para GitHub, vea también [`--gh-hostname`](#gh-hostname).
 :::
 
-### `--api-secret`
+### `--api-secret` <Badge text="Experimental" type="warning"/>
+
+Consulta el [experimento de API](../../docs/experiments.md#api) para conocer sus limitaciones y requisitos de graduación. Este secreto compartido requiere `api` o `drift-detection` en `experiments`, según las rutas que quieras usar. De lo contrario, el inicio falla.
 
 ```bash
 atlantis server --api-secret="secret"
@@ -497,6 +499,10 @@ ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
 Versión de Terraform a usar por defecto. Se descargará a `<data-dir>/bin/terraform<version>`
 si no está en `PATH`. Vea [Terraform Versions](terraform-versions.md) para más detalles.
 
+::: warning Cambio de comportamiento
+Antes, las imágenes oficiales de Docker incluían `terraform` en `PATH`, por lo que el servidor se iniciaba sin este flag. Ahora las imágenes no incluyen binarios de Terraform ni de OpenTofu, y el servidor no se inicia y muestra `terraform not found in $PATH` si este flag no está configurado. Configúralo (junto con [`--default-tf-distribution`](#default-tf-distribution) para OpenTofu) para que Atlantis descargue esa versión, o monta o copia un binario en `PATH` cuando las descargas estén bloqueadas. Consulta [Image variants](deployment.md#image-variants).
+:::
+
 ### `--disable-apply-all`
 
 ```bash
@@ -626,7 +632,11 @@ Habilita Atlantis para formatear la salida de Terraform plan en un formato amiga
 
 Útil para habilitar al usar GitHub. Las líneas cambiadas dentro de diffs de heredoc y cadenas multilínea de Terraform también se formatean para que los renderizadores markdown con reconocimiento de diff puedan colorearlas.
 
-### `--enable-drift-detection`
+### `--enable-drift-detection` <Badge text="Experimental" type="warning"/>
+
+Consulta el [experimento de detección de drift](../../docs/experiments.md#drift-detection) para conocer sus limitaciones y requisitos de graduación.
+
+Requiere `drift-detection` en `experiments` y `api-secret`; de lo contrario, el inicio falla.
 
 ```bash
 atlantis server --enable-drift-detection
@@ -645,7 +655,11 @@ incluyendo resultados heartbeat sin drift. La detección de drift no omite allow
 no pueden evaluarse fuera de un pull request. Las acciones destructivas de apply de remediación de drift también requieren
 `--enable-drift-remediation`. El valor predeterminado es `false`.
 
-### `--enable-drift-remediation`
+### `--enable-drift-remediation` <Badge text="Experimental" type="warning"/>
+
+Forma parte del [experimento de detección de drift](../../docs/experiments.md#drift-detection); sus limitaciones y requisitos de graduación también se aplican a la remediación.
+
+Requiere `drift-detection` en `experiments`, `api-secret` y `enable-drift-detection`; de lo contrario, el inicio falla.
 
 ```bash
 atlantis server --enable-drift-detection --enable-drift-remediation
@@ -726,6 +740,18 @@ Nombre del ejecutable disparador del comando de comentario. El valor predetermin
 Esto es útil cuando se ejecutan múltiples servidores Atlantis contra un solo repositorio.
 
 Nota: la advertencia de error ortográfico "did you mean" solo aplica al nombre ejecutable predeterminado (`atlantis`). Si establece un `--executable-name` personalizado, Atlantis no advertirá sobre comentarios que sean cercanos a él según Levenshtein — esto evita advertencias espurias cuando múltiples servidores con nombres similares (p. ej. `atlantis-dev` e `atlantis-prod`) reciben el mismo comentario.
+
+### `--experiments`
+
+Permisos para experimentos del servidor. La lista predeterminada está vacía. Los nombres deben coincidir exactamente; los nombres desconocidos o los ajustes experimentales sin permiso impiden el inicio. Cada nombre permite sus propias rutas HTTP; los ajustes de la función siguen controlando la autenticación y la activación.
+
+```sh
+atlantis server --experiments=api,drift-detection
+```
+
+Configura `ATLANTIS_EXPERIMENTS` como una lista separada por comas, o usa una lista YAML bajo `experiments` en el archivo de configuración del servidor. Repetir el flag añade nombres. Los flags prevalecen sobre el entorno, que prevalece sobre el archivo de configuración; las listas de distintas fuentes no se combinan. Usa `--experiments=` para vaciar la lista.
+
+Consulta [Experimentos](../../docs/experiments.md) para conocer los nombres admitidos y los detalles de compatibilidad.
 
 ### `--fail-on-pre-workflow-hook-error`
 

@@ -68,6 +68,7 @@ func TestNewServer_EnableDriftDetectionWiresServices(t *testing.T) {
 			GithubUser:           testGitHubUser,
 			APISecret:            "token",
 			EnableDriftDetection: true,
+			Experiments:          []string{"drift-detection"},
 		}, server.Config{
 			AtlantisVersion: testAtlantisVersion,
 		},
@@ -78,6 +79,7 @@ func TestNewServer_EnableDriftDetectionWiresServices(t *testing.T) {
 	Assert(t, s.APIController.RemediationService != nil, "expected remediation service to be configured")
 	Assert(t, !s.APIController.EnableDriftRemediation, "expected drift remediation apply to require explicit opt-in")
 	Assert(t, s.APIController.DriftWebhookSender != nil, "expected drift webhook sender to be configured")
+	Equals(t, []string{"drift-detection"}, s.Experiments)
 }
 
 func TestNewServer_EnableDriftRemediationWiresApplyOptIn(t *testing.T) {
@@ -92,6 +94,7 @@ func TestNewServer_EnableDriftRemediationWiresApplyOptIn(t *testing.T) {
 			APISecret:              "token",
 			EnableDriftDetection:   true,
 			EnableDriftRemediation: true,
+			Experiments:            []string{"drift-detection"},
 		}, server.Config{
 			AtlantisVersion: testAtlantisVersion,
 		},
@@ -114,6 +117,7 @@ func TestNewServer_EnableDriftRemediationRequiresDriftDetection(t *testing.T) {
 			GithubUser:             testGitHubUser,
 			APISecret:              "token",
 			EnableDriftRemediation: true,
+			Experiments:            []string{"drift-detection"},
 		}, server.Config{
 			AtlantisVersion: testAtlantisVersion,
 		},
@@ -356,6 +360,7 @@ func TestSetupRoutes_APIRoutesRegistered(t *testing.T) {
 
 	s := server.Server{
 		Router:              mux.NewRouter(),
+		Experiments:         []string{"api", "drift-detection"},
 		APIController:       &controllers.APIController{},
 		StatusController:    &controllers.StatusController{},
 		LocksController:     &controllers.LocksController{},
