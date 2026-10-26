@@ -4,5 +4,8 @@
   "description": "Pinned markdown-toc for the markdown-lint workflow, installed with npm ci from the lockfile.",
   "dependencies": {
     "markdown-toc": "1.2.0"
+  },
+  "overrides": {
+    "toml": "5.0.1"
   }
 }
