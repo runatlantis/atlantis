@@ -44,6 +44,8 @@ jobs:
               - 'runatlantis.io/**'
               - 'docs/adr/**'
               - 'scripts/website/**'
+              - 'scripts/stage-translation-sources.sh'
+              - '.github/workflows/translate-docs.yml'
               - '.lycheeignore'
               - 'package-lock.json'
               - 'package.json'

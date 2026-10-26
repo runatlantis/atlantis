@@ -9,13 +9,16 @@ test('publishes current ADRs under Contributing in both locales', async ({ page,
     await page.locator('.VPSidebar').getByRole('link', { name: label, exact: true }).click();
     await expect(page).toHaveURL(`${origin}${locale}/contributing/adr/`);
     await expect(page.locator('h1#architecture-decision-records')).toBeVisible();
-    const proposed = page.getByRole('row').filter({ has: page.getByRole('link', { name: '0002', exact: true }) });
-    await expect(proposed).toContainText('Proposed');
+    const row = page.locator('main tbody tr').first();
+    const status = await row.getByRole('cell').last().innerText();
+    expect(status.trim()).not.toBe('');
+    const record = row.getByRole('link').first();
+    const filename = (await record.getAttribute('href')).split('/').pop().replace(/\.html$/, '.md');
     await expect(page.locator('main a[href="https://github.com/runatlantis/atlantis/blob/main/docs/adr/template.md"]')).toBeVisible();
     expect((await request.get(`${origin}${locale}/contributing/adr/template.html`)).status()).toBe(404);
-    await proposed.getByRole('link', { name: '0002', exact: true }).click();
-    await expect(page.locator('#status + p')).toHaveText('Proposed');
-    await expect(page.getByRole('link', { name: 'View source', exact: true })).toHaveAttribute('href', /\/docs\/adr\/0002-/);
+    await record.click();
+    await expect(page.locator('#status + p')).toHaveText(status);
+    await expect(page.getByRole('link', { name: 'View source', exact: true })).toHaveAttribute('href', `https://github.com/runatlantis/atlantis/blob/main/docs/adr/${filename}`);
     if (locale) await expect(page.getByText('Registro original en inglés.')).toBeVisible();
   }
 });
