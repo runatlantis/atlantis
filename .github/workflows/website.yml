@@ -42,6 +42,9 @@ jobs:
           filters: |
             src:
               - 'runatlantis.io/**'
+              - 'docs/adr/**'
+              - 'scripts/website/**'
+              - '.lycheeignore'
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
@@ -109,17 +112,20 @@ jobs:
             --max-concurrency 5
             --max-retries 0
             --accept 200,429
+            --root-dir ./runatlantis.io
             ./runatlantis.io
 
       - name: setup npm
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
+          node-version: '24'
           cache: 'npm'
 
       - name: run http-server
         run: |
           # build site
           npm ci
+          npm run website:test:adrs
           npm run website:build
 
           # start http-server for integration testing
