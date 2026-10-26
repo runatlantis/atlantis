@@ -175,7 +175,7 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # renovate: datasource=apk depName=ca-certificates
 ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
-ENV CURL_VERSION="8.22.0-r0"
+ENV CURL_VERSION="8.23.0-r0"
 # renovate: datasource=apk depName=git
 ENV GIT_VERSION="2.54.0-r0"
 # renovate: datasource=apk depName=unzip
