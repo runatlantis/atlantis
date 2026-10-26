@@ -25,6 +25,7 @@ on:
       - 'scripts/align-tables.mjs'
       - 'scripts/stage-translation-sources.sh'
       - 'scripts/fix-translated-markdown.sh'
+      - 'scripts/record-translation-sources.mjs'
       - '.github/workflows/translate-docs.yml'
   workflow_dispatch:
     inputs:
@@ -90,18 +91,28 @@ jobs:
         # localize-links.mjs keeps the locale buildable, so a partial run still
         # produces a reviewable PR instead of nothing.
         run: |
+          completed=false
           for attempt in 1 2 3; do
             if npx --yes lingo.dev@0.138.4 run ${{ inputs.force && '--force' || '' }}; then
               echo "Translation completed on attempt ${attempt}."
+              completed=true
               break
             fi
             echo "::warning::Translation attempt ${attempt} had failures; retrying."
           done
 
-          # A total failure (bad key, provider outage) must not pass silently as
-          # "no changes to translate".
-          if [ -z "$(find .lingo-src -mindepth 2 -name '*.md' -not -path '.lingo-src/en/*' -print -quit)" ]; then
-            echo "::error::No translated files were produced."
+          # A total failure (bad key, exhausted quota, provider outage) must not
+          # pass silently as "no changes to translate". The existing
+          # translations are staged too, so look for anything the translator
+          # actually changed rather than for any file at all.
+          if [ "$completed" = false ]; then
+            locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+            for locale in $locales; do
+              if ! diff -rq "runatlantis.io/${locale}" ".lingo-src/${locale}" > /dev/null 2>&1; then
+                exit 0
+              fi
+            done
+            echo "::error::lingo.dev failed on every attempt and changed no translation. See the attempts above for the provider error, for example an exhausted API quota."
             exit 1
           fi
 
@@ -261,6 +272,15 @@ jobs:
 
           node scripts/localize-links.mjs $locales
           run_checks
+
+      - name: Record translation sources
+        # The integrity checker skips a committed page whose English source
+        # changed after it was translated. Record which source this run
+        # translated each rewritten page from, so a translation pull request
+        # that merges after a later source change is still recognized as stale.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/record-translation-sources.mjs $locales
 
       - name: Build the site
         # VitePress fails the build on dead relative links, so this is the real
