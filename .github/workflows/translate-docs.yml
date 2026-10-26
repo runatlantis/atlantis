@@ -23,6 +23,9 @@ on:
       - 'scripts/localize-links.mjs'
       - 'scripts/check-translation-integrity.mjs'
       - 'scripts/align-tables.mjs'
+      - 'scripts/stage-translation-sources.sh'
+      - 'scripts/fix-translated-markdown.sh'
+      - 'scripts/record-translation-sources.mjs'
       - '.github/workflows/translate-docs.yml'
   workflow_dispatch:
     inputs:
@@ -58,33 +61,21 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Translation integrity reads history so a quarantined page, restored
+          # to its committed translation, is skipped as stale instead of failing
+          # against the newer English source.
+          fetch-depth: 0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: '.node-version'
           cache: 'npm'
 
       - name: Stage English sources for the translator
         run: |
-          rm -rf .lingo-src
-          mkdir -p .lingo-src/en
-          # Markdown only. The blog keeps its images and Terraform samples in
-          # per-post directories; those are not translated, and the link
-          # localizer already points a translated post back at the English
-          # copy of its assets.
-          rsync -a --include='*/' --include='*.md' --exclude='*' --prune-empty-dirs \
-            runatlantis.io/docs runatlantis.io/guide runatlantis.io/blog runatlantis.io/contributing \
-            .lingo-src/en/
-          cp runatlantis.io/*.md .lingo-src/en/
-
-          # Stage the translations already on the branch too. Without them the
-          # translator sees no target files and re-translates every page on
-          # every run, which costs the full token budget and rewrites pages
-          # whose source did not change.
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
-          for locale in $locales; do
-            [ -d "runatlantis.io/${locale}" ] && cp -r "runatlantis.io/${locale}" ".lingo-src/${locale}"
-          done
+          scripts/stage-translation-sources.sh $locales
 
       - name: Translate
         env:
@@ -100,18 +91,28 @@ jobs:
         # localize-links.mjs keeps the locale buildable, so a partial run still
         # produces a reviewable PR instead of nothing.
         run: |
+          completed=false
           for attempt in 1 2 3; do
             if npx --yes lingo.dev@0.138.4 run ${{ inputs.force && '--force' || '' }}; then
               echo "Translation completed on attempt ${attempt}."
+              completed=true
               break
             fi
             echo "::warning::Translation attempt ${attempt} had failures; retrying."
           done
 
-          # A total failure (bad key, provider outage) must not pass silently as
-          # "no changes to translate".
-          if [ -z "$(find .lingo-src -mindepth 2 -name '*.md' -not -path '.lingo-src/en/*' -print -quit)" ]; then
-            echo "::error::No translated files were produced."
+          # A total failure (bad key, exhausted quota, provider outage) must not
+          # pass silently as "no changes to translate". The existing
+          # translations are staged too, so look for anything the translator
+          # actually changed rather than for any file at all.
+          if [ "$completed" = false ]; then
+            locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+            for locale in $locales; do
+              if ! diff -rq "runatlantis.io/${locale}" ".lingo-src/${locale}" > /dev/null 2>&1; then
+                exit 0
+              fi
+            done
+            echo "::error::lingo.dev failed on every attempt and changed no translation. See the attempts above for the provider error, for example an exhausted API quota."
             exit 1
           fi
 
@@ -135,40 +136,16 @@ jobs:
           node scripts/localize-links.mjs $locales
 
       - name: Lint translated markdown
-        # Website Check runs markdownlint on every locale. Translated tables
-        # rarely keep the source's column widths, which fails MD060, and the
-        # model occasionally leaves a stray space inside link text or doubles
-        # a blank line. Both are mechanical to repair.
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
-
-          # The translator's markdown serializer writes a link whose only
-          # content is an image as five lines: "[", blank, the image, blank,
-          # "](url)". That trips MD034 and renders a stray bracket. Fold it
-          # back onto one line, which is how the English source writes it.
-          for locale in $locales; do
-            find "runatlantis.io/${locale}" -name '*.md' -print0 \
-              | xargs -0 perl -0pi -e 's/\[\n\n(!\[[^\]]*\]\([^)]*\))\n\n\]\(/[$1](/g'
-          done
-
-          node scripts/align-tables.mjs $locales
-
-          # Quoted so markdownlint-cli2 expands `**` itself. Unquoted, bash
-          # treats `**` as `*` and the top-level <locale>/*.md pages are
-          # never linted.
-          globs=()
-          for locale in $locales; do globs+=("runatlantis.io/${locale}/**/*.md"); done
-          # `--fix` exits non-zero when findings remain. Those are caught by
-          # the integrity step below, which quarantines the page instead of
-          # failing the run.
-          npx --yes markdownlint-cli2@0.20.0 --fix --config .markdownlint.yaml "${globs[@]}" || true
+          scripts/fix-translated-markdown.sh $locales
 
       - name: Upload translated output
         # Kept even when the integrity check fails: when a page trips a check,
         # the generated file is the only way to see what actually happened, and
         # the run is otherwise the only place it ever existed.
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: translated-docs
           # Locale dirs only. Extend this list when a locale is added.
@@ -176,17 +153,90 @@ jobs:
           retention-days: 7
 
       - name: Check translation integrity
-        # A page that fails its checks is quarantined rather than blocking the
-        # run: it is restored to its previous version, or dropped if it never
-        # had one, and listed in the PR body. One bad page out of forty should
-        # not discard thirty-nine good ones, and a missing page is already a
-        # supported state - the link localizer and the sidebar fall back to
-        # English. The second run must pass, so nothing unverified is shipped.
-        #
         # markdownlint counts as a check here too: Website Check lints every
         # locale on the resulting PR, and the model sometimes leaves findings
         # that `--fix` cannot repair (whitespace inside link text, a table row
-        # split across lines).
+        # split across lines). Failing pages are retried below before anything
+        # is quarantined.
+        id: checks
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          globs=()
+          for locale in $locales; do globs+=("runatlantis.io/${locale}/**/*.md"); done
+
+          ok=0
+          node scripts/check-translation-integrity.mjs $locales > /tmp/integrity.txt 2>&1 || ok=1
+          npx --yes markdownlint-cli2@0.20.0 --config .markdownlint.yaml "${globs[@]}" > /tmp/lint.txt 2>&1 || ok=1
+          cat /tmp/integrity.txt /tmp/lint.txt
+          if [ "$ok" -eq 0 ]; then
+            exit 0
+          fi
+
+          # Integrity failures are reported as "✗ <file>"; markdownlint
+          # findings start with "<file>:<line>". `grep` exits 1 on no match,
+          # which under `set -e` would abort the step, hence the `|| true`.
+          {
+            grep '^✗' /tmp/integrity.txt | sed 's/^✗ //' || true
+            grep -oE '^runatlantis\.io/[^:]+\.md' /tmp/lint.txt || true
+          } | sort -u > /tmp/failed.txt
+
+          if [ ! -s /tmp/failed.txt ]; then
+            echo "::error::Checks failed but reported no files; see output above."
+            exit 1
+          fi
+          echo "failed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Re-translate failing pages without the lockfile
+        # Lingo.dev splits a page into numbered sections and reuses the
+        # translation of every section whose source did not change. A section
+        # inserted mid-page can make it reuse translations in the wrong place,
+        # dropping a heading or a `:::` container, or leave a locked-pattern
+        # placeholder unrestored. Translating just the failing pages again with
+        # --force rebuilds them from the source instead of from i18n.lock.
+        if: steps.checks.outputs.failed == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          scripts/stage-translation-sources.sh $locales
+
+          # runatlantis.io/<locale>/<page> -> the page's path pattern in
+          # i18n.json, which lingo.dev matches by substring.
+          pages="$(sed -E 's#^runatlantis\.io/[^/]+/##' /tmp/failed.txt | sort -u)"
+          file_flags=()
+          while read -r page; do
+            file_flags+=(--file ".lingo-src/[locale]/${page}")
+          done <<< "$pages"
+
+          for attempt in 1 2 3; do
+            if npx --yes lingo.dev@0.138.4 run --force "${file_flags[@]}"; then
+              break
+            fi
+            echo "::warning::Re-translation attempt ${attempt} had failures; retrying."
+          done
+
+          # Copy back only the retried pages; everything else already passed.
+          while read -r page; do
+            for locale in $locales; do
+              if [ -f ".lingo-src/${locale}/${page}" ]; then
+                cp ".lingo-src/${locale}/${page}" "runatlantis.io/${locale}/${page}"
+              fi
+            done
+          done <<< "$pages"
+          rm -rf .lingo-src
+
+          node scripts/localize-links.mjs $locales
+          scripts/fix-translated-markdown.sh $locales
+
+      - name: Quarantine pages that still fail
+        # A page that fails its checks after the retry is quarantined rather
+        # than blocking the run: it is restored to its previous version, or
+        # dropped if it never had one, and listed in the PR body. One bad page
+        # out of forty should not discard thirty-nine good ones, and a missing
+        # page is already a supported state - the link localizer and the
+        # sidebar fall back to English. The second run must pass, so nothing
+        # unverified is shipped.
+        if: steps.checks.outputs.failed == 'true'
         run: |
           locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
           globs=()
@@ -204,9 +254,6 @@ jobs:
             exit 0
           fi
 
-          # Integrity failures are reported as "✗ <file>"; markdownlint
-          # findings start with "<file>:<line>". `grep` exits 1 on no match,
-          # which under `set -e` would abort the step, hence the `|| true`.
           {
             grep '^✗' /tmp/integrity.txt | sed 's/^✗ //' || true
             grep -oE '^runatlantis\.io/[^:]+\.md' /tmp/lint.txt || true
@@ -225,6 +272,15 @@ jobs:
 
           node scripts/localize-links.mjs $locales
           run_checks
+
+      - name: Record translation sources
+        # The integrity checker skips a committed page whose English source
+        # changed after it was translated. Record which source this run
+        # translated each rewritten page from, so a translation pull request
+        # that merges after a later source change is still recognized as stale.
+        run: |
+          locales="$(node -e "process.stdout.write(require('./i18n.json').locale.targets.join(' '))")"
+          node scripts/record-translation-sources.mjs $locales
 
       - name: Build the site
         # VitePress fails the build on dead relative links, so this is the real
@@ -259,7 +315,7 @@ jobs:
 
           ### Quarantined pages
 
-          These pages failed the translation checks (integrity or markdownlint) and were left at their previous version (or omitted). They need a rerun or a look at the source:
+          These pages failed the translation checks (integrity or markdownlint), also after being re-translated without the lockfile, and were left at their previous version (or omitted). They need a look at the source:
 
           $(cat /tmp/quarantined.txt)"
           fi

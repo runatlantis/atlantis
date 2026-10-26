@@ -111,6 +111,212 @@ func TestClient_PullIsApprovedPagination(t *testing.T) {
 	Equals(t, []int{1, 2}, pages)
 }
 
+// giteaReview is a compact description of a Gitea pull review used to build
+// API responses for approval tests.
+type giteaReview struct {
+	id        int
+	login     string
+	state     string
+	dismissed bool
+	stale     bool
+	submitted string
+}
+
+func giteaReviewsJSON(reviews []giteaReview) string {
+	entries := make([]string, 0, len(reviews))
+	for _, r := range reviews {
+		entries = append(entries, fmt.Sprintf(`{
+  "id": %d,
+  "user": {"id": %d, "login": %q, "login_name": %q},
+  "state": %q,
+  "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "stale": %t,
+  "official": true,
+  "dismissed": %t,
+  "comments_count": 0,
+  "submitted_at": %q
+}`, r.id, 100+r.id, r.login, r.login, r.state, r.stale, r.dismissed, r.submitted))
+	}
+	return "[" + strings.Join(entries, ",") + "]"
+}
+
+func TestClient_PullIsApproved_EffectiveReviewState(t *testing.T) {
+	cases := []struct {
+		description   string
+		reviews       []giteaReview
+		expApproved   bool
+		expApprovedBy string
+	}{
+		{
+			description: "dismissed approval only is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", dismissed: true, submitted: "2026-01-10T01:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "approval superseded by request changes from the same user is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "REQUEST_CHANGES", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "stale approval is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", stale: true, submitted: "2026-01-10T01:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "approval followed by a dismissed approval from the same user is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", dismissed: true, submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "approval followed by a stale approval from the same user is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", stale: true, submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "approval followed by a dismissed request changes from the same user is not approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "REQUEST_CHANGES", dismissed: true, submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "dismissed approval followed by a fresh approval from the same user is approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", dismissed: true, submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "approval by one user plus dismissed approval by another is approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "bob", state: "APPROVED", dismissed: true, submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "dismissed comment after approval does not revoke the approval",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "COMMENT", dismissed: true, submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "approval by one user plus request changes by another is approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "bob", state: "REQUEST_CHANGES", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "request changes followed by approval from the same user is approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "REQUEST_CHANGES", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "comment after approval does not revoke the approval",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "COMMENT", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "normal approval is approved",
+			reviews: []giteaReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "no reviews is not approved",
+			reviews:     nil,
+			expApproved: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			logger := logging.NewNoopLogger(t)
+			body := giteaReviewsJSON(c.reviews)
+			client := newTestClient(t, 100, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/repos/owner/repo/pulls/1/reviews" {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+				_, _ = w.Write([]byte(body))
+			})
+
+			approvalStatus, err := client.PullIsApproved(logger, models.Repo{Owner: "owner", Name: "repo"}, models.PullRequest{Num: 1})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expApprovedBy, approvalStatus.ApprovedBy)
+		})
+	}
+}
+
+func TestClient_PullIsApproved_SupersededAcrossPages(t *testing.T) {
+	// The approval is on page 1 and the same reviewer's later REQUEST_CHANGES
+	// is on page 2. The client must read every page before deciding.
+	logger := logging.NewNoopLogger(t)
+	page1 := giteaReviewsJSON([]giteaReview{
+		{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+	})
+	page2 := giteaReviewsJSON([]giteaReview{
+		{id: 2, login: "alice", state: "REQUEST_CHANGES", submitted: "2026-01-10T02:00:00Z"},
+	})
+
+	client := newTestClient(t, 1, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/repos/owner/repo/pulls/1/reviews" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		switch r.URL.Query().Get("page") {
+		case "1":
+			w.Header().Set("Link", `</repos/owner/repo/pulls/1/reviews?page=2&limit=1>; rel="next"`)
+			_, _ = w.Write([]byte(page1))
+		case "2":
+			_, _ = w.Write([]byte(page2))
+		default:
+			t.Errorf("unexpected page %q", r.URL.Query().Get("page"))
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+
+	approvalStatus, err := client.PullIsApproved(logger, models.Repo{Owner: "owner", Name: "repo"}, models.PullRequest{Num: 1})
+	Ok(t, err)
+	Equals(t, false, approvalStatus.IsApproved)
+}
+
 func TestClient_DiscardReviewsPagination(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	listPages := make([]int, 0, 2)
@@ -405,4 +611,39 @@ func parseDismissReviewID(path string) (int, error) {
 		return 0, err
 	}
 	return reviewID, nil
+}
+
+func TestClient_PullIsApproved_TombstoneAcrossPages(t *testing.T) {
+	// The approval is on page 1 and the same reviewer's later dismissed
+	// review is on page 2. The dismissed review revokes the reviewer's stance,
+	// so the older approval must not be revived.
+	logger := logging.NewNoopLogger(t)
+	page1 := giteaReviewsJSON([]giteaReview{
+		{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+	})
+	page2 := giteaReviewsJSON([]giteaReview{
+		{id: 2, login: "alice", state: "APPROVED", dismissed: true, submitted: "2026-01-10T02:00:00Z"},
+	})
+
+	client := newTestClient(t, 1, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/repos/owner/repo/pulls/1/reviews" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.String())
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		switch r.URL.Query().Get("page") {
+		case "1":
+			w.Header().Set("Link", `</repos/owner/repo/pulls/1/reviews?page=2&limit=1>; rel="next"`)
+			_, _ = w.Write([]byte(page1))
+		case "2":
+			_, _ = w.Write([]byte(page2))
+		default:
+			t.Errorf("unexpected page %q", r.URL.Query().Get("page"))
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+	})
+
+	approvalStatus, err := client.PullIsApproved(logger, models.Repo{Owner: "owner", Name: "repo"}, models.PullRequest{Num: 1})
+	Ok(t, err)
+	Equals(t, false, approvalStatus.IsApproved)
 }
