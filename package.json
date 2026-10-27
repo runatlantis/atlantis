@@ -26,6 +26,8 @@
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
+    "website:build:versioned": "node scripts/website/build-versioned.mjs",
+    "website:test:versioned": "node --test scripts/website/versioning.test.mjs",
     "e2e": "playwright test",
     "website:test:adrs": "node --test scripts/website/adr.test.mjs"
   }
