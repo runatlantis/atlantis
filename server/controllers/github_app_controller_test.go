@@ -101,7 +101,7 @@ func exchange(c *controllers.GithubAppController, query string, cookie *http.Coo
 	w := httptest.NewRecorder()
 	r, _ := http.NewRequest("GET", "/github-app/exchange-code?"+query, nil)
 	if cookie != nil {
-		r.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value})
+		r.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value}) //nolint:gosec // G124: request cookies carry no attributes
 	}
 	c.ExchangeCode(w, r)
 	return w
@@ -194,7 +194,7 @@ func TestGithubAppController_ExchangeCode_StateWithOtherBrowsersCookieIsRejected
 func TestGithubAppController_ExchangeCode_ForgedCookieIsRejected(t *testing.T) {
 	c, exchanger := newGithubAppController(t)
 	flow := startSetup(t, c)
-	forged := &http.Cookie{Name: controllers.GithubAppSetupCookieName, Value: "forged"}
+	forged := &http.Cookie{Name: controllers.GithubAppSetupCookieName, Value: "forged"} //nolint:gosec // G124: request cookies carry no attributes
 
 	w := exchange(c, "code=abc123&state="+flow.state, forged)
 

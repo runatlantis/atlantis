@@ -153,8 +153,7 @@ func postProcessRunOutput(
 // runStepError it carries. Callers that need the raw output on success but
 // must not report it on failure use this instead of the hide option.
 func hideRunStepErrorOutput(err error) error {
-	var stepErr runStepError
-	if errors.As(err, &stepErr) {
+	if stepErr, ok := errors.AsType[runStepError](err); ok {
 		stepErr.output = ""
 		return stepErr
 	}
