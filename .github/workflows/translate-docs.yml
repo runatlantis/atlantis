@@ -123,7 +123,7 @@ jobs:
             locale="$(basename "$dir")"
             [ "$locale" = "en" ] && continue
             mkdir -p "runatlantis.io/${locale}"
-            rsync -a --delete --exclude='images/' "$dir" "runatlantis.io/${locale}/"
+            rsync -a --delete --exclude='images/' --exclude='/contributing/adr/' "$dir" "runatlantis.io/${locale}/"
           done
           rm -rf .lingo-src
 

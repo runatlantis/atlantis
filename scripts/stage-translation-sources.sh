@@ -15,7 +15,8 @@ mkdir -p .lingo-src/en
 # Markdown only. The blog keeps its images and Terraform samples in per-post
 # directories; those are not translated, and the link localizer already points
 # a translated post back at the English copy of its assets.
-rsync -a --include='*/' --include='*.md' --exclude='*' --prune-empty-dirs \
+# ADR wrappers load canonical records and are maintained by hand.
+rsync -a --exclude='/contributing/adr/' --include='*/' --include='*.md' --exclude='*' --prune-empty-dirs \
   runatlantis.io/docs runatlantis.io/guide runatlantis.io/blog runatlantis.io/contributing \
   .lingo-src/en/
 cp runatlantis.io/*.md .lingo-src/en/

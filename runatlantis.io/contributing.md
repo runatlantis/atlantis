@@ -14,4 +14,5 @@ If you're new, check out the [Guide](./guide.md) or the
 
 ## Next Steps
 
+- [Architecture Decisions](./contributing/adr/index.md)&nbsp;&nbsp;–&nbsp;&nbsp;Current proposals, decisions, and their status.
 - [Events Controller](./contributing/events-controller.md)&nbsp;&nbsp;–&nbsp;&nbsp;How do the events work?
