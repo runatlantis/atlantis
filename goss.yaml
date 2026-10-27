@@ -1,4 +1,8 @@
 # See: https://github.com/goss-org/goss/blob/master/docs/gossfile.md
+#
+# Since v0.49.0 the images ship without Terraform and OpenTofu. Atlantis
+# downloads the version it needs at runtime, so the two binaries must be absent
+# and no default version may be baked into the image.
 
 command:
   # ensure atlantis is available
@@ -22,16 +26,37 @@ command:
     stdout: []
     stderr: []
 
-  # ensure terraform is available
-  terraform-available:
+  # ensure terraform is NOT on PATH (127 is "command not found" from sh)
+  terraform-absent:
     exec: "terraform version"
-    exit-status: 0
-    stdout: []
-    stderr: []
+    exit-status: 127
 
-  # ensure tofu binary is available
-  tofu-available:
+  # ensure tofu is NOT on PATH
+  tofu-absent:
     exec: "tofu version"
-    exit-status: 0
-    stdout: []
-    stderr: []
+    exit-status: 127
+
+  # ensure no default Terraform version or distribution is baked into the
+  # image: an env var would override a value pinned in the server config file
+  default-tf-version-unset:
+    exec: "printenv ATLANTIS_DEFAULT_TF_VERSION"
+    exit-status: 1
+
+  default-tf-distribution-unset:
+    exec: "printenv ATLANTIS_DEFAULT_TF_DISTRIBUTION"
+    exit-status: 1
+
+  # ensure the server refuses to start, with a message that says what to set,
+  # rather than failing later in a less obvious way
+  server-fails-fast-without-tf-version:
+    exec: "atlantis server --gh-user=u --gh-token=t --repo-allowlist='github.com/*'"
+    exit-status: 1
+    stderr:
+      - "terraform not found in"
+      - "Set --default-tf-version"
+
+file:
+  /usr/local/bin/terraform:
+    exists: false
+  /usr/local/bin/tofu:
+    exists: false

@@ -7,27 +7,31 @@ import (
 	"fmt"
 
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 )
 
 func NewStateCommandRunner(
 	pullUpdater *PullUpdater,
 	dbUpdater *DBUpdater,
+	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	prjCmdBuilder ProjectStateCommandBuilder,
 	prjCmdRunner ProjectStateCommandRunner,
 ) *StateCommandRunner {
 	return &StateCommandRunner{
-		pullUpdater:   pullUpdater,
-		dbUpdater:     dbUpdater,
-		prjCmdBuilder: prjCmdBuilder,
-		prjCmdRunner:  prjCmdRunner,
+		pullUpdater:          pullUpdater,
+		dbUpdater:            dbUpdater,
+		pullReqStatusFetcher: pullReqStatusFetcher,
+		prjCmdBuilder:        prjCmdBuilder,
+		prjCmdRunner:         prjCmdRunner,
 	}
 }
 
 type StateCommandRunner struct {
-	pullUpdater   *PullUpdater
-	dbUpdater     *DBUpdater
-	prjCmdBuilder ProjectStateCommandBuilder
-	prjCmdRunner  ProjectStateCommandRunner
+	pullUpdater          *PullUpdater
+	dbUpdater            *DBUpdater
+	pullReqStatusFetcher vcs.PullReqStatusFetcher
+	prjCmdBuilder        ProjectStateCommandBuilder
+	prjCmdRunner         ProjectStateCommandRunner
 }
 
 func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
@@ -51,6 +55,17 @@ func (v *StateCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 }
 
 func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) command.Result {
+	// Fetch the approved and mergeable status before building the project
+	// contexts, as import does, so the state rm requirement check sees the
+	// pull request's real state rather than the zero value.
+	var err error
+	ctx.PullRequestStatus, err = v.pullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
+	if err != nil {
+		// Continue with approved and mergeable assumed false: a requirement
+		// that needs them then fails closed.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+	}
+
 	projectCmds, err := v.prjCmdBuilder.BuildStateRmCommands(ctx, cmd)
 	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
 		return command.Result{}

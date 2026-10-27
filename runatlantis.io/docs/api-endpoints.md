@@ -79,6 +79,8 @@ To enable the API endpoints, `api-secret` should be configured.
 
 Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified repository.
 
+Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) enabled are planned in parallel, up to [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) at once. In that case, the [pre workflow hooks](pre-workflow-hooks.md) of every project run before the first plan starts, and the [post workflow hooks](post-workflow-hooks.md) run after the last plan finishes. Otherwise, each project's hooks run right before and after its own plan.
+
 #### Parameters
 
 | Name       | Type     | Required | Description                              |
@@ -116,8 +118,22 @@ At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
 |-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run plan in relative to root of repo                                                                                                   |
+| Directory | string | No       | Which directory to run plan in relative to root of repo. Must be a literal repo-relative path; see [Directory validation](#directory-validation).         |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
+
+##### Directory validation
+
+`Directory` must be a literal path relative to the repository root, such as `.` or `modules/vpc`. It is cleaned before use, so `./modules/vpc/` becomes `modules/vpc`. An empty `Directory` is the same as omitting it. The request is rejected with HTTP 400 and a top-level `{ "error": "..." }` body if `Directory` is absolute (including a bare `/`), resolves outside the repository through `..`, contains a backslash, or contains a glob character (`*`, `?`, `[`, `]`, `{`, `}`). The same rule applies to `POST /api/apply`.
+
+```json
+{
+  "error": "invalid directory \"/modules/vpc\": directory must be a clean repo-relative path"
+}
+```
+
+::: warning Behavior change
+Previously, `Directory` only had trailing slashes removed. A leading slash was not rejected: `/modules/vpc` ran in `modules/vpc` under the clone but did not match that directory's `atlantis.yaml` project, so it ran with default settings; a bare `/` meant the repository root; glob patterns matched configured projects by pattern; and paths escaping the repository failed later during execution. Now all of these are rejected up front with HTTP 400 and `invalid directory "<value>": directory must be a clean repo-relative path`. Drop the leading slash (`modules/vpc`), use `.` for the repository root, and list each project directory explicitly instead of using a glob.
+:::
 
 #### Sample Request (with PR)
 
@@ -223,6 +239,8 @@ When a project-level error occurs:
 
 Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repository.
 
+The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-api-plan), then applies them one project at a time, even when [`parallel_apply`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) is enabled.
+
 #### Parameters
 
 | Name       | Type     | Required | Description                              |
@@ -246,7 +264,7 @@ At least one of `Directory` or `Workspace` should be specified.
 
 | Name      | Type   | Required | Description                                                                                                                                               |
 |-----------|--------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Directory | string | No       | Which directory to run apply in relative to root of repo                                                                                                  |
+| Directory | string | No       | Which directory to run apply in relative to root of repo. Must be a literal repo-relative path; see [Directory validation](#directory-validation).        |
 | Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) of the plan. Use `default` if Terraform workspaces are unused. |
 
 #### Sample Request
@@ -304,6 +322,8 @@ Drift detection runs Terraform plan workflows and can execute configured hooks o
 #### Description
 
 Execute drift remediation on the specified repository. This endpoint allows you to run plan-only (to preview remediation) or auto-apply (to automatically fix drift) operations for projects with detected drift.
+
+Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) enabled are planned in parallel, up to [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) at once. Auto-apply still applies one project at a time.
 
 ::: tip Prerequisites
 
@@ -599,6 +619,8 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 #### Description
 
 Trigger drift detection for projects in a repository. This endpoint initiates a plan operation to detect infrastructure drift without requiring a pull request. Results are stored for later retrieval via the drift status endpoints.
+
+Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) enabled are planned in parallel, up to [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) at once.
 
 When [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) are configured (`event: drift`), successful detection runs send webhook notifications automatically to Slack channels and/or HTTP endpoints, including no-drift heartbeat results.
 
@@ -949,7 +971,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 
 ## Other Endpoints
 
-Most endpoints listed in this section are non-destructive and therefore don't require authentication nor a special secret token. `GET /api/drift/status` is an authenticated drift API read endpoint and requires `X-Atlantis-Token`.
+The endpoints listed in this section are non-destructive, but they are not exempt from authentication. `GET /api/locks` requires `X-Atlantis-Token` whenever an API secret is configured on the server and stays open only when no secret is configured, because the `/api/` prefix is not covered by web basic auth. `GET /api/drift/status` is an authenticated drift API read endpoint and always requires `X-Atlantis-Token`.
 
 ### GET /api/locks
 
@@ -957,10 +979,14 @@ Most endpoints listed in this section are non-destructive and therefore don't re
 
 List the currently held project locks.
 
+::: warning Behavior change
+Previously, `GET /api/locks` returned the lock list to any caller, even when `--api-secret` was set. Now, when an API secret is configured, the request must send it in the `X-Atlantis-Token` header; with no API secret configured the endpoint stays open. Update scripts and dashboards that poll this endpoint to send the header. A missing or wrong token returns HTTP 401 with error code `UNAUTHORIZED` and message `invalid or missing API token`.
+:::
+
 #### Sample Request
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks' --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
 #### Sample Response

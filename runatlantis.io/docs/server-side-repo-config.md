@@ -405,6 +405,21 @@ projects:
   workflow: custom1 # could also be custom2 OR default
 ```
 
+When `allowed_workflows` is set, Atlantis checks the `workflow` of every
+project in `atlantis.yaml`. Each project must either leave `workflow` unset,
+name a workflow in `allowed_workflows`, or, when `allow_custom_workflows` is
+true, name a workflow defined in that repo's own `atlantis.yaml`. Otherwise
+Atlantis rejects the repo config with `workflow '<name>' is not allowed for this repo`.
+
+::: warning Behavior change
+Previously, once one project selected a workflow defined in the repo's own
+`atlantis.yaml` (with `allow_custom_workflows: true`), the projects listed after
+it skipped the `allowed_workflows` check and could select any server-side
+workflow. Now every project is checked. Repos that relied on this will see
+`workflow '<name>' is not allowed for this repo`; add the workflow to that
+repo's `allowed_workflows` or change the project's `workflow`.
+:::
+
 :::tip NOTE
 There is always a workflow named `default` that corresponds to Atlantis' default workflow
 unless you've created your own server-side workflow with that key (overriding it).
@@ -569,10 +584,10 @@ If you set a workflow with the key `default`, it will override this.
 | repo_config_file | string | none | no | Repo config file path in this repo. By default, use `atlantis.yaml` which is located on repository root. When multiple atlantis servers work with the same repo, please set different file names. |
 | workflow | string | none | no | A custom workflow. |
 | plan_requirements | []string | none | no | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
-| apply_requirements | []string | none | no | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
-| import_requirements | []string | none | no | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
+| apply_requirements | []string | none | no | Requirements that must be satisfied before `atlantis apply` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
+| import_requirements | []string | none | no | Requirements that must be satisfied before `atlantis import` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | allowed_overrides | []string | none | no | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks`, and `custom_policy_check` |
-| allowed_workflows | []string | none | no | A list of workflows that `atlantis.yaml` files can select from. |
+| allowed_workflows | []string | none | no | A list of server-side workflows that projects in `atlantis.yaml` files can select from. Checked for every project. |
 | allow_custom_workflows | bool | false | no | Whether or not to allow [Custom Workflows](custom-workflows.md). |
 | delete_source_branch_on_merge | bool | false | no | Whether or not to delete the source branch on merge. |
 | repo_locking | bool | false | no | (deprecated) Whether or not to get a lock. |

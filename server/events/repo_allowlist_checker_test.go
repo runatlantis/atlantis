@@ -167,6 +167,83 @@ func TestRepoAllowlistChecker_IsAllowlisted(t *testing.T) {
 			true,
 		},
 		{
+			// A rule with a wildcard in the middle must match the part before
+			// the wildcard as well. Matching only the suffix allows any
+			// repository, in any organisation, whose name ends the right way.
+			"wildcard in the middle must still anchor the prefix",
+			"github.com/myorg/*-prod",
+			"evil/anything-prod",
+			"github.com",
+			false,
+		},
+		{
+			"wildcard in the middle matches the intended org",
+			"github.com/myorg/*-prod",
+			"myorg/app-prod",
+			"github.com",
+			true,
+		},
+		{
+			"prefix before a trailing wildcard must still anchor",
+			"github.com/myorg/app*",
+			"evil/app-clone",
+			"github.com",
+			false,
+		},
+		{
+			"multiple wildcards are matched in order",
+			"github.com/*/team-*",
+			"someorg/team-alpha",
+			"github.com",
+			true,
+		},
+		{
+			"multiple wildcards do not match when a literal segment differs",
+			"github.com/*/team-*",
+			"someorg/group-alpha",
+			"github.com",
+			false,
+		},
+		{
+			// The host is part of the anchored prefix, so a rule written for
+			// one VCS host must not admit the same owner and name on another.
+			"wildcard in the middle does not match a different host",
+			"github.com/myorg/*-prod",
+			"myorg/app-prod",
+			"gitlab.com",
+			false,
+		},
+		{
+			"trailing wildcard does not match a different host",
+			"github.com/myorg/app*",
+			"myorg/app-clone",
+			"gitlab.com",
+			false,
+		},
+		{
+			// A negated rule goes through the same matcher, so a wildcard in
+			// the middle of it must anchor the prefix in the same way.
+			"negated rule with a wildcard in the middle excludes the intended repo",
+			"github.com/myorg/*,!github.com/myorg/*-prod",
+			"myorg/app-prod",
+			"github.com",
+			false,
+		},
+		{
+			"negated rule with a wildcard in the middle does not exclude other repos",
+			"github.com/myorg/*,!github.com/myorg/*-prod",
+			"myorg/app-dev",
+			"github.com",
+			true,
+		},
+		{
+			"negated rule with a wildcard in the middle only excludes its own org",
+			"github.com/*/*,!github.com/myorg/*-prod",
+			"otherorg/app-prod",
+			"github.com",
+			true,
+		},
+		{
 			"should exclude with negative match",
 			"github.com/owner/*,!github.com/owner/badrepo",
 			"owner/badrepo",

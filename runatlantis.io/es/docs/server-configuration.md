@@ -96,6 +96,13 @@ Atlantis ejecutará automáticamente `terraform plan`
 que puede ejecutar código arbitrario si recibe una configuración Terraform maliciosa.
 :::
 
+Independientemente de este flag, Atlantis solo ejecuta comandos para un pull request cuyo repositorio
+head está en el mismo host que su repositorio base.
+
+::: warning Cambio de comportamiento
+Anteriormente, Atlantis no comparaba los hosts de los repositorios head y base. Ahora, si el host de la clone URL del repositorio head difiere del del repositorio base (sin distinguir mayúsculas de minúsculas), o no tiene host, Atlantis no ejecuta el comando y no publica ningún comentario. Busque la línea del log del servidor `head repo host "<head>" does not match base repo host "<base>", not running command`. Para GitHub, vea también [`--gh-hostname`](#gh-hostname).
+:::
+
 ### `--api-secret` <Badge text="v0.22.2+" type="info"/>
 
 ```bash
@@ -104,7 +111,9 @@ atlantis server --api-secret="secret"
 ATLANTIS_API_SECRET="secret"
 ```
 
-Secreto requerido usado para validar solicitudes hechas a los [endpoints `/api/*`](api-endpoints.md).
+Secreto requerido usado para validar solicitudes realizadas a los endpoints de [`/api/*`](api-endpoints.md).
+
+Cuando está configurado, también es requerido por el endpoint de solo lectura [`GET /api/locks`](api-endpoints.md#get-api-locks).
 
 ### `--atlantis-url` <Badge text="v0.1.3+" type="info"/>
 
@@ -116,12 +125,12 @@ ATLANTIS_ATLANTIS_URL=https://my-domain.com:9090/basepath
 
 Especifique la URL desde la que Atlantis es accesible. Se usa en la UI de Atlantis
 y en enlaces desde comentarios de pull request. El valor predeterminado es `http://$(hostname):$port`
-donde `$port` proviene del flag [`--port`](#port). Soporta un basepath si está alojando Atlantis bajo una ruta.
+donde `$port` proviene del flag [`--port`](#port). Soporta un basepath si aloja Atlantis bajo una ruta.
 
 Notas:
 
 - Si se usa un balanceador de carga con un puerto no http/https (no el definido en el flag `--port`), actualice la URL para incluir el puerto como en el ejemplo anterior.
-- Esta URL se usa como el enlace `details` junto a cada job de atlantis para ver los logs del job.
+- Esta URL se usa como el enlace `details` junto a cada trabajo de atlantis para ver los logs del trabajo.
 
 ### `--autodiscover-mode` <Badge text="v0.27.0+" type="info"/>
 
@@ -131,15 +140,15 @@ atlantis server --autodiscover-mode="<auto|enabled|disabled>"
 ATLANTIS_AUTODISCOVER_MODE="<auto|enabled|disabled>"
 ```
 
-Establece el modo auto discover, el predeterminado es `auto`. Cuando se establece en `auto`, los proyectos en un repo serán descubiertos por
-Atlantis cuando no haya proyectos configurados en la configuración del repo. Si uno o más proyectos están definidos
-en la configuración del repo, entonces el auto discovery se deshabilitará completamente.
+Establece el modo auto discover; el valor predeterminado es `auto`. Cuando se establece en `auto`, los proyectos en un repo serán descubiertos por
+Atlantis cuando no haya proyectos configurados en la config del repo. Si uno o más proyectos están definidos
+en la config del repo, entonces el auto discovery quedará completamente deshabilitado.
 
-Cuando se establece en `enabled` los proyectos serán descubiertos incondicionalmente. Si un proyecto descubierto automáticamente ya está
-definido en la sección projects de la configuración del repo, el proyecto de la configuración del repo tendrá precedencia sobre
-el proyecto descubierto automáticamente.
+Cuando se establece en `enabled` los proyectos serán descubiertos incondicionalmente. Si un proyecto auto descubierto ya está
+definido en la sección projects de la config del repo, el proyecto de la config del repo tendrá precedencia sobre
+el proyecto auto descubierto.
 
-Cuando se establece en `disabled` los proyectos nunca serán descubiertos, incluso si no hay proyectos configurados en la configuración del repo.
+Cuando se establece en `disabled` los proyectos nunca serán descubiertos, incluso si no hay proyectos configurados en la config del repo.
 
 ### `--automerge` <Badge text="v0.17.0" type="info"/>
 
@@ -149,7 +158,7 @@ atlantis server --automerge
 ATLANTIS_AUTOMERGE=true
 ```
 
-Fusionar automáticamente pull requests después de que todos los plans se hayan aplicado correctamente.
+Fusiona automáticamente pull requests después de que todos los plans se hayan aplicado correctamente.
 El valor predeterminado es `false`. Vea [Automerging](automerging.md) para más detalles.
 
 ### `--automerge-method`
@@ -160,8 +169,8 @@ atlantis server --automerge-method="squash"
 ATLANTIS_AUTOMERGE_METHOD="squash"
 ```
 
-Método de merge predeterminado para usar al hacer automerging de pull requests. Los valores válidos son
-`merge`, `rebase`, y `squash`. Cuando no se establece, se usa el método de merge
+Método de merge predeterminado a usar al hacer automerging de pull requests. Los valores válidos son
+`merge`, `rebase` y `squash`. Cuando no está configurado, se usa el método de merge
 predeterminado del proveedor VCS. Esto puede sobrescribirse por comando con el flag de comentario `--auto-merge-method`.
 Actualmente solo está implementado para GitHub.
 
@@ -174,30 +183,30 @@ atlantis server --autoplan-file-list='**/*.tf,project1/*.pkr.hcl'
 ATLANTIS_AUTOPLAN_FILE_LIST='**/*.tf,project1/*.pkr.hcl'
 ```
 
-Lista de patrones de archivos que Atlantis usará para comprobar si un directorio contiene archivos modificados que deben activar project planning.
+Lista de patrones de archivos que Atlantis usará para verificar si un directorio contiene archivos modificados que deben disparar el planning del proyecto.
 
 Notas:
 
 - Acepta una lista separada por comas, p. ej. `pattern1,pattern2`.
-- Los patrones usan la [sintaxis `.dockerignore`](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
-- La lista de patrones de archivos será usada tanto por plans ejecutados automáticamente como manualmente.
-- Cuando no se establece, el valor predeterminado son todos los archivos `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` y `.terraform.lock.hcl`
+- Los patrones usan la [sintaxis de `.dockerignore`](https://docs.docker.com/engine/reference/builder/#dockerignore-file)
+- La lista de patrones de archivos será usada tanto por plans automáticos como por plans ejecutados manualmente.
+- Cuando no está configurado, el valor predeterminado es todos los archivos `.tf`, `.tf.json`, `.tfvars`, `.tfvars.json`, `.tofu`, `.tofu.json`, `terragrunt.hcl` e `.terraform.lock.hcl`
    (`--autoplan-file-list='**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl'`).
-- Establecer `--autoplan-file-list` sobrescribirá los valores predeterminados. **Debe** agregar `**/*.tf` y otros valores predeterminados si desea incluirlos.
-- El valor predeterminado es global (no distribution-aware). Tanto las instalaciones de Terraform como de OpenTofu coincidirán con cambios en `.tofu`. Si no usa OpenTofu, puede sobrescribir el valor predeterminado para excluir patrones `.tofu`.
+- Configurar `--autoplan-file-list` sobrescribirá los valores predeterminados. **Debe** agregar `**/*.tf` y otros valores predeterminados si quiere incluirlos.
+- El valor predeterminado es global (no distingue distribución). Tanto las instalaciones de Terraform como de OpenTofu coincidirán con cambios en `.tofu`. Si no usa OpenTofu, puede sobrescribir el valor predeterminado para excluir los patrones `.tofu`.
 - Un [Workflow](repo-level-atlantis-yaml.md#configuring-planning) personalizado que use autoplan `when_modified` ignorará este valor.
 
 Ejemplos:
 
-- Autoplan cuando se modifica cualquier archivo `*.tf` o `*.tfvars`.
+- Autoplan cuando cualquier archivo `*.tf` o `*.tfvars` es modificado.
   - `--autoplan-file-list='**/*.tf,**/*.tfvars'`
-- Autoplan cuando se modifica cualquier archivo `*.tf` excepto en el directorio `project2/`
+- Autoplan cuando cualquier archivo `*.tf` es modificado excepto en el directorio `project2/`
   - `--autoplan-file-list='**/*.tf,!project2'`
-- Autoplan cuando se modifica cualquier archivo `*.tf` o archivos `.yml` en una subcarpeta de `project1`.
+- Autoplan cuando cualquier archivo `*.tf` o archivos `.yml` en una subcarpeta de `project1` es modificado.
   - `--autoplan-file-list='**/*.tf,project1/**/*.yml'`
 
-::: warning NOTE
-De forma predeterminada, los cambios en módulos no activarán autoplanning. Vea los flags a continuación.
+::: warning NOTA
+De forma predeterminada, los cambios a módulos no dispararán autoplanning. Vea los flags a continuación.
 :::
 
 ### `--autoplan-modules` <Badge text="v0.26.0+" type="info"/>
@@ -210,11 +219,11 @@ ATLANTIS_AUTOPLAN_MODULES=true
 
 El valor predeterminado es `false`. Cuando se establece en `true`, Atlantis rastreará los módulos locales de los proyectos incluidos.
 Los proyectos incluidos son proyectos con archivos incluidos por `--autoplan-file-list`.
-Después del rastreo, Atlantis hará plan de cualquier proyecto que incluya un módulo modificado. Esto equivale a establecer
+Después del rastreo, Atlantis hará plan de cualquier proyecto que incluya un módulo cambiado. Esto es equivalente a establecer
 `--autoplan-modules-from-projects` al valor de `--autoplan-file-list`. Vea abajo.
 
-::: tip NOTE
-La indexación de dependencias de módulos usa inspección de configuración de Terraform y puede no soportar completamente archivos `.tofu` / `.tofu.json`. Las llamadas a módulos definidas solo en archivos `.tofu` o directorios de módulos compartidos que contienen solo archivos `.tofu` pueden no ser rastreadas. El autoplanning directo por cambio de archivo para proyectos `.tofu` funciona independientemente. Use patrones explícitos `autoplan.when_modified` como solución alternativa. Vea [OpenTofu .tofu file support](terraform-versions.md#opentofu-tofu-file-support) para detalles.
+::: tip NOTA
+La indexación de dependencias de módulos usa inspección de configuración de Terraform y puede no soportar completamente archivos `.tofu` / `.tofu.json`. Las llamadas a módulos definidas solo en archivos `.tofu` o directorios de módulos compartidos que contienen solo archivos `.tofu` pueden no ser rastreadas. El autoplanning directo por cambio de archivo para proyectos `.tofu` funciona independientemente. Use patrones `autoplan.when_modified` explícitos como solución alternativa. Vea [soporte de archivos OpenTofu .tofu](terraform-versions.md#opentofu-tofu-file-support) para detalles.
 :::
 
 ### `--autoplan-modules-from-projects` <Badge text="v0.26.0+" type="info"/>
@@ -228,25 +237,25 @@ ATLANTIS_AUTOPLAN_MODULES_FROM_PROJECTS='**/init.tf'
 Habilita auto-planing de proyectos cuando una dependencia de módulo en el mismo repositorio ha cambiado.
 Esta es una lista de patrones de archivos como `autoplan-file-list`.
 
-Estos patrones seleccionan **proyectos** para indexar en función de los archivos coincidentes. El índice mapea módulos a los proyectos que dependen de ellos,
-incluyendo proyectos que incluyen el módulo mediante otros módulos. Cuando cambia un archivo de módulo que coincide con `autoplan-file-list`,
-todos los proyectos indexados tendrán plan.
+Estos patrones seleccionan **proyectos** para indexar según los archivos coincidentes. El índice mapea módulos a los proyectos que dependen de ellos,
+incluyendo proyectos que incluyen el módulo a través de otros módulos. Cuando cambia un archivo de módulo que coincide con `autoplan-file-list`,
+se hará plan de todos los proyectos indexados.
 
 El valor predeterminado actual es "" (deshabilitado).
 
 Ejemplos:
 
-- `**/*.tf` - indexará todos los proyectos que tengan un archivo `.tf` en su directorio, y les hará plan cada vez que una dependencia de módulo dentro del repo haya cambiado.
-- `**/*.tf,!foo,!bar` - indexará todos los proyectos que contengan `.tf` excepto `foo` y `bar` y les hará plan cada vez que una dependencia de módulo dentro del repo haya cambiado.
-   Esto permite que los proyectos opten por no usar auto-planning cuando una dependencia de módulo cambia.
+- `**/*.tf` - indexará todos los proyectos que tengan un archivo `.tf` en su directorio, y hará plan de ellos siempre que una dependencia de módulo dentro del repo haya cambiado.
+- `**/*.tf,!foo,!bar` - indexará todos los proyectos que contengan `.tf` excepto `foo` y `bar` y hará plan de ellos siempre que una dependencia de módulo dentro del repo haya cambiado.
+   Esto permite que los proyectos opten por no participar en auto-planning cuando cambia una dependencia de módulo.
 
-::: warning NOTE
-Los módulos que no sean seleccionados por autoplan-file-list no serán indexados y no se hará plan de los proyectos dependientes. Este
+::: warning NOTA
+Los módulos que no son seleccionados por autoplan-file-list no serán indexados y no se hará plan de los proyectos dependientes. Este
 flag permite seleccionar los _proyectos_ a indexar, pero el disparador para un plan debe ser un archivo en `autoplan-file-list`.
 :::
 
-::: warning NOTE
-Este flag sobrescribe `--autoplan-modules`. Si desea deshabilitar auto-planning de módulos, establezca este flag en una cadena vacía,
+::: warning NOTA
+Este flag sobrescribe `--autoplan-modules`. Si desea deshabilitar auto-planning de módulos, establezca este flag a una cadena vacía,
 y establezca `--autoplan-modules` en `false`.
 :::
 
@@ -260,15 +269,15 @@ ATLANTIS_AZUREDEVOPS_HOSTNAME="dev.azure.com"
 
 Hostname de Azure DevOps para soportar instancias cloud y self-hosted. El valor predeterminado es `dev.azure.com`.
 
-::: warning COMPATIBILITY WARNING
+::: warning ADVERTENCIA DE COMPATIBILIDAD
 Si le afecta este cambio [docs](https://learn.microsoft.com/en-us/azure/devops/release-notes/2018/sep-10-azure-devops-launch#administration)
 o este [issue](https://github.com/runatlantis/atlantis/issues/5595)
-ambos Service Hooks (v1 y v2) convertirán el nombre de la organización de AD a minúsculas:
+ambos Service Hooks (v1 y v2) convertirán el nombre de la organización AD a minúsculas:
 Ejemplos:
-`https://dev.azure.com/MYCompany/` & `https://mycompany.visualstudio.com/` se convertirán en `mycompany`
-`https://dev.azure.com/MYCOMPANY/` & `https://myCOMPANY.visualstudio.com/` se convertirán en `mycompany`
+`https://dev.azure.com/MYCompany/` e `https://mycompany.visualstudio.com/` serán convertidos a `mycompany`
+`https://dev.azure.com/MYCOMPANY/` e `https://myCOMPANY.visualstudio.com/` serán convertidos a `mycompany`
 
-Este [cambio](https://github.com/runatlantis/atlantis/pull/5596) se aplicará a partir de la versión v0.35.0
+Este [cambio](https://github.com/runatlantis/atlantis/pull/5596) será aplicado desde la versión v0.35.0
 
 ¿Qué hacer si tiene plans pendientes que fueron generados con una versión anterior?
 Ejecutar un atlantis unlock desde v0.35.0 en sus PR actuales ignorará los archivos en la carpeta `MYCompany`. En el siguiente atlantis plan se usará la carpeta `mycompany` y se generará todo en el nuevo nombre de carpeta
@@ -282,7 +291,7 @@ atlantis server --azuredevops-token="RandomStringProducedByAzureDevOps"
 ATLANTIS_AZUREDEVOPS_TOKEN="RandomStringProducedByAzureDevOps"
 ```
 
-Token de Azure DevOps del usuario API.
+Token de Azure DevOps del usuario de API.
 
 ### `--azuredevops-user` <Badge text="v0.9.0+" type="info"/>
 
@@ -292,7 +301,7 @@ atlantis server --azuredevops-user="username@example.com"
 ATLANTIS_AZUREDEVOPS_USER="username@example.com"
 ```
 
-Nombre de usuario de Azure DevOps del usuario API.
+Nombre de usuario de Azure DevOps del usuario de API.
 
 ### `--azuredevops-webhook-password` <Badge text="v0.9.0+" type="info"/>
 
@@ -305,11 +314,11 @@ ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD="password123"
 Contraseña de autenticación básica de Azure DevOps para webhooks entrantes (vea
 [docs](https://docs.microsoft.com/en-us/azure/devops/service-hooks/authorize?view=azure-devops)).
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 Si no se especifica, Atlantis no podrá validar que la
-llamada webhook entrante provino de su organización Azure DevOps. Esto significa que un
-atacante podría falsificar llamadas a Atlantis y hacer que realice acciones
-maliciosas. Debe especificarse mediante la variable de entorno `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD`.
+llamada webhook entrante provino de su organización de Azure DevOps. Esto significa que un
+atacante podría falsificar llamadas a Atlantis y hacer que realice acciones maliciosas.
+Debe especificarse mediante la variable de entorno `ATLANTIS_AZUREDEVOPS_WEBHOOK_PASSWORD`.
 :::
 
 ### `--azuredevops-webhook-user` <Badge text="v0.9.0+" type="info"/>
@@ -330,11 +339,11 @@ atlantis server --bitbucket-api-user="apiuser@example.com"
 ATLANTIS_BITBUCKET_API_USER="apiuser@example.com"
 ```
 
-Nombre de usuario de Bitbucket (normalmente un email) usado para autenticación API con Bitbucket Cloud. Esto se usa solo para llamadas API. Si no se especifica, Atlantis usará el valor de `--bitbucket-user` para autenticación API para mantener compatibilidad hacia atrás.
+Nombre de usuario de Bitbucket (normalmente un email) usado para autenticación de API con Bitbucket Cloud. Esto se usa solo para llamadas de API. Si no se especifica, Atlantis usará el valor de `--bitbucket-user` para autenticación de API para mantener compatibilidad hacia atrás.
 
 **Nota:**
 
-- La compatibilidad hacia atrás es para soportar los APP Passwords existentes de Bitbucket que siguen siendo válidos hasta junio de 2026 (vea [Atlassian's Bitbucket app password deprecation notice](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
+- La compatibilidad hacia atrás es para soportar los Bitbucket APP Passwords existentes que siguen siendo válidos hasta junio de 2026 (vea [el aviso de deprecación de app passwords de Bitbucket de Atlassian](https://www.atlassian.com/blog/bitbucket/bitbucket-cloud-transitions-to-api-tokens-enhancing-security-with-app-password-deprecation)).
 
 **Clave del archivo de configuración:**
 
@@ -344,7 +353,7 @@ bitbucket-api-user: apiuser@example.com
 
 **Variable de entorno:** `ATLANTIS_BITBUCKET_API_USER`
 
-**Nota:** Este flag solo es relevante para integraciones de Bitbucket Cloud (bitbucket.org).
+**Nota:** Este flag solo es relevante para integraciones con Bitbucket Cloud (bitbucket.org).
 
 ### `--bitbucket-base-url` <Badge text="v0.36.0+" type="info"/>
 
@@ -355,7 +364,7 @@ ATLANTIS_BITBUCKET_BASE_URL="http://bitbucket.corp:7990/basepath"
 ```
 
 URL base de la instalación de Bitbucket Server (también conocido como Stash). Debe incluir
-`http://` o `https://`. Si usa Bitbucket Cloud (bitbucket.org), no la establezca. El valor predeterminado es
+`http://` o `https://`. Si usa Bitbucket Cloud (bitbucket.org), no lo configure. El valor predeterminado es
 `https://api.bitbucket.org`.
 
 ### `--bitbucket-token` <Badge text="v0.36.0+" type="info"/>
@@ -366,7 +375,7 @@ atlantis server --bitbucket-token="token"
 ATLANTIS_BITBUCKET_TOKEN="token"
 ```
 
-App password de Bitbucket del usuario API.
+App password de Bitbucket del usuario de API.
 
 ### `--bitbucket-user` <Badge text="v0.36.0+" type="info"/>
 
@@ -376,7 +385,7 @@ atlantis server --bitbucket-user="myuser"
 ATLANTIS_BITBUCKET_USER="myuser"
 ```
 
-Nombre de usuario de Bitbucket usado para operaciones git. Para Bitbucket Cloud, si `--bitbucket-api-user` no se especifica, este valor también se usará para autenticación API.
+Nombre de usuario de Bitbucket usado para operaciones git. Para Bitbucket Cloud, si `--bitbucket-api-user` no está especificado, este valor también se usará para autenticación de API.
 
 ### `--bitbucket-webhook-secret` <Badge text="v0.36.0+" type="info"/>
 
@@ -388,7 +397,7 @@ ATLANTIS_BITBUCKET_WEBHOOK_SECRET="secret"
 
 Secreto usado para validar webhooks de Bitbucket.
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 Si no se especifica, Atlantis no podrá validar que la llamada webhook entrante provino de Bitbucket.
 Esto significa que un atacante podría falsificar llamadas a Atlantis y hacer que realice acciones maliciosas.
 :::
@@ -396,19 +405,28 @@ Esto significa que un atacante podría falsificar llamadas a Atlantis y hacer qu
 ### `--blocked-extra-args`
 
 ```bash
-atlantis server --blocked-extra-args="-chdir,--chdir,-plugin-dir,--plugin-dir"
+atlantis server --blocked-extra-args="-lock-timeout,-parallelism"
 # or
-ATLANTIS_BLOCKED_EXTRA_ARGS='-chdir,--chdir,-plugin-dir,--plugin-dir'
+ATLANTIS_BLOCKED_EXTRA_ARGS='-lock-timeout,-parallelism'
 ```
 
-Lista separada por comas de prefijos de flags de Terraform CLI que no están permitidos en args extra de comentarios (los flags después de `--`).
-El valor predeterminado es `-chdir,--chdir,-plugin-dir,--plugin-dir`.
+Lista separada por comas de flags adicionales de Terraform CLI que no están permitidos en argumentos extra de comentarios (los flags después de `--`).
+Estos flags siempre están bloqueados, esté o no configurado este flag: `-chdir,-plugin-dir,-out,-generate-config-out,-state,-state-out,-backup`.
 
 Notas:
 
-- Estos flags se bloquean para prevenir problemas de seguridad como recorrido de directorio de trabajo (`-chdir`) o carga de providers maliciosos (`-plugin-dir`).
-- Establecer este flag **reemplaza** completamente la lista predeterminada. Para extender los valores predeterminados, inclúyalos junto con sus flags personalizados, p. ej. `-chdir,--chdir,-plugin-dir,--plugin-dir,-my-flag`.
+- `-chdir` e `-plugin-dir` están bloqueados porque mueven el directorio de trabajo o la fuente del proveedor de Terraform a una ubicación que el autor del comentario controla.
+- `-out`, `-generate-config-out`, `-state`, `-state-out` e `-backup` están bloqueados porque hacen que Terraform escriba un archivo, o lea state, en una ruta que el autor del comentario elige. Atlantis gestiona por sí mismo las ubicaciones de los archivos de plan y state.
+- Configurar este flag **agrega** a la lista siempre bloqueada; no puede desbloquear ninguno de ellos.
+- Un comentario que usa un flag bloqueado es rechazado con `flag "<arg>" is not allowed in extra args`.
+- Para generar configuración para bloques `import`, que necesita `-generate-config-out`, defina un [custom workflow](custom-workflows.md) del lado del servidor cuyo paso `plan` pase el flag en `extra_args`, por ejemplo `- plan: {extra_args: ["-generate-config-out=generated.tf"]}`, y selecciónelo para el proyecto solo mientras genera configuración.
+- Un flag se hace coincidir por nombre, por lo que listar `-lock-timeout` bloquea `-lock-timeout`, `--lock-timeout`, `-lock-timeout=VALUE` e `--lock-timeout=VALUE`. No necesita listar ambas grafías con guion.
+- Solo se verifican los argumentos extra de comentarios. Los flags establecidos por el operador del servidor, como `extra_args` en un workflow del lado del servidor o en un workflow a nivel de repo que el servidor permite, se pasan a Terraform sin cambios.
 - Acepta una lista separada por comas, p. ej. `-flag1,-flag2`.
+
+::: warning Cambio de comportamiento
+Anteriormente, solo `-chdir` e `-plugin-dir` estaban bloqueados por defecto, una entrada coincidía solo con la grafía con guion listada (`-foo` no bloqueaba `--foo`), y configurar `--blocked-extra-args` reemplazaba los valores predeterminados. Ahora `-out`, `-generate-config-out`, `-state`, `-state-out` e `-backup` también siempre están bloqueados, ambas grafías con guion coinciden, e `--blocked-extra-args` solo agrega flags. Comentarios como `atlantis plan -- -generate-config-out=generated.tf` o `atlantis state rm ADDRESS -- -backup=FILE` ahora fallan con `flag "<arg>" is not allowed in extra args`; mueva los flags que aún necesite al `extra_args` de un workflow del lado del servidor. Una lista personalizada existente sigue funcionando y ahora también obtiene las protecciones integradas.
+:::
 
 ### `--checkout-depth` <Badge text="v0.28.0+" type="info"/>
 
@@ -418,7 +436,7 @@ atlantis server --checkout-depth=0
 ATLANTIS_CHECKOUT_DEPTH=0
 ```
 
-El número de commits a obtener de la rama. Se usa si `--checkout-strategy=merge` ya que la estrategia de checkout `--checkout-strategy=branch` (predeterminada) siempre usa por defecto un shallow clone con una profundidad de 1.
+El número de commits a obtener de la rama. Se usa si `--checkout-strategy=merge`, ya que la estrategia de checkout `--checkout-strategy=branch` (predeterminada) siempre usa por defecto un clone superficial con una profundidad de 1.
 El valor predeterminado es `0`. Vea [Checkout Strategy](checkout-strategy.md) para más detalles.
 
 ### `--checkout-strategy` <Badge text="v0.9.0+" type="info"/>
@@ -440,7 +458,7 @@ atlantis server --config="my/config/file.yaml"
 ATLANTIS_CONFIG="my/config/file.yaml"
 ```
 
-Archivo de configuración YAML donde también pueden establecerse flags. Vea [Config File](#config-file) para más detalles.
+Archivo de configuración YAML donde también se pueden establecer flags. Vea [Config File](#config-file) para más detalles.
 
 ### `--data-dir` <Badge text="v0.1.3+" type="info"/>
 
@@ -451,7 +469,7 @@ ATLANTIS_DATA_DIR="path/to/data/dir"
 ```
 
 Directorio donde Atlantis almacenará sus datos. Se creará si no existe.
-El valor predeterminado es `~/.atlantis`. Atlantis almacenará aquí su base de datos, repos checked out, plans de Terraform por defecto y binarios de
+El valor predeterminado es `~/.atlantis`. Atlantis almacenará aquí su base de datos, repos checkout, plans de Terraform por defecto y binarios de
 Terraform descargados. Si Atlantis pierde este directorio, los [locks](locking.md)
 se perderán y los plans no aplicados se perderán.
 
@@ -466,7 +484,7 @@ atlantis server --default-tf-distribution="terraform"
 ATLANTIS_DEFAULT_TF_DISTRIBUTION="terraform"
 ```
 
-Qué distribución de TF usar. Puede establecerse en `terraform` o `opentofu`.
+Qué distribución TF usar. Puede establecerse en `terraform` o `opentofu`.
 
 ### `--default-tf-version` <Badge text="v0.13.0" type="info"/>
 
@@ -476,7 +494,7 @@ atlantis server --default-tf-version="v0.12.31"
 ATLANTIS_DEFAULT_TF_VERSION="v0.12.31"
 ```
 
-Versión de Terraform a usar por defecto. Se descargará en `<data-dir>/bin/terraform<version>`
+Versión de Terraform a usar por defecto. Se descargará a `<data-dir>/bin/terraform<version>`
 si no está en `PATH`. Vea [Terraform Versions](terraform-versions.md) para más detalles.
 
 ### `--disable-apply-all` <Badge text="v0.9.0+" type="info"/>
@@ -488,7 +506,7 @@ ATLANTIS_DISABLE_APPLY_ALL=true
 ```
 
 Deshabilita el comando `atlantis apply` para que deba
-especificarse un proyecto/workspace/directorio específico para applies.
+especificarse un proyecto/workspace/directorio específico para los apply.
 
 ### `--disable-automerge-label` <Badge text="v0.45.0+" type="info"/>
 
@@ -498,7 +516,7 @@ atlantis server --disable-automerge-label="no-auto-merge"
 ATLANTIS_DISABLE_AUTOMERGE_LABEL="no-auto-merge"
 ```
 
-Deshabilitar atlantis automerge solo en pull requests con la etiqueta especificada.
+Deshabilita atlantis automerge solo en pull requests con la etiqueta especificada.
 El valor predeterminado es una cadena vacía, por lo que ninguna etiqueta deshabilita automerge por defecto.
 Este flag no tiene efecto a menos que automerge esté habilitado con `--automerge` o
 `automerge: true` a nivel de repo.
@@ -511,7 +529,7 @@ atlantis server --disable-autoplan
 ATLANTIS_DISABLE_AUTOPLAN=true
 ```
 
-Deshabilitar auto planning de atlantis.
+Deshabilita auto planning de atlantis.
 
 ### `--disable-autoplan-label` <Badge text="v0.33.0+" type="info"/>
 
@@ -521,7 +539,7 @@ atlantis server --disable-autoplan-label="no-autoplan"
 ATLANTIS_DISABLE_AUTOPLAN_LABEL="no-autoplan"
 ```
 
-Deshabilitar auto planning de atlantis solo en pull requests con la etiqueta especificada.
+Deshabilita auto planning de atlantis solo en pull requests con la etiqueta especificada.
 
 Si la propiedad `disable-autoplan` es `true`, este flag no tiene efecto.
 
@@ -543,7 +561,7 @@ atlantis server --disable-markdown-folding
 ATLANTIS_DISABLE_MARKDOWN_FOLDING=true
 ```
 
-Deshabilitar folding en salida markdown usando la etiqueta html `<details>`.
+Deshabilita el plegado en la salida markdown usando la etiqueta html `<details>`.
 
 ### `--disable-repo-locking` <Badge text="v0.16.1" type="info"/>
 
@@ -553,7 +571,7 @@ atlantis server --disable-repo-locking
 ATLANTIS_DISABLE_REPO_LOCKING=true
 ```
 
-Impide que atlantis bloquee proyectos y/o workspaces al ejecutar terraform.
+Evita que atlantis bloquee proyectos y/o workspaces al ejecutar terraform.
 
 ### `--disable-unlock-label` <Badge text="v0.33.0+" type="info"/>
 
@@ -563,7 +581,7 @@ atlantis server --disable-unlock-label do-not-unlock
 ATLANTIS_DISABLE_UNLOCK_LABEL="do-not-unlock"
 ```
 
-Impide que atlantis desbloquee un pull request con esta etiqueta. El valor predeterminado es "" (feature deshabilitada).
+Evita que atlantis desbloquee un pull request con esta etiqueta. El valor predeterminado es "" (funcionalidad deshabilitada).
 
 ### `--discard-approval-on-plan` <Badge text="v0.29.0+" type="info"/>
 
@@ -573,7 +591,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-Si se establece, descarta la aprobación si se ha ejecutado un nuevo plan. Actualmente solo soportado en GitHub y GitLab. Para GitLab se requiere un bot, group o project token para esta feature.
+Si está configurado, descarta la aprobación si se ha ejecutado un nuevo plan. Actualmente solo soportado en GitHub y GitLab. Para GitLab se requiere un bot, group o project token para esta funcionalidad.
  Referencia: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction` <Badge text="v0.29.0+" type="info"/>
@@ -587,7 +605,7 @@ ATLANTIS_EMOJI_REACTION=eyes
 La reacción emoji a usar para marcar comentarios procesados. Actualmente soportado en Gitea, GitHub y GitLab. Si no se especifica, Atlantis no usará una reacción emoji.
 El valor predeterminado es "" (cadena vacía).
 
-::: warning NOTE
+::: warning NOTA
 Cada proveedor VCS soporta una lista diferente de emojis:
 
 - [GitHub](https://docs.github.com/en/rest/reactions/reactions?apiVersion=2022-11-28#about-reactions)
@@ -604,9 +622,9 @@ atlantis server --enable-diff-markdown-format
 ATLANTIS_ENABLE_DIFF_MARKDOWN_FORMAT=true
 ```
 
-Habilitar Atlantis para formatear la salida de Terraform plan en un formato amigable con markdown-diff para fines de colorización.
+Habilita Atlantis para formatear la salida de Terraform plan en un formato amigable con markdown-diff para propósitos de codificación por colores.
 
-Útil para habilitar para usar con GitHub. Las líneas cambiadas dentro de diffs de heredoc y multiline-string de Terraform también se formatean para que renderizadores markdown conscientes de diff puedan colorearlas.
+Útil para habilitar al usar GitHub. Las líneas cambiadas dentro de diffs de heredoc y cadenas multilínea de Terraform también se formatean para que los renderizadores markdown con reconocimiento de diff puedan colorearlas.
 
 ### `--enable-drift-detection`
 
@@ -616,14 +634,14 @@ atlantis server --enable-drift-detection
 ATLANTIS_ENABLE_DRIFT_DETECTION=true
 ```
 
-Habilitar endpoints API de detección de drift. La detección de drift no ejecuta Terraform apply, pero
-sí ejecuta el ciclo de vida normal de plan, incluyendo hooks pre-workflow configurados,
-workflows personalizados, pasos de plan personalizados y comandos Terraform plan. Cuando está habilitado, Atlantis
+Habilita endpoints de API de detección de drift. La detección de drift no ejecuta Terraform apply, pero
+sí ejecuta el ciclo de vida normal de plan, incluidos pre-workflow hooks configurados,
+custom workflows, pasos custom de plan y comandos Terraform plan. Cuando está habilitado, Atlantis
 inicializará almacenamiento en memoria para resultados de detección de drift y un servicio de remediación,
-haciendo funcionales los endpoints de detección de drift, estado y remediación solo-plan. Si [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) de drift
-están configurados (`event: drift`), las ejecuciones de detección exitosas envían notificaciones a Slack o endpoints HTTP,
-incluyendo resultados heartbeat de no-drift. La detección de drift no omite team allowlists ni requisitos de estado PR
-`plan_requirements` como `approved` o `mergeable`; esas comprobaciones fallan de forma cerrada cuando
+haciendo funcionales los endpoints de detección de drift, estado y remediación solo plan. Si se configuran [webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) de drift
+(`event: drift`), las ejecuciones exitosas de detección envían notificaciones a Slack o endpoints HTTP,
+incluyendo resultados heartbeat sin drift. La detección de drift no omite allowlists de equipos ni
+`plan_requirements` de estado de PR como `approved` o `mergeable`; esas verificaciones fallan de forma cerrada cuando
 no pueden evaluarse fuera de un pull request. Las acciones destructivas de apply de remediación de drift también requieren
 `--enable-drift-remediation`. El valor predeterminado es `false`.
 
@@ -636,11 +654,11 @@ ATLANTIS_ENABLE_DRIFT_DETECTION=true
 ATLANTIS_ENABLE_DRIFT_REMEDIATION=true
 ```
 
-Habilitar acciones destructivas de apply de remediación de drift en el endpoint `/api/drift/remediate`.
+Habilita acciones destructivas de apply para remediación de drift en el endpoint `/api/drift/remediate`.
 Este flag requiere `--enable-drift-detection`; sin él, las solicitudes `action: "apply"` son
-rechazadas mientras la detección de drift de solo lectura sigue disponible. Este flag no omite
+rechazadas mientras la detección de drift de solo lectura permanece disponible. Este flag no omite
 `apply_requirements` del repositorio; los requisitos que necesitan estado de pull request fallan de forma cerrada para
-solicitudes de remediación no PR. El valor predeterminado es `false`.
+solicitudes de remediación que no son de PR. El valor predeterminado es `false`.
 
 ### `--enable-external-stores`
 
@@ -650,7 +668,7 @@ atlantis server --enable-external-stores
 ATLANTIS_ENABLE_EXTERNAL_STORES=true
 ```
 
-Habilitar backends de almacenamiento externo configurados en la repo config del lado del servidor (bloque `external_stores`). Cuando se establece, Atlantis lee la sección `external_stores` desde el YAML de configuración del repo para inicializar backends como S3 para persistencia de archivos plan.
+Habilita backends de almacenamiento externo configurados en la config del repo del lado del servidor (bloque `external_stores`). Cuando está configurado, Atlantis lee la sección `external_stores` del YAML de config del repo para inicializar backends como S3 para persistencia de archivos de plan.
 
 ### `--enable-policy-checks` <Badge text="v0.17.0" type="info"/>
 
@@ -660,7 +678,7 @@ atlantis server --enable-policy-checks
 ATLANTIS_ENABLE_POLICY_CHECKS=true
 ```
 
-Habilita a atlantis para ejecutar policies del lado del servidor sobre el resultado de un terraform plan. Las policies están definidas en [server side repo config](server-side-repo-config.md#reference).
+Habilita a atlantis para ejecutar políticas del lado del servidor sobre el resultado de un terraform plan. Las políticas están definidas en [server side repo config](server-side-repo-config.md#reference).
 
 ### `--enable-profiling-api` <Badge text="v0.25.0+" type="info"/>
 
@@ -670,7 +688,7 @@ atlantis server --enable-profiling-api
 ATLANTIS_ENABLE_PROFILING_API=true
 ```
 
-Habilitar endpoints [`net/http/pprof`](https://pkg.go.dev/net/http/pprof) para [continuous profiling](https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/) de recursos usados por el servidor. Vea [profiling Go programs](https://go.dev/blog/pprof) para más información.
+Habilita endpoints de [`net/http/pprof`](https://pkg.go.dev/net/http/pprof) para [continuous profiling](https://grafana.com/docs/pyroscope/latest/introduction/continuous-profiling/) de recursos usados por el servidor. Vea [profiling Go programs](https://go.dev/blog/pprof) para más información.
 
 ### `--enable-regexp-cmd` <Badge text="v0.17.0" type="info"/>
 
@@ -680,17 +698,17 @@ atlantis server --enable-regexp-cmd
 ATLANTIS_ENABLE_REGEXP_CMD=true
 ```
 
-Habilitar Atlantis para usar expresiones regulares para ejecutar comandos plan/apply contra nombres de proyecto definidos cuando se pasa el flag `-p` con él.
+Habilita Atlantis para usar expresiones regulares para ejecutar comandos plan/apply contra nombres de proyectos definidos cuando se pasa el flag `-p` con él.
 
 Esto puede usarse para ejecutar todos los proyectos definidos (con la clave `name`) en `atlantis.yaml` usando `atlantis plan -p .*`.
 
-El flag solo permitirá las regex listadas en la clave [`allowed_regexp_prefixes`](repo-level-atlantis-yaml.md#reference) definida en el archivo repo `atlantis.yaml`. Si la clave no está definida, su valor predeterminado es `[]` que permitirá cualquier regex.
+El flag solo permitirá las regex listadas en la clave [`allowed_regexp_prefixes`](repo-level-atlantis-yaml.md#reference) definida en el archivo `atlantis.yaml` del repo. Si la clave no está definida, su valor predeterminado es `[]`, lo que permitirá cualquier regex.
 
-Esto aún no funcionará con `-d` y para usar `-p` los proyectos del repo deben estar definidos en el archivo repo `atlantis.yaml`.
+Esto todavía no funcionará con `-d` y para usar `-p` los proyectos del repo deben estar definidos en el archivo `atlantis.yaml` del repo.
 
-Cuando `--restrict-file-list` está habilitado, los plans de proyecto por regex se limitan a coincidir con proyectos con archivos modificados en el pull request. Sin `--restrict-file-list`, los comandos de proyecto por regex todavía pueden ejecutarse contra todos los proyectos coincidentes.
+Cuando `--restrict-file-list` está habilitado, los plans de proyectos por regex se limitan a coincidir con proyectos con archivos modificados en el pull request. Sin `--restrict-file-list`, los comandos de proyectos por regex todavía pueden ejecutarse contra todos los proyectos coincidentes.
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 No se supone que se use con `--disable-apply-all`.
 El comando `atlantis apply -p .*` omitirá la restricción y ejecutará apply en cada proyecto.
 :::
@@ -703,11 +721,11 @@ atlantis server --executable-name="atlantis"
 ATLANTIS_EXECUTABLE_NAME="atlantis"
 ```
 
-Nombre ejecutable disparador del comando de comentario. El valor predeterminado es `atlantis`.
+Nombre del ejecutable disparador del comando de comentario. El valor predeterminado es `atlantis`.
 
-Esto es útil al ejecutar múltiples servidores Atlantis contra un solo repositorio.
+Esto es útil cuando se ejecutan múltiples servidores Atlantis contra un solo repositorio.
 
-Nota: la advertencia de error ortográfico "did you mean" solo se aplica al nombre ejecutable predeterminado (`atlantis`). Si establece un `--executable-name` personalizado, Atlantis no advertirá sobre comentarios que estén cerca de él según Levenshtein — esto evita advertencias espurias cuando múltiples servidores con nombres similares (p. ej. `atlantis-dev` y `atlantis-prod`) reciben el mismo comentario.
+Nota: la advertencia de error ortográfico "did you mean" solo aplica al nombre ejecutable predeterminado (`atlantis`). Si establece un `--executable-name` personalizado, Atlantis no advertirá sobre comentarios que sean cercanos a él según Levenshtein — esto evita advertencias espurias cuando múltiples servidores con nombres similares (p. ej. `atlantis-dev` e `atlantis-prod`) reciben el mismo comentario.
 
 ### `--fail-on-pre-workflow-hook-error` <Badge text="v0.27.0+" type="info"/>
 
@@ -717,7 +735,7 @@ atlantis server --fail-on-pre-workflow-hook-error
 ATLANTIS_FAIL_ON_PRE_WORKFLOW_HOOK_ERROR=true
 ```
 
-Fallar y no ejecutar el comando Atlantis solicitado si alguno de los hooks pre workflow produce error.
+Falla y no ejecuta el comando solicitado de Atlantis si alguno de los pre workflow hooks produce un error.
 
 ### `--gh-allow-mergeable-bypass-apply` <Badge text="v0.30.0+" type="info"/>
 
@@ -737,10 +755,10 @@ atlantis server --gh-app-id="00000"
 ATLANTIS_GH_APP_ID="00000"
 ```
 
-ID de GitHub app. Si se establece, la autenticación de GitHub se realizará como [an installation](https://docs.github.com/en/rest/apps/installations).
+ID de GitHub app. Si está configurado, la autenticación de GitHub se realizará como [an installation](https://docs.github.com/en/rest/apps/installations).
 
 ::: tip
-Una GitHub app puede crearse iniciando Atlantis primero, y luego apuntando su navegador a
+Un GitHub app puede crearse iniciando primero Atlantis, luego apuntando su navegador a
 
 ```shell
 $(hostname)/github-app/setup
@@ -764,11 +782,11 @@ ATLANTIS_GH_APP_INSTALLATION_ID="123"
 ```
 
 El installation ID de una instancia específica de una aplicación GitHub. Normalmente este valor se
-deriva consultando a GitHub por la lista de instalaciones del ID suministrado mediante `--gh-app-id` y seleccionando
-la primera encontrada y donde múltiples instalaciones resultan en error. Use este flag si tiene múltiples
+deriva consultando a GitHub la lista de installations del ID suministrado mediante `--gh-app-id` y seleccionando
+la primera encontrada, y múltiples resultados de installations producen un error. Use este flag si tiene múltiples
 instancias de Atlantis pero quiere usar una sola GitHub app ya instalada para todas ellas. Normalmente haría esto si
-está ejecutando un proxy como su única aplicación GitHub que hará proxy hacia una instancia Atlantis apropiada
-según la organización o usuario que activó el webhook.
+está ejecutando un proxy como su única aplicación GitHub que hará proxy a una instancia de Atlantis apropiada
+según la organización o usuario que disparó el webhook.
 
 ### `--gh-app-key` <Badge text="v0.20.0+" type="info"/>
 
@@ -778,10 +796,10 @@ atlantis server --gh-app-key="-----BEGIN RSA PRIVATE KEY-----(...)"
 ATLANTIS_GH_APP_KEY="-----BEGIN RSA PRIVATE KEY-----(...)"
 ```
 
-La clave privada codificada en PEM para la GitHub App.
+La private key codificada en PEM para la GitHub App.
 
-::: warning SECURITY WARNING
-El contenido de la clave privada será visible para cualquiera que pueda ejecutar `ps` o mirar el historial del shell de la máquina donde Atlantis se está ejecutando. Use `--gh-app-key-file` para mitigar ese riesgo.
+::: warning ADVERTENCIA DE SEGURIDAD
+El contenido de la private key será visible para cualquiera que pueda ejecutar `ps` o mirar el historial del shell de la máquina donde se está ejecutando Atlantis. Use `--gh-app-key-file` para mitigar ese riesgo.
 :::
 
 ### `--gh-app-key-file` <Badge text="v0.20.0+" type="info"/>
@@ -792,7 +810,7 @@ atlantis server --gh-app-key-file="path/to/app-key.pem"
 ATLANTIS_GH_APP_KEY_FILE="path/to/app-key.pem"
 ```
 
-Ruta a un archivo de clave privada codificada en PEM de GitHub App. Si se establece, la autenticación de GitHub se realizará como [an installation](https://docs.github.com/en/rest/apps/installations).
+Ruta a un archivo de private key codificada en PEM de GitHub App. Si está configurado, la autenticación de GitHub se realizará como [an installation](https://docs.github.com/en/rest/apps/installations).
 
 ### `--gh-app-slug` <Badge text="v0.16.1" type="info"/>
 
@@ -802,7 +820,7 @@ atlantis server --gh-app-slug="myappslug"
 ATLANTIS_GH_APP_SLUG="myappslug"
 ```
 
-Una versión slugged del nombre de la GitHub app mostrada en comentarios de pull requests, etc. (no `Atlantis App` sino algo como `atlantis-app`). Atlantis usa el valor de este parámetro para identificar los comentarios que ha dejado en pull requests de GitHub. Esto se usa para funciones como `--hide-prev-plan-comments`. Necesita obtener este valor de su GitHub app; una forma es ir a la configuración de su App y abrir "Public page" desde la barra lateral izquierda. Su valor `--gh-app-slug` será la última parte de la URL, p. ej. `https://github.com/apps/<slug>`.
+Una versión slug del nombre de GitHub app mostrada en comentarios de pull requests, etc. (no `Atlantis App` sino algo como `atlantis-app`). Atlantis usa el valor de este parámetro para identificar los comentarios que ha dejado en los pull requests de GitHub. Esto se usa para funciones como `--hide-prev-plan-comments`. Necesita obtener este valor de su GitHub app; una forma es ir a la configuración de su App y abrir "Public page" desde la barra lateral izquierda. Su valor `--gh-app-slug` será la última parte de la URL, p. ej. `https://github.com/apps/<slug>`.
 
 ### `--gh-hostname` <Badge text="v0.1.3+" type="info"/>
 
@@ -813,9 +831,16 @@ ATLANTIS_GH_HOSTNAME="my.github.enterprise.com"
 ```
 
 Hostname de su instalación GitHub Enterprise. Si usa [GitHub.com](https://github.com),
-no lo establezca. El valor predeterminado es `github.com`.
+no lo configure. El valor predeterminado es `github.com`.
 
-Para GitHub Enterprise Cloud, use el hostname del tenant, por ejemplo `tenant.ghe.com`. No incluya un esquema ni un prefijo `api.`; Atlantis deriva los endpoints API REST y GraphQL a partir del hostname.
+Para GitHub Enterprise Cloud, use el hostname del tenant, por ejemplo `tenant.ghe.com`. No incluya un scheme ni un prefijo `api.`; Atlantis deriva los endpoints de API REST y GraphQL a partir del hostname.
+
+Atlantis requiere que la clone URL de cada repositorio GitHub que recibe, en webhooks
+o desde la API de GitHub, esté en este host. La comparación ignora mayúsculas/minúsculas y puertos.
+
+::: warning Cambio de comportamiento
+Anteriormente, Atlantis verificaba solo la ruta de una clone URL de GitHub (`/owner/repo.git`) y aceptaba cualquier host. Ahora el host de la clone URL tanto del repositorio base como del head debe ser igual a `--gh-hostname`, y una clone URL sin host es rechazada. Un webhook de pull request con host no coincidente se responde con HTTP 400 y el body contiene `expected clone url host "<gh-hostname>" but had "<host>"`; no se hace ningún plan. Si ejecuta GitHub Enterprise, configure `--gh-hostname` con el host que aparece en las clone URLs de sus repositorios (el campo `clone_url` en payloads de webhook), y verifique las entregas de webhook en GitHub por respuestas 400 después de actualizar.
+:::
 
 ### `--gh-org` <Badge text="v0.1.3+" type="info"/>
 
@@ -825,7 +850,7 @@ atlantis server --gh-org="myorgname"
 ATLANTIS_GH_ORG="myorgname"
 ```
 
-Nombre de organización GitHub. Establézcalo para habilitar la creación de una GitHub app privada para esta organización.
+Nombre de organización de GitHub. Configúrelo para habilitar la creación de una GitHub app privada para esta organización.
 
 ### `--gh-team-allowlist` <Badge text="v0.41.0+" type="info"/>
 
@@ -835,20 +860,20 @@ atlantis server --gh-team-allowlist="myteam:plan, secteam:apply, devops-team:app
 ATLANTIS_GH_TEAM_ALLOWLIST="myteam:plan, secteam:apply, devops-team:apply, devops-team:import"
 ```
 
-En las versiones v0.35.0 y posteriores, el nombre de equipo GitHub solo puede ser un slug porque es inmutable.
+En las versiones v0.35.0 y posteriores, el nombre del equipo de GitHub solo puede ser un slug porque es inmutable.
 
-En las versiones entre v0.21.0 y v0.34.0, el nombre de equipo GitHub puede ser un nombre o un slug.
+En las versiones entre v0.21.0 y v0.34.0, el nombre del equipo de GitHub puede ser un nombre o un slug.
 
-En las versiones v0.20.1 y anteriores, el nombre de equipo GitHub requería el nombre de equipo sensible a mayúsculas y minúsculas.
+En las versiones v0.20.1 y anteriores, el nombre del equipo de GitHub requería el nombre del equipo sensible a mayúsculas y minúsculas.
 
-Lista separada por comas de equipos GitHub y pares de permisos.
+Lista separada por comas de equipos de GitHub y pares de permisos.
 
 Por defecto, cualquier equipo puede plan y apply.
 
 Se respeta la jerarquía de equipos de GitHub. Si un equipo en allowlist tiene equipos hijo, los miembros de esos equipos hijo heredan los comandos permitidos del equipo padre.
 
 ::: tip
-Si está usando [policy checking](policy-checking.md), también debe incluir en allowlist el comando `policy_check` para que funcione en comandos manuales `atlantis plan`:
+Si está usando [policy checking](policy-checking.md), también debe incluir el comando `policy_check` en la allowlist para que funcione en comandos manuales `atlantis plan`:
 
 ```bash
 atlantis server --gh-team-allowlist="*:plan,*:policy_check,myteam:apply"
@@ -865,7 +890,7 @@ atlantis server --gh-token="token"
 ATLANTIS_GH_TOKEN="token"
 ```
 
-Token de GitHub del usuario API.
+Token de GitHub del usuario de API.
 
 ### `--gh-token-file` <Badge text="v0.41.0+" type="info"/>
 
@@ -875,7 +900,7 @@ atlantis server --gh-token-file="/path/to/token"
 ATLANTIS_GH_TOKEN_FILE="/path/to/token"
 ```
 
-Token de GitHub del usuario API. El token se carga regularmente desde disco para permitir la rotación del token sin necesidad de reiniciar el servidor Atlantis.
+Token de GitHub del usuario de API. El token se carga regularmente desde disco para permitir la rotación del token sin necesidad de reiniciar el servidor Atlantis.
 
 ### `--gh-user` <Badge text="v0.1.3+" type="info"/>
 
@@ -885,7 +910,7 @@ atlantis server --gh-user="myuser"
 ATLANTIS_GH_USER="myuser"
 ```
 
-Nombre de usuario de GitHub del usuario API. Este usuario también es usado por el flag `--hide-user-plan-comments` y necesitará actualizarse si migra a github EMU.
+Nombre de usuario de GitHub del usuario de API. Este usuario también es usado por el flag `--hide-user-plan-comments` y necesitará actualizarse si migra a github EMU.
 
 ### `--gh-webhook-secret` <Badge text="v0.1.3+" type="info"/>
 
@@ -897,7 +922,7 @@ ATLANTIS_GH_WEBHOOK_SECRET="secret"
 
 Secreto usado para validar webhooks de GitHub (vea [GitHub: Validating webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries)).
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 Si no se especifica, Atlantis no podrá validar que la llamada webhook entrante provino de GitHub.
 Esto significa que un atacante podría falsificar llamadas a Atlantis y hacer que realice acciones maliciosas.
 :::
@@ -910,7 +935,7 @@ atlantis server --gitea-base-url="http://your-gitea.corp:7990/basepath"
 ATLANTIS_GITEA_BASE_URL="http://your-gitea.corp:7990/basepath"
 ```
 
-URL base de la instalación Gitea. Debe incluir `http://` o `https://`. El valor predeterminado es `https://gitea.com` si se deja vacío/ausente.
+URL base de la instalación de Gitea. Debe incluir `http://` o `https://`. El valor predeterminado es `https://gitea.com` si se deja vacío/ausente.
 
 ### `--gitea-page-size` <Badge text="v0.28.0+" type="info"/>
 
@@ -922,7 +947,7 @@ ATLANTIS_GITEA_PAGE_SIZE=30
 
 Número de elementos en una sola página en respuestas paginadas de Gitea.
 
-::: warning Configuration dependent
+::: warning Dependiente de la configuración
 El valor predeterminado cumple con la configuración estándar del servidor Gitea: DEFAULT_PAGING_NUM
 El valor válido más alto depende de la configuración del servidor Gitea: MAX_RESPONSE_ITEMS
 :::
@@ -935,7 +960,7 @@ atlantis server --gitea-token="token"
 ATLANTIS_GITEA_TOKEN="token"
 ```
 
-App password de Gitea del usuario API.
+App password de Gitea del usuario de API.
 
 ### `--gitea-user` <Badge text="v0.28.0+" type="info"/>
 
@@ -945,7 +970,7 @@ atlantis server --gitea-user="myuser"
 ATLANTIS_GITEA_USER="myuser"
 ```
 
-Nombre de usuario de Gitea del usuario API.
+Nombre de usuario de Gitea del usuario de API.
 
 ### `--gitea-webhook-secret` <Badge text="v0.28.0+" type="info"/>
 
@@ -957,7 +982,7 @@ ATLANTIS_GITEA_WEBHOOK_SECRET="secret"
 
 Secreto usado para validar webhooks de Gitea.
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 Si no se especifica, Atlantis no podrá validar que la llamada webhook entrante provino de Gitea.
 Esto significa que un atacante podría falsificar llamadas a Atlantis y hacer que realice acciones maliciosas.
 :::
@@ -970,12 +995,12 @@ atlantis server --gitlab-group-allowlist="myorg/mygroup:plan, myorg/secteam:appl
 ATLANTIS_GITLAB_GROUP_ALLOWLIST="myorg/mygroup:plan, myorg/secteam:apply, myorg/devops:apply, myorg/devops:import"
 ```
 
-Lista separada por comas de grupos GitLab y pares de permisos.
+Lista separada por comas de grupos de GitLab y pares de permisos.
 
 Por defecto, cualquier grupo puede plan y apply.
 
-::: warning NOTE
-Atlantis necesita poder ver los miembros de los grupos listados; los grupos inaccesibles o inexistentes se ignoran silenciosamente.
+::: warning NOTA
+Atlantis necesita poder ver los miembros del grupo listado; los grupos inaccesibles o inexistentes se ignoran silenciosamente.
 :::
 
 ### `--gitlab-hostname` <Badge text="v0.2.0+" type="info"/>
@@ -987,7 +1012,7 @@ ATLANTIS_GITLAB_HOSTNAME="my.gitlab.enterprise.com"
 ```
 
 Hostname de su instalación GitLab Enterprise. Si usa [GitLab.com](https://gitlab.com),
-no lo establezca. El valor predeterminado es `gitlab.com`.
+no lo configure. El valor predeterminado es `gitlab.com`.
 
 ### `--gitlab-status-retry-enabled`
 
@@ -997,7 +1022,7 @@ atlantis server --gitlab-status-retry-enabled
 ATLANTIS_GITLAB_STATUS_RETRY_ENABLED=true
 ```
 
-Habilitar lógica de reintento mejorada para actualizaciones de estado de pipeline de GitLab con exponential backoff.
+Habilita lógica mejorada de reintentos para actualizaciones de estado de pipelines de GitLab con exponential backoff.
 
 El valor predeterminado es `false`.
 
@@ -1009,7 +1034,7 @@ atlantis server --gitlab-token="token"
 ATLANTIS_GITLAB_TOKEN="token"
 ```
 
-Token de GitLab del usuario API.
+Token de GitLab del usuario de API.
 
 ### `--gitlab-user` <Badge text="v0.2.0+" type="info"/>
 
@@ -1019,7 +1044,7 @@ atlantis server --gitlab-user="myuser"
 ATLANTIS_GITLAB_USER="myuser"
 ```
 
-Nombre de usuario de GitLab del usuario API.
+Nombre de usuario de GitLab del usuario de API.
 
 ### `--gitlab-webhook-secret` <Badge text="v0.2.0+" type="info"/>
 
@@ -1031,7 +1056,7 @@ ATLANTIS_GITLAB_WEBHOOK_SECRET="secret"
 
 Secreto usado para validar webhooks de GitLab.
 
-::: warning SECURITY WARNING
+::: warning ADVERTENCIA DE SEGURIDAD
 Si no se especifica, Atlantis no podrá validar que la llamada webhook entrante provino de GitLab.
 Esto significa que un atacante podría falsificar llamadas a Atlantis y hacer que realice acciones maliciosas.
 :::
@@ -1052,14 +1077,14 @@ atlantis server --hide-prev-plan-comments
 ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
-Ocultar comentarios de plan anteriores para reducir el desorden en los PRs. Esto solo está soportado actualmente en
+Oculta comentarios previos de plan para reducir el desorden en los PR. Actualmente esto solo está soportado en
 GitHub, GitLab y Bitbucket y no está habilitado por defecto.
 
 Para Bitbucket, los comentarios se eliminan en lugar de ocultarse ya que Bitbucket no soporta ocultar comentarios.
 
-Para GitHub, asegúrese de que `--gh-user` esté establecido apropiadamente o los comentarios no se ocultarán.
+Para GitHub, asegúrese de que `--gh-user` esté configurado apropiadamente o los comentarios no se ocultarán.
 
-Al usar GitHub App, necesita establecer `--gh-app-slug` para habilitar esta feature.
+Al usar GitHub App, necesita establecer `--gh-app-slug` para habilitar esta funcionalidad.
 
 ### `--hide-unchanged-plan-comments` <Badge text="v0.29.0+" type="info"/>
 
@@ -1069,7 +1094,7 @@ atlantis server --hide-unchanged-plan-comments
 ATLANTIS_HIDE_UNCHANGED_PLAN_COMMENTS=true
 ```
 
-Eliminar comentarios de plan sin cambios del pull request.
+Elimina comentarios de plan sin cambios del pull request.
 
 Esto es útil cuando tiene muchos proyectos y quiere mantener el pull request limpio de comentarios inútiles.
 
@@ -1082,9 +1107,9 @@ ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
 ```
 
 Lista separada por comas de nombres de estado VCS de otros servicios atlantis.
-Cuando `gh-allow-mergeable-bypass-apply` es true, ignorará status checks
+Cuando `gh-allow-mergeable-bypass-apply` es true, ignorará verificaciones de estado
 (p. ej. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
-de otros servicios Atlantis al comprobar si el PR puede fusionarse.
+de otros servicios Atlantis al verificar si el PR es mergeable.
 Actualmente solo implementado para GitHub.
 
 ### `--include-git-untracked-files` <Badge text="v0.27.0+" type="info"/>
@@ -1095,8 +1120,8 @@ atlantis server --include-git-untracked-files
 ATLANTIS_INCLUDE_GIT_UNTRACKED_FILES=true
 ```
 
-Incluir archivos untracked de git en la lista de archivos modificados de Atlantis.
-Se usa por ejemplo con hooks pre-workflow de [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) que
+Incluye archivos git no rastreados en la lista de archivos modificados de Atlantis.
+Usado por ejemplo con pre-workflow hooks de [CDK Terrain](custom-workflows.md#cdk-terrain-cdktn) que
 generan dinámicamente archivos Terraform.
 
 ### `--language` <Badge text="v0.45.0+" type="info"/>
@@ -1111,11 +1136,11 @@ Idioma usado para comentarios de pull request de Atlantis. El valor predetermina
 
 Valores soportados:
 
-- `en` (inglés)
-- `es` (español)
+- `en` (Inglés)
+- `es` (Español)
 
-Atlantis normaliza valores de estilo locale (por ejemplo `es-MX` se resuelve como `es`).
-Si se configura un idioma no soportado y `--language-config-file` no está establecido,
+Atlantis normaliza valores de estilo locale (por ejemplo `es-MX` se resuelve a `es`).
+Si se configura un idioma no soportado y `--language-config-file` no está configurado,
 Atlantis devuelve un error de validación al iniciar.
 
 Las cadenas de idioma integradas se cargan desde:
@@ -1134,8 +1159,8 @@ ATLANTIS_LANGUAGE_CONFIG_FILE="/etc/atlantis/language.yaml"
 Ruta opcional a un catálogo de idioma YAML personalizado. Los valores en este archivo sobrescriben
 el idioma integrado seleccionado, y se soportan sobrescrituras parciales.
 
-Cuando `--language-config-file` está establecido, se permiten valores `--language` no soportados
-y Atlantis recurre al inglés integrado para las cadenas no especificadas.
+Cuando `--language-config-file` está configurado, se permiten valores `--language` no soportados
+y Atlantis vuelve al inglés integrado para cadenas no especificadas.
 
 Esquema YAML esperado:
 
@@ -1147,7 +1172,7 @@ command_titles:
   apply: Apply (custom)
 ```
 
-Para una personalización completa del texto markdown, siga usando
+Para una personalización completa del texto markdown, continúe usando
 `--markdown-template-overrides-dir`.
 
 ### `--locking-db-type` <Badge text="v0.19.9+" type="info"/>
@@ -1163,7 +1188,7 @@ El tipo de base de datos de locking a usar para almacenar locks de plan y apply.
 Notas:
 
 - Si se establece en `boltdb`, solo un proceso puede tener acceso a la instancia boltdb.
-- Si se establece en `redis`, use `--redis-host` y `--redis-port` para modo de nodo único, o `--redis-cluster-addresses` para modo Redis Cluster. Use `--redis-password` y (opcionalmente) `--redis-username` solo si su despliegue Redis requiere autenticación.
+- Si se establece en `redis`, use `--redis-host` e `--redis-port` para modo de nodo único, o `--redis-cluster-addresses` para modo Redis Cluster. Use `--redis-password` y (opcionalmente) `--redis-username` solo si su despliegue Redis requiere autenticación.
 
 ### `--log-level` <Badge text="v0.1.3+" type="info"/>
 
@@ -1187,12 +1212,12 @@ Esto estará disponible en v0.21.0.
 
 Directorio donde Atlantis leerá sobrescrituras para plantillas markdown usadas para renderizar comentarios en pull requests.
 Las sobrescrituras de plantillas markdown pueden especificarse ya sea en archivos individuales, o todas juntas en un solo archivo. Todos los archivos de
-sobrescritura de plantilla _deben_ tener la extensión `.tmpl`, de lo contrario no serán parseados.
+sobrescritura de plantillas _deben_ tener la extensión `.tmpl`, de lo contrario no serán parseados.
 
-Las plantillas markdown que pueden tener sobrescrituras pueden encontrarse en [markdown templates directory](https://github.com/runatlantis/atlantis/tree/main/server/events/templates)
+Las plantillas markdown que pueden tener sobrescrituras se pueden encontrar en el [directorio de plantillas markdown](https://github.com/runatlantis/atlantis/tree/main/server/events/templates)
 
-Tenga en cuenta que configuraciones como `--enable-diff-markdown-format` dependen de lógica definida en las plantillas. Es
-posible desviarse del comportamiento esperado, si no se tiene cuidado al sobrescribir las plantillas predeterminadas.
+Tenga presente que configuraciones como `--enable-diff-markdown-format` dependen de la lógica definida en las plantillas. Es
+posible divergir del comportamiento esperado si no se tiene cuidado al sobrescribir las plantillas predeterminadas.
 
 El valor predeterminado es el directorio home de atlantis `/home/atlantis/.markdown_templates/` en `/$HOME/.markdown_templates`.
 
@@ -1204,9 +1229,9 @@ atlantis server --max-comments-per-command=100
 ATLANTIS_MAX_COMMENTS_PER_COMMAND=100
 ```
 
-Limitar el número de comentarios publicados después de ejecutar un comando, para evitar spam en su VCS y que Atlantis sea throttled como resultado. El valor predeterminado es `100`. Establezca esta opción en `0` para deshabilitar la truncación de logs. Tenga en cuenta que la truncación ocurrirá al inicio de la salida del comando, para preservar las partes más importantes de la salida, a menudo mostradas al final.
+Limita el número de comentarios publicados después de ejecutar un comando, para evitar hacer spam a su VCS y que Atlantis sea limitado como resultado. El valor predeterminado es `100`. Establezca esta opción en `0` para deshabilitar el truncado de logs. Tenga en cuenta que el truncado ocurrirá en la parte superior de la salida del comando, para preservar las partes más importantes de la salida, a menudo mostradas al final.
 
-Cuando la salida del comando excede el límite de tamaño de comentario del VCS (o cuando este límite aplica), Atlantis divide la salida en múltiples comentarios usando **división inteligente de comentarios**. Los puntos de división se eligen para preservar la estructura markdown: el divisor detecta si está dentro de un bloque de código (``
+Cuando la salida del comando excede el límite de tamaño de comentarios del VCS (o cuando aplica este límite), Atlantis divide la salida en múltiples comentarios usando **división inteligente de comentarios**. Los puntos de división se eligen para que la estructura markdown se preserve: el divisor detecta si está dentro de un bloque de código (``
 
  ``` ``), a `<details>` block, or inline code (`` ` ``), and inserts appropriate closing and continuation markers so that each comment renders correctly. Continuation comments are labeled with the command name (e.g. "Continued plan output from previous comment") when available.
 
@@ -1240,6 +1265,8 @@ ATLANTIS_PARALLEL_POOL_SIZE=100
 
 Tamaño máximo del wait group que ejecuta plans y applies en paralelo (si está habilitado). El valor predeterminado es `15`
 
+El límite es por comando: también limita los proyectos de una solicitud de API plan o detección de drift que hacen plan al mismo tiempo.
+
 ### `--pending-apply-status` <Badge text="v0.36.0+" type="info"/>
 
 ```bash
@@ -1248,14 +1275,14 @@ atlantis server --pending-apply-status
 ATLANTIS_PENDING_APPLY_STATUS=true
 ```
 
-Establecer el estado del commit como pending cuando hay cambios planificados que aún no se han aplicado.
-Esto evita que merge requests se fusionen hasta que todos los Terraform applies estén completos si tiene `Pipelines must succeed` habilitado en su repositorio.
+Establece el estado del commit en pending cuando hay cambios planificados que no se han aplicado.
+Esto evita que los merge requests se fusionen hasta que todos los Terraform apply se completen si tiene `Pipelines must succeed` habilitado en su repositorio.
 
 Cuando está habilitado, después de ejecutar `atlantis plan`, el estado del MR se mostrará como pending si hay cambios
-por aplicar. Una vez que todos los proyectos se hayan aplicado correctamente (o no muestren cambios), el estado se actualizará a success.
+para aplicar. Una vez que todos los proyectos se aplican correctamente (o no muestran cambios), el estado se actualizará a success.
 Los proyectos sin cambios de Terraform se cuentan como actualizados en lugar de aplicados. Si un pull request tiene tanto
-proyectos actualizados como proyectos que todavía esperan apply, el estado de commit apply de Atlantis permanece pending
-hasta que todos los proyectos modificados se apliquen.
+proyectos actualizados como proyectos todavía esperando apply, el estado de commit apply de Atlantis permanece pending
+hasta que todos los proyectos cambiados se apliquen.
 
 El valor predeterminado es `false`.
 
@@ -1269,7 +1296,7 @@ atlantis server --port=4141
 ATLANTIS_PORT=4141
 ```
 
-Puerto al que hacer bind. El valor predeterminado es `4141`.
+Puerto al que enlazarse. El valor predeterminado es `4141`.
 
 ### `--quiet-policy-checks` <Badge text="v0.32.0+" type="info"/>
 
@@ -1279,7 +1306,7 @@ atlantis server --quiet-policy-checks
 ATLANTIS_QUIET_POLICY_CHECKS=true
 ```
 
-Excluir comentarios de policy check de pull requests a menos que haya un error real de conftest. Esto también excluye advertencias. El valor predeterminado es `false`.
+Excluye comentarios de policy check de pull requests a menos que haya un error real de conftest. Esto también excluye advertencias. El valor predeterminado es `false`.
 
 ### `--redis-cluster-addresses`
 
@@ -1289,7 +1316,7 @@ atlantis server --redis-cluster-addresses="redis-node-0:6379,redis-node-1:6379,r
 ATLANTIS_REDIS_CLUSTER_ADDRESSES="redis-node-0:6379,redis-node-1:6379,redis-node-2:6379"
 ```
 
-Lista delimitada por comas de direcciones de nodos de clúster Redis en el formato `host:port`. Cuando se establece, Atlantis usa modo Redis Cluster en lugar de modo de nodo único. Esto es mutuamente excluyente con `--redis-host`/`--redis-port` (que se usan para modo de nodo único).
+Lista delimitada por comas de direcciones de nodos del clúster Redis en el formato `host:port`. Cuando está configurado, Atlantis usa modo Redis Cluster en lugar de modo de nodo único. Esto es mutuamente excluyente con `--redis-host`/`--redis-port` (que se usan para modo de nodo único).
 
 ### `--redis-db` <Badge text="v0.19.9+" type="info"/>
 
@@ -1299,7 +1326,7 @@ atlantis server --redis-db=0
 ATLANTIS_REDIS_DB=0
 ```
 
-La base de datos Redis a usar cuando se usa un tipo Locking DB de `redis`. El valor predeterminado es `0`.
+La base de datos Redis a usar cuando se usa un tipo de Locking DB de `redis`. El valor predeterminado es `0`.
 
 ### `--redis-host` <Badge text="v0.19.9+" type="info"/>
 
@@ -1309,7 +1336,7 @@ atlantis server --redis-host="localhost"
 ATLANTIS_REDIS_HOST="localhost"
 ```
 
-El hostname Redis cuando se usa un tipo Locking DB de `redis`.
+El hostname Redis para cuando se usa un tipo de Locking DB de `redis`.
 
 ### `--redis-insecure-skip-verify` <Badge text="v0.19.9+" type="info"/>
 
@@ -1321,8 +1348,8 @@ ATLANTIS_REDIS_INSECURE_SKIP_VERIFY=false
 
 Controla si el cliente Redis verifica la cadena de certificados y el nombre de host del servidor Redis. Si es true, acepta cualquier certificado presentado por el servidor y cualquier nombre de host en ese certificado. El valor predeterminado es `false`.
 
-::: warning SECURITY WARNING
-Si esto está habilitado, TLS es susceptible a ataques de machine-in-the-middle a menos que se use verificación personalizada.
+::: warning ADVERTENCIA DE SEGURIDAD
+Si esto está habilitado, TLS es susceptible a ataques de intermediario a menos que se use verificación personalizada.
 :::
 
 ### `--redis-password` <Badge text="v0.19.9+" type="info"/>
@@ -1333,7 +1360,7 @@ atlantis server --redis-password="password123"
 ATLANTIS_REDIS_PASSWORD="password123"
 ```
 
-La contraseña Redis cuando se usa un tipo Locking DB de `redis`.
+La contraseña Redis para cuando se usa un tipo de Locking DB de `redis`.
 
 ### `--redis-port` <Badge text="v0.19.9+" type="info"/>
 
@@ -1343,7 +1370,7 @@ atlantis server --redis-port=6379
 ATLANTIS_REDIS_PORT=6379
 ```
 
-El puerto Redis cuando se usa un tipo Locking DB de `redis`. El valor predeterminado es `6379`.
+El puerto Redis para cuando se usa un tipo de Locking DB de `redis`. El valor predeterminado es `6379`.
 
 ### `--redis-tls-enabled` <Badge text="v0.19.9+" type="info"/>
 
@@ -1353,7 +1380,7 @@ atlantis server --redis-tls-enabled=false
 ATLANTIS_REDIS_TLS_ENABLED=false
 ```
 
-Habilita una conexión TLS, con versión mínima 1.2, a Redis cuando se usa un tipo Locking DB de `redis`. El valor predeterminado es `false`.
+Habilita una conexión TLS, con versión mínima 1.2, a Redis cuando se usa un tipo de Locking DB de `redis`. El valor predeterminado es `false`.
 
 ### `--redis-username`
 
@@ -1363,7 +1390,7 @@ atlantis server --redis-username="myuser"
 ATLANTIS_REDIS_USERNAME="myuser"
 ```
 
-El nombre de usuario Redis cuando se usa un tipo Locking DB de `redis`. Útil cuando Redis está configurado con autenticación basada en ACL.
+El nombre de usuario Redis para cuando se usa un tipo de Locking DB de `redis`. Útil cuando Redis está configurado con autenticación basada en ACL.
 
 ### `--repo-allowlist` <Badge text="v0.13.0" type="info"/>
 
@@ -1374,32 +1401,32 @@ atlantis server --repo-allowlist='github.com/myorg/*'
 ATLANTIS_REPO_ALLOWLIST='github.com/myorg/*'
 ```
 
-Atlantis requiere que especifique una allowlist de repositorios desde los que aceptará webhooks.
+Atlantis requiere que especifique una allowlist de repositorios de los que aceptará webhooks.
 
 Notas:
 
 - Acepta una lista separada por comas, p. ej. `definition1,definition2`
 - El formato es `{hostname}/{owner}/{repo}`, p. ej. `github.com/runatlantis/atlantis`
 - `*` coincide con cualquier carácter, p. ej. `github.com/runatlantis/*` coincidirá con todos los repos en la organización runatlantis
-- Una entrada que comience con `!` la niega, p. ej. `github.com/foo/*,!github.com/foo/bar` coincidirá con todos los repos github en el owner `foo` _excepto_ `bar`.
-- Para Bitbucket Server: `{hostname}` es el dominio sin esquema ni puerto, `{owner}` es el nombre del proyecto (no la key), e `{repo}` es el nombre del repo
-  - Los repositorios de usuario (no proyecto) toman el formato: `{hostname}/{full name}/{repo}` (p. ej., `bitbucket.example.com/Jane Doe/myatlantis` para nombre de usuario `jdoe` y nombre completo `Jane Doe`, lo cual no es muy intuitivo)
+- Una entrada que comienza con `!` la niega, p. ej. `github.com/foo/*,!github.com/foo/bar` coincidirá con todos los repos github en el owner `foo` _excepto_ `bar`.
+- Para Bitbucket Server: `{hostname}` es el dominio sin scheme ni puerto, `{owner}` es el nombre del proyecto (no la key), e `{repo}` es el nombre del repo
+  - Los repositorios de usuario (no proyecto) tienen el formato: `{hostname}/{full name}/{repo}` (p. ej., `bitbucket.example.com/Jane Doe/myatlantis` para el nombre de usuario `jdoe` y nombre completo `Jane Doe`, lo cual no es muy intuitivo)
 - Para Azure DevOps la allowlist toma una de dos formas: `{owner}.visualstudio.com/{owner}/{project}/{repo}` o `dev.azure.com/{owner}/{project}/{repo}`
-- Microsoft está en proceso de cambiar Azure DevOps a la segunda forma, por lo que puede ser más seguro especificar siempre ambos formatos en su allowlist de repo para cada repositorio hasta que el cambio esté completo.
+- Microsoft está en proceso de cambiar Azure DevOps a la segunda forma, por lo que puede ser más seguro especificar siempre ambos formatos en su allowlist de repos para cada repositorio hasta que el cambio esté completo.
 
 Ejemplos:
 
-- Incluir en allowlist `myorg/repo1` y `myorg/repo2` en `github.com`
+- Allowlist `myorg/repo1` e `myorg/repo2` en `github.com`
   - `--repo-allowlist=github.com/myorg/repo1,github.com/myorg/repo2`
-- Incluir en allowlist todos los repos bajo `myorg` en `github.com`
+- Allowlist de todos los repos bajo `myorg` en `github.com`
   - `--repo-allowlist='github.com/myorg/*'`
-- Incluir en allowlist todos los repos bajo `myorg` en `github.com`, excluyendo `myorg/untrusted-repo`
+- Allowlist de todos los repos bajo `myorg` en `github.com`, excluyendo `myorg/untrusted-repo`
   - `--repo-allowlist='github.com/myorg/*,!github.com/myorg/untrusted-repo'`
-- Incluir en allowlist todos los repos en mi instalación GitHub Enterprise
+- Allowlist de todos los repos en mi instalación GitHub Enterprise
   - `--repo-allowlist='github.yourcompany.com/*'`
-- Incluir en allowlist todos los repos bajo el proyecto `myorg` `myproject` en Azure DevOps
+- Allowlist de todos los repositorios bajo el proyecto `myproject` de `myorg` en Azure DevOps
   - `--repo-allowlist='myorg.visualstudio.com/myorg/myproject/*,dev.azure.com/myorg/myproject/*'`
-- Incluir en allowlist todos los repositorios
+- Allowlist de todos los repositorios
   - `--repo-allowlist='*'`
 
 ### `--repo-config` <Badge text="v0.5.0+" type="info"/>
@@ -1410,7 +1437,7 @@ atlantis server --repo-config="path/to/repos.yaml"
 ATLANTIS_REPO_CONFIG="path/to/repos.yaml"
 ```
 
-Ruta a un archivo de configuración YAML de repos del lado del servidor. Vea [Server Side Repo Config](server-side-repo-config.md).
+Ruta a un archivo de configuración YAML de repo del lado del servidor. Vea [Server Side Repo Config](server-side-repo-config.md).
 
 ### `--repo-config-json` <Badge text="v0.5.0+" type="info"/>
 
@@ -1420,12 +1447,12 @@ atlantis server --repo-config-json='{"repos":[{"id":"/.*/", "apply_requirements"
 ATLANTIS_REPO_CONFIG_JSON='{"repos":[{"id":"/.*/", "apply_requirements":["mergeable"]}]}'
 ```
 
-Especifique server-side repo config como una cadena JSON. Útil si no quiere escribir un archivo de configuración en disco.
+Especifique la config de repo del lado del servidor como una cadena JSON. Útil si no quiere escribir un archivo de configuración en disco.
 Vea [Server Side Repo Config](server-side-repo-config.md) para más detalles.
 
 ::: tip
 Si especifica un [Workflow](custom-workflows.md#reference), los [step](custom-workflows.md#step)
-pueden especificarse de la siguiente manera:
+pueden especificarse como sigue:
 
 ```json
 {
@@ -1461,7 +1488,7 @@ ATLANTIS_RESTRICT_FILE_LIST=true
 ```
 
 `--restrict-file-list` bloqueará solicitudes de plan de proyectos fuera de los archivos modificados en el pull request.
-Cuando `--enable-regexp-cmd` también está habilitado, los plans de proyecto por regex como `atlantis plan -p .*` se limitan a proyectos coincidentes con archivos modificados en el pull request.
+Cuando `--enable-regexp-cmd` también está habilitado, los plans de proyectos por regex como `atlantis plan -p .*` se limitan a proyectos coincidentes con archivos modificados en el pull request.
 El valor predeterminado es `false`.
 
 ### `--share-plan-dir`
@@ -1472,7 +1499,7 @@ atlantis server --share-plan-dir="path/to/local/plan/dir"
 ATLANTIS_SHARE_PLAN_DIR="path/to/local/plan/dir"
 ```
 
-Directorio donde Atlantis almacenará archivos Terraform plan locales. Si no se establece, esto toma por defecto el valor resuelto de `--data-dir` para que las instalaciones existentes mantengan el mismo layout en disco. Cuando se establece en un directorio diferente, los repositorios checked out permanecen bajo `--data-dir` y los archivos `.tfplan` generados usan el mismo layout de ruta de repo, pull request, workspace y proyecto bajo `--share-plan-dir`.
+Directorio donde Atlantis almacenará archivos de plan local de Terraform. Si no está configurado, esto usa por defecto el valor resuelto de `--data-dir` para que las instalaciones existentes mantengan el mismo layout en disco. Cuando se configura a un directorio diferente, los repos checkout permanecen bajo `--data-dir` y los archivos `.tfplan` generados usan el mismo layout de ruta de repo, pull request, workspace y proyecto bajo `--share-plan-dir`.
 
 ### `--silence-allowlist-errors` <Badge text="v0.28.0+" type="info"/>
 
@@ -1486,7 +1513,7 @@ Algunos usuarios usan el flag `--repo-allowlist` para controlar a qué repos Atl
 responde. Normalmente, si Atlantis recibe un webhook de pull request de un repo no listado
 en la allowlist, responderá con un comentario de error. Este flag deshabilita ese comentario.
 
-Algunos usuarios encuentran esto útil porque prefieren agregar el webhook Atlantis
+Algunos usuarios encuentran esto útil porque prefieren agregar el webhook de Atlantis
 a nivel de organización en lugar de en cada repo.
 
 ### `--silence-fork-pr-errors` <Badge text="v0.28.0+" type="info"/>
@@ -1497,7 +1524,7 @@ atlantis server --silence-fork-pr-errors
 ATLANTIS_SILENCE_FORK_PR_ERRORS=true
 ```
 
-Normalmente, si Atlantis recibe un webhook de pull request desde un fork y --allow-fork-prs no está establecido,
+Normalmente, si Atlantis recibe un webhook de pull request de un fork y --allow-fork-prs no está configurado,
 responderá con un comentario de error. Este flag deshabilita ese comentario.
 
 ### `--silence-no-projects` <Badge text="v0.17.0" type="info"/>
@@ -1508,12 +1535,12 @@ atlantis server --silence-no-projects
 ATLANTIS_SILENCE_NO_PROJECTS=true
 ```
 
-`--silence-no-projects` le dirá a Atlantis que ignore PRs si ninguno de los archivos modificados forma parte de un proyecto definido en el archivo `atlantis.yaml`.
-Este flag garantiza que un servidor Atlantis solo responda a sus proyectos declarados explícitamente.
-Esto no tiene efecto si los proyectos no están definidos en el `atlantis.yaml` a nivel de repo.
-Esto también silencia comandos dirigidos (p. ej. `atlantis plan -d mydir` o `atlantis apply -p myproj`) por lo que si el proyecto no está en el repo config `atlantis.yaml`, estos comandos no se ejecutarán ni informarán de vuelta en un comentario.
+`--silence-no-projects` le dirá a Atlantis que ignore PRs si ninguno de los archivos modificados es parte de un proyecto definido en el archivo `atlantis.yaml`.
+Este flag asegura que un servidor Atlantis solo responda a sus proyectos declarados explícitamente.
+Esto no tiene efecto si los proyectos no están definidos en `atlantis.yaml` a nivel de repo.
+Esto también silencia comandos dirigidos (p. ej. `atlantis plan -d mydir` o `atlantis apply -p myproj`), por lo que si el proyecto no está en el archivo de configuración del repo `atlantis.yaml`, estos comandos no se ejecutarán ni reportarán en un comentario.
 
-Esto es útil al ejecutar múltiples servidores Atlantis contra un solo repositorio para que pueda
+Esto es útil cuando se ejecutan múltiples servidores Atlantis contra un solo repositorio, para que pueda
 delegar trabajo a cada servidor Atlantis. También es útil cuando se usa con pre_workflow_hooks para generar dinámicamente un archivo `atlantis.yaml`.
 
 ### `--silence-vcs-status-no-plans` <Badge text="v0.28.0+" type="info"/>
@@ -1524,7 +1551,7 @@ atlantis server --silence-vcs-status-no-plans
 ATLANTIS_SILENCE_VCS_STATUS_NO_PLANS=true
 ```
 
-`--silence-vcs-status-no-plans` le dirá a Atlantis que ignore establecer estado VCS en plans si ninguno de los archivos modificados forma parte de un proyecto definido en el archivo `atlantis.yaml`.
+`--silence-vcs-status-no-plans` le dirá a Atlantis que ignore establecer estado VCS en plans si ninguno de los archivos modificados es parte de un proyecto definido en el archivo `atlantis.yaml`.
 
 ### `--silence-vcs-status-no-projects` <Badge text="v0.28.0+" type="info"/>
 
@@ -1534,7 +1561,7 @@ atlantis server --silence-vcs-status-no-projects
 ATLANTIS_SILENCE_VCS_STATUS_NO_PROJECTS=true
 ```
 
-`--silence-vcs-status-no-projects` le dirá a Atlantis que ignore establecer estado VCS en cualquier comando si ninguno de los archivos modificados forma parte de un proyecto definido en el archivo `atlantis.yaml`.
+`--silence-vcs-status-no-projects` le dirá a Atlantis que ignore establecer estado VCS en cualquier comando si ninguno de los archivos modificados es parte de un proyecto definido en el archivo `atlantis.yaml`.
 
 ### `--skip-clone-no-changes` <Badge text="v0.15.0" type="info"/>
 
@@ -1544,7 +1571,7 @@ atlantis server --skip-clone-no-changes
 ATLANTIS_SKIP_CLONE_NO_CHANGES=true
 ```
 
-`--skip-clone-no-changes` omitirá clonar el repo durante autoplan si no hay cambios en proyectos Terraform. Esto solo aplicará para GitHub y GitLab y solo para repos que tengan archivo `atlantis.yaml`. El valor predeterminado es `false`.
+`--skip-clone-no-changes` omitirá clonar el repo durante autoplan si no hay cambios en proyectos Terraform. Esto solo se aplicará para GitHub y GitLab y solo para repos que tengan archivo `atlantis.yaml`. El valor predeterminado es `false`.
 
 ### `--slack-token` <Badge text="v0.43.0+" type="info"/>
 
@@ -1554,7 +1581,7 @@ atlantis server --slack-token=token
 ATLANTIS_SLACK_TOKEN='token'
 ```
 
-Token API para notificaciones de Slack. Vea [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
+Token de API para notificaciones de Slack. Vea [Using Slack hooks](sending-notifications-via-webhooks.md#using-slack-hooks).
 
 ### `--ssl-cert-file` <Badge text="v0.2.4+" type="info"/>
 
@@ -1576,7 +1603,7 @@ atlantis server --ssl-key-file="/etc/ssl/private/my-cert.key"
 ATLANTIS_SSL_KEY_FILE="/etc/ssl/private/my-cert.key"
 ```
 
-Archivo que contiene la clave privada x509 que coincide con `--ssl-cert-file`.
+Archivo que contiene la private key x509 que coincide con `--ssl-cert-file`.
 
 ### `--stats-namespace` <Badge text="v0.43.0+" type="info"/>
 
@@ -1602,7 +1629,7 @@ ATLANTIS_TF_DOWNLOAD=false
 ```
 
 El valor predeterminado es `true`. Permite a Atlantis listar y descargar versiones adicionales de Terraform.
-Establecer esto en `false` puede ser útil en un entorno air-gapped donde no hay un mirror de descarga disponible.
+Establecer esto en `false` puede ser útil en un entorno air-gapped donde un mirror de descarga no está disponible.
 
 ### `--tf-download-url` <Badge text="v0.18.0+" type="info"/>
 
@@ -1613,12 +1640,12 @@ ATLANTIS_TF_DOWNLOAD_URL="https://releases.company.com"
 ```
 
 Una URL alternativa para descargar versiones de Terraform si faltan. Útil en un entorno airgapped
-donde releases.hashicorp.com no está disponible. La estructura de directorios del endpoint
+donde releases.hashicorp.com no está disponible. La estructura de directorio del endpoint
 personalizado debe coincidir con la de releases.hashicorp.com.
 
-Esto no tiene impacto si `--tf-download` está establecido en `false`.
+Esto no tiene impacto si `--tf-download` está configurado en `false`.
 
-Esta configuración aún no está soportada cuando `--tf-distribution` está establecido en `opentofu`.
+Esta configuración todavía no está soportada cuando `--tf-distribution` está configurado en `opentofu`.
 
 ### `--tfe-hostname` <Badge text="v0.8.3+" type="info"/>
 
@@ -1628,10 +1655,10 @@ atlantis server --tfe-hostname="my-terraform-enterprise.company.com"
 ATLANTIS_TFE_HOSTNAME="my-terraform-enterprise.company.com"
 ```
 
-Hostname de su instalación Terraform Enterprise para usarse junto con
+Hostname de su instalación Terraform Enterprise para usar junto con
 `--tfe-token`. Vea [Terraform Cloud](terraform-cloud.md) para más detalles.
 Si usa Terraform Cloud (es decir, no tiene su propia instalación Terraform Enterprise)
-no es necesario establecerlo ya que el valor predeterminado es `app.terraform.io`.
+no necesita configurarlo ya que el valor predeterminado es `app.terraform.io`.
 
 ### `--tfe-local-execution-mode` <Badge text="v0.8.3+" type="info"/>
 
@@ -1651,7 +1678,7 @@ atlantis server --tfe-token="xxx.atlasv1.yyy"
 ATLANTIS_TFE_TOKEN='xxx.atlasv1.yyy'
 ```
 
-Un token para integración Terraform Cloud/Terraform Enterprise. Vea [Terraform Cloud](terraform-cloud.md) para más detalles.
+Un token para integración con Terraform Cloud/Terraform Enterprise. Vea [Terraform Cloud](terraform-cloud.md) para más detalles.
 
 ### `--use-tf-plugin-cache` <Badge text="v0.26.0+" type="info"/>
 
@@ -1659,14 +1686,14 @@ Un token para integración Terraform Cloud/Terraform Enterprise. Vea [Terraform 
 atlantis server --use-tf-plugin-cache=false
 ```
 
-Establézcalo en false si desea deshabilitar la caché de plugins de terraform.
+Establézcalo en false si quiere deshabilitar la caché de plugins de terraform.
 
-Este flag es útil cuando se tienen múltiples proyectos que necesitan ejecutar un plan y apply en el mismo PR para evitar la condición de carrera de `plugin_cache_dir` concurrentemente; este es un issue conocido de terraform, más información:
+Este flag es útil cuando hay múltiples proyectos que necesitan ejecutar plan y apply en el mismo PR para evitar la condición de carrera de `plugin_cache_dir` concurrentemente; este es un issue conocido de terraform, más información:
 
-- [plugin_cache_dir concurrently discussion](https://github.com/hashicorp/terraform/issues/31964)
-- [PR to improve the situation](https://github.com/hashicorp/terraform/pull/33479)
+- [discusión concurrente de plugin_cache_dir](https://github.com/hashicorp/terraform/issues/31964)
+- [PR para mejorar la situación](https://github.com/hashicorp/terraform/pull/33479)
 
-El efecto de la condición de carrera es más evidente al usar configuración paralela para ejecutar plan y apply. Deshabilitar el uso de la caché de plugins impactará el rendimiento al iniciar un nuevo plan o apply, pero en grandes despliegues Atlantis con múltiples proyectos y módulos compartidos el uso de `--parallel_plan` y `--parallel_apply` es obligatorio para una gestión eficiente de los PRs.
+El efecto de la condición de carrera es más evidente al usar configuración paralela para ejecutar plan y apply. Deshabilitar el uso de caché de plugins impactará el rendimiento al iniciar un nuevo plan o apply, pero en despliegues grandes de Atlantis con múltiples proyectos y módulos compartidos el uso de `--parallel_plan` e `--parallel_apply` es obligatorio para una gestión eficiente de los PRs.
 
 ### `--var-file-allowlist` <Badge text="v0.19.5" type="info"/>
 
@@ -1676,9 +1703,19 @@ atlantis server --var-file-allowlist='/path/to/tfvars/dir'
 ATLANTIS_VAR_FILE_ALLOWLIST='/path/to/tfvars/dir'
 ```
 
-Lista separada por comas de rutas de directorios adicionales desde donde pueden leerse [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files).
+Lista separada por comas de rutas de directorio adicionales desde las que se pueden leer [archivos de definición de variables](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files).
 Las rutas en este argumento deben ser rutas absolutas. Las rutas relativas y el globbing actualmente no están soportados.
-Si este argumento no se proporciona, su valor predeterminado es el directorio de datos de Atlantis, determinado por el argumento `--data-dir`.
+Si este argumento no se proporciona, el valor predeterminado es el directorio de datos de Atlantis, determinado por el argumento `--data-dir`.
+
+Notas:
+
+- La allowlist se aplica para cada comando de comentario que pasa `-var-file` a Terraform (`plan`, `apply`, `import` e `state rm`), y para ambas grafías `-var-file` e `--var-file`.
+- Solo se verifican los valores `-var-file` dados en argumentos extra de comentarios. Los archivos var nombrados en `extra_args` del workflow no.
+- Una ruta dentro del repositorio siempre está permitida tal como se escribe, pero una vez que el repositorio es clonado el archivo se resuelve siguiendo enlaces simbólicos. Un enlace confirmado en el repositorio que apunta fuera tanto del repositorio como de los directorios en allowlist es rechazado, y también lo es un enlace cuyo destino no existe. Una ruta de archivo var no puede contener un elemento `..`, porque el sistema operativo sigue un enlace simbólico antes de aplicar `..`.
+
+::: warning Cambio de comportamiento
+Anteriormente, la allowlist se verificaba solo para `atlantis plan`, solo para la grafía de guion simple `-var-file`, y solo contra la ruta tal como estaba escrita. Ahora se verifica para `plan`, `apply`, `import` e `state rm`, para cada grafía (`-var-file`, `--var-file`, con un espacio o `=`), y de nuevo después del clone con enlaces simbólicos resueltos. Las rutas rechazadas fallan con `var file path <path> is not allowed by the current allowlist: [<dirs>]`, `var file path <path> resolves to <target>, which is not allowed by the current allowlist: [<dirs>]`, `var file path <path> is a symbolic link whose target does not exist` o `var file path <path> must not contain '..' elements`. Mueva los archivos var compartidos al repositorio o a un directorio en allowlist, y reemplace los enlaces que apuntan fuera de ellos por archivos reales.
+:::
 
 ### `--vcs-status-name` <Badge text="v0.42.0+" type="info"/>
 
@@ -1688,9 +1725,9 @@ atlantis server --vcs-status-name="atlantis-dev"
 ATLANTIS_VCS_STATUS_NAME="atlantis-dev"
 ```
 
-Nombre usado para identificar Atlantis al actualizar el estado de un pull request. El valor predeterminado es `atlantis`.
+Nombre usado para identificar Atlantis al actualizar un estado de pull request. El valor predeterminado es `atlantis`.
 
-Esto es útil al ejecutar múltiples servidores Atlantis contra un solo repositorio para que pueda
+Esto es útil cuando se ejecutan múltiples servidores Atlantis contra un solo repositorio para que pueda
 dar a cada servidor Atlantis su propio nombre único para evitar que los estados colisionen.
 
 ### `--web-basic-auth` <Badge text="v0.1.0+" type="info"/>
@@ -1701,7 +1738,7 @@ atlantis server --web-basic-auth
 ATLANTIS_WEB_BASIC_AUTH=true
 ```
 
-Habilitar Basic Authentication en el servicio web Atlantis.
+Habilita Basic Authentication en el servicio web de Atlantis.
 
 ### `--web-password` <Badge text="v0.1.0+" type="info"/>
 
@@ -1711,7 +1748,7 @@ atlantis server --web-password="atlantis"
 ATLANTIS_WEB_PASSWORD="atlantis"
 ```
 
-Contraseña usada para Basic Authentication en el servicio web Atlantis. El valor predeterminado es `atlantis`.
+Contraseña usada para Basic Authentication en el servicio web de Atlantis. El valor predeterminado es `atlantis`.
 
 ### `--web-username` <Badge text="v0.1.0+" type="info"/>
 
@@ -1721,7 +1758,7 @@ atlantis server --web-username="atlantis"
 ATLANTIS_WEB_USERNAME="atlantis"
 ```
 
-Nombre de usuario usado para Basic Authentication en el servicio web Atlantis. El valor predeterminado es `atlantis`.
+Nombre de usuario usado para Basic Authentication en el servicio web de Atlantis. El valor predeterminado es `atlantis`.
 
 ### `--webhook-http-headers` <Badge text="v0.35.0+" type="info"/>
 
@@ -1731,8 +1768,8 @@ atlantis server --webhook-http-headers='{"Authorization":"Bearer some-token","X-
 ATLANTIS_WEBHOOK_HTTP_HEADERS='{"Authorization":"Bearer some-token","X-Custom-Header":["value1","value2"]}'
 ```
 
-Headers adicionales añadidos a cada payload HTTP POST al usar [http webhooks](sending-notifications-via-webhooks.md#using-http-webhooks)
-proporcionados como una cadena JSON. La clave del mapa es el nombre del header y el valor es el valor del header
+Headers adicionales agregados a cada payload HTTP POST al usar [http webhooks](sending-notifications-via-webhooks.md#using-http-webhooks)
+proporcionados como una cadena JSON. La key del mapa es el nombre del header y el valor es el valor del header
 (cadena) o valores (array de cadenas).
 
 ### `--websocket-check-origin` <Badge text="v0.19.0+" type="info"/>
@@ -1743,7 +1780,7 @@ atlantis server --websocket-check-origin
 ATLANTIS_WEBSOCKET_CHECK_ORIGIN=true
 ```
 
-Permitir conexión de websockets solo cuando se origine desde el servidor web Atlantis en ejecución
+Solo permite conexión websockets cuando se originan desde el servidor web Atlantis en ejecución
 
 ### `--write-git-creds` <Badge text="v0.11.0+" type="info"/>
 
@@ -1753,7 +1790,7 @@ atlantis server --write-git-creds
 ATLANTIS_WRITE_GIT_CREDS=true
 ```
 
-Escribir un archivo .git-credentials con el usuario y token del proveedor para permitir
+Escribe un archivo .git-credentials con el usuario y token del proveedor para permitir
 clonar módulos privados sobre HTTPS o SSH. Vea [Git Credential Store documentation](https://git-scm.com/docs/git-credential-store) para más información.
 
 Siga el `git::ssh`

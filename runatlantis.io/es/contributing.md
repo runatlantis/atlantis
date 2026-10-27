@@ -14,4 +14,5 @@ Si eres nuevo, revisa la [Guide](./guide.md) o la
 
 ## Siguientes pasos
 
+- [Decisiones de arquitectura](./contributing/adr/index.md)&nbsp;&nbsp;–&nbsp;&nbsp;Propuestas y decisiones actuales, con su estado.
 - [Events Controller](../contributing/events-controller.md)&nbsp;&nbsp;–&nbsp;&nbsp;¿Cómo funcionan los eventos?

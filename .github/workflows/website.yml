@@ -42,6 +42,11 @@ jobs:
           filters: |
             src:
               - 'runatlantis.io/**'
+              - 'docs/adr/**'
+              - 'scripts/website/**'
+              - 'scripts/stage-translation-sources.sh'
+              - '.github/workflows/translate-docs.yml'
+              - '.lycheeignore'
               - 'package-lock.json'
               - 'package.json'
               - '.github/workflows/website.yml'
@@ -62,6 +67,10 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Translation integrity reads history to skip pages whose English
+          # source changed after they were translated.
+          fetch-depth: 0
 
       - name: Spell check
         uses: crate-ci/typos@00f422f3b19c57bc6338715ebfe3316d38768461 # v1.50.3
@@ -105,17 +114,20 @@ jobs:
             --max-concurrency 5
             --max-retries 0
             --accept 200,429
+            --root-dir ./runatlantis.io
             ./runatlantis.io
 
       - name: setup npm
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
+          node-version: '24'
           cache: 'npm'
 
       - name: run http-server
         run: |
           # build site
           npm ci
+          npm run website:test:adrs
           npm run website:build
 
           # start http-server for integration testing
