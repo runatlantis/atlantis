@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/utils"
@@ -109,10 +110,9 @@ func (p *VarFileAllowlistChecker) CheckResolved(repoDir, projectDir string, flag
 // refused, and an allowlisted or in-repository file can always be named
 // without one.
 func rejectParentElements(path string) error {
-	for _, elem := range strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == filepath.Separator }) {
-		if elem == ".." {
-			return fmt.Errorf("var file path %s must not contain '..' elements", path)
-		}
+	elems := strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == filepath.Separator })
+	if slices.Contains(elems, "..") {
+		return fmt.Errorf("var file path %s must not contain '..' elements", path)
 	}
 	return nil
 }
