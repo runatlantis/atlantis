@@ -22,7 +22,7 @@ import (
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	. "github.com/petergtz/pegomock/v4"
 	lockingmocks "github.com/runatlantis/atlantis/server/core/locking/mocks"
 	"github.com/runatlantis/atlantis/server/events"
@@ -836,7 +836,7 @@ func TestPlanCommandRunner_HoldsPlanInFlightLockAcrossCleanupPlanAndDBWrite(t *t
 	setup(t, func(tc *TestConfig) {
 		tc.workingDirLocker = locker
 	})
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	cmd := &events.CommentCommand{Name: command.Plan}
 	projectCtx := command.ProjectContext{
@@ -868,7 +868,7 @@ func TestPlanCommandRunner_HoldsPlanLockDuringStalePlanCleanup(t *testing.T) {
 	setup(t, func(tc *TestConfig) {
 		tc.workingDirLocker = locker
 	})
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	cmd := &events.CommentCommand{Name: command.Plan}
 	projectCtx := command.ProjectContext{
@@ -911,7 +911,7 @@ func TestPlanCommandRunner_HoldsPlanLockDuringPullStatusWrite(t *testing.T) {
 		tc.database = database
 		tc.workingDirLocker = locker
 	})
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
 	cmd := &events.CommentCommand{Name: command.Plan}
 	projectCtx := command.ProjectContext{
@@ -1036,7 +1036,7 @@ func TestRunCommentCommand_IgnoredTargetedDirNoOp(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			vcsClient := setup(t)
 			ch.FailOnPreWorkflowHookError = true
-			pull := &github.PullRequest{State: github.Ptr("open")}
+			pull := &github.PullRequest{State: new("open")}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			cmd := &events.CommentCommand{Name: c.commandName, SubName: c.subName, RepoRelDir: "ignored"}
 
@@ -1106,7 +1106,7 @@ func TestRunCommentCommand_IgnoredTargetedDirSkipsValidationComments(t *testing.
 				c.setup(t, vcsClient)
 			}
 
-			pull := &github.PullRequest{State: github.Ptr("open")}
+			pull := &github.PullRequest{State: new("open")}
 			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
 			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
@@ -1182,7 +1182,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 				c.setup()
 			}
 
-			pull := &github.PullRequest{State: github.Ptr("open")}
+			pull := &github.PullRequest{State: new("open")}
 			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(c.modelPull, c.modelPull.BaseRepo, c.headRepo, nil)
 			When(projectCommandBuilder.ShouldIgnoreTargetedDir(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(true)
@@ -1204,7 +1204,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 
 func TestRunCommentCommand_IgnoredTargetedDirNoHooksDoesNotUseLocalConfig(t *testing.T) {
 	setup(t)
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	cmd := &events.CommentCommand{Name: command.Apply, RepoRelDir: "ignored"}
 	ignoreChecks := 0
@@ -1229,7 +1229,7 @@ func TestRunCommentCommand_IgnoredTargetedDirPreHooksCanGenerateExplicitConfig(t
 	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true}
 	preWorkflowHooksCommandRunner = configuredPreHooks
 	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
 	projectCtx := command.ProjectContext{
@@ -1262,7 +1262,7 @@ func TestRunCommentCommand_IgnoredTargetedDirNonFatalPreHookErrorCanGenerateExpl
 	configuredPreHooks := &configuredPreWorkflowHooksCommandRunner{hasHooks: true, err: errors.New("hook error")}
 	preWorkflowHooksCommandRunner = configuredPreHooks
 	ch.PreWorkflowHooksCommandRunner = configuredPreHooks
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	cmd := &events.CommentCommand{Name: command.Plan, RepoRelDir: "ignored"}
 	projectCtx := command.ProjectContext{
@@ -1937,7 +1937,7 @@ func TestRunCommentCommand_DisableApplyAllDisabled(t *testing.T) {
 	vcsClient := setup(t)
 	applyCommandRunner.DisableApplyAll = true
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -2025,7 +2025,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 		" comment saying that this is not allowed")
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.Ptr("closed"),
+		State: new("closed"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.ClosedPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -2078,12 +2078,12 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	}{
 		{
 			name:    "PR open",
-			prState: github.Ptr("open"),
+			prState: new("open"),
 		},
 
 		{
 			name:    "PR closed",
-			prState: github.Ptr("closed"),
+			prState: new("closed"),
 		},
 	}
 
@@ -2120,7 +2120,7 @@ func TestRunUnlockCommandFail_VCSComment(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -2144,7 +2144,7 @@ func TestRunUnlockCommandFail_DisableUnlockLabel(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -2168,7 +2168,7 @@ func TestRunUnlockCommandFail_GetLabelsFail(t *testing.T) {
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -2194,7 +2194,7 @@ func TestRunUnlockCommandDoesntRetrieveLabelsIfDisableUnlockLabelNotSet(t *testi
 
 	vcsClient := setup(t)
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
@@ -2447,7 +2447,7 @@ func TestRunCommentCommand_FailedPreWorkflowHook_FailOnPreWorkflowHookError_Fals
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -2508,7 +2508,7 @@ func TestRunGenericPlanCommand_DeletePlans(t *testing.T) {
 		},
 	})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -2610,7 +2610,7 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
@@ -2636,7 +2636,7 @@ func TestApplyMergeablityWhenPolicyCheckFails(t *testing.T) {
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 
 	modelPull := models.PullRequest{
@@ -2783,7 +2783,7 @@ func setupApplyWithAutoMerge(t *testing.T, options ...func(testConfig *TestConfi
 
 	vcsClient := setup(t, options...)
 	pull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
@@ -2832,7 +2832,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 	Ok(t, err)
 	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
 	ghPull := &github.PullRequest{
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(ghPull, nil)
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(ghPull))).ThenReturn(pull, pull.BaseRepo, testdata.GithubRepo, nil)

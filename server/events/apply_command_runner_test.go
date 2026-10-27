@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v92/github"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -71,7 +71,7 @@ func TestApplyCommandRunner_IsLocked(t *testing.T) {
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.Ptr("open"),
+				State: new("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 			When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
@@ -1715,7 +1715,7 @@ func TestApplyCommandRunner_ExecutionOrder(t *testing.T) {
 			scopeNull := metricstest.NewLoggingScope(t, logger, "atlantis")
 
 			pull := &github.PullRequest{
-				State: github.Ptr("open"),
+				State: new("open"),
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
 
@@ -1790,7 +1790,7 @@ func TestApplyCommandRunner_NoChangesCount(t *testing.T) {
 	})
 	Ok(t, err)
 
-	pull := &github.PullRequest{State: github.Ptr("open")}
+	pull := &github.PullRequest{State: new("open")}
 	When(githubGetter.GetPullRequest(logger, testdata.GithubRepo, testdata.Pull.Num)).ThenReturn(pull, nil)
 	When(eventParsing.ParseGithubPull(logger, pull)).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
 
