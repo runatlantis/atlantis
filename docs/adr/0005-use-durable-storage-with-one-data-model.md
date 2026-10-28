@@ -4,103 +4,85 @@ Date: 2026-10-22
 
 ## Status
 
-Accepted.
+Proposed
+
+Related issue: [#7031](https://github.com/runatlantis/atlantis/issues/7031).
 
 ## Context
 
-Every feature in Atlantis keeps state its own way. Locks and PR status are JSON in BoltDB or Redis. Plans live in working directories that PR cleanup deletes. Job output, the working-directory lock, and cancellation live in memory.
+Atlantis keeps state in several places. Locks and PR status are JSON in BoltDB or Redis. Plans and workflow files live in working directories, unless `--enable-external-stores` sends plans to S3. Job output, the working-directory lock, and cancellation live in memory.
 
-Nothing shares identifiers, so each new feature has to work out where its data goes, how it links to a repo or PR, and how it survives a restart. Drift detection, the API, and job history all need the same answers.
+Features don't share identifiers, so each one has to solve storage, repo and PR relationships, and restart recovery. Drift detection, the API, and job history all need the same answers. Clone paths also leave out the VCS host, so same-named repos on different hosts share a clone.
 
 ## Decision
 
-### One relational database
+Atlantis will use one relational database for application records and coordination, plus a configurable store for workflow artifacts. Repositories, pull requests, projects, and jobs share one data model. The database links jobs to their inputs and results. Durable storage replaces BoltDB and Redis.
 
-Application state lives in 1 relational database, accessed through GORM behind Atlantis's own interfaces. We support SQLite (embedded, single instance) and PostgreSQL (shared, multi-instance). SQLite must use a pure-Go driver compatible with `CGO_ENABLED=0` on all supported release targets. Other engines need testing first.
+### Database
 
-Schema changes are versioned SQL migrations run with Goose. Transactions stay short and never wrap a Terraform run or VCS call.
+Atlantis will support SQLite for single-instance installs and PostgreSQL for shared deployments, accessed through GORM behind Atlantis's own interfaces. SQLite must use a pure-Go driver compatible with `CGO_ENABLED=0`. Goose migrations are the only source of schema changes; Atlantis never calls GORM `AutoMigrate`. Every durable-storage database runs the same migrations, including experimental tables and columns. Experiment settings control whether Atlantis uses those additions.
 
-Records link by foreign key, and each has 1 identity:
+The model defines the logical identities and relationships below. Identity fields are non-null, with uniqueness enforced by the database. Unnamed projects use an empty name, and related records link by foreign key. Tables, columns, and indexes are implementation details.
 
-| Record | Unique by |
+| Record | Identity and relationships |
 | --- | --- |
-| VCS instance | Host, port, and base path; also records the provider |
+| VCS instance | Host, port, and base path |
 | Repository | VCS instance and full name |
 | Pull request | Repository and number |
-| Project | Repository, directory, name, workspace |
-| Job | Its own ID, linked to PR, project, command, and revision |
-| Artifact | Its own ID, linked to its job |
-
-Identity fields are non-null and enforced by database uniqueness constraints. An unnamed project's name is `''`.
-
-`platform/infrastructure` on `github.com` and on `github.corp.example` are 2 repos. The provider lives on the instance because 1 instance only ever serves 1 VCS. Each plan run is a new job, even at the same commit, and apply uses the specific plan recorded as pending.
+| Project | Repository, directory, workspace, and name |
+| Job | UUID, linked to its PR, project, command, and revision |
 
 ### Coordination
 
-If Atlantis needs something to stay correct or recover, it goes in the database or artifact storage. Memory can cache it but can't own it.
+State needed for correctness or recovery lives in the database or artifact storage. Memory can cache it but can't own it. Project locks, the working-directory lock, and execution claims move to the database. Each change to execution state checks the claim's owner atomically, preventing an instance that loses its claim from overwriting newer work. The PR claim covers plan and policy checks and remains held until the required artifacts and completion state are saved.
 
-Project locks and the working-directory lock both move to the database. Execution claims record their owner, and every change checks that owner atomically so a stale instance can't overwrite a newer one. Recovery assumes Terraform may still be running after a claim expires.
+Recovery must assume Terraform may still be running after a claim expires, including on another host. Database transactions stay short and never wrap Terraform execution or VCS calls.
 
-SQLite is single-instance only. We call multi-instance supported once tests cover competing commands, duplicate webhooks, cancellation, PR close, and instance failure.
+Multi-instance deployments require PostgreSQL and artifact storage accessible to every instance. Atlantis won't call multi-instance supported until tests cover competing commands, duplicate webhooks, cancellation, PR closure, and instance failure.
 
 ### Artifacts
 
-Plans, showfiles, and logs go to a separately configured store: a directory, object storage like S3, or the database. The database records each artifact's job, kind, location, size, and checksum.
+Artifacts include plans, showfiles, job logs, and files passed between workflow stages. They live in a directory, S3-compatible object storage, or the database. In every case, the database records which stored artifacts each job used. The database backend gives small installs one store to back up. Larger installs can keep plans and logs in a directory or object storage to limit database growth.
 
-Working directories use the persisted VCS instance ID, so same-named repos on different instances stop sharing a clone: `repos/<instance-id>/<owner>/<repo>/<pr>/<workspace>`. Artifacts follow the same layout, plus the project directory and job ID. For instance ID `42`:
+Every plan run creates a new job, even at the same commit. Policy check and apply jobs link to that plan job. Apply uses the artifacts recorded for the specific pending plan; a successful apply consumes it. Dependent jobs can use artifacts only after they are fully written. Atlantis records checksums when saving artifacts and verifies them before using those artifacts as inputs.
 
-```text
-artifacts/42/platform/infrastructure/6920/production/envs/prod/
-  9c1f497e-285a-4f13-81ed-6c35570746db/
-    networking.tfplan
-    networking.json
-    networking.log
-```
+Every backend confines reads, writes, and deletes to the job's assigned repository and PR namespace, including paths derived from PR-controlled `atlantis.yaml`. Working directories and artifact paths include the VCS instance to prevent collisions between repos on different hosts. Pending-plan discovery and cleanup use database records.
 
-Files take the project name, or the workspace if there's no name. The job ID keeps paths unique. Nothing parses paths, and cleanup goes by database record.
+### Security and retention
 
-Before a command runs, Atlantis copies the artifacts it needs into the working directory, so `$PLANFILE` and `$SHOWFILE` still work.
+Plans, showfiles, and logs can contain plaintext secrets. Saved plans include sensitive values even when Terraform redacts them from terminal output. Operators configure access controls and encryption at rest for the database and artifact storage. Backend documentation will state the minimum requirements.
 
-Content is written before the database references it, and writes and deletes can be retried. Reconciliation removes unreferenced content left by interrupted writes without deleting uploads still in progress.
+By default, plans, showfiles, and workflow files are deleted after their plan is applied or invalidated. PR closure invalidates plans and cancels dependent work; cleanup waits for running commands to stop. Operators may configure a retention period for obsolete files.
 
-Logs are flushed periodically as they stream, with a final flush when a job ends. Backends without append support persist ordered chunks. Closing a PR invalidates its plans but keeps jobs, logs, and artifacts until retention removes them.
-
-### Deployment
-
-Multi-instance installs need PostgreSQL and artifact storage every instance can reach. We document that; there's no HA flag. The whole thing ships behind the `durable-storage` experiment.
-
-## Consequences
-
-New features get one place to store state and one set of records to link to. Plans and logs survive restarts and PR cleanup, and multi-instance becomes something we can test.
-
-The costs: schema changes need coordination, writes span 2 systems, retained output needs cleanup, and the database can't kill a Terraform process on another host.
+Logs stay with their originating job and are saved during execution. They have a bounded default retention period starting at PR closure, or job completion when there is no PR. Operators can shorten or extend that period. Job records survive artifact cleanup, and retention never removes anything a pending plan or running job still needs. Cleanup also removes stored artifacts that no record references, once no job can still be writing them.
 
 ## Transition
 
-Existing installs don't change until operators opt in. We recommend a clean cutover: drain, start on an empty store, and regenerate plans before applying. Old logs and plans don't carry over, so keep the old data if you need it. Migration tooling is optional.
+Durable storage ships behind the `durable-storage` experiment; existing installs keep their configured stores unless operators opt in. The experiment will include the documentation page and graduation checklist required by [ADR 0004](0004-govern-feature-lifecycles.md), with implementation details and open questions tracked in [#7031](https://github.com/runatlantis/atlantis/issues/7031). The existing S3 plan store becomes the artifact store's object storage backend, with new configuration replacing `--enable-external-stores`. This ADR also covers the durable job output proposed in [#6928](https://github.com/runatlantis/atlantis/pull/6928) and replaces that proposal.
 
-Delivery:
+BoltDB, Redis, and `--enable-external-stores` are deprecated in the release that introduces the experiment. If the experiment is withdrawn, those deprecations are withdrawn too. After graduation and the required ADR 0004 notice period, reviewed PRs make durable storage the default and remove the old stores and configuration. Those changes may ship in the same release.
 
-1. Locks, status, SQLite, migrations.
-2. Jobs, claims, cancellation, filesystem artifacts, durable logs, retention.
-3. PostgreSQL, more artifact backends, multi-instance testing.
-4. Graduation.
+Cutover requires draining active work, starting with an empty store, and replanning open PRs. No migration tooling is planned for the old locks, PR status, and plans; replanning is already the documented [recovery procedure](https://www.runatlantis.io/docs/faq.html). Experiment data, including logs and job history, may not survive disabling the experiment or resetting its storage before graduation. Operators who need that data must preserve it separately.
 
-Delivery step 2 covers the job-output persistence proposed in [#6928](https://github.com/runatlantis/atlantis/pull/6928), using shared job identities, artifact storage, and retention. This ADR replaces that proposal; its buffered-flush design can inform the implementation.
+## Consequences
 
-Changing the default or retiring BoltDB and Redis are separate decisions.
+New features share records, identities, and storage rules. Plans survive restarts, logs and job records survive PR cleanup, and multi-instance behavior has explicit correctness requirements.
+
+Schema changes go through shared migrations. Saving an artifact writes to the artifact store and the database without one transaction covering both, so recovery and cleanup have to handle partial writes. Retained output needs protection and cleanup. Database claims can't stop Terraform processes on another host. Multi-instance installs using Redis will need PostgreSQL, and existing installs will receive deprecation warnings while the replacement is experimental.
 
 ## Alternatives considered
 
 - A pluggable store per domain: more combinations, no shared constraints.
 - PostgreSQL only: every install needs an external database.
-- Everything in SQL: artifacts drive database size.
+- The database as the only artifact store: plans and logs drive database size and backup time on every install.
 - Leave it as is: every feature keeps solving storage alone.
 
 ## References
 
+- [ADR 0003: Govern architecture proposals](0003-govern-architecture-proposals.md)
+- [ADR 0004: Manage feature lifecycles](0004-govern-feature-lifecycles.md)
 - [Pluggable-backends draft (#6829, closed in favor of this ADR)](https://github.com/runatlantis/atlantis/pull/6829)
-- [Feature lifecycle proposal (#6923)](https://github.com/runatlantis/atlantis/pull/6923)
-- [`working_dir_locker.go`](../../server/events/working_dir_locker.go)
+- [Pluggable-backends issue (#6694, closed)](https://github.com/runatlantis/atlantis/issues/6694)
+- [Job output persistence (#6928)](https://github.com/runatlantis/atlantis/pull/6928)
+- [Plan store object storage (#6312)](https://github.com/runatlantis/atlantis/pull/6312)
 - [Goose migrations](https://github.com/pressly/goose)
-- [Issue #6694](https://github.com/runatlantis/atlantis/issues/6694)
