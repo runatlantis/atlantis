@@ -5881,6 +5881,128 @@ func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecoveryPullDirWithoutPla
 	Equals(t, 1, len(ctxs))
 }
 
+// buildApplyWithLocalPlans runs a generic apply with project1 and project2
+// both planned in the pull status, and localPlans already on disk. restoreFn
+// is called when the builder restores plans from the store.
+func buildApplyWithLocalPlans(t *testing.T, localPlans []string, restoreFn func(pullDir string) error) ([]command.ProjectContext, error) {
+	t.Helper()
+	RegisterMockTestingT(t)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"default": map[string]any{
+			"project1": map[string]any{
+				"main.tf": nil,
+			},
+			"project2": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+	runCmd(t, filepath.Join(tmpDir, "default"), "git", "init")
+	for _, project := range localPlans {
+		Ok(t, os.WriteFile(filepath.Join(tmpDir, "default", project, "default.tfplan"), []byte("plan"), 0600))
+	}
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.GetPullDir(
+		Any[models.Repo](),
+		Any[models.PullRequest]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.Clone(
+		Any[logging.SimpleLogging](),
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(
+		Any[models.Repo](),
+		Any[models.PullRequest](),
+		Any[string]())).
+		ThenReturn(tmpDir, nil)
+
+	logger := logging.NewNoopLogger(t)
+	userConfig := defaultUserConfig
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	planStore := &mockExternalPlanStore{
+		workspaces: []string{"default"},
+		restoreFn: func(pullDir, _, _ string, _ int) error {
+			return restoreFn(pullDir)
+		},
+	}
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		nil,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(),
+		planStore,
+	)
+
+	return builder.BuildApplyCommands(
+		&command.Context{
+			Log:   logger,
+			Scope: scope,
+			PullStatus: &models.PullStatus{
+				Projects: []models.ProjectStatus{
+					{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+					{RepoRelDir: "project2", Workspace: "default", Status: models.PlannedPlanStatus},
+				},
+			},
+		},
+		&events.CommentCommand{
+			Name: command.Apply,
+		})
+}
+
+// project1 was planned on this replica and project2 on another one, so only
+// project1's plan is here. project2's has to come from the store.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreRecoveryPartialPlans(t *testing.T) {
+	restoreCalled := false
+	ctxs, err := buildApplyWithLocalPlans(t, []string{"project1"}, func(pullDir string) error {
+		restoreCalled = true
+		for _, project := range []string{"project1", "project2"} {
+			if err := os.WriteFile(filepath.Join(pullDir, "default", project, "default.tfplan"), []byte("plan"), 0600); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	Ok(t, err)
+	Assert(t, restoreCalled, "expected RestorePlans to be called")
+	Equals(t, 2, len(ctxs))
+}
+
+// When every planned project already has its plan locally, the store is not
+// touched.
+func TestDefaultProjectCommandBuilder_ExternalPlanStoreNoRestoreWhenPlansPresent(t *testing.T) {
+	ctxs, err := buildApplyWithLocalPlans(t, []string{"project1", "project2"}, func(string) error {
+		t.Error("RestorePlans should not be called when every plan is present")
+		return nil
+	})
+	Ok(t, err)
+	Equals(t, 2, len(ctxs))
+}
+
 // mockExternalPlanStore satisfies the runtime.PlanStore interface for testing
 // the external plan store recovery path.
 type mockExternalPlanStore struct {

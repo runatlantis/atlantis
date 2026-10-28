@@ -337,8 +337,6 @@ func (p *DefaultProjectCommandBuilder) restorePullDir(pullDir string, r models.R
 	return planPullDir, nil
 }
 
-// withDefaultWorkspace appends DefaultWorkspace to workspaces if it isn't
-// already present, preserving the original order.
 // restorePlansFromStore re-clones the workspaces that have plans in the
 // external store and restores those plans into the pull directory, returning
 // that directory. It returns os.ErrNotExist when the store cannot restore or
@@ -382,6 +380,8 @@ func (p *DefaultProjectCommandBuilder) restorePlansFromStore(ctx *command.Contex
 	return pullDir, nil
 }
 
+// withDefaultWorkspace appends DefaultWorkspace to workspaces if it isn't
+// already present, preserving the original order.
 func withDefaultWorkspace(workspaces []string) []string {
 	if slices.Contains(workspaces, DefaultWorkspace) {
 		return workspaces
@@ -1302,15 +1302,16 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		return nil, err
 	}
 
-	// The pull directory can exist on this replica without holding any plans:
-	// an earlier event may have created it, or the plans may have been removed
-	// while the authoritative copy still lives in the external store. That is
-	// the common case with more than one replica, where the apply can land on
-	// a different replica than the plan did. Restore and look again before
-	// giving up, otherwise the apply fails with "plan file is missing" even
-	// though the plan is in the store.
-	if len(plans) == 0 {
-		ctx.Log.Info("no plans found in pull directory, attempting to restore plans")
+	// The pull directory can exist on this replica without holding every plan:
+	// an earlier event may have created it, other projects may have been
+	// planned on another replica, or the plans may have been removed while the
+	// authoritative copy still lives in the external store. That is the common
+	// case with more than one replica, where the apply can land on a different
+	// replica than the plan did. Restore and look again before giving up,
+	// otherwise the apply fails with "plan file is missing" even though the
+	// plan is in the store.
+	if missingPlanFiles(ctx.PullStatus, plans) {
+		ctx.Log.Info("plans in pull status are missing from pull directory, attempting to restore plans")
 		restoredDir, restoreErr := p.restorePlansFromStore(ctx)
 		if restoreErr != nil {
 			// Nothing to restore. Keep the empty plan list so the caller
@@ -1561,6 +1562,28 @@ func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
 		repoRelDir:  filepath.Clean(repoRelDir),
 		projectName: projectName,
 	}
+}
+
+// missingPlanFiles reports whether a project in the pull status needs a plan
+// file that is not among plans. Without a pull status it falls back to
+// whether no plans were found at all.
+func missingPlanFiles(pullStatus *models.PullStatus, plans []PendingPlan) bool {
+	if pullStatus == nil {
+		return len(plans) == 0
+	}
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+	}
+	for _, proj := range pullStatus.Projects {
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		if statusRequiresPlanFileForGenericApply(proj.Status) {
+			return true
+		}
+	}
+	return false
 }
 
 func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
