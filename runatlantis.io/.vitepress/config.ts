@@ -1,9 +1,20 @@
 import { generateSitemap as sitemap } from "sitemap-ts"
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import footnote from 'markdown-it-footnote'
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { configureVersions, flagVersionBadges, versionedLinks } from './versioning.mjs';
+import { collectSharedPages } from './shared-pages.mjs';
+
+const docVersion = process.env.ATLANTIS_DOC_VERSION || '';
+const docVersions = process.env.ATLANTIS_DOC_VERSIONS_FILE
+    ? JSON.parse(readFileSync(process.env.ATLANTIS_DOC_VERSIONS_FILE, 'utf8')) : [];
+const docBuildMetadata = process.env.ATLANTIS_DOC_BUILD_METADATA_FILE
+    ? JSON.parse(readFileSync(process.env.ATLANTIS_DOC_BUILD_METADATA_FILE, 'utf8')) : {};
+const sharedPages = docBuildMetadata.sharedPages ?? collectSharedPages(fileURLToPath(new URL('../', import.meta.url)));
 
 // https://vitepress.dev/reference/site-config
 const config = defineConfig({
@@ -168,6 +179,8 @@ const config = defineConfig({
     markdown: {
         config: (md) => {
           md.use(footnote)
+          md.use(flagVersionBadges)
+          md.use(versionedLinks, docVersion, docVersions, sharedPages, docBuildMetadata.rootVersion)
         }
     },
     vite: {
@@ -179,4 +192,4 @@ const config = defineConfig({
     }
 })
 
-export default withMermaid(config)
+export default withMermaid(configureVersions(config, docVersion, docVersions, sidebars.en, { ...docBuildMetadata, sharedPages }))
