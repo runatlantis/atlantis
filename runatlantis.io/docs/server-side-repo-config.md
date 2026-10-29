@@ -8,7 +8,8 @@ and what users can do in repo-level `atlantis.yaml` files.
 ## Do I Need A Server-Side Config File?
 
 You do not need a server-side repo config file unless you want to customize
-some aspect of Atlantis on a per-repo basis.
+some aspect of Atlantis on a per-repo basis or configure server-wide settings
+such as external plan storage.
 
 Read through the [use-cases](#use-cases) to determine if you need it.
 
@@ -21,6 +22,52 @@ If you don't wish to write a config file to disk, you can use the
 `--repo-config-json` flag or `ATLANTIS_REPO_CONFIG_JSON` environment variable
 to specify your config as JSON. See [--repo-config-json](server-configuration.md#repo-config-json)
 for an example.
+
+## External Plan Storage
+
+Atlantis can persist plan files to an S3 bucket so they survive restarts and
+can be restored on another instance. Plans are still written locally; Atlantis
+uploads them after `plan` and restores them before `apply`.
+Configure the plan store in the server-side repo config passed with
+`--repo-config`, `--repo-config-json`, or `ATLANTIS_REPO_CONFIG_JSON`, then start Atlantis with
+[`--enable-external-stores`](server-configuration.md#enable-external-stores).
+This setting is server-wide and does not belong in a repository's `atlantis.yaml`.
+
+```yaml
+external_stores:
+  plan_store:
+    type: s3
+    s3:
+      bucket: "my-atlantis-plans"
+      region: "us-east-1"
+      # Optional key prefix for all stored plan files.
+      prefix: "plans"
+      # Optional custom S3-compatible endpoint, such as MinIO.
+      # endpoint: "https://minio.example.com"
+      # Set to true when the endpoint requires path-style URLs.
+      # force_path_style: true
+      # Optional AWS shared config profile name.
+      # profile: "atlantis"
+```
+
+Only `s3` is currently supported as the plan store `type`. The `type` is required
+when `--enable-external-stores` is set; `bucket` and `region` are required when
+`type` is `s3`. See the [reference](#externalstores) for optional fields.
+Atlantis uses the AWS SDK credential chain to authenticate, with an optional
+named shared configuration profile selected by `profile`.
+
+At startup, Atlantis checks the bucket with `HeadBucket` using a 10-second timeout
+and refuses to start if the check fails. The credentials need `s3:ListBucket`
+on the bucket for this check and for restoring plans, plus `s3:GetObject`,
+`s3:PutObject`, and `s3:DeleteObject` on plan objects for download, upload, and
+cleanup when a pull request closes. If you use SSE-KMS, also grant the required
+KMS key permissions.
+
+Plan files can contain sensitive values. Enable server-side encryption
+(SSE-S3 or SSE-KMS), Block Public Access, and a restrictive bucket policy.
+Check equivalent protections on custom endpoints such as MinIO. Consider a
+lifecycle expiry rule that retains plans long enough for your review and apply
+process.
 
 ## Example Server Side Repo
 
@@ -508,6 +555,7 @@ Each servers handle different repository config files.
 | policies   | Policies.                                             | none      | no       | List of policy sets to run and associated metadata                                    |
 | metrics    | Metrics.                                              | none      | no       | Map of metric configuration                                                           |
 | team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuration of team permission checking                                             |
+| external_stores | [ExternalStores](#externalstores) | none | no | Server-wide external storage configuration |
 
 ::: tip A Note On Defaults
 
@@ -668,3 +716,27 @@ mode: on_apply
 |---------|----------|---------|----------|---------------------------------------------|
 | command | string   | none    | yes      | full path to external authorization command |
 | args    | []string | none    | no       | optional arguments to pass to `command`     |
+
+### ExternalStores
+
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| plan_store | [PlanStore](#planstore) | none | when external stores are enabled | External plan storage configuration |
+
+### PlanStore
+
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| type | string | none | when external stores are enabled | Storage backend; only `s3` is supported |
+| s3 | [S3](#s3) | none | when `type` is `s3` | S3-compatible plan store configuration |
+
+### S3
+
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| bucket | string | none | when `type` is `s3` | Bucket for plan files |
+| region | string | none | when `type` is `s3` | AWS region for the bucket |
+| prefix | string | empty | no | Object key prefix |
+| endpoint | string | AWS default | no | Custom S3-compatible endpoint URL |
+| force_path_style | bool | false | no | Use path-style bucket addressing |
+| profile | string | SDK default | no | AWS shared configuration profile |
