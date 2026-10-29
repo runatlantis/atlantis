@@ -15,3 +15,4 @@ This list is sorted in the order that organizations were added to it.
 | [Rapid7](https://www.rapid7.com/) | @snorlaX-sleeps | Per-project Atlantis installations in k8s orchestrating all Terraform deployments for teams |
 | [CloudScript](https://www.cloudscript.com.br/) | @xcloudscript | Multi-cloud Kubernetes platform standardization across enterprise clients, orchestrating cloud-native infrastructure at scale |
 | [Vend](https://vend.com/) | @kasperbrandenburg | Currently used for multiple teams across our organization for everything infrastructure related across multiple cloud providers |
+| [Clickup](https://clickup.com/) | @tejisin | Cloud and Kubernetes orchestration platform |
