@@ -59,6 +59,7 @@ const en: SidebarItem[] = [
           { text: "FAQ", link: "/docs/faq" },
         ]
       },
+      { text: "Experiments", link: "/docs/experiments" },
       {
         text: "Using Atlantis",
         collapsed: true,
@@ -222,6 +223,7 @@ const esLabels: Record<string, string> = {
   "Configuring Webhooks": "Configurar webhooks",
   "Provider Credentials": "Credenciales del proveedor",
   "Configuring Atlantis": "Configurar Atlantis",
+  "Experiments": "Experimentos",
   "Overview": "Visión general",
   "Server Configuration": "Configuración del servidor",
   "Server Side Repo Config": "Configuración de repositorios en el servidor",

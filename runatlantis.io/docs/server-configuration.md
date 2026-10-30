@@ -103,7 +103,9 @@ repository is on the same host as its base repository.
 Previously, Atlantis did not compare the hosts of the head and base repositories. Now, if the head repository's clone URL host differs from the base repository's (case-insensitive), or has no host, Atlantis does not run the command and posts no comment. Look for the server log line `head repo host "<head>" does not match base repo host "<base>", not running command`. For GitHub, see also [`--gh-hostname`](#gh-hostname).
 :::
 
-### `--api-secret`
+### `--api-secret` <Badge text="Experimental" type="warning"/>
+
+See the [API experiment](experiments.md#api) for limitations and graduation requirements. This shared secret requires `api` or `drift-detection` in `experiments`, according to the routes you intend to use. Otherwise, startup fails.
 
 ```bash
 atlantis server --api-secret="secret"
@@ -631,7 +633,11 @@ Enable Atlantis to format Terraform plan output into a markdown-diff friendly fo
 
 Useful to enable for use with GitHub. Changed lines inside Terraform heredoc and multiline-string diffs are also formatted so diff-aware markdown renderers can color them.
 
-### `--enable-drift-detection`
+### `--enable-drift-detection` <Badge text="Experimental" type="warning"/>
+
+See the [drift detection experiment](experiments.md#drift-detection) for limitations and graduation requirements.
+
+Requires `drift-detection` in `experiments` and `api-secret`; otherwise, startup fails.
 
 ```bash
 atlantis server --enable-drift-detection
@@ -650,7 +656,11 @@ including no-drift heartbeat results. Drift detection does not bypass team allow
 they cannot be evaluated outside a pull request. Destructive drift remediation apply actions also require
 `--enable-drift-remediation`. Defaults to `false`.
 
-### `--enable-drift-remediation`
+### `--enable-drift-remediation` <Badge text="Experimental" type="warning"/>
+
+Part of the [drift detection experiment](experiments.md#drift-detection); its limitations and graduation requirements also apply to remediation.
+
+Requires `drift-detection` in `experiments`, `api-secret`, and `enable-drift-detection`; otherwise, startup fails.
 
 ```bash
 atlantis server --enable-drift-detection --enable-drift-remediation
@@ -731,6 +741,18 @@ Comment command trigger executable name. Defaults to `atlantis`.
 This is useful when running multiple Atlantis servers against a single repository.
 
 Note: the "did you mean" misspelling warning only applies to the default executable name (`atlantis`). If you set a custom `--executable-name`, Atlantis won't warn about comments that are Levenshtein-close to it — this avoids spurious warnings when multiple servers with similar names (e.g. `atlantis-dev` and `atlantis-prod`) receive the same comment.
+
+### `--experiments`
+
+Server experiment permissions. The default list is empty. Names match exactly; unknown names or experimental settings without permission prevent startup. Each name permits its own HTTP routes; the feature's settings still control authentication and activation.
+
+```sh
+atlantis server --experiments=api,drift-detection
+```
+
+Set `ATLANTIS_EXPERIMENTS` to a comma-separated list, or use a YAML list under `experiments` in the server configuration file. Repeated flags append names. Flags override the environment, which overrides the configuration file; lists from different sources are not combined. Use `--experiments=` to clear the list.
+
+See [Experiments](experiments.md) for supported names and compatibility details.
 
 ### `--fail-on-pre-workflow-hook-error`
 
