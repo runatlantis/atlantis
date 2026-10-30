@@ -73,6 +73,10 @@ To enable the API endpoints, `api-secret` should be configured.
 * Pass `X-Atlantis-Token` with the same secret in the request header
   :::
 
+:::tip Graceful Shutdown
+When Atlantis receives `SIGTERM` or `SIGINT`, it waits for in-progress `POST /api/plan`, `POST /api/apply`, `POST /api/drift/detect` and `POST /api/drift/remediate` requests to finish before it exits, the same way it waits for commands from pull request comments. New requests to these endpoints get a `503` response while Atlantis is shutting down.
+:::
+
 ### POST /api/plan
 
 #### Description
@@ -605,14 +609,14 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 #### Error Responses
 
-| Status Code | Description                                                                |
-|-------------|----------------------------------------------------------------------------|
-| 400         | Invalid request (missing required fields or invalid action)                |
-| 401         | Invalid or missing `X-Atlantis-Token` header                               |
-| 403         | Repository not in allowed list                                             |
-| 409         | Remediation ran but all targeted projects failed                           |
-| 503         | API, drift remediation, or remediation apply is not enabled on the server  |
-| 500         | Internal error during remediation                                          |
+| Status Code | Description                                                                                             |
+|-------------|---------------------------------------------------------------------------------------------------------|
+| 400         | Invalid request (missing required fields or invalid action)                                             |
+| 401         | Invalid or missing `X-Atlantis-Token` header                                                            |
+| 403         | Repository not in allowed list                                                                          |
+| 409         | Remediation ran but all targeted projects failed                                                        |
+| 503         | API, drift remediation, or remediation apply is not enabled on the server, or Atlantis is shutting down |
+| 500         | Internal error during remediation                                                                       |
 
 ### POST /api/drift/detect
 
@@ -762,12 +766,12 @@ Before this field existed, `POST /api/drift/detect` only returned numeric drift 
 
 #### Error Responses
 
-| Status Code | Error Code          | Description                                          |
-|-------------|---------------------|------------------------------------------------------|
-| 400         | VALIDATION_ERROR    | Invalid request (missing required fields)            |
-| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header         |
-| 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server |
-| 500         | INTERNAL_ERROR      | Internal error during drift detection                |
+| Status Code | Error Code          | Description                                                                        |
+|-------------|---------------------|------------------------------------------------------------------------------------|
+| 400         | VALIDATION_ERROR    | Invalid request (missing required fields)                                          |
+| 401         | UNAUTHORIZED        | Invalid or missing `X-Atlantis-Token` header                                       |
+| 503         | SERVICE_UNAVAILABLE | Drift detection storage is not enabled on the server, or Atlantis is shutting down |
+| 500         | INTERNAL_ERROR      | Internal error during drift detection                                              |
 
 ### GET /api/drift/remediate
 
