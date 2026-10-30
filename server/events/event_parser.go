@@ -479,6 +479,9 @@ func (e *EventParser) parseCommonBitbucketCloudEventData(event bitbucketcloud.Co
 	user = models.User{
 		Username: *event.Actor.AccountID,
 	}
+	if event.Actor.UUID != nil {
+		user.ID = *event.Actor.UUID
+	}
 	return
 }
 

@@ -56,8 +56,6 @@ func New(httpClient *http.Client, username string, password string, apiUser stri
 	}
 }
 
-var MY_UUID = ""
-
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
 func (b *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
@@ -186,31 +184,33 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 	return pulls.Values, nil
 }
 
-func (b *Client) GetMyUUID() (uuid string, err error) {
-	if MY_UUID == "" {
-		path := fmt.Sprintf("%s/2.0/user", b.BaseURL)
-		resp, err := b.makeRequest("GET", path, nil)
-
-		if err != nil {
-			return uuid, err
-		}
-
-		var user User
-		if err := json.Unmarshal(resp, &user); err != nil {
-			return uuid, fmt.Errorf("parsing response %q: %w", string(resp), err)
-		}
-
-		if err := validator.New().Struct(user); err != nil {
-			return uuid, fmt.Errorf("response %q was missing a field: %w", string(resp), err)
-		}
-
-		uuid = *user.UUID
-		MY_UUID = uuid
-
-		return uuid, nil
-	} else {
-		return MY_UUID, nil
+// GetMyUUID looks up this client's account without sharing a global identity cache.
+func (b *Client) GetMyUUID() (string, error) {
+	resp, err := b.makeRequest(http.MethodGet, b.BaseURL+"/2.0/user", nil)
+	if err != nil {
+		return "", err
 	}
+	var user User
+	if err := json.Unmarshal(resp, &user); err != nil {
+		return "", fmt.Errorf("parsing current user: %w", err)
+	}
+	if user.UUID == nil || *user.UUID == "" {
+		return "", fmt.Errorf("current user uuid is missing")
+	}
+	return *user.UUID, nil
+}
+
+func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.ID == "" {
+		return false, nil
+	}
+	me, err := b.GetMyUUID()
+	if err != nil {
+		return false, err
+	}
+	// Username is an Atlassian account_id; compare the UUID supplied by
+	// both the webhook and the current-user API instead.
+	return strings.EqualFold(me, user.ID), nil
 }
 
 // PullIsApproved returns true if the merge request was approved.

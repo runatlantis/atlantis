@@ -175,6 +175,17 @@ func (c *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	return nil
 }
 
+func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	currentUser, _, err := c.giteaClient.GetMyUserInfo()
+	if err != nil {
+		return false, fmt.Errorf("getting current user: %w", err)
+	}
+	return currentUser != nil && currentUser.UserName != "" && currentUser.UserName == user.Username, nil
+}
+
 // HidePrevCommandComments hides the previous command comments from the pull
 // request.
 func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {

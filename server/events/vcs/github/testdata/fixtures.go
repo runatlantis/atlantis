@@ -429,6 +429,13 @@ func GithubAppTestServer(t *testing.T) (string, error) {
 				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
+			case "/api/v3/app":
+				if err := validateToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")); err != nil {
+					http.Error(w, "Invalid token", http.StatusForbidden)
+					return
+				}
+				w.Write([]byte(appJSON)) // nolint: errcheck
+				return
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
 				if err := validateToken(token); err != nil {
@@ -484,6 +491,13 @@ func GithubMultipleAppTestServer(t *testing.T) (string, error) {
 				appInfo := fmt.Sprintf(conversionJSON, encodedKey)
 				w.Write([]byte(appInfo)) // nolint: errcheck
 			// https://developer.github.com/v3/apps/#list-installations
+			case "/api/v3/app":
+				if err := validateToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")); err != nil {
+					http.Error(w, "Invalid token", http.StatusForbidden)
+					return
+				}
+				w.Write([]byte(appJSON)) // nolint: errcheck
+				return
 			case "/api/v3/app/installations":
 				token := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
 				if err := validateToken(token); err != nil {

@@ -129,16 +129,12 @@ func (c *AppCredentials) Client() (*http.Client, error) {
 
 // GetUser returns the username for these credentials.
 func (c *AppCredentials) GetUser() (string, error) {
-	// Keeping backwards compatibility since this flag is optional
-	if c.AppSlug == "" {
-		return "", nil
-	}
-
 	ctx := context.Background()
 
 	// GHE Cloud doesn't support the /apps/{slug} endpoint with installation
 	// tokens, so use the /app self-lookup which requires app-level JWT auth.
-	if isGHECloud(c.Hostname) {
+	// This also discovers the slug when the optional flag is not configured.
+	if c.AppSlug == "" || isGHECloud(c.Hostname) {
 		ghClient, err := c.newJWTClient()
 		if err != nil {
 			return "", fmt.Errorf("initializing JWT client: %w", err)
@@ -146,6 +142,9 @@ func (c *AppCredentials) GetUser() (string, error) {
 		app, _, err := ghClient.Apps.Get(ctx, "")
 		if err != nil {
 			return "", fmt.Errorf("getting app details: %w", err)
+		}
+		if app.GetSlug() == "" {
+			return "", fmt.Errorf("getting app details: missing app slug")
 		}
 		return fmt.Sprintf("%s[bot]", app.GetSlug()), nil
 	}
@@ -170,6 +169,9 @@ func (c *AppCredentials) GetUser() (string, error) {
 	}
 	// Currently there is no way to get the bot's login info, so this is a
 	// hack until Github exposes that.
+	if app.GetSlug() == "" {
+		return "", fmt.Errorf("getting app details: missing app slug")
+	}
 	return fmt.Sprintf("%s[bot]", app.GetSlug()), nil
 }
 
