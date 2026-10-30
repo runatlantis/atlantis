@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -177,7 +178,6 @@ const (
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
-	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -239,10 +239,9 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultAllowCommands,
 	},
 	BlockedExtraArgsFlag: {
-		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
 			"in comment extra args (the flags after '--'). " +
-			"Defaults to " + DefaultBlockedExtraArgs + ".",
-		defaultValue: DefaultBlockedExtraArgs,
+			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -999,9 +998,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
-	}
-	if c.BlockedExtraArgs == "" {
-		c.BlockedExtraArgs = DefaultBlockedExtraArgs
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy

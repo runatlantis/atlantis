@@ -165,7 +165,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		cc = append(cc, &events.CommentCommand{
 			Name:        cmdName,
 			ProjectName: path.ProjectName,
-			RepoRelDir:  strings.TrimRight(path.Directory, "/"),
+			RepoRelDir:  path.Directory,
 			Workspace:   path.Workspace,
 		})
 	}
@@ -384,9 +384,18 @@ type ListLocksResult struct {
 	Locks []LockDetail
 }
 
+// ListLocks returns the currently held project locks. When an API secret is
+// configured the request must carry it in X-Atlantis-Token: the /api/ prefix
+// is exempt from web basic auth, so without this check the lock metadata
+// (repo, path, PR, workspace, user) would be readable by anyone who can reach
+// the server. Deployments without an API secret keep the endpoint open.
 func (a *APIController) ListLocks(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
+
+	if len(a.APISecret) > 0 && !middleware.RequireAuth(w, r) {
+		return
+	}
 
 	locks, err := a.Locker.List()
 	if err != nil {
@@ -974,6 +983,7 @@ func updatePullStatusFromProjectResult(ctx *command.Context, result command.Proj
 			result.RepoRelDir == project.RepoRelDir &&
 			result.ProjectName == project.ProjectName {
 			project.Status = result.PlanStatus()
+			project.PlanHash = result.PlanHashAfterMerge(project.PlanHash)
 			return
 		}
 	}
@@ -999,6 +1009,7 @@ func seedPullStatusFromPlanResult(ctx *command.Context, result *command.Result) 
 				ProjectName:  projectResult.ProjectName,
 				PolicyStatus: projectResult.PolicyStatus(),
 				Status:       projectResult.PlanStatus(),
+				PlanHash:     projectResult.PlanHashAfterMerge(""),
 			})
 		case command.PolicyCheck, command.ApprovePolicies:
 			upsertProjectPolicyStatus(ctx.PullStatus, projectResult)
@@ -1045,6 +1056,7 @@ func upsertProjectStatus(pullStatus *models.PullStatus, status models.ProjectSta
 			status.RepoRelDir == project.RepoRelDir &&
 			status.ProjectName == project.ProjectName {
 			project.Status = status.Status
+			project.PlanHash = status.PlanHash
 			project.PolicyStatus = mergePolicyStatuses(project.PolicyStatus, status.PolicyStatus)
 			return
 		}
@@ -1102,10 +1114,24 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	// A workspace becomes a Terraform command argument, which Atlantis runs
 	// through `sh -c`, and a path component of the files it writes. Validate it
 	// the same way as a workspace named in a pull request comment.
-	for _, path := range request.Paths {
-		if err = valid.ValidateWorkspaceName(path.Workspace); err != nil {
-			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", path.Workspace, err)
+	//
+	// A directory becomes the repo-relative dir of the project. The project
+	// runner already confines it to the clone with utils.EnsureSubPath; reject
+	// absolute and parent-escaping paths here as well so a bad request fails at
+	// the API boundary with a clear error instead of deep inside command
+	// execution. Directory is optional, so an empty value is left alone.
+	for i, p := range request.Paths {
+		if err = valid.ValidateWorkspaceName(p.Workspace); err != nil {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid workspace %q: %w", p.Workspace, err)
 		}
+		if strings.TrimSpace(p.Directory) == "" {
+			continue
+		}
+		dir, ok := models.NormalizeAPIPath(p.Directory)
+		if !ok {
+			return nil, nil, http.StatusBadRequest, fmt.Errorf("invalid directory %q: directory must be a clean repo-relative path", p.Directory)
+		}
+		request.Paths[i].Directory = dir
 	}
 
 	VCSHostType, err := models.NewVCSHostType(request.Type)

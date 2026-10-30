@@ -4,6 +4,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -102,17 +103,9 @@ func (r *RunStepRunner) Run(
 	runner := models.NewShellCommandRunner(shell, command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
-	// These need to run before the error check to filter output
-	for _, processOutput := range postProcessOutput {
-		switch processOutput {
-		case valid.PostProcessRunOutputStripRefreshing:
-			output = StripRefreshingFromPlanOutput(output, tfVersion)
-		case valid.PostProcessRunOutputFilterRegexKey:
-			for _, filterRegexes := range postProcessFilterRegexes {
-				output = FilterRegexFromPlanOutput(output, filterRegexes)
-			}
-		}
-	}
+	// Post-process before the error check so that a failing command never
+	// carries output into the error that the step asked to hide or filter.
+	output = postProcessRunOutput(output, tfVersion, postProcessOutput, postProcessFilterRegexes)
 
 	if err != nil {
 		err = runStepError{
@@ -130,15 +123,41 @@ func (r *RunStepRunner) Run(
 		return "", err
 	}
 
+	return output, nil
+}
+
+// postProcessRunOutput applies the step's output options to the raw command
+// output. It is applied on both the success and the error path.
+func postProcessRunOutput(
+	output string,
+	tfVersion *version.Version,
+	postProcessOutput []valid.PostProcessRunOutputOption,
+	postProcessFilterRegexes []*regexp.Regexp,
+) string {
 	for _, processOutput := range postProcessOutput {
 		switch processOutput {
 		case valid.PostProcessRunOutputHide:
 			output = ""
-		default:
+		case valid.PostProcessRunOutputStripRefreshing:
+			output = StripRefreshingFromPlanOutput(output, tfVersion)
+		case valid.PostProcessRunOutputFilterRegexKey:
+			for _, filterRegex := range postProcessFilterRegexes {
+				output = FilterRegexFromPlanOutput(output, filterRegex)
+			}
 		}
 	}
+	return output
+}
 
-	return output, nil
+// hideRunStepErrorOutput returns err with the command output removed from any
+// runStepError it carries. Callers that need the raw output on success but
+// must not report it on failure use this instead of the hide option.
+func hideRunStepErrorOutput(err error) error {
+	if stepErr, ok := errors.AsType[runStepError](err); ok {
+		stepErr.output = ""
+		return stepErr
+	}
+	return err
 }
 
 type runStepError struct {

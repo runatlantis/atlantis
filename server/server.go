@@ -611,6 +611,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GitlabHostname:     userConfig.GitlabHostname,
+		GithubHostname:     userConfig.GithubHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -807,11 +808,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	cancellationTracker := events.NewCancellationTracker()
 
+	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
+	if err != nil {
+		return nil, err
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		VcsClient:        vcsClient,
-		Locker:           projectLocker,
-		LockURLGenerator: router,
-		Logger:           logger,
+		VcsClient:               vcsClient,
+		VarFileAllowlistChecker: varFileAllowlistChecker,
+		Locker:                  projectLocker,
+		LockURLGenerator:        router,
+		Logger:                  logger,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
@@ -972,6 +979,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
@@ -1012,11 +1020,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
-	if err != nil {
-		return nil, err
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
