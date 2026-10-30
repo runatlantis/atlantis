@@ -751,6 +751,7 @@ ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY=true
 ```
 
 Feature flag to enable ability to use `mergeable` mode with required apply status check.
+If the branch protection rule or ruleset requires conversation resolution, `atlantis apply` is still blocked until all review conversations are resolved.
 
 ### `--gh-app-id`
 
