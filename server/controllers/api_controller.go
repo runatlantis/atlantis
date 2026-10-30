@@ -786,7 +786,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *c
 				return nil, err
 			}
 
-			res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+			res := events.RunOneProjectCmdRecovering(a.ProjectPlanCommandRunner.Plan, cmd)
 			projectResults = append(projectResults, res)
 
 			a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
@@ -807,7 +807,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *c
 		return &command.Result{ProjectResults: append(projectResults, policyResult.ProjectResults...)}, nil
 	}
 	for _, cmd := range policyCmds {
-		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
+		res := events.RunOneProjectCmdRecovering(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
@@ -928,7 +928,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			return nil, err
 		}
 
-		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
+		res := events.RunOneProjectCmdRecovering(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 		if res.Error != nil || res.Failure != "" {
 			currentGroupHasErrors = true

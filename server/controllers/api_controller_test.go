@@ -345,6 +345,49 @@ func TestAPIController_PlanLaterPreWorkflowHookErrorRunsEarlierPostHooksAndUnloc
 	}
 }
 
+func TestAPIController_PlanRecoversFromProjectPanicAndUnlocks(t *testing.T) {
+	for _, parallelPlan := range []bool{false, true} {
+		t.Run(fmt.Sprintf("parallel=%t", parallelPlan), func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+				config.allowUnlockByPull = false
+			})
+			ac.ParallelPoolSize = 2
+			ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+			logger := logging.NewNoopLogger(t)
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					return ReturnValues{[]command.ProjectContext{{
+						CommandName:         command.Plan,
+						ProjectName:         args[1].(*events.CommentCommand).ProjectName,
+						ParallelPlanEnabled: parallelPlan,
+						Log:                 logger,
+					}}, nil}
+				})
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+				Then(func(args []Param) ReturnValues {
+					if args[0].(command.ProjectContext).ProjectName == "a" {
+						panic("boom")
+					}
+					return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"a", "b"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+
+			Equals(t, http.StatusInternalServerError, w.Code)
+			projectCommandRunner.VerifyWasCalled(Times(2)).Plan(Any[command.ProjectContext]())
+		})
+	}
+}
+
 func TestAPIController_PlanRunsParallelPolicyChecksConcurrently(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 	ac.ParallelPoolSize = 2
