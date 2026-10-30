@@ -114,6 +114,8 @@
     // security updates into it, and it is the only suite that still publishes
     // the Packages.gz index the deb datasource reads (trixie-updates and
     // trixie-security ship Packages.xz only).
+    // .github/workflows/update-debian-pins.yml covers trixie-security until
+    // Renovate reads Packages.xz (renovatebot/renovate#35865).
     {
       matchFileNames: ['Dockerfile'],
       matchDatasources: ['apk'],
