@@ -617,7 +617,7 @@ func (b *BoltDB) getPullFromBucket(bucket *bolt.Bucket, key []byte) (*models.Pul
 
 	var p models.PullStatus
 	if err := json.Unmarshal(serialized, &p); err != nil {
-		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, serialized, err)
+		return nil, fmt.Errorf("deserializing pull at %q: %w", key, err)
 	}
 	return &p, nil
 }
