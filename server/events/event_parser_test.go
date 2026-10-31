@@ -887,6 +887,7 @@ func TestParseBitbucketCloudCommentEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
+		ID:       "{bf34a99b-8a11-452c-8fbc-bdffc340e584}",
 		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 	Equals(t, "my comment", comment)
@@ -974,6 +975,7 @@ func TestParseBitbucketCloudPullEvent_ValidEvent(t *testing.T) {
 		},
 	}, headRepo)
 	Equals(t, models.User{
+		ID:       "{bf34a99b-8a11-452c-8fbc-bdffc340e584}",
 		Username: "557058:dc3817de-68b5-45cd-b81c-5c39d2560090",
 	}, user)
 }

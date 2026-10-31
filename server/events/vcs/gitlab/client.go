@@ -220,6 +220,17 @@ func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	return err
 }
 
+func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	currentUser, _, err := g.Client.Users.CurrentUser()
+	if err != nil {
+		return false, fmt.Errorf("getting current user: %w", err)
+	}
+	return currentUser != nil && currentUser.Username != "" && strings.EqualFold(currentUser.Username, user.Username), nil
+}
+
 func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
 	logger.Debug("Hiding previous command comments on GitLab merge request %d", pullNum)
 	var allComments []*gitlab.Note

@@ -152,6 +152,29 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 	return nil
 }
 
+func (g *Client) IsAtlantisUser(repo models.Repo, user models.User) (bool, error) {
+	if user.ID == "" {
+		return false, nil
+	}
+	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+	// Connection data identifies the PAT owner without requiring the user
+	// entitlement permissions used by the configured-user lookup for merging.
+	req, err := g.Client.NewRequest(http.MethodGet, url.PathEscape(owner)+"/_apis/connectionData", nil)
+	if err != nil {
+		return false, err
+	}
+	var connection struct {
+		AuthenticatedUser *azuredevops.IdentityRef `json:"authenticatedUser"`
+	}
+	if _, err := g.Client.Execute(g.ctx, req, &connection); err != nil {
+		return false, fmt.Errorf("getting authenticated user: %w", err)
+	}
+	if connection.AuthenticatedUser.GetID() == "" {
+		return false, errors.New("authenticated user id is missing")
+	}
+	return strings.EqualFold(connection.AuthenticatedUser.GetID(), user.ID), nil
+}
+
 // PullIsApproved returns true if the merge request was approved by another reviewer.
 // https://docs.microsoft.com/en-us/azure/devops/repos/git/branch-policies?view=azure-devops#require-a-minimum-number-of-reviewers
 func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {

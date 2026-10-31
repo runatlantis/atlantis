@@ -144,6 +144,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
 * Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
+* **Account**: **Read** also allows Atlantis to identify and ignore its own comments. For scoped API tokens, the equivalent permission is `read:user:bitbucket`. If the identity lookup fails, Atlantis logs a warning and continues normal command processing. In that case, its own comments may still be parsed as commands, including producing parsing errors.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)

@@ -397,7 +397,9 @@ func (e *VCSEventsController) HandleGiteaPullRequestCommentEvent(w http.Response
 	baseRepo, user, pullNum, _ := e.Parser.ParseGiteaIssueCommentEvent(event)
 	// Since we're lacking headRepo and maybePull details, we'll pass nil
 	// This follows the same approach as the GitHub client for handling comment events without full PR details
-	response := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, pullNum, event.Comment.Body, event.Comment.ID, models.Gitea)
+	// The parser already returns the comment author as user.
+	commentAuthor := user
+	response := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, commentAuthor, pullNum, event.Comment.Body, event.Comment.ID, models.Gitea)
 
 	e.respond(w, logging.Debug, http.StatusOK, "%s", response.body)
 }
@@ -429,7 +431,9 @@ func (e *VCSEventsController) HandleGithubCommentEvent(event *github.IssueCommen
 
 	// We pass in nil for maybeHeadRepo because the head repo data isn't
 	// available in the GithubIssueComment event.
-	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, pullNum, comment.GetBody(), comment.GetID(), models.Github)
+	// The parser already returns the comment author as user.
+	commentAuthor := user
+	return e.handleCommentEvent(logger, baseRepo, nil, nil, user, commentAuthor, pullNum, comment.GetBody(), comment.GetID(), models.Github)
 }
 
 // HandleBitbucketCloudCommentEvent handles comment events from Bitbucket.
@@ -439,7 +443,9 @@ func (e *VCSEventsController) HandleBitbucketCloudCommentEvent(w http.ResponseWr
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, -1, models.BitbucketCloud)
+	// The parser already returns the comment author as user.
+	commentAuthor := user
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, commentAuthor, pull.Num, comment, -1, models.BitbucketCloud)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -460,7 +466,9 @@ func (e *VCSEventsController) HandleBitbucketServerCommentEvent(w http.ResponseW
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull data: %s %s=%s", err, bitbucketCloudRequestIDHeader, reqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, pull.Num, comment, -1, models.BitbucketCloud)
+	// The parser already returns the comment author as user.
+	commentAuthor := user
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, &pull, user, commentAuthor, pull.Num, comment, -1, models.BitbucketCloud)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -656,7 +664,9 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing webhook: %s", err)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, event.MergeRequest.IID, event.ObjectAttributes.Note, int64(commentID), models.Gitlab)
+	// The parser already returns the comment author as user.
+	commentAuthor := user
+	resp := e.handleCommentEvent(e.Logger, baseRepo, &headRepo, nil, user, commentAuthor, event.MergeRequest.IID, event.ObjectAttributes.Note, int64(commentID), models.Gitlab)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
@@ -670,11 +680,19 @@ func (e *VCSEventsController) HandleGitlabCommentEvent(w http.ResponseWriter, ev
 	e.respond(w, lvl, code, "%s", msg)
 }
 
-func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user models.User, pullNum int, comment string, commentID int64, vcsHost models.VCSHostType) HTTPResponse {
+func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, baseRepo models.Repo, maybeHeadRepo *models.Repo, maybePull *models.PullRequest, user, commentAuthor models.User, pullNum int, comment string, commentID int64, vcsHost models.VCSHostType) HTTPResponse {
 	logger = logger.WithHistory(
 		"repo", baseRepo.FullName,
 		"pull", pullNum,
 	)
+
+	self, err := e.VCSClient.IsAtlantisUser(baseRepo, commentAuthor)
+	if err != nil {
+		logger.Warn("unable to check comment author %q, continuing command processing with error %q", commentAuthor.Username, err)
+	} else if self {
+		logger.Debug("ignoring comment authored by the atlantis account %q", commentAuthor.Username)
+		return HTTPResponse{body: "Ignoring comment authored by Atlantis"}
+	}
 
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
@@ -815,12 +833,15 @@ func (e *VCSEventsController) HandleAzureDevopsPullRequestCommentedEvent(w http.
 
 	createdBy := resource.PullRequest.GetCreatedBy()
 	user := models.User{Username: createdBy.GetUniqueName()}
+	// Use the comment author only for self-comment filtering.
+	author := resource.Comment.GetAuthor()
+	commentAuthor := models.User{ID: author.GetID(), Username: author.GetUniqueName()}
 	baseRepo, err := e.Parser.ParseAzureDevopsRepo(resource.PullRequest.GetRepository())
 	if err != nil {
 		e.respond(w, logging.Error, http.StatusBadRequest, "Error parsing pull request repository field: %s; %s", err, azuredevopsReqID)
 		return
 	}
-	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, resource.PullRequest.GetPullRequestID(), string(strippedComment), -1, models.AzureDevops)
+	resp := e.handleCommentEvent(e.Logger, baseRepo, nil, nil, user, commentAuthor, resource.PullRequest.GetPullRequestID(), string(strippedComment), -1, models.AzureDevops)
 
 	//TODO: move this to the outer most function similar to github
 	lvl := logging.Debug
