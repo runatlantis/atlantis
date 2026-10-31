@@ -27,6 +27,7 @@ type PullInfo struct {
 }
 
 type JobIDInfo struct {
+	PullRequestURL string
 	JobID          string
 	JobIDUrl       string
 	JobDescription string
@@ -42,6 +43,7 @@ type PullInfoWithJobIDs struct {
 
 type JobInfo struct {
 	PullInfo
+	PullRequestURL string
 	HeadCommit     string
 	JobDescription string
 	JobStep        string
@@ -145,7 +147,8 @@ func (p *AsyncProjectCommandOutputHandler) Send(ctx command.ProjectContext, msg 
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.JobID,
 		JobInfo: JobInfo{
-			HeadCommit: ctx.Pull.HeadCommit,
+			HeadCommit:     ctx.Pull.HeadCommit,
+			PullRequestURL: ctx.Pull.URL,
 			PullInfo: PullInfo{
 				PullNum:      ctx.Pull.Num,
 				Repo:         ctx.BaseRepo.Name,
@@ -165,7 +168,8 @@ func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowH
 	p.projectCmdOutput <- &ProjectCmdOutputLine{
 		JobID: ctx.HookID,
 		JobInfo: JobInfo{
-			HeadCommit: ctx.Pull.HeadCommit,
+			HeadCommit:     ctx.Pull.HeadCommit,
+			PullRequestURL: ctx.Pull.URL,
 			PullInfo: PullInfo{
 				PullNum:      ctx.Pull.Num,
 				Repo:         ctx.BaseRepo.Name,
@@ -197,6 +201,7 @@ func (p *AsyncProjectCommandOutputHandler) Handle() {
 		value, _ := p.pullToJobMapping.Load(msg.JobInfo.PullInfo)
 		jobMapping := value.(*sync.Map)
 		jobMapping.Store(msg.JobID, JobIDInfo{
+			PullRequestURL: msg.JobInfo.PullRequestURL,
 			JobID:          msg.JobID,
 			JobDescription: msg.JobInfo.JobDescription,
 			Time:           time.Now(),
