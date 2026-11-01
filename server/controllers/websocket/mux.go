@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/websocket"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -44,15 +43,8 @@ func checkOriginFunc(checkOrigin bool) func(r *http.Request) bool {
 }
 
 func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerator, registry PartitionRegistry, checkOrigin bool) *Multiplexor {
-	upgrader := websocket.Upgrader{
-		CheckOrigin: checkOriginFunc(checkOrigin),
-	}
 	return &Multiplexor{
-		writer: &Writer{
-			upgrader: upgrader,
-			log:      log,
-			pongWait: defaultPongWait,
-		},
+		writer:       NewWriter(log, checkOrigin),
 		keyGenerator: keyGenerator,
 		registry:     registry,
 	}

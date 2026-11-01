@@ -369,3 +369,22 @@ func testWriterClientDropRace(t *testing.T, mode string) {
 		t.Fatal("writer did not exit")
 	}
 }
+
+// NewWriter must honor checkOrigin; NewMultiplexor builds the shipped
+// Writer through it, so the writer tests exercise the production upgrader.
+func TestWriterCheckOriginRejectsCrossSiteRequest(t *testing.T) {
+	w := ws.NewWriter(logging.NewNoopLogger(t), true)
+	done := make(chan error, 1)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		done <- w.Write(rw, r, make(chan string))
+	}))
+	defer s.Close()
+	header := http.Header{"Origin": []string{"https://evil.example"}}
+	client, resp, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(s.URL, "http"), header)
+	if client != nil {
+		_ = client.Close()
+	}
+	Assert(t, errors.Is(err, websocket.ErrBadHandshake), "expected the handshake to be rejected, got %v", err)
+	Equals(t, http.StatusForbidden, resp.StatusCode)
+	ErrContains(t, "upgrading websocket connection", <-done)
+}

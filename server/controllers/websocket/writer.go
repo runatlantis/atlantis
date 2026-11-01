@@ -37,7 +37,6 @@ func NewWriter(log logging.SimpleLogging, checkOrigin bool) *Writer {
 	upgrader := websocket.Upgrader{
 		CheckOrigin: checkOriginFunc(checkOrigin),
 	}
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	return &Writer{
 		upgrader: upgrader,
 		log:      log,
