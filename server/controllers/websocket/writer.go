@@ -18,6 +18,12 @@ import (
 const (
 	writeTimeout          = 10 * time.Second
 	closeHandshakeTimeout = 2 * time.Second
+	// maxInboundMessageSize bounds a single data message from the client.
+	// Job logs are output-only; the only data a browser sends is what
+	// xterm's AttachAddon forwards from keystrokes and small pastes, which
+	// the server discards. Control frames are capped at 125 bytes by
+	// RFC 6455 5.5 and are not counted against this limit.
+	maxInboundMessageSize = 512
 )
 
 func NewWriter(log logging.SimpleLogging, checkOrigin bool) *Writer {
@@ -42,6 +48,9 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 	if err != nil {
 		return fmt.Errorf("upgrading websocket connection: %w", err)
 	}
+	// Gorilla replies Close(1009) and fails the read once a data message
+	// exceeds the limit, so an oversized message ends the connection.
+	conn.SetReadLimit(maxInboundMessageSize)
 	// Unlike Gorilla's default handler, preserve a failed Close reply so a
 	// transport failure is not mistaken for a completed closing handshake.
 	conn.SetCloseHandler(func(code int, _ string) error {

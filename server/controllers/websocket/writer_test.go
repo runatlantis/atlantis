@@ -130,7 +130,9 @@ func TestWriterPingAndInboundData(t *testing.T) {
 	f := newWriterFixture(t)
 	pong := ""
 	f.client.SetPongHandler(func(payload string) error { pong = payload; return nil })
-	Ok(t, f.client.WriteMessage(websocket.TextMessage, []byte(strings.Repeat("x", 64*1024))))
+	// xterm's AttachAddon forwards keystrokes and small pastes; they are
+	// discarded, but must not end the stream.
+	Ok(t, f.client.WriteMessage(websocket.TextMessage, []byte(strings.Repeat("x", 512))))
 	Ok(t, f.client.WriteControl(websocket.PingMessage, []byte("probe"), time.Now().Add(time.Second)))
 	// A client Close follows the Ping on the wire, so the read below must
 	// process the Pong before it sees the server's Close response.
@@ -139,6 +141,17 @@ func TestWriterPingAndInboundData(t *testing.T) {
 	Assert(t, websocket.IsCloseError(err, 1000), "expected Close(1000), got %v", err)
 	Equals(t, "probe", pong)
 	Ok(t, f.await(t))
+}
+
+// Job logs are output-only, so an oversized inbound message ends the
+// connection instead of being read and discarded.
+func TestWriterRejectsOversizedInboundMessage(t *testing.T) {
+	f := newWriterFixture(t)
+	Ok(t, f.client.WriteMessage(websocket.TextMessage, []byte(strings.Repeat("x", 513))))
+	_, _, err := f.client.ReadMessage()
+	Assert(t, websocket.IsCloseError(err, websocket.CloseMessageTooBig), "expected Close(1009), got %v", err)
+	err = f.await(t)
+	Assert(t, errors.Is(err, websocket.ErrReadLimit), "expected read limit error, got %v", err)
 }
 
 // A browser that loses its network or closes the lid drops TCP without a
