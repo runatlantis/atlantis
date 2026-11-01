@@ -59,20 +59,12 @@
       ],
     },
     {
-      ignorePaths: [
-        'testing/**',
+      matchFileNames: [
+        '!testing/**',
       ],
       groupName: 'github-',
       matchPackageNames: [
         '/github-actions/',
-      ],
-    },
-    {
-      ignorePaths: [
-        'server/controllers/events/testdata/**/*.tf',
-      ],
-      matchDatasources: [
-        'terraform',
       ],
     },
     {
@@ -118,16 +110,6 @@
         'https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64',
       ],
     },
-    // Include testdata files for go-github updates
-    {
-      "matchPackageNames": [
-        "github.com/google/go-github"
-      ],
-      "matchDatasources": [
-        "go"
-      ],
-      "ignorePaths": []
-    }
   ],
   customManagers: [
     // Dockerfile apk/apt pins. Alpine pins use the native `apk` datasource,
