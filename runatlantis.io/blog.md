@@ -24,6 +24,6 @@ We have a rich history of blog posts dating back to 2017. Here are some of our p
 
 We are excited to welcome new authors to our blog. Our diverse team brings a wealth of knowledge and experience to share with our readers. Stay tuned for fresh perspectives and in-depth articles on the latest trends and technologies.
 
-If you have any questions or topics you would like us to cover, feel free to reach out on [Slack](https://slack.cncf.io/). We are always looking to engage with our community and provide valuable content.
+If you have any questions or topics you would like us to cover, feel free to reach out on [Slack](https://cncf-slack.netlify.app/). We are always looking to engage with our community and provide valuable content.
 
 Happy reading!

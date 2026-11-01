@@ -109,7 +109,7 @@ const config = defineConfig({
             }
         },
         socialLinks: [
-          { icon: "slack", link: "https://slack.cncf.io/" },
+          { icon: "slack", link: "https://cncf-slack.netlify.app/" },
           { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
