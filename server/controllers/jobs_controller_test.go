@@ -27,9 +27,9 @@ func (staticJobKey) Generate(*http.Request) (string, error) { return "job", nil 
 // finishedJobRegistry behaves like a job whose output has already completed.
 type finishedJobRegistry struct{ exists bool }
 
-func (r finishedJobRegistry) IsKeyExists(string) bool         { return r.exists }
-func (finishedJobRegistry) Register(_ string, ch chan string) { close(ch) }
-func (finishedJobRegistry) Deregister(string, chan string)    {}
+func (r finishedJobRegistry) IsKeyExists(string) bool                            { return r.exists }
+func (finishedJobRegistry) Register(_ string, ch chan string, _ <-chan struct{}) { close(ch) }
+func (finishedJobRegistry) Deregister(string, chan string)                       {}
 
 func newJobsWSController(t *testing.T, jobExists bool) *controllers.JobsController {
 	t.Helper()

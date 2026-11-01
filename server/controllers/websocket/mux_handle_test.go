@@ -13,6 +13,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	ws "github.com/runatlantis/atlantis/server/controllers/websocket"
+	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/jobs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -28,7 +30,7 @@ type completedJob struct {
 
 func (j completedJob) IsKeyExists(string) bool { return j.exists }
 
-func (j completedJob) Register(_ string, output chan string) {
+func (j completedJob) Register(_ string, output chan string, _ <-chan struct{}) {
 	output <- "hook output"
 	close(output)
 }
@@ -81,6 +83,61 @@ func TestMultiplexorInvalidJob(t *testing.T) {
 			ErrContains(t, tc.want, err)
 			Assert(t, !ws.IsResponseCommitted(err), "pre-upgrade errors leave the response to the caller")
 		})
+	}
+}
+
+// gatedRegistry delays the backfill until the test opens the gate, so the
+// client can leave before the backfill fills the multiplexor's buffer.
+type gatedRegistry struct {
+	*jobs.AsyncProjectCommandOutputHandler
+	gate     chan struct{}
+	returned chan struct{}
+}
+
+func (r gatedRegistry) Register(key string, ch chan string, done <-chan struct{}) {
+	defer close(r.returned)
+	<-r.gate
+	r.AsyncProjectCommandOutputHandler.Register(key, ch, done)
+}
+
+// A tab closed mid-backfill must not leave Register blocked on a buffer
+// that nobody reads any more.
+func TestMultiplexorClientLeavesDuringBackfill(t *testing.T) {
+	output := make(chan *jobs.ProjectCmdOutputLine)
+	handler := jobs.NewAsyncProjectCommandOutputHandler(output, logging.NewNoopLogger(t)).(*jobs.AsyncProjectCommandOutputHandler)
+	go handler.Handle()
+	defer close(output)
+	const lines = 1500 // more than the multiplexor's 1000-slot buffer
+	for range lines {
+		handler.Send(command.ProjectContext{JobID: "job"}, "line", false)
+	}
+	for len(handler.GetProjectOutputBuffer("job").Buffer) < lines {
+		time.Sleep(time.Millisecond)
+	}
+
+	registry := gatedRegistry{handler, make(chan struct{}), make(chan struct{})}
+	mux := ws.NewMultiplexor(logging.NewNoopLogger(t), jobKey{}, registry, false)
+	handled := make(chan error, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		handled <- mux.Handle(rw, r)
+	}))
+	defer server.Close()
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	Ok(t, err)
+	defer client.Close()
+	Ok(t, client.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(1001, ""), time.Now().Add(time.Second)))
+	select {
+	case err := <-handled:
+		Ok(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("multiplexor did not finish after the client left")
+	}
+
+	close(registry.gate)
+	select {
+	case <-registry.returned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Register leaked: blocked on backfill after the client left")
 	}
 }
 

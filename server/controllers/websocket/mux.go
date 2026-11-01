@@ -20,7 +20,7 @@ type PartitionKeyGenerator interface {
 // PartitionRegistry is the registry holding each partition
 // and is responsible for registering/deregistering new buffers
 type PartitionRegistry interface {
-	Register(key string, buffer chan string)
+	Register(key string, buffer chan string, done <-chan struct{})
 	Deregister(key string, buffer chan string)
 	IsKeyExists(key string) bool
 }
@@ -91,8 +91,14 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 	buffer := make(chan string, 1000)
 
 	// spinning up a goroutine for this since we are attempting to block on the read side.
-	go m.registry.Register(key, buffer)
+	// Write can return before the buffer is drained (for example when the
+	// client leaves mid-backfill), so done lets Register stop instead of
+	// blocking on a buffer nobody reads. Defers run LIFO: done closes first,
+	// then Deregister removes a receiver registered before that.
+	done := make(chan struct{})
+	go m.registry.Register(key, buffer, done)
 	defer m.registry.Deregister(key, buffer)
+	defer close(done)
 
 	err = m.writer.Write(w, r, buffer)
 	if err != nil {
