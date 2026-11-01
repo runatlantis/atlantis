@@ -91,14 +91,14 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 			"yaml: construct errors: line 1: cannot construct !!str `slkjds` into",
 		},
 		{
-			"just a colon",
-			[]byte(":"),
-			"go-yaml load error in parser (while parsing a block mapping) at L1.C1: did not find expected key",
+			"mapping value in a scalar",
+			[]byte("a: b: c"),
+			"yaml: line 1: mapping values are not allowed in this context",
 		},
 		{
 			"invalid merge key from fuzzing",
 			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
-			"go-yaml load error in constructor at L1.C3: runtime error: hash of unhashable type []interface {}",
+			"go-yaml load error in constructor at L1.C3: cannot use '[]interface {}{\"foo\"}' as a map key; try decoding into yaml.Node",
 		},
 	}
 

@@ -59,7 +59,7 @@ require (
 	go.etcd.io/bbolt v1.4.3
 	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.1
-	go.yaml.in/yaml/v4 v4.0.0-rc.6
+	go.yaml.in/yaml/v4 v4.0.0-rc.7
 	golang.org/x/term v0.46.0
 	golang.org/x/text v0.42.0
 )

@@ -1346,7 +1346,7 @@ func TestExecute_ValidateLanguage(t *testing.T) {
 func TestExecute_ValidateLanguageConfigFileInvalid(t *testing.T) {
 	c := setupWithDefaults(map[string]any{
 		LanguageFlag:           "de",
-		LanguageConfigFileFlag: writeTempLanguageConfig(t, ":\n"),
+		LanguageConfigFileFlag: writeTempLanguageConfig(t, "a: b: c\n"),
 	}, t)
 	err := c.Execute()
 	if err == nil {

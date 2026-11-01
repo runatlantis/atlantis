@@ -63,7 +63,7 @@ func TestValidateCustomCatalog(t *testing.T) {
 	Ok(t, i18n.ValidateCustomCatalog(validPath))
 
 	invalidPath := filepath.Join(tmpDir, "invalid-language.yaml")
-	err = os.WriteFile(invalidPath, []byte(":\n"), 0o600)
+	err = os.WriteFile(invalidPath, []byte("a: b: c\n"), 0o600)
 	Ok(t, err)
 	err = i18n.ValidateCustomCatalog(invalidPath)
 	if err == nil {
