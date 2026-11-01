@@ -31,17 +31,8 @@
     ],
   },
   packageRules: [
-    // enable release branches for security updates
-    {
-      matchBaseBranches: [
-        '/^release-.*/',
-      ],
-      matchUpdateTypes: [
-        'security',
-      ],
-      enabled: true,
-    },
-    // disable release branches for anything else
+    // Disable release branches. Vulnerability-fix PRs still open there,
+    // because vulnerabilityAlerts.enabled overrides this rule.
     {
       matchBaseBranches: [
         '/^release-.*/',
@@ -99,7 +90,6 @@
         'go',
         'golang',
       ],
-      versioning: 'go',
       groupName: 'go',
     },
     {
