@@ -45,6 +45,6 @@ Esta era una oferta convincente frente a fundar yo solo una empresa alrededor de
 
 Atlantis ha sido una de mis pasiones durante casi dos años. Me importa profundamente el futuro del proyecto y de su comunidad, y sé que este cambio asegurará que ese futuro sea prometedor.
 
-Probablemente haya algunas preguntas que no he respondido en esta publicación, así que por favor no duden en ponerse en contacto, ya sea a través de [Twitter](https://twitter.com/lkysow) o en el [Slack de Atlantis](https://slack.cncf.io/).
+Probablemente haya algunas preguntas que no he respondido en esta publicación, así que por favor no duden en ponerse en contacto, ya sea a través de [Twitter](https://twitter.com/lkysow) o en el [Slack de Atlantis](https://cncf-slack.netlify.app/).
 
 Estoy entusiasmado por el futuro de Atlantis y de la colaboración con Terraform, y espero que ustedes también lo estén.
