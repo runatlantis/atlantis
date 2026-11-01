@@ -51,6 +51,7 @@ func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerato
 		writer: &Writer{
 			upgrader: upgrader,
 			log:      log,
+			pongWait: defaultPongWait,
 		},
 		keyGenerator: keyGenerator,
 		registry:     registry,

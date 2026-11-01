@@ -31,7 +31,7 @@ type writerFixture struct {
 	log    logging.SimpleLogging
 }
 
-func newWriterFixture(t *testing.T) *writerFixture {
+func newWriterFixture(t *testing.T, opts ...func(*ws.Writer)) *writerFixture {
 	t.Helper()
 	f := &writerFixture{
 		input: make(chan string, 10),
@@ -40,6 +40,9 @@ func newWriterFixture(t *testing.T) *writerFixture {
 	}
 	f.finish = sync.OnceFunc(func() { close(f.input) })
 	w := ws.NewWriter(f.log, false)
+	for _, opt := range opts {
+		opt(w)
+	}
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		f.err = w.Write(rw, r, f.input)
 		close(f.done)
@@ -141,6 +144,54 @@ func TestWriterPingAndInboundData(t *testing.T) {
 	Assert(t, websocket.IsCloseError(err, 1000), "expected Close(1000), got %v", err)
 	Equals(t, "probe", pong)
 	Ok(t, f.await(t))
+}
+
+const testPongWait = 200 * time.Millisecond
+
+func withTestPongWait(w *ws.Writer) { w.SetPongWait(testPongWait) }
+
+// A terraform phase with no output must not leave the connection silent:
+// idle-timeout load balancers would drop it while the job is still running.
+func TestWriterKeepsIdleConnectionAlive(t *testing.T) {
+	f := newWriterFixture(t, withTestPongWait)
+	var pings atomic.Int32
+	f.client.SetPingHandler(func(payload string) error {
+		pings.Add(1)
+		return f.client.WriteControl(websocket.PongMessage, []byte(payload), time.Now().Add(time.Second))
+	})
+	// Control frames are only handled while the client reads.
+	readErr := make(chan error, 1)
+	go func() {
+		_, _, err := f.client.ReadMessage()
+		readErr <- err
+	}()
+
+	select {
+	case <-f.done:
+		t.Fatalf("writer exited on an idle but responsive connection: %v", f.err)
+	case <-time.After(3 * testPongWait):
+	}
+	Assert(t, pings.Load() >= 2, "expected periodic pings, got %d", pings.Load())
+
+	f.finish()
+	Assert(t, websocket.IsCloseError(<-readErr, websocket.CloseNormalClosure), "expected a normal close")
+	Ok(t, f.await(t))
+}
+
+// A peer that vanishes without FIN never answers pings; the read deadline
+// must release the connection instead of holding it until the job ends.
+func TestWriterReleasesUnresponsivePeer(t *testing.T) {
+	f := newWriterFixture(t, withTestPongWait)
+	// The client never reads, so it never sees a ping or sends a pong.
+	select {
+	case <-f.done:
+	case <-time.After(5 * testPongWait):
+		t.Fatal("writer kept an unresponsive connection open")
+	}
+	Ok(t, f.err)
+	// The job is still running; the writer must not have consumed or closed input.
+	f.input <- "later output"
+	Equals(t, 1, len(f.input))
 }
 
 // Job logs are output-only, so an oversized inbound message ends the
