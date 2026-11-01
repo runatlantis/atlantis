@@ -92,6 +92,12 @@ you can append them to the end of the comment after `--`, ex.
 atlantis plan -d dir -- -var foo='bar'
 ```
 
+Flags that change where Terraform runs or writes files are not allowed after `--`: `-chdir`, `-plugin-dir`, `-out`, `-generate-config-out`, `-state`, `-state-out` and `-backup`, in any spelling, plus any flags listed in [--blocked-extra-args](server-configuration.md#blocked-extra-args). `-var-file` paths must be inside the repository or in a directory listed in [--var-file-allowlist](server-configuration.md#var-file-allowlist). The same rules apply to `apply`, `import` and `state rm`.
+
+::: warning Behavior change
+Previously, `atlantis plan -- -generate-config-out=FILE` could be used to generate configuration for `import` blocks. Now `-generate-config-out` is blocked in comments and fails with `flag "-generate-config-out=FILE" is not allowed in extra args`. Ask your Atlantis operator for a server-side workflow whose `plan` step sets `-generate-config-out` in `extra_args`.
+:::
+
 If you always need to append a certain flag, see [Custom Workflow Use Cases](custom-workflows.md#adding-extra-arguments-to-terraform-commands).
 
 ### Automatic Environment Variable Files
@@ -289,6 +295,7 @@ atlantis state [options] rm ADDRESS... -- [terraform state rm flags]
 
 Runs `terraform state rm` that matches the directory/project/workspace.
 This command discards the terraform plan result. After running `state rm` and before an apply, another `atlantis plan` must be run again.
+Because it changes state without a reviewed plan, `state rm` must satisfy both the project's `apply_requirements` and `import_requirements` (see [Command Requirements](command-requirements.md)).
 
 To allow the `state` command requires [--allow-commands](server-configuration.md#allow-commands) configuration.
 

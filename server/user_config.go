@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -175,12 +174,10 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	return allowCommands, nil
 }
 
-// ToBlockedExtraArgs parses BlockedExtraArgs into a slice of flag prefixes.
-// When BlockedExtraArgs is empty, events.DefaultBlockedExtraArgs is returned.
+// ToBlockedExtraArgs parses BlockedExtraArgs into the flags the operator
+// blocks in addition to events.DefaultBlockedExtraArgs, which the comment
+// parser always enforces. It returns nil when no extra flags are configured.
 func (u UserConfig) ToBlockedExtraArgs() []string {
-	if u.BlockedExtraArgs == "" {
-		return events.DefaultBlockedExtraArgs
-	}
 	var args []string
 	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
 		if trimmed := strings.TrimSpace(arg); trimmed != "" {

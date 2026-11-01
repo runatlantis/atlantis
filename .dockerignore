@@ -1,6 +1,5 @@
 *
 !cmd/
-!scripts/download-release.sh
 !server/
 !testdrive/
 !main.go

@@ -58,6 +58,10 @@ repos:
           description: Generating configs
 ```
 
+::: warning Treat the environment variables as untrusted data
+Values such as `HEAD_BRANCH_NAME`, `PULL_AUTHOR` and `COMMENT_ARGS` come from the pull request. Atlantis passes them to the hook as environment variables and never interpolates them into the command string, so a plain `$HEAD_BRANCH_NAME` in your command is safe: the shell does not re-parse an expanded value for command substitution. The protection is lost if the hook evaluates a value a second time, for example with `eval`, a nested `sh -c "... $HEAD_BRANCH_NAME"`, or by writing it into a script that is then executed. Avoid those patterns, and quote the variables as usual.
+:::
+
 ## Customizing the Shell
 
 By default, the command will be run using the 'sh' shell with an argument of '-c'. This

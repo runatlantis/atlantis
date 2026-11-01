@@ -79,45 +79,61 @@ Para habilitar los endpoints de API, se debe configurar `api-secret`.
 
 Ejecute [atlantis plan](using-atlantis.md#atlantis-plan) en el repositorio especificado.
 
+Los proyectos con [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) habilitado se planifican en paralelo, hasta [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) a la vez. En ese caso, los [pre workflow hooks](pre-workflow-hooks.md) de cada proyecto se ejecutan antes de que comience el primer plan, y los [post workflow hooks](post-workflow-hooks.md) se ejecutan después de que termine el último plan. De lo contrario, los hooks de cada proyecto se ejecutan justo antes y después de su propio plan.
+
 #### Parámetros
 
-| Name       | Type     | Required | Description                                        |
-| ---------- | -------- | -------- | -------------------------------------------------- |
-| Repository | string   | Yes      | Nombre del repositorio de Terraform                |
-| Ref        | string   | Yes      | Referencia Git, como un nombre de rama             |
-| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)             |
-| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el plan |
-| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el plan        |
-| PR         | int      | No       | Número de Pull Request                             |
+| Name       | Type     | Required | Description                                         |
+| ---------- | -------- | -------- | --------------------------------------------------- |
+| Repository | string   | Yes      | Nombre del repositorio de Terraform                 |
+| Ref        | string   | Yes      | Referencia de Git, como un nombre de rama           |
+| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)              |
+| Projects   | []string | No       | Lista de nombres de proyectos para ejecutar el plan |
+| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el plan         |
+| PR         | int      | No       | Número del Pull Request                             |
 
 ::: tip NOTE
 Se debe especificar al menos uno de `Projects` o `Paths`.
 :::
 
-::: tip Solicitudes de API sin PR
-Cuando `PR` se omite o se establece en `0`, Atlantis ejecuta la solicitud como un workflow sintético aislado sin PR. Los workflows sintéticos de API usan identidades de pull generadas para directorios de trabajo y locks, realizan checkout reforzado calificado por rama, omiten búsquedas de archivos modificados del pull request, fallan de forma cerrada ante denegación de la allowlist de equipos y ordenan los proyectos seleccionados por el orden de ejecución configurado.
+::: tip Solicitudes API sin PR
+Cuando `PR` se omite o se establece en `0`, Atlantis ejecuta la solicitud como un workflow sintético aislado sin PR. Los workflows sintéticos de API usan identidades de pull generadas para directorios de trabajo y locks, realizan checkout reforzado calificado por rama, omiten búsquedas de archivos modificados del pull request, fallan de forma cerrada en caso de denegación de allowlist de equipos, y ordenan los proyectos seleccionados por el orden de ejecución configurado.
 
-Para refs de tag, SHA de commit o refs ambiguas que no son de rama, proporcione `base_branch` para que Atlantis pueda verificar que el ref extraído es alcanzable desde la rama base prevista. Los nombres de rama como `main` o `feature/foo` se obtienen como `refs/heads/<branch>`.
+Para refs de tag, commit SHA o refs no ambiguas que no son de rama, proporcione `base_branch` para que Atlantis pueda verificar que la ref comprobada es alcanzable desde la rama base prevista. Los nombres de rama como `main` o `feature/foo` se obtienen como `refs/heads/<branch>`.
 :::
 
-::: tip Verificaciones de policy
-Cuando las verificaciones de policy están habilitadas y la selección de proyectos genera contextos `policy_check`, las solicitudes de API plan/apply ejecutan verificaciones de policy después de contextos plan exitosos. Las solicitudes de API apply con `apply_requirements: [policies_passed]` requieren estado de policy exitoso antes de aplicar.
+::: tip Verificaciones de políticas
+Cuando las verificaciones de políticas están habilitadas y la selección de proyectos genera contextos `policy_check`, las solicitudes API de plan/apply ejecutan verificaciones de políticas después de contextos de plan exitosos. Las solicitudes API de apply con `apply_requirements: [policies_passed]` requieren un estado de política exitoso antes de aplicar.
 :::
 
-::: tip Fase plan de API apply
-El endpoint de API apply ejecuta un plan antes de apply. Los errores a nivel de proyecto en esa fase previa a apply no omiten por sí mismos la fase apply para otros planes pendientes elegibles. El auto-apply de remediación de drift es más estricto y falla de forma cerrada cuando su plan previo a apply tiene errores.
+::: tip Fase de plan de API apply
+El endpoint API apply ejecuta un plan antes de apply. Los errores a nivel de proyecto en esa fase previa a apply no omiten por sí mismos la fase de apply para otros planes pendientes elegibles. El auto-apply de remediación de drift es más estricto y falla de forma cerrada cuando su plan previo a apply tiene errores.
 :::
 
 #### Path
 
 Similar a las [Options](using-atlantis.md#options) de `atlantis plan`. Path especifica qué directorio/workspace
-dentro del repositorio ejecutar el plan.
+ dentro del repositorio ejecutar el plan.
 Se debe especificar al menos uno de `Directory` o `Workspace`.
 
-| Name      | Type   | Required | Description                                                                                                                                            |
-| --------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Directory | string | No       | En qué directorio ejecutar plan relativo a la raíz del repo                                                                                            |
-| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces. |
+| Name      | Type   | Required | Description                                                                                                                                                               |
+| --------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Directory | string | No       | En qué directorio ejecutar plan relativo a la raíz del repositorio. Debe ser una ruta literal relativa al repositorio; vea [Directory validation](#directory-validation). |
+| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces.                    |
+
+##### Validación de directorio
+
+`Directory` debe ser una ruta literal relativa a la raíz del repositorio, como `.` o `modules/vpc`. Se limpia antes de usarla, por lo que `./modules/vpc/` se convierte en `modules/vpc`. Un `Directory` vacío es lo mismo que omitirlo. La solicitud se rechaza con HTTP 400 y un cuerpo `{ "error": "..." }` de nivel superior si `Directory` es absoluta (incluyendo un `/` solo), se resuelve fuera del repositorio mediante `..`, contiene una barra invertida, o contiene un carácter glob (`*`, `?`, `[`, `]`, `{`, `}`). La misma regla aplica a `POST /api/apply`.
+
+```json
+{
+  "error": "invalid directory \"/modules/vpc\": directory must be a clean repo-relative path"
+}
+```
+
+::: warning Cambio de comportamiento
+Anteriormente, a `Directory` solo se le quitaban las barras finales. Una barra inicial no se rechazaba: `/modules/vpc` se ejecutaba en `modules/vpc` bajo el clone pero no coincidía con el proyecto `atlantis.yaml` de ese directorio, por lo que se ejecutaba con la configuración predeterminada; un `/` solo significaba la raíz del repositorio; los patrones glob coincidían con proyectos configurados por patrón; y las rutas que escapaban del repositorio fallaban más tarde durante la ejecución. Ahora todo esto se rechaza por adelantado con HTTP 400 e `invalid directory "<value>": directory must be a clean repo-relative path`. Quite la barra inicial (`modules/vpc`), use `.` para la raíz del repositorio, y enumere explícitamente cada directorio de proyecto en lugar de usar un glob.
+:::
 
 #### Solicitud de ejemplo (con PR)
 
@@ -137,7 +153,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }'
 ```
 
-#### Solicitud de ejemplo (detección de drift - sin PR)
+#### Solicitud de ejemplo (Detección de Drift - Sin PR)
 
 Para workflows de detección de drift, omita el parámetro `PR`:
 
@@ -156,7 +172,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }'
 ```
 
-#### Respuesta de ejemplo (éxito)
+#### Respuesta de ejemplo (Éxito)
 
 ```json
 {
@@ -178,9 +194,9 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
 }
 ```
 
-#### Respuesta de ejemplo (error)
+#### Respuesta de ejemplo (Error)
 
-Cuando ocurre un error de solicitud/autenticación/configuración, el endpoint heredado devuelve un cuerpo de error de nivel superior:
+Cuando ocurre un error de solicitud/auth/setup, el endpoint heredado devuelve un cuerpo de error de nivel superior:
 
 ```json
 {
@@ -188,7 +204,7 @@ Cuando ocurre un error de solicitud/autenticación/configuración, el endpoint h
 }
 ```
 
-#### Respuesta de ejemplo (error de proyecto)
+#### Respuesta de ejemplo (Error de proyecto)
 
 Cuando ocurre un error a nivel de proyecto:
 
@@ -209,11 +225,11 @@ Cuando ocurre un error a nivel de proyecto:
 }
 ```
 
-::: tip Valores de estado de proyecto
+::: tip Valores de estado del proyecto
 
-* `success`: El comando del proyecto se completó con éxito
-* `error`: Ocurrió un error. Las respuestas heredadas de plan/apply conservan la forma JSON histórica del error Go: los valores `Error` no nulos del proyecto se codifican como `{}`, y los valores nulos se codifican como `null`.
-* `failed`: Ocurrió un fallo (verifique el campo `failure`)
+* `success`: El comando del proyecto se completó exitosamente
+* `error`: Ocurrió un error. Las respuestas heredadas de plan/apply conservan la forma histórica del JSON de error de Go: los valores `Error` de proyecto no nulos se codifican como `{}`, y los valores nulos se codifican como `null`.
+* `failed`: Ocurrió una falla (revise el campo `failure`)
 
 :::
 
@@ -223,16 +239,18 @@ Cuando ocurre un error a nivel de proyecto:
 
 Ejecute [atlantis apply](using-atlantis.md#atlantis-apply) en el repositorio especificado.
 
+El endpoint planifica primero los proyectos, de la misma manera que [`POST /api/plan`](#post-api-plan), luego los aplica un proyecto a la vez, incluso cuando [`parallel_apply`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) está habilitado.
+
 #### Parámetros
 
-| Name       | Type     | Required | Description                                         |
-| ---------- | -------- | -------- | --------------------------------------------------- |
-| Repository | string   | Yes      | Nombre del repositorio de Terraform                 |
-| Ref        | string   | Yes      | Referencia Git, como un nombre de rama              |
-| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)              |
-| Projects   | []string | No       | Lista de nombres de proyecto para ejecutar el apply |
-| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el apply        |
-| PR         | int      | No       | Número de Pull Request                              |
+| Name       | Type     | Required | Description                                          |
+| ---------- | -------- | -------- | ---------------------------------------------------- |
+| Repository | string   | Yes      | Nombre del repositorio de Terraform                  |
+| Ref        | string   | Yes      | Referencia de Git, como un nombre de rama            |
+| Type       | string   | Yes      | Tipo del proveedor VCS (Github/Gitlab)               |
+| Projects   | []string | No       | Lista de nombres de proyectos para ejecutar el apply |
+| Paths      | []Path   | No       | Rutas a los proyectos para ejecutar el apply         |
+| PR         | int      | No       | Número del Pull Request                              |
 
 ::: tip NOTE
 Se debe especificar al menos uno de `Projects` o `Paths`.
@@ -241,13 +259,13 @@ Se debe especificar al menos uno de `Projects` o `Paths`.
 #### Path
 
 Similar a las [Options](using-atlantis.md#options-1) de `atlantis apply`. Path especifica qué directorio/workspace
-dentro del repositorio ejecutar el apply.
+ dentro del repositorio ejecutar el apply.
 Se debe especificar al menos uno de `Directory` o `Workspace`.
 
-| Name      | Type   | Required | Description                                                                                                                                            |
-| --------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Directory | string | No       | En qué directorio ejecutar apply relativo a la raíz del repo                                                                                           |
-| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces. |
+| Name      | Type   | Required | Description                                                                                                                                                                |
+| --------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Directory | string | No       | En qué directorio ejecutar apply relativo a la raíz del repositorio. Debe ser una ruta literal relativa al repositorio; vea [Directory validation](#directory-validation). |
+| Workspace | string | No       | [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) del plan. Use `default` si no se usan Terraform workspaces.                     |
 
 #### Solicitud de ejemplo
 
@@ -267,7 +285,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 }'
 ```
 
-#### Respuesta de ejemplo (éxito)
+#### Respuesta de ejemplo (Éxito)
 
 ```json
 {
@@ -288,15 +306,15 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/apply' \
 ```
 
 ::: tip Formato de respuesta de error
-Las respuestas de error siguen el mismo formato heredado que el endpoint plan. Consulte el [ejemplo de respuesta de error de plan](#sample-response-error) para más detalles.
+Las respuestas de error siguen el mismo formato heredado que el endpoint de plan. Vea el [ejemplo de respuesta de error de plan](#sample-response-error) para más detalles.
 :::
 
 ## Detección y remediación de drift (Alpha)
 
-:::warning FUNCIÓN ALPHA - SUJETA A CAMBIOS
-Las APIs de detección de drift, estado de drift, remediación, historial de remediación y webhook de drift son funciones alpha. Sus campos de solicitud, esquemas de respuesta, semántica de almacenamiento, payloads de webhook y compuertas de seguridad pueden cambiar antes de que la función sea promovida a estable.
+:::warning ALPHA FEATURE - SUBJECT TO CHANGE
+Las APIs de detección de drift, estado de drift, remediación, historial de remediación y webhook de drift son características alpha. Sus campos de solicitud, esquemas de respuesta, semántica de almacenamiento, payloads de webhook y puertas de seguridad pueden cambiar antes de que la característica sea promovida a estable.
 
-La detección de drift ejecuta workflows de Terraform plan y puede ejecutar hooks configurados o pasos plan personalizados. La remediación apply destructiva requiere tanto `--enable-drift-detection` como `--enable-drift-remediation`.
+La detección de drift ejecuta workflows de Terraform plan y puede ejecutar hooks configurados o pasos de plan personalizados. El apply destructivo de remediación requiere tanto `--enable-drift-detection` como `--enable-drift-remediation`.
 :::
 
 ### POST /api/drift/remediate
@@ -305,7 +323,9 @@ La detección de drift ejecuta workflows de Terraform plan y puede ejecutar hook
 
 Ejecute remediación de drift en el repositorio especificado. Este endpoint le permite ejecutar operaciones solo de plan (para previsualizar la remediación) o auto-apply (para corregir automáticamente el drift) para proyectos con drift detectado.
 
-::: tip Prerrequisitos
+Los proyectos con [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) habilitado se planifican en paralelo, hasta [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) a la vez. El auto-apply sigue aplicando un proyecto a la vez.
+
+::: tip Requisitos previos
 
 * El almacenamiento de detección de drift debe estar habilitado en el servidor Atlantis
 * El repositorio debe estar en la lista de repositorios permitidos (si está configurada)
@@ -313,58 +333,58 @@ Ejecute remediación de drift en el repositorio especificado. Este endpoint le p
 :::
 
 ::: tip Orden del workflow
-`POST /api/drift/remediate` con `action: "plan"` (el valor predeterminado) ejecuta un plan fresco incluso sin datos de drift en caché — no requiere una llamada previa a `POST /api/drift/detect` — cuando se especifican `projects` o `paths`; una remediación sin alcance (ninguno establecido) todavía obtiene sus objetivos del drift en caché. Solo `action: "apply"` (o `drift_only: true`) requiere un registro de drift en caché para cada proyecto/ruta/workspace objetivo. Vea el tip "Cached Drift Required" más abajo.
+`POST /api/drift/remediate` con `action: "plan"` (el predeterminado) ejecuta un plan nuevo incluso sin datos de drift en caché — no requiere una llamada previa a `POST /api/drift/detect` — cuando se especifican `projects` o `paths`; una remediación sin alcance (ninguno establecido) todavía toma sus objetivos del drift en caché. Solo `action: "apply"` (o `drift_only: true`) requiere un registro de drift en caché para cada proyecto/path/workspace objetivo. Vea el tip "Cached Drift Required" más abajo.
 :::
 
 #### Parámetros
 
-| Name        | Type                 | Required    | Description                                                                             |
-| ----------- | -------------------- | ----------- | --------------------------------------------------------------------------------------- |
-| repository  | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                  |
-| ref         | string               | Yes         | Referencia Git (branch/tag/commit) a usar para la remediación                           |
-| base_branch | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia |
-| type        | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                      |
-| action      | string               | No          | Acción de remediación: `plan` (predeterminado) o `apply`                                |
-| projects    | []string             | No          | Lista de nombres de proyecto a remediar. Si está vacía, usa datos de detección de drift |
-| paths       | []DriftDetectionPath | No          | Lista de directorios/workspaces relativos al repo a remediar                            |
-| workspaces  | []string             | No          | Filtra la remediación a workspaces específicos                                          |
-| drift_only  | boolean              | No          | Si es true, remedia solo proyectos con drift detectado                                  |
+| Name        | Type                 | Required    | Description                                                                              |
+| ----------- | -------------------- | ----------- | ---------------------------------------------------------------------------------------- |
+| repository  | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                   |
+| ref         | string               | Yes         | Referencia de Git (rama/tag/commit) a usar para la remediación                           |
+| base_branch | string               | Conditional | Contexto de rama para filtros de rama de repo-config y comprobaciones de no divergencia  |
+| type        | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                       |
+| action      | string               | No          | Acción de remediación: `plan` (predeterminada) o `apply`                                 |
+| projects    | []string             | No          | Lista de nombres de proyectos a remediar. Si está vacía, usa datos de detección de drift |
+| paths       | []DriftDetectionPath | No          | Lista de directorios/workspaces relativos al repositorio a remediar                      |
+| workspaces  | []string             | No          | Filtra la remediación a workspaces específicos                                           |
+| drift_only  | boolean              | No          | Si es true, solo remedia proyectos con drift detectado                                   |
 
 El campo `paths` usa el mismo objeto `DriftDetectionPath` descrito en `POST /api/drift/detect`.
-Para la remediación, un selector path sin `workspace` apunta solo al workspace predeterminado de Terraform.
-Use el campo de nivel superior `workspaces` o valores `workspace` a nivel de path para remediar workspaces no predeterminados.
-Los selectores de proyecto para remediación son nombres de proyecto exactos. Los selectores de proyecto por expresión regular no son compatibles para la remediación; use nombres de proyecto explícitos o selectores path cuando apunte a múltiples proyectos.
-Los selectores path de la API son rutas literales normalizadas relativas al repo; los patrones glob como `envs/*` no son compatibles.
+Para remediación, un selector de path sin `workspace` apunta solo al workspace predeterminado de Terraform.
+Use el campo de nivel superior `workspaces` o los valores `workspace` a nivel de path para remediar workspaces no predeterminados.
+Los selectores de proyecto para remediación son nombres exactos de proyecto. Los selectores de proyecto con expresiones regulares no son compatibles para remediación; use nombres de proyecto explícitos o selectores de path cuando apunte a varios proyectos.
+Los selectores de path de API son rutas literales normalizadas relativas al repositorio; los patrones glob como `envs/*` no son compatibles.
 
 ::: tip Acciones
 
 * `plan`: Ejecuta un plan para previsualizar qué cambiaría (predeterminado, no destructivo)
-* `apply`: Ejecuta tanto plan como apply para corregir automáticamente el drift (destructivo). Esta acción requiere tanto `--enable-drift-detection` como `--enable-drift-remediation`, además de drift en caché con `has_drift: true` de una ejecución de detección previa para cada proyecto/path/workspace objetivo.
+* `apply`: Ejecuta tanto plan como apply para corregir automáticamente el drift (destructivo). Esta acción requiere tanto `--enable-drift-detection` como `--enable-drift-remediation`, además de drift en caché con `has_drift: true` de una ejecución de detección anterior para cada proyecto/path/workspace objetivo.
 
 :::
 
 ::: warning Requisitos de apply
-El apply de remediación de drift no omite los `apply_requirements` del repositorio. Los requisitos que necesitan estado de pull request, como `approved` o `mergeable`, fallan de forma cerrada para solicitudes de remediación sin PR. Use remediación solo de plan o workflows normales de PR para proyectos protegidos por esos requisitos.
+El apply de remediación de drift no omite `apply_requirements` del repositorio. Los requisitos que necesitan estado de pull request, como `approved` o `mergeable`, fallan de forma cerrada para solicitudes de remediación sin PR. Use remediación solo de plan o workflows normales de PR para proyectos protegidos por esos requisitos.
 :::
 
 ::: tip Webhooks
-El apply de remediación de drift no dispara webhooks heredados de `event: apply`. Use webhooks de drift para notificaciones del workflow de drift.
+El apply de remediación de drift no dispara webhooks heredados de `event: apply`. Use webhooks de drift para notificaciones de workflow de drift.
 :::
 
 ::: warning Requisitos de plan
-Las acciones solo de plan de remediación de drift y la detección de drift no omiten los `plan_requirements` de estado de PR. Los requisitos como `approved` o `mergeable` no pueden satisfacerse sin un pull request y fallan de forma cerrada.
+Las acciones solo de plan de remediación de drift y la detección de drift no omiten `plan_requirements` de estado de PR. Los requisitos como `approved` o `mergeable` no pueden satisfacerse sin un pull request y fallan de forma cerrada.
 :::
 
 ::: tip Seguridad de ref
-Cuando la remediación usa drift en caché para un ref mutable como `main`, Atlantis compara el commit del checkout actual con el commit que produjo el registro de drift en caché. Si el ref se ha movido, vuelva a ejecutar la detección de drift antes de usar `action: "apply"`.
+Cuando la remediación usa drift en caché para una ref móvil como `main`, Atlantis compara el commit actual del checkout con el commit que produjo el registro de drift en caché. Si la ref se movió, vuelva a ejecutar la detección de drift antes de usar `action: "apply"`.
 :::
 
-::: tip Cached Drift Required
+::: tip Se requiere drift en caché
 La remediación `action: "apply"` solo aplica registros de drift en caché con `has_drift: true` para el mismo repositorio, ref, `base_branch`, proyecto/path y workspace. Use `action: "plan"` para vistas previas sin caché, luego ejecute detección de drift antes de aplicar.
 :::
 
 ::: tip Contexto de rama
-Para refs de rama como `main`, `feature/foo` o `refs/heads/feature/foo`, Atlantis usa `ref` como el contexto de rama y obtiene el namespace de la rama explícitamente. Las refs bare ambiguas como `prod`, `latest`, `stable` o `v1.2.3` requieren `base_branch` pero aún se obtienen como nombres de rama. Para SHA de commit sin procesar y refs `refs/tags/...` explícitas, proporcione `base_branch` para que los filtros de rama de repo-config y las verificaciones de no divergencia se evalúen contra la rama prevista. Use la forma explícita `refs/tags/...` para tags.
+Para refs de rama como `main`, `feature/foo` o `refs/heads/feature/foo`, Atlantis usa `ref` como contexto de rama y obtiene explícitamente el namespace de rama. Las refs ambiguas desnudas como `prod`, `latest`, `stable` o `v1.2.3` requieren `base_branch` pero aun así se obtienen como nombres de rama. Para commit SHAs sin procesar y refs `refs/tags/...` explícitas, proporcione `base_branch` para que los filtros de rama de repo-config y las comprobaciones de no divergencia se evalúen contra la rama prevista. Use la forma explícita `refs/tags/...` para tags.
 :::
 
 #### Solicitud de ejemplo (solo plan)
@@ -399,7 +419,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 }'
 ```
 
-#### Solicitud de ejemplo (paths específicas)
+#### Solicitud de ejemplo (paths específicos)
 
 ```shell
 curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
@@ -416,7 +436,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 }'
 ```
 
-#### Respuesta de ejemplo (éxito)
+#### Respuesta de ejemplo (Éxito)
 
 ```json
 {
@@ -477,7 +497,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 }
 ```
 
-#### Respuesta de ejemplo (éxito de auto-apply)
+#### Respuesta de ejemplo (Éxito de auto-apply)
 
 ```json
 {
@@ -532,7 +552,7 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 }
 ```
 
-#### Respuesta de ejemplo (fallo parcial)
+#### Respuesta de ejemplo (Falla parcial)
 
 ```json
 {
@@ -579,17 +599,17 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 | --------- | ---------------------------------------------------- |
 | `pending` | La remediación está en cola pero aún no ha comenzado |
 | `running` | La remediación está actualmente en progreso          |
-| `success` | Todos los proyectos fueron remediados con éxito      |
-| `failed`  | Todos los proyectos fallaron la remediación          |
+| `success` | Todos los proyectos se remediaron exitosamente       |
+| `failed`  | Todos los proyectos fallaron en la remediación       |
 | `partial` | Algunos proyectos tuvieron éxito, algunos fallaron   |
 
 #### Respuestas de error
 
 | Status Code | Description                                                                     |
 | ----------- | ------------------------------------------------------------------------------- |
-| 400         | Solicitud no válida (faltan campos requeridos o acción no válida)               |
-| 401         | Encabezado `X-Atlantis-Token` no válido o faltante                              |
-| 403         | Repositorio no está en la lista permitida                                       |
+| 400         | Solicitud inválida (faltan campos requeridos o acción inválida)                 |
+| 401         | Encabezado `X-Atlantis-Token` inválido o faltante                               |
+| 403         | El repositorio no está en la lista permitida                                    |
 | 409         | La remediación se ejecutó pero todos los proyectos objetivo fallaron            |
 | 503         | API, remediación de drift o remediation apply no está habilitado en el servidor |
 | 500         | Error interno durante la remediación                                            |
@@ -598,11 +618,13 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate' \
 
 #### Descripción
 
-Dispare la detección de drift para proyectos en un repositorio. Este endpoint inicia una operación plan para detectar drift de infraestructura sin requerir un pull request. Los resultados se almacenan para su recuperación posterior a través de los endpoints de estado de drift.
+Dispare la detección de drift para proyectos en un repositorio. Este endpoint inicia una operación de plan para detectar drift de infraestructura sin requerir un pull request. Los resultados se almacenan para recuperación posterior a través de los endpoints de estado de drift.
 
-Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) están configurados (`event: drift`), las ejecuciones de detección exitosas envían notificaciones webhook automáticamente a canales de Slack y/o endpoints HTTP, incluidos resultados heartbeat sin drift.
+Los proyectos con [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) habilitado se planifican en paralelo, hasta [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) a la vez.
 
-::: tip Prerrequisitos
+Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detection-webhooks) están configurados (`event: drift`), las ejecuciones de detección exitosas envían automáticamente notificaciones por webhook a canales de Slack y/o endpoints HTTP, incluyendo resultados heartbeat sin drift.
+
+::: tip Requisitos previos
 
 * El almacenamiento de detección de drift debe estar habilitado en el servidor Atlantis (`--enable-drift-detection`)
 
@@ -613,8 +635,8 @@ Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detectio
 | Name                | Type                 | Required    | Description                                                                                              |
 | ------------------- | -------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
 | repository          | string               | Yes         | Nombre completo del repositorio (p. ej., `owner/repo`)                                                   |
-| ref                 | string               | Yes         | Referencia Git (branch/tag/commit) para verificar drift                                                  |
-| base_branch         | string               | Conditional | Contexto de rama para filtros de rama de repo-config y verificaciones de no divergencia                  |
+| ref                 | string               | Yes         | Referencia de Git (rama/tag/commit) para verificar drift                                                 |
+| base_branch         | string               | Conditional | Contexto de rama para filtros de rama de repo-config y comprobaciones de no divergencia                  |
 | type                | string               | Yes         | Tipo del proveedor VCS (`Github`/`Gitlab`/`Gitea`)                                                       |
 | projects            | []string             | No          | Lista de nombres de proyecto a verificar. Si está vacía, se verifican todos                              |
 | paths               | []DriftDetectionPath | No          | Lista de paths a verificar. Si está vacía, se usan nombres de proyecto                                   |
@@ -624,25 +646,25 @@ Cuando los [drift webhooks](sending-notifications-via-webhooks.md#drift-detectio
 
 | Name      | Type   | Required | Description                                                           |
 | --------- | ------ | -------- | --------------------------------------------------------------------- |
-| directory | string | Yes      | Ruta relativa al directorio Terraform                                 |
+| directory | string | Yes      | Ruta relativa al directorio de Terraform                              |
 | workspace | string | No       | Terraform workspace. Si se omite, se usa el workspace predeterminado. |
 
-Los selectores path son rutas literales normalizadas relativas al repo. Los patrones glob como `envs/*` no son compatibles.
+Los selectores de path son rutas literales normalizadas relativas al repositorio. Los patrones glob como `envs/*` no son compatibles.
 
 ::: tip NOTE
-Se debe especificar al menos uno de `projects` o `paths` para una detección dirigida. Si ambos están vacíos, la detección de drift puede escanear todos los proyectos descubiertos. `projects` y `paths` son mutuamente excluyentes para la detección de drift; use un tipo de selector por solicitud.
+Se debe especificar al menos uno de `projects` o `paths` para detección dirigida. Si ambos están vacíos, la detección de drift puede escanear todos los proyectos descubiertos. `projects` y `paths` son mutuamente excluyentes para la detección de drift; use un tipo de selector por solicitud.
 :::
 
 ::: tip Efectos secundarios de estado
-La detección de drift suprime los estados normales de commit de Atlantis para plan, verificación de policy, apply y hook. Las notificaciones webhook específicas de drift aún pueden enviarse para ejecuciones de detección exitosas, incluidos resultados heartbeat sin drift, cuando los drift webhooks están configurados.
+La detección de drift suprime los estados normales de commit de plan, verificación de políticas, apply y hooks de Atlantis. Las notificaciones por webhook específicas de drift aún pueden enviarse para ejecuciones de detección exitosas, incluyendo resultados heartbeat sin drift, cuando los drift webhooks están configurados.
 
-La detección de drift no ejecuta Terraform apply, pero sí ejecuta el ciclo de vida normal de plan. Los hooks previos al workflow configurados, workflows personalizados, pasos plan personalizados y comandos Terraform plan pueden ejecutarse del lado del servidor fuera del contexto de un pull request.
+La detección de drift no ejecuta Terraform apply, pero sí ejecuta el ciclo de vida normal de plan. Los pre-workflow hooks configurados, workflows personalizados, pasos personalizados de plan y comandos Terraform plan pueden ejecutarse del lado del servidor fuera del contexto de un pull request.
 
-La detección de drift no omite las allowlists de equipos. Si una allowlist de equipos configurada no puede autorizar la solicitud de API, la solicitud falla en lugar de escanear o reconciliar un conjunto vacío de proyectos. Los `plan_requirements` de estado de PR, como `approved` o `mergeable`, también fallan de forma cerrada para detección de drift sin PR.
+La detección de drift no omite las allowlists de equipo. Si una allowlist de equipo configurada no puede autorizar la solicitud API, la solicitud falla en lugar de escanear o reconciliar un conjunto vacío de proyectos. `plan_requirements` de estado de PR como `approved` o `mergeable` también fallan de forma cerrada para detección de drift sin PR.
 :::
 
 ::: tip Contexto de rama
-Para refs de rama como `main`, `feature/foo` o `refs/heads/feature/foo`, Atlantis usa `ref` como el contexto de rama y obtiene el namespace de la rama explícitamente. Las refs bare ambiguas como `prod`, `latest`, `stable` o `v1.2.3` requieren `base_branch` pero aún se obtienen como nombres de rama. Para SHA de commit sin procesar y refs `refs/tags/...` explícitas, proporcione `base_branch` para que los filtros de rama de repo-config y las verificaciones de no divergencia se evalúen contra la rama prevista. Use la forma explícita `refs/tags/...` para tags.
+Para refs de rama como `main`, `feature/foo` o `refs/heads/feature/foo`, Atlantis usa `ref` como contexto de rama y obtiene explícitamente el namespace de rama. Las refs ambiguas desnudas como `prod`, `latest`, `stable` o `v1.2.3` requieren `base_branch` pero aun así se obtienen como nombres de rama. Para commit SHAs sin procesar y refs `refs/tags/...` explícitas, proporcione `base_branch` para que los filtros de rama de repo-config y las comprobaciones de no divergencia se evalúen contra la rama prevista. Use la forma explícita `refs/tags/...` para tags.
 :::
 
 #### Solicitud de ejemplo
@@ -679,14 +701,14 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/drift/detect' \
 ```
 
 ::: tip Salida de plan
-Establezca `include_plan_output: true` en la solicitud para que la respuesta incluya `plan_output` para cada proyecto — el texto de Terraform plan para ese proyecto. Para el paso plan incorporado, esto típicamente está normalizado para renderizado diff; el contenido exacto depende del workflow configurado, ya que un paso `run` personalizado puede producir en su lugar salida arbitraria no normalizada. El valor predeterminado es `false`, ya que el texto del plan puede ser grande; cuando se omite o es `false`, `plan_output` no se incluye incluso para proyectos con un plan exitoso. También se omite cuando no hay salida de plan (por ejemplo, si el proyecto tuvo un error antes de que se ejecutara un plan). `plan_output` solo se devuelve alguna vez por esta respuesta detect; nunca se incluye en `GET /api/drift/status`, ya que nunca se persiste en el almacenamiento de drift.
+Establezca `include_plan_output: true` en la solicitud para que la respuesta incluya `plan_output` para cada proyecto — el texto de Terraform plan para ese proyecto. Para el paso de plan incorporado esto normalmente se normaliza para renderizado de diff; el contenido exacto depende del workflow configurado, ya que un paso personalizado `run` puede producir en su lugar salida arbitraria no normalizada. El valor predeterminado es `false`, ya que el texto del plan puede ser grande; cuando se omite o es `false`, `plan_output` no se incluye incluso para proyectos con un plan exitoso. También se omite cuando no hay salida de plan (por ejemplo, si el proyecto tuvo un error antes de que se ejecutara un plan). `plan_output` solo se devuelve alguna vez en esta respuesta de detect; nunca se incluye en `GET /api/drift/status`, ya que nunca se persiste en el almacenamiento de drift.
 :::
 
 ::: warning La salida de plan puede contener datos sensibles
-Antes de que este campo existiera, `POST /api/drift/detect` solo devolvía conteos numéricos de drift. Con `include_plan_output: true`, las respuestas pueden incluir valores de atributos de recursos y, para workflows de pasos `run` personalizados, salida arbitraria de comandos. El límite de autenticación del endpoint no cambia (el mismo token de API que otros endpoints de drift/remediación), por lo que esto no es una nueva brecha de autorización, pero la sensibilidad de los datos de la respuesta cambia materialmente cuando este campo está habilitado. Solo la redacción filter-regex del paso `run` (si está configurada) se aplica a la salida de plan; por lo demás, no se depura.
+Antes de que existiera este campo, `POST /api/drift/detect` solo devolvía conteos numéricos de drift. Con `include_plan_output: true`, las respuestas pueden incluir valores de atributos de recursos y, para workflows con paso `run` personalizado, salida arbitraria de comandos. El límite de autenticación del endpoint no cambia (el mismo token API que otros endpoints de drift/remediation), por lo que esto no es una nueva brecha de autorización, pero la sensibilidad de los datos de la respuesta cambia materialmente cuando este campo está habilitado. Solo la redacción filter-regex del paso `run` (si está configurada) se aplica a la salida del plan; por lo demás no se depura.
 :::
 
-#### Respuesta de ejemplo (éxito)
+#### Respuesta de ejemplo (Éxito)
 
 ```json
 {
@@ -742,8 +764,8 @@ Antes de que este campo existiera, `POST /api/drift/detect` solo devolvía conte
 
 | Status Code | Error Code          | Description                                                               |
 | ----------- | ------------------- | ------------------------------------------------------------------------- |
-| 400         | VALIDATION_ERROR    | Solicitud no válida (faltan campos requeridos)                            |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
+| 400         | VALIDATION_ERROR    | Solicitud inválida (faltan campos requeridos)                             |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` inválido o faltante                         |
 | 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
 | 500         | INTERNAL_ERROR      | Error interno durante la detección de drift                               |
 
@@ -751,10 +773,10 @@ Antes de que este campo existiera, `POST /api/drift/detect` solo devolvía conte
 
 #### Descripción
 
-Liste resultados de remediación para un repositorio. Devuelve una lista paginada de operaciones de remediación pasadas. Este es un endpoint autenticado que requiere el secreto de API.
+Liste los resultados de remediación para un repositorio. Devuelve una lista paginada de operaciones de remediación pasadas. Este es un endpoint autenticado que requiere el secreto de API.
 
-::: tip Prerrequisitos
-La detección de drift debe estar habilitada en el servidor Atlantis. El apply de remediación destructiva requiere adicionalmente `--enable-drift-remediation`.
+::: tip Requisitos previos
+La detección de drift debe estar habilitada en el servidor Atlantis. El apply destructivo de remediación adicionalmente requiere `--enable-drift-remediation`.
 :::
 
 #### Parámetros de consulta
@@ -847,7 +869,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 | Status Code | Error Code          | Description                                                               |
 | ----------- | ------------------- | ------------------------------------------------------------------------- |
 | 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`                                 |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` inválido o faltante                         |
 | 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
 | 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación                           |
 
@@ -857,18 +879,18 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate?repository=
 
 Obtenga un resultado de remediación específico por ID. Devuelve información detallada sobre una operación de remediación pasada, incluidos resultados por proyecto. Este es un endpoint autenticado que requiere el secreto de API.
 
-::: tip Prerrequisitos
-La detección de drift debe estar habilitada en el servidor Atlantis. El apply de remediación destructiva requiere adicionalmente `--enable-drift-remediation`.
+::: tip Requisitos previos
+La detección de drift debe estar habilitada en el servidor Atlantis. El apply destructivo de remediación adicionalmente requiere `--enable-drift-remediation`.
 :::
 
-#### Parámetros de ruta
+#### Parámetros de path
 
 | Name | Type   | Required | Description                              |
 | ---- | ------ | -------- | ---------------------------------------- |
 | id   | string | Yes      | El identificador único de la remediación |
 
 ::: tip ¿Qué ID?
-El `id` aquí es el campo `id` devuelto por una llamada previa a `POST /api/drift/remediate` — no el `detection_id`/`id` devuelto por `POST /api/drift/detect`. Las ejecuciones de detección y remediación se rastrean por separado, cada una con su propio espacio de ID. Para inspeccionar la salida de plan para una remediación, llame primero a `POST /api/drift/remediate` y use el `id` de su respuesta.
+El `id` aquí es el campo `id` devuelto por una llamada previa a `POST /api/drift/remediate` — no el `detection_id`/`id` devuelto por `POST /api/drift/detect`. Las ejecuciones de detección y remediación se rastrean por separado, cada una con su propio espacio de IDs. Para inspeccionar la salida del plan para una remediación, llame primero a `POST /api/drift/remediate` y use el `id` de su respuesta.
 :::
 
 #### Parámetros de consulta
@@ -941,26 +963,30 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/remediate/550e8400-e2
 | Status Code | Error Code          | Description                                                               |
 | ----------- | ------------------- | ------------------------------------------------------------------------- |
 | 400         | VALIDATION_ERROR    | Falta un parámetro requerido                                              |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante                        |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` inválido o faltante                         |
 | 403         | FORBIDDEN           | El repositorio no está en la allowlist                                    |
-| 404         | NOT_FOUND           | Resultado de remediación no encontrado                                    |
+| 404         | NOT_FOUND           | No se encontró el resultado de remediación                                |
 | 503         | SERVICE_UNAVAILABLE | El almacenamiento de detección de drift no está habilitado en el servidor |
 | 500         | INTERNAL_ERROR      | Error interno al recuperar datos de remediación                           |
 
 ## Otros endpoints
 
-La mayoría de los endpoints listados en esta sección no son destructivos y, por lo tanto, no requieren autenticación ni un token secreto especial. `GET /api/drift/status` es un endpoint autenticado de lectura de la API de drift y requiere `X-Atlantis-Token`.
+Los endpoints listados en esta sección no son destructivos, pero no están exentos de autenticación. `GET /api/locks` requiere `X-Atlantis-Token` siempre que un secreto API esté configurado en el servidor y permanece abierto solo cuando no hay ningún secreto configurado, porque el prefijo `/api/` no está cubierto por web basic auth. `GET /api/drift/status` es un endpoint autenticado de lectura de la API de drift y siempre requiere `X-Atlantis-Token`.
 
 ### GET /api/locks
 
 #### Descripción
 
-Liste los locks de proyecto actualmente mantenidos.
+Liste los locks de proyecto actualmente retenidos.
+
+::: warning Cambio de comportamiento
+Anteriormente, `GET /api/locks` devolvía la lista de locks a cualquier llamador, incluso cuando `--api-secret` estaba establecido. Ahora, cuando un secreto API está configurado, la solicitud debe enviarlo en el encabezado `X-Atlantis-Token`; sin secreto API configurado el endpoint permanece abierto. Actualice los scripts y dashboards que consultan este endpoint para enviar el encabezado. Un token faltante o incorrecto devuelve HTTP 401 con código de error `UNAUTHORIZED` y mensaje `invalid or missing API token`.
+:::
 
 #### Solicitud de ejemplo
 
 ```shell
-curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
+curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks' --header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>'
 ```
 
 #### Respuesta de ejemplo
@@ -983,7 +1009,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 }
 ```
 
-#### Respuesta de ejemplo (sin locks)
+#### Respuesta de ejemplo (Sin locks)
 
 ```json
 {
@@ -995,9 +1021,9 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/locks'
 
 #### Descripción
 
-Devuelva el estado de drift para un repositorio. Este endpoint proporciona resultados en caché de detección de drift de ejecuciones plan previas. La detección de drift debe estar habilitada en el servidor para que este endpoint funcione y requiere el token de API configurado.
+Devuelva el estado de drift para un repositorio. Este endpoint proporciona resultados en caché de detección de drift de ejecuciones de plan previas. La detección de drift debe estar habilitada en el servidor para que este endpoint funcione y requiere el token API configurado.
 
-::: tip Prerrequisitos
+::: tip Requisitos previos
 El almacenamiento de detección de drift debe estar habilitado en el servidor Atlantis. Si no está habilitado, este endpoint devuelve un error `503 Service Unavailable`.
 :::
 
@@ -1010,7 +1036,7 @@ El almacenamiento de detección de drift debe estar habilitado en el servidor At
 | project     | string | No       | Filtrar por nombre de proyecto                                            |
 | path        | string | No       | Filtrar por ruta literal normalizada del proyecto relativa al repositorio |
 | workspace   | string | No       | Filtrar por Terraform workspace                                           |
-| ref         | string | No       | Filtrar por referencia git                                                |
+| ref         | string | No       | Filtrar por referencia de git                                             |
 | base_branch | string | No       | Filtrar por el contexto de rama usado cuando se detectó drift             |
 
 #### Solicitud de ejemplo
@@ -1103,7 +1129,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/api/drift/status?repository=own
 | Status Code | Error Code          | Description                                             |
 | ----------- | ------------------- | ------------------------------------------------------- |
 | 400         | VALIDATION_ERROR    | Falta el parámetro requerido `repository`               |
-| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` no válido o faltante      |
+| 401         | UNAUTHORIZED        | Encabezado `X-Atlantis-Token` inválido o faltante       |
 | 403         | FORBIDDEN           | El repositorio no está en la allowlist                  |
 | 503         | SERVICE_UNAVAILABLE | La detección de drift no está habilitada en el servidor |
 | 500         | INTERNAL_ERROR      | Error interno al recuperar datos de drift               |
@@ -1134,7 +1160,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/status'
 
 #### Descripción
 
-Endpoint de vivacidad. Devuelve 200 si el proceso Atlantis está en ejecución. No verifica dependencias externas. Adecuado para sondas de vivacidad de Kubernetes.
+Endpoint de liveness. Devuelve 200 si el proceso de Atlantis está en ejecución. No verifica dependencias externas. Adecuado para probes de liveness de Kubernetes.
 
 #### Solicitud de ejemplo
 
@@ -1154,7 +1180,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/healthz'
 
 #### Descripción
 
-Endpoint de preparación. Devuelve 200 si el servidor está listo para manejar solicitudes, incluida la conectividad con dependencias externas (p. ej. Redis). Devuelve 503 si alguna dependencia es inalcanzable. Adecuado para sondas de preparación de Kubernetes.
+Endpoint de readiness. Devuelve 200 si el servidor está listo para manejar solicitudes, incluida la conectividad con dependencias externas (p. ej. Redis). Devuelve 503 si alguna dependencia es inalcanzable. Adecuado para probes de readiness de Kubernetes.
 
 #### Solicitud de ejemplo
 
@@ -1162,7 +1188,7 @@ Endpoint de preparación. Devuelve 200 si el servidor está listo para manejar s
 curl --request GET 'https://<ATLANTIS_HOST_NAME>/readyz'
 ```
 
-#### Respuesta de ejemplo (saludable)
+#### Respuesta de ejemplo (healthy)
 
 ```json
 {
@@ -1170,7 +1196,7 @@ curl --request GET 'https://<ATLANTIS_HOST_NAME>/readyz'
 }
 ```
 
-#### Respuesta de ejemplo (no saludable)
+#### Respuesta de ejemplo (unhealthy)
 
 Devuelve HTTP 503:
 
@@ -1183,4 +1209,4 @@ Devuelve HTTP 503:
 
 ### GET /debug/pprof
 
-Si `--enable-profiling-api` está establecido en true, agrega endpoints bajo esta ruta para exponer datos de profiling del servidor. Consulte [profiling Go programs](https://go.dev/blog/pprof) para más información.
+Si `--enable-profiling-api` se establece en true, agrega endpoints bajo esta ruta para exponer los datos de profiling del servidor. Consulte [profiling Go programs](https://go.dev/blog/pprof) para más información.

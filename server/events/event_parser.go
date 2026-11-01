@@ -350,12 +350,15 @@ type EventParsing interface {
 
 // EventParser parses VCS events.
 type EventParser struct {
-	GithubUser         string
-	GithubToken        string
-	GithubTokenFile    string
-	GitlabUser         string
-	GitlabToken        string
-	GitlabHostname     string
+	GithubUser      string
+	GithubToken     string
+	GithubTokenFile string
+	GitlabUser      string
+	GitlabToken     string
+	GitlabHostname  string
+	// GithubHostname is the configured GitHub host. When set, the clone URL
+	// of every GitHub repository parsed from a webhook must be on this host.
+	GithubHostname     string
 	GiteaUser          string
 	GiteaToken         string
 	AllowDraftPRs      bool
@@ -377,7 +380,7 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 			}
 			token = string(content)
 		}
-		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token, "")
+		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GithubUser, token, e.GithubHostname)
 	case models.Gitea:
 		return models.NewRepo(vcsHostType, repoFullName, cloneURL, e.GiteaUser, e.GiteaToken, "")
 	case models.Gitlab:
@@ -657,7 +660,7 @@ func (e *EventParser) ParseGithubRepo(ghRepo *github.Repository) (models.Repo, e
 		token = string(content)
 	}
 
-	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token, "")
+	return models.NewRepo(models.Github, ghRepo.GetFullName(), ghRepo.GetCloneURL(), e.GithubUser, token, e.GithubHostname)
 }
 
 // ParseGiteaRepo parses the response from the Gitea API endpoint that

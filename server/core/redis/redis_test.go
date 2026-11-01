@@ -1474,3 +1474,79 @@ func generateLocalhostCert() ([]byte, []byte, error) {
 	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	return certBytes, keyBytes, err
 }
+
+// The plan hash recorded by a plan result must survive the policy check and
+// apply-failure results that follow it, and must be dropped once the plan has
+// been applied or replaced; apply verifies the plan file against it.
+func TestPullStatus_PlanHashPreservedAcrossLaterResults(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	result := func(cmd command.Name, out command.ProjectCommandOutput) command.ProjectResult {
+		return command.ProjectResult{
+			Command:              cmd,
+			RepoRelDir:           ".",
+			Workspace:            "default",
+			ProjectName:          "projA",
+			ProjectCommandOutput: out,
+		}
+	}
+	const planHash = "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+
+	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Plan, command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{PlanHash: planHash}}),
+	})
+	Ok(t, err)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	status, err = rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.PolicyCheck, command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{}}),
+	})
+	Ok(t, err)
+	Equals(t, models.PassedPolicyCheckStatus, status.Projects[0].Status)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	stored, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, planHash, stored.Projects[0].PlanHash)
+
+	status, err = rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Apply, command.ProjectCommandOutput{Error: errors.New("apply failed")}),
+	})
+	Ok(t, err)
+	Equals(t, models.ErroredApplyStatus, status.Projects[0].Status)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	status, err = rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Apply, command.ProjectCommandOutput{ApplySuccess: "applied"}),
+	})
+	Ok(t, err)
+	Equals(t, models.AppliedPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].PlanHash)
+
+	const replanHash = "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+	status, err = rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Plan, command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{PlanHash: replanHash}}),
+	})
+	Ok(t, err)
+	Equals(t, replanHash, status.Projects[0].PlanHash)
+}
