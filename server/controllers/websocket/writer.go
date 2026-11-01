@@ -105,36 +105,48 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 			return closeReadError(readErr)
 		case <-ticker.C:
 			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
-				// The peer's Close was already answered; let the reader finish.
-				if errors.Is(err, websocket.ErrCloseSent) {
-					<-readDone
-					return closeReadError(readErr)
-				}
-				return fmt.Errorf("sending websocket ping: %w", err)
+				return resolveWriteError(conn, readDone, &readErr, fmt.Errorf("sending websocket ping: %w", err))
 			}
 		case msg, ok := <-input:
 			if !ok {
 				readerDone, err := w.sendClose(conn, readDone)
-				if err != nil || !readerDone {
-					// readErr is only safe to read once the reader has exited.
-					return err
+				if err != nil {
+					return resolveWriteError(conn, readDone, &readErr, err)
+				}
+				if !readerDone {
+					return nil // missing Close reply, already logged
 				}
 				return closeReadError(readErr)
 			}
 			if err := conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
-				return fmt.Errorf("setting websocket write deadline: %w", err)
+				return resolveWriteError(conn, readDone, &readErr, fmt.Errorf("setting websocket write deadline: %w", err))
 			}
 			if err := conn.WriteMessage(websocket.BinaryMessage, []byte("\r"+msg+"\n")); err != nil {
-				// WriteControl serializes Close against data writes and prevents
-				// further data frames once Close is sent, including a peer reply.
-				if errors.Is(err, websocket.ErrCloseSent) {
-					<-readDone
-					return closeReadError(readErr)
-				}
-				return fmt.Errorf("writing websocket message: %w", err)
+				return resolveWriteError(conn, readDone, &readErr, fmt.Errorf("writing websocket message: %w", err))
 			}
 		}
 	}
+}
+
+// resolveWriteError reports what a failed write actually means. When the
+// client drops the connection, the reader closes it and a concurrent write
+// fails with "use of closed network connection", possibly before readDone
+// is closed. Waiting for the reader and preferring its result makes the
+// outcome the client's disconnect instead of depending on scheduling.
+// readErr is read only after readDone is closed.
+func resolveWriteError(conn *websocket.Conn, readDone <-chan struct{}, readErr *error, writeErr error) error {
+	// ErrCloseSent: Close was already exchanged on the reader's side, so the
+	// reader is finishing on its own. Otherwise close the connection so a
+	// reader still blocked on a live peer returns.
+	if !errors.Is(writeErr, websocket.ErrCloseSent) {
+		_ = conn.Close()
+	}
+	<-readDone
+	readResult := closeReadError(*readErr)
+	if errors.Is(writeErr, websocket.ErrCloseSent) || readResult == nil {
+		return readResult
+	}
+	return writeErr
 }
 
 // readMessages discards client data without buffering whole messages in memory.

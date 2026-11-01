@@ -323,3 +323,49 @@ func testWriterWriteFailure(t *testing.T, mode string) {
 		_ = conn.Close()
 	}
 }
+
+// The client drops TCP just as the job finishes or prints a line. The
+// reader has already closed the connection, so the writer may see both its
+// input and readDone ready, or fail a write before readDone is closed. The
+// result must be the client's disconnect, never a scheduling-dependent
+// "use of closed network connection".
+func TestWriterClientDropRacesWithOutput(t *testing.T) {
+	for _, mode := range []string{"job done", "data"} {
+		t.Run(mode, func(t *testing.T) {
+			for range 50 {
+				testWriterClientDropRace(t, mode)
+			}
+		})
+	}
+}
+
+func testWriterClientDropRace(t *testing.T, mode string) {
+	t.Helper()
+	conn := &failingConn{closed: make(chan struct{})}
+	input := make(chan string, 1)
+	done := make(chan error, 1)
+	w := ws.NewWriter(logging.NewNoopLogger(t), false)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		done <- w.Write(failingResponseWriter{rw, conn}, r, input)
+	}))
+	defer s.Close()
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(s.URL, "http"), nil)
+	Ok(t, err)
+	Ok(t, client.Close()) // drop TCP without a Close frame
+	select {
+	case <-conn.closed: // the reader saw the drop and closed the server side
+	case <-time.After(5 * time.Second):
+		t.Fatal("reader did not close the connection after the client dropped")
+	}
+	if mode == "data" {
+		input <- "output"
+	} else {
+		close(input)
+	}
+	select {
+	case err := <-done:
+		Ok(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("writer did not exit")
+	}
+}
