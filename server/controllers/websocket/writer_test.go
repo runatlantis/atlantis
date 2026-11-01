@@ -28,13 +28,18 @@ type writerFixture struct {
 	done   chan struct{}
 	err    error
 	finish func()
+	log    logging.SimpleLogging
 }
 
 func newWriterFixture(t *testing.T) *writerFixture {
 	t.Helper()
-	f := &writerFixture{input: make(chan string, 10), done: make(chan struct{})}
+	f := &writerFixture{
+		input: make(chan string, 10),
+		done:  make(chan struct{}),
+		log:   logging.NewNoopLogger(t).WithHistory(),
+	}
 	f.finish = sync.OnceFunc(func() { close(f.input) })
-	w := ws.NewWriter(logging.NewNoopLogger(t), false)
+	w := ws.NewWriter(f.log, false)
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		f.err = w.Write(rw, r, f.input)
 		close(f.done)
@@ -136,19 +141,35 @@ func TestWriterPingAndInboundData(t *testing.T) {
 	Ok(t, f.await(t))
 }
 
+// A browser that loses its network or closes the lid drops TCP without a
+// Close frame. That is routine client behavior, not a server failure.
 func TestWriterAbruptDisconnect(t *testing.T) {
 	f := newWriterFixture(t)
 	Ok(t, f.client.Close())
-	Assert(t, f.await(t) != nil, "transport failure must not be reported as a clean close")
+	Ok(t, f.await(t))
 }
 
+func TestWriterConnectionReset(t *testing.T) {
+	f := newWriterFixture(t)
+	tcp, ok := f.client.UnderlyingConn().(*net.TCPConn)
+	Assert(t, ok, "expected a TCP connection, got %T", f.client.UnderlyingConn())
+	// Linger 0 makes Close send RST, like a proxy or LB cutting the socket.
+	Ok(t, tcp.SetLinger(0))
+	Ok(t, f.client.Close())
+	Ok(t, f.await(t))
+}
+
+// Every line was already written when the server starts the closing
+// handshake, so a missing reply leaves nothing to act on: warn, don't fail.
 func TestWriterCloseTimeout(t *testing.T) {
 	f := newWriterFixture(t)
 	f.client.SetCloseHandler(func(int, string) error { return nil })
 	f.finish()
 	_, _, err := f.client.ReadMessage()
 	Assert(t, websocket.IsCloseError(err, 1000), "expected Close(1000), got %v", err)
-	Assert(t, f.await(t) != nil, "missing Close reply must not be reported as a clean close")
+	Ok(t, f.await(t))
+	Assert(t, strings.Contains(f.log.GetHistory(), "[WARN] websocket close reply not received"),
+		"expected a warning, got log %q", f.log.GetHistory())
 	// Read the underlying transport because Gorilla remembers Close errors.
 	buf := make([]byte, 1)
 	_, err = f.client.UnderlyingConn().Read(buf)

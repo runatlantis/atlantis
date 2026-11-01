@@ -4,6 +4,7 @@
 package websocket
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -56,6 +57,21 @@ func NewMultiplexor(log logging.SimpleLogging, keyGenerator PartitionKeyGenerato
 	}
 }
 
+// responseCommittedError marks a failure that happened after the Writer took
+// over the HTTP response, either by writing the upgrade error itself or by
+// hijacking the connection.
+type responseCommittedError struct{ err error }
+
+func (e *responseCommittedError) Error() string { return e.err.Error() }
+func (e *responseCommittedError) Unwrap() error { return e.err }
+
+// IsResponseCommitted reports whether err came after the HTTP response was
+// already written or hijacked, so the caller must not write a response.
+func IsResponseCommitted(err error) bool {
+	var committed *responseCommittedError
+	return errors.As(err, &committed)
+}
+
 // Handle should be called for a given websocket request. It blocks
 // while writing to the websocket until the buffer is closed.
 func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
@@ -80,7 +96,7 @@ func (m *Multiplexor) Handle(w http.ResponseWriter, r *http.Request) error {
 
 	err = m.writer.Write(w, r, buffer)
 	if err != nil {
-		return fmt.Errorf("writing to ws %s: %w", key, err)
+		return &responseCommittedError{fmt.Errorf("writing to ws %s: %w", key, err)}
 	}
 	return nil
 }

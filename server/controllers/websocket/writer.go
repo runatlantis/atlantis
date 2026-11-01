@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -74,7 +75,9 @@ func (w *Writer) Write(rw http.ResponseWriter, r *http.Request, input chan strin
 			return closeReadError(readErr)
 		case msg, ok := <-input:
 			if !ok {
-				if err := sendClose(conn, readDone); err != nil {
+				readerDone, err := w.sendClose(conn, readDone)
+				if err != nil || !readerDone {
+					// readErr is only safe to read once the reader has exited.
 					return err
 				}
 				return closeReadError(readErr)
@@ -109,26 +112,39 @@ func readMessages(conn *websocket.Conn) error {
 }
 
 // sendClose starts a normal closing handshake and bounds the wait for a reply.
-// readDone indicates reader termination, not necessarily a successful handshake;
-// the caller must inspect the read error as well.
-func sendClose(conn *websocket.Conn, readDone <-chan struct{}) error {
+// It reports whether the reader exited, which indicates reader termination,
+// not necessarily a successful handshake; the caller must then inspect the
+// read error as well.
+// All output was written before the handshake starts, so a missing reply is
+// logged rather than returned: the server has nothing left to recover.
+func (w *Writer) sendClose(conn *websocket.Conn, readDone <-chan struct{}) (bool, error) {
 	msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	err := conn.WriteControl(websocket.CloseMessage, msg, time.Now().Add(writeTimeout))
 	if err != nil && !errors.Is(err, websocket.ErrCloseSent) {
-		return fmt.Errorf("sending websocket close: %w", err)
+		return false, fmt.Errorf("sending websocket close: %w", err)
 	}
 	timer := time.NewTimer(closeHandshakeTimeout)
 	defer timer.Stop()
 	select {
 	case <-readDone:
-		return nil
+		return true, nil
 	case <-timer.C:
-		return fmt.Errorf("waiting for websocket close reply: timeout")
+		w.log.Warn("websocket close reply not received within %s, closing connection", closeHandshakeTimeout)
+		return false, nil
 	}
 }
 
+// closeReadError reports only failures the server should act on. A client
+// that leaves cleanly, or vanishes without a Close frame (closed lid, lost
+// network, a proxy cutting the socket), is routine browser behavior.
+// Gorilla reports an unexpected EOF as CloseAbnormalClosure (1006).
 func closeReadError(err error) error {
-	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+	if websocket.IsCloseError(err,
+		websocket.CloseNormalClosure,
+		websocket.CloseGoingAway,
+		websocket.CloseNoStatusReceived,
+		websocket.CloseAbnormalClosure,
+	) || errors.Is(err, syscall.ECONNRESET) {
 		return nil
 	}
 	return fmt.Errorf("reading websocket message: %w", err)

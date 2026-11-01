@@ -79,6 +79,17 @@ func TestMultiplexorInvalidJob(t *testing.T) {
 			mux := ws.NewMultiplexor(logging.NewNoopLogger(t), jobKey{tc.keyErr}, completedJob{}, false)
 			err := mux.Handle(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 			ErrContains(t, tc.want, err)
+			Assert(t, !ws.IsResponseCommitted(err), "pre-upgrade errors leave the response to the caller")
 		})
 	}
+}
+
+func TestMultiplexorUpgradeFailureCommitsResponse(t *testing.T) {
+	registry := completedJob{exists: true, deregistered: make(chan struct{})}
+	mux := ws.NewMultiplexor(logging.NewNoopLogger(t), jobKey{}, registry, false)
+	rec := httptest.NewRecorder()
+	err := mux.Handle(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	ErrContains(t, "upgrading websocket connection", err)
+	Assert(t, ws.IsResponseCommitted(err), "the upgrader already wrote the response")
+	Equals(t, http.StatusBadRequest, rec.Code)
 }
