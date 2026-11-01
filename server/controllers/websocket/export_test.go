@@ -7,3 +7,6 @@ import "time"
 
 // SetPongWait shortens the keepalive timing so tests do not wait a minute.
 func (w *Writer) SetPongWait(d time.Duration) { w.pongWait = d }
+
+// CheckOriginFunc exposes checkOriginFunc to the external Multiplexor tests.
+var CheckOriginFunc = checkOriginFunc
