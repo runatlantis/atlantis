@@ -18,7 +18,7 @@ hero:
       link: /blog/2017/introducing-atlantis
     - theme: alt
       text: Join us on Slack
-      link: https://slack.cncf.io/
+      link: https://cncf-slack.netlify.app/
 
 features:
   - title: Fewer Mistakes
