@@ -1,0 +1,26 @@
+runatlantis.io/.vitepress/config.ts
+  h_9df9c32c3f321d 112
+runatlantis.io/blog.md
+  h_9df9c32c3f321d 27
+runatlantis.io/blog/2018/joining-hashicorp.md
+  h_9df9c32c3f321d 48
+runatlantis.io/es/blog.md
+  h_9df9c32c3f321d 27
+runatlantis.io/es/blog/2018/joining-hashicorp.md
+  h_9df9c32c3f321d 48
+runatlantis.io/es/index.md
+  h_9df9c32c3f321d 18
+runatlantis.io/index.md
+  h_9df9c32c3f321d 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9332a0d48826326629be846abf780a59bf854c3",
+  "prompts": {},
+  "humans": {
+    "h_9df9c32c3f321d": {
+      "author": "Rui Chen <rui@chenrui.dev>"
+    }
+  }
+}
