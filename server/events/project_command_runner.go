@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,6 +35,25 @@ type DirNotExistErr struct {
 // Error implements the error interface.
 func (d DirNotExistErr) Error() string {
 	return fmt.Sprintf("dir %q does not exist", d.RepoRelDir)
+}
+
+// checkProjectDir verifies that the project directory for ctx exists inside
+// repoDir once symlinks are resolved. A pull request can commit a symlink
+// named as the project directory whose target lies outside the clone, so a
+// lexical check alone is not enough. It returns DirNotExistErr when the
+// directory is missing so callers keep their existing behaviour.
+func checkProjectDir(ctx command.ProjectContext, repoDir, absPath string) error {
+	err := utils.EnsureSubPathResolved(repoDir, absPath)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, fs.ErrNotExist):
+		return DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	case errors.Is(err, utils.ErrPathEscapesBase):
+		return fmt.Errorf("project path traversal detected: %w", err)
+	default:
+		return fmt.Errorf("resolving project path: %w", err)
+	}
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_lock_url_generator.go LockURLGenerator
@@ -162,6 +182,10 @@ type JobURLSetter interface {
 	SetJobURLWithStatus(ctx command.ProjectContext, cmdName command.Name, status models.CommitStatus, res *command.ProjectCommandOutput) error
 }
 
+type DeferredPlanStatusPublisher interface {
+	PublishDeferredPlanStatuses([]command.ProjectContext, command.Result, models.CommitStatus)
+}
+
 type DeferredApplyStatusPublisher interface {
 	PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus)
 }
@@ -221,7 +245,7 @@ func (p *ProjectOutputWrapper) updateProjectPRStatus(commandName command.Name, c
 		return result
 	}
 
-	if commandName == command.Apply {
+	if commandName == command.Apply || (commandName == command.Plan && !ctx.API) {
 		return result
 	}
 
@@ -345,6 +369,21 @@ type DefaultProjectCommandRunner struct {
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
 	PlanStore                 runtime.PlanStore
+	// VarFileAllowlistChecker re-checks comment var-file arguments once the
+	// repository is cloned, so that a committed symlink cannot point a
+	// repository-relative path at a file outside the clone.
+	VarFileAllowlistChecker *VarFileAllowlistChecker
+}
+
+// checkVarFilesResolved rejects comment var-file arguments that resolve, with
+// symlinks in the cloned repository followed, to a file outside both the
+// repository and the allowlist. The comment parser already checked the paths
+// as written; this is the half of the check that needs the clone on disk.
+func (p *DefaultProjectCommandRunner) checkVarFilesResolved(ctx command.ProjectContext, repoDir, projAbsPath string) error {
+	if p.VarFileAllowlistChecker == nil || len(ctx.CommentArgs) == 0 {
+		return nil
+	}
+	return p.VarFileAllowlistChecker.CheckResolved(repoDir, projAbsPath, ctx.CommentArgs)
 }
 
 func (p *DefaultProjectCommandRunner) workingDirLockMetadata(ctx command.ProjectContext) WorkingDirLockMetadata {
@@ -579,23 +618,14 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		return nil, "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
 
 		// let's unlock here since something probably nuked our directory between the plan and policy check phase
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
 
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-
-		// let's unlock here since something probably nuked our directory between the plan and policy check phase
-		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
-			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
-		}
-
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", err
 	}
 
 	var failure string
@@ -833,17 +863,17 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 	}
 
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
+	if err := checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+		return nil, "", err
 	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
 		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
 			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
 		}
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+		return nil, "", err
 	}
 
 	// Validate requirements after refreshing the merge checkout so project path
@@ -869,13 +899,45 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
+	planHash, err := planStagePlanHash(ctx, projAbsPath)
+	if err != nil {
+		if unlockErr := lockAttempt.UnlockFn(); unlockErr != nil {
+			ctx.Log.Err("error unlocking state after plan error: %v", unlockErr)
+		}
+		return nil, "", errorWithStepOutput(err, outputs)
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
 		RePlanCmd:       ctx.RePlanCmd,
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,
+		PlanHash:        planHash,
 	}, "", nil
+}
+
+// planStagePlanHash hashes the convention plan file the built-in plan step
+// wrote so that apply can verify the file it is handed is the one produced
+// here. The hash is recorded with the project's plan status. A plan stage
+// without a built-in plan step manages its own plan file, so there is nothing
+// for Atlantis to bind and the hash is empty.
+func planStagePlanHash(ctx command.ProjectContext, absPath string) (string, error) {
+	if !hasAtlantisManagedPlanStep(ctx.Steps) {
+		return "", nil
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return "", err
+	}
+	planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("plan step did not write a plan file for dir %q workspace %q project %q", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName)
+		}
+		return "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+	}
+	return planHash, nil
 }
 
 func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (applyOut string, applyURL string, failure string, err error) {
@@ -894,11 +956,11 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-		return "", "", "", fmt.Errorf("project path traversal detected: %w", err)
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", "", "", err
 	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err := p.checkVarFilesResolved(ctx, repoDir, absPath); err != nil {
+		return "", "", "", err
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateApplyProject(repoDir, ctx)
@@ -935,22 +997,49 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 		return "", "", "", err
 	}
 
-	if p.ApplyPlanValidator != nil {
-		if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+	// Workflows assembled only from custom run steps manage their own plan
+	// artifact, so Atlantis cannot require or hash a convention plan file for
+	// them. Their durable plan state is still validated.
+	managedPlanFile := requiresManagedPlanFileForApply(ctx)
+	defaultApplyPlanValidator, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
+	if ctx.CommandName == command.Apply && managedPlanFile && usingDefaultApplyPlanValidator {
+		recordedHash, err := defaultApplyPlanValidator.RecordedPlanHash(ctx)
+		if err != nil {
 			return "", "", "", err
+		}
+		if recordedHash != "" {
+			// The plan step recorded this hash when it wrote the file. Bind
+			// the apply step to it rather than to whatever is on disk now, so
+			// a file replaced after planning fails the apply step's final
+			// check as well as the validation below.
+			ctx.ExpectedPlanHash = recordedHash
+		} else {
+			planPath, err := safePlanFilePath(ctx, absPath)
+			if err != nil {
+				return "", "", "", err
+			}
+			planHash, err := hashFile(runtime.GetPlanFileDir(ctx, absPath), planPath)
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
+				}
+			} else {
+				// No hash was recorded at plan time (status written by an
+				// older version, or a custom plan stage). Overwrite builder
+				// hash. Load may have replaced leftover disk.
+				ctx.ExpectedPlanHash = planHash
+			}
 		}
 	}
-	_, usingDefaultApplyPlanValidator := p.ApplyPlanValidator.(*DefaultApplyPlanValidator)
-	if ctx.CommandName == command.Apply && ctx.ExpectedPlanHash == "" && usingDefaultApplyPlanValidator {
-		planPath, err := safePlanFilePath(ctx, absPath)
-		if err != nil {
+
+	if p.ApplyPlanValidator != nil {
+		if managedPlanFile {
+			if err := p.ApplyPlanValidator.ValidateProjectPlan(ctx, absPath); err != nil {
+				return "", "", "", err
+			}
+		} else if err := p.ApplyPlanValidator.ValidateProjectPlanStatus(ctx); err != nil {
 			return "", "", "", err
 		}
-		planHash, err := hashFile(absPath, planPath)
-		if err != nil {
-			return "", "", "", fmt.Errorf("hashing plan file for dir %q workspace %q project %q: %w", ctx.RepoRelDir, ctx.Workspace, ctx.ProjectName, err)
-		}
-		ctx.ExpectedPlanHash = planHash
 	}
 
 	if err := ValidateNonPRAPIRefUnchanged(ctx, repoDir); err != nil {
@@ -998,11 +1087,8 @@ func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (ver
 		return "", "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := utils.EnsureSubPath(repoDir, absPath); err != nil {
-		return "", "", fmt.Errorf("project path traversal detected: %w", err)
-	}
-	if _, err = os.Stat(absPath); os.IsNotExist(err) {
-		return "", "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", "", err
 	}
 
 	// Acquire internal lock for the directory we're going to operate in.
@@ -1027,11 +1113,11 @@ func (p *DefaultProjectCommandRunner) doImport(ctx command.ProjectContext) (out 
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	if err = checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
 
 	failure, err = p.CommandRequirementHandler.ValidateImportProject(repoDir, ctx)
@@ -1076,11 +1162,16 @@ func (p *DefaultProjectCommandRunner) doStateRm(ctx command.ProjectContext) (out
 		return nil, "", cloneErr
 	}
 	projAbsPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err = utils.EnsureSubPath(repoDir, projAbsPath); err != nil {
-		return nil, "", fmt.Errorf("project path traversal detected: %w", err)
+	if err = checkProjectDir(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
-	if _, err = os.Stat(projAbsPath); os.IsNotExist(err) {
-		return nil, "", DirNotExistErr{RepoRelDir: ctx.RepoRelDir}
+
+	failure, err = p.CommandRequirementHandler.ValidateStateRmProject(repoDir, ctx)
+	if failure != "" || err != nil {
+		return nil, failure, err
+	}
+	if err := p.checkVarFilesResolved(ctx, repoDir, projAbsPath); err != nil {
+		return nil, "", err
 	}
 
 	// Acquire Atlantis lock for this repo/dir/workspace.
@@ -1200,4 +1291,34 @@ func getMissingPolicySetNames(policySets []valid.PolicySet, receivedCount int) [
 		missing = append(missing, policySets[i].Name)
 	}
 	return missing
+}
+
+// requiresManagedPlanFileForApply reports whether this apply must consume the
+// Atlantis convention plan artifact. It fails closed: the steps being executed
+// are authoritative, so a context that never had
+// RequiresAtlantisManagedPlanFile populated still validates the plan file when a
+// built-in apply step will read it.
+func requiresManagedPlanFileForApply(ctx command.ProjectContext) bool {
+	return ctx.RequiresAtlantisManagedPlanFile || hasAtlantisManagedApplyStep(ctx.Steps)
+}
+
+func (p *ProjectOutputWrapper) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	for _, res := range result.ProjectResults {
+		if res.Command != command.Plan || res.PlanSuccess == nil || res.Error != nil || res.Failure != "" {
+			continue
+		}
+		for _, ctx := range projectCmds {
+			if ctx.CommandName != command.Plan || ctx.RepoRelDir != res.RepoRelDir || ctx.Workspace != res.Workspace || ctx.ProjectName != res.ProjectName || ctx.SuppressVCSStatus {
+				continue
+			}
+			output := res.ProjectCommandOutput
+			if result.Error != nil {
+				output = command.ProjectCommandOutput{Error: result.Error}
+			}
+			if err := p.JobURLSetter.SetJobURLWithStatus(ctx, command.Plan, status, &output); err != nil {
+				ctx.Log.Err("updating project PR status: %s", err)
+			}
+			break
+		}
+	}
 }

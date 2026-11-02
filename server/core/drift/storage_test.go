@@ -37,6 +37,31 @@ func TestInMemoryStorage_Store(t *testing.T) {
 	Equals(t, projectDrift.ProjectName, results[0].ProjectName)
 }
 
+func TestInMemoryStorage_StoreStripsPlanOutput(t *testing.T) {
+	storage := drift.NewInMemoryStorage()
+
+	projectDrift := models.ProjectDrift{
+		ProjectName: "test-project",
+		Path:        "modules/vpc",
+		Workspace:   "default",
+		Ref:         "main",
+		Drift: models.DriftSummary{
+			HasDrift: true,
+			ToAdd:    2,
+		},
+		PlanOutput:  "Terraform will perform the following actions:\n  # aws_vpc.main will be updated in-place",
+		LastChecked: time.Now(),
+	}
+
+	err := storage.Store("owner/repo", projectDrift)
+	Ok(t, err)
+
+	results, err := storage.Get("owner/repo", drift.GetOptions{})
+	Ok(t, err)
+	Equals(t, 1, len(results))
+	Equals(t, "", results[0].PlanOutput)
+}
+
 func TestInMemoryStorage_StoreOverwrite(t *testing.T) {
 	storage := drift.NewInMemoryStorage()
 

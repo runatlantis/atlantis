@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/hashicorp/go-version"
 	"github.com/mitchellh/go-homedir"
 	tally "github.com/uber-go/tally/v4"
 	prometheus "github.com/uber-go/tally/v4/prometheus"
@@ -545,10 +546,11 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
-		DataDir:          userConfig.DataDir,
-		CheckoutMerge:    userConfig.CheckoutStrategy == "merge",
-		CheckoutDepth:    userConfig.CheckoutDepth,
-		GithubAppEnabled: githubAppEnabled,
+		DataDir:           userConfig.DataDir,
+		LocalSharePlanDir: userConfig.SharePlanDir,
+		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
+		CheckoutDepth:     userConfig.CheckoutDepth,
+		GithubAppEnabled:  githubAppEnabled,
 	}
 
 	scheduledExecutorService := scheduled.NewExecutorService(
@@ -604,6 +606,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		GitlabUser:         userConfig.GitlabUser,
 		GitlabToken:        userConfig.GitlabToken,
 		GitlabHostname:     userConfig.GitlabHostname,
+		GithubHostname:     userConfig.GithubHostname,
 		GiteaUser:          userConfig.GiteaUser,
 		GiteaToken:         userConfig.GiteaToken,
 		AllowDraftPRs:      userConfig.PlanDrafts,
@@ -632,14 +635,33 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		allowCommands,
 		userConfig.ToBlockedExtraArgs(),
 	)
-	defaultTfDistribution := terraformClient.DefaultDistribution()
-	defaultTfVersion := terraformClient.DefaultVersion()
-	pendingPlanFinder := &events.DefaultPendingPlanFinder{}
+	defaultTfDistribution := distribution
+	terraformBinDir := binDir
+
+	var defaultTfVersion *version.Version
+	if userConfig.DefaultTFVersion != "" {
+		defaultTfVersion, err = version.NewVersion(userConfig.DefaultTFVersion)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if terraformClient != nil {
+		defaultTfDistribution = terraformClient.DefaultDistribution()
+		defaultTfVersion = terraformClient.DefaultVersion()
+		terraformBinDir = terraformClient.TerraformBinDir()
+	}
+
+	pendingPlanFinder := &events.DefaultPendingPlanFinder{
+		Log:               logger,
+		DataDir:           userConfig.DataDir,
+		LocalSharePlanDir: userConfig.SharePlanDir,
+	}
 	runStepRunner := &runtime.RunStepRunner{
 		TerraformExecutor:       terraformClient,
 		DefaultTFDistribution:   defaultTfDistribution,
 		DefaultTFVersion:        defaultTfVersion,
-		TerraformBinDir:         terraformClient.TerraformBinDir(),
+		TerraformBinDir:         terraformBinDir,
 		ProjectCmdOutputHandler: projectCmdOutputHandler,
 	}
 	drainer := &events.Drainer{}
@@ -694,7 +716,14 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			return nil, fmt.Errorf("unsupported plan store type %q", psCfg.Type)
 		}
 	} else {
-		planStore = &runtime.LocalPlanStore{}
+		local := &runtime.LocalPlanStore{}
+		// A plan store dir outside the data dir survives the loss of a
+		// checkout, so plans there can be recovered after a restart even
+		// without an external store.
+		if userConfig.SharePlanDir != "" && filepath.Clean(userConfig.SharePlanDir) != filepath.Clean(userConfig.DataDir) {
+			local.SeparatePlanDir = userConfig.SharePlanDir
+		}
+		planStore = local
 	}
 
 	deleteLockCommand.PlanStore = planStore
@@ -740,6 +769,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		terraformClient,
 		planStore,
+		userConfig.SharePlanDir,
 	)
 
 	showStepRunner, err := runtime.NewShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion)
@@ -773,11 +803,17 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 
 	cancellationTracker := events.NewCancellationTracker()
 
+	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
+	if err != nil {
+		return nil, err
+	}
+
 	projectCommandRunner := &events.DefaultProjectCommandRunner{
-		VcsClient:        vcsClient,
-		Locker:           projectLocker,
-		LockURLGenerator: router,
-		Logger:           logger,
+		VcsClient:               vcsClient,
+		VarFileAllowlistChecker: varFileAllowlistChecker,
+		Locker:                  projectLocker,
+		LockURLGenerator:        router,
+		Logger:                  logger,
 		InitStepRunner: &runtime.InitStepRunner{
 			TerraformExecutor:     terraformClient,
 			DefaultTFDistribution: defaultTfDistribution,
@@ -938,6 +974,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
+		pullReqStatusFetcher,
 		projectCommandBuilder,
 		instrumentedProjectCmdRunner,
 	)
@@ -978,11 +1015,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	varFileAllowlistChecker, err := events.NewVarFileAllowlistChecker(userConfig.VarFileAllowlist)
-	if err != nil {
-		return nil, err
 	}
 
 	commandRunner := &events.DefaultCommandRunner{
@@ -1073,6 +1105,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PullStatusFetcher:               database,
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
+		ParallelPoolSize:                userConfig.ParallelPoolSize,
 	}
 
 	if userConfig.EnableDriftDetection {

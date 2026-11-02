@@ -433,12 +433,11 @@ func (g *Client) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string
 // field used to drive these contexts where all text preceding the final '/' character is
 // treated as the 'genre'.
 func gitStatusContextFromSrc(src string) *azuredevops.GitStatusContext {
-	lastSlashIdx := strings.LastIndex(src, "/")
 	genre := "Atlantis Bot"
 	name := src
-	if lastSlashIdx != -1 {
-		genre = fmt.Sprintf("%s/%s", genre, src[:lastSlashIdx])
-		name = src[lastSlashIdx+1:]
+	if before, after, found := strings.CutLast(src, "/"); found {
+		genre = fmt.Sprintf("%s/%s", genre, before)
+		name = after
 	}
 
 	return &azuredevops.GitStatusContext{

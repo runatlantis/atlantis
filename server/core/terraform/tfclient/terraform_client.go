@@ -390,15 +390,10 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		output = ansi.Strip(output)
 		return fmt.Sprintf("%s\n", output), err
 	}
-	tfCmd, cmd, err := c.prepExecCmd(ctx.Log, d, v, workspace, path, args)
+	tfCmd, cmd, err := c.prepExecCmd(ctx, d, v, workspace, path, args, customEnvVars)
 	if err != nil {
 		return "", err
 	}
-	envVars := cmd.Env
-	for key, val := range customEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-	}
-	cmd.Env = envVars
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	dur := time.Since(start)
@@ -416,20 +411,24 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 // prepExecCmd builds a ready to execute command based on the version of terraform
 // v, and args. It returns a printable representation of the command that will
 // be run and the actual command.
-func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
-	tfCmd, envVars, err := c.prepCmd(log, d, v, workspace, path, args)
+func (c *DefaultClient) prepExecCmd(ctx command.ProjectContext, d terraform.Distribution, v *version.Version, workspace string, path string, args []string, customEnvVars map[string]string) (string, *exec.Cmd, error) {
+	argv, display, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args, customEnvVars, ctx.ExpandableArgs, ctx.CommentArgs)
 	if err != nil {
 		return "", nil, err
 	}
-	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd := exec.Command(argv[0], argv[1:]...) // #nosec G204 -- argv[0] is a resolved Terraform binary path, and the arguments are passed as a vector rather than as shell source
 	cmd.Dir = path
 	cmd.Env = envVars
-	return tfCmd, cmd, nil
+	return display, cmd, nil
 }
 
-// prepCmd prepares a shell command (to be interpreted with `sh -c <cmd>`) and set of environment
-// variables for running terraform.
-func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, []string, error) {
+// prepCmd prepares the argument vector and the set of environment variables for
+// running terraform. The vector is executed directly, without a shell, so that
+// a metacharacter in an argument is never interpreted. Arguments still undergo
+// environment variable expansion, because extra_args is documented to be able
+// to refer to $WORKSPACE and friends, but that expansion is performed here
+// rather than by a shell, so it neither word splits nor globs.
+func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string, customEnvVars map[string]string, expandable []string, literal []string) ([]string, string, []string, error) {
 
 	if v == nil {
 		v = c.defaultVersion
@@ -444,7 +443,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 		d = c.effectiveDistribution(d)
 		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 		if err != nil {
-			return "", nil, err
+			return nil, "", nil, err
 		}
 	}
 
@@ -464,8 +463,74 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	// Append current Atlantis process's environment variables, ex.
 	// AWS_ACCESS_KEY.
 	envVars = append(envVars, os.Environ()...)
-	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
-	return tfCmd, envVars, nil
+	// Appended last so that they win over the process environment, and before
+	// expansion so that an extra_args entry can refer to a variable a workflow
+	// set with an `env` step.
+	for key, val := range customEnvVars {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+	}
+
+	argv := make([]string, 0, len(args)+1)
+	argv = append(argv, binPath)
+	expand := envLookup(envVars)
+	mayExpand := expansionSet(expandable, literal)
+	for _, arg := range args {
+		if mayExpand[arg] {
+			argv = append(argv, os.Expand(arg, expand))
+			continue
+		}
+		argv = append(argv, arg)
+	}
+
+	// The display string keeps variable references unexpanded. It ends up in
+	// logs and in the error comments Atlantis posts on pull requests, and an
+	// extra_args entry may well reference a variable holding a credential.
+	display := displayCmd(append([]string{binPath}, args...))
+
+	return argv, display, envVars, nil
+}
+
+// expansionSet returns the arguments whose environment variable references may
+// be expanded. Only operator-configured extra_args qualify. Anything that also
+// appears in literal, which is the set of arguments taken from a pull request
+// comment, is excluded, so that a commenter cannot have a value expanded by
+// repeating an operator's argument back.
+func expansionSet(expandable []string, literal []string) map[string]bool {
+	if len(expandable) == 0 {
+		return nil
+	}
+	fromComment := make(map[string]bool, len(literal))
+	for _, arg := range literal {
+		fromComment[arg] = true
+	}
+	set := make(map[string]bool, len(expandable))
+	for _, arg := range expandable {
+		if !fromComment[arg] {
+			set[arg] = true
+		}
+	}
+	return set
+}
+
+// envLookup returns a lookup function over environ, with later entries winning
+// over earlier ones. That matches how the child process resolves duplicates, so
+// expansion here sees the same values the process will.
+func envLookup(environ []string) func(string) string {
+	values := make(map[string]string, len(environ))
+	for _, kv := range environ {
+		if key, value, found := strings.Cut(kv, "="); found {
+			values[key] = value
+		}
+	}
+	return func(key string) string {
+		return values[key]
+	}
+}
+
+// displayCmd renders an argument vector for logs and error messages. It is
+// never executed.
+func displayCmd(argv []string) string {
+	return strings.Join(argv, " ")
 }
 
 func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terraform.Distribution {
@@ -482,7 +547,7 @@ func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terrafor
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
 func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
-	cmd, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args)
+	argv, display, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args, customEnvVars, ctx.ExpandableArgs, ctx.CommentArgs)
 	if err != nil {
 		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
 		// once reading the output. Since we won't be spawning a process, simulate that by sending the
@@ -497,11 +562,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 		return inCh, outCh
 	}
 
-	for key, val := range customEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-	}
-
-	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
+	runner := models.NewArgvCommandRunner(argv, display, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }

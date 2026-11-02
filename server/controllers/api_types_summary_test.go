@@ -31,7 +31,7 @@ func TestDriftSummaryAPICountsOverlappingDriftAndErrors(t *testing.T) {
 		TotalProjects:     len(projects),
 		ProjectsWithDrift: 1,
 		DetectedAt:        time.Now(),
-	})
+	}, false)
 	Equals(t, 2, detection.Summary.TotalProjects)
 	Equals(t, 1, detection.Summary.ProjectsWithDrift)
 	Equals(t, 1, detection.Summary.ProjectsWithErrors)

@@ -4,6 +4,7 @@
 package runtime_test
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -60,9 +61,10 @@ func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
-		Log:        logger,
-		Workspace:  "workspace",
-		RepoRelDir: ".",
+		ExpectedPlanHash: expectedPlanHash(t, planPath),
+		Log:              logger,
+		Workspace:        "workspace",
+		RepoRelDir:       ".",
 	}
 
 	RegisterMockTestingT(t)
@@ -76,12 +78,24 @@ func TestRun_TruncatedPlanUsesLocalApply(t *testing.T) {
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
 
+	var executionPlanPath string
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("", applyErr)
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"", applyErr}
+		})
 	_, err = o.Run(ctx, nil, tmpDir, nil)
 
 	Assert(t, errors.Is(err, applyErr), "expected the local apply error, got %v", err)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", fmt.Sprintf("%q", planPath)}, nil, tfDistribution, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", executionPlanPath}, nil, tfDistribution, nil, "workspace")
 	_, statErr := os.Stat(planPath)
 	Ok(t, statErr)
 }
@@ -92,11 +106,15 @@ func TestRun_Success(t *testing.T) {
 	err := os.WriteFile(planPath, nil, 0600)
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
+		ExpectedPlanHash:   expectedPlanHash(t, planPath),
 		Log:                logger,
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -109,12 +127,86 @@ func TestRun_Success(t *testing.T) {
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
 
+	// extra_args is marked expandable on the context the client receives.
+
+	ctx.ExpandableArgs = []string{"extra", "args"}
+
+	var executionPlanPath string
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"output", nil}
+		})
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", executionPlanPath}, map[string]string(nil), tfDistribution, nil, "workspace")
+	_, err = os.Stat(planPath)
+	Assert(t, os.IsNotExist(err), "planfile should be deleted")
+}
+
+func TestRun_UsesLocalSharePlanDir(t *testing.T) {
+	projectPath := t.TempDir()
+	sharePlanDir := t.TempDir()
+	planPath := filepath.Join(sharePlanDir, "repos", "owner", "repo", "2", "workspace", "env", "workspace.tfplan")
+	Ok(t, os.MkdirAll(filepath.Dir(planPath), 0700))
+	Ok(t, os.WriteFile(planPath, nil, 0600))
+
+	logger := logging.NewNoopLogger(t)
+	ctx := command.ProjectContext{
+		ExpectedPlanHash: expectedPlanHash(t, planPath),
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		CommentArgs:        []string{"comment", "args"},
+		EscapedCommentArgs: []string{"comment", "args"},
+		LocalSharePlanDir:  sharePlanDir,
+		Log:                logger,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "env",
+		Workspace:  "workspace",
+	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
+
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+	o := runtime.ApplyStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		PlanStore:             &runtime.LocalPlanStore{},
+	}
+	var executionPlanPath string
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"output", nil}
+		})
+
+	output, err := o.Run(ctx, []string{"extra", "args"}, projectPath, map[string]string(nil))
+	Ok(t, err)
+	Equals(t, "output", output)
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, projectPath, []string{"apply", "-input=false", "extra", "args", "comment", "args", executionPlanPath}, map[string]string(nil), tfDistribution, nil, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -127,12 +219,16 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 
 	logger := logging.NewNoopLogger(t)
 	ctx := command.ProjectContext{
+		ExpectedPlanHash:   expectedPlanHash(t, planPath),
 		Log:                logger,
 		Workspace:          "default",
 		RepoRelDir:         ".",
 		ProjectName:        "projectname",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	Ok(t, err)
 
 	RegisterMockTestingT(t)
@@ -144,12 +240,24 @@ func TestRun_AppliesCorrectProjectPlan(t *testing.T) {
 		DefaultTFDistribution: tfDistribution,
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
+	var executionPlanPath string
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"output", nil}
+		})
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, nil, "default")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", executionPlanPath}, map[string]string(nil), tfDistribution, nil, "default")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -163,12 +271,16 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	tfVersion, _ := version.NewVersion("0.11.0")
 	ctx := command.ProjectContext{
+		ExpectedPlanHash:   expectedPlanHash(t, planPath),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		Log:                logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -179,12 +291,24 @@ func TestApplyStepRunner_TestRun_UsesConfiguredTFVersion(t *testing.T) {
 		DefaultTFDistribution: tfDistribution,
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
+	var executionPlanPath string
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"output", nil}
+		})
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, tmpDir, []string{"apply", "-input=false", "extra", "args", "comment", "args", executionPlanPath}, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
@@ -201,12 +325,16 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.11.0")
 	projTFDistribution := "opentofu"
 	ctx := command.ProjectContext{
+		ExpectedPlanHash:      expectedPlanHash(t, planPath),
 		Workspace:             "workspace",
 		RepoRelDir:            ".",
+		CommentArgs:           []string{"comment", "args"},
 		EscapedCommentArgs:    []string{"comment", "args"},
 		TerraformDistribution: &projTFDistribution,
 		Log:                   logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -216,18 +344,31 @@ func TestApplyStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 		DefaultTFVersion:      tfVersion,
 		PlanStore:             &runtime.LocalPlanStore{},
 	}
+	var executionPlanPath string
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), NotEq[tf.Distribution](tfDistribution), Any[*version.Version](), Any[string]())).
-		ThenReturn("output", nil)
+		Then(func(params []Param) ReturnValues {
+			args := params[2].([]string)
+			executionPlanPath = args[len(args)-1]
+			Assert(t, executionPlanPath != planPath, "must consume a snapshot")
+			bytes, readErr := os.ReadFile(executionPlanPath)
+			Ok(t, readErr)
+			Equals(t, expectedPlanHash(t, planPath), fmt.Sprintf("%x", sha256.Sum256(bytes)))
+			info, statErr := os.Stat(executionPlanPath)
+			Ok(t, statErr)
+			Equals(t, os.FileMode(0400), info.Mode().Perm())
+			return ReturnValues{"output", nil}
+		})
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	Ok(t, err)
 	Equals(t, "output", output)
-	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", fmt.Sprintf("%q", planPath)}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq(tmpDir), Eq([]string{"apply", "-input=false", "extra", "args", "comment", "args", executionPlanPath}), Eq(map[string]string(nil)), NotEq[tf.Distribution](tfDistribution), Eq(tfVersion), Eq("workspace"))
 	_, err = os.Stat(planPath)
 	Assert(t, os.IsNotExist(err), "planfile should be deleted")
 }
 
 // Apply ignores the -target flag when used with a planfile so we should give
 // an error if it's being used with -target.
+
 func TestRun_UsingTarget(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := []struct {
@@ -292,10 +433,12 @@ func TestRun_UsingTarget(t *testing.T) {
 			}
 
 			output, err := step.Run(command.ProjectContext{
+				ExpectedPlanHash:   expectedPlanHash(t, planPath),
 				Log:                logger,
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
-				EscapedCommentArgs: c.commentFlags,
+				CommentArgs:        c.commentFlags,
+				EscapedCommentArgs: escapeForTest(c.commentFlags),
 			}, c.extraArgs, tmpDir, map[string]string(nil))
 			Equals(t, "", output)
 			if c.expErr {
@@ -337,13 +480,17 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	tfVersion, _ := version.NewVersion("0.11.0")
 	var remoteApplyRunURL string
 	ctx := command.ProjectContext{
+		ExpectedPlanHash:   expectedPlanHash(t, planPath),
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 		RemoteApplyRunURL:  &remoteApplyRunURL,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	output, err := o.Run(ctx, []string{"extra", "args"}, tmpDir, map[string]string(nil))
 	<-tfExec.DoneCh
 
@@ -401,9 +548,11 @@ Plan: 0 to add, 0 to change, 1 to destroy.`
 	tfVersion, _ := version.NewVersion("0.11.0")
 
 	output, err := o.Run(command.ProjectContext{
+		ExpectedPlanHash:   expectedPlanHash(t, planPath),
 		Log:                logging.NewNoopLogger(t),
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		TerraformVersion:   tfVersion,
 	}, []string{"extra", "args"}, tmpDir, map[string]string(nil))
@@ -538,3 +687,77 @@ var noConfirmationOut = `
 
 Error: Apply discarded.
 `
+
+// escapeForTest mirrors the production escaping applied to EscapedCommentArgs,
+// so that a test setting both fields reflects what a real context looks like.
+func escapeForTest(args []string) []string {
+	var escaped []string
+	for _, arg := range args {
+		var b strings.Builder
+		for i := range arg {
+			b.WriteString("\\" + string(arg[i]))
+		}
+		escaped = append(escaped, b.String())
+	}
+	return escaped
+}
+
+func expectedPlanHash(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	Ok(t, err)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
+func TestApplyStepRunner_SnapshotIntegrity(t *testing.T) {
+	for _, scenario := range []string{"valid", "missing hash", "mutated before snapshot", "mutated after snapshot"} {
+		t.Run(scenario, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			dir := t.TempDir()
+			planPath := filepath.Join(dir, "default.tfplan")
+			original := []byte("accepted plan bytes")
+			Ok(t, os.WriteFile(planPath, original, 0600))
+			ctx := command.ProjectContext{Workspace: "default", RepoRelDir: "infra", ProjectName: "", Log: logging.NewNoopLogger(t), ExpectedPlanHash: expectedPlanHash(t, planPath)}
+			if scenario == "missing hash" {
+				ctx.ExpectedPlanHash = ""
+			}
+			if scenario == "mutated before snapshot" {
+				Ok(t, os.WriteFile(planPath, []byte("unapproved plan"), 0600))
+			}
+			executor := tfclientmocks.NewMockClient()
+			called := false
+			var snapshot string
+			When(executor.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).Then(func(params []Param) ReturnValues {
+				called = true
+				args := params[2].([]string)
+				snapshot = args[len(args)-1]
+				if scenario == "mutated after snapshot" {
+					Ok(t, os.WriteFile(planPath, []byte("replaced after verification"), 0600))
+				}
+				data, err := os.ReadFile(snapshot)
+				Ok(t, err)
+				Equals(t, original, data)
+				Equals(t, ".tfplan", filepath.Ext(snapshot))
+				info, err := os.Stat(snapshot)
+				Ok(t, err)
+				Equals(t, os.FileMode(0400), info.Mode().Perm())
+				return ReturnValues{"applied", nil}
+			})
+			runner := runtime.ApplyStepRunner{TerraformExecutor: executor, PlanStore: &runtime.LocalPlanStore{}}
+			_, err := runner.Run(ctx, nil, dir, nil)
+			if scenario == "missing hash" || scenario == "mutated before snapshot" {
+				Assert(t, err != nil && !called, "must reject before execution: %v", err)
+				Assert(t, strings.Contains(err.Error(), `dir "infra" workspace "default" project ""`), "error must identify the project: %v", err)
+				_, statErr := os.Stat(planPath)
+				Ok(t, statErr)
+			} else {
+				Ok(t, err)
+				Assert(t, called, "expected execution")
+				_, statErr := os.Stat(snapshot)
+				Assert(t, os.IsNotExist(statErr), "snapshot must be removed")
+				_, statErr = os.Stat(planPath)
+				Assert(t, os.IsNotExist(statErr), "successful apply must preserve main's cleanup")
+			}
+		})
+	}
+}

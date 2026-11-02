@@ -21,6 +21,15 @@ type InitStepRunner struct {
 }
 
 func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
+	// extra_args comes from configuration, so environment variable references
+	// in it may be expanded. Comment args are not part of the init command and
+	// must not influence its expansion policy.
+	execCtx := ctx
+	execCtx.ExpandableArgs = nil
+	if len(extraArgs) > 0 {
+		execCtx.ExpandableArgs = extraArgs
+	}
+	execCtx.CommentArgs = nil
 	lockFileName := ".terraform.lock.hcl"
 	terraformLockfilePath := filepath.Join(path, lockFileName)
 	terraformLockFileTracked, err := common.IsFileTracked(path, lockFileName)
@@ -66,7 +75,7 @@ func (i *InitStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 
 	terraformInitCmd := append(terraformInitVerb, finalArgs...)
 
-	out, err := i.TerraformExecutor.RunCommandWithVersion(ctx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
+	out, err := i.TerraformExecutor.RunCommandWithVersion(execCtx, path, terraformInitCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	// Only include the init output if there was an error. Otherwise it's
 	// unnecessary and lengthens the comment.
 	if err != nil {

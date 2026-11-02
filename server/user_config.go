@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -40,6 +39,7 @@ type UserConfig struct {
 	CheckoutDepth               int    `mapstructure:"checkout-depth"`
 	CheckoutStrategy            string `mapstructure:"checkout-strategy"`
 	DataDir                     string `mapstructure:"data-dir"`
+	SharePlanDir                string `mapstructure:"share-plan-dir"`
 	DisableApplyAll             bool   `mapstructure:"disable-apply-all"`
 	DisableAutoplan             bool   `mapstructure:"disable-autoplan"`
 	DisableAutoplanLabel        string `mapstructure:"disable-autoplan-label"`
@@ -174,12 +174,10 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	return allowCommands, nil
 }
 
-// ToBlockedExtraArgs parses BlockedExtraArgs into a slice of flag prefixes.
-// When BlockedExtraArgs is empty, events.DefaultBlockedExtraArgs is returned.
+// ToBlockedExtraArgs parses BlockedExtraArgs into the flags the operator
+// blocks in addition to events.DefaultBlockedExtraArgs, which the comment
+// parser always enforces. It returns nil when no extra flags are configured.
 func (u UserConfig) ToBlockedExtraArgs() []string {
-	if u.BlockedExtraArgs == "" {
-		return events.DefaultBlockedExtraArgs
-	}
 	var args []string
 	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
 		if trimmed := strings.TrimSpace(arg); trimmed != "" {

@@ -4,8 +4,12 @@
 package models_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,6 +17,7 @@ import (
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/jobs/mocks"
+	"github.com/runatlantis/atlantis/server/logging"
 	logmocks "github.com/runatlantis/atlantis/server/logging/mocks"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -126,6 +131,53 @@ func TestShellCommandRunner_RunLongOutputLines(t *testing.T) {
 			output, err := runner.Run(ctx)
 			Ok(t, err)
 			Equals(t, strings.Repeat("x", longLen)+"\n", output)
+		})
+	}
+}
+
+func TestShellCommandRunner_RunFailure(t *testing.T) {
+	dir := t.TempDir()
+	const script = "printf 'stdout\\n'; printf 'stderr\\n' >&2; exit 7"
+	runners := map[string]*models.ShellCommandRunner{
+		"shell": models.NewShellCommandRunner(nil, script, nil, dir, false, nil),
+		"argv":  models.NewArgvCommandRunner([]string{"sh", "-c", script}, script, nil, dir, false, nil),
+	}
+	for name, runner := range runners {
+		t.Run(name, func(t *testing.T) {
+			ctx := command.ProjectContext{Log: logging.NewNoopLogger(t)}
+			output, err := runner.Run(ctx)
+
+			exitErr, ok := errors.AsType[*exec.ExitError](err)
+			Assert(t, ok, "expected process exit error, got %v", err)
+			Equals(t, 7, exitErr.ExitCode())
+			// stdout and stderr are read concurrently; their relative order is unspecified.
+			lines := strings.Split(strings.TrimSuffix(output, "\n"), "\n")
+			slices.Sort(lines)
+			Equals(t, []string{"stderr", "stdout"}, lines)
+			Assert(t, strings.Contains(err.Error(), dir), "missing working directory context: %v", err)
+		})
+	}
+}
+
+func TestShellCommandRunner_StartFailure(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name, executable, workdir string
+	}{
+		{"missing executable", filepath.Join(dir, "missing-command"), dir},
+		{"missing working directory", "sh", filepath.Join(dir, "missing-dir")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := command.ProjectContext{Log: logging.NewNoopLogger(t)}
+			runner := models.NewArgvCommandRunner([]string{tc.executable, "-c", "exit 0"}, tc.executable, nil, tc.workdir, false, nil)
+
+			output, err := runner.Run(ctx)
+
+			Equals(t, "", output)
+			Assert(t, errors.Is(err, os.ErrNotExist), "expected missing-file error, got %v", err)
+			Assert(t, strings.Contains(err.Error(), tc.workdir), "missing working directory context: %v", err)
+			Assert(t, strings.Contains(err.Error(), tc.executable), "missing executable context: %v", err)
 		})
 	}
 }

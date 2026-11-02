@@ -426,37 +426,133 @@ func TestProject_Validate(t *testing.T) {
 				Dir:       String("."),
 				Workspace: String("../evil"),
 			},
-			expErr: "workspace: cannot contain '..', '/', or '\\'.",
-		},
+			expErr: "workspace: cannot contain '/' or '\\'."},
+		{
+			description: "workspace with embedded ..",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("abc..abc"),
+			},
+			expErr: "workspace: cannot contain '..'."},
 		{
 			description: "workspace beginning with /",
 			input: raw.Project{
 				Dir:       String("."),
 				Workspace: String("/etc"),
 			},
-			expErr: "workspace: cannot contain '..', '/', or '\\'.",
-		},
+			expErr: "workspace: cannot contain '/' or '\\'."},
 		{
 			description: "workspace with embedded /",
 			input: raw.Project{
 				Dir:       String("."),
 				Workspace: String("sub/dir"),
 			},
-			expErr: "workspace: cannot contain '..', '/', or '\\'.",
-		},
+			expErr: "workspace: cannot contain '/' or '\\'."},
 		{
 			description: "workspace with backslash",
 			input: raw.Project{
 				Dir:       String("."),
 				Workspace: String("sub\\dir"),
 			},
-			expErr: "workspace: cannot contain '..', '/', or '\\'.",
+			expErr: "workspace: cannot contain '/' or '\\'."},
+		{
+			description: "workspace with semicolon command injection",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("poc;id;false;#"),
+			},
+			expErr: ""},
+		{
+			description: "workspace with && command injection",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a&&id"),
+			},
+			expErr: ""},
+		{
+			description: "workspace with command substitution",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a$(id)b"),
+			},
+			expErr: "workspace: cannot contain '$'."},
+		{
+			description: "workspace with backtick substitution",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a`id`b"),
+			},
+			expErr: ""},
+		{
+			description: "workspace with pipe",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a|id"),
+			},
+			expErr: ""},
+		{
+			description: "workspace with redirection",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a>/tmp/pwned"),
+			},
+			expErr: "workspace: cannot contain '/' or '\\'."},
+		{
+			description: "workspace with whitespace",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a b"),
+			},
+			expErr: "workspace: cannot contain whitespace or control characters."},
+		{
+			description: "workspace with newline",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a\nid"),
+			},
+			expErr: "workspace: cannot contain whitespace or control characters.",
 		},
+		{
+			description: "workspace with variable expansion",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("a$HOME"),
+			},
+			expErr: "workspace: cannot contain '$'."},
+		{
+			description: "workspace starting with dash is flag injection",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("-chdir"),
+			},
+			expErr: "workspace: cannot start with '-'."},
+		{
+			description: "workspace starting with tilde",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("~root"),
+			},
+			expErr: "workspace: cannot start with '~'."},
+		{
+			description: "workspace starting with dot",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String(".hidden"),
+			},
+			expErr: ""},
 		{
 			description: "valid workspace",
 			input: raw.Project{
 				Dir:       String("."),
 				Workspace: String("my-workspace"),
+			},
+			expErr: "",
+		},
+		{
+			description: "valid workspace with dot and underscore",
+			input: raw.Project{
+				Dir:       String("."),
+				Workspace: String("my.work_space-1"),
 			},
 			expErr: "",
 		},

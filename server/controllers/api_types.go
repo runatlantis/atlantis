@@ -162,6 +162,12 @@ type DriftProjectAPI struct {
 	HasDrift bool `json:"has_drift"`
 	// Drift contains drift details if drift was detected.
 	Drift *DriftDetailsAPI `json:"drift,omitempty"`
+	// PlanOutput contains the Terraform plan output, if detection ran a
+	// plan successfully. Only populated on the detect response; omitted from
+	// status responses to reduce payload size. It is never persisted in
+	// drift storage, so it is unavailable when a status response is built
+	// from stored records.
+	PlanOutput string `json:"plan_output,omitempty"`
 	// LastChecked is when drift was last checked.
 	LastChecked time.Time `json:"last_checked"`
 	// Error contains any error message if detection failed.
@@ -189,6 +195,9 @@ type DriftDetailsAPI struct {
 }
 
 // NewDriftProjectAPI converts an internal ProjectDrift to its API representation.
+// PlanOutput is never copied here since it is transient and not persisted in
+// drift storage; callers that want it on the immediate detect response set
+// result.PlanOutput explicitly after calling this function.
 func NewDriftProjectAPI(pd models.ProjectDrift) DriftProjectAPI {
 	result := DriftProjectAPI{
 		ProjectName:    pd.ProjectName,
@@ -287,7 +296,9 @@ type DriftDetectionResultAPI struct {
 }
 
 // NewDriftDetectionResultAPI converts an internal DriftDetectionResult to its API representation.
-func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionResultAPI {
+// includePlanOutput controls whether plan_output is included for each project;
+// callers should pass the request's IncludePlanOutput flag.
+func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult, includePlanOutput bool) DriftDetectionResultAPI {
 	result := DriftDetectionResultAPI{
 		ID:         dr.ID,
 		Repository: dr.Repository,
@@ -297,7 +308,11 @@ func NewDriftDetectionResultAPI(dr *models.DriftDetectionResult) DriftDetectionR
 
 	var withErrors, withoutDrift int
 	for _, p := range dr.Projects {
-		result.Projects = append(result.Projects, NewDriftProjectAPI(p))
+		proj := NewDriftProjectAPI(p)
+		if includePlanOutput {
+			proj.PlanOutput = p.PlanOutput
+		}
+		result.Projects = append(result.Projects, proj)
 		if p.Error != "" {
 			withErrors++
 		}

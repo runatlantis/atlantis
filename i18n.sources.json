@@ -1,0 +1,21 @@
+{
+  "es/blog/2017/introducing-atlantis.md": "c0e805cc1fa3cf22db2e5a80af7d281dce87d4ce",
+  "es/blog/2018/atlantis-0-4-4-now-supports-bitbucket.md": "c70b0e3550ee65aa9dfd713b51918570a4c4e01b",
+  "es/blog/2018/hosting-our-static-site-over-ssl-with-s3-acm-cloudfront-and-terraform.md": "91afea2af741a0fe6941832591b0e93cad50a5f4",
+  "es/blog/2018/joining-hashicorp.md": "1e964683fe28178be69c640816ebf3e2685e3dfa",
+  "es/blog/2018/putting-the-dev-into-devops-why-your-developers-should-write-terraform-too.md": "751ad5eb6adbdc904123ca5a01f751562794b00c",
+  "es/blog/2018/terraform-and-the-dangers-of-applying-locally.md": "c87b9533555db17ada360f2bb405a09a1f6333d1",
+  "es/blog/2019/4-reasons-to-try-hashicorps-new-free-terraform-remote-state-storage.md": "842824244cd30021d6acafa37ffbaae51a0acf8c",
+  "es/blog/2024/april-2024-survey-results.md": "57623a0757ca1e9db925105e5931e8585e8fa0c7",
+  "es/blog/2024/integrating-atlantis-with-opentofu.md": "574017fb7115d8c78f246854b50e2b412642716d",
+  "es/blog/2025/atlantis-on-google-cloud-run.md": "da7fe542ef629d4b04e99d89a47ff416cc643f0d",
+  "es/contributing/events-controller.md": "1e264589da6255b810f4d84641f754a2561c475d",
+  "es/contributing/glossary.md": "99c1e732878058c33bb3b5a2a772ecb368302f6c",
+  "es/docs/access-credentials.md": "769dc531220df6832eb158377920d35c36cd83a2",
+  "es/docs/api-endpoints.md": "7a18c4a1c6610cfed1419460a5f507a2b236aad1",
+  "es/docs/command-requirements.md": "b7aea66f1534bcb50771bdc357eef3a35b33f472",
+  "es/docs/repo-level-atlantis-yaml.md": "f222982752bd50cef6670a4c5e8562f40c2791e6",
+  "es/docs/security.md": "93b7d76400e45593fd1a65bea23b1122a31d28a0",
+  "es/docs/server-configuration.md": "2251181ecddd10e3fd9f1688b59e8fcaaaa1829f",
+  "es/docs/using-atlantis.md": "ccfbcf49b2c5e346a8049a56771502e5a2561298"
+}

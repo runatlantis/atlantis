@@ -38,3 +38,13 @@ func TestNewDriftProjectAPI_IncludesForgetCount(t *testing.T) {
 	Equals(t, 3, result.Drift.ToForget)
 	Equals(t, 3, result.Drift.TotalChanges)
 }
+
+func TestNewDriftProjectAPI_NeverCopiesPlanOutput(t *testing.T) {
+	pd := models.ProjectDrift{
+		Drift:      models.DriftSummary{HasDrift: true},
+		PlanOutput: "Terraform will perform the following actions...",
+	}
+
+	result := controllers.NewDriftProjectAPI(pd)
+	Equals(t, "", result.PlanOutput)
+}

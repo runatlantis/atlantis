@@ -230,6 +230,7 @@ func TestRun_CreatesWorkspace(t *testing.T) {
 				Workspace:          "workspace",
 				RepoRelDir:         ".",
 				User:               models.User{Username: "username"},
+				CommentArgs:        []string{"comment", "args"},
 				EscapedCommentArgs: []string{"comment", "args"},
 				Pull: models.PullRequest{
 					Num: 2,
@@ -272,6 +273,7 @@ func TestRun_NoWorkspaceSwitchIfNotNecessary(t *testing.T) {
 		Workspace:          "workspace",
 		RepoRelDir:         ".",
 		User:               models.User{Username: "username"},
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Pull: models.PullRequest{
 			Num: 2,

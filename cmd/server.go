@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/events/vcs/github"
 	"github.com/runatlantis/atlantis/server/i18n"
@@ -120,6 +121,7 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	SharePlanDirFlag                 = "share-plan-dir"
 	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
@@ -174,7 +176,6 @@ const (
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
-	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -236,10 +237,9 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultAllowCommands,
 	},
 	BlockedExtraArgsFlag: {
-		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
 			"in comment extra args (the flags after '--'). " +
-			"Defaults to " + DefaultBlockedExtraArgs + ".",
-		defaultValue: DefaultBlockedExtraArgs,
+			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -434,6 +434,10 @@ var stringFlags = map[string]stringFlag{
 	StatsNamespace: {
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
+	},
+	SharePlanDirFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
 	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
@@ -939,6 +943,9 @@ func (s *ServerCmd) run() error {
 	if err := s.setDataDir(&userConfig); err != nil {
 		return err
 	}
+	if err := s.setSharePlanDir(&userConfig); err != nil {
+		return err
+	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
 		return err
 	}
@@ -978,9 +985,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
-	}
-	if c.BlockedExtraArgs == "" {
-		c.BlockedExtraArgs = DefaultBlockedExtraArgs
 	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
@@ -1244,6 +1248,31 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
+	return nil
+}
+
+// setSharePlanDir checks if ~ was used in share-plan-dir and converts it to the actual
+// home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
+func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
+	if userConfig.SharePlanDir == "" {
+		userConfig.SharePlanDir = userConfig.DataDir
+		return nil
+	}
+
+	finalPath := userConfig.SharePlanDir
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making share-plan-dir absolute: %w", err)
+	}
+	userConfig.SharePlanDir = finalPath
 	return nil
 }
 

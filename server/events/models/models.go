@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	paths "path"
 	"regexp"
@@ -130,6 +131,22 @@ func NewRepo(vcsHostType VCSHostType, repoFullName string, cloneURL string, vcsU
 				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Host)
 			}
 			expClonePath = basePath + expClonePath
+		}
+
+		// The clone URL of a GitHub repository comes straight from the webhook
+		// payload. Checking only its path lets a forged payload keep the
+		// expected owner/name while pointing the host at a server the
+		// attacker controls, which Atlantis would then fetch from and plan.
+		// Require the host to be the configured GitHub hostname, as is already
+		// done for GitLab.
+		if vcsHostType == Github && vcsHostname != "" {
+			expectedHost := vcsHostname
+			if host, _, splitErr := net.SplitHostPort(vcsHostname); splitErr == nil {
+				expectedHost = host
+			}
+			if !strings.EqualFold(cloneURLParsed.Hostname(), expectedHost) {
+				return Repo{}, fmt.Errorf("expected clone url host %q but had %q", expectedHost, cloneURLParsed.Hostname())
+			}
 		}
 
 		if expClonePath != cloneURLParsed.Path {
@@ -441,6 +458,12 @@ type PlanSuccess struct {
 	// branch we're merging into had been updated, and we had to merge again
 	// before planning
 	MergedAgain bool
+	// PlanHash is the lowercase hex SHA-256 of the plan file the built-in plan
+	// step wrote. Apply verifies the plan file it is given against it, so a
+	// file replaced after planning is not applied as the reviewed plan. It is
+	// empty when the plan stage is built only from custom run steps, which
+	// manage their own plan file.
+	PlanHash string
 }
 
 func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {
@@ -836,6 +859,12 @@ type ProjectStatus struct {
 	PolicyStatus []PolicySetStatus
 	// Status is the status of where this project is at in the planning cycle.
 	Status ProjectPlanStatus
+	// PlanHash is the SHA-256 recorded for the plan file when this project was
+	// last planned (see PlanSuccess.PlanHash). It is kept while the plan can
+	// still be applied and cleared once it has been applied or discarded.
+	// Empty for statuses written before hashes were recorded and for
+	// workflows whose plan stage manages its own plan file.
+	PlanHash string
 }
 
 // ProjectPlanStatus is the status of where this project is at in the planning

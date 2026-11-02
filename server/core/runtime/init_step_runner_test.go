@@ -59,6 +59,8 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 				RepoRelDir: ".",
 				Log:        logger,
 			}
+			// extra_args is marked expandable on the context the client receives.
+			ctx.ExpandableArgs = []string{"extra", "args"}
 
 			tfVersion, _ := version.NewVersion(c.version)
 			iso := runtime.InitStepRunner{
@@ -82,6 +84,49 @@ func TestRun_UsesGetOrInitForRightVersion(t *testing.T) {
 			terraform.VerifyWasCalledOnce().RunCommandWithVersion(ctx, "/path", expArgs, map[string]string(nil), tfDistribution, tfVersion, "workspace")
 		})
 	}
+}
+
+func TestInitStepRunner_IgnoresCommentArgsForExpansionPolicy(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	logger := logging.NewNoopLogger(t)
+	tfVersion := version.Must(version.NewVersion("1.14.0"))
+	mockDownloader := mocks.NewMockDownloader()
+	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
+
+	const backendConfigArg = "-backend-config=$ATLANTIS_BACKEND_CONFIG"
+	ctx := command.ProjectContext{
+		Workspace:   "default",
+		RepoRelDir:  ".",
+		Log:         logger,
+		CommentArgs: []string{backendConfigArg},
+	}
+	execCtx := ctx
+	execCtx.ExpandableArgs = []string{backendConfigArg}
+	execCtx.CommentArgs = nil
+
+	runner := runtime.InitStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: tfDistribution,
+		DefaultTFVersion:      tfVersion,
+	}
+	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
+		ThenReturn("", nil)
+
+	path := t.TempDir()
+	output, err := runner.Run(ctx, []string{backendConfigArg}, path, nil)
+	Ok(t, err)
+	Equals(t, "", output)
+
+	terraform.VerifyWasCalledOnce().RunCommandWithVersion(
+		execCtx,
+		path,
+		[]string{"init", "-input=false", "-upgrade", backendConfigArg},
+		map[string]string(nil),
+		tfDistribution,
+		tfVersion,
+		"default",
+	)
 }
 
 func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
@@ -126,6 +171,8 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 				Log:                   logger,
 				TerraformDistribution: &c.distribution,
 			}
+			// extra_args is marked expandable on the context the client receives.
+			ctx.ExpandableArgs = []string{"extra", "args"}
 
 			tfVersion, _ := version.NewVersion(c.version)
 			iso := runtime.InitStepRunner{
@@ -193,6 +240,8 @@ func TestRun_InitOmitsUpgradeFlagIfLockFileTracked(t *testing.T) {
 		RepoRelDir: ".",
 		Log:        logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 
 	RegisterMockTestingT(t)
 	terraform := tfclientmocks.NewMockClient()
@@ -227,6 +276,8 @@ func TestRun_InitKeepsUpgradeFlagIfLockFileNotPresent(t *testing.T) {
 		RepoRelDir: ".",
 		Log:        logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.14.0")
@@ -262,6 +313,8 @@ func TestRun_InitKeepUpgradeFlagIfLockFilePresentAndTFLessThanPoint14(t *testing
 		RepoRelDir: ".",
 		Log:        logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.13.0")
@@ -331,6 +384,10 @@ func TestRun_InitExtraArgsDeDupe(t *testing.T) {
 				RepoRelDir: ".",
 				Log:        logger,
 			}
+			// extra_args is marked expandable on the context the client receives.
+			if len(c.extraArgs) > 0 {
+				ctx.ExpandableArgs = c.extraArgs
+			}
 			mockDownloader := mocks.NewMockDownloader()
 			tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 			tfVersion, _ := version.NewVersion("0.10.0")
@@ -381,6 +438,8 @@ func TestRun_InitDeletesLockFileIfPresentAndNotTracked(t *testing.T) {
 		RepoRelDir: ".",
 		Log:        logger,
 	}
+	// extra_args is marked expandable on the context the client receives.
+	ctx.ExpandableArgs = []string{"extra", "args"}
 	output, err := iso.Run(ctx, []string{"extra", "args"}, repoDir, map[string]string(nil))
 	Ok(t, err)
 	// When there is no error, should not return init output to PR.

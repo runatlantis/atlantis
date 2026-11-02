@@ -730,3 +730,17 @@ func TestDefaultProjectFinder_DetermineProjectsViaConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestDetermineWorkspaceFromHCL_RejectsUnsafeName(t *testing.T) {
+	// A Terraform Cloud workspace name is read straight out of pull-request
+	// controlled HCL, and Atlantis uses it to build paths, so it has to satisfy
+	// the same rules as a workspace named in atlantis.yaml or in a comment.
+	noopLogger := logging.NewNoopLogger(t)
+	m := events.DefaultProjectFinder{}
+	fullPath := filepath.Join("testdata/test-repos", "workspace-unsafe-name")
+
+	got, err := m.DetermineWorkspaceFromHCL(noopLogger, fullPath, "")
+
+	ErrContains(t, "cannot contain '/'", err)
+	Equals(t, "", got)
+}

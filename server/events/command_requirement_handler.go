@@ -19,6 +19,7 @@ type CommandRequirementHandler interface {
 	ValidatePlanProject(repoDir string, ctx command.ProjectContext) (string, error)
 	ValidateApplyProject(repoDir string, ctx command.ProjectContext) (string, error)
 	ValidateImportProject(repoDir string, ctx command.ProjectContext) (string, error)
+	ValidateStateRmProject(repoDir string, ctx command.ProjectContext) (string, error)
 }
 
 type UndivergedProjectImpactResolver interface {
@@ -68,6 +69,34 @@ func (a *DefaultCommandRequirementHandler) ValidateApplyProject(repoDir string, 
 
 func (a *DefaultCommandRequirementHandler) ValidateImportProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
 	return a.validateCommandRequirement(repoDir, ctx, command.Import, ctx.ImportRequirements)
+}
+
+// ValidateStateRmProject gates `state rm`, which rewrites Terraform state with
+// no reviewed plan, behind both the apply requirements and the import
+// requirements of the project. Import is the closest sibling, a state change
+// made outside a plan, and apply requirements are what operators configure to
+// protect infrastructure changes, so removing a resource from state must
+// satisfy both. Before this check existed, `state rm` ran for any commenter
+// regardless of either list.
+func (a *DefaultCommandRequirementHandler) ValidateStateRmProject(repoDir string, ctx command.ProjectContext) (failure string, err error) {
+	return a.validateCommandRequirement(repoDir, ctx, command.State, stateRmRequirements(ctx))
+}
+
+// stateRmRequirements returns the project's apply requirements followed by its
+// import requirements, keeping the first occurrence of each.
+func stateRmRequirements(ctx command.ProjectContext) []string {
+	seen := make(map[string]bool, len(ctx.ApplyRequirements)+len(ctx.ImportRequirements))
+	var reqs []string
+	for _, list := range [][]string{ctx.ApplyRequirements, ctx.ImportRequirements} {
+		for _, req := range list {
+			if seen[req] {
+				continue
+			}
+			seen[req] = true
+			reqs = append(reqs, req)
+		}
+	}
+	return reqs
 }
 
 func (a *DefaultCommandRequirementHandler) validateCommandRequirement(repoDir string, ctx command.ProjectContext, cmd command.Name, requirements []string) (failure string, err error) {
