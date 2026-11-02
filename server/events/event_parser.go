@@ -674,7 +674,11 @@ func (e *EventParser) ParseGiteaRepo(repo giteasdk.Repository) (models.Repo, err
 func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent) models.PullRequestEventType {
 	// New commit to opened MR
 	if len(event.ObjectAttributes.OldRev) > 0 ||
-		// Check for MR that has been marked as ready
+		// Check for MR that has been marked as ready. GitLab reports the change
+		// in changes.draft whatever draft prefix the title used ("Draft:",
+		// "draft:", "[Draft]", "(Draft)"); the title check covers payloads
+		// without it.
+		(event.Changes.Draft.Previous && !event.Changes.Draft.Current) ||
 		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
 		return models.UpdatedPullEvent
 	}

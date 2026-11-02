@@ -511,6 +511,10 @@ func TestParseGitlabMergeEvent_Update_ActionType(t *testing.T) {
 			filename: "gitlab-merge-request-event-mark-as-ready.json",
 			exp:      models.UpdatedPullEvent,
 		},
+		{
+			filename: "gitlab-merge-request-event-mark-as-ready-lowercase.json",
+			exp:      models.UpdatedPullEvent,
+		},
 	}
 
 	for _, c := range cases {
