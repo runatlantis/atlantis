@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	giteasdk "code.gitea.io/sdk/gitea"
@@ -32,6 +33,10 @@ const gitlabPullOpened = "opened"
 const usagesCols = 90
 
 var lastBitbucketSha, _ = lru.New[string, string](300)
+
+// gitlabDraftTitleRegex matches the title prefixes GitLab treats as draft
+// (Gitlab::Regex::MergeRequests#merge_request_draft).
+var gitlabDraftTitleRegex = regexp.MustCompile(`^(?i)(\[draft\]|\(draft\)|draft:)`)
 
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
@@ -675,11 +680,9 @@ func (e *EventParser) ParseGitlabMergeRequestUpdateEvent(event gitlab.MergeEvent
 	// New commit to opened MR
 	if len(event.ObjectAttributes.OldRev) > 0 ||
 		// Check for MR that has been marked as ready. GitLab reports the change
-		// in changes.draft whatever draft prefix the title used ("Draft:",
-		// "draft:", "[Draft]", "(Draft)"); the title check covers payloads
-		// without it.
+		// in changes.draft; older GitLab versions only report the title change.
 		(event.Changes.Draft.Previous && !event.Changes.Draft.Current) ||
-		(strings.HasPrefix(event.Changes.Title.Previous, "Draft:") && !strings.HasPrefix(event.Changes.Title.Current, "Draft:")) {
+		(gitlabDraftTitleRegex.MatchString(event.Changes.Title.Previous) && !gitlabDraftTitleRegex.MatchString(event.Changes.Title.Current)) {
 		return models.UpdatedPullEvent
 	}
 	return models.OtherPullEvent
