@@ -4,6 +4,7 @@
 package events
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -33,13 +34,18 @@ type UnlockCommandRunner struct {
 	DisableUnlockLabel string
 }
 
-func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
+func (u *UnlockCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	baseRepo := ctx.Pull.BaseRepo
 	pullNum := ctx.Pull.Num
 	disableUnlockLabel := u.DisableUnlockLabel
 
-	ctx.Log.Info("Unlocking all locks")
 	vcsMessage := "All Atlantis locks for this PR have been unlocked and plans discarded"
+	if cmd.ProjectName != "" {
+		ctx.Log.Info("unlocking project %q", cmd.ProjectName)
+		vcsMessage = fmt.Sprintf("Atlantis locks for project %q in this PR have been unlocked and its plans discarded. Run plan again before applying.", cmd.ProjectName)
+	} else {
+		ctx.Log.Info("unlocking all locks")
+	}
 
 	var hasLabel bool
 	var err error
@@ -59,15 +65,24 @@ func (u *UnlockCommandRunner) Run(ctx *command.Context, _ *CommentCommand) {
 
 	var numLocks int
 	if err == nil && !hasLabel {
-		numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, baseRepo.FullName, pullNum)
+		if cmd.ProjectName != "" {
+			numLocks, err = u.deleteLockCommand.DeleteLocksByProject(ctx.Log, baseRepo.FullName, pullNum, cmd.ProjectName)
+			if err != nil {
+				vcsMessage = fmt.Sprintf("Could not unlock project %q: %s", cmd.ProjectName, err)
+			}
+		} else {
+			numLocks, err = u.deleteLockCommand.DeleteLocksByPull(ctx.Log, baseRepo.FullName, pullNum)
+			if err != nil {
+				vcsMessage = "Failed to delete PR locks"
+			}
+		}
 		if err != nil {
-			vcsMessage = "Failed to delete PR locks"
-			ctx.Log.Err("failed to delete locks by pull %s", err.Error())
+			ctx.Log.Err("deleting locks for pull %d - %s", pullNum, err)
 		}
 	}
 
 	// if there are no locks to delete, no errors, and SilenceNoProjects is enabled, don't comment
-	if err == nil && numLocks == 0 {
+	if err == nil && !hasLabel && numLocks == 0 {
 		ctx.Log.Info("No locks to delete")
 		if u.SilenceNoProjects {
 			return

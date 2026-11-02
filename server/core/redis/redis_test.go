@@ -810,7 +810,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 		})
 	Ok(t, err)
 
-	err = rdb.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
+	err = rdb.UpdateProjectStatus(pull, "default", ".", "", models.DiscardedPlanStatus)
 	Ok(t, err)
 
 	status, err := rdb.GetPullStatus(pull)
