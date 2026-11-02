@@ -29,7 +29,7 @@ Consulta <www.runatlantis.io> para más información.
 
 ## Primeros pasos
 
-La forma más fácil de probar Atlantis con Bitbucket es ejecutar Atlantis localmente en tu propia computadora. Con el tiempo querrás desplegarlo como una aplicación independiente, pero esta es la forma más fácil de probarlo. Sigue [estas instrucciones](https://www.runatlantis.io/guide/getting-started.html) para poner Atlantis en ejecución localmente.
+La forma más fácil de probar Atlantis con Bitbucket es ejecutar Atlantis localmente en tu propia computadora. Con el tiempo querrás desplegarlo como una aplicación independiente, pero esta es la forma más fácil de probarlo. Sigue [estas instrucciones](../../guide/testing-locally.md) para poner Atlantis en ejecución localmente.
 
 Crear un Pull Request
 Si ya tienes el webhook de Atlantis configurado para tu repositorio y Atlantis está en ejecución, es momento de crear un nuevo pull request. Recomiendo agregar un `null_resource` a uno de tus archivos de Terraform para el pull request de prueba. En realidad no creará nada, así que es seguro usarlo como prueba.
@@ -64,7 +64,7 @@ Atlantis está escuchando comentarios del pull request y ejecutará `terraform a
 
 ### Aprobaciones de Pull Request
 
-Si no quieres que cualquiera pueda `terraform apply`, puedes ejecutar Atlantis con `--require-approval` o agregar esa configuración a tu [archivo atlantis.yaml](https://www.runatlantis.io/docs/command-requirements.html#approved).
+Si no quieres que cualquiera pueda `terraform apply`, puedes ejecutar Atlantis con `--require-approval` o agregar esa configuración a tu [archivo atlantis.yaml](../../docs/command-requirements.md#approved).
 
 Esto asegurará que el pull request haya sido aprobado antes de que alguien pueda ejecutar `apply`.
 
