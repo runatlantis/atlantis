@@ -384,6 +384,63 @@ func TestAPIController_PlanRecoversFromProjectPanicAndUnlocks(t *testing.T) {
 
 			Equals(t, http.StatusInternalServerError, w.Code)
 			projectCommandRunner.VerifyWasCalled(Times(2)).Plan(Any[command.ProjectContext]())
+			// The legacy response renders a project error as {}, so check
+			// which project errored and which planned.
+			var result struct {
+				ProjectResults []struct {
+					ProjectName string
+					Error       json.RawMessage
+					PlanSuccess *models.PlanSuccess
+				}
+			}
+			Ok(t, json.Unmarshal(w.Body.Bytes(), &result))
+			Equals(t, 2, len(result.ProjectResults))
+			for _, r := range result.ProjectResults {
+				if r.ProjectName == "a" {
+					Equals(t, "{}", string(r.Error))
+					Assert(t, r.PlanSuccess == nil, "expected no plan for the panicking project")
+				} else {
+					Equals(t, "null", string(r.Error))
+					Assert(t, r.PlanSuccess != nil, "expected project %q to plan", r.ProjectName)
+				}
+			}
+		})
+	}
+}
+
+func TestAPIController_PlanUnlocksWhenAWorkflowHookPanics(t *testing.T) {
+	for _, parallelPlan := range []bool{false, true} {
+		t.Run(fmt.Sprintf("parallel=%t", parallelPlan), func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+				config.allowUnlockByPull = false
+			})
+			ac.ParallelPoolSize = 2
+			ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+			stubPlanCommandPerProject(projectCommandBuilder, parallelPlan)
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+				ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+			When(ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).
+				Then(func(args []Param) ReturnValues {
+					if args[1].(*events.CommentCommand).ProjectName == "b" {
+						panic("boom")
+					}
+					return ReturnValues{nil}
+				})
+
+			body, _ := json.Marshal(controllers.APIRequest{
+				Repository: "Repo",
+				Ref:        "main",
+				Type:       "Gitlab",
+				Projects:   []string{"a", "b"},
+			})
+			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+
+			func() {
+				defer func() { Equals(t, "boom", recover()) }()
+				ac.Plan(w, req)
+			}()
 		})
 	}
 }

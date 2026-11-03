@@ -703,11 +703,15 @@ func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, rem
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *command.Result, err error) {
-	// The callers only unlock after a successful apiPlan, so an error after
-	// some plans ran would leave their project locks behind.
+	// The callers only unlock after a successful apiPlan, so an error or a
+	// panic after some plans ran would leave their project locks behind.
 	defer func() {
-		if err != nil && !ctx.CommandSkipped {
+		r := recover()
+		if (err != nil || r != nil) && !ctx.CommandSkipped {
 			a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+		}
+		if r != nil {
+			panic(r)
 		}
 	}()
 
