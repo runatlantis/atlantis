@@ -43,6 +43,7 @@ jobs:
             markdown:
               - '**.md'
               - '.github/workflows/markdown-lint.yml'
+              - '.github/markdown-toc/**'
 
   markdown-toc:
     needs: [changes]
@@ -64,11 +65,12 @@ jobs:
           node-version: 24
 
       - name: Install markdown-toc
-        run: npm install --global markdown-toc@1.2.0
+        # From the lockfile, so every transitive dependency is pinned by hash.
+        run: npm ci --prefix .github/markdown-toc --no-audit --no-fund
 
       - name: Verify markdown TOC
         run: |
-          markdown-toc --bullets "-" -i CONTRIBUTING.md
+          .github/markdown-toc/node_modules/.bin/markdown-toc --bullets "-" -i CONTRIBUTING.md
 
           git diff --exit-code -- CONTRIBUTING.md || {
             echo "markdown table of contents is out of date"
