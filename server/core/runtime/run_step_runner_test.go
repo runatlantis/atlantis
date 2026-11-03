@@ -243,3 +243,60 @@ func TestRunStepRunner_Run(t *testing.T) {
 		}
 	}
 }
+
+// TestRunStepRunner_Run_HideOnError checks that a failing command configured
+// with `output: hide` never carries its output into the returned error, neither
+// in the string posted to the PR nor in the job log message, while `show`
+// keeps reporting it.
+func TestRunStepRunner_Run_HideOnError(t *testing.T) {
+	const secret = "hunter2-token"
+	cases := []struct {
+		Name              string
+		PostProcessOutput []valid.PostProcessRunOutputOption
+		ExpContainsSecret bool
+	}{
+		{
+			Name:              "hide",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+			ExpContainsSecret: false,
+		},
+		{
+			Name:              "show",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpContainsSecret: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			terraform := tfclientmocks.NewMockClient()
+			When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
+				ThenReturn(nil)
+			defaultVersion, err := version.NewVersion("0.11.0")
+			Ok(t, err)
+			r := runtime.RunStepRunner{
+				TerraformExecutor:       terraform,
+				DefaultTFDistribution:   tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader()),
+				DefaultTFVersion:        defaultVersion,
+				ProjectCmdOutputHandler: jobmocks.NewMockProjectCommandOutputHandler(),
+			}
+			ctx := command.ProjectContext{
+				Log:       logging.NewNoopLogger(t),
+				Workspace: "default",
+			}
+			envs := map[string]string{"SECRET": secret}
+
+			// streamOutput is false so JobMessage falls back to the full error text.
+			out, err := r.Run(ctx, nil, "echo $SECRET; exit 1", t.TempDir(), envs, false, c.PostProcessOutput, nil)
+			Equals(t, "", out)
+			ErrContains(t, "exit status 1: running \"echo $SECRET; exit 1\" in", err)
+
+			jobErr, ok := err.(interface{ JobMessage() string })
+			Assert(t, ok, "error %T should expose JobMessage()", err)
+			for name, msg := range map[string]string{"Error()": err.Error(), "JobMessage()": jobErr.JobMessage()} {
+				got := strings.Contains(msg, secret)
+				Assert(t, got == c.ExpContainsSecret, "%s = %q: contains secret = %v, want %v", name, msg, got, c.ExpContainsSecret)
+			}
+		})
+	}
+}

@@ -4,7 +4,9 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -69,6 +71,9 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	if err := EnsurePlanFileDir(ctx, path); err != nil {
 		return "", err
 	}
+	if err := removeNonRegularPlanFile(planFile); err != nil {
+		return "", err
+	}
 	planCmd := p.buildPlanCmd(ctx, extraArgs, path, tfVersion, planFile)
 	output, err := p.TerraformExecutor.RunCommandWithVersion(ctx, filepath.Clean(path), planCmd, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if p.isRemoteOpsErr(output, err) {
@@ -119,6 +124,9 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 
 	// We also prepend our own remote ops header to the file so during apply we
 	// know this is a remote apply.
+	if err := removeNonRegularPlanFile(planFile); err != nil {
+		return output, err
+	}
 	err = os.WriteFile(planFile, []byte(remoteOpsHeader+planOutput), 0600)
 	if err != nil {
 		return output, fmt.Errorf("unable to create planfile for remote ops: %w", err)
@@ -128,6 +136,29 @@ func (p *planStepRunner) remotePlan(ctx command.ProjectContext, extraArgs []stri
 	}
 
 	return p.fmtPlanOutput(output, tfVersion), nil
+}
+
+// removeNonRegularPlanFile deletes planFile when it already exists as anything
+// other than a regular file. With the default share-plan-dir the plan file
+// lives inside the cloned project directory, so a pull request can commit a
+// symlink at that path; terraform plan -out and os.WriteFile both follow it
+// and would write outside the clone. os.Remove acts on the link itself, never
+// its target, so the following write creates a fresh regular file.
+func removeNonRegularPlanFile(planFile string) error {
+	info, err := os.Lstat(planFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspecting existing plan file: %w", err)
+	}
+	if info.Mode().IsRegular() {
+		return nil
+	}
+	if err := os.Remove(planFile); err != nil {
+		return fmt.Errorf("removing non-regular plan file: %w", err)
+	}
+	return nil
 }
 
 func (p *planStepRunner) buildPlanCmd(ctx command.ProjectContext, extraArgs []string, path string, tfVersion *version.Version, planFile string) []string {

@@ -602,7 +602,7 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 			if allowCustomWorkflows {
 				// If we allow CustomWorkflows we need to check that workflow name is defined inside repo and not global.
 				if mapContainsF(rCfg.Workflows, name) {
-					break
+					continue
 				}
 			}
 

@@ -1683,6 +1683,7 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
+		e2ePullReqStatusFetcher,
 		projectCommandBuilder,
 		projectCommandRunner,
 	)

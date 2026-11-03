@@ -1389,6 +1389,57 @@ func TestAPIController_Plan_SkipsIgnoredPathsWithoutShiftingHookCommands(t *test
 	Equals(t, "kept-workspace", capturedCmd.Workspace)
 }
 
+func TestAPIController_Plan_InvalidPathDirectory(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	for _, dir := range []string{"../../etc", "/etc", "sub/../../x"} {
+		body, _ := json.Marshal(controllers.APIRequest{
+			Repository: "Repo",
+			Ref:        "main",
+			Type:       "Gitlab",
+			Paths: []controllers.APIRequestPath{
+				{Directory: dir, Workspace: "default"},
+			},
+		})
+
+		req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+		req.Header.Set(atlantisTokenHeader, atlantisToken)
+		w := httptest.NewRecorder()
+		ac.Plan(w, req)
+
+		Equals(t, http.StatusBadRequest, w.Code)
+		Assert(t, strings.Contains(w.Body.String(), "invalid directory"),
+			"expected invalid directory error for %q, got: %s", dir, w.Body.String())
+	}
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+}
+
+func TestAPIController_Plan_ValidPathDirectory(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Paths: []controllers.APIRequestPath{
+			{Directory: "project1", Workspace: "default"},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Plan(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	_, capturedCmd := projectCommandBuilder.VerifyWasCalledOnce().
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, "project1", capturedCmd.RepoRelDir)
+	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+}
+
 func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
 		config.allowUnlockByPull = false
@@ -1518,6 +1569,7 @@ func TestAPIController_ListLocks(t *testing.T) {
 	ac.Locker.(*MockLocker).EXPECT().List().Return(mockLocks, nil)
 
 	req, _ := http.NewRequest("GET", "", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListLocks(w, req)
 	Equals(t, http.StatusOK, w.Code)
@@ -2367,6 +2419,7 @@ func TestAPIController_ListLocksEmpty(t *testing.T) {
 	ac.Locker.(*MockLocker).EXPECT().List().Return(mockLocks, nil)
 
 	req, _ := http.NewRequest("GET", "", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListLocks(w, req)
 	Equals(t, http.StatusOK, w.Code)
@@ -2385,6 +2438,7 @@ func TestAPIController_ListLocksErrorReturnsLegacyShape(t *testing.T) {
 	ac.Locker.(*MockLocker).EXPECT().List().Return(nil, errors.New("lock list failed"))
 
 	req, _ := http.NewRequest("GET", "", nil)
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.ListLocks(w, req)
 
@@ -2394,6 +2448,48 @@ func TestAPIController_ListLocksErrorReturnsLegacyShape(t *testing.T) {
 	Ok(t, json.Unmarshal(responseBody, &legacyErr))
 	Equals(t, "lock list failed", legacyErr["error"])
 	Assert(t, !strings.Contains(string(responseBody), "\"success\""), "legacy locks error must not use success envelope: %s", responseBody)
+}
+
+func TestAPIController_ListLocks_RequiresTokenWhenSecretConfigured(t *testing.T) {
+	cases := []struct {
+		name  string
+		token string
+	}{
+		{name: "missing token", token: ""},
+		{name: "wrong token", token: "wrong-token"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, _, _ := setup(t)
+			// No EXPECT().List() is registered: gomock fails the test if the
+			// locker is called before authentication succeeds.
+
+			req, _ := http.NewRequest("GET", "", nil)
+			if c.token != "" {
+				req.Header.Set(atlantisTokenHeader, c.token)
+			}
+			w := httptest.NewRecorder()
+			ac.ListLocks(w, req)
+
+			Equals(t, http.StatusUnauthorized, w.Code)
+		})
+	}
+}
+
+func TestAPIController_ListLocks_NoSecretStaysOpen(t *testing.T) {
+	ac, _, _ := setup(t)
+	ac.APISecret = nil
+	ac.Locker.(*MockLocker).EXPECT().List().Return(map[string]models.ProjectLock{}, nil)
+
+	req, _ := http.NewRequest("GET", "", nil)
+	w := httptest.NewRecorder()
+	ac.ListLocks(w, req)
+
+	Equals(t, http.StatusOK, w.Code)
+	responseBody, _ := io.ReadAll(w.Result().Body)
+	var result controllers.ListLocksResult
+	Ok(t, json.Unmarshal(responseBody, &result))
+	Equals(t, 0, len(result.Locks))
 }
 
 type apiControllerTestConfig struct {

@@ -25,9 +25,59 @@ func TestRequestLogger_WebAuthentication(t *testing.T) {
 	tests := []struct {
 		name           string
 		path           string
+		user           string
+		pass           string
 		expStatus      int
 		expNextHandler bool
 	}{
+		{
+			name:           "correct credentials are accepted",
+			path:           "/",
+			user:           "user",
+			pass:           "password",
+			expStatus:      http.StatusNoContent,
+			expNextHandler: true,
+		},
+		{
+			name:           "wrong password is rejected",
+			path:           "/",
+			user:           "user",
+			pass:           "passwore",
+			expStatus:      http.StatusUnauthorized,
+			expNextHandler: false,
+		},
+		{
+			name:           "wrong username is rejected even with the right password",
+			path:           "/",
+			user:           "admin",
+			pass:           "password",
+			expStatus:      http.StatusUnauthorized,
+			expNextHandler: false,
+		},
+		{
+			name:           "credentials longer than the real ones are rejected",
+			path:           "/",
+			user:           "user",
+			pass:           "password-and-more",
+			expStatus:      http.StatusUnauthorized,
+			expNextHandler: false,
+		},
+		{
+			name:           "empty password is rejected",
+			path:           "/",
+			user:           "user",
+			pass:           "",
+			expStatus:      http.StatusUnauthorized,
+			expNextHandler: false,
+		},
+		{
+			name:           "credentials that are a prefix of the real ones are rejected",
+			path:           "/",
+			user:           "use",
+			pass:           "passwor",
+			expStatus:      http.StatusUnauthorized,
+			expNextHandler: false,
+		},
 		{
 			name:           "ready endpoint is public",
 			path:           "/readyz",
@@ -53,6 +103,9 @@ func TestRequestLogger_WebAuthentication(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			responseWriter := negroni.NewResponseWriter(recorder)
 			request := httptest.NewRequest(http.MethodGet, test.path, nil)
+			if test.user != "" {
+				request.SetBasicAuth(test.user, test.pass)
+			}
 			nextHandlerCalled := false
 
 			requestLogger.ServeHTTP(responseWriter, request, func(w http.ResponseWriter, _ *http.Request) {

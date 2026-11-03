@@ -375,6 +375,9 @@ func (g *Client) getPRReviews(repo models.Repo, pull models.PullRequest) (Github
 // PullIsApproved returns true if the pull request was approved.
 func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	logger.Debug("Checking if GitHub pull request %d is approved", pull.Num)
+	// Every page must be read before deciding: a later page can hold a
+	// CHANGES_REQUESTED that supersedes an approval on an earlier page.
+	effective := newEffectiveReviews()
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -391,20 +394,77 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 			return approvalStatus, fmt.Errorf("getting reviews: %w", err)
 		}
 		for _, review := range pageReviews {
-			if review != nil && review.GetState() == "APPROVED" {
-				return models.ApprovalStatus{
-					IsApproved: true,
-					ApprovedBy: *review.User.Login,
-					Date:       review.SubmittedAt.Time,
-				}, nil
-			}
+			effective.record(review)
 		}
 		if resp.NextPage == 0 {
 			break
 		}
 		nextPage = resp.NextPage
 	}
+	if review := effective.firstApproval(); review != nil {
+		return models.ApprovalStatus{
+			IsApproved: true,
+			ApprovedBy: review.GetUser().GetLogin(),
+			Date:       review.GetSubmittedAt().Time,
+		}, nil
+	}
 	return approvalStatus, nil
+}
+
+// effectiveReviews tracks, for each reviewer, the review that currently
+// determines their stance on a pull request.
+//
+// GitHub keeps every review a user ever submitted, so an APPROVED row on its
+// own does not mean the approval is still in force: the same user may have
+// submitted CHANGES_REQUESTED afterwards, or a later review of theirs may
+// have been dismissed. The reviewer's latest APPROVED, CHANGES_REQUESTED or
+// DISMISSED review (by SubmittedAt, falling back to API order for equal
+// times) is their effective stance, and only an APPROVED stance grants
+// approval. DISMISSED acts as a tombstone: it grants nothing and supersedes
+// every earlier review by the same user, so a dismissal never revives an
+// older approval. COMMENTED, PENDING and any other state neither grant nor
+// revoke approval and are ignored, as are reviews with no user.
+type effectiveReviews struct {
+	latestByReviewer map[string]*github.PullRequestReview
+	// reviewers holds reviewer logins in the order they were first seen so
+	// that the reported approver is deterministic.
+	reviewers []string
+}
+
+func newEffectiveReviews() *effectiveReviews {
+	return &effectiveReviews{latestByReviewer: make(map[string]*github.PullRequestReview)}
+}
+
+func (e *effectiveReviews) record(review *github.PullRequestReview) {
+	if review == nil || review.GetUser() == nil {
+		return
+	}
+	switch review.GetState() {
+	case "APPROVED", "CHANGES_REQUESTED", "DISMISSED":
+	default:
+		return
+	}
+
+	key := review.GetUser().GetLogin()
+	existing, seen := e.latestByReviewer[key]
+	if seen && review.GetSubmittedAt().Before(existing.GetSubmittedAt().Time) {
+		return
+	}
+	if !seen {
+		e.reviewers = append(e.reviewers, key)
+	}
+	e.latestByReviewer[key] = review
+}
+
+// firstApproval returns the first reviewer's effective review that is an
+// approval, or nil when no reviewer currently approves the pull request.
+func (e *effectiveReviews) firstApproval() *github.PullRequestReview {
+	for _, key := range e.reviewers {
+		if review := e.latestByReviewer[key]; review.GetState() == "APPROVED" {
+			return review
+		}
+	}
+	return nil
 }
 
 // DiscardReviews dismisses all reviews on a pull request
