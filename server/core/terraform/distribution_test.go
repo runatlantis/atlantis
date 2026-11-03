@@ -127,7 +127,7 @@ func TestResolveTerraformVersions_MirrorAuthNotForwardedOnRedirect(t *testing.T)
 			return
 		}
 		storageURL := strings.Replace(storage.URL, "127.0.0.1", "localhost", 1)
-		http.Redirect(w, r, storageURL+r.URL.Path, http.StatusFound)
+		http.Redirect(w, r, storageURL+"/terraform/index.json", http.StatusFound)
 	}))
 	t.Cleanup(mirror.Close)
 

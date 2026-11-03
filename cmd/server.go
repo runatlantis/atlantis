@@ -153,7 +153,7 @@ const (
 	TFDownloadURLFlag                = "tf-download-url"
 	TFDownloadUsernameFlag           = "tf-download-username"
 	TFDownloadPasswordFlag           = "tf-download-password"
-	TFDownloadTokenFlag              = "tf-download-token"
+	TFDownloadTokenFlag              = "tf-download-token" // #nosec G101 -- CLI flag name, not a credential
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
