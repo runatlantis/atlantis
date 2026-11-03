@@ -5,7 +5,6 @@ package events
 
 import (
 	"fmt"
-	"runtime/debug"
 	"sort"
 	"sync"
 
@@ -13,11 +12,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/recovery"
 )
 
 type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
 
-func RunOneProjectCmd(
+func runOneProjectCmd(
 	runnerFunc prjCmdRunnerFunc,
 	cmd command.ProjectContext,
 ) command.ProjectResult {
@@ -34,21 +34,21 @@ func RunOneProjectCmd(
 	}
 }
 
-// RunOneProjectCmdRecovering is RunOneProjectCmd for callers outside the
-// command runner's panic recovery, like the parallel pool goroutines and the
-// API controller. A panic in runnerFunc is logged and becomes an errored result
-// for cmd, instead of crashing the server or skipping the caller's cleanup.
+// RunOneProjectCmdRecovering runs cmd for callers outside the command runner's
+// panic recovery, like the parallel pool goroutines and the API controller. A
+// panic in runnerFunc is logged and becomes an errored result for cmd, instead
+// of crashing the server or skipping the caller's cleanup.
 func RunOneProjectCmdRecovering(
 	runnerFunc prjCmdRunnerFunc,
 	cmd command.ProjectContext,
 ) (res command.ProjectResult) {
 	defer func() {
 		if r := recover(); r != nil {
-			cmd.Log.Err("panic running %s for project %q (dir %q, workspace %q): %v\n%s", cmd.CommandName, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, r, debug.Stack())
+			cmd.Log.Err("panic running %s for project %q (dir %q, workspace %q): %v\n%s", cmd.CommandName, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, r, recovery.Stack(3))
 			res = errorProjectResult(cmd, fmt.Errorf("panic: %v", r))
 		}
 	}()
-	return RunOneProjectCmd(runnerFunc, cmd)
+	return runOneProjectCmd(runnerFunc, cmd)
 }
 
 func runProjectCmdsParallel(
@@ -171,7 +171,7 @@ func runProjectCmds(
 ) command.Result {
 	var results []command.ProjectResult
 	for _, pCmd := range cmds {
-		res := RunOneProjectCmd(runnerFunc, pCmd)
+		res := runOneProjectCmd(runnerFunc, pCmd)
 
 		results = append(results, res)
 	}
