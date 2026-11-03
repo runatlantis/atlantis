@@ -117,4 +117,4 @@ Al bloquear el directorio, esencialmente estamos asegurando que la rama a la que
 
 En conclusión, ejecutar `terraform apply` cuando trabajas con un equipo de operadores puede ser peligroso. Considera soluciones como tu propio CI, Atlantis o Terraform Enterprise para asegurar que siempre estés trabajando a partir del código más reciente al que se le hizo `apply`.
 
-Si te gustaría probar Atlantis, puedes comenzar aquí: <https://www.runatlantis.io/guide/>
+Si te gustaría probar Atlantis, puedes comenzar aquí: [Prueba de Atlantis](../../guide/test-drive.md).
