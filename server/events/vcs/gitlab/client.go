@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-version"
@@ -31,7 +32,9 @@ import (
 const maxCommentLength = 1000000 - 100
 
 type Client struct {
-	Client *gitlab.Client
+	Client          *gitlab.Client
+	identityMu      sync.Mutex
+	currentUsername string
 	// Version is set to the server version.
 	Version *version.Version
 	// All GitLab groups configured in allowlists and policies
@@ -224,11 +227,20 @@ func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 	if user.Username == "" {
 		return false, nil
 	}
-	currentUser, _, err := g.Client.Users.CurrentUser()
-	if err != nil {
-		return false, fmt.Errorf("getting current user: %w", err)
+	g.identityMu.Lock()
+	defer g.identityMu.Unlock()
+	if g.currentUsername == "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		currentUser, _, err := g.Client.Users.CurrentUser(gitlab.WithContext(ctx))
+		if err != nil {
+			return false, fmt.Errorf("getting current user: %w", err)
+		}
+		if currentUser != nil {
+			g.currentUsername = currentUser.Username
+		}
 	}
-	return currentUser != nil && currentUser.Username != "" && strings.EqualFold(currentUser.Username, user.Username), nil
+	return g.currentUsername != "" && strings.EqualFold(g.currentUsername, user.Username), nil
 }
 
 func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {

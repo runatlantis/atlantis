@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
@@ -21,9 +22,11 @@ import (
 
 // Client represents an Azure DevOps VCS client
 type Client struct {
-	Client   *azuredevops.Client
-	ctx      context.Context
-	UserName string
+	Client     *azuredevops.Client
+	ctx        context.Context
+	UserName   string
+	identityMu sync.Mutex
+	userIDs    map[string]string
 }
 
 // NewClient returns a valid Azure DevOps client.
@@ -157,6 +160,11 @@ func (g *Client) IsAtlantisUser(repo models.Repo, user models.User) (bool, error
 		return false, nil
 	}
 	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+	g.identityMu.Lock()
+	defer g.identityMu.Unlock()
+	if id := g.userIDs[owner]; id != "" {
+		return strings.EqualFold(id, user.ID), nil
+	}
 	// Connection data identifies the PAT owner without requiring the user
 	// entitlement permissions used by the configured-user lookup for merging.
 	req, err := g.Client.NewRequest(http.MethodGet, url.PathEscape(owner)+"/_apis/connectionData", nil)
@@ -172,7 +180,11 @@ func (g *Client) IsAtlantisUser(repo models.Repo, user models.User) (bool, error
 	if connection.AuthenticatedUser.GetID() == "" {
 		return false, errors.New("authenticated user id is missing")
 	}
-	return strings.EqualFold(connection.AuthenticatedUser.GetID(), user.ID), nil
+	if g.userIDs == nil {
+		g.userIDs = make(map[string]string)
+	}
+	g.userIDs[owner] = connection.AuthenticatedUser.GetID()
+	return strings.EqualFold(g.userIDs[owner], user.ID), nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.

@@ -8,12 +8,15 @@ package bitbucketcloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
@@ -30,6 +33,8 @@ type Client struct {
 	password    string
 	BaseURL     string
 	atlantisURL string
+	identityMu  sync.Mutex
+	myUUID      string
 }
 
 // NewClient builds a bitbucket cloud client. atlantisURL is the
@@ -184,9 +189,16 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 	return pulls.Values, nil
 }
 
-// GetMyUUID looks up this client's account without sharing a global identity cache.
+// GetMyUUID caches successful account lookups for this client.
 func (b *Client) GetMyUUID() (string, error) {
-	resp, err := b.makeRequest(http.MethodGet, b.BaseURL+"/2.0/user", nil)
+	b.identityMu.Lock()
+	defer b.identityMu.Unlock()
+	if b.myUUID != "" {
+		return b.myUUID, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := b.makeRequestWithContext(ctx, http.MethodGet, b.BaseURL+"/2.0/user", nil)
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +209,8 @@ func (b *Client) GetMyUUID() (string, error) {
 	if user.UUID == nil || *user.UUID == "" {
 		return "", fmt.Errorf("current user uuid is missing")
 	}
-	return *user.UUID, nil
+	b.myUUID = *user.UUID
+	return b.myUUID, nil
 }
 
 func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
@@ -379,11 +392,15 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 }
 
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
+	return b.makeRequestWithContext(context.Background(), method, path, reqBody)
+}
+
+func (b *Client) makeRequestWithContext(ctx context.Context, method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
-	resp, err := b.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ package events
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -27,14 +26,13 @@ import (
 type identityClient struct {
 	vcs.Client
 	self bool
-	err  error
 	repo models.Repo
 	user models.User
 }
 
 func (c *identityClient) IsAtlantisUser(repo models.Repo, user models.User) (bool, error) {
 	c.repo, c.user = repo, user
-	return c.self, c.err
+	return c.self, nil
 }
 
 type countingParser struct {
@@ -63,30 +61,42 @@ func (r *countingRunner) RunCommentCommand(_ models.Repo, _ *models.Repo, _ *mod
 
 func TestHandleCommentEvent_IdentityLookup(t *testing.T) {
 	for _, test := range []struct {
-		name, author, comment              string
-		status                             int
-		body                               string
-		wantParses, wantRuns, wantComments int
+		name, author, comment               string
+		status                              int
+		body                                string
+		wantLookups, wantRuns, wantComments int
 	}{
-		{"no user-read permission", "human", "atlantis plan", 403, `{}`, 1, 1, 0},
-		{"human", "human", "atlantis plan", 200, `{"uuid":"self"}`, 1, 1, 0},
-		{"other bot", "other-bot", "atlantis plan", 200, `{"uuid":"self"}`, 1, 1, 0},
-		{"self command", "self", "atlantis plan", 200, `{"uuid":"self"}`, 0, 0, 0},
-		{"self closed PR", "self", "Atlantis commands can't be run on closed pull requests", 200, `{"uuid":"self"}`, 0, 0, 0},
-		{"self fork PR", "self", "Atlantis commands can't be run on fork pull requests", 200, `{"uuid":"self"}`, 0, 0, 0},
-		{"invalid credentials", "human", "atlantis plan", 401, `{}`, 1, 1, 0},
-		{"rate limited", "human", "atlantis plan", 429, `{}`, 1, 1, 0},
-		{"API unavailable", "human", "atlantis plan", 500, `{}`, 1, 1, 0},
-		{"network error", "human", "atlantis plan", 0, `{}`, 1, 1, 0},
-		{"malformed response", "human", "atlantis plan", 200, `{`, 1, 1, 0},
-		{"missing UUID", "human", "atlantis plan", 200, `{}`, 1, 1, 0},
+		{"no user-read permission", "human", "atlantis plan", 403, `{}`, 0, 1, 0},
+		{"human", "human", "atlantis plan", 200, `{"uuid":"self"}`, 0, 1, 0},
+		{"other bot", "other-bot", "atlantis plan", 200, `{"uuid":"self"}`, 0, 1, 0},
+		{"self plan", "self", "atlantis plan", 200, `{"uuid":"self"}`, 0, 1, 0},
+		{"self apply", "self", "atlantis apply", 200, `{"uuid":"self"}`, 0, 1, 0},
+		{"self closed PR", "self", "Atlantis commands can't be run on closed pull requests", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self fork PR", "self", "Atlantis commands can't be run on fork pull requests", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self help", "self", "atlantis help", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self flag help", "self", "atlantis --help", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self dash", "self", "atlantis -", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self suggestion", "self", "terraform plan", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"self invalid flags", "self", "atlantis plan --unknown", 200, `{"uuid":"self"}`, 1, 0, 0},
+		{"human help", "human", "atlantis help", 200, `{"uuid":"self"}`, 1, 0, 1},
+		{"human parsing error", "human", "atlantis plan '", 200, `{"uuid":"self"}`, 1, 0, 1},
+		{"ignored comment", "human", "LGTM", 500, `{}`, 0, 0, 0},
+		{"ignored self output", "self", "Atlantis plan results\n1 to add", 500, `{}`, 0, 0, 0},
+		{"invalid credentials", "human", "atlantis help", 401, `{}`, 1, 0, 1},
+		{"no identity permission", "human", "atlantis help", 403, `{}`, 1, 0, 1},
+		{"rate limited", "human", "atlantis help", 429, `{}`, 1, 0, 1},
+		{"API unavailable", "human", "atlantis help", 500, `{}`, 1, 0, 1},
+		{"network error", "human", "atlantis help", 0, `{}`, 1, 0, 1},
+		{"malformed response", "human", "atlantis help", 200, `{`, 1, 0, 1},
+		{"missing UUID", "human", "atlantis help", 200, `{}`, 1, 0, 1},
 		{"self parsing error after lookup failure", "self", "Atlantis commands can't be run on closed pull requests", 500, `{}`, 1, 0, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			comments := 0
+			comments, lookups := 0, 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case "/2.0/user":
+					lookups++
 					if test.status == 0 {
 						conn, _, err := w.(http.Hijacker).Hijack()
 						Ok(t, err)
@@ -107,7 +117,7 @@ func TestHandleCommentEvent_IdentityLookup(t *testing.T) {
 			client.BaseURL = server.URL
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
-			parser := &countingParser{parser: &events.CommentParser{ExecutableName: "atlantis", AllowCommands: []command.Name{command.Plan}}}
+			parser := &countingParser{parser: &events.CommentParser{ExecutableName: "atlantis", AllowCommands: command.AllCommentCommands}}
 			runner := &countingRunner{}
 			controller := VCSEventsController{
 				VCSClient: client, CommentParser: parser, CommandRunner: runner,
@@ -117,7 +127,8 @@ func TestHandleCommentEvent_IdentityLookup(t *testing.T) {
 			user := models.User{ID: test.author, Username: test.author}
 			response := controller.handleCommentEvent(logging.NewNoopLogger(t), repo, nil, nil, user, user, 1, test.comment, 2, models.BitbucketCloud)
 			Equals(t, 0, response.err.code)
-			Equals(t, test.wantParses, parser.calls)
+			Equals(t, 1, parser.calls)
+			Equals(t, test.wantLookups, lookups)
 			Equals(t, test.wantRuns, runner.calls)
 			Equals(t, test.wantComments, comments)
 		})
@@ -137,7 +148,7 @@ func TestCommentWebhooks_SelfAuthor(t *testing.T) {
 		t.Run(host.String(), func(t *testing.T) {
 			client := &identityClient{self: true}
 			body := "Atlantis commands can't be run on closed pull requests"
-			parser := &countingParser{}
+			parser := &countingParser{parser: &events.CommentParser{ExecutableName: "atlantis"}}
 			logger := logging.NewNoopLogger(t)
 			controller := VCSEventsController{
 				VCSClient: client, CommentParser: parser, Logger: logger,
@@ -163,15 +174,15 @@ func TestCommentWebhooks_SelfAuthor(t *testing.T) {
 			ResponseContains(t, w, http.StatusOK, "Ignoring comment authored by Atlantis")
 			Equals(t, expectedUser, client.user.Username)
 			Equals(t, host, client.repo.VCSHost.Type)
-			Equals(t, 0, parser.calls)
+			Equals(t, 1, parser.calls)
 		})
 	}
 }
 
 func TestAzureCommentPreservesCommandUser(t *testing.T) {
-	for _, lookupErr := range []error{nil, errors.New("identity lookup unavailable")} {
-		t.Run(fmt.Sprint(lookupErr), func(t *testing.T) {
-			client := &identityClient{err: lookupErr}
+	for _, self := range []bool{false, true} {
+		t.Run(fmt.Sprint(self), func(t *testing.T) {
+			client := &identityClient{self: self}
 			runner := &countingRunner{}
 			allowlist, err := events.NewRepoAllowlistChecker("*")
 			Ok(t, err)
@@ -183,7 +194,7 @@ func TestAzureCommentPreservesCommandUser(t *testing.T) {
 			w := httptest.NewRecorder()
 			controller.HandleAzureDevopsPullRequestCommentedEvent(w, azureCommentEvent(t, "atlantis plan"), "test")
 			ResponseContains(t, w, http.StatusOK, "Processing...")
-			Equals(t, models.User{ID: "comment-author-id", Username: "atlantis@example.com"}, client.user)
+			Equals(t, models.User{}, client.user)
 			Equals(t, 1, runner.calls)
 			Equals(t, models.User{Username: "human@example.com"}, runner.user)
 		})

@@ -4,11 +4,19 @@
 package vcs_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -25,7 +33,6 @@ import (
 
 func newIdentityClient(t *testing.T, host models.VCSHostType, configuredUser, identity string, status int) vcs.Client {
 	t.Helper()
-	logger := logging.NewNoopLogger(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/api/v1/version" {
@@ -56,29 +63,35 @@ func newIdentityClient(t *testing.T, host models.VCSHostType, configuredUser, id
 		}
 	}))
 	t.Cleanup(server.Close)
+	return newIdentityClientForServer(t, host, configuredUser, server.URL, server.Client())
+}
+
+func newIdentityClientForServer(t *testing.T, host models.VCSHostType, configuredUser, baseURL string, httpClient *http.Client) vcs.Client {
+	t.Helper()
+	logger := logging.NewNoopLogger(t)
 	var client vcs.Client
 	var err error
 	switch host {
 	case models.Github:
 		client, err = github.New("github.com", &github.UserCredentials{User: configuredUser, Token: "token"}, github.Config{}, 0, logger)
 	case models.BitbucketServer:
-		client, err = bitbucketserver.NewClient(server.Client(), configuredUser, "token", server.URL, "")
+		client, err = bitbucketserver.NewClient(httpClient, configuredUser, "token", baseURL, "")
 	case models.BitbucketCloud:
-		bb := bitbucketcloud.New(server.Client(), configuredUser, "token", "api@example.com", "")
-		bb.BaseURL = server.URL
+		bb := bitbucketcloud.New(httpClient, configuredUser, "token", "api@example.com", "")
+		bb.BaseURL = baseURL
 		client = bb
 	case models.Gitea:
-		client, err = gitea.New(server.URL, configuredUser, "token", 100, logger)
+		client, err = gitea.New(baseURL, configuredUser, "token", 100, logger)
 	case models.Gitlab:
 		var sdk *gitlab.Client
-		sdk, err = gitlab.NewClient("token", gitlab.WithBaseURL(server.URL))
+		sdk, err = gitlab.NewClient("token", gitlab.WithBaseURL(baseURL), gitlab.WithHTTPClient(httpClient), gitlab.WithCustomRetryMax(0))
 		client = &atlantisgitlab.Client{Client: sdk}
 	case models.AzureDevops:
 		var ado *azuredevops.Client
 		ado, err = azuredevops.New("dev.azure.com", configuredUser, "token")
-		baseURL, parseErr := url.Parse(server.URL + "/")
+		parsedURL, parseErr := url.Parse(baseURL + "/")
 		Ok(t, parseErr)
-		ado.Client.BaseURL = *baseURL
+		ado.Client.BaseURL = *parsedURL
 		client = ado
 	}
 	Ok(t, err)
@@ -152,6 +165,137 @@ func TestIsAtlantisUser_StableID(t *testing.T) {
 				Ok(t, err)
 				Equals(t, c.self, self)
 			}
+		})
+	}
+}
+
+func TestIsAtlantisUser_CachesOnlySuccessfulLookups(t *testing.T) {
+	for _, host := range []models.VCSHostType{models.Gitlab, models.Gitea, models.BitbucketCloud, models.AzureDevops} {
+		for _, failure := range []string{"forbidden", "missing identity", "malformed response"} {
+			t.Run(host.String()+"/"+failure, func(t *testing.T) {
+				var requests atomic.Int32
+				var otherAccount atomic.Bool
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					if r.URL.Path == "/api/v1/version" {
+						_, _ = fmt.Fprint(w, `{"version":"1.25.4"}`)
+						return
+					}
+					if requests.Add(1) == 1 {
+						switch failure {
+						case "forbidden":
+							w.WriteHeader(http.StatusForbidden)
+							_, _ = fmt.Fprint(w, `{}`)
+						case "missing identity":
+							_, _ = fmt.Fprint(w, `{}`)
+						case "malformed response":
+							_, _ = fmt.Fprint(w, `{`)
+						}
+						return
+					}
+					identity := "self"
+					if otherAccount.Load() {
+						identity = "other"
+					}
+					_, _ = fmt.Fprint(w, identityResponse(identity))
+				}))
+				t.Cleanup(server.Close)
+				client := newIdentityClientForServer(t, host, "configured", server.URL, server.Client())
+				repo := models.Repo{FullName: "owner/project/repo"}
+				user := models.User{Username: "self", ID: "self"}
+				self, _ := client.IsAtlantisUser(repo, user)
+				Equals(t, false, self)
+				var wg sync.WaitGroup
+				for range 12 {
+					wg.Go(func() {
+						self, err := client.IsAtlantisUser(repo, user)
+						Ok(t, err)
+						Equals(t, true, self)
+					})
+				}
+				wg.Wait()
+				Equals(t, int32(2), requests.Load())
+				otherAccount.Store(true)
+				self, err := client.IsAtlantisUser(repo, user)
+				Ok(t, err)
+				Equals(t, true, self)
+				Equals(t, int32(2), requests.Load())
+				other := newIdentityClientForServer(t, host, "configured", server.URL, server.Client())
+				self, err = other.IsAtlantisUser(repo, user)
+				Ok(t, err)
+				Equals(t, false, self)
+				Equals(t, int32(3), requests.Load())
+			})
+		}
+	}
+}
+
+func TestIsAtlantisUser_AzureOrganizationCache(t *testing.T) {
+	requests := make(map[string]int)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests[r.URL.Path]++
+		owner := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")[0]
+		_, _ = fmt.Fprint(w, identityResponse(owner))
+	}))
+	t.Cleanup(server.Close)
+	client := newIdentityClientForServer(t, models.AzureDevops, "configured", server.URL, server.Client())
+	for range 2 {
+		for _, owner := range []string{"one", "two"} {
+			self, err := client.IsAtlantisUser(models.Repo{FullName: owner + "/project/repo"}, models.User{ID: owner})
+			Ok(t, err)
+			Equals(t, true, self)
+		}
+	}
+	Equals(t, map[string]int{"/one/_apis/connectionData": 1, "/two/_apis/connectionData": 1}, requests)
+}
+
+type identityRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f identityRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func identityResponse(identity string) string {
+	return fmt.Sprintf(`{"username":%q,"login":%q,"uuid":%q,"authenticatedUser":{"id":%q}}`, identity, identity, identity, identity)
+}
+
+func TestIsAtlantisUser_Timeout(t *testing.T) {
+	for _, host := range []models.VCSHostType{models.Gitlab, models.Gitea, models.BitbucketCloud, models.AzureDevops} {
+		t.Run(host.String(), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				previous := http.DefaultTransport
+				t.Cleanup(func() { http.DefaultTransport = previous })
+				stalled := true
+				requests := 0
+				http.DefaultTransport = identityRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+					body := identityResponse("self")
+					if req.URL.Path == "/api/v1/version" {
+						body = `{"version":"1.25.4"}`
+					} else {
+						requests++
+						_, bounded := req.Context().Deadline()
+						Assert(t, bounded, "identity lookup must have a deadline")
+						if stalled {
+							<-req.Context().Done()
+							return nil, req.Context().Err()
+						}
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+				})
+				client := newIdentityClientForServer(t, host, "configured", "http://identity.test", &http.Client{})
+				repo := models.Repo{FullName: "owner/project/repo"}
+				user := models.User{Username: "self", ID: "self"}
+				start := time.Now()
+				self, err := client.IsAtlantisUser(repo, user)
+				Assert(t, errors.Is(err, context.DeadlineExceeded), "expected lookup timeout, got %v", err)
+				Equals(t, false, self)
+				Equals(t, 10*time.Second, time.Since(start))
+				stalled = false
+				self, err = client.IsAtlantisUser(repo, user)
+				Ok(t, err)
+				Equals(t, true, self)
+				Equals(t, 2, requests)
+			})
 		})
 	}
 }

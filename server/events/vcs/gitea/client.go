@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
@@ -22,11 +23,14 @@ import (
 const giteaPaginationEBreak = 500
 
 type Client struct {
-	giteaClient *gitea.Client
-	username    string
-	token       string
-	pageSize    int
-	ctx         context.Context
+	giteaClient     *gitea.Client
+	username        string
+	token           string
+	pageSize        int
+	ctx             context.Context
+	baseURL         string
+	identityMu      sync.Mutex
+	currentUsername string
 }
 
 type GiteaPRReviewSummary struct {
@@ -67,6 +71,7 @@ func New(baseURL string, username string, token string, pagesize int, logger log
 		token:       token,
 		pageSize:    pagesize,
 		ctx:         context.Background(),
+		baseURL:     baseURL,
 	}, nil
 }
 
@@ -179,11 +184,25 @@ func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 	if user.Username == "" {
 		return false, nil
 	}
-	currentUser, _, err := c.giteaClient.GetMyUserInfo()
-	if err != nil {
-		return false, fmt.Errorf("getting current user: %w", err)
+	c.identityMu.Lock()
+	defer c.identityMu.Unlock()
+	if c.currentUsername == "" {
+		ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+		defer cancel()
+		// New already checked the version; isolate this deadline from concurrent SDK calls.
+		client, err := gitea.NewClient(c.baseURL, gitea.SetToken(c.token), gitea.SetUserAgent("atlantis"), gitea.SetContext(ctx), gitea.SetGiteaVersion(""))
+		if err != nil {
+			return false, fmt.Errorf("creating identity client: %w", err)
+		}
+		currentUser, _, err := client.GetMyUserInfo()
+		if err != nil {
+			return false, fmt.Errorf("getting current user: %w", err)
+		}
+		if currentUser != nil {
+			c.currentUsername = currentUser.UserName
+		}
 	}
-	return currentUser != nil && currentUser.UserName != "" && currentUser.UserName == user.Username, nil
+	return c.currentUsername != "" && c.currentUsername == user.Username, nil
 }
 
 // HidePrevCommandComments hides the previous command comments from the pull

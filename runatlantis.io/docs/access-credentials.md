@@ -95,7 +95,7 @@ Repositories must be manually registered with the created GitHub app to allow At
 :::
 
 ::: tip NOTE
-Passing the additional flag `--gh-app-slug` will modify the name of the App when posting comments on a Pull Request.
+Atlantis uses the GitHub App slug to identify its own comments. If `--gh-app-slug` is omitted, Atlantis attempts to discover it automatically at startup. If discovery fails, Atlantis logs a warning and starts without hiding previous comments or suppressing automatic replies to its own comments. See [GitHub App slug](server-configuration.md#gh-app-slug).
 :::
 
 #### Permissions

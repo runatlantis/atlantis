@@ -681,14 +681,6 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		"pull", pullNum,
 	)
 
-	self, err := e.VCSClient.IsAtlantisUser(baseRepo, commentAuthor)
-	if err != nil {
-		logger.Warn("unable to check comment author %q, continuing command processing with error %q", commentAuthor.Username, err)
-	} else if self {
-		logger.Debug("ignoring comment authored by the atlantis account %q", commentAuthor.Username)
-		return HTTPResponse{body: "Ignoring comment authored by Atlantis"}
-	}
-
 	parseResult := e.CommentParser.Parse(comment, vcsHost)
 	if parseResult.Ignore {
 		truncated := comment
@@ -699,6 +691,16 @@ func (e *VCSEventsController) handleCommentEvent(logger logging.SimpleLogging, b
 		logger.Debug("Ignoring non-command comment: '%s'", truncated)
 		return HTTPResponse{
 			body: fmt.Sprintf("Ignoring non-command comment: %q", truncated),
+		}
+	}
+	// Preserve commands posted by automation using the Atlantis account.
+	if parseResult.CommentResponse != "" {
+		self, err := e.VCSClient.IsAtlantisUser(baseRepo, commentAuthor)
+		if err != nil {
+			logger.Warn("unable to check comment author %q, continuing command processing with error %q", commentAuthor.Username, err)
+		} else if self {
+			logger.Debug("ignoring response to comment authored by the atlantis account %q", commentAuthor.Username)
+			return HTTPResponse{body: "Ignoring comment authored by Atlantis"}
 		}
 	}
 	if parseResult.Command != nil {
