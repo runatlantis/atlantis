@@ -245,7 +245,7 @@ var testCases = []TestCase{
 		Dir:        "drift/local-file",
 		MutateFile: "e2e_trigger.tf",
 		Status:     CaseDisabled,
-		SkipReason: "Requires --enable-drift-detection server flag. Alpha feature.",
+		SkipReason: "Requires --experiments=drift-detection, --api-secret, and --enable-drift-detection. Experimental feature.",
 	},
 	{
 		Name:       "multi-project-workspace",

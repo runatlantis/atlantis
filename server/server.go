@@ -127,6 +127,7 @@ type Server struct {
 	ScheduledExecutorService       *scheduled.ExecutorService
 	DisableGlobalApplyLock         bool
 	EnableProfilingAPI             bool
+	Experiments                    []string
 	database                       db.Database
 }
 
@@ -170,10 +171,9 @@ var staticAssets embed.FS
 // its dependencies an error will be returned. This is like the main() function
 // for the server CLI command because it injects all the dependencies.
 func NewServer(userConfig UserConfig, config Config) (*Server, error) {
-	if userConfig.EnableDriftRemediation && !userConfig.EnableDriftDetection {
-		return nil, errors.New("--enable-drift-remediation requires --enable-drift-detection")
+	if err := userConfig.ValidateExperiments(); err != nil {
+		return nil, err
 	}
-
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
@@ -1187,6 +1187,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		WebPassword:                    userConfig.WebPassword,
 		ScheduledExecutorService:       scheduledExecutorService,
 		EnableProfilingAPI:             userConfig.EnableProfilingAPI,
+		Experiments:                    slices.Clone(userConfig.Experiments),
 		database:                       database,
 	}
 
@@ -1211,14 +1212,18 @@ func (s *Server) SetupRoutes() {
 	s.Router.HandleFunc("/status", s.StatusController.Get).Methods("GET")
 	s.Router.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticAssets)))
 	s.Router.HandleFunc("/events", s.VCSEventsController.Post).Methods("POST")
-	s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
-	s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
-	s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
-	s.Router.HandleFunc("/api/drift/status", s.APIController.DriftStatus).Methods("GET")
-	s.Router.HandleFunc("/api/drift/detect", s.APIController.DetectDrift).Methods("POST")
-	s.Router.HandleFunc("/api/drift/remediate/{id}", s.APIController.GetRemediationResult).Methods("GET")
-	s.Router.HandleFunc("/api/drift/remediate", s.APIController.ListRemediationResults).Methods("GET")
-	s.Router.HandleFunc("/api/drift/remediate", s.APIController.Remediate).Methods("POST")
+	if slices.Contains(s.Experiments, apiExperiment) {
+		s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
+		s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+		s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
+	}
+	if slices.Contains(s.Experiments, driftExperiment) {
+		s.Router.HandleFunc("/api/drift/status", s.APIController.DriftStatus).Methods("GET")
+		s.Router.HandleFunc("/api/drift/detect", s.APIController.DetectDrift).Methods("POST")
+		s.Router.HandleFunc("/api/drift/remediate/{id}", s.APIController.GetRemediationResult).Methods("GET")
+		s.Router.HandleFunc("/api/drift/remediate", s.APIController.ListRemediationResults).Methods("GET")
+		s.Router.HandleFunc("/api/drift/remediate", s.APIController.Remediate).Methods("POST")
+	}
 	s.Router.HandleFunc("/github-app/exchange-code", s.GithubAppController.ExchangeCode).Methods("GET")
 	s.Router.HandleFunc("/github-app/setup", s.GithubAppController.New).Methods("GET")
 	s.Router.HandleFunc("/locks", s.LocksController.DeleteLock).Methods("DELETE").Queries("id", "{id:.*}")

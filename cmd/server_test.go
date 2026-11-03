@@ -59,7 +59,7 @@ var testFlags = map[string]any{
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	BlockedExtraArgsFlag:             "-no-color,-lock-timeout",
 	AllowForkPRsFlag:                 true,
-	APISecretFlag:                    "",
+	APISecretFlag:                    "api-secret",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutomergeMethodFlag:              "squash",
@@ -81,6 +81,7 @@ var testFlags = map[string]any{
 	DiscardApprovalOnPlanFlag:        true,
 	EmojiReaction:                    "eyes",
 	ExecutableName:                   "atlantis",
+	ExperimentsFlag:                  []string{"api", "drift-detection"},
 	FailOnPreWorkflowHookError:       false,
 	GHAllowMergeableBypassApply:      false,
 	GHHostnameFlag:                   "ghhostname",
@@ -220,6 +221,9 @@ func TestExecute_Defaults(t *testing.T) {
 			Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
 		}
 	}
+	for flag, cfg := range stringSliceFlags {
+		Assert(t, slices.Equal(cfg.defaultValue, configVal(t, passedConfig, flag).([]string)), "unexpected default for "+flag)
+	}
 	for flag, cfg := range boolFlags {
 		t.Log(flag)
 		Equals(t, cfg.defaultValue, configVal(t, passedConfig, flag))
@@ -353,7 +357,6 @@ func TestUserConfigAllTested(t *testing.T) {
 	t.Log("All settings in userConfig should be tested.")
 
 	for _, userConfigKey := range getUserConfigKeysWithFlags() {
-
 		t.Run(userConfigKey, func(t *testing.T) {
 			// If a setting is configured in server.UserConfig, it should be tested here. If there is no corresponding const
 			// for specifying the flag, that probably means one *also* needs to be added to server.go
@@ -505,7 +508,11 @@ func TestExecute_EnvironmentVariables(t *testing.T) {
 	t.Log("Environment variables should work.")
 	for flag, value := range testFlags {
 		envKey := "ATLANTIS_" + strings.ToUpper(strings.ReplaceAll(flag, "-", "_"))
-		os.Setenv(envKey, fmt.Sprintf("%v", value)) // nolint: errcheck
+		envValue := fmt.Sprintf("%v", value)
+		if values, ok := value.([]string); ok {
+			envValue = strings.Join(values, ",")
+		}
+		os.Setenv(envKey, envValue) // nolint: errcheck
 		defer func(key string) { os.Unsetenv(key) }(envKey)
 	}
 	c := setup(nil, t)

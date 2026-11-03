@@ -31,17 +31,8 @@
     ],
   },
   packageRules: [
-    // enable release branches for security updates
-    {
-      matchBaseBranches: [
-        '/^release-.*/',
-      ],
-      matchUpdateTypes: [
-        'security',
-      ],
-      enabled: true,
-    },
-    // disable release branches for anything else
+    // Disable release branches. Vulnerability-fix PRs still open there,
+    // because vulnerabilityAlerts.enabled overrides this rule.
     {
       matchBaseBranches: [
         '/^release-.*/',
@@ -68,20 +59,12 @@
       ],
     },
     {
-      ignorePaths: [
-        'testing/**',
+      matchFileNames: [
+        '!testing/**',
       ],
       groupName: 'github-',
       matchPackageNames: [
         '/github-actions/',
-      ],
-    },
-    {
-      ignorePaths: [
-        'server/controllers/events/testdata/**/*.tf',
-      ],
-      matchDatasources: [
-        'terraform',
       ],
     },
     {
@@ -99,7 +82,6 @@
         'go',
         'golang',
       ],
-      versioning: 'go',
       groupName: 'go',
     },
     {
@@ -128,16 +110,6 @@
         'https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64',
       ],
     },
-    // Include testdata files for go-github updates
-    {
-      "matchPackageNames": [
-        "github.com/google/go-github"
-      ],
-      "matchDatasources": [
-        "go"
-      ],
-      "ignorePaths": []
-    }
   ],
   customManagers: [
     // Dockerfile apk/apt pins. Alpine pins use the native `apk` datasource,
