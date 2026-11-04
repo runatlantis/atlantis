@@ -40,11 +40,8 @@ func (r *RunStepRunner) Run(
 	postProcessOutput []valid.PostProcessRunOutputOption,
 	postProcessFilterRegexes []*regexp.Regexp,
 ) (string, error) {
-	tfDistribution := r.DefaultTFDistribution
+	tfDistribution := terraform.SelectDistribution(r.DefaultTFDistribution, ctx.TerraformDistribution)
 	tfVersion := r.DefaultTFVersion
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution, "", terraform.APIAuth{})
-	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}

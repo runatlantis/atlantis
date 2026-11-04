@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hashicorp/go-retryablehttp"
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/hc-install/httpclient"
 	"github.com/hashicorp/hc-install/product"
@@ -25,13 +26,9 @@ type APIAuth struct {
 	BearerToken string
 }
 
-// newMirrorHTTPClient returns an http.Client for hc-install which injects
-// auth credentials into requests made to the host of mirrorURL only, so they
-// are never sent to any other host.
-//
-// It returns nil when no credentials are configured, or no mirror host can be
-// determined, so that hc-install falls back to its default client unmodified
-// (no Transport override, and hence no related overhead).
+// newMirrorHTTPClient scopes credentials to the mirror origin on every request,
+// including redirects and retries. With no credentials it returns nil so that
+// hc-install uses its default client.
 func newMirrorHTTPClient(mirrorURL string, auth APIAuth) *http.Client {
 	if auth.BearerToken == "" && auth.Username == "" {
 		return nil
@@ -40,57 +37,78 @@ func newMirrorHTTPClient(mirrorURL string, auth APIAuth) *http.Client {
 	if err != nil || u.Host == "" {
 		return nil
 	}
-
-	client := httpclient.New()
-	switch {
-	case auth.BearerToken != "":
-		client.Transport = &bearerTokenRoundTripper{
-			host:  u.Host,
-			token: auth.BearerToken,
-			inner: client.Transport,
+	return httpclient.New(func(client *retryablehttp.Client) {
+		// This inner client follows redirects. Wrapping its transport checks
+		// each destination while preserving hc-install's retries and User-Agent.
+		switch {
+		case auth.BearerToken != "":
+			client.HTTPClient.Transport = &bearerTokenRoundTripper{
+				origin: u,
+				token:  auth.BearerToken,
+				inner:  client.HTTPClient.Transport,
+			}
+		case auth.Username != "":
+			client.HTTPClient.Transport = &basicAuthRoundTripper{
+				origin:   u,
+				username: auth.Username,
+				password: auth.Password,
+				inner:    client.HTTPClient.Transport,
+			}
 		}
-	case auth.Username != "":
-		client.Transport = &basicAuthRoundTripper{
-			host:     u.Host,
-			username: auth.Username,
-			password: auth.Password,
-			inner:    client.Transport,
-		}
-	}
-	return client
+	})
 }
 
-// bearerTokenRoundTripper injects a bearer token into requests made to host.
+// sameMirrorOrigin compares scheme, hostname and effective port. Go's default
+// redirect policy permits credentials across ports and to subdomains.
+func sameMirrorOrigin(a, b *url.URL) bool {
+	return strings.EqualFold(a.Scheme, b.Scheme) &&
+		strings.EqualFold(a.Hostname(), b.Hostname()) && urlPort(a) == urlPort(b)
+}
+
+func urlPort(u *url.URL) string {
+	if port := u.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	if strings.EqualFold(u.Scheme, "http") {
+		return "80"
+	}
+	return ""
+}
+
+// bearerTokenRoundTripper scopes bearer auth to the configured mirror origin.
 type bearerTokenRoundTripper struct {
-	host  string
-	token string
-	inner http.RoundTripper
+	origin *url.URL
+	token  string
+	inner  http.RoundTripper
 }
 
 func (rt *bearerTokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host != rt.host {
+	req = req.Clone(req.Context())
+	if !sameMirrorOrigin(req.URL, rt.origin) {
+		req.Header.Del("Authorization")
 		return rt.inner.RoundTrip(req)
 	}
-
-	req = req.Clone(req.Context())
 	req.Header.Set("Authorization", "Bearer "+rt.token)
 	return rt.inner.RoundTrip(req)
 }
 
-// basicAuthRoundTripper injects HTTP basic auth into requests made to host.
+// basicAuthRoundTripper scopes basic auth to the configured mirror origin.
 type basicAuthRoundTripper struct {
-	host     string
+	origin   *url.URL
 	username string
 	password string
 	inner    http.RoundTripper
 }
 
 func (rt *basicAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host != rt.host {
+	req = req.Clone(req.Context())
+	if !sameMirrorOrigin(req.URL, rt.origin) {
+		req.Header.Del("Authorization")
 		return rt.inner.RoundTrip(req)
 	}
-
-	req = req.Clone(req.Context())
 	req.SetBasicAuth(rt.username, rt.password)
 	return rt.inner.RoundTrip(req)
 }
@@ -102,22 +120,58 @@ type Distribution interface {
 	ResolveConstraint(context.Context, string) (*version.Version, error)
 }
 
-// NewDistribution returns the distribution implementation for Atlantis.
-// tfDownloadBaseURL is used for Terraform release listing and installs when
-// distribution is terraform (e.g. --tf-download-url); it is ignored for OpenTofu.
-// apiAuth carries optional credentials for the tfDownloadBaseURL mirror; a
-// zero value means no auth (the hc-install default).
+// NewDistribution configures the default distribution and its project overrides.
+// Terraform mirror settings are retained even when the default is OpenTofu.
 func NewDistribution(distribution string, tfDownloadBaseURL string, apiAuth APIAuth) Distribution {
-	if distribution == "opentofu" {
-		return NewDistributionOpenTofu()
-	}
 	downloadBaseURL := strings.TrimSpace(tfDownloadBaseURL)
 	httpClient := newMirrorHTTPClient(downloadBaseURL, apiAuth)
-	return &DistributionTerraform{
+	terraformDistribution := &DistributionTerraform{
 		downloader:      &TerraformDownloader{httpClient: httpClient},
 		downloadBaseURL: downloadBaseURL,
 		httpClient:      httpClient,
 	}
+	opentofuDistribution := NewDistributionOpenTofu()
+	var defaultDistribution Distribution = terraformDistribution
+	if distribution == "opentofu" {
+		defaultDistribution = opentofuDistribution
+	}
+	return &configuredDistributions{
+		Distribution: defaultDistribution,
+		terraform:    terraformDistribution,
+		opentofu:     opentofuDistribution,
+	}
+}
+
+// configuredDistributions exposes the default Distribution while retaining the
+// configured alternatives for project-specific selection.
+type configuredDistributions struct {
+	Distribution
+	terraform Distribution
+	opentofu  Distribution
+}
+
+// SelectDistribution selects a project's distribution without dropping the
+// server's mirror configuration. A nil override preserves the default.
+func SelectDistribution(defaultDistribution Distribution, override *string) Distribution {
+	if override == nil {
+		return defaultDistribution
+	}
+	if configured, ok := defaultDistribution.(*configuredDistributions); ok {
+		if *override == "opentofu" {
+			return configured.opentofu
+		}
+		return configured.terraform
+	}
+	// Standalone distributions can supply custom downloaders. Preserve those
+	// instances when the project selects the same distribution.
+	binName := "terraform"
+	if *override == "opentofu" {
+		binName = "tofu"
+	}
+	if defaultDistribution != nil && defaultDistribution.BinName() == binName {
+		return defaultDistribution
+	}
+	return NewDistribution(*override, "", APIAuth{})
 }
 
 type DistributionOpenTofu struct {
