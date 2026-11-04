@@ -7,6 +7,8 @@ These docs are for users who want to contribute to the Atlantis project. This
 can vary from writing documentation, helping the community on Slack, discussing
 issues, or writing code.
 
+To propose changes or open a pull request, start with the [contributing guide on GitHub](https://github.com/runatlantis/atlantis/blob/main/CONTRIBUTING.md).
+
 :::tip Looking to get started or use Atlantis?
 If you're new, check out the [Guide](./guide.md) or the
 [Documentation](./docs.md).
