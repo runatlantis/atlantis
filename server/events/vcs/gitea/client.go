@@ -9,11 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -23,14 +23,13 @@ import (
 const giteaPaginationEBreak = 500
 
 type Client struct {
-	giteaClient     *gitea.Client
-	username        string
-	token           string
-	pageSize        int
-	ctx             context.Context
-	baseURL         string
-	identityMu      sync.Mutex
-	currentUsername string
+	giteaClient *gitea.Client
+	username    string
+	token       string
+	pageSize    int
+	ctx         context.Context
+	baseURL     string
+	identity    common.IdentityCache
 }
 
 type GiteaPRReviewSummary struct {
@@ -184,25 +183,26 @@ func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 	if user.Username == "" {
 		return false, nil
 	}
-	c.identityMu.Lock()
-	defer c.identityMu.Unlock()
-	if c.currentUsername == "" {
-		ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
-		defer cancel()
-		// New already checked the version; isolate this deadline from concurrent SDK calls.
-		client, err := gitea.NewClient(c.baseURL, gitea.SetToken(c.token), gitea.SetUserAgent("atlantis"), gitea.SetContext(ctx), gitea.SetGiteaVersion(""))
-		if err != nil {
-			return false, fmt.Errorf("creating identity client: %w", err)
-		}
-		currentUser, _, err := client.GetMyUserInfo()
-		if err != nil {
-			return false, fmt.Errorf("getting current user: %w", err)
-		}
-		if currentUser != nil {
-			c.currentUsername = currentUser.UserName
-		}
+	username, err := c.identity.Get("", c.fetchCurrentUsername)
+	return username == user.Username, err
+}
+
+func (c *Client) fetchCurrentUsername() (string, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+	defer cancel()
+	// New already checked the version; isolate this deadline from concurrent SDK calls.
+	client, err := gitea.NewClient(c.baseURL, gitea.SetToken(c.token), gitea.SetUserAgent("atlantis"), gitea.SetContext(ctx), gitea.SetGiteaVersion(""))
+	if err != nil {
+		return "", fmt.Errorf("creating identity client: %w", err)
 	}
-	return c.currentUsername != "" && c.currentUsername == user.Username, nil
+	currentUser, _, err := client.GetMyUserInfo()
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+	if currentUser == nil {
+		return "", nil
+	}
+	return currentUser.UserName, nil
 }
 
 // HidePrevCommandComments hides the previous command comments from the pull

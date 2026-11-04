@@ -15,12 +15,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -33,8 +33,7 @@ type Client struct {
 	password    string
 	BaseURL     string
 	atlantisURL string
-	identityMu  sync.Mutex
-	myUUID      string
+	identity    common.IdentityCache
 }
 
 // NewClient builds a bitbucket cloud client. atlantisURL is the
@@ -191,11 +190,10 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 
 // GetMyUUID caches successful account lookups for this client.
 func (b *Client) GetMyUUID() (string, error) {
-	b.identityMu.Lock()
-	defer b.identityMu.Unlock()
-	if b.myUUID != "" {
-		return b.myUUID, nil
-	}
+	return b.identity.Get("", b.fetchMyUUID)
+}
+
+func (b *Client) fetchMyUUID() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	resp, err := b.makeRequestWithContext(ctx, http.MethodGet, b.BaseURL+"/2.0/user", nil)
@@ -209,8 +207,7 @@ func (b *Client) GetMyUUID() (string, error) {
 	if user.UUID == nil || *user.UUID == "" {
 		return "", fmt.Errorf("current user uuid is missing")
 	}
-	b.myUUID = *user.UUID
-	return b.myUUID, nil
+	return *user.UUID, nil
 }
 
 func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {

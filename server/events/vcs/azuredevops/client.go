@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/drmaxgit/go-azuredevops/azuredevops"
@@ -25,8 +24,7 @@ type Client struct {
 	Client     *azuredevops.Client
 	ctx        context.Context
 	UserName   string
-	identityMu sync.Mutex
-	userIDs    map[string]string
+	identities common.IdentityCache
 }
 
 // NewClient returns a valid Azure DevOps client.
@@ -160,31 +158,30 @@ func (g *Client) IsAtlantisUser(repo models.Repo, user models.User) (bool, error
 		return false, nil
 	}
 	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
-	g.identityMu.Lock()
-	defer g.identityMu.Unlock()
-	if id := g.userIDs[owner]; id != "" {
-		return strings.EqualFold(id, user.ID), nil
-	}
+	id, err := g.identities.Get(owner, func() (string, error) {
+		return g.authenticatedUserID(owner)
+	})
+	return strings.EqualFold(id, user.ID), err
+}
+
+func (g *Client) authenticatedUserID(owner string) (string, error) {
 	// Connection data identifies the PAT owner without requiring the user
 	// entitlement permissions used by the configured-user lookup for merging.
 	req, err := g.Client.NewRequest(http.MethodGet, url.PathEscape(owner)+"/_apis/connectionData", nil)
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	var connection struct {
 		AuthenticatedUser *azuredevops.IdentityRef `json:"authenticatedUser"`
 	}
 	if _, err := g.Client.Execute(g.ctx, req, &connection); err != nil {
-		return false, fmt.Errorf("getting authenticated user: %w", err)
+		return "", fmt.Errorf("getting authenticated user: %w", err)
 	}
-	if connection.AuthenticatedUser.GetID() == "" {
-		return false, errors.New("authenticated user id is missing")
+	id := connection.AuthenticatedUser.GetID()
+	if id == "" {
+		return "", errors.New("authenticated user id is missing")
 	}
-	if g.userIDs == nil {
-		g.userIDs = make(map[string]string)
-	}
-	g.userIDs[owner] = connection.AuthenticatedUser.GetID()
-	return strings.EqualFold(g.userIDs[owner], user.ID), nil
+	return id, nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.

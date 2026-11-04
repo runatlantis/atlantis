@@ -299,3 +299,81 @@ func TestIsAtlantisUser_Timeout(t *testing.T) {
 		})
 	}
 }
+
+func TestIsAtlantisUser_SharesStalledLookup(t *testing.T) {
+	for _, host := range []models.VCSHostType{models.Gitlab, models.Gitea, models.BitbucketCloud, models.AzureDevops} {
+		t.Run(host.String(), func(t *testing.T) {
+			previous := http.DefaultTransport
+			t.Cleanup(func() { http.DefaultTransport = previous })
+			var requests atomic.Int32
+			firstStarted := make(chan struct{})
+			firstFinished := make(chan struct{})
+			stalled := true
+			http.DefaultTransport = identityRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+				body := identityResponse("self")
+				switch req.URL.Path {
+				case "/api/v1/version":
+					body = `{"version":"1.25.4"}`
+				case "/other/_apis/connectionData":
+					body = identityResponse("other")
+				default:
+					first := requests.Add(1) == 1
+					if stalled {
+						if first {
+							close(firstStarted)
+							defer close(firstFinished)
+						}
+						// Use a short real deadline so a regression to a locked
+						// lookup also lets the test finish.
+						ctx, cancel := context.WithTimeout(req.Context(), 200*time.Millisecond)
+						defer cancel()
+						<-ctx.Done()
+						return nil, ctx.Err()
+					}
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})
+			client := newIdentityClientForServer(t, host, "configured", "http://identity.test", &http.Client{})
+			repo := models.Repo{FullName: "owner/project/repo"}
+			user := models.User{Username: "self", ID: "self"}
+			var wg sync.WaitGroup
+			var selves [3]bool
+			var errs [3]error
+			start := make(chan struct{})
+			for i := range errs {
+				wg.Go(func() {
+					<-start
+					selves[i], errs[i] = client.IsAtlantisUser(repo, user)
+				})
+			}
+			close(start)
+			if host == models.AzureDevops {
+				<-firstStarted
+				otherRepo := models.Repo{FullName: "other/project/repo"}
+				self, err := client.IsAtlantisUser(otherRepo, models.User{ID: "other"})
+				if err != nil || !self {
+					t.Errorf("lookup for another organization returned self=%t, err=%v", self, err)
+				}
+				select {
+				case <-firstFinished:
+					t.Error("lookup for another organization waited for the stalled lookup")
+				default:
+				}
+			}
+			wg.Wait()
+			for i, err := range errs {
+				Assert(t, errors.Is(err, context.DeadlineExceeded), "expected lookup timeout, got %v", err)
+				Equals(t, false, selves[i])
+			}
+			Equals(t, int32(1), requests.Load())
+
+			stalled = false
+			for range 2 {
+				self, err := client.IsAtlantisUser(repo, user)
+				Ok(t, err)
+				Equals(t, true, self)
+			}
+			Equals(t, int32(2), requests.Load())
+		})
+	}
+}
