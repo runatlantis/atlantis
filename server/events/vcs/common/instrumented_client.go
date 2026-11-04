@@ -199,7 +199,7 @@ func (c *InstrumentedClient) MergePull(logger logging.SimpleLogging, pull models
 
 func SetGitScopeTags(scope tally.Scope, repoFullName string, pullNum int) tally.Scope {
 	return scope.Tagged(map[string]string{
-		"base_repo": repoFullName,
-		"pr_number": strconv.Itoa(pullNum),
+		"base_repo":                  repoFullName,
+		metrics.PullRequestNumberTag: strconv.Itoa(pullNum),
 	})
 }
