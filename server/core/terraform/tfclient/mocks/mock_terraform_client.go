@@ -28,6 +28,21 @@ func NewMockClient(options ...pegomock.Option) *MockClient {
 func (mock *MockClient) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockClient) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockClient) DefaultDistribution() terraform.Distribution {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockClient().")
+	}
+	_params := []pegomock.Param{}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("DefaultDistribution", _params, []reflect.Type{reflect.TypeOf((*terraform.Distribution)(nil)).Elem()})
+	var _ret0 terraform.Distribution
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(terraform.Distribution)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *go_version.Version {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockClient().")
@@ -112,6 +127,23 @@ type VerifierMockClient struct {
 	invocationCountMatcher pegomock.InvocationCountMatcher
 	inOrderContext         *pegomock.InOrderContext
 	timeout                time.Duration
+}
+
+func (verifier *VerifierMockClient) DefaultDistribution() *MockClient_DefaultDistribution_OngoingVerification {
+	_params := []pegomock.Param{}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DefaultDistribution", _params, verifier.timeout)
+	return &MockClient_DefaultDistribution_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockClient_DefaultDistribution_OngoingVerification struct {
+	mock              *MockClient
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockClient_DefaultDistribution_OngoingVerification) GetCapturedArguments() {
+}
+
+func (c *MockClient_DefaultDistribution_OngoingVerification) GetAllCapturedArguments() {
 }
 
 func (verifier *VerifierMockClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *MockClient_DetectVersion_OngoingVerification {

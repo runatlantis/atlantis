@@ -233,10 +233,7 @@ func detectProjectTerraformVersion(ctx *command.Context, prjCfg *valid.MergedPro
 		return
 	}
 
-	var tfDistribution terraform.Distribution
-	if prjCfg.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*prjCfg.TerraformDistribution, "", terraform.APIAuth{})
-	}
+	tfDistribution := terraform.SelectDistribution(terraformClient.DefaultDistribution(), prjCfg.TerraformDistribution)
 	prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, tfDistribution, filepath.Join(repoDir, prjCfg.RepoRelDir))
 }
 

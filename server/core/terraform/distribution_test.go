@@ -106,33 +106,45 @@ func TestResolveTerraformVersions_MirrorBasicAuth(t *testing.T) {
 }
 
 func TestResolveTerraformVersions_MirrorAuthNotForwardedOnRedirect(t *testing.T) {
-	const wantToken = "my-mirror-token"
-
-	// e.g. object storage the mirror redirects to, which must not
-	// receive the mirror's credentials. Addressed via a different
-	// hostname below, as redirect header stripping ignores ports.
-	storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "" {
-			http.Error(w, "unexpected Authorization header", http.StatusBadRequest)
-			return
+	for _, auth := range []struct {
+		name   string
+		config terraform.APIAuth
+		header string
+	}{
+		{"bearer", terraform.APIAuth{BearerToken: "mirror-token"}, "Bearer mirror-token"},
+		{"basic", terraform.APIAuth{Username: "user", Password: "pass"}, "Basic dXNlcjpwYXNz"},
+	} {
+		for _, changeHost := range []bool{false, true} {
+			name := "port"
+			if changeHost {
+				name = "hostname"
+			}
+			t.Run(auth.name+"/"+name, func(t *testing.T) {
+				received := make(chan string, 1)
+				storage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					received <- r.Header.Get("Authorization")
+					w.Header().Set("content-type", "application/json")
+					_, _ = w.Write([]byte(mirrorIndexBody))
+				}))
+				t.Cleanup(storage.Close)
+				storageURL := storage.URL
+				if changeHost {
+					storageURL = strings.Replace(storageURL, "127.0.0.1", "localhost", 1)
+				}
+				mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Header.Get("Authorization") != auth.header {
+						http.Error(w, "unauthorized", http.StatusUnauthorized)
+						return
+					}
+					http.Redirect(w, r, storageURL+"/terraform/index.json", http.StatusFound)
+				}))
+				t.Cleanup(mirror.Close)
+				d := terraform.NewDistribution("terraform", mirror.URL, auth.config)
+				version, err := d.ResolveConstraint(context.Background(), "= 1.9.3")
+				Ok(t, err)
+				Equals(t, "1.9.3", version.String())
+				Equals(t, "", <-received)
+			})
 		}
-		w.Header().Set("content-type", "application/json")
-		_, _ = w.Write([]byte(mirrorIndexBody))
-	}))
-	t.Cleanup(storage.Close)
-
-	mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer "+wantToken {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		storageURL := strings.Replace(storage.URL, "127.0.0.1", "localhost", 1)
-		http.Redirect(w, r, storageURL+"/terraform/index.json", http.StatusFound)
-	}))
-	t.Cleanup(mirror.Close)
-
-	d := terraform.NewDistribution("terraform", mirror.URL, terraform.APIAuth{BearerToken: wantToken})
-	version, err := d.ResolveConstraint(context.Background(), "= 1.9.3")
-	Ok(t, err)
-	Equals(t, version.String(), "1.9.3")
+	}
 }

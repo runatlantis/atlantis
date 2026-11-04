@@ -36,11 +36,8 @@ func (p *importStepRunner) Run(ctx command.ProjectContext, extraArgs []string, p
 	if len(extraArgs) > 0 {
 		ctx.ExpandableArgs = extraArgs
 	}
-	tfDistribution := p.defaultTFDistribution
+	tfDistribution := terraform.SelectDistribution(p.defaultTFDistribution, ctx.TerraformDistribution)
 	tfVersion := p.defaultTFVersion
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution, "", terraform.APIAuth{})
-	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
