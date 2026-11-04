@@ -3,7 +3,7 @@
 ARG ALPINE_TAG=3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd
+ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
 
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.70.1
@@ -183,7 +183,7 @@ ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash
 ENV BASH_VERSION="5.3.9-r1"
 # renovate: datasource=apk depName=openssh
-ENV OPENSSH_VERSION="10.3_p1-r1"
+ENV OPENSSH_VERSION="10.3_p1-r2"
 # renovate: datasource=apk depName=dumb-init
 ENV DUMB_INIT_VERSION="1.2.5-r4"
 # renovate: datasource=apk depName=gcompat
