@@ -51,4 +51,4 @@ Help shape Atlantis! Share feedback, discuss ideas, report issues, or contribute
 - **Community meetings:** Join the conversation at an [Atlantis community meeting](https://zoom-lfx.platform.linuxfoundation.org/meetings/atlantis).
 - **Slack:** Join [CNCF Slack](https://slack.cncf.io/) and find **#atlantis** for questions and feedback, or **#atlantis-contributors** to discuss ideas and contributions.
 - **Issues:** [Report a bug or suggest an improvement](https://github.com/runatlantis/atlantis/issues).
-- **Contributing:** See the [contributing guide](https://github.com/runatlantis/atlantis/blob/main/CONTRIBUTING.md) to get started.
+- **Contributing:** See the [contributing guide](https://github.com/runatlantis/atlantis/blob/main/CONTRIBUTING.md) on GitHub to learn how to propose changes and open a pull request.
