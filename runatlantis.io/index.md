@@ -18,7 +18,7 @@ hero:
       link: /blog/2017/introducing-atlantis
     - theme: alt
       text: Join us on Slack
-      link: https://cncf-slack.netlify.app/
+      link: https://slack.cncf.io/
 
 features:
   - title: Fewer Mistakes
@@ -41,3 +41,14 @@ features:
     icon: 🌐
 
 ---
+
+<!-- markdownlint-disable MD041 -- The home layout supplies the h1. -->
+
+## Get involved
+
+Help shape Atlantis! Share feedback, discuss ideas, report issues, or contribute code and documentation.
+
+- **Community meetings:** Join the conversation at an [Atlantis community meeting](https://zoom-lfx.platform.linuxfoundation.org/meetings/atlantis).
+- **Slack:** Join [CNCF Slack](https://slack.cncf.io/) and find **#atlantis** for questions and feedback, or **#atlantis-contributors** to discuss ideas and contributions.
+- **Issues:** [Report a bug or suggest an improvement](https://github.com/runatlantis/atlantis/issues).
+- **Contributing:** See the [contributing guide](https://github.com/runatlantis/atlantis/blob/main/CONTRIBUTING.md) to get started.
