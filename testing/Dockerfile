@@ -1,4 +1,4 @@
-FROM golang:1.27.1@sha256:3680233e3204827fbdc66088528ae6d4b3d034f51d03a99d454f6de034888244
+FROM golang:1.27.3@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b
 
 RUN apt-get update && apt-get --no-install-recommends -y install unzip \
     && apt-get clean \
@@ -8,7 +8,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Install Terraform
 # renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ENV TERRAFORM_VERSION=1.16.5
+ENV TERRAFORM_VERSION=1.16.6
 RUN case "$(uname -m)" in x86_64|amd64) ARCH="amd64" ;; aarch64|arm64|armv7l) ARCH="arm64" ;; *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; esac && \
     TERRAFORM_ARCHIVE="terraform_${TERRAFORM_VERSION}_linux_${ARCH}.zip" && \
     wget -nv "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/${TERRAFORM_ARCHIVE}" && \

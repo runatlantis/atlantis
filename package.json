@@ -5,7 +5,7 @@
     "@playwright/test": "1.63.0",
     "@types/node": "24.12.4",
     "@vueuse/core": "12.8.2",
-    "esbuild": "0.27.0",
+    "esbuild": "0.28.1",
     "markdown-it-footnote": "4.0.0",
     "mermaid": "11.17.2",
     "sitemap-ts": "1.10.1",
@@ -15,12 +15,20 @@
     "vue": "3.5.44"
   },
   "overrides": {
-    "minimatch": "^10.2.1",
-    "markdown-it": "^14.2.0"
+    "minimatch": "^11.0.0",
+    "markdown-it": "^14.2.0",
+    "dompurify": "^3.4.17",
+    "katex": "^0.18.2",
+    "vitepress": {
+      "vite": "^6.4.5"
+    }
   },
   "scripts": {
     "website:dev": "vitepress dev --host localhost --port 8080 runatlantis.io",
     "website:build": "vitepress build runatlantis.io",
-    "e2e": "playwright test"
+    "website:build:versioned": "node scripts/website/build-versioned.mjs",
+    "website:test:versioned": "node --test scripts/website/versioning.test.mjs",
+    "e2e": "playwright test",
+    "website:test:adrs": "node --test scripts/website/adr.test.mjs"
   }
 }

@@ -240,23 +240,39 @@ async function sourceFiles() {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
 // Without history every file looks like it was added in the same commit, so
-// staleness cannot be told apart. translate-docs runs this in a shallow clone
-// on freshly generated pages, which must all be checked anyway.
+// staleness cannot be told apart and every translation is checked. CI checks
+// out full history: translate-docs restores pages that fail to their committed
+// translation, which is stale against the new source and must be skipped.
 const shallow = git('rev-parse', '--is-shallow-repository') === 'true';
 
+// Git blob hash of the English source each translation was generated from,
+// keyed by "<locale>/<path relative to runatlantis.io>". translate-docs writes
+// it (scripts/record-translation-sources.mjs) for every page it translates.
+const SOURCES_FILE = 'i18n.sources.json';
+const translatedFrom = existsSync(SOURCES_FILE)
+  ? JSON.parse(await readFile(SOURCES_FILE, 'utf8'))
+  : {};
+
 /**
- * Reports whether a committed translation predates a change to its English
- * source, i.e. some commit in HEAD touches the source but is not contained in
- * the translation's last commit. translate-docs regenerates those pages after
- * the change merges, so comparing them now would fail every pull request that
- * edits a translated page. Commit ancestry is used instead of dates so a pull
- * request authored before the last translation run still counts as newer.
+ * Reports whether a committed translation was generated from an older version
+ * of its English source. translate-docs regenerates those pages after the
+ * source change merges, so comparing them now would fail every pull request
+ * that edits a translated page.
+ *
+ * The recorded source hash is authoritative. Merge order is not: a translation
+ * pull request generated before a source change can merge after it. Pages with
+ * no record fall back to commit ancestry, i.e. some commit in HEAD touches the
+ * source but is not contained in the translation's last commit.
  *
  * Translations with uncommitted changes (the translate-docs output, or a
  * local edit) are never stale: that is the content being checked.
  */
-function isStale(source, target) {
-  if (shallow || git('status', '--porcelain', '--', target) !== '') return false;
+function isStale(source, target, key) {
+  if (git('status', '--porcelain', '--', target) !== '') return false;
+  if (key in translatedFrom) {
+    return translatedFrom[key] !== git('hash-object', source);
+  }
+  if (shallow) return false;
   const lastTranslated = git('log', '-1', '--format=%H', '--', target);
   if (lastTranslated === '') return false;
   return git('rev-list', '-1', `${lastTranslated}..HEAD`, '--', source) !== '';
@@ -281,7 +297,7 @@ for (const locale of locales) {
     const target = path.join(SITE_DIR, locale, relative);
     if (!existsSync(target)) continue; // not translated yet — that is allowed
     const source = path.join(SITE_DIR, relative);
-    if (isStale(source, target)) {
+    if (isStale(source, target, `${locale}/${relative.split(path.sep).join('/')}`)) {
       stale += 1;
       console.log(`~ ${target} skipped: its source changed after it was translated; translate-docs refreshes it after merge`);
       continue;

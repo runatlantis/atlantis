@@ -22,7 +22,7 @@ var commentParser = events.CommentParser{
 	GiteaUser:        "gitea-user",
 	ExecutableName:   "atlantis",
 	AllowCommands:    command.AllCommentCommands,
-	BlockedExtraArgs: events.DefaultBlockedExtraArgs,
+	BlockedExtraArgs: nil,
 }
 
 func TestNewCommentParser(t *testing.T) {
@@ -645,6 +645,44 @@ func TestParse_BlockedExtraArgs(t *testing.T) {
 			comment: "atlantis import address id -- -chdir=..",
 			expMsg:  `flag "-chdir=.." is not allowed in extra args`,
 		},
+		// Flags that make Terraform write to (or read state from) a caller-chosen
+		// path. Atlantis passes its own -out before the comment args, and
+		// Terraform's last-value-wins parsing would let a comment redirect the
+		// plan file anywhere the service account can write.
+		{
+			comment: "atlantis plan -- -out=/tmp/evil.tfplan",
+			expMsg:  `flag "-out=/tmp/evil.tfplan" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- --out=/tmp/evil.tfplan",
+			expMsg:  `flag "--out=/tmp/evil.tfplan" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -out /tmp/evil.tfplan",
+			expMsg:  `flag "-out" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis plan -- -generate-config-out=/tmp/evil.tf",
+			expMsg:  `flag "-generate-config-out=/tmp/evil.tf" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis apply -- -state=/tmp/evil.tfstate",
+			expMsg:  `flag "-state=/tmp/evil.tfstate" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis apply -- --state-out=/tmp/evil.tfstate",
+			expMsg:  `flag "--state-out=/tmp/evil.tfstate" is not allowed in extra args`,
+		},
+		{
+			comment: "atlantis state rm addr -- -backup=/tmp/evil.backup",
+			expMsg:  `flag "-backup=/tmp/evil.backup" is not allowed in extra args`,
+		},
+		// The blocklist is matched on the flag name, not on a literal spelling,
+		// so an unusual dash count cannot slip past it.
+		{
+			comment: "atlantis plan -- ---out=/tmp/evil.tfplan",
+			expMsg:  `flag "---out=/tmp/evil.tfplan" is not allowed in extra args`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.comment, func(t *testing.T) {
@@ -655,8 +693,18 @@ func TestParse_BlockedExtraArgs(t *testing.T) {
 	}
 }
 
+func TestParse_BlockedExtraArgs_DoesNotBlockPrefixes(t *testing.T) {
+	t.Log("a blocked flag name only matches that exact name, not other flags that start with it")
+	// -out is blocked; -out-of-band is a different flag and must pass through
+	// to Terraform, which will reject it itself if it does not exist.
+	r := commentParser.Parse("atlantis plan -- -outline=true", models.Github)
+	Assert(t, r.CommentResponse == "",
+		"expected no CommentResponse but got: %q", r.CommentResponse)
+	Assert(t, r.Command != nil, "expected a Command to be parsed")
+}
+
 func TestParse_CustomBlockedExtraArgs(t *testing.T) {
-	t.Log("a CommentParser with a custom BlockedExtraArgs list blocks exactly those flags and allows the defaults")
+	t.Log("a CommentParser with a custom BlockedExtraArgs list blocks those flags on top of the defaults")
 
 	customParser := events.CommentParser{
 		ExecutableName:   "atlantis",
@@ -672,14 +720,22 @@ func TestParse_CustomBlockedExtraArgs(t *testing.T) {
 			"expected CommentResponse to contain %q, got: %q", exp, r.CommentResponse)
 	})
 
-	// The default flags (-chdir etc.) should now be allowed because the
-	// custom list replaces (rather than extends) the defaults.
-	t.Run("default flag allowed when overridden", func(t *testing.T) {
-		r := customParser.Parse("atlantis plan -- -chdir=other", models.Github)
-		Assert(t, r.CommentResponse == "",
-			"expected no CommentResponse but got: %q", r.CommentResponse)
-		Assert(t, r.Command != nil, "expected a Command to be parsed")
-	})
+	// The custom list extends the defaults, so every default flag stays
+	// blocked. An operator who configured a list before the defaults grew
+	// (for example only -chdir and -plugin-dir) still gets -out blocked.
+	for _, c := range []string{
+		"atlantis plan -- -chdir=other",
+		"atlantis plan -- --plugin-dir=/tmp/evil",
+		"atlantis plan -- -out=/tmp/evil.tfplan",
+		"atlantis apply -- --state-out=/tmp/evil.tfstate",
+		"atlantis state rm addr -- -backup=/tmp/evil.backup",
+	} {
+		t.Run("default flag still blocked: "+c, func(t *testing.T) {
+			r := customParser.Parse(c, models.Github)
+			Assert(t, strings.Contains(r.CommentResponse, "is not allowed in extra args"),
+				"expected %q to be rejected, got CommentResponse %q", c, r.CommentResponse)
+		})
+	}
 
 	// Flags not in the custom list should pass through.
 	t.Run("unblocked flag allowed", func(t *testing.T) {
@@ -687,6 +743,20 @@ func TestParse_CustomBlockedExtraArgs(t *testing.T) {
 		Assert(t, r.CommentResponse == "",
 			"expected no CommentResponse but got: %q", r.CommentResponse)
 		Assert(t, r.Command != nil, "expected a Command to be parsed")
+	})
+
+	// An operator who lists one spelling gets every spelling Terraform
+	// accepts, so a single-dash entry also blocks the double-dash form.
+	t.Run("one spelling blocks all dash forms", func(t *testing.T) {
+		oneSpelling := events.CommentParser{
+			ExecutableName:   "atlantis",
+			AllowCommands:    command.AllCommentCommands,
+			BlockedExtraArgs: []string{"-no-color"},
+		}
+		r := oneSpelling.Parse("atlantis plan -- --no-color", models.Github)
+		exp := `flag "--no-color" is not allowed in extra args`
+		Assert(t, strings.Contains(r.CommentResponse, exp),
+			"expected CommentResponse to contain %q, got: %q", exp, r.CommentResponse)
 	})
 }
 
