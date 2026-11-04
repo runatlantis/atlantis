@@ -1098,6 +1098,19 @@ func (p *DefaultProjectCommandBuilder) buildProjectPlanCommand(ctx *command.Cont
 			return pcc, err
 		}
 	}
+
+	// Reject a targeted directory that does not exist before any project
+	// command is built. Failing later, in the project runner, leaves behind a
+	// per-project commit status that no subsequent plan can ever clear.
+	if cmd.ProjectName == "" && cmd.RepoRelDir != "" {
+		workspaceDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, workspace)
+		if err != nil {
+			return pcc, err
+		}
+		if err := utils.EnsureSubPathResolved(workspaceDir, filepath.Join(workspaceDir, repoRelDir)); errors.Is(err, fs.ErrNotExist) {
+			return pcc, DirNotExistErr{RepoRelDir: repoRelDir}
+		}
+	}
 	if restrictedRegexRepoCfg != nil {
 		return p.buildProjectCommandCtxWithCfg(
 			ctx,
