@@ -256,10 +256,12 @@ func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
 	cases := []struct {
 		name     string
 		abort    bool
+		panics   bool
 		expRuns  []string
 		expError string
 	}{
 		{name: "aborts when set", abort: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
+		{name: "aborts after a panic", abort: true, panics: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
 		{name: "keeps going otherwise", expRuns: []string{"p1", "p2", "p3"}},
 	}
 	for _, c := range cases {
@@ -270,12 +272,16 @@ func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
 				mu.Lock()
 				ran = append(ran, ctx.ProjectName)
 				mu.Unlock()
+				if c.panics {
+					panic("boom")
+				}
 				return command.ProjectCommandOutput{Error: errors.New("plan failed")}
 			}
+			log := logging.NewNoopLogger(t)
 			cmds := []command.ProjectContext{
-				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort},
-				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
-				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2},
+				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort, Log: log},
+				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1, Log: log},
+				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2, Log: log},
 			}
 
 			result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)

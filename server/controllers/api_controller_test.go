@@ -346,65 +346,67 @@ func TestAPIController_PlanLaterPreWorkflowHookErrorRunsEarlierPostHooksAndUnloc
 }
 
 func TestAPIController_PlanRecoversFromProjectPanicAndUnlocks(t *testing.T) {
-	for _, parallelPlan := range []bool{false, true} {
-		t.Run(fmt.Sprintf("parallel=%t", parallelPlan), func(t *testing.T) {
-			ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
-				config.allowUnlockByPull = false
-			})
-			ac.ParallelPoolSize = 2
-			ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
-			logger := logging.NewNoopLogger(t)
-			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
-				Then(func(args []Param) ReturnValues {
-					return ReturnValues{[]command.ProjectContext{{
-						CommandName:         command.Plan,
-						ProjectName:         args[1].(*events.CommentCommand).ProjectName,
-						ParallelPlanEnabled: parallelPlan,
-						Log:                 logger,
-					}}, nil}
+	cases := []struct {
+		panicIn command.Name
+		exp     []string
+	}{
+		// A failed plan skips the policy checks.
+		{panicIn: command.Plan, exp: []string{"plan a errored", "plan b ok"}},
+		{panicIn: command.PolicyCheck, exp: []string{"plan a ok", "plan b ok", "policy_check a errored", "policy_check b ok"}},
+	}
+	for _, c := range cases {
+		for _, parallel := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/parallel=%t", c.panicIn, parallel), func(t *testing.T) {
+				ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+					config.allowUnlockByPull = false
 				})
-			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
-				Then(func(args []Param) ReturnValues {
-					if args[0].(command.ProjectContext).ProjectName == "a" {
-						panic("boom")
+				ac.ParallelPoolSize = 2
+				ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+				logger := logging.NewNoopLogger(t)
+				When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+					Then(func(args []Param) ReturnValues {
+						var cmds []command.ProjectContext
+						for _, name := range []command.Name{command.Plan, command.PolicyCheck} {
+							cmds = append(cmds, command.ProjectContext{
+								CommandName:                name,
+								ProjectName:                args[1].(*events.CommentCommand).ProjectName,
+								ParallelPlanEnabled:        parallel,
+								ParallelPolicyCheckEnabled: parallel,
+								Log:                        logger,
+							})
+						}
+						return ReturnValues{cmds, nil}
+					})
+				panicInA := func(name command.Name, out command.ProjectCommandOutput) func([]Param) ReturnValues {
+					return func(args []Param) ReturnValues {
+						if name == c.panicIn && args[0].(command.ProjectContext).ProjectName == "a" {
+							panic("boom")
+						}
+						return ReturnValues{out}
 					}
-					return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+				}
+				When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+					Then(panicInA(command.Plan, command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}))
+				When(projectCommandRunner.PolicyCheck(Any[command.ProjectContext]())).
+					Then(panicInA(command.PolicyCheck, command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{{PolicySetName: "policy", Passed: true}},
+					}}))
+
+				body, _ := json.Marshal(controllers.APIRequest{
+					Repository: "Repo",
+					Ref:        "main",
+					Type:       "Gitlab",
+					Projects:   []string{"a", "b"},
 				})
+				req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+				req.Header.Set(atlantisTokenHeader, atlantisToken)
+				w := httptest.NewRecorder()
+				ac.Plan(w, req)
 
-			body, _ := json.Marshal(controllers.APIRequest{
-				Repository: "Repo",
-				Ref:        "main",
-				Type:       "Gitlab",
-				Projects:   []string{"a", "b"},
+				Equals(t, http.StatusInternalServerError, w.Code)
+				Equals(t, c.exp, projectResultStatuses(t, w.Body.Bytes()))
 			})
-			req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
-			req.Header.Set(atlantisTokenHeader, atlantisToken)
-			w := httptest.NewRecorder()
-			ac.Plan(w, req)
-
-			Equals(t, http.StatusInternalServerError, w.Code)
-			projectCommandRunner.VerifyWasCalled(Times(2)).Plan(Any[command.ProjectContext]())
-			// The legacy response renders a project error as {}, so check
-			// which project errored and which planned.
-			var result struct {
-				ProjectResults []struct {
-					ProjectName string
-					Error       json.RawMessage
-					PlanSuccess *models.PlanSuccess
-				}
-			}
-			Ok(t, json.Unmarshal(w.Body.Bytes(), &result))
-			Equals(t, 2, len(result.ProjectResults))
-			for _, r := range result.ProjectResults {
-				if r.ProjectName == "a" {
-					Equals(t, "{}", string(r.Error))
-					Assert(t, r.PlanSuccess == nil, "expected no plan for the panicking project")
-				} else {
-					Equals(t, "null", string(r.Error))
-					Assert(t, r.PlanSuccess != nil, "expected project %q to plan", r.ProjectName)
-				}
-			}
-		})
+		}
 	}
 }
 
@@ -1212,6 +1214,43 @@ func TestAPIController_ApplyProjectFailureReturnsLegacyNon2xx(t *testing.T) {
 	Assert(t, strings.Contains(string(responseBody), "\"ProjectResults\""), "expected legacy ProjectResults body: %s", responseBody)
 	Assert(t, strings.Contains(string(responseBody), "\"Error\":{}"), "expected legacy project Error object in response: %s", responseBody)
 	Assert(t, !strings.Contains(string(responseBody), "apply failed"), "legacy project Error must not be stringified: %s", responseBody)
+}
+
+func TestAPIController_ApplyContinuesAfterProjectPanicAndUnlocks(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
+		config.allowUnlockByPull = false
+	})
+	ac.Locker.(*MockLocker).EXPECT().UnlockByPull(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+	logger := logging.NewNoopLogger(t)
+	buildCommands := func(args []Param) ReturnValues {
+		cc := args[1].(*events.CommentCommand)
+		return ReturnValues{[]command.ProjectContext{{CommandName: cc.Name, ProjectName: cc.ProjectName, Log: logger}}, nil}
+	}
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(buildCommands)
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(buildCommands)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).
+		ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
+	When(projectCommandRunner.Apply(Any[command.ProjectContext]())).
+		Then(func(args []Param) ReturnValues {
+			if args[0].(command.ProjectContext).ProjectName == "a" {
+				panic("boom")
+			}
+			return ReturnValues{command.ProjectCommandOutput{ApplySuccess: "success"}}
+		})
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"a", "b"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+
+	Equals(t, http.StatusInternalServerError, w.Code)
+	Equals(t, []string{"apply a errored", "apply b ok"}, projectResultStatuses(t, w.Body.Bytes()))
 }
 
 func TestAPIController_ApplyContinuesAfterPrePlanProjectError(t *testing.T) {
@@ -2821,6 +2860,29 @@ func stubPlanCommandPerProject(builder *MockProjectCommandBuilder, parallelPlan 
 				ParallelPlanEnabled: parallelPlan,
 			}}, nil}
 		})
+}
+
+// projectResultStatuses returns "<command> <project> ok|errored" for each
+// result in a legacy API response, which renders a project error as {}.
+func projectResultStatuses(t *testing.T, body []byte) []string {
+	t.Helper()
+	var result struct {
+		ProjectResults []struct {
+			Command     command.Name
+			ProjectName string
+			Error       json.RawMessage
+		}
+	}
+	Ok(t, json.Unmarshal(body, &result))
+	var statuses []string
+	for _, r := range result.ProjectResults {
+		status := "ok"
+		if string(r.Error) != "null" {
+			status = "errored"
+		}
+		statuses = append(statuses, r.Command.String()+" "+r.ProjectName+" "+status)
+	}
+	return statuses
 }
 
 // newConcurrencyBarrier returns a func that blocks until n callers are inside
