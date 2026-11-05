@@ -23,19 +23,10 @@ func NewStateShowStepRunner(terraformExecutor TerraformExec, defaultTfDistributi
 		defaultTFDistribution: defaultTfDistribution,
 		defaultTFVersion:      defaultTfVersion,
 	}
-	return &workspaceStepRunnerDelegate{
-		terraformExecutor:     terraformExecutor,
-		defaultTfDistribution: defaultTfDistribution,
-		defaultTfVersion:      defaultTfVersion,
-		delegate:              runner,
-		existingWorkspaceOnly: true,
-	}
+	return NewWorkspaceStepRunnerDelegate(terraformExecutor, defaultTfDistribution, defaultTfVersion, runner)
 }
 
 func (p *stateShowStepRunner) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	if err := command.ValidateInspectionArgs(command.StateShow, ctx.CommentArgs); err != nil {
-		return "", err
-	}
 	if len(extraArgs) > 0 {
 		ctx.ExpandableArgs = extraArgs
 	}

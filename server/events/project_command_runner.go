@@ -1101,15 +1101,12 @@ func (p *DefaultProjectCommandRunner) Output(ctx command.ProjectContext) command
 }
 
 func (p *DefaultProjectCommandRunner) doOutput(ctx command.ProjectContext) (out *models.OutputSuccess, failure string, err error) {
-	if err := command.ValidateInspectionArgs(command.Output, ctx.CommentArgs); err != nil {
-		return nil, "", err
-	}
 	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Output, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlock()
-	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		return nil, "", err
 	}
@@ -1130,15 +1127,12 @@ func (p *DefaultProjectCommandRunner) StateList(ctx command.ProjectContext) comm
 }
 
 func (p *DefaultProjectCommandRunner) doStateList(ctx command.ProjectContext) (out *models.StateListSuccess, failure string, err error) {
-	if err := command.ValidateInspectionArgs(command.StateList, ctx.CommentArgs); err != nil {
-		return nil, "", err
-	}
 	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateList, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlock()
-	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		return nil, "", err
 	}
@@ -1159,15 +1153,12 @@ func (p *DefaultProjectCommandRunner) StateShow(ctx command.ProjectContext) comm
 }
 
 func (p *DefaultProjectCommandRunner) doStateShow(ctx command.ProjectContext) (out *models.StateShowSuccess, failure string, err error) {
-	if err := command.ValidateInspectionArgs(command.StateShow, ctx.CommentArgs); err != nil {
-		return nil, "", err
-	}
 	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateShow, p.workingDirLockMetadata(ctx))
 	if err != nil {
 		return nil, "", err
 	}
 	defer unlock()
-	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
 		return nil, "", err
 	}

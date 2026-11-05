@@ -867,11 +867,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	clone := p.WorkingDir.Clone
-	if cmdName.IsInspection() {
-		clone = p.WorkingDir.CloneForInspection
-	}
-	repoDir, err := clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -1641,7 +1637,7 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 	var repoDir string
 	var err error
 	if cmd.Name.IsInspection() {
-		repoDir, err = p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+		repoDir, err = p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
 	} else {
 		repoDir, err = p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
 	}

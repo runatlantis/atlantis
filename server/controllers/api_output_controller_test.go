@@ -76,17 +76,17 @@ func TestOutputAPIExecutesRequestedCommand(t *testing.T) {
 	})
 }
 
-func TestOutputAPIRejectsCheckoutRefresh(t *testing.T) {
+func TestOutputAPIReportsCheckoutErrors(t *testing.T) {
 	ac, builder, runner := setup(t)
 	ac.AllowAPICommands = []command.Name{command.Output}
 	ac.ProjectOutputCommandRunner = runner
-	When(ac.WorkingDir.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("", errors.New("inspection checkout is at a different commit"))
+	When(ac.WorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("", errors.New("cloning repository"))
 	req := httptest.NewRequest(http.MethodPost, "/api/output", bytes.NewBufferString(`{"Repository":"Repo","Ref":"main","Type":"Gitlab","PR":1,"Projects":["app"]}`))
 	req.Header.Set(atlantisTokenHeader, atlantisToken)
 	w := httptest.NewRecorder()
 	ac.Output(w, req)
 	Equals(t, http.StatusInternalServerError, w.Code)
-	Assert(t, strings.Contains(w.Body.String(), "different commit"), "expected checkout rejection: %s", w.Body.String())
+	Assert(t, strings.Contains(w.Body.String(), "cloning repository"), "expected checkout error: %s", w.Body.String())
 	builder.VerifyWasCalled(Never()).BuildOutputCommands(Any[*command.Context](), Any[*events.CommentCommand]())
 	runner.VerifyWasCalled(Never()).Output(Any[command.ProjectContext]())
 }

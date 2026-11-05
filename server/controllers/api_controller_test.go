@@ -5831,7 +5831,7 @@ func setupAPIProjectBuilder(t *testing.T, ac *controllers.APIController) {
 	Ok(t, os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte("version: 3\nprojects:\n- name: app\n  dir: .\n  terraform_version: v1.11.1\n"), 0600))
 	working := ac.WorkingDir.(*MockWorkingDir)
 	When(ac.WorkingDirLocker.(*MockWorkingDirLocker).TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
-	When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
+	When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
 	When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
 	ac.ProjectCommandBuilder = &events.DefaultProjectCommandBuilder{
 		ParserValidator:              &config.ParserValidator{},

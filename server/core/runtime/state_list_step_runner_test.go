@@ -4,9 +4,6 @@
 package runtime_test
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/hashicorp/go-version"
@@ -21,32 +18,26 @@ import (
 
 func TestStateListStepRunner_Run(t *testing.T) {
 	t.Run("all resources", func(t *testing.T) {
-		assertStateListStepRunnerPreservesPlan(t, []string{}, []string{"state", "list"})
+		assertStateListStepRunnerRunsCommand(t, []string{}, []string{"state", "list"})
 	})
 	t.Run("ID filter", func(t *testing.T) {
-		assertStateListStepRunnerPreservesPlan(t, []string{"-id=i-123"}, []string{"state", "list", "-id=i-123"})
+		assertStateListStepRunnerRunsCommand(t, []string{"-id=i-123"}, []string{"state", "list", "-id=i-123"})
 	})
-}
-
-func TestStateListStepRunner_DoesNotCreateMissingWorkspace(t *testing.T) {
-	assertStateListStepRunnerDoesNotCreateWorkspace(t, []string{}, []string{"state", "list"})
 }
 
 func TestStateListStepRunner_ConfiguredExtraArgs(t *testing.T) {
-	assertStateListStepRunnerPreservesPlan(t, []string{"module.app"}, []string{"state", "list", "-id=$RESOURCE_ID", "module.app"}, "-id=$RESOURCE_ID")
+	assertStateListStepRunnerRunsCommand(t, []string{"module.app"}, []string{"state", "list", "-id=$RESOURCE_ID", "module.app"}, "-id=$RESOURCE_ID")
 }
 
 func TestStateListStepRunner_UsesDefaultVersionAndDistribution(t *testing.T) {
 	assertStateListStepRunnerUsesDefaults(t, []string{}, []string{"state", "list"})
 }
 
-func assertStateListStepRunnerPreservesPlan(t *testing.T, args, want []string, extraArgs ...string) {
+func assertStateListStepRunnerRunsCommand(t *testing.T, args, want []string, extraArgs ...string) {
 	t.Helper()
 	RegisterMockTestingT(t)
 	executor := mocks.NewMockClient()
 	dir := t.TempDir()
-	plan := filepath.Join(dir, "production.tfplan")
-	Ok(t, os.WriteFile(plan, []byte("saved plan"), 0600))
 	def := version.Must(version.NewVersion("1.10.0"))
 	project := version.Must(version.NewVersion("1.11.1"))
 	distributionName := "opentofu"
@@ -63,24 +54,6 @@ func assertStateListStepRunnerPreservesPlan(t *testing.T, args, want []string, e
 		expectedCtx.ExpandableArgs = extraArgs
 	}
 	executor.VerifyWasCalledOnce().RunCommandWithVersion(expectedCtx, dir, want, map[string]string(nil), distribution, project, "production")
-	saved, err := os.ReadFile(plan)
-	Ok(t, err)
-	Equals(t, "saved plan", string(saved))
-}
-
-func assertStateListStepRunnerDoesNotCreateWorkspace(t *testing.T, args, want []string) {
-	t.Helper()
-	RegisterMockTestingT(t)
-	executor := mocks.NewMockClient()
-	tfVersion := version.Must(version.NewVersion("1.11.1"))
-	distribution := tf.NewDistribution("terraform")
-	ctx := command.ProjectContext{Log: logging.NewNoopLogger(t), CommandName: command.StateList, CommentArgs: args, Workspace: "missing"}
-	When(executor.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Eq([]string{"workspace", "show"}), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).ThenReturn("default", nil)
-	When(executor.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Eq([]string{"workspace", "select", "missing"}), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).ThenReturn("", errors.New("workspace does not exist"))
-	_, err := runtime.NewStateListStepRunner(executor, distribution, tfVersion).Run(ctx, nil, t.TempDir(), nil)
-	Assert(t, err != nil, "expected workspace selection failure")
-	executor.VerifyWasCalled(Never()).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Eq([]string{"workspace", "new", "missing"}), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
-	executor.VerifyWasCalled(Never()).RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Eq(want), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())
 }
 
 func assertStateListStepRunnerUsesDefaults(t *testing.T, args, want []string) {

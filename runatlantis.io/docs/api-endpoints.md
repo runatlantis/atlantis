@@ -130,9 +130,8 @@ from Terraform, rather than a parsed JSON value; diagnostics may accompany
 returns an empty output string. Disabled commands return HTTP 403; invalid or
 missing credentials return HTTP 401; invalid arguments return HTTP 400.
 
-These endpoints select an existing workspace and preserve saved plans and
-plan/apply status. A checkout at a different commit is rejected rather than
-reset; use a separate plan request to refresh it. Results are returned to the API caller. **Named outputs and
+These endpoints use standard checkout and workspace handling; checkout refreshes
+can discard saved plans. Results are returned to the API caller. **Named outputs and
 JSON/raw output can expose sensitive values**, and `/api/state/list` and
 `/api/state/show` can reveal infrastructure details. Review the
 [data exposure considerations](using-atlantis.md#enabling-inspection-commands)

@@ -293,16 +293,9 @@ atlantis state list [options] [ADDRESS...] -- [-id=ID]
 atlantis state show [options] ADDRESS
 ```
 
-`output`, `state list`, and `state show` read a project's saved Terraform state
-from its configured backend without running a plan or apply. These inspection
-commands do not refresh infrastructure, discard saved plans, or change plan/apply
-status. If an existing checkout is at another commit, they
-report an error instead of resetting it; run `atlantis plan` separately to refresh
-that checkout. When a checkout is missing but recoverable plans still exist,
-the command reports an error so a subsequent apply can restore those plans.
-Symbolic API refs are checked against the remote without resetting the checkout.
-They select an existing Terraform workspace and
-report an error if it cannot be selected; they do not create a missing workspace.
+`output`, `state list`, and `state show` read a project's saved state without
+running a plan or apply. They use the standard checkout, initialization, and
+workspace handling; refreshing a checkout can discard saved plans.
 
 Use `-p PROJECT`, or `-d DIRECTORY` and `-w WORKSPACE`, to select a project as with
 `import`. With no selector, the command runs for every configured project. For example:

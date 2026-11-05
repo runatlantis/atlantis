@@ -1052,10 +1052,6 @@ type mergeCreatesProjectWorkingDir struct {
 	mergeCalled bool
 }
 
-func (m *mergeCreatesProjectWorkingDir) CloneForInspection(log logging.SimpleLogging, repo models.Repo, pull models.PullRequest, workspace string) (string, error) {
-	return m.Clone(log, repo, pull, workspace)
-}
-
 func (m *mergeCreatesProjectWorkingDir) Clone(logging.SimpleLogging, models.Repo, models.PullRequest, string) (string, error) {
 	return m.repoDir, nil
 }
@@ -5951,15 +5947,13 @@ func TestDefaultProjectCommandRunner_PlanRejectsVarFileSymlinkOutsideRepo(t *tes
 	Assert(t, unlocked, "expected the project lock to be released after the rejection")
 }
 
-func TestOutputProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T) {
+func TestOutputProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
 	name := command.Output
 	t.Run(name.String(), func(t *testing.T) {
 		RegisterMockTestingT(t)
 		repoDir := t.TempDir()
-		planPath := filepath.Join(repoDir, "production.tfplan")
-		Ok(t, os.WriteFile(planPath, []byte("saved plan"), 0600))
 		working := mocks.NewMockWorkingDir()
-		When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 		step := mocks.NewMockStepRunner()
 		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
@@ -5976,22 +5970,17 @@ func TestOutputProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T) {
 		Equals(t, "", out.Failure)
 		Assert(t, out.OutputSuccess != nil, "expected successful empty output")
 		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
-		saved, err := os.ReadFile(planPath)
-		Ok(t, err)
-		Equals(t, "saved plan", string(saved))
 		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 	})
 }
 
-func TestStateListProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T) {
+func TestStateListProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
 	name := command.StateList
 	t.Run(name.String(), func(t *testing.T) {
 		RegisterMockTestingT(t)
 		repoDir := t.TempDir()
-		planPath := filepath.Join(repoDir, "production.tfplan")
-		Ok(t, os.WriteFile(planPath, []byte("saved plan"), 0600))
 		working := mocks.NewMockWorkingDir()
-		When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 		step := mocks.NewMockStepRunner()
 		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
@@ -6008,22 +5997,17 @@ func TestStateListProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T)
 		Equals(t, "", out.Failure)
 		Assert(t, out.StateListSuccess != nil, "expected successful empty output")
 		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
-		saved, err := os.ReadFile(planPath)
-		Ok(t, err)
-		Equals(t, "saved plan", string(saved))
 		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 	})
 }
 
-func TestStateShowProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T) {
+func TestStateShowProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
 	name := command.StateShow
 	t.Run(name.String(), func(t *testing.T) {
 		RegisterMockTestingT(t)
 		repoDir := t.TempDir()
-		planPath := filepath.Join(repoDir, "production.tfplan")
-		Ok(t, os.WriteFile(planPath, []byte("saved plan"), 0600))
 		working := mocks.NewMockWorkingDir()
-		When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
 		step := mocks.NewMockStepRunner()
 		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
@@ -6040,9 +6024,6 @@ func TestStateShowProjectRunner_PreservesPlanWithoutPersistentLock(t *testing.T)
 		Equals(t, "", out.Failure)
 		Assert(t, out.StateShowSuccess != nil, "expected successful empty output")
 		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
-		saved, err := os.ReadFile(planPath)
-		Ok(t, err)
-		Equals(t, "saved plan", string(saved))
 		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
 	})
 }

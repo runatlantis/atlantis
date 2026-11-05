@@ -545,15 +545,13 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
 	workingDirLocker := events.NewDefaultWorkingDirLocker()
 
-	fileWorkspace := &events.FileWorkspace{
+	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:           userConfig.DataDir,
 		LocalSharePlanDir: userConfig.SharePlanDir,
 		CheckoutMerge:     userConfig.CheckoutStrategy == "merge",
 		CheckoutDepth:     userConfig.CheckoutDepth,
 		GithubAppEnabled:  githubAppEnabled,
 	}
-
-	var workingDir events.WorkingDir = fileWorkspace
 
 	scheduledExecutorService := scheduled.NewExecutorService(
 		statsScope,
@@ -728,7 +726,6 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		planStore = local
 	}
 
-	fileWorkspace.PlanStore = planStore
 	deleteLockCommand.PlanStore = planStore
 
 	pullClosedExecutor := events.NewInstrumentedPullClosedExecutor(

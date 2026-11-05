@@ -6333,7 +6333,7 @@ func TestBuildOutputCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
 				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
 				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
 				working := mocks.NewMockWorkingDir()
-				When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				logger := logging.NewNoopLogger(t)
 				scope := metricstest.NewLoggingScope(t, logger, "inspection")
@@ -6372,7 +6372,7 @@ func TestBuildStateListCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
 				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
 				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
 				working := mocks.NewMockWorkingDir()
-				When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				logger := logging.NewNoopLogger(t)
 				scope := metricstest.NewLoggingScope(t, logger, "inspection")
@@ -6411,7 +6411,7 @@ func TestBuildStateShowCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
 				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
 				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
 				working := mocks.NewMockWorkingDir()
-				When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
 				logger := logging.NewNoopLogger(t)
 				scope := metricstest.NewLoggingScope(t, logger, "inspection")

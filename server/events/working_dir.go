@@ -49,8 +49,6 @@ type WorkingDir interface {
 	// Clone git clones headRepo, checks out the branch and then returns the
 	// absolute path to the root of the cloned repo.
 	Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
-	// CloneForInspection creates a missing checkout but never resets an existing one.
-	CloneForInspection(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error)
 	// MergeAgain refreshes the working tree if the base branch has advanced since
 	// the last clone/merge. Returns true if the working tree was updated — either
 	// because this goroutine performed the merge or because a concurrent goroutine
@@ -89,8 +87,6 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
-	// PlanStore prevents inspection from creating a checkout over plans awaiting recovery.
-	PlanStore runtime.PlanStore
 	// LocalSharePlanDir is the root directory for local Terraform plan files.
 	// If empty, DataDir is used for backward compatibility.
 	LocalSharePlanDir string
@@ -130,31 +126,18 @@ func (w *FileWorkspace) CheckoutMergeEnabled() bool {
 // the right commit it does nothing. This is to support running commands in
 // multiple dirs of the same repo without deleting existing plans.
 func (w *FileWorkspace) Clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
-	return w.clone(logger, headRepo, p, workspace, false)
-}
-
-// CloneForInspection preserves existing checkouts and their saved plans.
-func (w *FileWorkspace) CloneForInspection(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string) (string, error) {
-	return w.clone(logger, headRepo, p, workspace, true)
-}
-
-func (w *FileWorkspace) clone(logger logging.SimpleLogging, headRepo models.Repo, p models.PullRequest, workspace string, inspection bool) (string, error) {
 	cloneDir, err := w.validateCloneDir(p.BaseRepo, p, workspace)
 	if err != nil {
 		return "", err
 	}
 	c := wrappedGitContext{cloneDir, headRepo, p}
-	isAtTargetRef := w.isBranchAtTargetRef
-	if inspection {
-		isAtTargetRef = w.isInspectionAtTargetRef
-	}
 
 	// Fast path: if the directory already exists and is at the right commit,
 	// verify under a READ lock so we don't block concurrent plan operations.
 	// isBranchAtTargetRef only runs "git rev-parse" which is read-only.
 	if _, err := os.Stat(cloneDir); err == nil {
 		gitReadUnlockFn := w.gitReadLock(cloneDir)
-		isUpToDate, err := isAtTargetRef(logger, c, p.HeadCommit)
+		isUpToDate, err := w.isBranchAtTargetRef(logger, c, p.HeadCommit)
 		gitReadUnlockFn()
 		if err == nil && isUpToDate {
 			logger.Info("repo is at correct commit %q so will not re-clone (fast path)", p.HeadCommit)
@@ -167,42 +150,6 @@ func (w *FileWorkspace) clone(logger logging.SimpleLogging, headRepo models.Repo
 	gitWriteUnlockFn := w.gitWriteLock(cloneDir)
 	defer gitWriteUnlockFn()
 
-	if inspection {
-		if _, err := os.Stat(cloneDir); err == nil {
-			current, err := isAtTargetRef(logger, c, p.HeadCommit)
-			if err != nil {
-				return "", fmt.Errorf("checking inspection checkout: %w", err)
-			}
-			if !current {
-				return "", fmt.Errorf("inspection checkout is at a different commit; run atlantis plan to refresh it before inspecting")
-			}
-			return cloneDir, nil
-		} else if !os.IsNotExist(err) {
-			return "", fmt.Errorf("checking inspection checkout: %w", err)
-		}
-		if w.PlanStore != nil && p.Num > 0 {
-			workspaces, err := w.PlanStore.ListWorkspaces(p.BaseRepo.Owner, p.BaseRepo.Name, p.Num)
-			if err != nil {
-				return "", fmt.Errorf("checking pending plans before inspection: %w", err)
-			}
-			recoveryPending := len(workspaces) > 0 && workspace == DefaultWorkspace
-			for _, storedWorkspace := range workspaces {
-				storedDir, err := w.validateCloneDir(p.BaseRepo, p, storedWorkspace)
-				if err != nil {
-					return "", fmt.Errorf("checking stored-plan checkout: %w", err)
-				}
-				if _, err := os.Stat(storedDir); os.IsNotExist(err) {
-					recoveryPending = true
-				} else if err != nil {
-					return "", fmt.Errorf("checking stored-plan checkout: %w", err)
-				}
-			}
-			if recoveryPending {
-				return "", fmt.Errorf("pending plans need recovery before inspection can create a checkout; run atlantis apply to restore them or atlantis plan to replace them")
-			}
-		}
-		return cloneDir, w.forceClone(logger, c)
-	}
 	ok, err := w.attemptReuseCloneDir(logger, c, cloneDir)
 	if ok && err == nil {
 		return cloneDir, nil
@@ -211,36 +158,6 @@ func (w *FileWorkspace) clone(logger logging.SimpleLogging, headRepo models.Repo
 		logger.Err("An error occurred attempting to reuse the clone dir, falling back to forced clone. This is likely a bug please report: %v", err)
 	}
 	return cloneDir, w.forceClone(logger, c)
-}
-
-func (w *FileWorkspace) isInspectionAtTargetRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) (bool, error) {
-	if targetRef != "" && !isRawCommitRef(targetRef) {
-		remoteRef := nonPRFetchRef(targetRef)
-		cmd := exec.Command("git", "ls-remote", "--exit-code", "origin", remoteRef, remoteRef+"^{}") // #nosec G204 -- ref patterns are literal arguments after the fixed remote name.
-		cmd.Dir = c.dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return false, fmt.Errorf("resolving inspection ref %q: %w", targetRef, err)
-		}
-		resolved := ""
-		for line := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
-			fields := strings.Fields(line)
-			if len(fields) != 2 {
-				continue
-			}
-			if fields[1] == remoteRef && resolved == "" {
-				resolved = fields[0]
-			}
-			if fields[1] == remoteRef+"^{}" {
-				resolved = fields[0]
-			}
-		}
-		if resolved == "" {
-			return false, fmt.Errorf("resolving inspection ref %q: ref not found", targetRef)
-		}
-		targetRef = resolved
-	}
-	return w.isBranchAtTargetRef(logger, c, targetRef)
 }
 
 // attemptReuseCloneDir tries to reuse an existing cloneDir.

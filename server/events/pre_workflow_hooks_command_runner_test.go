@@ -5,9 +5,6 @@ package events_test
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -621,40 +618,6 @@ func TestRunPreHooksSuppressesVCSStatus(t *testing.T) {
 	}
 }
 
-func TestInspectionPreWorkflowHooksDoNotResetSavedPlans(t *testing.T) {
-	source := initRepo(t)
-	runCmd(t, source, "git", "checkout", "branch")
-	head := strings.TrimSpace(runCmd(t, source, "git", "rev-parse", "HEAD"))
-	working := &events.FileWorkspace{DataDir: t.TempDir(), TestingOverrideHeadCloneURL: "file://" + source, GpgNoSigningEnabled: true}
-	logger := logging.NewNoopLogger(t)
-	pull := models.PullRequest{Num: 1, HeadBranch: "branch", HeadCommit: head, BaseBranch: "main"}
-	dir, err := working.CloneForInspection(logger, models.Repo{}, pull, "default")
-	Ok(t, err)
-	ignorePlanFiles(t, dir)
-	plan := filepath.Join(dir, "default.tfplan")
-	createPlanFile(t, plan)
-	runCmd(t, source, "git", "commit", "--allow-empty", "-m", "new head")
-	pull.HeadCommit = strings.TrimSpace(runCmd(t, source, "git", "rev-parse", "HEAD"))
-	cfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{})
-	cfg.Repos[0].PreWorkflowHooks = []*valid.WorkflowHook{{RunCommand: "true"}}
-	cfg.Repos[0].PostWorkflowHooks = []*valid.WorkflowHook{{RunCommand: "true"}}
-	ctx := &command.Context{Pull: pull, Log: logger}
-	locker := events.NewDefaultWorkingDirLocker()
-	pre := &events.DefaultPreWorkflowHooksCommandRunner{WorkingDir: working, WorkingDirLocker: locker, GlobalCfg: cfg}
-	for _, name := range []command.Name{command.Output, command.StateList, command.StateShow} {
-		t.Run(name.String(), func(t *testing.T) {
-			cmd := &events.CommentCommand{Name: name}
-			for _, run := range []func(*command.Context, *events.CommentCommand) error{pre.RunPreHooks} {
-				err := run(ctx, cmd)
-				Assert(t, err != nil && strings.Contains(err.Error(), "different commit"), "expected safe hook setup rejection, got %v", err)
-				_, err = os.Stat(plan)
-				Ok(t, err)
-				Equals(t, head, strings.TrimSpace(runCmd(t, dir, "git", "rev-parse", "HEAD")))
-			}
-		})
-	}
-}
-
 func TestRunPreHooks_MatchesExactCommands(t *testing.T) {
 	for _, tc := range []struct {
 		commands string
@@ -680,7 +643,6 @@ func TestRunPreHooks_MatchesExactCommands(t *testing.T) {
 			preWh.GlobalCfg = valid.GlobalCfg{Repos: []valid.Repo{{ID: testdata.GithubRepo.ID(), PreWorkflowHooks: []*valid.WorkflowHook{hook}}}}
 			When(preWhWorkingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
 			When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("checkout", nil)
-			When(preWhWorkingDir.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("checkout", nil)
 			When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Any[string](), Any[string](), Any[string](), Any[string]())).ThenReturn("", "", nil)
 			Ok(t, preWh.RunPreHooks(ctx, &events.CommentCommand{Name: tc.name}))
 			if tc.want {

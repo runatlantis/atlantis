@@ -561,11 +561,7 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	}
 
 	// ensure workingDir is present
-	clone := a.WorkingDir.Clone
-	if cmdName.IsInspection() {
-		clone = a.WorkingDir.CloneForInspection
-	}
-	repoDir, err := clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
+	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
 	if err != nil {
 		return sanitizeAPIError(ctx, err)
 	}
