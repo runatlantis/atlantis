@@ -82,6 +82,10 @@ To enable the API endpoints, `api-secret` should be configured.
 
 Execute [atlantis plan](using-atlantis.md#atlantis-plan) on the specified repository.
 
+The optional `arguments` array passes literal Terraform arguments, subject to
+[`--blocked-extra-args`](server-configuration.md#blocked-extra-args) and
+[`--var-file-allowlist`](server-configuration.md#var-file-allowlist).
+
 Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) enabled are planned in parallel, up to [`--parallel-pool-size`](server-configuration.md#parallel-pool-size) at once. In that case, the [pre workflow hooks](pre-workflow-hooks.md) of every project run before the first plan starts, and the [post workflow hooks](post-workflow-hooks.md) run after the last plan finishes. Otherwise, each project's hooks run right before and after its own plan.
 
 #### Parameters
@@ -94,6 +98,7 @@ Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applie
 | Projects   | []string | No       | List of project names to run the plan    |
 | Paths      | []Path   | No       | Paths to the projects to run the plan    |
 | PR         | int      | No       | Pull Request number                      |
+| arguments  | []string | No       | Literal Terraform arguments |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
@@ -244,6 +249,9 @@ Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repo
 
 The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-api-plan), then applies them one project at a time, even when [`parallel_apply`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) is enabled.
 
+`arguments` are passed to both phases; `-parallelism=1` works in both, while
+`-target` is rejected during apply.
+
 #### Parameters
 
 | Name       | Type     | Required | Description                              |
@@ -254,6 +262,7 @@ The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-
 | Projects   | []string | No       | List of project names to run the apply   |
 | Paths      | []Path   | No       | Paths to the projects to run the apply   |
 | PR         | int      | No       | Pull Request number                      |
+| arguments  | []string | No       | Literal Terraform arguments |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.

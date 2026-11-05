@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,8 @@ type APIController struct {
 	ProjectPolicyCheckCommandRunner events.ProjectPolicyCheckCommandRunner
 	ProjectApplyCommandRunner       events.ProjectApplyCommandRunner `validate:"required"`
 	FailOnPreWorkflowHookError      bool
+	BlockedExtraArgs                []string
+	VarFileAllowlistChecker         *events.VarFileAllowlistChecker
 	PreWorkflowHooksCommandRunner   events.PreWorkflowHooksCommandRunner  `validate:"required"`
 	PostWorkflowHooksCommandRunner  events.PostWorkflowHooksCommandRunner `validate:"required"`
 	RepoAllowlistChecker            *events.RepoAllowlistChecker          `validate:"required"`
@@ -139,6 +142,7 @@ type APIRequest struct {
 	BaseBranch string `json:"base_branch,omitempty"`
 	Type       string `validate:"required"`
 	PR         int
+	Arguments  []string `json:"arguments,omitempty"`
 	Projects   []string
 	Paths      []APIRequestPath
 	// DiscoverProjects enables all-project discovery when no projects or paths
@@ -184,6 +188,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 	ignoredCommands := 0
 	nonIgnoredCommands := 0
 	for _, commentCommand := range cc {
+		commentCommand.Flags = slices.Clone(a.Arguments)
 		projectCmds, err := cmdBuilder(ctx, commentCommand)
 		if err != nil {
 			if events.IsIgnoredTargetedDir(err) {
@@ -1109,6 +1114,15 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+
+	if err := events.ValidateExtraArgs(request.Arguments, a.BlockedExtraArgs); err != nil {
+		return nil, nil, http.StatusBadRequest, err
+	}
+	if a.VarFileAllowlistChecker != nil {
+		if err := a.VarFileAllowlistChecker.Check(request.Arguments); err != nil {
+			return nil, nil, http.StatusBadRequest, err
+		}
 	}
 
 	// A workspace becomes a Terraform command argument, which Atlantis runs
