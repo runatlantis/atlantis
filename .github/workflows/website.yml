@@ -139,6 +139,11 @@ jobs:
           python3 -m http.server 8081 --directory /tmp/atlantis-versioned-docs &
           python3 -m http.server 8082 --directory /tmp/atlantis-preview-docs &
 
+          # wait until the servers accept connections before running Playwright
+          for port in 8080 8081 8082; do
+            curl --silent --show-error --fail --output /dev/null --retry 10 --retry-delay 1 --retry-connrefused "http://127.0.0.1:${port}/"
+          done
+
       - name: Run Playwright E2E tests
         env:
           ATLANTIS_VERSIONED_DOCS_URL: http://127.0.0.1:8081
