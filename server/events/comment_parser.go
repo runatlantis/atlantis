@@ -244,7 +244,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Need to have allow commands at this point.
-	if !e.isAllowedCommand(cmd) && !(cmd == "state" && (e.isAllowedCommand("state_list") || e.isAllowedCommand("state_show"))) {
+	allowed := e.isAllowedCommand(cmd)
+	if cmd == "state" {
+		allowed = allowed || e.isAllowedCommand("state_list") || e.isAllowedCommand("state_show")
+	}
+	if !allowed {
 		var allowCommandList []string
 		for _, allowCommand := range e.AllowCommands {
 			allowCommandList = append(allowCommandList, allowCommand.String())

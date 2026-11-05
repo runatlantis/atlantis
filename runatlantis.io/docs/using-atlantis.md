@@ -345,20 +345,20 @@ names, such as `platform:state_list`; authorizing `state` does not authorize the
 
 Before enabling these commands, consider who can read their results:
 
-- Results are posted to PR comments and may also appear in execution logs or job
+* Results are posted to PR comments and may also appear in execution logs or job
   output pages. Include those surfaces when reviewing access.
   `state list` reveals resource addresses and infrastructure structure;
   `state show` reveals resource attributes. Terraform can only redact values
   correctly marked as sensitive in the configuration/provider schema.
-- Plain `terraform output` redacts outputs marked sensitive. Selecting an output
+* Plain `terraform output` redacts outputs marked sensitive. Selecting an output
   by name, or using `-json` or `-raw`, can reveal sensitive values in plaintext.
   Atlantis preserves this Terraform behavior; it does not add secret detection
   or redaction. Restrict command access and PR visibility accordingly.
-- These commands use Atlantis's backend credentials. They show the saved state,
+* These commands use Atlantis's backend credentials. They show the saved state,
   which can differ from live infrastructure, and the state is shared across
   PRs targeting the same backend/workspace.
-- Custom stages and workflow hooks can mutate infrastructure; use trusted configuration.
-- The default `init` step can upgrade providers when `.terraform.lock.hcl` is
+* Custom stages and workflow hooks can mutate infrastructure; use trusted configuration.
+* The default `init` step can upgrade providers when `.terraform.lock.hcl` is
   untracked, requiring a new plan before apply.
 
 The [API equivalents](api-endpoints.md#inspection-endpoints) require separate

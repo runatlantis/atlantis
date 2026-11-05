@@ -608,15 +608,15 @@ state_list:
 state_show:
 ```
 
-| Key      | Type            | Default                   | Required | Description                           |
-|----------|-----------------|---------------------------|----------|---------------------------------------|
-| plan     | [Stage](#stage) | `steps: [init, plan]`     | no       | How to plan for this project.         |
-| apply    | [Stage](#stage) | `steps: [apply]`          | no       | How to apply for this project.        |
-| import   | [Stage](#stage) | `steps: [init, import]`   | no       | How to import for this project.       |
-| state_rm | [Stage](#stage) | `steps: [init, state_rm]` | no       | How to run state rm for this project. |
-| output | [Stage](#stage) | `steps: [init, output]` | no | How to inspect root module outputs. |
-| state_list | [Stage](#stage) | `steps: [init, state_list]` | no | How to list managed resource addresses. |
-| state_show | [Stage](#stage) | `steps: [init, state_show]` | no | How to inspect a resource in state. |
+| Key        | Type            | Default                     | Required | Description                             |
+| ---------- | --------------- | --------------------------- | -------- | --------------------------------------- |
+| plan       | [Stage](#stage) | `steps: [init, plan]`       | no       | How to plan for this project.           |
+| apply      | [Stage](#stage) | `steps: [apply]`            | no       | How to apply for this project.          |
+| import     | [Stage](#stage) | `steps: [init, import]`     | no       | How to import for this project.         |
+| state_rm   | [Stage](#stage) | `steps: [init, state_rm]`   | no       | How to run state rm for this project.   |
+| output     | [Stage](#stage) | `steps: [init, output]`     | no       | How to inspect root module outputs.     |
+| state_list | [Stage](#stage) | `steps: [init, state_list]` | no       | How to list managed resource addresses. |
+| state_show | [Stage](#stage) | `steps: [init, state_show]` | no       | How to inspect a resource in state.     |
 
 ### Stage
 
@@ -646,8 +646,8 @@ Steps can be a single string for a built-in command.
 - state_rm
 ```
 
-| Key                             | Type   | Default | Required | Description                                                                                                                  |
-|---------------------------------|--------|---------|----------|------------------------------------------------------------------------------------------------------------------------------|
+| Key                                                          | Type   | Default | Required | Description                                                                                                                                                         |
+| ------------------------------------------------------------ | ------ | ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | init/plan/apply/import/state_rm/output/state_list/state_show | string | none    | no       | Use a built-in command without additional configuration. Only `init`, `plan`, `apply`, `import`, `state_rm`, `output`, `state_list`, and `state_show` are supported |
 
 #### Built-In Command With Extra Args
@@ -667,9 +667,9 @@ A map from string to `extra_args` for a built-in command with extra arguments.
     extra_args: [arg1, arg2]
 ```
 
-| Key | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| init/plan/apply/import/state_rm/output/state_list/state_show | map\[`extra_args` -> array\[string\]\] | none | no | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import`, `state_rm`, `output`, `state_list`, and `state_show` are supported as keys and only `extra_args` is supported as a value |
+| Key                                                          | Type                                   | Default | Required | Description                                                                                                                                                                                                      |
+| ------------------------------------------------------------ | -------------------------------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| init/plan/apply/import/state_rm/output/state_list/state_show | map\[`extra_args` -> array\[string\]\] | none    | no       | Use a built-in command and append `extra_args`. Only `init`, `plan`, `apply`, `import`, `state_rm`, `output`, `state_list`, and `state_show` are supported as keys and only `extra_args` is supported as a value |
 
 #### Custom `run` Command
 
