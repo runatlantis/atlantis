@@ -8,8 +8,10 @@
 package models
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -521,6 +523,35 @@ type PolicySetStatus struct {
 	Approvals       []PolicySetApproval
 	Hashes          []string
 	PolicyItemRegex string
+}
+
+// UnmarshalJSON decodes a PolicySetStatus. Pull records written before
+// v0.44.0 stored Approvals as an int count, with no approver or hashes. That
+// form is still accepted so those records can be read after an upgrade, and it
+// decodes to no approvals: a policy set approved under the old format has to
+// be approved again.
+func (pss *PolicySetStatus) UnmarshalJSON(data []byte) error {
+	type plain PolicySetStatus
+	aux := struct {
+		*plain
+		Approvals json.RawMessage
+	}{plain: (*plain)(pss)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	pss.Approvals = nil
+	raw := bytes.TrimSpace(aux.Approvals)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return nil
+	}
+	if raw[0] == '[' {
+		return json.Unmarshal(raw, &pss.Approvals)
+	}
+	var legacyCount int
+	if err := json.Unmarshal(raw, &legacyCount); err != nil {
+		return fmt.Errorf("decoding approvals for policy set %q: %w", pss.PolicySetName, err)
+	}
+	return nil
 }
 
 // GetCurApprovals returns the number of approvals that cover all hashes in this policy set.
