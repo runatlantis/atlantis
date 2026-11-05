@@ -98,7 +98,7 @@ Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applie
 | Projects   | []string | No       | List of project names to run the plan    |
 | Paths      | []Path   | No       | Paths to the projects to run the plan    |
 | PR         | int      | No       | Pull Request number                      |
-| arguments  | []string | No       | Literal Terraform arguments |
+| arguments  | []string | No       | Literal Terraform arguments              |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
@@ -262,7 +262,7 @@ The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-
 | Projects   | []string | No       | List of project names to run the apply   |
 | Paths      | []Path   | No       | Paths to the projects to run the apply   |
 | PR         | int      | No       | Pull Request number                      |
-| arguments  | []string | No       | Literal Terraform arguments |
+| arguments  | []string | No       | Literal Terraform arguments              |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
