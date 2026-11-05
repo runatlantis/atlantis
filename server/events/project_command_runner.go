@@ -162,9 +162,23 @@ type ProjectStateCommandRunner interface {
 	StateRm(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
-// ProjectCommandRunner runs project commands. A project command is a command
-// for a specific TF project.
+type ProjectOutputCommandRunner interface {
+	Output(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+type ProjectStateListCommandRunner interface {
+	StateList(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+type ProjectStateShowCommandRunner interface {
+	StateShow(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+// ProjectCommandRunner runs commands for a specific Terraform project.
 type ProjectCommandRunner interface {
+	ProjectOutputCommandRunner
+	ProjectStateListCommandRunner
+	ProjectStateShowCommandRunner
 	ProjectPlanCommandRunner
 	ProjectApplyCommandRunner
 	ProjectPolicyCheckCommandRunner
@@ -356,6 +370,9 @@ type DefaultProjectCommandRunner struct {
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
+	OutputStepRunner          StepRunner
+	StateListStepRunner       StepRunner
+	StateShowStepRunner       StepRunner
 	StateRmStepRunner         StepRunner
 	RunStepRunner             CustomStepRunner
 	EnvStepRunner             EnvStepRunner
@@ -1078,6 +1095,93 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
 }
 
+func (p *DefaultProjectCommandRunner) Output(ctx command.ProjectContext) command.ProjectCommandOutput {
+	success, failure, err := p.doOutput(ctx)
+	return command.ProjectCommandOutput{OutputSuccess: success, Failure: failure, Error: err}
+}
+
+func (p *DefaultProjectCommandRunner) doOutput(ctx command.ProjectContext) (out *models.OutputSuccess, failure string, err error) {
+	if err := command.ValidateInspectionArgs(command.Output, ctx.CommentArgs); err != nil {
+		return nil, "", err
+	}
+	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Output, p.workingDirLockMetadata(ctx))
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return nil, "", err
+	}
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err != nil {
+		return nil, "", errorWithStepOutput(err, outputs)
+	}
+	return &models.OutputSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+}
+
+func (p *DefaultProjectCommandRunner) StateList(ctx command.ProjectContext) command.ProjectCommandOutput {
+	success, failure, err := p.doStateList(ctx)
+	return command.ProjectCommandOutput{StateListSuccess: success, Failure: failure, Error: err}
+}
+
+func (p *DefaultProjectCommandRunner) doStateList(ctx command.ProjectContext) (out *models.StateListSuccess, failure string, err error) {
+	if err := command.ValidateInspectionArgs(command.StateList, ctx.CommentArgs); err != nil {
+		return nil, "", err
+	}
+	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateList, p.workingDirLockMetadata(ctx))
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return nil, "", err
+	}
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err != nil {
+		return nil, "", errorWithStepOutput(err, outputs)
+	}
+	return &models.StateListSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+}
+
+func (p *DefaultProjectCommandRunner) StateShow(ctx command.ProjectContext) command.ProjectCommandOutput {
+	success, failure, err := p.doStateShow(ctx)
+	return command.ProjectCommandOutput{StateShowSuccess: success, Failure: failure, Error: err}
+}
+
+func (p *DefaultProjectCommandRunner) doStateShow(ctx command.ProjectContext) (out *models.StateShowSuccess, failure string, err error) {
+	if err := command.ValidateInspectionArgs(command.StateShow, ctx.CommentArgs); err != nil {
+		return nil, "", err
+	}
+	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateShow, p.workingDirLockMetadata(ctx))
+	if err != nil {
+		return nil, "", err
+	}
+	defer unlock()
+	repoDir, err := p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return nil, "", err
+	}
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err != nil {
+		return nil, "", errorWithStepOutput(err, outputs)
+	}
+	return &models.StateShowSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+}
+
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
@@ -1258,6 +1362,12 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "import":
 			out, err = p.ImportStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "output":
+			out, err = p.OutputStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "state_list":
+			out, err = p.StateListStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "state_show":
+			out, err = p.StateShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":

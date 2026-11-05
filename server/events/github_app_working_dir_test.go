@@ -149,3 +149,24 @@ func TestMergeAgain_GithubAppSetsCorrectUrl(t *testing.T) {
 
 	Ok(t, err)
 }
+
+func TestCloneForInspection_GithubAppSetsCorrectURL(t *testing.T) {
+	RegisterMockTestingT(t)
+	working := eventMocks.NewMockWorkingDir()
+	wrapper := &events.GithubAppWorkingDir{WorkingDir: working}
+	repo, err := models.NewRepo(models.Github, "owner/repo", "https://github.com/owner/repo.git", "", "", "")
+	Ok(t, err)
+	normalized := repo
+	normalized.CloneURL = "https://github.com/owner/repo.git"
+	normalized.SanitizedCloneURL = normalized.CloneURL
+	pull := models.PullRequest{Num: 1, BaseRepo: repo}
+	expectedPull := pull
+	expectedPull.BaseRepo = normalized
+	logger := logging.NewNoopLogger(t)
+	When(working.CloneForInspection(Any[logging.SimpleLogging](), Eq(normalized), Eq(expectedPull), Eq("production"))).ThenReturn("checkout", nil)
+	dir, err := wrapper.CloneForInspection(logger, repo, pull, "production")
+	Ok(t, err)
+	Equals(t, "checkout", dir)
+	working.VerifyWasCalledOnce().CloneForInspection(logger, normalized, expectedPull, "production")
+	working.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+}

@@ -250,8 +250,26 @@ type ProjectTargetedDirIgnorer interface {
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_project_command_builder.go ProjectCommandBuilder
 
+type ProjectOutputCommandBuilder interface {
+	ProjectTargetedDirIgnorer
+	BuildOutputCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+}
+
+type ProjectStateListCommandBuilder interface {
+	ProjectTargetedDirIgnorer
+	BuildStateListCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+}
+
+type ProjectStateShowCommandBuilder interface {
+	ProjectTargetedDirIgnorer
+	BuildStateShowCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+}
+
 // ProjectCommandBuilder builds commands that run on individual projects.
 type ProjectCommandBuilder interface {
+	ProjectOutputCommandBuilder
+	ProjectStateListCommandBuilder
+	ProjectStateShowCommandBuilder
 	ProjectPlanCommandBuilder
 	ProjectApplyCommandBuilder
 	ProjectApprovePoliciesCommandBuilder
@@ -396,6 +414,27 @@ func (p *DefaultProjectCommandBuilder) BuildApprovePoliciesCommands(ctx *command
 func (p *DefaultProjectCommandBuilder) BuildVersionCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
 	if !cmd.IsForSpecificProject() {
 		return p.buildAllProjectCommandsByPlan(ctx, cmd)
+	}
+	return p.buildProjectCommand(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildOutputCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectsByCfg(ctx, command.Output, cmd.SubName, cmd.Flags, cmd.Verbose)
+	}
+	return p.buildProjectCommand(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildStateListCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectsByCfg(ctx, command.StateList, cmd.SubName, cmd.Flags, cmd.Verbose)
+	}
+	return p.buildProjectCommand(ctx, cmd)
+}
+
+func (p *DefaultProjectCommandBuilder) BuildStateShowCommands(ctx *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	if !cmd.IsForSpecificProject() {
+		return p.buildAllProjectsByCfg(ctx, command.StateShow, cmd.SubName, cmd.Flags, cmd.Verbose)
 	}
 	return p.buildProjectCommand(ctx, cmd)
 }
@@ -828,7 +867,11 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectsByCfg(ctx *command.Contex
 	ctx.Log.Debug("got workspace lock")
 	defer unlockFn()
 
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	clone := p.WorkingDir.Clone
+	if cmdName.IsInspection() {
+		clone = p.WorkingDir.CloneForInspection
+	}
+	repoDir, err := clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
 	if err != nil {
 		return nil, err
 	}
@@ -1595,7 +1638,16 @@ func (p *DefaultProjectCommandBuilder) buildProjectCommand(ctx *command.Context,
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
 	// other workspaces will not have the file if they are using pre_workflow_hooks to generate it dynamically
-	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	var repoDir string
+	var err error
+	if cmd.Name.IsInspection() {
+		repoDir, err = p.WorkingDir.CloneForInspection(ctx.Log, ctx.HeadRepo, ctx.Pull, DefaultWorkspace)
+	} else {
+		repoDir, err = p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, DefaultWorkspace)
+	}
+	if cmd.Name.IsInspection() && err != nil {
+		return nil, err
+	}
 	recloned := false
 	if errors.Is(err, os.ErrNotExist) {
 		// Re-clone only if the plan store can recover plans externally.

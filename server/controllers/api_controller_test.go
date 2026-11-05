@@ -23,9 +23,12 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	. "github.com/runatlantis/atlantis/server/events/mocks"
@@ -5820,3 +5823,38 @@ func TestAPIController_RejectsWorkspaceUnsafeForPaths(t *testing.T) {
 		})
 	}
 }
+
+func setupAPIProjectBuilder(t *testing.T, ac *controllers.APIController) {
+	t.Helper()
+	dir := t.TempDir()
+	Ok(t, os.WriteFile(filepath.Join(dir, "main.tf"), nil, 0600))
+	Ok(t, os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte("version: 3\nprojects:\n- name: app\n  dir: .\n  terraform_version: v1.11.1\n"), 0600))
+	working := ac.WorkingDir.(*MockWorkingDir)
+	When(ac.WorkingDirLocker.(*MockWorkingDirLocker).TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
+	When(working.CloneForInspection(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
+	When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
+	ac.ProjectCommandBuilder = &events.DefaultProjectCommandBuilder{
+		ParserValidator:              &config.ParserValidator{},
+		ProjectFinder:                &events.DefaultProjectFinder{},
+		VCSClient:                    ac.VCSClient,
+		WorkingDir:                   working,
+		WorkingDirLocker:             ac.WorkingDirLocker,
+		GlobalCfg:                    valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		ProjectCommandContextBuilder: events.NewProjectCommandContextBuilder(false, &events.CommentParser{ExecutableName: "atlantis"}, ac.Scope),
+	}
+}
+
+type apiTeamAuthorizationRunner struct {
+	output string
+	calls  int
+}
+
+func (r *apiTeamAuthorizationRunner) Run(ctx models.TeamAllowlistCheckerContext, _, _, _ string) (string, error) {
+	if !ctx.API || ctx.CommandName == "" || ctx.ProjectName != "app" {
+		return "", fmt.Errorf("missing API authorization context")
+	}
+	r.calls++
+	return r.output, nil
+}
+
+var _ runtime.ExternalTeamAllowlistRunner = (*apiTeamAuthorizationRunner)(nil)

@@ -400,3 +400,16 @@ func TestSetupRoutes_APIRoutesRegistered(t *testing.T) {
 		})
 	}
 }
+
+func TestNewServer_WiresAPITeamAuthorization(t *testing.T) {
+	s, err := server.NewServer(server.UserConfig{
+		DataDir: t.TempDir(), AtlantisURL: testAtlantisUrl,
+		LockingDBType: testLockingDBType, GithubHostname: testGitHubHostName, GithubUser: testGitHubUser,
+		GithubTeamAllowlist: "*:state_list",
+	}, server.Config{AtlantisVersion: testAtlantisVersion})
+	Ok(t, err)
+	checker := s.APIController.TeamAllowlistChecker
+	Assert(t, checker != nil, "expected API team authorization checker")
+	Assert(t, checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{API: true}, nil, "state_list"), "expected configured wildcard rule")
+	Assert(t, !checker.IsCommandAllowedForAnyTeam(models.TeamAllowlistCheckerContext{API: true}, nil, "output"), "unexpected output permission")
+}

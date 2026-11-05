@@ -47,6 +47,7 @@ const (
 	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
+	AllowAPICommandsFlag             = "allow-api-commands"
 	AllowCommandsFlag                = "allow-commands"
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
@@ -175,6 +176,7 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowAPICommands             = "plan,apply"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
@@ -237,6 +239,10 @@ var stringFlags = map[string]stringFlag{
 	ADHostnameFlag: {
 		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
 		defaultValue: "dev.azure.com",
+	},
+	AllowAPICommandsFlag: {
+		description:  "Comma separated list of allowed Terraform API commands: plan, apply, output, state_list, state_show, all, or none.",
+		defaultValue: DefaultAllowAPICommands,
 	},
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
@@ -1001,6 +1007,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.CheckoutDepth <= 0 {
 		c.CheckoutDepth = DefaultCheckoutDepth
 	}
+	if c.AllowAPICommands == "" {
+		c.AllowAPICommands = DefaultAllowAPICommands
+	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
@@ -1224,6 +1233,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
 		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
+	}
+
+	if _, err := userConfig.ToAllowAPICommandNames(); err != nil {
+		return fmt.Errorf("invalid --%s: %w", AllowAPICommandsFlag, err)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {

@@ -35,6 +35,12 @@ const (
 	State
 	// Cancel is a command to cancel running plan or apply operations
 	Cancel
+	// Output inspects root module outputs.
+	Output
+	// StateList lists managed resource addresses.
+	StateList
+	// StateShow inspects a managed resource.
+	StateShow
 	// Adding more? Don't forget to update String() below
 )
 
@@ -53,6 +59,9 @@ var AllCommentCommands = []Name{
 	ApprovePolicies,
 	Import,
 	State,
+	Output,
+	StateList,
+	StateShow,
 }
 
 // TitleString returns the string representation in title form.
@@ -82,6 +91,12 @@ func (c Name) String() string {
 		return "state"
 	case Cancel:
 		return "cancel"
+	case Output:
+		return "output"
+	case StateList:
+		return "state_list"
+	case StateShow:
+		return "state_show"
 	}
 	return ""
 }
@@ -92,7 +107,13 @@ func (c Name) DefaultUsage() string {
 	case Import:
 		return "import ADDRESS ID"
 	case State:
-		return "state [rm ADDRESS...]"
+		return "state [rm ADDRESS... | list [ADDRESS...] | show ADDRESS]"
+	case Output:
+		return "output [NAME]"
+	case StateList:
+		return "state list [ADDRESS...]"
+	case StateShow:
+		return "state show ADDRESS"
 	default:
 		return c.String()
 	}
@@ -102,7 +123,7 @@ func (c Name) DefaultUsage() string {
 func (c Name) SubCommands() []string {
 	switch c {
 	case State:
-		return []string{"rm"}
+		return []string{"rm", "list", "show"}
 	default:
 		return nil
 	}
@@ -111,9 +132,21 @@ func (c Name) SubCommands() []string {
 // CommandArgCount returns the number of required arguments for the command
 func (c Name) CommandArgCount(subCommand string) (*ArgCount, error) {
 	switch c {
+	case Output:
+		return &ArgCount{0, 1}, nil
+	case StateList:
+		return &ArgCount{0, -1}, nil
+	case StateShow:
+		return &ArgCount{1, 1}, nil
 	case Import:
 		return &ArgCount{2, 2}, nil // "atlantis import ADDRESS ID"
 	case State:
+		if subCommand == "list" {
+			return &ArgCount{0, -1}, nil
+		}
+		if subCommand == "show" {
+			return &ArgCount{1, 1}, nil
+		}
 		if subCommand == "rm" {
 			return &ArgCount{1, -1}, nil // "atlantis state rm ADDRESS..."
 		}
@@ -159,6 +192,53 @@ func ParseCommandName(name string) (Name, error) {
 		return State, nil
 	case "cancel":
 		return Cancel, nil
+	case "output":
+		return Output, nil
+	case "state_list":
+		return StateList, nil
+	case "state_show":
+		return StateShow, nil
 	}
 	return -1, fmt.Errorf("unknown command name: %s", name)
+}
+
+func (c Name) IsInspection() bool {
+	return c == Output || c == StateList || c == StateShow
+}
+
+// ValidateInspectionArgs confines inspection to the selected project's backend.
+func ValidateInspectionArgs(c Name, args []string) error {
+	if !c.IsInspection() {
+		return fmt.Errorf("%s is not an inspection command", c)
+	}
+	positional := 0
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if !strings.HasPrefix(arg, "-") {
+			positional++
+			continue
+		}
+		if positional > 0 {
+			return fmt.Errorf("terraform flags must precede addresses or output names")
+		}
+		flag, _, hasValue := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		switch {
+		case flag == "no-color" && !hasValue:
+		case c == Output && (flag == "json" || flag == "raw") && (!hasValue || strings.HasSuffix(arg, "=true") || strings.HasSuffix(arg, "=false")):
+		case c == StateList && flag == "id":
+			if !hasValue {
+				i++
+				if i >= len(args) {
+					return fmt.Errorf("flag -id requires a value")
+				}
+			}
+		default:
+			return fmt.Errorf("flag %q is not allowed for %s", arg, c)
+		}
+	}
+	count, _ := c.CommandArgCount("")
+	if !count.IsMatchCount(positional) {
+		return fmt.Errorf("usage: %s", c.DefaultUsage())
+	}
+	return nil
 }

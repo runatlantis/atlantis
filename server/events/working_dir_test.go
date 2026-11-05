@@ -2726,3 +2726,82 @@ func ignorePlanFiles(t *testing.T, cloneDir string) {
 	Ok(t, os.MkdirAll(filepath.Dir(excludePath), 0700))
 	Ok(t, os.WriteFile(excludePath, []byte("*.tfplan\n"), 0600))
 }
+
+func TestInspectionCheckoutPreservesPlansWhenRefChanges(t *testing.T) {
+	for _, separatePlans := range []bool{false, true} {
+		t.Run(fmt.Sprint(separatePlans), func(t *testing.T) {
+			source := initRepo(t)
+			runCmd(t, source, "git", "checkout", "branch")
+			head := strings.TrimSpace(runCmd(t, source, "git", "rev-parse", "HEAD"))
+			working := &events.FileWorkspace{DataDir: t.TempDir(), TestingOverrideHeadCloneURL: "file://" + source, GpgNoSigningEnabled: true}
+			if separatePlans {
+				working.LocalSharePlanDir = t.TempDir()
+			}
+			logger := logging.NewNoopLogger(t)
+			pull := models.PullRequest{HeadBranch: "branch", HeadCommit: head, BaseBranch: "main"}
+			dir, err := working.CloneForInspection(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			ignorePlanFiles(t, dir)
+			plan := filepath.Join(dir, "default.tfplan")
+			createPlanFile(t, plan)
+			var external string
+			if separatePlans {
+				external = filepath.Join(working.LocalSharePlanDir, "repos", "0", "default", "default.tfplan")
+				createPlanFile(t, external)
+			}
+			// Reusing the same commit or a remotely resolved branch leaves the plan intact.
+			_, err = working.CloneForInspection(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			pull.HeadCommit = "branch"
+			_, err = working.CloneForInspection(logger, models.Repo{}, pull, "default")
+			Ok(t, err)
+			runCmd(t, source, "git", "commit", "--allow-empty", "-m", "new head")
+			pull.HeadCommit = "branch"
+			_, err = working.CloneForInspection(logger, models.Repo{}, pull, "default")
+			Assert(t, err != nil && strings.Contains(err.Error(), "different commit"), "expected moved branch rejection, got %v", err)
+			pull.HeadCommit = strings.TrimSpace(runCmd(t, source, "git", "rev-parse", "HEAD"))
+			_, err = working.CloneForInspection(logger, models.Repo{}, pull, "default")
+			Assert(t, err != nil && strings.Contains(err.Error(), "different commit"), "expected stale-checkout rejection, got %v", err)
+			Equals(t, head, strings.TrimSpace(runCmd(t, dir, "git", "rev-parse", "HEAD")))
+			_, err = os.Stat(plan)
+			Ok(t, err)
+			if separatePlans {
+				_, err = os.Stat(external)
+				Ok(t, err)
+			}
+		})
+	}
+}
+
+func TestInspectionCheckoutDoesNotBypassPendingPlanRecovery(t *testing.T) {
+	dataDir := t.TempDir()
+	working := &events.FileWorkspace{DataDir: dataDir, PlanStore: &mockExternalPlanStore{workspaces: []string{"production"}}}
+	_, err := working.CloneForInspection(logging.NewNoopLogger(t), models.Repo{}, models.PullRequest{Num: 1}, "default")
+	Assert(t, err != nil && strings.Contains(err.Error(), "pending plans need recovery"), "expected recovery guard, got %v", err)
+	entries, err := os.ReadDir(dataDir)
+	Ok(t, err)
+	Equals(t, 0, len(entries))
+}
+
+func TestInspectionCheckoutAllowsNewWorkspaceWithExistingStoredPlans(t *testing.T) {
+	source := initRepo(t)
+	runCmd(t, source, "git", "checkout", "branch")
+	head := strings.TrimSpace(runCmd(t, source, "git", "rev-parse", "HEAD"))
+	working := &events.FileWorkspace{DataDir: t.TempDir(), TestingOverrideHeadCloneURL: "file://" + source, GpgNoSigningEnabled: true}
+	logger := logging.NewNoopLogger(t)
+	pull := models.PullRequest{Num: 1, HeadBranch: "branch", HeadCommit: head, BaseBranch: "main"}
+	defaultDir, err := working.CloneForInspection(logger, models.Repo{}, pull, "default")
+	Ok(t, err)
+	plan := filepath.Join(defaultDir, "default.tfplan")
+	createPlanFile(t, plan)
+	working.PlanStore = &mockExternalPlanStore{workspaces: []string{"default"}}
+	stagingDir, err := working.CloneForInspection(logger, models.Repo{}, pull, "staging")
+	Ok(t, err)
+	Equals(t, head, strings.TrimSpace(runCmd(t, stagingDir, "git", "rev-parse", "HEAD")))
+	_, err = os.Stat(plan)
+	Ok(t, err)
+	// A missing checkout with a stored plan must still block new checkout creation.
+	Ok(t, os.Rename(defaultDir, defaultDir+".lost"))
+	_, err = working.CloneForInspection(logger, models.Repo{}, pull, "other")
+	Assert(t, err != nil && strings.Contains(err.Error(), "pending plans need recovery"), "expected missing stored-plan checkout guard, got %v", err)
+}

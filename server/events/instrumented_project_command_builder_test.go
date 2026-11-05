@@ -70,6 +70,17 @@ func (f fakeInstrumentedProjectCommandBuilder) BuildVersionCommands(ctx *command
 	return nil, f.err
 }
 
+func (f fakeInstrumentedProjectCommandBuilder) BuildOutputCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return nil, f.err
+}
+
+func (f fakeInstrumentedProjectCommandBuilder) BuildStateListCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return nil, f.err
+}
+
+func (f fakeInstrumentedProjectCommandBuilder) BuildStateShowCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return nil, f.err
+}
 func (f fakeInstrumentedProjectCommandBuilder) BuildImportCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	return nil, f.err
 }

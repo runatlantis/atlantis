@@ -42,6 +42,10 @@ var nonPRPullCounter atomic.Int64
 var apiErrorURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\s/@]+@`)
 
 type APIController struct {
+	AllowAPICommands                []command.Name
+	ProjectOutputCommandRunner      events.ProjectOutputCommandRunner
+	ProjectStateListCommandRunner   events.ProjectStateListCommandRunner
+	ProjectStateShowCommandRunner   events.ProjectStateShowCommandRunner
 	APISecret                       []byte
 	Locker                          locking.Locker `validate:"required"`
 	DriftStorage                    drift.Storage
@@ -58,11 +62,12 @@ type APIController struct {
 	PreWorkflowHooksCommandRunner   events.PreWorkflowHooksCommandRunner  `validate:"required"`
 	PostWorkflowHooksCommandRunner  events.PostWorkflowHooksCommandRunner `validate:"required"`
 	RepoAllowlistChecker            *events.RepoAllowlistChecker          `validate:"required"`
-	Scope                           tally.Scope                           `validate:"required"`
-	VCSClient                       vcs.Client                            `validate:"required"`
-	WorkingDir                      events.WorkingDir                     `validate:"required"`
-	WorkingDirLocker                events.WorkingDirLocker               `validate:"required"`
-	CommitStatusUpdater             events.CommitStatusUpdater            `validate:"required"`
+	TeamAllowlistChecker            command.TeamAllowlistChecker
+	Scope                           tally.Scope                `validate:"required"`
+	VCSClient                       vcs.Client                 `validate:"required"`
+	WorkingDir                      events.WorkingDir          `validate:"required"`
+	WorkingDirLocker                events.WorkingDirLocker    `validate:"required"`
+	CommitStatusUpdater             events.CommitStatusUpdater `validate:"required"`
 	// PullReqStatusFetcher is optional. When set and the API request supplies a
 	// PR number, it is used to populate command.Context.PullRequestStatus so
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
@@ -139,6 +144,7 @@ type APIRequest struct {
 	BaseBranch string `json:"base_branch,omitempty"`
 	Type       string `validate:"required"`
 	PR         int
+	Arguments  []string `json:"arguments,omitempty"`
 	Projects   []string
 	Paths      []APIRequestPath
 	// DiscoverProjects enables all-project discovery when no projects or paths
@@ -284,6 +290,9 @@ func sanitizeRepoCloneURL(message string, repo models.Repo) string {
 }
 
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAPICommand(w, r, command.Plan) {
+		return
+	}
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
@@ -317,6 +326,9 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
+	if !a.requireAPICommand(w, r, command.Apply) {
+		return
+	}
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
@@ -549,7 +561,11 @@ func (a *APIController) apiSetup(ctx *command.Context, cmdName command.Name) (er
 	}
 
 	// ensure workingDir is present
-	repoDir, err := a.WorkingDir.Clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
+	clone := a.WorkingDir.Clone
+	if cmdName.IsInspection() {
+		clone = a.WorkingDir.CloneForInspection
+	}
+	repoDir, err := clone(ctx.Log, headRepo, ctx.Pull, events.DefaultWorkspace)
 	if err != nil {
 		return sanitizeAPIError(ctx, err)
 	}

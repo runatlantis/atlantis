@@ -265,5 +265,8 @@ type Workflow struct {
 	Plan        Stage
 	PolicyCheck Stage
 	Import      Stage
+	Output      Stage
+	StateList   Stage
+	StateShow   Stage
 	StateRm     Stage
 }

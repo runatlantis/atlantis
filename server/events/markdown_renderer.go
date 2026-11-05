@@ -323,6 +323,27 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 				resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup("applyUnwrappedSuccess"), struct{ Output string }{output})
 			}
 			numApplySuccesses++
+		} else if result.OutputSuccess != nil {
+			output := strings.TrimSpace(result.OutputSuccess.Output)
+			name := "outputSuccessUnwrapped"
+			if m.shouldUseWrappedTmpl(vcsHost, output) {
+				name = "outputSuccessWrapped"
+			}
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup(name), struct{ Output string }{output})
+		} else if result.StateListSuccess != nil {
+			output := strings.TrimSpace(result.StateListSuccess.Output)
+			name := "stateListSuccessUnwrapped"
+			if m.shouldUseWrappedTmpl(vcsHost, output) {
+				name = "stateListSuccessWrapped"
+			}
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup(name), struct{ Output string }{output})
+		} else if result.StateShowSuccess != nil {
+			output := strings.TrimSpace(result.StateShowSuccess.Output)
+			name := "stateShowSuccessUnwrapped"
+			if m.shouldUseWrappedTmpl(vcsHost, output) {
+				name = "stateShowSuccessWrapped"
+			}
+			resultData.Rendered = m.renderTemplateTrimSpace(templates.Lookup(name), struct{ Output string }{output})
 		} else if result.VersionSuccess != "" {
 			output := strings.TrimSpace(result.VersionSuccess)
 			if m.shouldUseWrappedTmpl(vcsHost, output) {
@@ -371,6 +392,18 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 
 	var tmpl *template.Template
 	switch {
+	case len(resultsTmplData) == 1 && common.CommandName == command.Output.String():
+		tmpl = templates.Lookup("singleProjectOutput")
+	case common.CommandName == command.Output.String():
+		tmpl = templates.Lookup("multiProjectOutput")
+	case len(resultsTmplData) == 1 && common.CommandName == command.StateList.String():
+		tmpl = templates.Lookup("singleProjectStateList")
+	case common.CommandName == command.StateList.String():
+		tmpl = templates.Lookup("multiProjectStateList")
+	case len(resultsTmplData) == 1 && common.CommandName == command.StateShow.String():
+		tmpl = templates.Lookup("singleProjectStateShow")
+	case common.CommandName == command.StateShow.String():
+		tmpl = templates.Lookup("multiProjectStateShow")
 	case len(resultsTmplData) == 1 && common.CommandName == planCommandTitle && numPlanSuccesses > 0:
 		tmpl = templates.Lookup("singleProjectPlanSuccess")
 	case len(resultsTmplData) == 1 && common.CommandName == planCommandTitle && numPlanSuccesses == 0:

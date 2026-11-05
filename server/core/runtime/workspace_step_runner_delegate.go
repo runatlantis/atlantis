@@ -17,6 +17,7 @@ type workspaceStepRunnerDelegate struct {
 	terraformExecutor     TerraformExec
 	defaultTfDistribution terraform.Distribution
 	defaultTfVersion      *version.Version
+	existingWorkspaceOnly bool
 	delegate              Runner
 }
 
@@ -90,6 +91,9 @@ func (r *workspaceStepRunnerDelegate) switchWorkspace(ctx command.ProjectContext
 	// that's why we're running select here.
 	_, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "select", ctx.Workspace}, envs, tfDistribution, tfVersion, ctx.Workspace)
 	if err != nil {
+		if r.existingWorkspaceOnly {
+			return fmt.Errorf("selecting existing workspace %q: %w", ctx.Workspace, err)
+		}
 		// If terraform workspace select fails we run terraform workspace
 		// new to create a new workspace automatically.
 		out, err := r.terraformExecutor.RunCommandWithVersion(ctx, path, []string{workspaceCmd, "new", ctx.Workspace}, envs, tfDistribution, tfVersion, ctx.Workspace)
