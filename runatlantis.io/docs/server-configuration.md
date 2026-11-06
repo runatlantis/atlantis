@@ -570,6 +570,18 @@ ATLANTIS_DISABLE_MARKDOWN_FOLDING=true
 
 Disable folding in markdown output using the `<details>` html tag.
 
+### `--disable-metrics-pr-number-tag`
+
+```bash
+atlantis server --disable-metrics-pr-number-tag
+# or
+ATLANTIS_DISABLE_METRICS_PR_NUMBER_TAG=true
+```
+
+Remove the `pr_number` tag (label in Prometheus) from all [metrics](stats.md). Defaults to `false`.
+
+By default, project, VCS client, and webhook event metrics include the pull request number. Each new pull request adds new metric series, and Atlantis keeps them until it restarts. On busy servers this can use a lot of memory and produce more series than your metrics backend allows. Enable this flag if you don't need per pull request metrics.
+
 ### `--disable-repo-locking`
 
 ```bash

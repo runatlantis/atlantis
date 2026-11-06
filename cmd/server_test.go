@@ -76,6 +76,7 @@ var testFlags = map[string]any{
 	DefaultTFVersionFlag:             "v0.11.0",
 	DisableApplyAllFlag:              true,
 	DisableMarkdownFoldingFlag:       true,
+	DisableMetricsPRNumberTagFlag:    true,
 	DisableRepoLockingFlag:           true,
 	DisableGlobalApplyLockFlag:       false,
 	DiscardApprovalOnPlanFlag:        true,
