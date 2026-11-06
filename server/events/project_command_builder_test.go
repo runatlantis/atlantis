@@ -4755,6 +4755,13 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommands_Single_With_RestrictFile
 			DirectoryStructure: map[string]any{
 				testDir1: map[string]any{
 					"main.ts": nil,
+					"ci-cdktf.out": map[string]any{
+						"stacks": map[string]any{
+							"test": map[string]any{
+								"cdk.tf.json": nil,
+							},
+						},
+					},
 				},
 			},
 			ModifiedFiles:  []string{testDir1 + "/main.ts"},
@@ -6316,4 +6323,79 @@ projects:
 	Equals(t, "staging", ctxs[0].Workspace)
 	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
 		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
+}
+
+// A targeted plan for a directory that does not exist should fail while the
+// command is being built, before any per-project commit status is created.
+// Otherwise the "atlantis/plan: <dir>/default" status stays failed forever,
+// because no later plan will ever run for that directory.
+func TestDefaultProjectCommandBuilder_BuildTargetedPlan_DirDoesNotExist(t *testing.T) {
+	RegisterMockTestingT(t)
+
+	tmpDir := DirStructure(t, map[string]any{
+		"environments": map[string]any{
+			"prod": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(tmpDir, nil)
+	When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(tmpDir, nil)
+	vcsClient := vcsmocks.NewMockClient()
+	When(vcsClient.GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](),
+		Any[models.PullRequest]())).ThenReturn([]string{"environments/prod/main.tf"}, nil)
+
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+	globalCfg := valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true})
+	userConfig := defaultUserConfig
+
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsClient,
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		globalCfg,
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		userConfig.SkipCloneNoChanges,
+		userConfig.EnableRegExpCmd,
+		userConfig.EnableAutoMerge,
+		userConfig.EnableParallelPlan,
+		userConfig.EnableParallelApply,
+		userConfig.AutoDetectModuleFiles,
+		userConfig.AutoplanFileList,
+		userConfig.RestrictFileList,
+		userConfig.DefaultTFDistribution,
+		userConfig.SilenceNoProjects,
+		userConfig.IncludeGitUntrackedFiles,
+		userConfig.AutoDiscoverMode,
+		scope,
+		tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{},
+	)
+
+	cmdCtx := &command.Context{Log: logger, Scope: scope}
+
+	planCtxs, err := builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/staging",
+		Workspace:  "default",
+	})
+	var dirErr events.DirNotExistErr
+	Assert(t, errors.As(err, &dirErr), "expected DirNotExistErr, got %v", err)
+	Equals(t, "environments/staging", dirErr.RepoRelDir)
+	Equals(t, 0, len(planCtxs))
+
+	planCtxs, err = builder.BuildPlanCommands(cmdCtx, &events.CommentCommand{
+		Name:       command.Plan,
+		RepoRelDir: "environments/prod",
+		Workspace:  "default",
+	})
+	Ok(t, err)
+	Equals(t, 1, len(planCtxs))
 }
