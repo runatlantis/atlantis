@@ -48,6 +48,8 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		"OUTPUT_STATUS_FILE": outputFilePath,
 		"COMMAND_NAME":       ctx.CommandName,
 		"PROJECT_NAME":       ctx.ProjectName,
+		"REPO_REL_DIR":       ctx.RepoRelDir,
+		"WORKSPACE":          ctx.Workspace,
 	}
 
 	finalEnvVars := baseEnvVars

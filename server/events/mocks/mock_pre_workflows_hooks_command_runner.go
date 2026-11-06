@@ -43,6 +43,21 @@ func (mock *MockPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 	return _ret0
 }
 
+func (mock *MockPreWorkflowHooksCommandRunner) RunPreHooksForProject(pctx command.ProjectContext) error {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockPreWorkflowHooksCommandRunner().")
+	}
+	_params := []pegomock.Param{pctx}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("RunPreHooksForProject", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(error)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockPreWorkflowHooksCommandRunner) VerifyWasCalledOnce() *VerifierMockPreWorkflowHooksCommandRunner {
 	return &VerifierMockPreWorkflowHooksCommandRunner{
 		mock:                   mock,
@@ -109,6 +124,35 @@ func (c *MockPreWorkflowHooksCommandRunner_RunPreHooks_OngoingVerification) GetA
 			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockPreWorkflowHooksCommandRunner) RunPreHooksForProject(pctx command.ProjectContext) *MockPreWorkflowHooksCommandRunner_RunPreHooksForProject_OngoingVerification {
+	_params := []pegomock.Param{pctx}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "RunPreHooksForProject", _params, verifier.timeout)
+	return &MockPreWorkflowHooksCommandRunner_RunPreHooksForProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockPreWorkflowHooksCommandRunner_RunPreHooksForProject_OngoingVerification struct {
+	mock              *MockPreWorkflowHooksCommandRunner
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockPreWorkflowHooksCommandRunner_RunPreHooksForProject_OngoingVerification) GetCapturedArguments() command.ProjectContext {
+	pctx := c.GetAllCapturedArguments()
+	return pctx[len(pctx)-1]
+}
+
+func (c *MockPreWorkflowHooksCommandRunner_RunPreHooksForProject_OngoingVerification) GetAllCapturedArguments() (_param0 []command.ProjectContext) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(command.ProjectContext)
 			}
 		}
 	}
