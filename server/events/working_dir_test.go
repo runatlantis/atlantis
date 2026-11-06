@@ -2486,6 +2486,42 @@ func TestFileWorkspace_DeleteRemovesSeparatePlanStorePaths(t *testing.T) {
 	assertPathExists(t, otherPullPlanFile)
 }
 
+// A custom workflow can write a directory at the plan path, for example a
+// Terragrunt stack plan. Deleting the plan, as unlock does, must remove it
+// instead of failing with "directory not empty".
+func TestFileWorkspace_DeletePlan(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	dataDir := t.TempDir()
+	fileWorkspace := &events.FileWorkspace{DataDir: dataDir}
+	repo := models.Repo{FullName: "owner/repo"}
+	pull := models.PullRequest{Num: 1, BaseRepo: repo}
+	projectDir := filepath.Join(dataDir, "repos", "owner", "repo", "1", "default", "project")
+
+	t.Run("plan file", func(t *testing.T) {
+		planFile := filepath.Join(projectDir, "file-default.tfplan")
+		createPlanFile(t, planFile)
+		Ok(t, fileWorkspace.DeletePlan(logger, repo, pull, "default", "project", "file"))
+		assertPathMissing(t, planFile)
+	})
+
+	t.Run("plan directory", func(t *testing.T) {
+		planDir := filepath.Join(projectDir, "stack-default.tfplan")
+		createPlanFile(t, filepath.Join(planDir, "unit-a", "tfplan.tfplan"))
+		createPlanFile(t, filepath.Join(planDir, "unit-b", "tfplan.tfplan"))
+		otherPlan := filepath.Join(projectDir, "other-default.tfplan")
+		createPlanFile(t, otherPlan)
+
+		Ok(t, fileWorkspace.DeletePlan(logger, repo, pull, "default", "project", "stack"))
+		assertPathMissing(t, planDir)
+		assertPathExists(t, otherPlan)
+		assertPathExists(t, projectDir)
+	})
+
+	t.Run("missing plan", func(t *testing.T) {
+		Ok(t, fileWorkspace.DeletePlan(logger, repo, pull, "default", "project", "missing"))
+	})
+}
+
 // Re-cloning over an existing checkout invalidates any plan made against it,
 // so the separate plan store copy has to go too.
 func TestClone_ForceCloneDeletesSeparatePlanWorkspaceWhenReplacingCheckout(t *testing.T) {
