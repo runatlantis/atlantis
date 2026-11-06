@@ -98,7 +98,6 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
         <li>set <strong>Secret Token</strong> to your random string</li>
         <li>check the boxes
             <ul>
-                <li><strong>Push events</strong></li>
                 <li><strong>Comments</strong></li>
                 <li><strong>Merge Request events</strong></li>
             </ul>
