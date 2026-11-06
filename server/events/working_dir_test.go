@@ -981,6 +981,10 @@ func TestClone_ResetOnWrongCommitWithMergeStrategy(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "anotherfile")
 	expCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
 
+	// The merge checkout strategy fetches the head as pull/<n>/head from origin
+	// (the base repo), so expose the head commit under that ref like GitHub does.
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", expCommit)
+
 	// Pretend that terraform has created plan files, we'll check for them later.
 	worktreeDir := filepath.Join(dataDir, "repos/1/default")
 	ignorePlanFiles(t, worktreeDir)
