@@ -99,9 +99,10 @@ type ProjectContext struct {
 	// The runner sets it after PlanStore.Load. A later change fails apply.
 	ExpectedPlanHash string
 	// RequiresAtlantisManagedPlanFile is true when this project's workflow uses
-	// the built-in plan or apply step, meaning Atlantis owns the convention plan
-	// artifact (<workspace>.tfplan). Workflows built only from custom run steps
-	// manage their own plan file, so Atlantis must not require or inspect one.
+	// the built-in plan/apply steps or a marked custom run produces/consumes a plan,
+	// meaning Atlantis owns the convention plan artifact (<workspace>.tfplan).
+	// Workflows built only from custom run steps manage their own plan file, so
+	// Atlantis must not require or inspect one.
 	RequiresAtlantisManagedPlanFile bool
 	//PullStatus is the status of the current pull request prior to this command.
 	PullStatus *models.PullStatus
