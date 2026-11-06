@@ -54,10 +54,11 @@ Esto actualmente solo está implementado para el VCS de GitHub.
 
 ## Requisitos
 
-### Todos los plans deben tener éxito
+### Los plans fallidos no descartan los plans exitosos
 
-Cuando la fusión automática está habilitada, **todos los plans** en un pull request **deben tener éxito** antes de que
-**cualquier** plan pueda ser aplicado.
+Cuando un plan en un pull request falla, Atlantis conserva los plans que tuvieron éxito, para que
+todavía puedan aplicarse individualmente. Atlantis no fusionará automáticamente el pull request
+hasta que todos los proyectos hayan sido aplicados (ver más abajo).
 
 Por ejemplo, imagina este escenario:
 
@@ -65,17 +66,17 @@ Por ejemplo, imagina este escenario:
    e `dir2/`.
 1. El plan para `dir2/` falla porque mi sintaxis de Terraform es incorrecta.
 
-En este escenario, no puedo ejecutar
+En este escenario, todavía puedo ejecutar
 
 ```shell
 atlantis apply -d dir1
 ```
 
-Aunque ese plan tuvo éxito, porque **todos** los plans deben tener éxito para que **cualquier** plan
-pueda ser guardado.
+porque el plan para `dir1/` tuvo éxito y fue guardado.
 
 Una vez que corrija el problema en `dir2`, puedo hacer push de un nuevo commit que activará un
-autoplan. Entonces podré aplicar ambos plans.
+autoplan. Después de aplicar `dir2`, todos los proyectos han sido aplicados y Atlantis
+fusiona el pull request.
 
 ### Todos los plans deben ser aplicados
 

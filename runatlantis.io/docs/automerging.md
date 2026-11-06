@@ -56,10 +56,11 @@ This is currently only implemented for the GitHub VCS.
 
 ## Requirements
 
-### All Plans Must Succeed
+### Failed Plans Don't Discard Successful Plans
 
-When automerge is enabled, **all plans** in a pull request **must succeed** before
-**any** plans can be applied.
+When one plan in a pull request fails, Atlantis keeps the plans that succeeded, so
+they can still be applied individually. Atlantis won't automatically merge the
+pull request until every project has been applied (see below).
 
 For example, imagine this scenario:
 
@@ -67,17 +68,17 @@ For example, imagine this scenario:
    and `dir2/`.
 1. The plan for `dir2/` fails because my Terraform syntax is wrong.
 
-In this scenario, I can't run
+In this scenario, I can still run
 
 ```shell
 atlantis apply -d dir1
 ```
 
-Even though that plan succeeded, because **all** plans must succeed for **any** plans
-to be saved.
+because the plan for `dir1/` succeeded and was saved.
 
 Once I fix the issue in `dir2`, I can push a new commit which will trigger an
-autoplan. Then I will be able to apply both plans.
+autoplan. After I apply `dir2`, every project has been applied and Atlantis
+merges the pull request.
 
 ### All Plans must be applied
 
