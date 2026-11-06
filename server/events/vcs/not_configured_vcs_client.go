@@ -18,6 +18,10 @@ type NotConfiguredVCSClient struct {
 	Host models.VCSHostType
 }
 
+func (a *NotConfiguredVCSClient) IsAtlantisUser(_ models.Repo, _ models.User) (bool, error) {
+	return false, a.err()
+}
+
 func (a *NotConfiguredVCSClient) GetModifiedFiles(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, a.err()
 }

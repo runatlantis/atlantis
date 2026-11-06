@@ -297,6 +297,8 @@ func (p PullRequestEventType) String() string {
 // User is a VCS user.
 // During an autoplan, the user will be the Atlantis API user.
 type User struct {
+	// ID is the provider's account ID when a webhook supplies one.
+	ID       string
 	Username string
 	Teams    []string
 }

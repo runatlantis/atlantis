@@ -71,7 +71,7 @@ func TestClient_AppAuthentication(t *testing.T) {
 	user, err := appCreds.GetUser()
 	Ok(t, err)
 
-	Assert(t, user == "", "user should be empty")
+	Equals(t, "octoapp[bot]", user)
 
 	if token != newToken {
 		t.Errorf("app token was not cached: %q != %q", token, newToken)
@@ -108,7 +108,7 @@ func TestClient_MultipleAppAuthentication(t *testing.T) {
 	user, err := appCreds.GetUser()
 	Ok(t, err)
 
-	Assert(t, user == "", "user should be empty")
+	Equals(t, "octoapp[bot]", user)
 
 	if token != newToken {
 		t.Errorf("app token was not cached: %q != %q", token, newToken)

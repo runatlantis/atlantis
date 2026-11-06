@@ -13,6 +13,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -27,6 +28,8 @@ type Client struct {
 	token       string
 	pageSize    int
 	ctx         context.Context
+	baseURL     string
+	identity    common.IdentityCache
 }
 
 type GiteaPRReviewSummary struct {
@@ -67,6 +70,7 @@ func New(baseURL string, username string, token string, pagesize int, logger log
 		token:       token,
 		pageSize:    pagesize,
 		ctx:         context.Background(),
+		baseURL:     baseURL,
 	}, nil
 }
 
@@ -173,6 +177,32 @@ func (c *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	}
 
 	return nil
+}
+
+func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	username, err := c.identity.Get("", c.fetchCurrentUsername)
+	return username == user.Username, err
+}
+
+func (c *Client) fetchCurrentUsername() (string, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+	defer cancel()
+	// New already checked the version; isolate this deadline from concurrent SDK calls.
+	client, err := gitea.NewClient(c.baseURL, gitea.SetToken(c.token), gitea.SetUserAgent("atlantis"), gitea.SetContext(ctx), gitea.SetGiteaVersion(""))
+	if err != nil {
+		return "", fmt.Errorf("creating identity client: %w", err)
+	}
+	currentUser, _, err := client.GetMyUserInfo()
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+	if currentUser == nil {
+		return "", nil
+	}
+	return currentUser.UserName, nil
 }
 
 // HidePrevCommandComments hides the previous command comments from the pull
