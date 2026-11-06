@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -176,7 +177,6 @@ const (
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowAPICommands             = "plan,apply"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
@@ -210,6 +210,14 @@ const (
 	DefaultWebUsername                  = "atlantis"
 	DefaultWebPassword                  = "atlantis"
 )
+
+var DefaultAllowAPICommands = func() string {
+	var names []string
+	for _, name := range command.DefaultAPICommands {
+		names = append(names, name.String())
+	}
+	return strings.Join(names, ",")
+}()
 
 var stringSliceFlags = map[string]stringSliceFlag{
 	ExperimentsFlag: {

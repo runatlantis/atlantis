@@ -5858,3 +5858,70 @@ func (r *apiTeamAuthorizationRunner) Run(ctx models.TeamAllowlistCheckerContext,
 }
 
 var _ runtime.ExternalTeamAllowlistRunner = (*apiTeamAuthorizationRunner)(nil)
+
+func TestAPICommandAllowlistCanDisablePlanAndApply(t *testing.T) {
+	for _, name := range []command.Name{command.Plan, command.Apply} {
+		t.Run(name.String(), func(t *testing.T) {
+			ac, _, runner := setup(t)
+			ac.AllowAPICommands = []command.Name{command.Output}
+			req := httptest.NewRequest(http.MethodPost, "/api/"+name.String(), bytes.NewBufferString(`{}`))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			if name == command.Plan {
+				ac.Plan(w, req)
+			} else {
+				ac.Apply(w, req)
+			}
+			Equals(t, http.StatusForbidden, w.Code)
+			runner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+			runner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+		})
+	}
+}
+
+func TestAPIController_RejectsUnauthorizedCommandsBeforeReadingRequest(t *testing.T) {
+	for _, handler := range []struct {
+		name command.Name
+		call func(*controllers.APIController, http.ResponseWriter, *http.Request)
+	}{
+		{command.Plan, (*controllers.APIController).Plan},
+		{command.Apply, (*controllers.APIController).Apply},
+		{command.Output, (*controllers.APIController).Output},
+		{command.StateList, (*controllers.APIController).StateList},
+		{command.StateShow, (*controllers.APIController).StateShow},
+	} {
+		for _, tc := range []struct {
+			name    string
+			secret  []byte
+			token   string
+			allowed []command.Name
+			status  int
+		}{
+			{"API disabled", nil, atlantisToken, []command.Name{handler.name}, http.StatusServiceUnavailable},
+			{"missing token", []byte(atlantisToken), "", []command.Name{handler.name}, http.StatusUnauthorized},
+			{"invalid token", []byte(atlantisToken), "wrong", []command.Name{}, http.StatusUnauthorized},
+			{"command disabled", []byte(atlantisToken), atlantisToken, []command.Name{}, http.StatusForbidden},
+		} {
+			t.Run(handler.name.String()+"/"+tc.name, func(t *testing.T) {
+				ac, _, _ := setup(t)
+				ac.APISecret = tc.secret
+				ac.AllowAPICommands = tc.allowed
+				body := &apiUnreadRequestBody{}
+				req := httptest.NewRequest(http.MethodPost, "/api/"+handler.name.String(), body)
+				req.Header.Set(atlantisTokenHeader, tc.token)
+				w := httptest.NewRecorder()
+				handler.call(ac, w, req)
+				Equals(t, tc.status, w.Code)
+				Equals(t, 0, body.reads)
+				ac.VCSClient.(*MockClient).VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+			})
+		}
+	}
+}
+
+type apiUnreadRequestBody struct{ reads int }
+
+func (b *apiUnreadRequestBody) Read([]byte) (int, error) {
+	b.reads++
+	return 0, io.EOF
+}

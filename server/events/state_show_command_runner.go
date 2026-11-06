@@ -22,18 +22,7 @@ func NewStateShowCommandRunner(pullUpdater *PullUpdater, prjCmdBuilder ProjectSt
 }
 
 func (r *StateShowCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
-	cmds, err := r.prjCmdBuilder.BuildStateShowCommands(ctx, cmd)
-	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
-		return
-	}
-	result := command.Result{Error: err}
-	if err == nil {
-		if len(cmds) == 0 && r.silenceNoProjects {
-			return
-		}
-		result = runProjectCmds(cmds, r.prjCmdRunner.StateShow)
-	}
-	r.pullUpdater.updatePull(ctx, cmd, result)
+	runCommentWorkflow(ctx, cmd, r.prjCmdBuilder.BuildStateShowCommands, r.prjCmdRunner.StateShow, r.pullUpdater, r.silenceNoProjects)
 }
 
 func (r *StateShowCommandRunner) ShouldSkipPreWorkflowHooks(ctx *command.Context, cmd *CommentCommand) bool {

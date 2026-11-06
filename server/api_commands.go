@@ -5,6 +5,7 @@ package server
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -14,7 +15,7 @@ func (u UserConfig) ToAllowAPICommandNames() ([]command.Name, error) {
 	allowed := []command.Name{}
 	input := u.AllowAPICommands
 	if input == "" {
-		input = "plan,apply"
+		return slices.Clone(command.DefaultAPICommands), nil
 	}
 	hasAll := false
 	hasNone := false

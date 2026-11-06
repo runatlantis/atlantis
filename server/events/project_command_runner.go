@@ -1096,81 +1096,48 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 }
 
 func (p *DefaultProjectCommandRunner) Output(ctx command.ProjectContext) command.ProjectCommandOutput {
-	success, failure, err := p.doOutput(ctx)
-	return command.ProjectCommandOutput{OutputSuccess: success, Failure: failure, Error: err}
-}
-
-func (p *DefaultProjectCommandRunner) doOutput(ctx command.ProjectContext) (out *models.OutputSuccess, failure string, err error) {
-	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.Output, p.workingDirLockMetadata(ctx))
+	output, err := p.runInspectionWorkflow(ctx, command.Output)
 	if err != nil {
-		return nil, "", err
+		return command.ProjectCommandOutput{Error: err}
 	}
-	defer unlock()
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if err != nil {
-		return nil, "", err
-	}
-	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
-		return nil, "", err
-	}
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
-	if err != nil {
-		return nil, "", errorWithStepOutput(err, outputs)
-	}
-	return &models.OutputSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+	return command.ProjectCommandOutput{OutputSuccess: &models.OutputSuccess{Output: output}}
 }
 
 func (p *DefaultProjectCommandRunner) StateList(ctx command.ProjectContext) command.ProjectCommandOutput {
-	success, failure, err := p.doStateList(ctx)
-	return command.ProjectCommandOutput{StateListSuccess: success, Failure: failure, Error: err}
-}
-
-func (p *DefaultProjectCommandRunner) doStateList(ctx command.ProjectContext) (out *models.StateListSuccess, failure string, err error) {
-	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateList, p.workingDirLockMetadata(ctx))
+	output, err := p.runInspectionWorkflow(ctx, command.StateList)
 	if err != nil {
-		return nil, "", err
+		return command.ProjectCommandOutput{Error: err}
 	}
-	defer unlock()
-	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
-	if err != nil {
-		return nil, "", err
-	}
-	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
-	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
-		return nil, "", err
-	}
-	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
-	if err != nil {
-		return nil, "", errorWithStepOutput(err, outputs)
-	}
-	return &models.StateListSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+	return command.ProjectCommandOutput{StateListSuccess: &models.StateListSuccess{Output: output}}
 }
 
 func (p *DefaultProjectCommandRunner) StateShow(ctx command.ProjectContext) command.ProjectCommandOutput {
-	success, failure, err := p.doStateShow(ctx)
-	return command.ProjectCommandOutput{StateShowSuccess: success, Failure: failure, Error: err}
+	output, err := p.runInspectionWorkflow(ctx, command.StateShow)
+	if err != nil {
+		return command.ProjectCommandOutput{Error: err}
+	}
+	return command.ProjectCommandOutput{StateShowSuccess: &models.StateShowSuccess{Output: output}}
 }
 
-func (p *DefaultProjectCommandRunner) doStateShow(ctx command.ProjectContext) (out *models.StateShowSuccess, failure string, err error) {
-	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, command.StateShow, p.workingDirLockMetadata(ctx))
+func (p *DefaultProjectCommandRunner) runInspectionWorkflow(ctx command.ProjectContext, name command.Name) (string, error) {
+	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, name, p.workingDirLockMetadata(ctx))
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	defer unlock()
 	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
 	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
 	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
-		return nil, "", err
+		return "", err
 	}
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	if err != nil {
-		return nil, "", errorWithStepOutput(err, outputs)
+		return "", errorWithStepOutput(err, outputs)
 	}
-	return &models.StateShowSuccess{Output: strings.Join(outputs, "\n")}, "", nil
+	return strings.Join(outputs, "\n"), nil
 }
 
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {

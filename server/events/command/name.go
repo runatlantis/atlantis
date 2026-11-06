@@ -49,6 +49,9 @@ type ArgCount struct {
 	Max int
 }
 
+// DefaultAPICommands preserves access to the existing command API endpoints.
+var DefaultAPICommands = []Name{Plan, Apply}
+
 // AllCommentCommands are list of commands that can be run from a comment.
 var AllCommentCommands = []Name{
 	Version,
