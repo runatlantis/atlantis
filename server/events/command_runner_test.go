@@ -2608,6 +2608,8 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	autoMerger.GlobalAutomerge = true
 	defer func() { autoMerger.GlobalAutomerge = false }()
 
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{CommandName: command.Plan}}, nil)
 	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).ThenReturn(command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
 	pull := &github.PullRequest{State: github.Ptr("open")}
@@ -2617,6 +2619,63 @@ func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
 	testdata.Pull.BaseRepo = testdata.GithubRepo
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	pendingPlanFinder.VerifyWasCalledOnce().Find(tmp)
+
+	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
+// An Atlantis instance whose plan resolves to no projects, for example because
+// another instance manages the changed files, must not discard the approvals.
+func TestRunPlanCommand_NoProjects_KeepsApprovals(t *testing.T) {
+	cases := []struct {
+		description       string
+		cmd               *events.CommentCommand
+		silenceNoProjects bool
+	}{
+		{"generic plan", &events.CommentCommand{Name: command.Plan}, false},
+		{"generic plan with silence no projects", &events.CommentCommand{Name: command.Plan}, true},
+		{"targeted plan", &events.CommentCommand{Name: command.Plan, ProjectName: "other-instance-project"}, false},
+		{"targeted plan with silence no projects", &events.CommentCommand{Name: command.Plan, ProjectName: "other-instance-project"}, true},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			vcsClient := setup(t, func(testConfig *TestConfig) {
+				testConfig.discardApprovalOnPlan = true
+				testConfig.SilenceNoProjects = c.silenceNoProjects
+			})
+
+			tmp := t.TempDir()
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				ThenReturn([]command.ProjectContext{}, nil)
+			When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+			pull := &github.PullRequest{State: github.Ptr("open")}
+			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+			testdata.Pull.BaseRepo = testdata.GithubRepo
+
+			ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, c.cmd)
+
+			vcsClient.VerifyWasCalled(Never()).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+		})
+	}
+}
+
+// A plan that fails while its projects are being built still discards the
+// approvals, as before.
+func TestRunPlanCommand_BuildError_DiscardsApprovals(t *testing.T) {
+	vcsClient := setup(t, func(testConfig *TestConfig) {
+		testConfig.discardApprovalOnPlan = true
+	})
+
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn(nil, errors.New("building plan commands"))
+	pull := &github.PullRequest{State: github.Ptr("open")}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	testdata.Pull.BaseRepo = testdata.GithubRepo
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 
 	vcsClient.VerifyWasCalledOnce().DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }

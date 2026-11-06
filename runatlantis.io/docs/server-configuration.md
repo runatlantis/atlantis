@@ -598,7 +598,7 @@ atlantis server --discard-approval-on-plan
 ATLANTIS_DISCARD_APPROVAL_ON_PLAN=true
 ```
 
-If set, discard approval if a new plan has been executed. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.
+If set, discard approval if a new plan has been executed. A plan that has no project to run, for example on an Atlantis instance that doesn't manage the changed files, doesn't discard approvals. Currently only supported on GitHub and GitLab. For GitLab a bot, group or project token is required for this feature.
  Reference: [reset-approvals-of-a-merge-request](https://docs.gitlab.com/api/merge_request_approvals/#reset-approvals-of-a-merge-request)
 
 ### `--emoji-reaction`
