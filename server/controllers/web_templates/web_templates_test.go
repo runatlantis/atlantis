@@ -4,7 +4,9 @@
 package web_templates
 
 import (
+	"bytes"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +15,8 @@ import (
 )
 
 func TestIndexTemplate(t *testing.T) {
-	err := IndexTemplate.Execute(io.Discard, IndexData{
+	var rendered bytes.Buffer
+	err := IndexTemplate.Execute(&rendered, IndexData{
 		Locks: []LockIndexData{
 			{
 				LockPath:      "lock path",
@@ -49,6 +52,9 @@ func TestIndexTemplate(t *testing.T) {
 		},
 	})
 	Ok(t, err)
+	// html/template escapes the leading slash in JS context, so "/path" renders as "\/path".
+	Assert(t, strings.Contains(rendered.String(), `window.location.href = "\/path/";`),
+		"expected the discard redirect to be prefixed with CleanedBasePath, got:\n%s", rendered.String())
 }
 
 func TestLockTemplate(t *testing.T) {
