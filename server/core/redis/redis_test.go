@@ -639,6 +639,34 @@ func TestUnlockByPullMatching(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
+func TestUnlockByPullSiblingRepoPrefix(t *testing.T) {
+	t.Log("UnlockByPull on owner/repo must not delete a lock for owner/repo2 at the same pull num")
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	repoLock := lock
+	repoLock.Project = models.NewProject("owner/repo", "path", "proj")
+	acquired, _, err := rdb.TryLock(repoLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire owner/repo lock")
+
+	siblingLock := lock
+	siblingLock.Project = models.NewProject("owner/repo2", "path", "proj")
+	acquired, _, err = rdb.TryLock(siblingLock)
+	Ok(t, err)
+	Assert(t, acquired, "should acquire owner/repo2 lock")
+
+	unlocked, err := rdb.UnlockByPull("owner/repo", pullNum)
+	Ok(t, err)
+	Equals(t, 1, len(unlocked))
+	Equals(t, "owner/repo", unlocked[0].Project.RepoFullName)
+
+	ls, err := rdb.List()
+	Ok(t, err)
+	Equals(t, 1, len(ls))
+	Equals(t, "owner/repo2", ls[0].Project.RepoFullName)
+}
+
 func TestGetLockNotThere(t *testing.T) {
 	t.Log("getting a lock that doesn't exist should return a nil pointer")
 	s := miniredis.RunT(t)
