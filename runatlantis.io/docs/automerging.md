@@ -79,6 +79,10 @@ to be saved.
 Once I fix the issue in `dir2`, I can push a new commit which will trigger an
 autoplan. Then I will be able to apply both plans.
 
+If the pull request has the label set by
+[`--disable-automerge-label`](server-configuration.md#disable-automerge-label),
+automerge is off for it, so the successful plans are kept and can be applied.
+
 ### All Plans must be applied
 
 If multiple projects/dirs/workspaces are configured to be planned automatically,

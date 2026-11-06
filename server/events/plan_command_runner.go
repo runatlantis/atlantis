@@ -49,7 +49,7 @@ func NewPlanCommandRunner(
 	discardApprovalOnPlan bool,
 	pullReqStatusFetcher vcs.PullReqStatusFetcher,
 	PendingApplyStatus bool,
-
+	disableAutomergeLabel string,
 ) *PlanCommandRunner {
 	return &PlanCommandRunner{
 		silenceVCSStatusNoPlans:    silenceVCSStatusNoPlans,
@@ -73,6 +73,7 @@ func NewPlanCommandRunner(
 		DiscardApprovalOnPlan:      discardApprovalOnPlan,
 		pullReqStatusFetcher:       pullReqStatusFetcher,
 		PendingApplyStatus:         PendingApplyStatus,
+		disableAutomergeLabel:      disableAutomergeLabel,
 	}
 }
 
@@ -107,6 +108,10 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	// disableAutomergeLabel is the pull request label that turns automerge off
+	// for that pull request. When it is set, a failed project no longer causes
+	// the successful plans to be deleted.
+	disableAutomergeLabel string
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
@@ -179,7 +184,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
+	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() && !p.automergeDisabledByLabel(ctx) {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
 			ctx.Log.Err("deleting pending plans: %s", err)
@@ -327,7 +332,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
 
-	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
+	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() && !p.automergeDisabledByLabel(ctx) {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
 		if err := p.deletePlansAndPlanLocks(ctx, projectCmds); err != nil {
 			ctx.Log.Err("deleting pending plans: %s", err)
@@ -368,6 +373,27 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 			ctx.Log.Warn("unable to update commit status: %s", err)
 		}
 	}
+}
+
+// automergeDisabledByLabel reports whether the pull request carries the
+// configured disable automerge label. Automerge will not happen for such a pull
+// request, so there is no reason to delete the successful plans when another
+// project fails. If the labels can't be fetched, it returns false so the plans
+// are deleted as they would be without the label.
+func (p *PlanCommandRunner) automergeDisabledByLabel(ctx *command.Context) bool {
+	if p.disableAutomergeLabel == "" {
+		return false
+	}
+	labels, err := p.vcsClient.GetPullLabels(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		ctx.Log.Warn("unable to get pull request labels so deleting plans, error %s", err)
+		return false
+	}
+	if slices.Contains(labels, p.disableAutomergeLabel) {
+		ctx.Log.Info("pull request has disable automerge label %q so not deleting successful plans", p.disableAutomergeLabel)
+		return true
+	}
+	return false
 }
 
 func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {

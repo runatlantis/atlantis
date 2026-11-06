@@ -204,6 +204,7 @@ func setup(t *testing.T, options ...func(testConfig *TestConfig)) *vcsmocks.Mock
 		testConfig.discardApprovalOnPlan,
 		pullReqStatusFetcher,
 		testConfig.PendingApplyStatus,
+		testConfig.DisableAutomergeLabel,
 	)
 
 	applyCommandRunner = events.NewApplyCommandRunner(
@@ -1927,6 +1928,7 @@ func installPlanCommandRunnerLocker(vcsClient *vcsmocks.MockClient, locker locki
 		false,
 		pullReqStatusFetcher,
 		false,
+		"",
 	)
 	ch.CommentCommandRunnerByCmd[command.Plan] = planCommandRunner
 }
@@ -2590,6 +2592,152 @@ func TestRunAutoplanCommandWithError_DeletePlans(t *testing.T) {
 	pendingPlanFinder.VerifyWasCalled(Times(2)).Find(tmp)
 
 	vcsClient.VerifyWasCalled(Times(0)).DiscardReviews(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+}
+
+// Test that the disable automerge label keeps the successful plans when
+// another project fails, for both autoplan and comment plans, and that the
+// plans are still deleted when the label is missing or can't be fetched.
+func TestRunPlanCommandWithError_DisableAutomergeLabel(t *testing.T) {
+	const disableAutomergeLabel = "no-automerge"
+	cases := []struct {
+		description   string
+		autoplan      bool
+		labels        []string
+		labelsErr     error
+		expPlansKept  bool
+		expLabelCalls int
+	}{
+		{
+			description:   "autoplan with the label keeps the successful plans",
+			autoplan:      true,
+			labels:        []string{"other", disableAutomergeLabel},
+			expPlansKept:  true,
+			expLabelCalls: 1,
+		},
+		{
+			description:   "autoplan without the label deletes the plans",
+			autoplan:      true,
+			labels:        []string{"other"},
+			expLabelCalls: 1,
+		},
+		{
+			description:   "autoplan deletes the plans when labels can't be fetched",
+			autoplan:      true,
+			labelsErr:     errors.New("labels unavailable"),
+			expLabelCalls: 1,
+		},
+		{
+			description:   "comment plan with the label keeps the successful plans",
+			labels:        []string{disableAutomergeLabel},
+			expPlansKept:  true,
+			expLabelCalls: 1,
+		},
+		{
+			description:   "comment plan without the label deletes the plans",
+			labels:        nil,
+			expLabelCalls: 1,
+		},
+		{
+			description:   "comment plan deletes the plans when labels can't be fetched",
+			labelsErr:     errors.New("labels unavailable"),
+			expLabelCalls: 1,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			vcsClient := setup(t, func(testConfig *TestConfig) {
+				testConfig.DisableAutomergeLabel = disableAutomergeLabel
+			})
+
+			tmp := t.TempDir()
+			boltDB, err := boltdb.New(tmp)
+			t.Cleanup(func() {
+				boltDB.Close()
+			})
+			Ok(t, err)
+			dbUpdater.Database = boltDB
+			applyCommandRunner.Database = boltDB
+
+			projectCmds := []command.ProjectContext{
+				{
+					CommandName:      command.Plan,
+					ProjectName:      "ok",
+					AutomergeEnabled: true,
+				},
+				{
+					CommandName:      command.Plan,
+					ProjectName:      "failing",
+					AutomergeEnabled: true,
+				},
+			}
+			When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn(projectCmds, nil)
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).ThenReturn(projectCmds, nil)
+			When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(params []Param) ReturnValues {
+				if params[0].(command.ProjectContext).ProjectName == "failing" {
+					return ReturnValues{command.ProjectCommandOutput{Error: errors.New("err")}}
+				}
+				return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+			})
+			When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+			When(vcsClient.GetPullLabels(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())).
+				ThenReturn(c.labels, c.labelsErr)
+
+			testdata.Pull.BaseRepo = testdata.GithubRepo
+			if c.autoplan {
+				ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
+			} else {
+				pull := &github.PullRequest{State: github.Ptr("open")}
+				modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+				When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
+				When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+				ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
+			}
+
+			// Plans are deleted once before planning. They are deleted a second
+			// time after the failure unless the disable automerge label is set.
+			expFindCalls := 2
+			if c.expPlansKept {
+				expFindCalls = 1
+			}
+			pendingPlanFinder.VerifyWasCalled(Times(expFindCalls)).Find(tmp)
+			vcsClient.VerifyWasCalled(Times(c.expLabelCalls)).GetPullLabels(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+		})
+	}
+}
+
+// Test that the labels are not fetched when no disable automerge label is
+// configured, so the existing behavior is unchanged.
+func TestRunAutoplanCommandWithError_NoDisableAutomergeLabelConfigured(t *testing.T) {
+	vcsClient := setup(t)
+
+	tmp := t.TempDir()
+	boltDB, err := boltdb.New(tmp)
+	t.Cleanup(func() {
+		boltDB.Close()
+	})
+	Ok(t, err)
+	dbUpdater.Database = boltDB
+	applyCommandRunner.Database = boltDB
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).
+		ThenReturn([]command.ProjectContext{
+			{CommandName: command.Plan, ProjectName: "ok", AutomergeEnabled: true},
+			{CommandName: command.Plan, ProjectName: "failing", AutomergeEnabled: true},
+		}, nil)
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func(params []Param) ReturnValues {
+		if params[0].(command.ProjectContext).ProjectName == "failing" {
+			return ReturnValues{command.ProjectCommandOutput{Error: errors.New("err")}}
+		}
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(tmp, nil)
+
+	testdata.Pull.BaseRepo = testdata.GithubRepo
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
+
+	pendingPlanFinder.VerifyWasCalled(Times(2)).Find(tmp)
+	vcsClient.VerifyWasCalled(Never()).GetPullLabels(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
 }
 
 func TestRunGenericPlanCommand_DiscardApprovals(t *testing.T) {
