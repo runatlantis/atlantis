@@ -138,7 +138,11 @@ func TestResult_MarshalJSON(t *testing.T) {
 			result: command.Result{
 				Failure:        "",
 				ProjectResults: []command.ProjectResult{},
-				PlansDeleted:   false,
+				ApplyExecutionOrderProgress: &command.ApplyExecutionOrderProgress{
+					CompletedExecutionOrderGroup:  1,
+					RemainingExecutionOrderGroups: []int{2, 3},
+				},
+				PlansDeleted: false,
 			},
 			checkFields: map[string]any{
 				"Error":        nil,
@@ -199,6 +203,9 @@ func TestResult_MarshalJSON(t *testing.T) {
 			// Verify ProjectResults is present and is an array
 			_, exists := parsed["ProjectResults"]
 			Assert(t, exists, "expected ProjectResults field in JSON output")
+
+			_, exists = parsed["ApplyExecutionOrderProgress"]
+			Assert(t, !exists, "expected transient apply execution order progress to be omitted from JSON output")
 		})
 	}
 }
