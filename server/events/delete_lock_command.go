@@ -4,6 +4,7 @@
 package events
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -19,6 +20,7 @@ import (
 type DeleteLockCommand interface {
 	DeleteLock(logger logging.SimpleLogging, id string) (*models.ProjectLock, error)
 	DeleteLocksByPull(logger logging.SimpleLogging, repoFullName string, pullNum int) (int, error)
+	DeleteLocksByProject(logger logging.SimpleLogging, repoFullName string, pullNum int, projectName string) (int, error)
 }
 
 // DefaultDeleteLockCommand deletes a specific lock after a request from the LocksController.
@@ -40,10 +42,18 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 		return nil, nil
 	}
 
+	if err := l.deleteProjectPlan(logger, lock); err != nil {
+		return nil, err
+	}
+	return lock, nil
+}
+
+// deleteProjectPlan is shared by UI and comment-triggered project unlocks.
+func (l *DefaultDeleteLockCommand) deleteProjectPlan(logger logging.SimpleLogging, lock *models.ProjectLock) error {
 	removeErr := l.WorkingDir.DeletePlan(logger, lock.Pull.BaseRepo, lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName)
 	if removeErr != nil {
 		logger.Warn("Failed to delete plan: %s", removeErr)
-		return nil, removeErr
+		return removeErr
 	}
 
 	if l.PlanStore != nil {
@@ -59,7 +69,46 @@ func (l *DefaultDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 		}
 	}
 
-	return lock, nil
+	return nil
+}
+
+// DeleteLocksByProject discards only locks and plans belonging to the named
+// project in this pull request. It uses saved locks rather than checking out
+// the repo, so projects removed from the current config can still be unlocked.
+func (l *DefaultDeleteLockCommand) DeleteLocksByProject(logger logging.SimpleLogging, repoFullName string, pullNum int, projectName string) (int, error) {
+	if strings.TrimSpace(projectName) == "" {
+		return 0, fmt.Errorf("project name must not be empty")
+	}
+	locks, err := l.Locker.List()
+	if err != nil {
+		return 0, fmt.Errorf("listing project locks: %w", err)
+	}
+
+	var numLocks int
+	for _, candidate := range locks {
+		if candidate.Project.RepoFullName != repoFullName || candidate.Pull.Num != pullNum || candidate.Project.ProjectName != projectName {
+			continue
+		}
+		// Ownership may have changed since List. Never unlock another PR's lock.
+		lock, err := l.Locker.UnlockIfOwnedByPull(candidate.Project, candidate.Workspace, pullNum)
+		if err != nil {
+			return numLocks, fmt.Errorf("unlocking project %q: %w", projectName, err)
+		}
+		if lock == nil {
+			continue
+		}
+		numLocks++
+		if err := l.deleteProjectPlan(logger, lock); err != nil {
+			return numLocks, fmt.Errorf("discarding plan for project %q: %w", projectName, err)
+		}
+		if err := l.Database.UpdateProjectStatus(lock.Pull, lock.Workspace, lock.Project.Path, lock.Project.ProjectName, models.DiscardedPlanStatus); err != nil {
+			return numLocks, fmt.Errorf("updating status for project %q: %w", projectName, err)
+		}
+	}
+	if numLocks == 0 {
+		return 0, fmt.Errorf("no Atlantis lock found for project %q in this PR", projectName)
+	}
+	return numLocks, nil
 }
 
 // DeleteLocksByPull handles deleting all locks for the pull request
