@@ -193,7 +193,7 @@ func TestInitStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 			if c.expCmd == "get" {
 				expArgs = []string{c.expCmd, "-upgrade", "extra", "args"}
 			}
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("workspace"))
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expArgs), Eq(map[string]string(nil)), Eq(tf.SelectDistribution(tfDistribution, ctx.TerraformDistribution)), Eq(tfVersion), Eq("workspace"))
 		})
 	}
 }

@@ -30,11 +30,8 @@ func NewWorkspaceStepRunnerDelegate(terraformExecutor TerraformExec, defaultTfDi
 }
 
 func (r *workspaceStepRunnerDelegate) Run(ctx command.ProjectContext, extraArgs []string, path string, envs map[string]string) (string, error) {
-	tfDistribution := r.defaultTfDistribution
+	tfDistribution := terraform.SelectDistribution(r.defaultTfDistribution, ctx.TerraformDistribution)
 	tfVersion := r.defaultTfVersion
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
-	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}
