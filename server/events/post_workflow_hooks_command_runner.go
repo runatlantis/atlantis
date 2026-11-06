@@ -5,7 +5,6 @@ package events
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -114,7 +113,7 @@ func (w *DefaultPostWorkflowHooksCommandRunner) runHooks(
 
 		ctx.Log.Debug("Processing post workflow hook '%s', Command '%s', Target commands [%s]",
 			ctx.HookDescription, ctx.CommandName, hook.Commands)
-		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
+		if !hook.MatchesCommand(ctx.CommandName) {
 			ctx.Log.Debug("Skipping post workflow hook '%s' as command '%s' is not in Commands [%s]",
 				ctx.HookDescription, ctx.CommandName, hook.Commands)
 			continue

@@ -244,7 +244,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	}
 
 	// Need to have allow commands at this point.
-	if !e.isAllowedCommand(cmd) {
+	allowed := e.isAllowedCommand(cmd)
+	if cmd == "state" {
+		allowed = allowed || e.isAllowedCommand("state_list") || e.isAllowedCommand("state_show")
+	}
+	if !allowed {
 		var allowCommandList []string
 		for _, allowCommand := range e.AllowCommands {
 			allowCommandList = append(allowCommandList, allowCommand.String())
@@ -308,6 +312,14 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Which directory to run version in relative to root of repo, ex. 'child/dir'.")
 		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Print the version for this project. Refers to the name of the project configured in a repo config file.")
 		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
+	case command.Output.String(), command.StateList.String(), command.StateShow.String():
+		name, _ = command.ParseCommandName(cmd)
+		flagSet = pflag.NewFlagSet(cmd, pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&workspace, workspaceFlagLong, workspaceFlagShort, "", "Inspect this Terraform workspace.")
+		flagSet.StringVarP(&dir, dirFlagLong, dirFlagShort, "", "Inspect this directory, relative to the repository root.")
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Inspect this configured project.")
+		flagSet.BoolVarP(&verbose, verboseFlagLong, verboseFlagShort, false, "Append Atlantis log to comment.")
 	case command.Import.String():
 		name = command.Import
 		flagSet = pflag.NewFlagSet(command.Import.String(), pflag.ContinueOnError)
@@ -333,6 +345,22 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: errResult}
 	}
 
+	if name == command.State {
+		switch subName {
+		case "list":
+			name = command.StateList
+		case "show":
+			name = command.StateShow
+		}
+	}
+	if !e.isAllowedCommand(name.String()) {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("command %q is disabled by --allow-commands", name.String()), name.DefaultUsage(), flagSet)}
+	}
+	if name.IsInspection() {
+		if err := command.ValidateInspectionArgs(name, extraArgs); err != nil {
+			return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), name.DefaultUsage(), flagSet)}
+		}
+	}
 	dir, err = e.validateDir(dir)
 	if err != nil {
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
@@ -621,6 +649,9 @@ func (e *CommentParser) HelpComment() string {
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
+		AllowOutput          bool
+		AllowStateList       bool
+		AllowStateShow       bool
 		AllowState           bool
 	}{
 		ExecutableName:       e.ExecutableName,
@@ -631,6 +662,9 @@ func (e *CommentParser) HelpComment() string {
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
+		AllowOutput:          e.isAllowedCommand(command.Output.String()),
+		AllowStateList:       e.isAllowedCommand(command.StateList.String()),
+		AllowStateShow:       e.isAllowedCommand(command.StateShow.String()),
 		AllowState:           e.isAllowedCommand(command.State.String()),
 	}); err != nil {
 		return fmt.Sprintf("Failed to render template, this is a bug: %v", err)
@@ -690,6 +724,18 @@ Commands:
   import ADDRESS ID
            Runs 'terraform import' for the passed address resource.
            To import a specific project, use the -d, -w and -p flags.
+{{- end }}
+{{- if .AllowOutput }}
+  output [NAME]
+           Runs 'terraform output' for the selected project.
+{{- end }}
+{{- if .AllowStateList }}
+  state list [ADDRESS...]
+           Lists resources in the selected project's Terraform state.
+{{- end }}
+{{- if .AllowStateShow }}
+  state show ADDRESS
+           Shows a resource in the selected project's Terraform state.
 {{- end }}
 {{- if .AllowState }}
   state rm ADDRESS...

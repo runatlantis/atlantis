@@ -102,6 +102,25 @@ func (mock *MockProjectCommandBuilder) BuildImportCommands(ctx *command.Context,
 	return _ret0, _ret1
 }
 
+func (mock *MockProjectCommandBuilder) BuildOutputCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	_params := []pegomock.Param{ctx, comment}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("BuildOutputCommands", _params, []reflect.Type{reflect.TypeOf((*[]command.ProjectContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []command.ProjectContext
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]command.ProjectContext)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
@@ -121,12 +140,50 @@ func (mock *MockProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, c
 	return _ret0, _ret1
 }
 
+func (mock *MockProjectCommandBuilder) BuildStateListCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	_params := []pegomock.Param{ctx, comment}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("BuildStateListCommands", _params, []reflect.Type{reflect.TypeOf((*[]command.ProjectContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []command.ProjectContext
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]command.ProjectContext)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
 	}
 	_params := []pegomock.Param{ctx, comment}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("BuildStateRmCommands", _params, []reflect.Type{reflect.TypeOf((*[]command.ProjectContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []command.ProjectContext
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]command.ProjectContext)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
+func (mock *MockProjectCommandBuilder) BuildStateShowCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	_params := []pegomock.Param{ctx, comment}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("BuildStateShowCommands", _params, []reflect.Type{reflect.TypeOf((*[]command.ProjectContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 []command.ProjectContext
 	var _ret1 error
 	if len(_result) != 0 {
@@ -345,6 +402,41 @@ func (c *MockProjectCommandBuilder_BuildImportCommands_OngoingVerification) GetA
 	return
 }
 
+func (verifier *VerifierMockProjectCommandBuilder) BuildOutputCommands(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_BuildOutputCommands_OngoingVerification {
+	_params := []pegomock.Param{ctx, comment}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildOutputCommands", _params, verifier.timeout)
+	return &MockProjectCommandBuilder_BuildOutputCommands_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_BuildOutputCommands_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_BuildOutputCommands_OngoingVerification) GetCapturedArguments() (*command.Context, *events.CommentCommand) {
+	ctx, comment := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], comment[len(comment)-1]
+}
+
+func (c *MockProjectCommandBuilder_BuildOutputCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_BuildPlanCommands_OngoingVerification {
 	_params := []pegomock.Param{ctx, comment}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildPlanCommands", _params, verifier.timeout)
@@ -380,6 +472,41 @@ func (c *MockProjectCommandBuilder_BuildPlanCommands_OngoingVerification) GetAll
 	return
 }
 
+func (verifier *VerifierMockProjectCommandBuilder) BuildStateListCommands(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_BuildStateListCommands_OngoingVerification {
+	_params := []pegomock.Param{ctx, comment}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildStateListCommands", _params, verifier.timeout)
+	return &MockProjectCommandBuilder_BuildStateListCommands_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_BuildStateListCommands_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_BuildStateListCommands_OngoingVerification) GetCapturedArguments() (*command.Context, *events.CommentCommand) {
+	ctx, comment := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], comment[len(comment)-1]
+}
+
+func (c *MockProjectCommandBuilder_BuildStateListCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockProjectCommandBuilder) BuildStateRmCommands(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_BuildStateRmCommands_OngoingVerification {
 	_params := []pegomock.Param{ctx, comment}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildStateRmCommands", _params, verifier.timeout)
@@ -397,6 +524,41 @@ func (c *MockProjectCommandBuilder_BuildStateRmCommands_OngoingVerification) Get
 }
 
 func (c *MockProjectCommandBuilder_BuildStateRmCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandBuilder) BuildStateShowCommands(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_BuildStateShowCommands_OngoingVerification {
+	_params := []pegomock.Param{ctx, comment}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildStateShowCommands", _params, verifier.timeout)
+	return &MockProjectCommandBuilder_BuildStateShowCommands_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_BuildStateShowCommands_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_BuildStateShowCommands_OngoingVerification) GetCapturedArguments() (*command.Context, *events.CommentCommand) {
+	ctx, comment := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], comment[len(comment)-1]
+}
+
+func (c *MockProjectCommandBuilder_BuildStateShowCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
