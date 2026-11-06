@@ -1,3 +1,35 @@
+
+<div align="right">
+  <details>
+    <summary >🌐 Language</summary>
+    <div>
+      <div align="center">
+        <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=en">English</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=zh-CN">简体中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=zh-TW">繁體中文</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=ja">日本語</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=ko">한국어</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=hi">हिन्दी</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=th">ไทย</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=fr">Français</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=de">Deutsch</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=es">Español</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=it">Italiano</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=ru">Русский</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=pt">Português</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=nl">Nederlands</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=pl">Polski</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=ar">العربية</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=fa">فارسی</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=tr">Türkçe</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=vi">Tiếng Việt</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=id">Bahasa Indonesia</a>
+        | <a href="https://openaitx.github.io/view.html?user=runatlantis&project=atlantis&lang=as">অসমীয়া</
+      </div>
+    </div>
+  </details>
+</div>
+
 # Atlantis <!-- omit in toc -->
 
 [![Latest Release](https://img.shields.io/github/release/runatlantis/atlantis.svg)](https://github.com/runatlantis/atlantis/releases/latest)
