@@ -93,6 +93,10 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	// Delete locks before the working directory so other pulls are not
+	// blocked while it is removed, which can take minutes on slow filesystems.
+	locks, lockErr := p.Locker.UnlockByPull(repo.FullName, pull.Num)
+
 	var workspaceErr error
 	if err := p.WorkingDir.Delete(logger, repo, pull); err != nil {
 		workspaceErr = fmt.Errorf("cleaning workspace: %w", err)
@@ -106,16 +110,11 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 		}
 	}
 
+	if lockErr != nil {
+		return fmt.Errorf("cleaning up locks: %w", lockErr)
+	}
 	if workspaceErr != nil {
 		return workspaceErr
-	}
-
-	// Finally, delete locks. We do this last because when someone
-	// unlocks a project, right now we don't actually delete the plan
-	// so we might have plans laying around but no locks.
-	locks, err := p.Locker.UnlockByPull(repo.FullName, pull.Num)
-	if err != nil {
-		return fmt.Errorf("cleaning up locks: %w", err)
 	}
 
 	// Delete pull from DB.
