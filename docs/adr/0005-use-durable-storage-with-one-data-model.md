@@ -4,9 +4,19 @@ Date: 2026-10-22
 
 ## Status
 
-Proposed
+Accepted
 
 Related issue: [#7031](https://github.com/runatlantis/atlantis/issues/7031).
+
+## Acceptance record
+
+Acceptance is pending completion of the [ADR 0003 requirements](0003-govern-architecture-proposals.md#acceptance-rule). Complete this record before merging the status-change PR.
+
+- Decision date: pending.
+- Rationale: a shared relational model and durable artifacts give features consistent identities, coordination, and restart recovery, with SQLite for single-instance installs and PostgreSQL for shared deployments.
+- Maintainer approvals: pending two approvals of the final text.
+- Final comment period: pending announcement identifying the final revision and the 14-day start and end times in UTC.
+- Feedback disposition: pending final review, including agreement on any resolved maintainer objections or their explicit withdrawal.
 
 ## Context
 
