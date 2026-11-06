@@ -527,6 +527,8 @@ Disable atlantis automerge only on pull requests with the specified label.
 Defaults to an empty string, so no label disables automerge by default.
 This flag has no effect unless automerge is enabled with `--automerge` or
 repo-level `automerge: true`.
+On a pull request with this label, a failed plan no longer causes the successful
+plans to be deleted.
 
 ### `--disable-autoplan`
 
