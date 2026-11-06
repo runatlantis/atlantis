@@ -183,7 +183,7 @@ ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash
 ENV BASH_VERSION="5.3.9-r1"
 # renovate: datasource=apk depName=openssh
-ENV OPENSSH_VERSION="10.3_p1-r1"
+ENV OPENSSH_VERSION="10.3_p1-r2"
 # renovate: datasource=apk depName=dumb-init
 ENV DUMB_INIT_VERSION="1.2.5-r4"
 # renovate: datasource=apk depName=gcompat
