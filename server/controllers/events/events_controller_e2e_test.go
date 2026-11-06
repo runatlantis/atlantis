@@ -1622,6 +1622,8 @@ func setupE2E(t *testing.T, repoDir string, opt setupOption) (events_controllers
 		discardApprovalOnPlan,
 		e2ePullReqStatusFetcher,
 		false,
+		projectLocker,
+		userConfig.LockAllProjectsBeforePlan,
 	)
 
 	applyCommandRunner := events.NewApplyCommandRunner(
