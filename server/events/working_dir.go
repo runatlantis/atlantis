@@ -1152,7 +1152,10 @@ func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, 
 		return fmt.Errorf("plan path traversal detected: %w", err)
 	}
 	logger.Info("Deleting plan: %s", planPath)
-	return utils.RemoveIgnoreNonExistent(planPath)
+	// Custom workflows can write a directory at the plan path, for example
+	// Terragrunt stacks, so remove it recursively. RemoveAll also returns nil
+	// when the path doesn't exist.
+	return os.RemoveAll(planPath)
 }
 
 // getGitUntrackedFiles returns a list of Git untracked files in the working dir.
