@@ -427,7 +427,7 @@ func TestRunCommentCommand_ForkPRDisabled(t *testing.T) {
 	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, headRepo, nil)
 
 	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
-	commentMessage := fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
+	commentMessage := fmt.Sprintf(events.ForkPullComment, ch.AllowForkPRsFlag, ch.SilenceForkPRErrorsFlag)
 	vcsClient.VerifyWasCalledOnce().CreateComment(
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(commentMessage), Eq(""))
 }
@@ -1148,7 +1148,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 				FullName: "forkrepo/atlantis",
 				VCSHost:  testdata.GithubRepo.VCSHost,
 			},
-			wantComment: fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", "allow-fork-prs-flag", ""),
+			wantComment: fmt.Sprintf(events.ForkPullComment, "allow-fork-prs-flag", ""),
 		},
 		{
 			name: "closed pull request",
@@ -1158,7 +1158,7 @@ func TestRunCommentCommand_IgnoredTargetedDirValidatesPullBeforeIgnoreCheck(t *t
 				Num:      testdata.Pull.Num,
 			},
 			headRepo:    testdata.GithubRepo,
-			wantComment: "Atlantis commands can't be run on closed pull requests",
+			wantComment: events.ClosedPullComment,
 		},
 		{
 			name: "base branch mismatch",
@@ -2033,7 +2033,7 @@ func TestRunCommentCommand_ClosedPull(t *testing.T) {
 
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.Plan})
 	vcsClient.VerifyWasCalledOnce().CreateComment(
-		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq("Atlantis commands can't be run on closed pull requests"), Eq(""))
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Eq(events.ClosedPullComment), Eq(""))
 }
 
 func TestRunCommentCommand_MatchedBranch(t *testing.T) {
@@ -2849,7 +2849,7 @@ func TestRunCommentCommand_DrainOngoing(t *testing.T) {
 	drainer.ShutdownBlocking()
 	ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num, nil)
 	vcsClient.VerifyWasCalledOnce().CreateComment(
-		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("Atlantis server is shutting down, please try again later."), Eq(""))
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq(events.ShutdownComment), Eq(""))
 }
 
 func TestRunCommentCommand_DrainNotOngoing(t *testing.T) {
@@ -2868,7 +2868,7 @@ func TestRunAutoplanCommand_DrainOngoing(t *testing.T) {
 	drainer.ShutdownBlocking()
 	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, testdata.Pull, testdata.User)
 	vcsClient.VerifyWasCalledOnce().CreateComment(
-		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq("Atlantis server is shutting down, please try again later."), Eq("plan"))
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq(events.ShutdownComment), Eq("plan"))
 }
 
 func TestRunAutoplanCommand_DrainNotOngoing(t *testing.T) {
