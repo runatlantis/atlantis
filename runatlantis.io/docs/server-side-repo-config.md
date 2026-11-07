@@ -56,6 +56,18 @@ when `--enable-external-stores` is set; `bucket` and `region` are required when
 Atlantis uses the AWS SDK credential chain to authenticate, with an optional
 named shared configuration profile selected by `profile`.
 
+Plan files are stored under this key layout. The prefix segment is omitted when
+`prefix` is empty, and `<planfile>` is `<workspace>.tfplan` or
+`<project name>-<workspace>.tfplan` for named projects:
+
+```text
+<prefix>/<owner>/<repo>/<pull number>/<workspace>/<dir>/<planfile>
+```
+
+Each object records the pull request's head commit as metadata. Before an apply,
+Atlantis rejects a stored plan that was created at a different commit and asks
+for a new `atlantis plan`.
+
 At startup, Atlantis checks the bucket with `HeadBucket` using a 10-second timeout
 and refuses to start if the check fails. The credentials need `s3:ListBucket`
 on the bucket for this check and for restoring plans, plus `s3:GetObject`,
@@ -63,8 +75,10 @@ on the bucket for this check and for restoring plans, plus `s3:GetObject`,
 cleanup when a pull request closes. If you use SSE-KMS, also grant the required
 KMS key permissions.
 
-Plan files can contain sensitive values. Enable server-side encryption
-(SSE-S3 or SSE-KMS), Block Public Access, and a restrictive bucket policy.
+Plan files can contain sensitive values. Atlantis does not set encryption
+options on uploads, so rely on the bucket's default encryption. Enable
+server-side encryption (SSE-S3 or SSE-KMS), Block Public Access, and a
+restrictive bucket policy.
 Check equivalent protections on custom endpoints such as MinIO. Consider a
 lifecycle expiry rule that retains plans long enough for your review and apply
 process.
@@ -555,7 +569,7 @@ Each servers handle different repository config files.
 | policies   | Policies.                                             | none      | no       | List of policy sets to run and associated metadata                                    |
 | metrics    | Metrics.                                              | none      | no       | Map of metric configuration                                                           |
 | team_authz | [TeamAuthz](#teamauthz)                               | none      | no       | Configuration of team permission checking                                             |
-| external_stores | [ExternalStores](#externalstores) | none | no | Server-wide external storage configuration |
+| external_stores | [ExternalStores](#externalstores)             | none      | no       | Server-wide external storage configuration. Only used with `--enable-external-stores`. |
 
 ::: tip A Note On Defaults
 
