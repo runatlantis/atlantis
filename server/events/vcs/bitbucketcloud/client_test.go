@@ -5,11 +5,14 @@ package bitbucketcloud_test
 
 import (
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -654,4 +657,111 @@ func TestClient_HidePRComments(t *testing.T) {
 		}, 5, "plan", "")
 	Ok(t, err)
 	Equals(t, 2, called)
+}
+
+// UpdateStatus should retry once when the connection is closed or reset, as
+// happens when Bitbucket drops a stale pooled connection, but not when
+// Bitbucket answers with an error status.
+// See https://github.com/runatlantis/atlantis/issues/6667.
+func TestClient_UpdateStatus_RetriesClosedConnection(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		description string
+		// actions is what the server does for each request, in order.
+		actions     []string
+		expErr      bool
+		expRequests int32
+	}{
+		{
+			"success",
+			[]string{"ok"},
+			false,
+			1,
+		},
+		{
+			"connection closed then success",
+			[]string{"close", "ok"},
+			false,
+			2,
+		},
+		{
+			"connection reset then success",
+			[]string{"reset", "ok"},
+			false,
+			2,
+		},
+		{
+			"connection closed twice",
+			[]string{"close", "close"},
+			true,
+			2,
+		},
+		{
+			"error status is not retried",
+			[]string{"500", "ok"},
+			true,
+			1,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var requests atomic.Int32
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "POST" || r.RequestURI != "/2.0/repositories/owner/repo/commit/sha/statuses/build" {
+					t.Errorf("got unexpected request %s %q", r.Method, r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+				// Read the whole body so closing the connection sends a FIN
+				// rather than a RST.
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("reading request body: %s", err)
+				}
+				if !strings.Contains(string(body), `"state":"SUCCESSFUL"`) {
+					t.Errorf("request body %q does not contain the state", string(body))
+				}
+
+				n := requests.Add(1)
+				if int(n) > len(c.actions) {
+					t.Errorf("got unexpected request number %d", n)
+					return
+				}
+				switch action := c.actions[n-1]; action {
+				case "ok":
+					w.WriteHeader(http.StatusCreated)
+				case "500":
+					http.Error(w, "internal error", http.StatusInternalServerError)
+				case "close", "reset":
+					conn, _, err := w.(http.Hijacker).Hijack()
+					if err != nil {
+						t.Errorf("hijacking connection: %s", err)
+						return
+					}
+					if action == "reset" {
+						// Closing with a zero linger sends a RST.
+						if err := conn.(*net.TCPConn).SetLinger(0); err != nil {
+							t.Errorf("setting linger: %s", err)
+						}
+					}
+					conn.Close() // nolint: errcheck
+				}
+			}))
+			defer testServer.Close()
+
+			client := bitbucketcloud.New(testServer.Client(), "user", "pass", "", "runatlantis.io")
+			client.BaseURL = testServer.URL
+
+			repo, err := models.NewRepo(models.BitbucketCloud, "owner/repo", "https://bitbucket.org/owner/repo.git", "user", "token", "")
+			Ok(t, err)
+			err = client.UpdateStatus(logger, repo, models.PullRequest{Num: 1, HeadCommit: "sha", BaseRepo: repo}, models.SuccessCommitStatus, "atlantis/plan", "plan succeeded", "")
+			if c.expErr {
+				Assert(t, err != nil, "expected an error")
+			} else {
+				Ok(t, err)
+			}
+			Equals(t, c.expRequests, requests.Load())
+		})
+	}
 }

@@ -9,11 +9,13 @@ package bitbucketcloud
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
@@ -341,7 +343,21 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		return fmt.Errorf("json encoding: %w", err)
 	}
 	_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
+	// A pooled keep-alive connection can be closed by Bitbucket while a long
+	// plan or apply runs, and Go's transport does not retry a POST by itself.
+	// The build status endpoint upserts by key, so sending it again is safe.
+	// See https://github.com/runatlantis/atlantis/issues/6667.
+	if isConnClosedError(err) {
+		logger.Warn("retrying bitbucket commit status update for %q after connection error %q", src, err)
+		_, err = b.makeRequest("POST", path, bytes.NewBuffer(bodyBytes))
+	}
 	return err
+}
+
+// isConnClosedError reports whether err means the server closed or reset the
+// connection, as happens when a stale pooled connection is reused.
+func isConnClosedError(err error) bool {
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.EOF)
 }
 
 // MergePull merges the pull request.
