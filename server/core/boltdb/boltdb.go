@@ -553,7 +553,7 @@ func (b *BoltDB) DeletePullStatus(pull models.PullRequest) error {
 }
 
 // UpdateProjectStatus updates project status.
-func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, projectName string, newStatus models.ProjectPlanStatus) error {
 	key, err := b.pullKey(pull)
 	if err != nil {
 		return err
@@ -574,7 +574,7 @@ func (b *BoltDB) UpdateProjectStatus(pull models.PullRequest, workspace string, 
 			// NOTE: We're using a reference here because we are
 			// in-place updating its Status field.
 			proj := &currStatus.Projects[i]
-			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+			if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir && proj.ProjectName == projectName {
 				proj.Status = newStatus
 				break
 			}

@@ -810,7 +810,7 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 		})
 	Ok(t, err)
 
-	err = rdb.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus)
+	err = rdb.UpdateProjectStatus(pull, "default", ".", "", models.DiscardedPlanStatus)
 	Ok(t, err)
 
 	status, err := rdb.GetPullStatus(pull)
@@ -830,6 +830,42 @@ func TestPullStatus_UpdateProject(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, status.Projects) // nolint: staticcheck
+}
+
+// Discarding one named project must not change the status of another named
+// project that shares its directory and workspace.
+func TestPullStatus_UpdateProjectMatchesProjectName(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			Owner:    "runatlantis",
+			Name:     "atlantis",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	planned := command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{TerraformOutput: "tf-output"}}
+	_, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{
+		{Command: command.Plan, RepoRelDir: ".", Workspace: "default", ProjectName: "a", ProjectCommandOutput: planned},
+		{Command: command.Plan, RepoRelDir: ".", Workspace: "default", ProjectName: "b", ProjectCommandOutput: planned},
+	})
+	Ok(t, err)
+
+	Ok(t, rdb.UpdateProjectStatus(pull, "default", ".", "b", models.DiscardedPlanStatus))
+
+	status, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, []models.ProjectStatus{
+		{Workspace: "default", RepoRelDir: ".", ProjectName: "a", Status: models.PlannedPlanStatus},
+		{Workspace: "default", RepoRelDir: ".", ProjectName: "b", Status: models.DiscardedPlanStatus},
+	}, status.Projects)
 }
 
 // Test that if we update an existing pull status and our new status is for a
