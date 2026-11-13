@@ -650,6 +650,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 	checkRuns []CheckRun,
 	statusContexts []StatusContext,
 	pendingRequiredReviewerApproval bool,
+	pendingConversationResolution bool,
 	err error,
 ) {
 	var query struct {
@@ -661,9 +662,15 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 						State githubv4.String
 					}
 				} `graphql:"latestOpinionatedReviews(first: 100)"`
+				ReviewThreads struct {
+					Nodes []struct {
+						IsResolved githubv4.Boolean
+					}
+				} `graphql:"reviewThreads(first: 100)"`
 				BaseRef struct {
 					BranchProtectionRule struct {
-						RequiredStatusChecks []struct {
+						RequiresConversationResolution githubv4.Boolean
+						RequiredStatusChecks           []struct {
 							Context githubv4.String
 						}
 					}
@@ -684,7 +691,8 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 									Workflows []WorkflowFileReference
 								} `graphql:"... on WorkflowsParameters"`
 								PullRequestParameters struct {
-									RequiredApprovingReviewCount githubv4.Int
+									RequiredApprovingReviewCount   githubv4.Int
+									RequiredReviewThreadResolution githubv4.Boolean
 								} `graphql:"... on PullRequestParameters"`
 							}
 						}
@@ -720,6 +728,7 @@ func (g *Client) GetPullRequestMergeabilityInfo(
 
 	requiredChecksSet := make(map[githubv4.String]any)
 	maxRequiredApprovals := 0
+	requiresConversationResolution := false
 
 pagination:
 	for {
@@ -730,6 +739,10 @@ pagination:
 		}
 
 		reviewDecision = query.Repository.PullRequest.ReviewDecision
+
+		if query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiresConversationResolution {
+			requiresConversationResolution = true
+		}
 
 		for _, rule := range query.Repository.PullRequest.BaseRef.BranchProtectionRule.RequiredStatusChecks {
 			requiredChecksSet[rule.Context] = struct{}{}
@@ -752,6 +765,9 @@ pagination:
 				required := int(rule.Parameters.PullRequestParameters.RequiredApprovingReviewCount)
 				if required > maxRequiredApprovals {
 					maxRequiredApprovals = required
+				}
+				if rule.Parameters.PullRequestParameters.RequiredReviewThreadResolution {
+					requiresConversationResolution = true
 				}
 			default:
 				continue
@@ -789,7 +805,7 @@ pagination:
 	}
 
 	if err != nil {
-		return "", nil, nil, nil, nil, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
+		return "", nil, nil, nil, nil, false, false, fmt.Errorf("fetching rulesets, branch protections and status checks from GraphQL: %w", err)
 	}
 
 	// latestOpinionatedReviews is not paginated, so compute the approved count once after the loop.
@@ -805,11 +821,21 @@ pagination:
 		}
 	}
 
+	// reviewThreads is not paginated either, so check it once after the loop.
+	if requiresConversationResolution {
+		for _, thread := range query.Repository.PullRequest.ReviewThreads.Nodes {
+			if !thread.IsResolved {
+				pendingConversationResolution = true
+				break
+			}
+		}
+	}
+
 	for context := range requiredChecksSet {
 		requiredChecks = append(requiredChecks, context)
 	}
 
-	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, nil
+	return reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, pendingConversationResolution, nil
 }
 
 func CheckSuitePassed(checkSuite CheckSuite) bool {
@@ -886,12 +912,12 @@ func (g *Client) ExpectedWorkflowPassed(expectedWorkflow WorkflowFileReference, 
 	return false, nil
 }
 
-// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS) and required checks for PR (excluding the atlantis apply check).
+// IsMergeableMinusApply checks review decision (which takes into account CODEOWNERS), required conversation resolution and required checks for PR (excluding the atlantis apply check).
 func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models.Repo, pull *github.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	if pull.Number == nil {
 		return false, errors.New("pull request number is nil")
 	}
-	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, err := g.GetPullRequestMergeabilityInfo(repo, pull)
+	reviewDecision, requiredChecks, requiredWorkflows, checkRuns, statusContexts, pendingRequiredReviewerApproval, pendingConversationResolution, err := g.GetPullRequestMergeabilityInfo(repo, pull)
 	if err != nil {
 		return false, err
 	}
@@ -907,6 +933,12 @@ func (g *Client) IsMergeableMinusApply(logger logging.SimpleLogging, repo models
 	}
 	if pendingRequiredReviewerApproval {
 		logger.Debug("%s: Pending required reviewer approval from ruleset", notMergeablePrefix)
+		return false, nil
+	}
+	// Branch protection and rulesets can require all review conversations to be resolved.
+	// GitHub refuses the merge in that case, so don't let apply bypass it.
+	if pendingConversationResolution {
+		logger.Debug("%s: Unresolved review conversations", notMergeablePrefix)
 		return false, nil
 	}
 
