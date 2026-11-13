@@ -177,7 +177,7 @@ ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
 ENV CURL_VERSION="8.23.0-r0"
 # renovate: datasource=apk depName=git
-ENV GIT_VERSION="2.54.0-r0"
+ENV GIT_VERSION="2.54.1-r0"
 # renovate: datasource=apk depName=unzip
 ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash
