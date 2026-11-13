@@ -126,6 +126,13 @@ func TestIsAtlantisUser(t *testing.T) {
 	}
 }
 
+func TestIsAtlantisUser_GiteaCaseInsensitiveUsername(t *testing.T) {
+	client := newIdentityClient(t, models.Gitea, "atlantis", "Atlantis", http.StatusOK)
+	self, err := client.IsAtlantisUser(models.Repo{}, models.User{Username: "atlantis"})
+	Ok(t, err)
+	Equals(t, true, self)
+}
+
 func TestIsAtlantisUser_MissingIdentity(t *testing.T) {
 	for _, host := range []models.VCSHostType{models.Github, models.Gitlab, models.BitbucketCloud, models.BitbucketServer, models.AzureDevops, models.Gitea} {
 		t.Run(host.String(), func(t *testing.T) {

@@ -184,7 +184,7 @@ func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 		return false, nil
 	}
 	username, err := c.identity.Get("", c.fetchCurrentUsername)
-	return username == user.Username, err
+	return strings.EqualFold(username, user.Username), err
 }
 
 func (c *Client) fetchCurrentUsername() (string, error) {
