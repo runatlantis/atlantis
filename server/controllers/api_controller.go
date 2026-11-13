@@ -84,6 +84,9 @@ type APIController struct {
 	// or policy check at once when their parallel_plan setting is enabled.
 	// Values below 2 keep the projects sequential.
 	ParallelPoolSize int
+	// Drainer tracks in-progress plan, apply and drift operations so a
+	// graceful shutdown waits for them. Nil disables the tracking.
+	Drainer *events.Drainer
 
 	// apiMiddleware provides common authentication and response utilities.
 	// Initialized lazily via getAPIMiddleware() with sync.Once for thread safety.
@@ -105,6 +108,23 @@ func (a *APIController) getAPIMiddleware() *APIMiddleware {
 		a.apiMiddleware = NewAPIMiddleware(a.APISecret, a.Logger)
 	})
 	return a.apiMiddleware
+}
+
+// apiShutdownMessage is returned with a 503 when a request arrives while the
+// server is shutting down, like the webhook path's events.ShutdownComment.
+const apiShutdownMessage = "atlantis server is shutting down, please try again later"
+
+// startOp registers an API operation with the drainer so a graceful shutdown
+// waits for it to finish. It returns false when the server is shutting down.
+// Otherwise the caller must call done when the operation ends.
+func (a *APIController) startOp() (done func(), ok bool) {
+	if a.Drainer == nil {
+		return func() {}, true
+	}
+	if !a.Drainer.StartOp() {
+		return nil, false
+	}
+	return a.Drainer.OpDone, true
 }
 
 func nextNonPRPullNum() int {
@@ -293,6 +313,13 @@ func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	opDone, ok := a.startOp()
+	if !ok {
+		a.apiReportLegacyError(w, http.StatusServiceUnavailable, errors.New(apiShutdownMessage))
+		return
+	}
+	defer opDone()
+
 	err = a.apiSetup(ctx, command.Plan)
 	if err != nil {
 		a.apiReportLegacyError(w, http.StatusInternalServerError, err)
@@ -325,6 +352,13 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 		a.apiReportLegacyError(w, code, err)
 		return
 	}
+
+	opDone, ok := a.startOp()
+	if !ok {
+		a.apiReportLegacyError(w, http.StatusServiceUnavailable, errors.New(apiShutdownMessage))
+		return
+	}
+	defer opDone()
 
 	err = a.apiSetup(ctx, command.Apply)
 	if err != nil {
@@ -1303,6 +1337,13 @@ func (a *APIController) Remediate(w http.ResponseWriter, r *http.Request) {
 		logger:     a.Logger,
 	}
 
+	opDone, ok := a.startOp()
+	if !ok {
+		responder.ServiceUnavailable(w, r, apiShutdownMessage)
+		return
+	}
+	defer opDone()
+
 	// Execute remediation
 	result, err := a.RemediationService.Remediate(request, executor)
 	if err != nil {
@@ -2235,6 +2276,13 @@ func (a *APIController) DetectDrift(w http.ResponseWriter, r *http.Request) {
 		responder.Forbidden(w, r, "repository is not in the allowlist")
 		return
 	}
+	opDone, ok := a.startOp()
+	if !ok {
+		responder.ServiceUnavailable(w, r, apiShutdownMessage)
+		return
+	}
+	defer opDone()
+
 	normalizedRef := apiRequestStorageRef(request.Ref)
 	normalizedBaseBranch := apiRequestBaseBranch(request.Ref, request.BaseBranch)
 	fullDetection := len(request.Projects) == 0 && len(request.Paths) == 0
