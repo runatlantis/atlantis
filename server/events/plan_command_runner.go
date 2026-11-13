@@ -238,7 +238,11 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		return
 	}
 
-	if p.DiscardApprovalOnPlan {
+	// A plan that resolves to no projects creates no new plan, so there is
+	// nothing to invalidate. This happens, for example, on an Atlantis instance
+	// that doesn't manage the projects changed by the pull request when several
+	// instances watch the same repository.
+	if p.DiscardApprovalOnPlan && (err != nil || len(projectCmds) > 0) {
 		if discardErr := p.pullUpdater.VCSClient.DiscardReviews(ctx.Log, baseRepo, pull); discardErr != nil {
 			ctx.Log.Err("failed to remove approvals: %s", discardErr)
 		}
