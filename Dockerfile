@@ -58,8 +58,8 @@ ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u7"
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=deb depName=unzip
 ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
-# renovate: datasource=deb depName=openssh-server
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
+# renovate: datasource=deb depName=openssh-client
+ENV DEBIAN_OPENSSH_CLIENT_VERSION="1:10.0p1-7+deb13u4"
 # renovate: datasource=deb depName=dumb-init
 ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
 # renovate: datasource=deb depName=gnupg
@@ -82,7 +82,7 @@ RUN apt-get update && \
     curl=${DEBIAN_CURL_VERSION} \
     git=${DEBIAN_GIT_VERSION} \
     unzip=${DEBIAN_UNZIP_VERSION} \
-    openssh-server=${DEBIAN_OPENSSH_SERVER_VERSION} \
+    openssh-client=${DEBIAN_OPENSSH_CLIENT_VERSION} \
     dumb-init=${DEBIAN_DUMB_INIT_VERSION} \
     gnupg=${DEBIAN_GNUPG_VERSION} \
     openssl=${DEBIAN_OPENSSL_VERSION} && \
@@ -182,8 +182,8 @@ ENV GIT_VERSION="2.54.0-r0"
 ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash
 ENV BASH_VERSION="5.3.9-r1"
-# renovate: datasource=apk depName=openssh
-ENV OPENSSH_VERSION="10.3_p1-r2"
+# renovate: datasource=apk depName=openssh-client-default
+ENV OPENSSH_CLIENT_VERSION="10.3_p1-r2"
 # renovate: datasource=apk depName=dumb-init
 ENV DUMB_INIT_VERSION="1.2.5-r4"
 # renovate: datasource=apk depName=gcompat
@@ -199,7 +199,7 @@ RUN apk add --no-cache \
     git=${GIT_VERSION} \
     unzip=${UNZIP_VERSION} \
     bash=${BASH_VERSION} \
-    openssh=${OPENSSH_VERSION} \
+    openssh-client-default=${OPENSSH_CLIENT_VERSION} \
     dumb-init=${DUMB_INIT_VERSION} \
     gcompat=${GCOMPAT_VERSION} \
     coreutils-env=${COREUTILS_ENV_VERSION}
