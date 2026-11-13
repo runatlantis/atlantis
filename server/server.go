@@ -539,6 +539,20 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		lockingClient = noOpLocker
 	} else {
 		lockingClient = locking.NewClient(database)
+		// API requests without a pull request lock projects under negative pull
+		// numbers and release them when the request ends, so a process killed
+		// mid-request leaves them behind for good. BoltDB allows one process
+		// only, so at startup no live request owns them. With Redis, another
+		// replica's requests might, so those locks are kept.
+		if userConfig.LockingDBType == "boltdb" {
+			unlocked, unlockErr := locking.UnlockNonPRLocks(lockingClient)
+			if unlockErr != nil {
+				logger.Warn("unable to release all locks left by API requests %s", unlockErr)
+			}
+			for _, lock := range unlocked {
+				logger.Info("released lock %q left by API request %d", models.GenerateLockKey(lock.Project, lock.Workspace), lock.Pull.Num)
+			}
+		}
 	}
 	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
