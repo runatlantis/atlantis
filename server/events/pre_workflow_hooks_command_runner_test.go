@@ -31,6 +31,8 @@ func preWorkflowHooksSetup(t *testing.T) {
 	vcsClient := vcsmocks.NewMockClient()
 	preWhWorkingDir = mocks.NewMockWorkingDir()
 	preWhWorkingDirLocker = mocks.NewMockWorkingDirLocker()
+	When(preWhWorkingDirLocker.TryLockPull(Any[string](), Any[int](), Any[command.Name](),
+		Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
 	whPreWorkflowHookRunner = runtime_mocks.NewMockPreWorkflowHookRunner()
 	preCommitStatusUpdater = mocks.NewMockCommitStatusUpdater()
 	preWorkflowHookURLGenerator := mocks.NewMockPreWorkflowHookURLGenerator()
@@ -188,6 +190,7 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](), Eq(testHook.RunCommand),
 			Eq(defaultShell), Eq(defaultShellArgs), Eq(repoDir))
 		preWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace, "", "", command.Plan, events.WorkingDirLockMetadataForPull(newPull))
+		preWhWorkingDirLocker.VerifyWasCalled(Never()).TryLockPull(Any[string](), Any[int](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())
 		preWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
 			Eq(events.DefaultWorkspace))
 	})
@@ -614,6 +617,153 @@ func TestRunPreHooksSuppressesVCSStatus(t *testing.T) {
 			Assert(t, capturedHookCtx.SuppressJobOutput, "expected hook runtime context to suppress job output")
 			preCommitStatusUpdater.VerifyWasCalled(Never()).UpdatePreWorkflowHook(Any[logging.SimpleLogging](),
 				Any[models.PullRequest](), Any[models.CommitStatus](), Any[string](), Any[string](), Any[string]())
+		})
+	}
+}
+
+func preWorkflowHooksLockSetup(t *testing.T) (*command.Context, *events.DefaultWorkingDirLocker) {
+	preWorkflowHooksSetup(t)
+	pull := testdata.Pull
+	pull.BaseRepo = testdata.GithubRepo
+	ctx := &command.Context{
+		Pull:     pull,
+		HeadRepo: testdata.GithubRepo,
+		User:     testdata.User,
+		Log:      logging.NewNoopLogger(t),
+	}
+	locker := events.NewDefaultWorkingDirLocker()
+	preWh.WorkingDirLocker = locker
+	preWh.GlobalCfg = valid.GlobalCfg{Repos: []valid.Repo{{
+		ID:               pull.BaseRepo.ID(),
+		PreWorkflowHooks: []*valid.WorkflowHook{{RunCommand: "echo hook"}},
+	}}}
+	When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(ctx.HeadRepo), Eq(pull),
+		Eq(events.DefaultWorkspace))).ThenReturn("path/to/repo", nil)
+	return ctx, locker
+}
+
+func TestRunPreHooks_DoesNotLockActiveCommandWorkspace(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		active command.Name
+		hook   command.Name
+	}{
+		{name: "apply during plan", active: command.Plan, hook: command.Apply},
+		{name: "plan during apply", active: command.Apply, hook: command.Plan},
+		{name: "autoplan during apply", active: command.Apply, hook: command.Autoplan},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ctx, locker := preWorkflowHooksLockSetup(t)
+			metadata := events.WorkingDirLockMetadataForPull(ctx.Pull)
+			unlockPull, err := locker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, c.active, metadata)
+			Ok(t, err)
+			defer unlockPull()
+
+			err = preWh.RunPreHooks(ctx, &events.CommentCommand{Name: c.hook})
+
+			ErrContains(t, "pull request", err)
+			preWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](),
+				Any[models.PullRequest](), Any[string]())
+			whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](),
+				Any[string](), Any[string](), Any[string](), Any[string]())
+			unlockWorkspace, err := locker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, events.DefaultWorkspace,
+				events.DefaultRepoRelDir, "", c.active, metadata)
+			Ok(t, err)
+			unlockWorkspace()
+			Assert(t, locker.HasCommandLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, c.active), "active command must retain its lock")
+		})
+	}
+}
+
+func TestRunPreHooks_BlocksCommandDuringHook(t *testing.T) {
+	for _, cmdName := range []command.Name{command.Plan, command.Autoplan, command.Apply} {
+		name := cmdName.String()
+		if cmdName == command.Autoplan {
+			name = "autoplan"
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx, locker := preWorkflowHooksLockSetup(t)
+			metadata := events.WorkingDirLockMetadataForPull(ctx.Pull)
+			When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Any[string](),
+				Any[string](), Any[string](), Any[string]())).Then(func([]Param) ReturnValues {
+				unlock, err := locker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan, metadata)
+				defer unlock()
+				ErrContains(t, "pull request", err)
+				otherUnlock, err := locker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num+1, command.Plan, metadata)
+				Ok(t, err)
+				otherUnlock()
+				return ReturnValues{"", "", nil}
+			})
+
+			Ok(t, preWh.RunPreHooks(ctx, &events.CommentCommand{Name: cmdName}))
+			whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Any[string](),
+				Any[string](), Any[string](), Any[string]())
+		})
+	}
+}
+
+func TestRunPreHooks_ReleasesLocks(t *testing.T) {
+	for _, c := range []struct {
+		name          string
+		workspaceBusy bool
+		cloneErr      error
+		hookErr       error
+	}{
+		{name: "success"},
+		{name: "workspace locked", workspaceBusy: true},
+		{name: "clone error", cloneErr: errors.New("clone error")},
+		{name: "hook error", hookErr: errors.New("hook error")},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			ctx, locker := preWorkflowHooksLockSetup(t)
+			metadata := events.WorkingDirLockMetadataForPull(ctx.Pull)
+			var releaseWorkspace func()
+			if c.workspaceBusy {
+				var err error
+				releaseWorkspace, err = locker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, events.DefaultWorkspace,
+					events.DefaultRepoRelDir, "", command.Apply, metadata)
+				Ok(t, err)
+				defer releaseWorkspace()
+			}
+			When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn("path/to/repo", c.cloneErr)
+			When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Any[string](),
+				Any[string](), Any[string](), Any[string]())).ThenReturn("", "", c.hookErr)
+
+			err := preWh.RunPreHooks(ctx, &events.CommentCommand{Name: command.Apply})
+
+			if c.workspaceBusy || c.cloneErr != nil || c.hookErr != nil {
+				Assert(t, err != nil, "expected hook to fail")
+			} else {
+				Ok(t, err)
+			}
+			unlock, err := locker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, metadata)
+			Ok(t, err)
+			unlock()
+			if releaseWorkspace != nil {
+				releaseWorkspace()
+			}
+			When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+				Any[string]())).ThenReturn("path/to/repo", nil)
+			When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Any[string](),
+				Any[string](), Any[string](), Any[string]())).ThenReturn("", "", nil)
+			Ok(t, preWh.RunPreHooks(ctx, &events.CommentCommand{Name: command.Apply}))
+		})
+	}
+}
+
+func TestRunPreHooks_ControlCommandsDoNotTakePullLock(t *testing.T) {
+	for _, cmdName := range []command.Name{command.Cancel, command.Unlock} {
+		t.Run(cmdName.String(), func(t *testing.T) {
+			ctx, locker := preWorkflowHooksLockSetup(t)
+			unlock, err := locker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan,
+				events.WorkingDirLockMetadataForPull(ctx.Pull))
+			Ok(t, err)
+			defer unlock()
+
+			Ok(t, preWh.RunPreHooks(ctx, &events.CommentCommand{Name: cmdName}))
+			whPreWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Any[string](),
+				Any[string](), Any[string](), Any[string]())
 		})
 	}
 }
