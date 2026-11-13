@@ -76,7 +76,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.JobID, ch, nil)
 
 		wg.Add(1)
 
@@ -125,7 +125,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.JobID, ch, nil)
 
 		projectOutputHandler.Send(ctx, Msg, false)
 		wg.Wait()
@@ -148,7 +148,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.JobID, ch, nil)
 
 		wg.Add(1)
 
@@ -193,7 +193,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.JobID, ch, nil)
 
 		// read from channel
 		go func() {
@@ -227,7 +227,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 		// Note: We call this synchronously because otherwise
 		// there could be a race where we are unable to register the channel
 		// before sending messages due to the way we lock our buffer memory cache
-		projectOutputHandler.Register(ctx.JobID, ch)
+		projectOutputHandler.Register(ctx.JobID, ch, nil)
 
 		// read from channel
 		go func() {
@@ -251,7 +251,7 @@ func TestProjectCommandOutputHandler(t *testing.T) {
 			opComplete <- true
 		}()
 
-		projectOutputHandler.Register(ctx.JobID, ch2)
+		projectOutputHandler.Register(ctx.JobID, ch2, nil)
 
 		assert.True(t, <-opComplete)
 	})
@@ -421,4 +421,63 @@ func TestHighConcurrencyStress(t *testing.T) {
 
 	wg.Wait()
 	close(prjCmdOutputChan)
+}
+
+// newAsyncHandlerWithLines returns a handler whose running job has n buffered lines.
+func newAsyncHandlerWithLines(t *testing.T, ctx command.ProjectContext, n int) *jobs.AsyncProjectCommandOutputHandler {
+	t.Helper()
+	h := createProjectCommandOutputHandler(t).(*jobs.AsyncProjectCommandOutputHandler)
+	for range n {
+		h.Send(ctx, "line", false)
+	}
+	// Send returns once Handle receives a line, before it is appended.
+	deadline := time.Now().Add(5 * time.Second)
+	for len(h.GetProjectOutputBuffer(ctx.JobID).Buffer) < n {
+		if time.Now().After(deadline) {
+			t.Fatalf("buffer never reached %d lines", n)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return h
+}
+
+func TestRegisterStopsWhenReceiverIsDone(t *testing.T) {
+	ctx := createTestProjectCmdContext(t)
+
+	t.Run("during backfill", func(t *testing.T) {
+		h := newAsyncHandlerWithLines(t, ctx, 3)
+		ch := make(chan string, 1) // full after one line; nobody reads it
+		done := make(chan struct{})
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			h.Register(ctx.JobID, ch, done)
+		}()
+		deadline := time.Now().Add(5 * time.Second)
+		for len(ch) < cap(ch) {
+			if time.Now().After(deadline) {
+				t.Fatal("backfill never filled the receiver")
+			}
+			time.Sleep(time.Millisecond)
+		}
+		close(done) // the receiver leaves while Register is blocked on line 2
+
+		select {
+		case <-returned:
+		case <-time.After(5 * time.Second):
+			t.Fatal("Register stayed blocked after the receiver left")
+		}
+		_, registered := h.GetReceiverBufferForPull(ctx.JobID)[ch]
+		Assert(t, !registered, "a departed receiver must not be registered")
+	})
+
+	t.Run("before registration", func(t *testing.T) {
+		h := newAsyncHandlerWithLines(t, ctx, 1)
+		ch := make(chan string, 10) // room for the whole backfill
+		done := make(chan struct{})
+		close(done)
+		h.Register(ctx.JobID, ch, done)
+		_, registered := h.GetReceiverBufferForPull(ctx.JobID)[ch]
+		Assert(t, !registered, "registering after the receiver left would outlive its Deregister")
+	})
 }
