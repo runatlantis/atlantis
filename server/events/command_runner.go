@@ -25,8 +25,15 @@ import (
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
+// Comments that Atlantis posts itself. They must not start with the executable
+// name, otherwise the comment webhook for them is parsed as a command (for
+// example "atlantis server ...") and Atlantis replies to its own comment.
 const (
-	ShutdownComment = "Atlantis server is shutting down, please try again later."
+	ShutdownComment = "The Atlantis server is shutting down, please try again later."
+	// ForkPullComment takes the allow fork PRs flag and the silence fork PR
+	// errors flag names.
+	ForkPullComment   = "Fork pull requests can't run Atlantis commands. To enable, set --%s  or, to disable this message, set --%s"
+	ClosedPullComment = "Closed pull requests can't run Atlantis commands"
 )
 
 //go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events --package mocks -o mocks/mock_command_runner.go CommandRunner
@@ -701,7 +708,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 			return false
 		}
 		ctx.Log.Info("command was run on a fork pull request which is disallowed")
-		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf("Atlantis commands can't be run on fork pull requests. To enable, set --%s  or, to disable this message, set --%s", c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
+		if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, fmt.Sprintf(ForkPullComment, c.AllowForkPRsFlag, c.SilenceForkPRErrorsFlag), ""); err != nil {
 			ctx.Log.Err("unable to comment: %s", err)
 		}
 		return false
@@ -710,7 +717,7 @@ func (c *DefaultCommandRunner) validateCtxAndComment(ctx *command.Context, comma
 	if ctx.Pull.State != models.OpenPullState && commandName != command.Unlock {
 		ctx.Log.Info("command was run on closed pull request")
 		if shouldComment {
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, "Atlantis commands can't be run on closed pull requests", ""); err != nil {
+			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, ClosedPullComment, ""); err != nil {
 				ctx.Log.Err("unable to comment: %s", err)
 			}
 		}
