@@ -153,6 +153,19 @@ type WorkflowHook struct {
 	Commands        string
 }
 
+// MatchesCommand reports whether the hook runs for the given command.
+func (h WorkflowHook) MatchesCommand(name string) bool {
+	if h.Commands == "" {
+		return true
+	}
+	for entry := range strings.SplitSeq(h.Commands, ",") {
+		if strings.TrimSpace(entry) == name {
+			return true
+		}
+	}
+	return false
+}
+
 // DefaultApplyStage is the Atlantis default apply stage.
 var DefaultApplyStage = Stage{
 	Steps: []Step{
@@ -210,6 +223,12 @@ var DefaultStateRmStage = Stage{
 	},
 }
 
+var DefaultOutputStage = Stage{Steps: []Step{{StepName: "init"}, {StepName: "output"}}}
+
+var DefaultStateListStage = Stage{Steps: []Step{{StepName: "init"}, {StepName: "state_list"}}}
+
+var DefaultStateShowStage = Stage{Steps: []Step{{StepName: "init"}, {StepName: "state_show"}}}
+
 type GlobalCfgArgs struct {
 	RepoConfigFile string
 	// No longer a user option as of https://github.com/runatlantis/atlantis/pull/3911,
@@ -228,6 +247,9 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 		Plan:        DefaultPlanStage,
 		PolicyCheck: DefaultPolicyCheckStage,
 		Import:      DefaultImportStage,
+		Output:      DefaultOutputStage,
+		StateList:   DefaultStateListStage,
+		StateShow:   DefaultStateShowStage,
 		StateRm:     DefaultStateRmStage,
 	}
 	// Must construct slices here instead of using a `var` declaration because

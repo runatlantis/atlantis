@@ -179,8 +179,11 @@ workflows:
 								},
 							},
 						},
-						Import:  valid.DefaultImportStage,
-						StateRm: valid.DefaultStateRmStage,
+						Import:    valid.DefaultImportStage,
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
+						StateRm:   valid.DefaultStateRmStage,
 					},
 				},
 			},
@@ -867,6 +870,9 @@ workflows:
 								},
 							},
 						},
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
 						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -969,6 +975,9 @@ workflows:
 								},
 							},
 						},
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
 						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -1052,6 +1061,9 @@ workflows:
 								},
 							},
 						},
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
 						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -1149,6 +1161,9 @@ workflows:
 								},
 							},
 						},
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
 						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{
@@ -1282,6 +1297,9 @@ func TestParseGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		Output:    valid.DefaultOutputStage,
+		StateList: valid.DefaultStateListStage,
+		StateShow: valid.DefaultStateShowStage,
 		StateRm: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -1678,6 +1696,9 @@ workflows:
 							Import: valid.Stage{
 								Steps: nil,
 							},
+							Output:    valid.DefaultOutputStage,
+							StateList: valid.DefaultStateListStage,
+							StateShow: valid.DefaultStateShowStage,
 							StateRm: valid.Stage{
 								Steps: nil,
 							},
@@ -1693,7 +1714,10 @@ workflows:
 				},
 				Workflows: map[string]valid.Workflow{
 					"default": {
-						Name: "default",
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
+						Name:      "default",
 						Apply: valid.Stage{
 							Steps: nil,
 						},
@@ -1801,6 +1825,9 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 				},
 			},
 		},
+		Output:    valid.DefaultOutputStage,
+		StateList: valid.DefaultStateListStage,
+		StateShow: valid.DefaultStateShowStage,
 		StateRm: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -2039,6 +2066,9 @@ func defaultWorkflow(name string) valid.Workflow {
 		Plan:        valid.DefaultPlanStage,
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Import:      valid.DefaultImportStage,
+		Output:      valid.DefaultOutputStage,
+		StateList:   valid.DefaultStateListStage,
+		StateShow:   valid.DefaultStateShowStage,
 		StateRm:     valid.DefaultStateRmStage,
 	}
 }

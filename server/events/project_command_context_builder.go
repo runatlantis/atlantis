@@ -113,6 +113,12 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		steps = []valid.Step{{
 			StepName: "version",
 		}}
+	case command.Output:
+		steps = prjCfg.Workflow.Output.Steps
+	case command.StateList:
+		steps = prjCfg.Workflow.StateList.Steps
+	case command.StateShow:
+		steps = prjCfg.Workflow.StateShow.Steps
 	case command.Import:
 		steps = prjCfg.Workflow.Import.Steps
 	case command.State:

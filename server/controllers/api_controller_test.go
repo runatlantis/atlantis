@@ -23,9 +23,12 @@ import (
 	"github.com/gorilla/mux"
 	. "github.com/petergtz/pegomock/v4"
 	"github.com/runatlantis/atlantis/server/controllers"
+	"github.com/runatlantis/atlantis/server/core/config"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/drift"
 	driftmocks "github.com/runatlantis/atlantis/server/core/drift/mocks"
 	. "github.com/runatlantis/atlantis/server/core/locking/mocks"
+	"github.com/runatlantis/atlantis/server/core/runtime"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	. "github.com/runatlantis/atlantis/server/events/mocks"
@@ -5819,4 +5822,106 @@ func TestAPIController_RejectsWorkspaceUnsafeForPaths(t *testing.T) {
 			projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
 		})
 	}
+}
+
+func setupAPIProjectBuilder(t *testing.T, ac *controllers.APIController) {
+	t.Helper()
+	dir := t.TempDir()
+	Ok(t, os.WriteFile(filepath.Join(dir, "main.tf"), nil, 0600))
+	Ok(t, os.WriteFile(filepath.Join(dir, "atlantis.yaml"), []byte("version: 3\nprojects:\n- name: app\n  dir: .\n  terraform_version: v1.11.1\n"), 0600))
+	working := ac.WorkingDir.(*MockWorkingDir)
+	When(ac.WorkingDirLocker.(*MockWorkingDirLocker).TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
+	When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
+	When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(dir, nil)
+	ac.ProjectCommandBuilder = &events.DefaultProjectCommandBuilder{
+		ParserValidator:              &config.ParserValidator{},
+		ProjectFinder:                &events.DefaultProjectFinder{},
+		VCSClient:                    ac.VCSClient,
+		WorkingDir:                   working,
+		WorkingDirLocker:             ac.WorkingDirLocker,
+		GlobalCfg:                    valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		ProjectCommandContextBuilder: events.NewProjectCommandContextBuilder(false, &events.CommentParser{ExecutableName: "atlantis"}, ac.Scope),
+	}
+}
+
+type apiTeamAuthorizationRunner struct {
+	output string
+	calls  int
+}
+
+func (r *apiTeamAuthorizationRunner) Run(ctx models.TeamAllowlistCheckerContext, _, _, _ string) (string, error) {
+	if !ctx.API || ctx.CommandName == "" || ctx.ProjectName != "app" {
+		return "", fmt.Errorf("missing API authorization context")
+	}
+	r.calls++
+	return r.output, nil
+}
+
+var _ runtime.ExternalTeamAllowlistRunner = (*apiTeamAuthorizationRunner)(nil)
+
+func TestAPICommandAllowlistCanDisablePlanAndApply(t *testing.T) {
+	for _, name := range []command.Name{command.Plan, command.Apply} {
+		t.Run(name.String(), func(t *testing.T) {
+			ac, _, runner := setup(t)
+			ac.AllowAPICommands = []command.Name{command.Output}
+			req := httptest.NewRequest(http.MethodPost, "/api/"+name.String(), bytes.NewBufferString(`{}`))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			if name == command.Plan {
+				ac.Plan(w, req)
+			} else {
+				ac.Apply(w, req)
+			}
+			Equals(t, http.StatusForbidden, w.Code)
+			runner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+			runner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+		})
+	}
+}
+
+func TestAPIController_RejectsUnauthorizedCommandsBeforeReadingRequest(t *testing.T) {
+	for _, handler := range []struct {
+		name command.Name
+		call func(*controllers.APIController, http.ResponseWriter, *http.Request)
+	}{
+		{command.Plan, (*controllers.APIController).Plan},
+		{command.Apply, (*controllers.APIController).Apply},
+		{command.Output, (*controllers.APIController).Output},
+		{command.StateList, (*controllers.APIController).StateList},
+		{command.StateShow, (*controllers.APIController).StateShow},
+	} {
+		for _, tc := range []struct {
+			name    string
+			secret  []byte
+			token   string
+			allowed []command.Name
+			status  int
+		}{
+			{"API disabled", nil, atlantisToken, []command.Name{handler.name}, http.StatusServiceUnavailable},
+			{"missing token", []byte(atlantisToken), "", []command.Name{handler.name}, http.StatusUnauthorized},
+			{"invalid token", []byte(atlantisToken), "wrong", []command.Name{}, http.StatusUnauthorized},
+			{"command disabled", []byte(atlantisToken), atlantisToken, []command.Name{}, http.StatusForbidden},
+		} {
+			t.Run(handler.name.String()+"/"+tc.name, func(t *testing.T) {
+				ac, _, _ := setup(t)
+				ac.APISecret = tc.secret
+				ac.AllowAPICommands = tc.allowed
+				body := &apiUnreadRequestBody{}
+				req := httptest.NewRequest(http.MethodPost, "/api/"+handler.name.String(), body)
+				req.Header.Set(atlantisTokenHeader, tc.token)
+				w := httptest.NewRecorder()
+				handler.call(ac, w, req)
+				Equals(t, tc.status, w.Code)
+				Equals(t, 0, body.reads)
+				ac.VCSClient.(*MockClient).VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+			})
+		}
+	}
+}
+
+type apiUnreadRequestBody struct{ reads int }
+
+func (b *apiUnreadRequestBody) Read([]byte) (int, error) {
+	b.reads++
+	return 0, io.EOF
 }

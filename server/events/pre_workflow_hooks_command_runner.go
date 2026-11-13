@@ -5,7 +5,6 @@ package events
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -127,7 +126,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		ctx.Log.Debug("Processing pre workflow hook '%s', Command '%s', Target commands [%s]",
 			ctx.HookDescription, ctx.CommandName, hook.Commands)
-		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
+		if !hook.MatchesCommand(ctx.CommandName) {
 			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
 				ctx.HookDescription, ctx.CommandName, hook.Commands)
 			continue

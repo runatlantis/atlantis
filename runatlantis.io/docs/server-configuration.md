@@ -51,6 +51,30 @@ Values are chosen in this order:
 
 ## Flags
 
+### `--allow-api-commands`
+
+```bash
+atlantis server --allow-api-commands=plan,apply,output,state_list,state_show
+# or
+ATLANTIS_ALLOW_API_COMMANDS='plan,apply,output,state_list,state_show'
+```
+
+Allowed Terraform command API endpoints. Defaults to `plan,apply`, so `output`,
+`state_list`, and `state_show` are disabled until explicitly enabled. Each command
+is independent of the comment command allowlist. Use `none` to disable all five
+command endpoints, or `all` to enable all five. An explicit list replaces the default.
+
+The [API experiment](experiments.md#api), `api-secret`, and a matching
+`X-Atlantis-Token` are also required. Repository and applicable team restrictions
+still apply. This flag controls `/api/plan`, `/api/apply`, `/api/output`,
+`/api/state/list`, and `/api/state/show`; lock and drift endpoints retain their
+existing controls. Disabling `plan` here does not prevent the plan phase of an
+enabled `/api/apply` request.
+
+Before enabling `output`, `state_list`, or `state_show`, read the [data exposure considerations](using-atlantis.md#enabling-inspection-commands).
+API token holders can request the selected project's outputs and state details,
+including sensitive values Terraform reveals for named outputs or JSON/raw output.
+
 ### `--allow-commands`
 
 ```bash
@@ -64,8 +88,9 @@ List of allowed commands to be run on the Atlantis server, Defaults to `version,
 Notes:
 
 - Accepts a comma separated list, ex. `command1,command2`.
-- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel`, `import`, `state`, `policy_check` and `all` are available.
+- `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel`, `import`, `state`, `output`, `state_list`, `state_show`, `policy_check` and `all` are available.
 - `policy_check` is an internal command that runs automatically after `plan` when [policy checking](policy-checking.md) is enabled. It must be explicitly allowlisted when using [`--gh-team-allowlist`](#gh-team-allowlist).
+- `output`, `state_list`, and `state_show` are disabled by default. `state` continues to enable only `state rm`; use the `state_list` or `state_show` entries to enable `state list` or `state show` without granting state removal. See [enabling inspection commands](using-atlantis.md#enabling-inspection-commands).
 - `all` is a special keyword that allows all commands. If pass `all` then all other commands will be ignored.
 
 ### `--allow-draft-prs`

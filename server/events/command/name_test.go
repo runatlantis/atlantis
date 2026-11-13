@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 
+	. "github.com/runatlantis/atlantis/testing"
+
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,7 +68,7 @@ func TestName_DefaultUsage(t *testing.T) {
 		{command.ApprovePolicies, "approve_policies"},
 		{command.Version, "version"},
 		{command.Import, "import ADDRESS ID"},
-		{command.State, "state [rm ADDRESS...]"},
+		{command.State, "state [rm ADDRESS... | list [ADDRESS...] | show ADDRESS]"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.c.String(), func(t *testing.T) {
@@ -89,7 +91,7 @@ func TestName_SubCommands(t *testing.T) {
 		{c: command.ApprovePolicies},
 		{c: command.Version},
 		{c: command.Import},
-		{c: command.State, want: []string{"rm"}},
+		{c: command.State, want: []string{"rm", "list", "show"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.c.String(), func(t *testing.T) {
@@ -195,4 +197,47 @@ func TestParseCommandName(t *testing.T) {
 		_, err := command.ParseCommandName("unknown")
 		assert.ErrorContains(t, err, "unknown command name: unknown")
 	})
+}
+
+func TestValidateInspectionArgs(t *testing.T) {
+	for _, tc := range []struct {
+		name  command.Name
+		args  []string
+		valid bool
+	}{
+		{command.Output, nil, true},
+		{command.Output, []string{"endpoint"}, true},
+		{command.Output, []string{"-raw", "endpoint"}, true},
+		{command.Output, []string{"--json=true"}, true},
+		{command.Output, []string{"a", "b"}, false},
+		{command.StateList, nil, true},
+		{command.StateList, []string{"module.app", "aws_instance.web"}, true},
+		{command.StateList, []string{"-id", "i-123"}, true},
+		{command.StateList, []string{"-id=i-123", "module.app"}, true},
+		{command.StateList, []string{"-id"}, false},
+		{command.StateShow, []string{`aws_instance.web["blue"]`}, true},
+		{command.StateShow, nil, false},
+		{command.StateShow, []string{"a", "b"}, false},
+		{command.StateShow, []string{"-json", "a"}, false},
+		{command.Output, []string{"-state=/tmp/other"}, false},
+		{command.StateList, []string{"--state", "/tmp/other"}, false},
+		{command.StateShow, []string{"-chdir=/tmp", "a"}, false},
+		{command.Output, []string{"-out=path"}, false},
+		{command.Output, []string{"endpoint", "-raw"}, false},
+		{command.StateList, []string{"module.app", "-id=i-123"}, false},
+		{command.Plan, nil, false},
+	} {
+		t.Run(tc.name.String()+"/"+joinArgs(tc.args), func(t *testing.T) {
+			err := command.ValidateInspectionArgs(tc.name, tc.args)
+			Equals(t, tc.valid, err == nil)
+		})
+	}
+}
+
+func joinArgs(args []string) string {
+	var out string
+	for _, a := range args {
+		out += a + " "
+	}
+	return out
 }

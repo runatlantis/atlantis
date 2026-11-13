@@ -285,6 +285,79 @@ If a flag is needed to be always appended, see [Custom Workflow Use Cases](custo
 
 ---
 
+## Inspection commands
+
+```shell
+atlantis output [options] [NAME] -- [terraform output flags]
+atlantis state list [options] [ADDRESS...] -- [-id=ID]
+atlantis state show [options] ADDRESS
+```
+
+`output`, `state list`, and `state show` read a project's saved state without
+running a plan or apply. They use the standard checkout, initialization, and
+workspace handling; refreshing a checkout can discard saved plans.
+
+Use `-p PROJECT`, or `-d DIRECTORY` and `-w WORKSPACE`, to select a project as with
+`import`. With no selector, the command runs for every configured project. For example:
+
+```shell
+atlantis state list -p networking
+atlantis state list -p networking module.vpc -- -id=vpc-123
+atlantis state show -p networking 'aws_subnet.private["us-west-2a"]'
+atlantis output -p networking
+atlantis output -p networking vpc_id -- -raw
+```
+
+`output` accepts `-json`, `-raw`, and `-no-color` after `--`. `state list` accepts
+`-id=ID` (or `-id ID`) and `-no-color`; `state show` accepts `-no-color`.
+Flags that select an arbitrary state file or working directory are rejected.
+Configured `--blocked-extra-args` restrictions also apply to comments.
+
+### Enabling inspection commands
+
+All three comment commands are disabled by default. Add only the commands you
+need to the server's existing allowlist, for example:
+
+```shell
+ATLANTIS_ALLOW_COMMANDS=version,plan,apply,unlock,approve_policies,cancel,output,state_list,state_show
+```
+
+The allowlist names are `output`, `state_list`, and `state_show`, even though
+comments normally use `state list` and `state show`. Comments also accept
+`atlantis state_list` and `atlantis state_show`, with the same permissions.
+Enabling `state` grants `state rm` only. Using `all` enables every comment command,
+including `output`, `state_list`, and `state_show`.
+
+::: warning Upgrading with `--allow-commands=all`
+Existing deployments configured with `all` gain `output`, `state list`, and
+`state show` when upgraded, including named outputs that may expose sensitive
+values. Use an explicit command list before upgrading to keep them disabled.
+:::
+When team restrictions are configured, authorize the same individual command
+names, such as `platform:state_list`; authorizing `state` does not authorize them.
+
+Before enabling these commands, consider who can read their results:
+
+* Results are posted to PR comments and may also appear in execution logs or job
+  output pages. Include those surfaces when reviewing access.
+  `state list` reveals resource addresses and infrastructure structure;
+  `state show` reveals resource attributes. Terraform can only redact values
+  correctly marked as sensitive in the configuration/provider schema.
+* Plain `terraform output` redacts outputs marked sensitive. Selecting an output
+  by name, or using `-json` or `-raw`, can reveal sensitive values in plaintext.
+  Atlantis preserves this Terraform behavior; it does not add secret detection
+  or redaction. Restrict command access and PR visibility accordingly.
+* These commands use Atlantis's backend credentials. They show the saved state,
+  which can differ from live infrastructure, and the state is shared across
+  PRs targeting the same backend/workspace.
+* Custom stages and workflow hooks can mutate infrastructure; use trusted configuration.
+* The default `init` step can upgrade providers when `.terraform.lock.hcl` is
+  untracked, requiring a new plan before apply.
+
+The [API equivalents](api-endpoints.md#inspection-endpoints) require separate
+opt-in through `--allow-api-commands`, as well as API authentication. Their output
+is returned to the API caller rather than posted as a PR comment.
+
 ## atlantis state rm
 
 ```bash

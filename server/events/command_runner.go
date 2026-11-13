@@ -88,6 +88,28 @@ func buildCommentCommandRunner(
 	return runner
 }
 
+func runCommentWorkflow(
+	ctx *command.Context,
+	cmd *CommentCommand,
+	build func(*command.Context, *CommentCommand) ([]command.ProjectContext, error),
+	run prjCmdRunnerFunc,
+	pullUpdater *PullUpdater,
+	silenceNoProjects bool,
+) {
+	cmds, err := build(ctx, cmd)
+	if MarkCommandSkippedIfIgnoredTargetedDir(ctx, cmd.CommandName(), err) {
+		return
+	}
+	result := command.Result{Error: err}
+	if err == nil {
+		if len(cmds) == 0 && silenceNoProjects {
+			return
+		}
+		result = runProjectCmds(cmds, run)
+	}
+	pullUpdater.updatePull(ctx, cmd, result)
+}
+
 func shouldSkipPreWorkflowHooks(ctx *command.Context, cmdRunner CommentCommandRunner, cmd *CommentCommand) bool {
 	skipper, ok := cmdRunner.(PreWorkflowHooksSkipper)
 	return ok && skipper.ShouldSkipPreWorkflowHooks(ctx, cmd)

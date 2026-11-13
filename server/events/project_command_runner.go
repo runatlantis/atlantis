@@ -162,9 +162,23 @@ type ProjectStateCommandRunner interface {
 	StateRm(ctx command.ProjectContext) command.ProjectCommandOutput
 }
 
-// ProjectCommandRunner runs project commands. A project command is a command
-// for a specific TF project.
+type ProjectOutputCommandRunner interface {
+	Output(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+type ProjectStateListCommandRunner interface {
+	StateList(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+type ProjectStateShowCommandRunner interface {
+	StateShow(ctx command.ProjectContext) command.ProjectCommandOutput
+}
+
+// ProjectCommandRunner runs commands for a specific Terraform project.
 type ProjectCommandRunner interface {
+	ProjectOutputCommandRunner
+	ProjectStateListCommandRunner
+	ProjectStateShowCommandRunner
 	ProjectPlanCommandRunner
 	ProjectApplyCommandRunner
 	ProjectPolicyCheckCommandRunner
@@ -356,6 +370,9 @@ type DefaultProjectCommandRunner struct {
 	PolicyCheckStepRunner     StepRunner
 	VersionStepRunner         StepRunner
 	ImportStepRunner          StepRunner
+	OutputStepRunner          StepRunner
+	StateListStepRunner       StepRunner
+	StateShowStepRunner       StepRunner
 	StateRmStepRunner         StepRunner
 	RunStepRunner             CustomStepRunner
 	EnvStepRunner             EnvStepRunner
@@ -1078,6 +1095,51 @@ func (p *DefaultProjectCommandRunner) doApply(ctx command.ProjectContext) (apply
 	return strings.Join(outputs, "\n"), remoteApplyRunURL, "", nil
 }
 
+func (p *DefaultProjectCommandRunner) Output(ctx command.ProjectContext) command.ProjectCommandOutput {
+	output, err := p.runInspectionWorkflow(ctx, command.Output)
+	if err != nil {
+		return command.ProjectCommandOutput{Error: err}
+	}
+	return command.ProjectCommandOutput{OutputSuccess: &models.OutputSuccess{Output: output}}
+}
+
+func (p *DefaultProjectCommandRunner) StateList(ctx command.ProjectContext) command.ProjectCommandOutput {
+	output, err := p.runInspectionWorkflow(ctx, command.StateList)
+	if err != nil {
+		return command.ProjectCommandOutput{Error: err}
+	}
+	return command.ProjectCommandOutput{StateListSuccess: &models.StateListSuccess{Output: output}}
+}
+
+func (p *DefaultProjectCommandRunner) StateShow(ctx command.ProjectContext) command.ProjectCommandOutput {
+	output, err := p.runInspectionWorkflow(ctx, command.StateShow)
+	if err != nil {
+		return command.ProjectCommandOutput{Error: err}
+	}
+	return command.ProjectCommandOutput{StateShowSuccess: &models.StateShowSuccess{Output: output}}
+}
+
+func (p *DefaultProjectCommandRunner) runInspectionWorkflow(ctx command.ProjectContext, name command.Name) (string, error) {
+	unlock, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, ctx.Workspace, ctx.RepoRelDir, ctx.ProjectName, name, p.workingDirLockMetadata(ctx))
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, ctx.Workspace)
+	if err != nil {
+		return "", err
+	}
+	absPath := filepath.Join(repoDir, ctx.RepoRelDir)
+	if err := checkProjectDir(ctx, repoDir, absPath); err != nil {
+		return "", err
+	}
+	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
+	if err != nil {
+		return "", errorWithStepOutput(err, outputs)
+	}
+	return strings.Join(outputs, "\n"), nil
+}
+
 func (p *DefaultProjectCommandRunner) doVersion(ctx command.ProjectContext) (versionOut string, failure string, err error) {
 	repoDir, err := p.WorkingDir.GetWorkingDir(ctx.Pull.BaseRepo, ctx.Pull, ctx.Workspace)
 	if err != nil {
@@ -1258,6 +1320,12 @@ func (p *DefaultProjectCommandRunner) runSteps(steps []valid.Step, ctx command.P
 			out, err = p.VersionStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "import":
 			out, err = p.ImportStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "output":
+			out, err = p.OutputStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "state_list":
+			out, err = p.StateListStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
+		case "state_show":
+			out, err = p.StateShowStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "state_rm":
 			out, err = p.StateRmStepRunner.Run(ctx, step.ExtraArgs, absPath, envs)
 		case "run":

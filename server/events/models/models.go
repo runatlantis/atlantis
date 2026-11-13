@@ -725,6 +725,18 @@ type ImportSuccess struct {
 	RePlanCmd string
 }
 
+type OutputSuccess struct {
+	Output string
+}
+
+type StateListSuccess struct {
+	Output string
+}
+
+type StateShowSuccess struct {
+	Output string
+}
+
 // StateRmSuccess is the result of a successful state rm run.
 type StateRmSuccess struct {
 	// Output is the output from terraform state rm

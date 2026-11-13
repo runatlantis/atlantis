@@ -76,6 +76,68 @@ To enable the API endpoints, `api-secret` should be configured.
 * Pass `X-Atlantis-Token` with the same secret in the request header
   :::
 
+### Inspection endpoints
+
+| Endpoint | `--allow-api-commands` entry | Terraform command |
+| --- | --- | --- |
+| `POST /api/output` | `output` | `terraform output [NAME]` |
+| `POST /api/state/list` | `state_list` | `terraform state list [ADDRESS...]` |
+| `POST /api/state/show` | `state_show` | `terraform state show ADDRESS` |
+
+All three endpoints are disabled by default. To enable them while retaining
+plan/apply access, set:
+
+```shell
+ATLANTIS_EXPERIMENTS=api
+ATLANTIS_ALLOW_API_COMMANDS=plan,apply,output,state_list,state_show
+```
+
+Configure `api-secret` and send it in `X-Atlantis-Token`. Command API permissions
+are independent of `--allow-commands`. Repository allowlisting and applicable
+team restrictions still apply. API requests have no VCS user identity, so team
+allowlists require wildcard team rules. See [`--allow-api-commands`](server-configuration.md#allow-api-commands).
+
+These endpoints accept the same `Repository`, `Ref`, `Type`, optional `PR` and
+`base_branch`, and project/path selectors as `/api/plan`. At least one `Projects`
+or `Paths` entry is required. The optional `arguments` array contains literal
+Terraform arguments, with flags before output names or resource addresses; it is not a shell command. An array preserves quoted resource
+addresses without requiring shell escaping in the JSON value.
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/state/show' \
+  --header "X-Atlantis-Token: $ATLANTIS_API_SECRET" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "Repository": "github.com/owner/repo",
+    "Ref": "main",
+    "Type": "Github",
+    "Projects": ["networking"],
+    "arguments": ["aws_vpc.main"]
+  }'
+```
+
+For `/api/output`, use `"arguments": ["-raw", "vpc_id"]` to request a named
+output. For `/api/state/list`, omit `arguments` to list all resources, or pass
+address filters and `-id=ID`. Supported flags are the same as the
+[inspection comment commands](using-atlantis.md#inspection-commands); arbitrary
+state-file and directory flags are rejected.
+
+Responses use the existing command API format. Each `ProjectResults` entry
+contains `OutputSuccess.Output`, `StateListSuccess.Output`, or
+`StateShowSuccess.Output` on success, according to the endpoint. This is combined stdout/stderr
+from Terraform, rather than a parsed JSON value; diagnostics may accompany
+`-json` or `-raw` output. A successful empty state list
+returns an empty output string. Disabled commands return HTTP 403; invalid or
+missing credentials return HTTP 401; invalid arguments return HTTP 400.
+
+These endpoints use standard checkout and workspace handling; checkout refreshes
+can discard saved plans. Results are returned to the API caller. **Named outputs and
+JSON/raw output can expose sensitive values**, and `/api/state/list` and
+`/api/state/show` can reveal infrastructure details. Review the
+[data exposure considerations](using-atlantis.md#enabling-inspection-commands)
+and restrict API token access before enabling these endpoints. Custom workflows
+and hooks retain their configured behavior and can produce logs or side effects.
+
 ### POST /api/plan
 
 #### Description

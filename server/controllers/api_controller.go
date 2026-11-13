@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +43,10 @@ var nonPRPullCounter atomic.Int64
 var apiErrorURLCredentialRE = regexp.MustCompile(`(?i)(https?://)([^\s/@]+:)?[^\s/@]+@`)
 
 type APIController struct {
+	AllowAPICommands                []command.Name
+	ProjectOutputCommandRunner      events.ProjectOutputCommandRunner
+	ProjectStateListCommandRunner   events.ProjectStateListCommandRunner
+	ProjectStateShowCommandRunner   events.ProjectStateShowCommandRunner
 	APISecret                       []byte
 	Locker                          locking.Locker `validate:"required"`
 	DriftStorage                    drift.Storage
@@ -58,11 +63,12 @@ type APIController struct {
 	PreWorkflowHooksCommandRunner   events.PreWorkflowHooksCommandRunner  `validate:"required"`
 	PostWorkflowHooksCommandRunner  events.PostWorkflowHooksCommandRunner `validate:"required"`
 	RepoAllowlistChecker            *events.RepoAllowlistChecker          `validate:"required"`
-	Scope                           tally.Scope                           `validate:"required"`
-	VCSClient                       vcs.Client                            `validate:"required"`
-	WorkingDir                      events.WorkingDir                     `validate:"required"`
-	WorkingDirLocker                events.WorkingDirLocker               `validate:"required"`
-	CommitStatusUpdater             events.CommitStatusUpdater            `validate:"required"`
+	TeamAllowlistChecker            command.TeamAllowlistChecker
+	Scope                           tally.Scope                `validate:"required"`
+	VCSClient                       vcs.Client                 `validate:"required"`
+	WorkingDir                      events.WorkingDir          `validate:"required"`
+	WorkingDirLocker                events.WorkingDirLocker    `validate:"required"`
+	CommitStatusUpdater             events.CommitStatusUpdater `validate:"required"`
 	// PullReqStatusFetcher is optional. When set and the API request supplies a
 	// PR number, it is used to populate command.Context.PullRequestStatus so
 	// apply requirements like 'mergeable' and 'approved' evaluate against real
@@ -139,6 +145,7 @@ type APIRequest struct {
 	BaseBranch string `json:"base_branch,omitempty"`
 	Type       string `validate:"required"`
 	PR         int
+	Arguments  []string `json:"arguments,omitempty"`
 	Projects   []string
 	Paths      []APIRequestPath
 	// DiscoverProjects enables all-project discovery when no projects or paths
@@ -283,11 +290,74 @@ func sanitizeRepoCloneURL(message string, repo models.Repo) string {
 	return strings.ReplaceAll(message, repo.CloneURL, repo.SanitizedCloneURL)
 }
 
+func (a *APIController) apiRunInspection(w http.ResponseWriter, r *http.Request, name command.Name) {
+	request, ctx, code, err := a.apiParseAndValidate(r, name)
+	if err != nil {
+		a.apiReportLegacyError(w, code, err)
+		return
+	}
+	ctx.TeamAllowlistChecker = a.TeamAllowlistChecker
+	if err := command.ValidateInspectionArgs(name, request.Arguments); err != nil {
+		a.apiReportLegacyError(w, http.StatusBadRequest, err)
+		return
+	}
+	if len(request.Projects) == 0 && len(request.Paths) == 0 {
+		a.apiReportLegacyError(w, http.StatusBadRequest, fmt.Errorf("specify at least one project or path"))
+		return
+	}
+	if err := a.apiSetup(ctx, name); err != nil {
+		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
+		return
+	}
+	defer a.cleanupNonPRWorkingDir(ctx)
+	var buildCommands func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)
+	var run func(command.ProjectContext) command.ProjectCommandOutput
+	switch name {
+	case command.Output:
+		buildCommands = a.ProjectCommandBuilder.BuildOutputCommands
+		run = a.ProjectOutputCommandRunner.Output
+	case command.StateList:
+		buildCommands = a.ProjectCommandBuilder.BuildStateListCommands
+		run = a.ProjectStateListCommandRunner.StateList
+	case command.StateShow:
+		buildCommands = a.ProjectCommandBuilder.BuildStateShowCommands
+		run = a.ProjectStateShowCommandRunner.StateShow
+	}
+	build := func(ctx *command.Context, cc *events.CommentCommand) ([]command.ProjectContext, error) {
+		cc.Flags = slices.Clone(request.Arguments)
+		return buildCommands(ctx, cc)
+	}
+	cmds, ccs, err := request.getCommands(ctx, name, build)
+	if events.IsIgnoredTargetedDir(err) {
+		ctx.CommandSkipped = true
+		a.getAPIMiddleware().Responder.writeJSON(w, http.StatusOK, command.Result{ProjectResults: []command.ProjectResult{}})
+		return
+	}
+	if err != nil {
+		a.apiReportLegacyError(w, apiErrorStatusCode(err), err)
+		return
+	}
+	result := command.Result{ProjectResults: []command.ProjectResult{}}
+	for i, cmd := range cmds {
+		if err := a.runPreHooks(ctx, ccs[i]); err != nil {
+			a.apiReportLegacyError(w, http.StatusInternalServerError, err)
+			return
+		}
+		result.ProjectResults = append(result.ProjectResults, events.RunOneProjectCmd(run, cmd))
+		a.runPostHooks(ctx, ccs[i:i+1])
+	}
+	status := http.StatusOK
+	if result.HasErrors() {
+		status = http.StatusInternalServerError
+	}
+	a.getAPIMiddleware().Responder.writeJSON(w, status, result)
+}
+
 func (a *APIController) Plan(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
-	request, ctx, code, err := a.apiParseAndValidate(r)
+	request, ctx, code, err := a.apiParseAndValidate(r, command.Plan)
 	if err != nil {
 		a.apiReportLegacyError(w, code, err)
 		return
@@ -320,7 +390,7 @@ func (a *APIController) Apply(w http.ResponseWriter, r *http.Request) {
 	middleware := a.getAPIMiddleware()
 	responder := middleware.Responder
 
-	request, ctx, code, err := a.apiParseAndValidate(r)
+	request, ctx, code, err := a.apiParseAndValidate(r, command.Apply)
 	if err != nil {
 		a.apiReportLegacyError(w, code, err)
 		return
@@ -1087,7 +1157,7 @@ func mergePolicyStatuses(existing []models.PolicySetStatus, incoming []models.Po
 	return existing
 }
 
-func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *command.Context, int, error) {
+func (a *APIController) apiParseAndValidate(r *http.Request, name command.Name) (*APIRequest, *command.Context, int, error) {
 	if len(a.APISecret) == 0 {
 		return nil, nil, http.StatusServiceUnavailable, fmt.Errorf("ignoring request since API is disabled")
 	}
@@ -1096,6 +1166,14 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	secret := r.Header.Get(atlantisTokenHeader)
 	if subtle.ConstantTimeCompare([]byte(secret), a.APISecret) != 1 {
 		return nil, nil, http.StatusUnauthorized, fmt.Errorf("header %s did not match expected secret", atlantisTokenHeader)
+	}
+
+	allowed := a.AllowAPICommands
+	if allowed == nil {
+		allowed = command.DefaultAPICommands
+	}
+	if !slices.Contains(allowed, name) {
+		return nil, nil, http.StatusForbidden, fmt.Errorf("API command %q is disabled by --allow-api-commands", name)
 	}
 
 	// Parse the JSON payload

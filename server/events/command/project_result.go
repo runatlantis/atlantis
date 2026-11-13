@@ -26,6 +26,9 @@ type ProjectCommandOutput struct {
 	ApplySuccessURL    string `json:"-"`
 	VersionSuccess     string
 	ImportSuccess      *models.ImportSuccess
+	OutputSuccess      *models.OutputSuccess
+	StateListSuccess   *models.StateListSuccess
+	StateShowSuccess   *models.StateShowSuccess
 	StateRmSuccess     *models.StateRmSuccess
 }
 
@@ -121,5 +124,5 @@ func (p ProjectResult) PlanHashAfterMerge(existing string) string {
 
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
-	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
+	return ((p.OutputSuccess != nil || p.StateListSuccess != nil || p.StateShowSuccess != nil) && p.Error == nil && p.Failure == "") || p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""
 }

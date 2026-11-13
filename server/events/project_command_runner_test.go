@@ -5946,3 +5946,84 @@ func TestDefaultProjectCommandRunner_PlanRejectsVarFileSymlinkOutsideRepo(t *tes
 		"unexpected error: %s", res.Error)
 	Assert(t, unlocked, "expected the project lock to be released after the rejection")
 }
+
+func TestOutputProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
+	name := command.Output
+	t.Run(name.String(), func(t *testing.T) {
+		RegisterMockTestingT(t)
+		repoDir := t.TempDir()
+		working := mocks.NewMockWorkingDir()
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+		step := mocks.NewMockStepRunner()
+		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
+		runner := &events.DefaultProjectCommandRunner{WorkingDir: working, WorkingDirLocker: events.NewDefaultWorkingDirLocker(), OutputStepRunner: step, StateListStepRunner: step, StateShowStepRunner: step}
+		args := []string(nil)
+		if name == command.StateShow {
+			args = []string{"aws_instance.web"}
+		}
+		ctx := command.ProjectContext{CommandName: name, CommentArgs: args, Log: logging.NewNoopLogger(t), Workspace: "production", RepoRelDir: ".", Steps: []valid.Step{{StepName: name.String()}}}
+		// Nil status/lock dependencies ensure inspection uses neither plan/apply statuses nor persistent project locks.
+		run := runner.Output
+		out := run(ctx)
+		Ok(t, out.Error)
+		Equals(t, "", out.Failure)
+		Assert(t, out.OutputSuccess != nil, "expected successful empty output")
+		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
+		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	})
+}
+
+func TestStateListProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
+	name := command.StateList
+	t.Run(name.String(), func(t *testing.T) {
+		RegisterMockTestingT(t)
+		repoDir := t.TempDir()
+		working := mocks.NewMockWorkingDir()
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+		step := mocks.NewMockStepRunner()
+		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
+		runner := &events.DefaultProjectCommandRunner{WorkingDir: working, WorkingDirLocker: events.NewDefaultWorkingDirLocker(), OutputStepRunner: step, StateListStepRunner: step, StateShowStepRunner: step}
+		args := []string(nil)
+		if name == command.StateShow {
+			args = []string{"aws_instance.web"}
+		}
+		ctx := command.ProjectContext{CommandName: name, CommentArgs: args, Log: logging.NewNoopLogger(t), Workspace: "production", RepoRelDir: ".", Steps: []valid.Step{{StepName: name.String()}}}
+		// Nil status/lock dependencies ensure inspection uses neither plan/apply statuses nor persistent project locks.
+		run := runner.StateList
+		out := run(ctx)
+		Ok(t, out.Error)
+		Equals(t, "", out.Failure)
+		Assert(t, out.StateListSuccess != nil, "expected successful empty output")
+		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
+		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	})
+}
+
+func TestStateShowProjectRunner_RunsConfiguredWorkflow(t *testing.T) {
+	name := command.StateShow
+	t.Run(name.String(), func(t *testing.T) {
+		RegisterMockTestingT(t)
+		repoDir := t.TempDir()
+		working := mocks.NewMockWorkingDir()
+		When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+		When(working.GitReadLock(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(func() {})
+		step := mocks.NewMockStepRunner()
+		When(step.Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())).ThenReturn("", nil)
+		runner := &events.DefaultProjectCommandRunner{WorkingDir: working, WorkingDirLocker: events.NewDefaultWorkingDirLocker(), OutputStepRunner: step, StateListStepRunner: step, StateShowStepRunner: step}
+		args := []string(nil)
+		if name == command.StateShow {
+			args = []string{"aws_instance.web"}
+		}
+		ctx := command.ProjectContext{CommandName: name, CommentArgs: args, Log: logging.NewNoopLogger(t), Workspace: "production", RepoRelDir: ".", Steps: []valid.Step{{StepName: name.String()}}}
+		// Nil status/lock dependencies ensure inspection uses neither plan/apply statuses nor persistent project locks.
+		run := runner.StateShow
+		out := run(ctx)
+		Ok(t, out.Error)
+		Equals(t, "", out.Failure)
+		Assert(t, out.StateShowSuccess != nil, "expected successful empty output")
+		Assert(t, (command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: out}}}).HasErrors() == false, "empty output must succeed")
+		step.VerifyWasCalledOnce().Run(Any[command.ProjectContext](), Any[[]string](), Any[string](), Any[map[string]string]())
+	})
+}
