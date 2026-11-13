@@ -234,7 +234,7 @@ func TestIsAtlantisUser_AzureOrganizationCache(t *testing.T) {
 	requests := make(map[string]int)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests[r.URL.Path]++
-		owner := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")[0]
+		owner, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/"), "/")
 		_, _ = fmt.Fprint(w, identityResponse(owner))
 	}))
 	t.Cleanup(server.Close)
