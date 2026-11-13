@@ -5,6 +5,7 @@
 package models_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -2090,4 +2091,64 @@ func TestNewRepo_GithubCloneURLHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPolicySetStatus_UnmarshalJSON(t *testing.T) {
+	cases := []struct {
+		description string
+		json        string
+		expected    models.PolicySetStatus
+	}{
+		{
+			description: "current format",
+			json:        `{"PolicySetName":"opa","Passed":false,"Approvals":[{"Approver":"user1","Hashes":["h1"]}],"Hashes":["h1"],"PolicyItemRegex":"^x"}`,
+			expected: models.PolicySetStatus{
+				PolicySetName:   "opa",
+				Approvals:       []models.PolicySetApproval{{Approver: "user1", Hashes: []string{"h1"}}},
+				Hashes:          []string{"h1"},
+				PolicyItemRegex: "^x",
+			},
+		},
+		{
+			description: "null approvals",
+			json:        `{"PolicySetName":"opa","Passed":true,"Approvals":null}`,
+			expected:    models.PolicySetStatus{PolicySetName: "opa", Passed: true},
+		},
+		{
+			description: "missing approvals",
+			json:        `{"PolicySetName":"opa","Passed":true}`,
+			expected:    models.PolicySetStatus{PolicySetName: "opa", Passed: true},
+		},
+		{
+			description: "pre v0.44.0 record with zero approvals",
+			json:        `{"PolicySetName":"opa-checks","Passed":true,"Approvals":0}`,
+			expected:    models.PolicySetStatus{PolicySetName: "opa-checks", Passed: true},
+		},
+		{
+			description: "pre v0.44.0 record with approvals is decoded without approvals",
+			json:        `{"PolicySetName":"opa-checks","Passed":false,"Approvals":2}`,
+			expected:    models.PolicySetStatus{PolicySetName: "opa-checks"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			var status models.PolicySetStatus
+			Ok(t, json.Unmarshal([]byte(c.json), &status))
+			Equals(t, c.expected, status)
+		})
+	}
+}
+
+func TestPolicySetStatus_UnmarshalJSON_InvalidApprovals(t *testing.T) {
+	var status models.PolicySetStatus
+	err := json.Unmarshal([]byte(`{"PolicySetName":"opa","Approvals":"yes"}`), &status)
+	Assert(t, err != nil, "expected an error for a string approvals value")
+}
+
+func TestPullStatus_UnmarshalJSON_PreV044PolicyStatus(t *testing.T) {
+	serialized := `{"Projects":[{"Workspace":"default","RepoRelDir":".","ProjectName":"","PolicyStatus":[{"PolicySetName":"opa-checks","Passed":true,"Approvals":0}],"Status":5}],"Pull":{"Num":1}}`
+	var pull models.PullStatus
+	Ok(t, json.Unmarshal([]byte(serialized), &pull))
+	Equals(t, 1, len(pull.Projects))
+	Equals(t, []models.PolicySetStatus{{PolicySetName: "opa-checks", Passed: true}}, pull.Projects[0].PolicyStatus)
 }

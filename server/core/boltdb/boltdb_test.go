@@ -1344,11 +1344,11 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Ok(t, err)
 	Ok(t, b.Close())
 
-	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
-	// that the current Go types cannot unmarshal.
+	// Inject a corrupt pull-status blob with a shape that the current Go
+	// types cannot unmarshal.
 	key := fmt.Appendf(nil, "%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`)
+	corrupt := []byte(`{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":"two"}],"Status":0}],"Pull":{"Num":1}}`)
 	raw, err := bolt.Open(filepath.Join(tmp, "atlantis.db"), 0600, nil)
 	Ok(t, err)
 	err = raw.Update(func(tx *bolt.Tx) error {
@@ -1503,4 +1503,33 @@ func TestPullStatus_PlanHashPreservedAcrossLaterResults(t *testing.T) {
 	Ok(t, err)
 	Equals(t, replanHash, status.Projects[0].PlanHash)
 	b.Close()
+}
+
+// Pull records written before v0.44.0 stored policy set approvals as an int.
+// They must still be readable after an upgrade.
+func TestPullStatus_GetPreV044PolicyStatus(t *testing.T) {
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	pull := models.PullRequest{
+		Num: 1,
+		BaseRepo: models.Repo{
+			FullName: "runatlantis/atlantis",
+			VCSHost:  models.VCSHost{Hostname: "github.com", Type: models.Github},
+		},
+	}
+	serialized := `{"Projects":[{"Workspace":"default","RepoRelDir":".","ProjectName":"","PolicyStatus":[{"PolicySetName":"opa-checks","Passed":true,"Approvals":0}],"Status":5}],"Pull":{"Num":1}}`
+	Ok(t, db.Update(func(tx *bolt.Tx) error {
+		bucket, err := tx.CreateBucketIfNotExists([]byte("pulls"))
+		if err != nil {
+			return err
+		}
+		return bucket.Put([]byte("github.com::runatlantis/atlantis::1"), []byte(serialized))
+	}))
+
+	status, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, status != nil, "exp non-nil")
+	Equals(t, 1, len(status.Projects))
+	Equals(t, []models.PolicySetStatus{{PolicySetName: "opa-checks", Passed: true}}, status.Projects[0].PolicyStatus)
 }
