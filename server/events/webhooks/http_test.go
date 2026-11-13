@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package webhooks_test
 
 import (
@@ -58,6 +61,23 @@ func TestHttpWebhookNoHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		Equals(t, r.Header.Get("Content-Type"), "application/json")
 		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	webhook := webhooks.HttpWebhook{
+		Client:         &webhooks.HttpClient{Client: http.DefaultClient},
+		URL:            server.URL,
+		WorkspaceRegex: regexp.MustCompile(".*"),
+		BranchRegex:    regexp.MustCompile(".*"),
+	}
+
+	err := webhook.Send(logging.NewNoopLogger(t), httpApplyResult)
+	Ok(t, err)
+}
+
+func TestHttpWebhook202(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
 	}))
 	defer server.Close()
 

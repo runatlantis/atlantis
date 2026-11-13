@@ -1,8 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -20,15 +25,56 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
+func TestRunStepRunner_CreatesLocalSharePlanDir(t *testing.T) {
+	RegisterMockTestingT(t)
+	terraform := tfclientmocks.NewMockClient()
+	defaultDistribution := tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader())
+	defaultVersion, err := version.NewVersion("0.11.0")
+	Ok(t, err)
+	When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
+		ThenReturn(nil)
+
+	projectPath := t.TempDir()
+	sharePlanDir := t.TempDir()
+	planPath := filepath.Join(sharePlanDir, "repos", "owner", "repo", "2", "default", "project", "default.tfplan")
+	logger := logging.NewNoopLogger(t)
+	r := runtime.RunStepRunner{
+		TerraformExecutor:     terraform,
+		DefaultTFDistribution: defaultDistribution,
+		DefaultTFVersion:      defaultVersion,
+	}
+	ctx := command.ProjectContext{
+		BaseRepo: models.Repo{
+			FullName: "owner/repo",
+		},
+		LocalSharePlanDir: sharePlanDir,
+		Log:               logger,
+		Pull: models.PullRequest{
+			Num: 2,
+		},
+		RepoRelDir: "project",
+		Workspace:  "default",
+	}
+
+	_, err = r.Run(ctx, nil, `printf plan > "$PLANFILE"`, projectPath, nil, false, nil, nil)
+	Ok(t, err)
+	_, err = os.Stat(planPath)
+	Ok(t, err)
+}
+
 func TestRunStepRunner_Run(t *testing.T) {
+	testRegexSecret := regexp.MustCompile(`((?i)Secret:\s")[^"]*`)
+
 	cases := []struct {
-		Command        string
-		ProjectName    string
-		ExpOut         string
-		ExpOutContains string
-		ExpErr         string
-		Version        string
-		Distribution   string
+		Command                  string
+		ProjectName              string
+		ExpOut                   string
+		ExpOutContains           string
+		ExpErr                   string
+		Version                  string
+		Distribution             string
+		PostProcessOutput        []valid.PostProcessRunOutputOption
+		PostProcessFilterRegexes []*regexp.Regexp
 	}{
 		{
 			Command: "",
@@ -102,6 +148,16 @@ func TestRunStepRunner_Run(t *testing.T) {
 			Command: "echo args=$COMMENT_ARGS",
 			ExpOut:  "args=-target=resource1,-target=resource2\n",
 		},
+		{
+			Command: `echo mySecret: \"foo\"`,
+			ExpOut:  "mySecret: \"<redacted>\"\n",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{
+				"filter_regex",
+			},
+			PostProcessFilterRegexes: []*regexp.Regexp{
+				testRegexSecret,
+			},
+		},
 	}
 	for _, customPolicyCheck := range []bool{false, true} {
 		for _, c := range cases {
@@ -171,29 +227,83 @@ func TestRunStepRunner_Run(t *testing.T) {
 					EscapedCommentArgs:    []string{"-target=resource1", "-target=resource2"},
 					CustomPolicyCheck:     customPolicyCheck,
 				}
-				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, valid.PostProcessRunOutputShow)
-
+				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, c.PostProcessOutput, c.PostProcessFilterRegexes)
 				// Replace $DIR in the exp with the actual temp dir. We do this
 				// here because when constructing the cases we don't yet know the
 				// temp dir.
-				expOut := strings.Replace(c.ExpOut, "$DIR", tmpDir, -1)
-				if len(expOut) > 0 {
-					Equals(t, expOut, out)
-				}
-				if len(c.ExpOutContains) > 0 {
+				expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
+				if c.ExpOutContains != "" {
 					Assert(t, strings.Contains(out, c.ExpOutContains), "expected %q to contain %q", out, c.ExpOutContains)
 				}
-
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
 					return
 				}
 				Ok(t, err)
+				Equals(t, expOut, out)
 
 				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
 				terraform.VerifyWasCalled(Never()).EnsureVersion(Eq(logger), Eq(defaultDistribution), Eq(defaultVersion))
 
 			})
 		}
+	}
+}
+
+// TestRunStepRunner_Run_HideOnError checks that a failing command configured
+// with `output: hide` never carries its output into the returned error, neither
+// in the string posted to the PR nor in the job log message, while `show`
+// keeps reporting it.
+func TestRunStepRunner_Run_HideOnError(t *testing.T) {
+	const secret = "hunter2-token"
+	cases := []struct {
+		Name              string
+		PostProcessOutput []valid.PostProcessRunOutputOption
+		ExpContainsSecret bool
+	}{
+		{
+			Name:              "hide",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+			ExpContainsSecret: false,
+		},
+		{
+			Name:              "show",
+			PostProcessOutput: []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpContainsSecret: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			terraform := tfclientmocks.NewMockClient()
+			When(terraform.EnsureVersion(Any[logging.SimpleLogging](), Any[tf.Distribution](), Any[*version.Version]())).
+				ThenReturn(nil)
+			defaultVersion, err := version.NewVersion("0.11.0")
+			Ok(t, err)
+			r := runtime.RunStepRunner{
+				TerraformExecutor:       terraform,
+				DefaultTFDistribution:   tf.NewDistributionTerraformWithDownloader(mocks.NewMockDownloader()),
+				DefaultTFVersion:        defaultVersion,
+				ProjectCmdOutputHandler: jobmocks.NewMockProjectCommandOutputHandler(),
+			}
+			ctx := command.ProjectContext{
+				Log:       logging.NewNoopLogger(t),
+				Workspace: "default",
+			}
+			envs := map[string]string{"SECRET": secret}
+
+			// streamOutput is false so JobMessage falls back to the full error text.
+			out, err := r.Run(ctx, nil, "echo $SECRET; exit 1", t.TempDir(), envs, false, c.PostProcessOutput, nil)
+			// A failing command still returns its output, unless the step hides it.
+			Equals(t, c.ExpContainsSecret, strings.Contains(out, secret))
+			ErrContains(t, "exit status 1: running \"echo $SECRET; exit 1\" in", err)
+
+			jobErr, ok := err.(interface{ JobMessage() string })
+			Assert(t, ok, "error %T should expose JobMessage()", err)
+			for name, msg := range map[string]string{"Error()": err.Error(), "JobMessage()": jobErr.JobMessage()} {
+				got := strings.Contains(msg, secret)
+				Assert(t, got == c.ExpContainsSecret, "%s = %q: contains secret = %v, want %v", name, msg, got, c.ExpContainsSecret)
+			}
+		})
 	}
 }

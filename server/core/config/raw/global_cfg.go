@@ -1,23 +1,84 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
-	"github.com/runatlantis/atlantis/server/utils"
 )
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos      []Repo              `yaml:"repos" json:"repos"`
-	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
-	PolicySets PolicySets          `yaml:"policies" json:"policies"`
-	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
-	TeamAuthz  TeamAuthz           `yaml:"team_authz" json:"team_authz"`
+	Repos          []Repo              `yaml:"repos" json:"repos"`
+	Workflows      map[string]Workflow `yaml:"workflows" json:"workflows"`
+	PolicySets     PolicySets          `yaml:"policies" json:"policies"`
+	Metrics        Metrics             `yaml:"metrics" json:"metrics"`
+	TeamAuthz      TeamAuthz           `yaml:"team_authz" json:"team_authz"`
+	ExternalStores ExternalStores      `yaml:"external_stores" json:"external_stores"`
+}
+
+// ExternalStores is the raw schema for external storage backends.
+type ExternalStores struct {
+	PlanStore PlanStoreConfig `yaml:"plan_store" json:"plan_store"`
+}
+
+// PlanStoreConfig is the raw schema for plan storage configuration.
+type PlanStoreConfig struct {
+	Type string        `yaml:"type" json:"type"`
+	S3   S3StoreConfig `yaml:"s3" json:"s3"`
+}
+
+// S3StoreConfig is the raw schema for S3 plan store configuration.
+type S3StoreConfig struct {
+	Bucket         string `yaml:"bucket" json:"bucket"`
+	Region         string `yaml:"region" json:"region"`
+	Prefix         string `yaml:"prefix" json:"prefix"`
+	Endpoint       string `yaml:"endpoint" json:"endpoint"`
+	ForcePathStyle bool   `yaml:"force_path_style" json:"force_path_style"`
+	Profile        string `yaml:"profile" json:"profile"`
+}
+
+func (e ExternalStores) Validate() error {
+	return e.PlanStore.Validate()
+}
+
+func (p PlanStoreConfig) Validate() error {
+	if p.Type == "" {
+		return nil
+	}
+	if p.Type != "s3" {
+		return fmt.Errorf("unsupported plan store type %q: only 's3' is supported", p.Type)
+	}
+	if p.S3.Bucket == "" {
+		return fmt.Errorf("external_stores.plan_store.s3.bucket is required when type is 's3'")
+	}
+	if p.S3.Region == "" {
+		return fmt.Errorf("external_stores.plan_store.s3.region is required when type is 's3'")
+	}
+	return nil
+}
+
+func (e ExternalStores) ToValid() valid.ExternalStores {
+	return valid.ExternalStores{
+		PlanStore: valid.PlanStoreConfig{
+			Type: e.PlanStore.Type,
+			S3: valid.S3StoreConfig{
+				Bucket:         e.PlanStore.S3.Bucket,
+				Region:         e.PlanStore.S3.Region,
+				Prefix:         e.PlanStore.S3.Prefix,
+				Endpoint:       e.PlanStore.S3.Endpoint,
+				ForcePathStyle: e.PlanStore.S3.ForcePathStyle,
+				Profile:        e.PlanStore.S3.Profile,
+			},
+		},
+	}
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -50,6 +111,10 @@ func (g GlobalCfg) Validate() error {
 		validation.Field(&g.Metrics),
 	)
 	if err != nil {
+		return err
+	}
+
+	if err := g.ExternalStores.Validate(); err != nil {
 		return err
 	}
 
@@ -104,7 +169,7 @@ func (g GlobalCfg) Validate() error {
 			continue
 		}
 		for _, silenceStage := range repo.SilencePRComments {
-			if !utils.SlicesContains(valid.AllowedSilencePRComments, silenceStage) {
+			if !slices.Contains(valid.AllowedSilencePRComments, silenceStage) {
 				return fmt.Errorf(
 					"server-side repo config '%s' key value of '%s' is not supported, supported values are [%s]",
 					valid.SilencePRCommentsKey,
@@ -158,11 +223,12 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	repos = append(defaultCfg.Repos, repos...)
 
 	return valid.GlobalCfg{
-		Repos:      repos,
-		Workflows:  workflows,
-		PolicySets: g.PolicySets.ToValid(),
-		Metrics:    g.Metrics.ToValid(),
-		TeamAuthz:  g.TeamAuthz.ToValid(),
+		Repos:          repos,
+		Workflows:      workflows,
+		PolicySets:     g.PolicySets.ToValid(),
+		Metrics:        g.Metrics.ToValid(),
+		TeamAuthz:      g.TeamAuthz.ToValid(),
+		ExternalStores: g.ExternalStores.ToValid(),
 	}
 }
 
@@ -178,7 +244,7 @@ func (r Repo) HasRegexBranch() bool {
 }
 
 func (r Repo) Validate() error {
-	idValid := func(value interface{}) error {
+	idValid := func(value any) error {
 		id := value.(string)
 		if !r.HasRegexID() {
 			return nil
@@ -190,7 +256,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	branchValid := func(value interface{}) error {
+	branchValid := func(value any) error {
 		branch := value.(string)
 		if branch == "" {
 			return nil
@@ -206,7 +272,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	repoConfigFileValid := func(value interface{}) error {
+	repoConfigFileValid := func(value any) error {
 		repoConfigFile := value.(string)
 		if repoConfigFile == "" {
 			return nil
@@ -220,7 +286,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	overridesValid := func(value interface{}) error {
+	overridesValid := func(value any) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
 			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.RepoLocksKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey && o != valid.SilencePRCommentsKey {
@@ -230,18 +296,18 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	workflowExists := func(value interface{}) error {
+	workflowExists := func(value any) error {
 		// We validate workflows in ParserValidator.validateRepoWorkflows
 		// because we need the list of workflows to validate.
 		return nil
 	}
 
-	deleteSourceBranchOnMergeValid := func(value interface{}) error {
+	deleteSourceBranchOnMergeValid := func(value any) error {
 		//TOBE IMPLEMENTED
 		return nil
 	}
 
-	autoDiscoverValid := func(value interface{}) error {
+	autoDiscoverValid := func(value any) error {
 		autoDiscover := value.(*AutoDiscover)
 		if autoDiscover != nil {
 			return autoDiscover.Validate()
@@ -249,7 +315,7 @@ func (r Repo) Validate() error {
 		return nil
 	}
 
-	repoLocksValid := func(value interface{}) error {
+	repoLocksValid := func(value any) error {
 		repoLocks := value.(*RepoLocks)
 		if repoLocks != nil {
 			return repoLocks.Validate()

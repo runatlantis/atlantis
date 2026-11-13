@@ -1,12 +1,16 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package vcs
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
-//go:generate pegomock generate github.com/runatlantis/atlantis/server/events/vcs --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
+//go:generate go tool pegomock generate github.com/runatlantis/atlantis/server/events/vcs --package mocks -o mocks/mock_pull_req_status_fetcher.go PullReqStatusFetcher
 
 type PullReqStatusFetcher interface {
 	FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) (models.PullReqStatus, error)
@@ -29,16 +33,16 @@ func NewPullReqStatusFetcher(client Client, vcsStatusName string, ignoreVCSStatu
 func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pull models.PullRequest) (pullStatus models.PullReqStatus, err error) {
 	approvalStatus, err := f.client.PullIsApproved(logger, pull.BaseRepo, pull)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching pull approval status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
+		return pullStatus, fmt.Errorf("fetching pull approval status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
 	}
 
 	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName, f.ignoreVCSStatusNames)
 	if err != nil {
-		return pullStatus, errors.Wrapf(err, "fetching mergeability status for repo: %s, and pull number: %d", pull.BaseRepo.FullName, pull.Num)
+		return pullStatus, fmt.Errorf("fetching mergeability status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
 	}
 
 	return models.PullReqStatus{
-		ApprovalStatus: approvalStatus,
-		Mergeable:      mergeable,
+		ApprovalStatus:  approvalStatus,
+		MergeableStatus: mergeable,
 	}, err
 }

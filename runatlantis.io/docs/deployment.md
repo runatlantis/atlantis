@@ -82,6 +82,14 @@ To install:
     ```
 
     **Note**: For helm chart version < `4.0.2`, `orgWhitelist` must be used instead.
+1. Edit `values.yaml` and set `defaultTFVersion` to the Terraform version Atlantis should download and use by default (see [Image variants](#image-variants))
+
+    ```yaml
+    defaultTFVersion: "1.16.6" # for example
+    # for OpenTofu, also set
+    # defaultTFDistribution: opentofu
+    ```
+
 1. Configure any other variables (see [Atlantis Helm Chart: Customization](https://github.com/runatlantis/helm-charts#customization)
     for documentation)
 1. Run
@@ -124,6 +132,8 @@ Next, edit the manifests below as follows:
 up upgrading Atlantis by accident!
 2. Replace `value: github.com/yourorg/*` under `name: ATLANTIS_REPO_ALLOWLIST` with the allowlist pattern
 for your Terraform repos. See [--repo-allowlist](server-configuration.md#repo-allowlist) for more details.
+    * Replace `<TF_VERSION>` under `name: ATLANTIS_DEFAULT_TF_VERSION` with the Terraform version Atlantis should download and use by default.
+    The image ships no Terraform binary, so the server will not start without it. See [Image variants](#image-variants).
 3. If you're using GitHub:
     1. Replace `<YOUR_GITHUB_USER>` with the username of your Atlantis GitHub user without the `@`.
     2. Delete all the `ATLANTIS_GITLAB_*`, `ATLANTIS_GITEA_*`, `ATLANTIS_BITBUCKET_*`, and `ATLANTIS_AZUREDEVOPS_*` environment variables.
@@ -173,6 +183,8 @@ spec:
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+        - name: ATLANTIS_DEFAULT_TF_VERSION
+          value: <TF_VERSION> # 2. Replace this with the Terraform version to download and use by default.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -342,6 +354,8 @@ spec:
         env:
         - name: ATLANTIS_REPO_ALLOWLIST
           value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+        - name: ATLANTIS_DEFAULT_TF_VERSION
+          value: <TF_VERSION> # 2. Replace this with the Terraform version to download and use by default.
 
         ### GitHub Config ###
         - name: ATLANTIS_GH_USER
@@ -515,6 +529,8 @@ patchesStrategicMerge:
     env:
       - name: ATLANTIS_REPO_ALLOWLIST
         value: github.com/yourorg/* # 2. Replace this with your own repo allowlist.
+      - name: ATLANTIS_DEFAULT_TF_VERSION
+        value: <TF_VERSION> # Replace this with the Terraform version to download and use by default.
 ```
 
 #### GitLab
@@ -628,6 +644,28 @@ After it is deployed, see [Next Steps](#next-steps).
 
 Atlantis has an [official](https://ghcr.io/runatlantis/atlantis) Docker image: `ghcr.io/runatlantis/atlantis`.
 
+#### Image variants
+
+Every release is published as an Alpine and a Debian image. The unsuffixed tag (for example `v0.49.0` or `latest`) is the Alpine image.
+
+| Tag suffix          | Base   | Bundled Terraform and OpenTofu |
+|---------------------|--------|--------------------------------|
+| none or `-alpine`   | Alpine | no                             |
+| `-debian`           | Debian | no                             |
+
+::: warning Behavior change
+Previously, the default images bundled the last few Terraform minor releases and the current OpenTofu release, with `terraform` on `PATH` pointing at the newest of them, and an earlier release also published binary-free `-alpine-slim` and `-debian-slim` images as an intermediate step. Now the default images ship no Terraform or OpenTofu binaries and the `-slim` images are no longer published, so vulnerability scanners do not report advisories against versions you may not even use. Set [`--default-tf-version`](server-configuration.md#default-tf-version) (and [`--default-tf-distribution`](server-configuration.md#default-tf-distribution) for OpenTofu) so Atlantis downloads the version it needs, or mount or copy a binary into the image when downloads are blocked.
+:::
+
+If you pinned a `-alpine-slim` or `-debian-slim` tag, switch to the unsuffixed, `-alpine` or `-debian` tag. They contain the same thing.
+
+Everything else (`conftest`, `git-lfs`, `git`, `curl`, `dumb-init`) is still in the image. Atlantis downloads the Terraform version it needs on first use, so it needs to be told which version that is:
+
+* Set [`--default-tf-version`](server-configuration.md#default-tf-version) as a flag, as `ATLANTIS_DEFAULT_TF_VERSION`, or in the server config file. Without it the server refuses to start with `terraform not found in $PATH`. The image deliberately sets no default of its own, because an environment variable baked into the image would take precedence over a version pinned in your config file.
+* Per-project `terraform_version` in `atlantis.yaml` and `--tf-download-url` work as usual.
+* For OpenTofu, set [`--default-tf-distribution=opentofu`](server-configuration.md#default-tf-distribution) (`ATLANTIS_DEFAULT_TF_DISTRIBUTION=opentofu`) and give an OpenTofu version as the default.
+* If outbound downloads are not allowed from your Atlantis host (`--tf-download=false`), mount or copy the binaries you need into the image instead, for example by putting `terraform` on `PATH` in a custom image. See [Customization](#customization) below.
+
 #### Customization
 
 If you need to modify the Docker image that we provide, for instance to add the terragrunt binary, you can do something like this:
@@ -637,9 +675,12 @@ If you need to modify the Docker image that we provide, for instance to add the 
     ```dockerfile
     FROM ghcr.io/runatlantis/atlantis:{latest version}
 
-    # copy a terraform binary of the version you need
+    # copy the extra binaries you need, for example terragrunt, or a terraform
+    # binary when Atlantis cannot download one (--tf-download=false)
     USER root
     COPY terragrunt /usr/local/bin/terragrunt
+    COPY terraform /usr/local/bin/terraform
+    USER atlantis
     ```
 
 Beginning with version 0.26.0, the Atlantis image has been updated to run under the atlantis user, replacing the previous root user configuration. This change necessitates adjustments in existing container definitions and scripts to accommodate the new user settings. In scenarios where additional packages from other images are required, users can temporarily switch to the root user by inserting USER root in the Dockerfile. Following the installation of necessary packages, it is advisable to revert to the atlantis user for initiating the Atlantis service.
@@ -690,7 +731,7 @@ atlantis server \
 ##### GitHub Enterprise
 
 ```bash
-HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io
+HOSTNAME=YOUR_GITHUB_ENTERPRISE_HOSTNAME # ex. github.runatlantis.io or tenant.ghe.com
 atlantis server \
 --atlantis-url="$URL" \
 --gh-user="$USERNAME" \
@@ -699,6 +740,8 @@ atlantis server \
 --gh-hostname="$HOSTNAME" \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
+
+For GitHub Enterprise Cloud, set `--gh-hostname` to the tenant hostname, such as `tenant.ghe.com`, without `https://` or an `api.` prefix.
 
 ##### GitLab
 
@@ -727,10 +770,12 @@ atlantis server \
 ##### Gitea
 
 ```bash
+GITEA_BASE_URL=YOUR_GITEA_BASE_URL # ex. https://gitea.example.com:3000
 atlantis server \
 --atlantis-url="$URL" \
 --gitea-user="$USERNAME" \
 --gitea-token="$TOKEN" \
+--gitea-base-url="$GITEA_BASE_URL" \
 --gitea-webhook-secret="$SECRET" \
 --gitea-page-size=30 \
 --repo-allowlist="$REPO_ALLOWLIST"

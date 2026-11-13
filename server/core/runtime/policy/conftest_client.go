@@ -1,16 +1,19 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package policy
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
-
-	"encoding/json"
-	"regexp"
 
 	"github.com/hashicorp/go-getter/v2"
 
@@ -35,8 +38,128 @@ type Arg struct {
 	Option string
 }
 
-func (a Arg) build() []string {
-	return []string{a.Option, a.Param}
+func (a Arg) build(env map[string]string) []string {
+	return append([]string{a.Option}, splitConfiguredArg(a.Param, env)...)
+}
+
+type configuredArgQuote uint8
+
+const (
+	configuredArgUnquoted configuredArgQuote = iota
+	configuredArgSingleQuoted
+	configuredArgDoubleQuoted
+)
+
+// splitConfiguredArg parses the shell-like whitespace and quoting supported by
+// administrator-configured policy paths and extra_args without interpreting
+// the result as shell source. Environment references expand only while they are
+// unquoted or double quoted. Single quotes and backslashes preserve a literal
+// dollar sign, as they did when the command was run by a shell.
+//
+// Expansion happens while quote and escape provenance is still available. An
+// expanded value remains within its source argument even when it contains
+// whitespace. A malformed value is passed through as one literal argument
+// because its expansion intent cannot be determined safely.
+func splitConfiguredArg(value string, env map[string]string) []string {
+	lookup := func(key string) string {
+		// LocalExec appends the process environment after workflow values,
+		// and exec.Cmd resolves duplicates in favor of the later entry.
+		if val, ok := os.LookupEnv(key); ok {
+			return val
+		}
+		return env[key]
+	}
+
+	var args []string
+	var word strings.Builder
+	var expandable strings.Builder
+	quote := configuredArgUnquoted
+	wordStarted := false
+
+	flushExpandable := func() {
+		if expandable.Len() == 0 {
+			return
+		}
+		word.WriteString(os.Expand(expandable.String(), lookup))
+		expandable.Reset()
+	}
+	flushWord := func() {
+		flushExpandable()
+		if !wordStarted {
+			return
+		}
+		args = append(args, word.String())
+		word.Reset()
+		wordStarted = false
+	}
+
+	for i := 0; i < len(value); i++ {
+		char := value[i]
+		switch quote {
+		case configuredArgSingleQuoted:
+			if char == '\'' {
+				quote = configuredArgUnquoted
+				continue
+			}
+			word.WriteByte(char)
+			wordStarted = true
+		case configuredArgDoubleQuoted:
+			switch char {
+			case '"':
+				flushExpandable()
+				quote = configuredArgUnquoted
+			case '\\':
+				flushExpandable()
+				if i+1 >= len(value) {
+					return []string{value}
+				}
+				i++
+				word.WriteByte(value[i])
+				wordStarted = true
+			default:
+				expandable.WriteByte(char)
+				wordStarted = true
+			}
+		case configuredArgUnquoted:
+			switch char {
+			case '\'', '"':
+				flushExpandable()
+				wordStarted = true
+				if char == '\'' {
+					quote = configuredArgSingleQuoted
+				} else {
+					quote = configuredArgDoubleQuoted
+				}
+			case '\\':
+				flushExpandable()
+				if i+1 >= len(value) {
+					return []string{value}
+				}
+				i++
+				word.WriteByte(value[i])
+				wordStarted = true
+			case ' ', '\t', '\r', '\n':
+				flushWord()
+			case '#':
+				if wordStarted {
+					expandable.WriteByte(char)
+					continue
+				}
+				for i+1 < len(value) && value[i+1] != '\n' {
+					i++
+				}
+			default:
+				expandable.WriteByte(char)
+				wordStarted = true
+			}
+		}
+	}
+
+	if quote != configuredArgUnquoted {
+		return []string{value}
+	}
+	flushWord()
+	return args
 }
 
 func NewPolicyArg(parameter string) Arg {
@@ -51,6 +174,10 @@ type ConftestTestCommandArgs struct {
 	ExtraArgs  []string
 	InputFile  string
 	Command    string
+	// Env are the environment variables the conftest process will receive.
+	// Administrator-configured values are expanded against them, since the
+	// previous shell-based command line expanded them too.
+	Env map[string]string
 }
 
 func (c ConftestTestCommandArgs) build() ([]string, error) {
@@ -63,21 +190,23 @@ func (c ConftestTestCommandArgs) build() ([]string, error) {
 	commandArgs := []string{c.Command, "test"}
 
 	for _, a := range c.PolicyArgs {
-		commandArgs = append(commandArgs, a.build()...)
+		commandArgs = append(commandArgs, a.build(c.Env)...)
 	}
 
 	// add hardcoded options
 	commandArgs = append(commandArgs, c.InputFile, "--no-color")
 
 	// add extra args provided through server config
-	commandArgs = append(commandArgs, c.ExtraArgs...)
+	for _, extraArg := range c.ExtraArgs {
+		commandArgs = append(commandArgs, splitConfiguredArg(extraArg, c.Env)...)
+	}
 
 	return commandArgs, nil
 }
 
 // SourceResolver resolves the policy set to a local fs path
 //
-//go:generate pegomock generate --package mocks -o mocks/mock_conftest_client.go SourceResolver
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_conftest_client.go SourceResolver
 type SourceResolver interface {
 	Resolve(policySet valid.PolicySet) (string, error)
 }
@@ -105,7 +234,7 @@ func (p *SourceResolverProxy) Resolve(policySet valid.PolicySet) (string, error)
 	}
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_downloader.go Downloader
 
 type Downloader interface {
 	GetAny(dst, src string) error
@@ -185,7 +314,7 @@ func NewConfTestExecutorWorkflow(log logging.SimpleLogging, versionRootDir strin
 }
 
 func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePath string, envs map[string]string, workdir string, extraArgs []string) (string, error) {
-	ctx.Log.Debug("policy sets, %s ", ctx.PolicySets)
+	ctx.Log.Debug("policy sets, %v ", ctx.PolicySets)
 
 	inputFile := filepath.Join(workdir, ctx.GetShowResultFileName())
 	var policySetResults []models.PolicySetResult
@@ -205,6 +334,7 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 			ExtraArgs:  extraArgs,
 			InputFile:  inputFile,
 			Command:    executablePath,
+			Env:        envs,
 		}
 
 		serializedArgs, _ := args.build()
@@ -220,16 +350,36 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		}
 
 		passed := true
-		if hasFailures(cmdOutput) {
+		if cmdErr != nil || hasFailures(cmdOutput) {
 			passed = false
 		}
 
-		policySetResults = append(policySetResults, models.PolicySetResult{
-			PolicySetName: policySet.Name,
-			PolicyOutput:  cmdOutput,
-			Passed:        passed,
-			ReqApprovals:  policySet.ApproveCount,
-		})
+		// Sanitize before hashing so that hashes are stable across runs
+		// (temp file paths vary) and match what ends up in PolicyOutput.
+		sanitizedOutput := c.sanitizeOutput(inputFile, cmdOutput)
+
+		result, regexErr := models.NewPolicySetResult(
+			policySet.Name,
+			sanitizedOutput,
+			passed,
+			policySet.ApproveCount,
+			policySet.PolicyItemRegex,
+		)
+		if regexErr != nil {
+			// RegexValidator runs at config-parse time so this is in theory
+			// unreachable. Fail closed with a synthetic failing result so the
+			// project surfaces the misconfiguration rather than silently
+			// passing without this policy set.
+			ctx.Log.Err("invalid policy_item_regex for policy set %q: %v", policySet.Name, regexErr)
+			policySetResults = append(policySetResults, models.PolicySetResult{
+				PolicySetName:    policySet.Name,
+				PolicyOutput:     fmt.Sprintf("invalid policy_item_regex %q: %v", policySet.PolicyItemRegex, regexErr),
+				ReqApprovalCount: policySet.ApproveCount,
+				PolicyItemRegex:  policySet.PolicyItemRegex,
+			})
+			continue
+		}
+		policySetResults = append(policySetResults, *result)
 	}
 
 	if policySetResults == nil {
@@ -239,25 +389,26 @@ func (c *ConfTestExecutorWorkflow) Run(ctx command.ProjectContext, executablePat
 		// return "", errors.Wrap(err, "building args")
 	}
 
-	marshaledStatus, err := json.Marshal(policySetResults)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(policySetResults); err != nil {
 		return "", errors.New("cannot marshal data into []PolicySetResult. data")
 	}
+	marshaledStatus := bytes.TrimRight(buf.Bytes(), "\n")
 
 	// Write policy check results to a file which can be used by custom workflow run steps for metrics, notifications, etc.
 	policyCheckResultFile := filepath.Join(workdir, ctx.GetPolicyCheckResultFileName())
-	err = os.WriteFile(policyCheckResultFile, marshaledStatus, 0600)
+	if writeErr := os.WriteFile(policyCheckResultFile, marshaledStatus, 0600); writeErr != nil {
+		combinedErr = errors.Join(combinedErr, writeErr)
+	}
 
-	combinedErr = errors.Join(combinedErr, err)
-
-	output := string(marshaledStatus)
-
-	return c.sanitizeOutput(inputFile, output), combinedErr
+	return string(marshaledStatus), combinedErr
 
 }
 
 func (c *ConfTestExecutorWorkflow) sanitizeOutput(inputFile string, output string) string {
-	return strings.Replace(output, inputFile, "<redacted plan file>", -1)
+	return strings.ReplaceAll(output, inputFile, "<redacted plan file>")
 }
 
 func (c *ConfTestExecutorWorkflow) EnsureExecutorVersion(log logging.SimpleLogging, v *version.Version) (string, error) {

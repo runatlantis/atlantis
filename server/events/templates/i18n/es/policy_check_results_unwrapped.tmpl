@@ -1,0 +1,35 @@
+{{ define "policyCheckResultsUnwrapped" -}}
+{{- if eq .CommandName "policy_check" }}
+{{- if ne .PreConftestOutput "" }}
+```diff
+{{ .PreConftestOutput }}
+```
+{{- end -}}
+{{ template "policyCheck" .PolicySetResults }}
+{{- if ne .PostConftestOutput "" }}
+```diff
+{{ .PostConftestOutput }}
+```
+{{ end -}}
+{{- end }}
+{{- if .PolicyCleared }}
+* :arrow_forward: Para **aplicar** este plan, comenta:
+  ```shell
+  {{ .ApplyCmd }}
+  ```
+{{- else }}
+#### Estado de aprobación de políticas:
+```
+{{ .PolicyApprovalSummary }}
+```
+* :heavy_check_mark: Para **aprobar** este proyecto, comenta:
+  ```shell
+  {{ .ApprovePoliciesCmd }}
+  ```
+{{- end }}
+* :put_litter_in_its_place: Para **eliminar** este plan y bloqueo, haz clic [aquí]({{ .LockURL }})
+* :repeat: Para volver a ejecutar las políticas, **planifica** este proyecto de nuevo comentando:
+  ```shell
+  {{ .RePlanCmd }}
+  ```
+{{ end -}}

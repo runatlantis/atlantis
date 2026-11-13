@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package config_test
 
 import (
@@ -7,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,18 +82,23 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 func TestParseCfgs_InvalidYAML(t *testing.T) {
 	cases := []struct {
 		description string
-		input       string
+		input       []byte
 		expErr      string
 	}{
 		{
 			"random characters",
-			"slkjds",
-			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
+			[]byte("slkjds"),
+			"yaml: construct errors: line 1: cannot construct !!str `slkjds` into",
 		},
 		{
 			"just a colon",
-			":",
-			"yaml: did not find expected key",
+			[]byte(":"),
+			"go-yaml load error in parser (while parsing a block mapping) at L1.C1: did not find expected key",
+		},
+		{
+			"invalid merge key from fuzzing",
+			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
+			"go-yaml load error in constructor at L1.C3: runtime error: hash of unhashable type []interface {}",
 		},
 	}
 
@@ -98,7 +107,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := os.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, c.input, 0600)
 			Ok(t, err)
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
@@ -212,10 +221,36 @@ projects:
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
+					},
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "timestamp-like strings are preserved",
+			input: `
+version: 3
+projects:
+- dir: 2026-06-26
+  name: 2026-06-27
+  autoplan:
+    when_modified:
+    - 2026-06-28`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       "2026-06-26",
+						Workspace: "default",
+						Name:      String("2026-06-27"),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"2026-06-28"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
@@ -235,7 +270,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -281,7 +316,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -304,7 +339,7 @@ workflows: ~
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -332,7 +367,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -363,7 +398,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -397,7 +432,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -431,7 +466,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable"},
@@ -465,7 +500,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged"},
@@ -499,7 +534,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable", "approved"},
@@ -533,7 +568,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "approved"},
@@ -567,7 +602,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable"},
@@ -601,7 +636,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
@@ -629,7 +664,7 @@ projects:
 						Workspace:             "myworkspace",
 						TerraformDistribution: String("opentofu"),
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -670,7 +705,7 @@ projects:
 version: 3
 projects:
 - unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
+			expErr: "yaml: construct errors: line 4: field unknown not found in type raw.Project",
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -736,7 +771,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -745,7 +780,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -787,7 +822,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -886,7 +921,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -977,7 +1012,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1070,7 +1105,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1273,7 +1308,7 @@ func TestParseGlobalCfg(t *testing.T) {
 		},
 		"invalid fields": {
 			input:  "invalid: key",
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
+			expErr: "yaml: construct errors: line 1: field invalid not found in type raw.GlobalCfg",
 		},
 		"no id specified": {
 			input: `repos:
@@ -1540,14 +1575,16 @@ policies:
 					"custom1": customWorkflow1,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      conftestVersion,
-					ApproveCount: 1,
+					Version:         conftestVersion,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/policy",
-							Source:       valid.LocalPolicySet,
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/policy",
+							Source:          valid.LocalPolicySet,
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},
@@ -1652,7 +1689,6 @@ workflows:
 						RepoLocks:                 &valid.DefaultRepoLocks,
 						PolicyCheck:               Bool(false),
 						CustomPolicyCheck:         Bool(false),
-						AutoDiscover:              raw.DefaultAutoDiscover(),
 					},
 				},
 				Workflows: map[string]valid.Workflow{
@@ -1692,7 +1728,7 @@ workflows:
 			act, err := r.ParseGlobalCfg(path, valid.NewGlobalCfgFromArgs(globalCfgArgs))
 
 			if c.expErr != "" {
-				expErr := strings.Replace(c.expErr, "<tmp>", path, -1)
+				expErr := strings.ReplaceAll(c.expErr, "<tmp>", path)
 				ErrEquals(t, expErr, err)
 				return
 			}
@@ -1884,14 +1920,16 @@ func TestParserValidator_ParseGlobalCfgJSON(t *testing.T) {
 					"custom":  customWorkflow,
 				},
 				PolicySets: valid.PolicySets{
-					Version:      conftestVersion,
-					ApproveCount: 1,
+					Version:         conftestVersion,
+					ApproveCount:    1,
+					PolicyItemRegex: "(?s).+",
 					PolicySets: []valid.PolicySet{
 						{
-							Name:         "good-policy",
-							Path:         "rel/path/to/policy",
-							Source:       valid.LocalPolicySet,
-							ApproveCount: 1,
+							Name:            "good-policy",
+							Path:            "rel/path/to/policy",
+							Source:          valid.LocalPolicySet,
+							ApproveCount:    1,
+							PolicyItemRegex: "(?s).+",
 						},
 					},
 				},
@@ -2002,5 +2040,297 @@ func defaultWorkflow(name string) valid.Workflow {
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Import:      valid.DefaultImportStage,
 		StateRm:     valid.DefaultStateRmStage,
+	}
+}
+
+// Test that ContainsGlobPattern correctly identifies glob patterns.
+func TestContainsGlobPattern(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		{".", false},
+		{"dir/subdir", false},
+		{"dir-name", false},
+		{"dir_name", false},
+		{"*", true},
+		{"**", true},
+		{"dir/*", true},
+		{"dir/**", true},
+		{"**/subdir", true},
+		{"dir/*/subdir", true},
+		{"dir/**/subdir", true},
+		{"?", true},
+		{"dir/?", true},
+		{"[abc]", true},
+		{"dir/[abc]", true},
+		{"modules/*/", true},
+		{"environments/**/terraform", true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			result := raw.ContainsGlobPattern(c.input)
+			Equals(t, c.expected, result)
+		})
+	}
+}
+
+// Test that ValidateGlobPattern correctly validates glob patterns.
+func TestValidateGlobPattern(t *testing.T) {
+	cases := []struct {
+		input  string
+		expErr bool
+	}{
+		{"*", false},
+		{"**", false},
+		{"dir/*", false},
+		{"dir/**", false},
+		{"**/subdir", false},
+		{"dir/*/subdir", false},
+		{"dir/**/subdir", false},
+		{"?", false},
+		{"[abc]", false},
+		{"[a-z]", false},
+		{"modules/*/", false},
+		{"environments/**/terraform", false},
+		// Invalid patterns
+		{"[", true},
+		{"[abc", true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			err := raw.ValidateGlobPattern(c.input)
+			if c.expErr {
+				Assert(t, err != nil, "expected error for pattern %q", c.input)
+			} else {
+				Ok(t, err)
+			}
+		})
+	}
+}
+
+// Test glob pattern expansion in ParseRepoCfg.
+func TestParseRepoCfg_GlobExpansion(t *testing.T) {
+	// Create a temp directory with the following structure:
+	// repo/
+	//   atlantis.yaml
+	//   modules/
+	//     module-a/
+	//       main.tf
+	//     module-b/
+	//       main.tf
+	//     module-c/          (no .tf files - should be excluded)
+	//       readme.md
+	//   environments/
+	//     dev/
+	//       main.tf
+	//     prod/
+	//       main.tf
+
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{
+		"modules/module-a",
+		"modules/module-b",
+		"modules/module-c",
+		"environments/dev",
+		"environments/prod",
+	}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+	}
+
+	// Create .tf files in terraform directories
+	tfDirs := []string{
+		"modules/module-a",
+		"modules/module-b",
+		"environments/dev",
+		"environments/prod",
+	}
+	for _, dir := range tfDirs {
+		err := os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# terraform"), 0600)
+		Ok(t, err)
+	}
+
+	// Create non-tf file in module-c
+	err := os.WriteFile(filepath.Join(tmpDir, "modules/module-c/readme.md"), []byte("# readme"), 0600)
+	Ok(t, err)
+
+	cases := []struct {
+		description string
+		input       string
+		expDirs     []string // Expected project directories after expansion
+		expErr      string
+	}{
+		{
+			description: "single glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+`,
+			expDirs: []string{"modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "double star glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "environments/**"
+`,
+			expDirs: []string{"environments/dev", "environments/prod"},
+		},
+		{
+			description: "mixed glob and non-glob projects",
+			input: `
+version: 3
+projects:
+- dir: "."
+- dir: "modules/*"
+`,
+			expDirs: []string{".", "modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "glob with workflow preserved",
+			input: `
+version: 3
+projects:
+- dir: "modules/*"
+  workspace: staging
+  apply_requirements: [approved]
+workflows:
+  default: ~
+`,
+			expDirs: []string{"modules/module-a", "modules/module-b"},
+		},
+		{
+			description: "no glob - backward compatibility",
+			input: `
+version: 3
+projects:
+- dir: "modules/module-a"
+`,
+			expDirs: []string{"modules/module-a"},
+		},
+		{
+			description: "invalid glob pattern",
+			input: `
+version: 3
+projects:
+- dir: "[invalid"
+`,
+			expErr: "syntax error in pattern",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(c.input), 0600)
+			Ok(t, err)
+
+			r := config.ParserValidator{}
+			cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+			if c.expErr != "" {
+				Assert(t, err != nil, "expected error")
+				Assert(t, strings.Contains(err.Error(), c.expErr), "error %q should contain %q", err.Error(), c.expErr)
+				return
+			}
+			Ok(t, err)
+
+			// Extract directories from the parsed config
+			var actualDirs []string
+			for _, p := range cfg.Projects {
+				actualDirs = append(actualDirs, p.Dir)
+			}
+
+			// Sort both slices for comparison
+			Equals(t, len(c.expDirs), len(actualDirs))
+			for _, expDir := range c.expDirs {
+				found := slices.Contains(actualDirs, expDir)
+				Assert(t, found, "expected dir %q not found in actual dirs %v", expDir, actualDirs)
+			}
+		})
+	}
+}
+
+// Test that glob expansion preserves project settings.
+func TestParseRepoCfg_GlobExpansionPreservesSettings(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{"modules/mod-a", "modules/mod-b"}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+		err = os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# tf"), 0600)
+		Ok(t, err)
+	}
+
+	input := `
+version: 3
+projects:
+- dir: "modules/*"
+  workspace: staging
+  terraform_version: v1.0.0
+  apply_requirements: [approved, mergeable]
+  autoplan:
+    enabled: false
+    when_modified: ["*.tf"]
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(input), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+	Ok(t, err)
+
+	// Verify we got 2 projects
+	Equals(t, 2, len(cfg.Projects))
+
+	// Verify each project has the correct settings
+	for _, p := range cfg.Projects {
+		Equals(t, "staging", p.Workspace)
+		Assert(t, p.TerraformVersion != nil, "TerraformVersion should not be nil")
+		Equals(t, "1.0.0", p.TerraformVersion.String())
+		Equals(t, []string{"approved", "mergeable"}, p.ApplyRequirements)
+		Equals(t, false, p.Autoplan.Enabled)
+		Equals(t, []string{"*.tf"}, p.Autoplan.WhenModified)
+	}
+}
+
+// Test that glob expansion does not copy project names.
+func TestParseRepoCfg_GlobExpansionNoNameCopy(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create directory structure
+	dirs := []string{"modules/mod-a", "modules/mod-b"}
+	for _, dir := range dirs {
+		err := os.MkdirAll(filepath.Join(tmpDir, dir), 0755)
+		Ok(t, err)
+		err = os.WriteFile(filepath.Join(tmpDir, dir, "main.tf"), []byte("# tf"), 0600)
+		Ok(t, err)
+	}
+
+	input := `
+version: 3
+projects:
+- name: my-project
+  dir: "modules/*"
+`
+	err := os.WriteFile(filepath.Join(tmpDir, "atlantis.yaml"), []byte(input), 0600)
+	Ok(t, err)
+
+	r := config.ParserValidator{}
+	cfg, err := r.ParseRepoCfg(tmpDir, globalCfg, "", "")
+	Ok(t, err)
+
+	// Verify we got 2 projects and none have names (since name is not copied for expanded projects)
+	Equals(t, 2, len(cfg.Projects))
+	for _, p := range cfg.Projects {
+		Assert(t, p.Name == nil, "expanded projects should not have names")
 	}
 }

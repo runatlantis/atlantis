@@ -35,7 +35,7 @@ because anyone can open up a pull request from their fork to your repo.
 
 ### `--repo-allowlist`
 
-Atlantis requires you to specify a allowlist of repositories it will accept webhooks from via the `--repo-allowlist` flag.
+Atlantis requires you to specify an allowlist of repositories it will accept webhooks from via the `--repo-allowlist` flag.
 For example:
 
 * Specific repositories: `--repo-allowlist=github.com/runatlantis/atlantis,github.com/runatlantis/atlantis-tests`
@@ -66,8 +66,9 @@ To prevent this, you could:
 The files on your Atlantis install may be accessible as [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files)
 from pull requests by adding  
 `atlantis plan -- -var-file=/path/to/file` comments. To mitigate this security risk, Atlantis has limited such access
-only to the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
-Atlantis' data directory.
+only to the files in the repository and the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
+Atlantis' data directory. The check covers every comment command that accepts extra args and resolves symbolic links in the
+cloned repository. See [--var-file-allowlist](server-configuration.md#var-file-allowlist).
 
 ### Webhook Secrets
 
@@ -76,7 +77,7 @@ Even with the `--repo-allowlist` flag set, without a webhook secret, attackers c
 Webhook secrets ensure that the webhook requests are actually coming from your VCS provider (GitHub or GitLab).
 
 :::tip Tip
-If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure devops basic authentication)
+If you are using Azure DevOps, instead of webhook secrets add a [basic username and password](#azure-devops-basic-authentication)
 :::
 
 ### Azure DevOps Basic Authentication
@@ -91,7 +92,7 @@ flags.
 
 ### Enable Authentication on Atlantis Web Server
 
-It is very recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and setup a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
+It is highly recommended to enable authentication in the web service. Enable BasicAuth using the `--web-basic-auth=true` and set up a username and a password using `--web-username=yourUsername` and `--web-password=yourPassword` flags.
 
 You can also pass these as environment variables `ATLANTIS_WEB_BASIC_AUTH=true` `ATLANTIS_WEB_USERNAME=yourUsername` and `ATLANTIS_WEB_PASSWORD=yourPassword`.
 

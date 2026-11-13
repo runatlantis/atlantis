@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package cmd
@@ -18,16 +9,18 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -46,7 +39,7 @@ const (
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
-// 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
+// 3. Add your flag's description and default to stringFlags, stringSliceFlags, intFlags, or boolFlags.
 const (
 	// Flag names.
 	ADWebhookPasswordFlag            = "azuredevops-webhook-password" // nolint: gosec
@@ -55,15 +48,18 @@ const (
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
 	AllowCommandsFlag                = "allow-commands"
+	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
 	AtlantisURLFlag                  = "atlantis-url"
 	AutoDiscoverModeFlag             = "autodiscover-mode"
 	AutomergeFlag                    = "automerge"
+	AutomergeMethodFlag              = "automerge-method"
 	ParallelPlanFlag                 = "parallel-plan"
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
+	BitbucketApiUserFlag             = "bitbucket-api-user"
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
 	BitbucketTokenFlag               = "bitbucket-token"
 	BitbucketUserFlag                = "bitbucket-user"
@@ -77,6 +73,7 @@ const (
 	DisableApplyAllFlag              = "disable-apply-all"
 	DisableAutoplanFlag              = "disable-autoplan"
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
+	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
@@ -88,6 +85,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
 	ExecutableName                   = "executable-name"
+	ExperimentsFlag                  = "experiments"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
@@ -113,6 +111,7 @@ const (
 	GitlabTokenFlag                  = "gitlab-token"
 	GitlabUserFlag                   = "gitlab-user"
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
+	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
@@ -122,8 +121,11 @@ const (
 	MarkdownTemplateOverridesDirFlag = "markdown-template-overrides-dir"
 	MaxCommentsPerCommand            = "max-comments-per-command"
 	ParallelPoolSize                 = "parallel-pool-size"
+	SharePlanDirFlag                 = "share-plan-dir"
+	PendingApplyStatusFlag           = "pending-apply-status"
 	StatsNamespace                   = "stats-namespace"
 	AllowDraftPRs                    = "allow-draft-prs"
+	EnableExternalStoresFlag         = "enable-external-stores"
 	PortFlag                         = "port"
 	RedisDB                          = "redis-db"
 	RedisHost                        = "redis-host"
@@ -131,6 +133,8 @@ const (
 	RedisPort                        = "redis-port"
 	RedisTLSEnabled                  = "redis-tls-enabled"
 	RedisInsecureSkipVerify          = "redis-insecure-skip-verify"
+	RedisUsername                    = "redis-username"
+	RedisClusterAddresses            = "redis-cluster-addresses"
 	RepoConfigFlag                   = "repo-config"
 	RepoConfigJSONFlag               = "repo-config-json"
 	RepoAllowlistFlag                = "repo-allowlist"
@@ -151,6 +155,8 @@ const (
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
 	IgnoreVCSStatusNames             = "ignore-vcs-status-names"
+	LanguageFlag                     = "language"
+	LanguageConfigFileFlag           = "language-config-file"
 	TFEHostnameFlag                  = "tfe-hostname"
 	TFELocalExecutionModeFlag        = "tfe-local-execution-mode"
 	TFETokenFlag                     = "tfe-token"
@@ -159,6 +165,8 @@ const (
 	WebBasicAuthFlag                 = "web-basic-auth"
 	WebUsernameFlag                  = "web-username"
 	WebPasswordFlag                  = "web-password"
+	EnableDriftDetectionFlag         = "enable-drift-detection"
+	EnableDriftRemediationFlag       = "enable-drift-remediation"
 	WebsocketCheckOrigin             = "websocket-check-origin"
 
 	// NOTE: Must manually set these as defaults in the setDefaults function.
@@ -166,8 +174,8 @@ const (
 	DefaultADBasicPassword              = ""
 	DefaultADHostname                   = "dev.azure.com"
 	DefaultAutoDiscoverMode             = "auto"
-	DefaultAutoplanFileList             = "**/*.tf,**/*.tfvars,**/*.tfvars.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
-	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies"
+	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
+	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -180,6 +188,7 @@ const (
 	DefaultGiteaPageSize                = 30
 	DefaultGitlabHostname               = "gitlab.com"
 	DefaultLockingDBType                = "boltdb"
+	DefaultLanguage                     = i18n.DefaultLanguage
 	DefaultLogLevel                     = "info"
 	DefaultIgnoreVCSStatusNames         = ""
 	DefaultMaxCommentsPerCommand        = 100
@@ -199,6 +208,12 @@ const (
 	DefaultWebUsername                  = "atlantis"
 	DefaultWebPassword                  = "atlantis"
 )
+
+var stringSliceFlags = map[string]stringSliceFlag{
+	ExperimentsFlag: {
+		description: "Server experiment permissions, separated by commas. Required for experimental feature settings and routes; activation settings still apply. See " + server.ExperimentsDocumentationURL + ".",
+	},
+}
 
 var stringFlags = map[string]stringFlag{
 	ADTokenFlag: {
@@ -227,6 +242,11 @@ var stringFlags = map[string]stringFlag{
 		description:  "Comma separated list of acceptable atlantis commands.",
 		defaultValue: DefaultAllowCommands,
 	},
+	BlockedExtraArgsFlag: {
+		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
+			"in comment extra args (the flags after '--'). " +
+			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
+	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
 	},
@@ -235,6 +255,11 @@ var stringFlags = map[string]stringFlag{
 			"means projects will be discovered when no explicit projects are defined in repo config. Also supports 'enabled' (always " +
 			"discover projects) and 'disabled' (never discover projects).",
 		defaultValue: DefaultAutoDiscoverMode,
+	},
+	AutomergeMethodFlag: {
+		description: "Default merge method to use when automerging pull requests, unless overridden by the --auto-merge-method comment flag. " +
+			"Valid values are 'merge', 'rebase', and 'squash'. Currently only implemented for GitHub.",
+		defaultValue: "",
 	},
 	AutoplanModulesFromProjects: {
 		description: "Comma separated list of file patterns to select projects Atlantis will index for module dependencies." +
@@ -250,8 +275,11 @@ var stringFlags = map[string]stringFlag{
 			" A custom Workflow that uses autoplan 'when_modified' will ignore this value.",
 		defaultValue: DefaultAutoplanFileList,
 	},
+	BitbucketApiUserFlag: {
+		description: "Bitbucket username for API calls. If not set, defaults to bitbucket-user for backward compatibility. Can also be specified via the ATLANTIS_BITBUCKET_API_USER environment variable.",
+	},
 	BitbucketUserFlag: {
-		description: "Bitbucket username of API user.",
+		description: "Bitbucket username for git operations.",
 	},
 	BitbucketTokenFlag: {
 		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
@@ -286,6 +314,10 @@ var stringFlags = map[string]stringFlag{
 	},
 	DisableAutoplanLabelFlag: {
 		description:  "Pull request label to disable atlantis auto planning feature only if present.",
+		defaultValue: "",
+	},
+	DisableAutomergeLabelFlag: {
+		description:  "Pull request label to disable atlantis automerge feature only if present.",
 		defaultValue: "",
 	},
 	DisableUnlockLabelFlag: {
@@ -390,7 +422,7 @@ var stringFlags = map[string]stringFlag{
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	APISecretFlag: {
-		description: "Secret used to validate requests made to the /api/* endpoints",
+		description: "Secret used to validate requests made to the /api/* endpoints. Requires the api or drift-detection experiment for the corresponding routes.",
 	},
 	LockingDBType: {
 		description:  "The locking database type to use for storing plan and apply locks.",
@@ -408,11 +440,22 @@ var stringFlags = map[string]stringFlag{
 		description:  "Namespace for aggregating stats.",
 		defaultValue: DefaultStatsNamespace,
 	},
+	SharePlanDirFlag: {
+		description:  "Path to directory to store local Terraform plan files. If unset, defaults to --" + DataDirFlag + ".",
+		defaultValue: "",
+	},
 	RedisHost: {
 		description: "The Redis Hostname for when using a Locking DB type of 'redis'.",
 	},
 	RedisPassword: {
 		description: "The Redis Password for when using a Locking DB type of 'redis'.",
+	},
+	RedisUsername: {
+		description: "The Redis Username for when using a Locking DB type of 'redis'.",
+	},
+	RedisClusterAddresses: {
+		description: "Comma-delimited list of Redis cluster node addresses in the format 'host:port'. " +
+			"When set, Atlantis uses Redis Cluster mode instead of single-node mode.",
 	},
 	RepoConfigFlag: {
 		description: "Path to a repo config file, used to customize how Atlantis runs on each repo. See runatlantis.io/docs for more details.",
@@ -469,6 +512,14 @@ var stringFlags = map[string]stringFlag{
 			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
 			" Currently only implemented for GitHub.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
+	},
+	LanguageFlag: {
+		description:  "Language used for Atlantis pull request comments. Supported values: " + i18n.SupportedLanguagesDescription() + ".",
+		defaultValue: DefaultLanguage,
+	},
+	LanguageConfigFileFlag: {
+		description: "Optional path to a custom YAML language catalog that overrides built-in localized strings. " +
+			"Supports partial overrides and can be combined with --language.",
 	},
 	VCSStatusName: {
 		description:  "Name used to identify Atlantis for pull request statuses.",
@@ -546,6 +597,10 @@ var boolFlags = map[string]boolFlag{
 		description:  "Feature flag to enable functionality to allow mergeable check to ignore apply required check",
 		defaultValue: false,
 	},
+	GitlabStatusRetryEnabledFlag: {
+		description:  "Enable enhanced retry logic for GitLab pipeline status updates with exponential backoff.",
+		defaultValue: false,
+	},
 	AllowDraftPRs: {
 		description:  "Enable autoplan for Github Draft Pull Requests",
 		defaultValue: false,
@@ -565,6 +620,14 @@ var boolFlags = map[string]boolFlag{
 	},
 	ParallelApplyFlag: {
 		description:  "Run apply operations in parallel.",
+		defaultValue: false,
+	},
+	PendingApplyStatusFlag: {
+		description:  "Set apply job status as pending when there are planned changes that haven't been applied yet. Currently only supported for GitLab.",
+		defaultValue: false,
+	},
+	EnableExternalStoresFlag: {
+		description:  "Enable external storage backends configured in the server-side repo config (external_stores block).",
 		defaultValue: false,
 	},
 	QuietPolicyChecks: {
@@ -632,6 +695,14 @@ var boolFlags = map[string]boolFlag{
 		description:  "Enable websocket origin check",
 		defaultValue: false,
 	},
+	EnableDriftDetectionFlag: {
+		description:  "Enable drift detection API endpoints. Requires --experiments=drift-detection and --api-secret. Detection does not apply, but can run plan hooks and custom plan commands.",
+		defaultValue: false,
+	},
+	EnableDriftRemediationFlag: {
+		description:  "Enable drift remediation apply API actions. Requires --experiments=drift-detection, --api-secret, and --enable-drift-detection.",
+		defaultValue: false,
+	},
 	HideUnchangedPlanComments: {
 		description:  "Remove no-changes plan comments from the pull request.",
 		defaultValue: false,
@@ -691,9 +762,18 @@ var int64Flags = map[string]int64Flag{
 // ValidLogLevels are the valid log levels that can be set
 var ValidLogLevels = []string{"debug", "info", "warn", "error"}
 
+// ValidAutomergeMethods are the valid merge methods that can be set for the
+// automerge-method flag.
+var ValidAutomergeMethods = []string{"merge", "rebase", "squash"}
+
 type stringFlag struct {
 	description  string
 	defaultValue string
+	hidden       bool
+}
+type stringSliceFlag struct {
+	description  string
+	defaultValue []string
 	hidden       bool
 }
 type intFlag struct {
@@ -767,7 +847,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 	s.Viper.AutomaticEnv()
 	s.Viper.SetTypeByDefaultValue(true)
 
-	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
+	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags, stringSliceFlags))
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		s.printErr(err)
@@ -781,6 +861,14 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %q)", usage, f.defaultValue)
 		}
 		c.Flags().String(name, "", usage+"\n")
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+	}
+
+	for name, f := range stringSliceFlags {
+		c.Flags().StringSlice(name, f.defaultValue, f.description+"\n")
 		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
@@ -831,13 +919,29 @@ func (s *ServerCmd) preRun() error {
 	if configFile != "" {
 		s.Viper.SetConfigFile(configFile)
 		if err := s.Viper.ReadInConfig(); err != nil {
-			return errors.Wrapf(err, "invalid config: reading %s", configFile)
+			return fmt.Errorf("invalid config: reading %s: %w", configFile, err)
 		}
 	}
 	return nil
 }
 
+// sanitizeKubernetesServiceLinks detects Kubernetes service link environment
+// variables that collide with Atlantis's ATLANTIS_ env prefix and resets them
+// to their defaults. Kubernetes auto-creates env vars like
+// ATLANTIS_REDIS_PORT=tcp://10.x.x.x:6379 for services in the same namespace,
+// which viper picks up and fails to parse as integers.
+func (s *ServerCmd) sanitizeKubernetesServiceLinks() {
+	for name, f := range intFlags {
+		val := s.Viper.GetString(name)
+		if strings.HasPrefix(val, "tcp://") || strings.HasPrefix(val, "udp://") {
+			s.Viper.Set(name, f.defaultValue)
+		}
+	}
+}
+
 func (s *ServerCmd) run() error {
+	s.sanitizeKubernetesServiceLinks()
+
 	var userConfig server.UserConfig
 	if err := s.Viper.Unmarshal(&userConfig); err != nil {
 		return err
@@ -855,6 +959,9 @@ func (s *ServerCmd) run() error {
 		return err
 	}
 	if err := s.setDataDir(&userConfig); err != nil {
+		return err
+	}
+	if err := s.setSharePlanDir(&userConfig); err != nil {
 		return err
 	}
 	if err := s.setMarkdownTemplateOverridesDir(&userConfig); err != nil {
@@ -879,7 +986,7 @@ func (s *ServerCmd) run() error {
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "initializing server")
+		return fmt.Errorf("initializing server: %w", err)
 	}
 	return server.Start()
 }
@@ -926,6 +1033,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	}
 	if c.LockingDBType == "" {
 		c.LockingDBType = DefaultLockingDBType
+	}
+	if c.Language == "" {
+		c.Language = DefaultLanguage
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = DefaultLogLevel
@@ -981,9 +1091,24 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
+	// Check before preparing directories; NewServer also validates direct callers.
+	if err := userConfig.ValidateExperiments(); err != nil {
+		return err
+	}
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)
+	}
+	// Intentionally allow unsupported --language values when a custom language
+	// catalog is provided, so operators can define their own locale codes.
+	if strings.TrimSpace(userConfig.LanguageConfigFile) == "" {
+		if err := i18n.ValidateLanguage(userConfig.Language); err != nil {
+			return err
+		}
+	} else {
+		if err := i18n.ValidateCustomCatalog(userConfig.LanguageConfigFile); err != nil {
+			return err
+		}
 	}
 
 	if userConfig.DefaultTFDistribution != TFDistributionTerraform && userConfig.DefaultTFDistribution != TFDistributionOpenTofu {
@@ -995,6 +1120,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	if checkoutStrategy != CheckoutStrategyBranch && checkoutStrategy != CheckoutStrategyMerge {
 		return fmt.Errorf("invalid checkout strategy: not one of %s or %s",
 			CheckoutStrategyBranch, CheckoutStrategyMerge)
+	}
+
+	if userConfig.AutomergeMethod != "" && !slices.Contains(ValidAutomergeMethods, userConfig.AutomergeMethod) {
+		return fmt.Errorf("invalid --%s: must be one of %v", AutomergeMethodFlag, ValidAutomergeMethods)
 	}
 
 	if (userConfig.SSLKeyFile == "") != (userConfig.SSLCertFile == "") {
@@ -1080,17 +1209,29 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 		return fmt.Errorf("if setting --%s, must set --%s", TFEHostnameFlag, TFETokenFlag)
 	}
 
+	if userConfig.RedisClusterAddresses != "" {
+		if userConfig.RedisHost != "" {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisHost)
+		}
+		if userConfig.RedisPort != DefaultRedisPort {
+			return fmt.Errorf("--%s cannot be combined with --%s", RedisClusterAddresses, RedisPort)
+		}
+		if userConfig.RedisDB != DefaultRedisDB {
+			return fmt.Errorf("--%s is not supported in cluster mode (Redis Cluster ignores the DB parameter)", RedisDB)
+		}
+	}
+
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
-		return errors.Wrapf(patternErr, "invalid pattern in --%s, %s", AutoplanFileListFlag, userConfig.AutoplanFileList)
+		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", AllowCommandsFlag)
+		return fmt.Errorf("invalid --%s: %w", AllowCommandsFlag, err)
 	}
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {
-		return errors.Wrapf(err, "invalid --%s", WebhookHttpHeaders)
+		return fmt.Errorf("invalid --%s: %w", WebhookHttpHeaders, err)
 	}
 
 	return nil
@@ -1101,7 +1242,7 @@ func (s *ServerCmd) setAtlantisURL(userConfig *server.UserConfig) error {
 	if userConfig.AtlantisURL == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			return errors.Wrap(err, "failed to determine hostname")
+			return fmt.Errorf("failed to determine hostname: %w", err)
 		}
 		userConfig.AtlantisURL = fmt.Sprintf("http://%s:%d", hostname, userConfig.Port)
 	}
@@ -1119,16 +1260,41 @@ func (s *ServerCmd) setDataDir(userConfig *server.UserConfig) error {
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making data-dir absolute")
+		return fmt.Errorf("making data-dir absolute: %w", err)
 	}
 	userConfig.DataDir = finalPath
+	return nil
+}
+
+// setSharePlanDir checks if ~ was used in share-plan-dir and converts it to the actual
+// home directory. If unset, it defaults to the resolved data-dir. It also converts relative paths to absolute.
+func (s *ServerCmd) setSharePlanDir(userConfig *server.UserConfig) error {
+	if userConfig.SharePlanDir == "" {
+		userConfig.SharePlanDir = userConfig.DataDir
+		return nil
+	}
+
+	finalPath := userConfig.SharePlanDir
+	if strings.HasPrefix(finalPath, "~/") {
+		var err error
+		finalPath, err = homedir.Expand(finalPath)
+		if err != nil {
+			return fmt.Errorf("determining home directory: %w", err)
+		}
+	}
+
+	finalPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("making share-plan-dir absolute: %w", err)
+	}
+	userConfig.SharePlanDir = finalPath
 	return nil
 }
 
@@ -1143,14 +1309,14 @@ func (s *ServerCmd) setMarkdownTemplateOverridesDir(userConfig *server.UserConfi
 		var err error
 		finalPath, err = homedir.Expand(finalPath)
 		if err != nil {
-			return errors.Wrap(err, "determining home directory")
+			return fmt.Errorf("determining home directory: %w", err)
 		}
 	}
 
 	// Convert relative paths to absolute.
 	finalPath, err := filepath.Abs(finalPath)
 	if err != nil {
-		return errors.Wrap(err, "making markdown-template-overrides-dir absolute")
+		return fmt.Errorf("making markdown-template-overrides-dir absolute: %w", err)
 	}
 	userConfig.MarkdownTemplateOverridesDir = finalPath
 	return nil
@@ -1236,11 +1402,5 @@ func (s *ServerCmd) printErr(err error) {
 }
 
 func isValidLogLevel(level string) bool {
-	for _, logLevel := range ValidLogLevels {
-		if logLevel == level {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ValidLogLevels, level)
 }

@@ -1,10 +1,15 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
+	"github.com/runatlantis/atlantis/server/core/terraform"
 	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -121,21 +126,19 @@ func (cb *DefaultProjectCommandContextBuilder) BuildProjectContext(
 		}
 	}
 
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
+	detectProjectTerraformVersion(ctx, &prjCfg, repoDir, terraformClient)
 
 	projectCmdContext := newProjectCommandContext(
 		ctx,
 		cmdName,
+		subName,
 		cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 		cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 		cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 		prjCfg,
 		steps,
 		prjCfg.PolicySets,
+		commentFlags,
 		escapeArgs(commentFlags),
 		automerge,
 		parallelApply,
@@ -175,11 +178,7 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		ctx.Log.Debug("PolicyChecks are disabled on this repository")
 	}
 
-	// If TerraformVersion not defined in config file look for a
-	// terraform.require_version block.
-	if prjCfg.TerraformVersion == nil {
-		prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, filepath.Join(repoDir, prjCfg.RepoRelDir))
-	}
+	detectProjectTerraformVersion(ctx, &prjCfg, repoDir, terraformClient)
 
 	projectCmds = cb.ProjectCommandContextBuilder.BuildProjectContext(
 		ctx,
@@ -203,12 +202,14 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 		projectCmds = append(projectCmds, newProjectCommandContext(
 			ctx,
 			command.PolicyCheck,
+			"",
 			cb.CommentBuilder.BuildApplyComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, prjCfg.AutoMergeDisabled, prjCfg.AutoMergeMethod),
 			cb.CommentBuilder.BuildApprovePoliciesComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name),
 			cb.CommentBuilder.BuildPlanComment(prjCfg.RepoRelDir, prjCfg.Workspace, prjCfg.Name, commentFlags),
 			prjCfg,
 			steps,
 			prjCfg.PolicySets,
+			commentFlags,
 			escapeArgs(commentFlags),
 			automerge,
 			parallelApply,
@@ -225,16 +226,32 @@ func (cb *PolicyCheckProjectCommandContextBuilder) BuildProjectContext(
 	return
 }
 
+func detectProjectTerraformVersion(ctx *command.Context, prjCfg *valid.MergedProjectCfg, repoDir string, terraformClient tfclient.Client) {
+	// If TerraformVersion is not defined in the repo config, look for a
+	// required_version setting in the project's Terraform/OpenTofu config.
+	if prjCfg.TerraformVersion != nil {
+		return
+	}
+
+	var tfDistribution terraform.Distribution
+	if prjCfg.TerraformDistribution != nil {
+		tfDistribution = terraform.NewDistribution(*prjCfg.TerraformDistribution)
+	}
+	prjCfg.TerraformVersion = terraformClient.DetectVersion(ctx.Log, tfDistribution, filepath.Join(repoDir, prjCfg.RepoRelDir))
+}
+
 // newProjectCommandContext is a initializer method that handles constructing the
 // ProjectCommandContext.
 func newProjectCommandContext(ctx *command.Context,
 	cmd command.Name,
+	subCommand string,
 	applyCmd string,
 	approvePoliciesCmd string,
 	planCmd string,
 	projCfg valid.MergedProjectCfg,
 	steps []valid.Step,
 	policySets valid.PolicySets,
+	commentArgs []string,
 	escapedCommentArgs []string,
 	automergeEnabled bool,
 	parallelApplyEnabled bool,
@@ -269,60 +286,98 @@ func newProjectCommandContext(ctx *command.Context,
 	}
 
 	return command.ProjectContext{
-		CommandName:                cmd,
-		ApplyCmd:                   applyCmd,
-		ApprovePoliciesCmd:         approvePoliciesCmd,
-		BaseRepo:                   ctx.Pull.BaseRepo,
-		EscapedCommentArgs:         escapedCommentArgs,
-		AutomergeEnabled:           automergeEnabled,
-		DeleteSourceBranchOnMerge:  projCfg.DeleteSourceBranchOnMerge,
-		RepoLocksMode:              projCfg.RepoLocks.Mode,
-		CustomPolicyCheck:          projCfg.CustomPolicyCheck,
-		ParallelApplyEnabled:       parallelApplyEnabled,
-		ParallelPlanEnabled:        parallelPlanEnabled,
-		ParallelPolicyCheckEnabled: parallelPlanEnabled,
-		DependsOn:                  projCfg.DependsOn,
-		AutoplanEnabled:            projCfg.AutoplanEnabled,
-		Steps:                      steps,
-		HeadRepo:                   ctx.HeadRepo,
-		Log:                        ctx.Log,
-		Scope:                      scope,
-		ProjectPlanStatus:          projectPlanStatus,
-		ProjectPolicyStatus:        projectPolicyStatus,
-		Pull:                       ctx.Pull,
-		ProjectName:                projCfg.Name,
-		PlanRequirements:           projCfg.PlanRequirements,
-		ApplyRequirements:          projCfg.ApplyRequirements,
-		ImportRequirements:         projCfg.ImportRequirements,
-		RePlanCmd:                  planCmd,
-		RepoRelDir:                 projCfg.RepoRelDir,
-		RepoConfigVersion:          projCfg.RepoCfgVersion,
-		TerraformDistribution:      projCfg.TerraformDistribution,
-		TerraformVersion:           projCfg.TerraformVersion,
-		User:                       ctx.User,
-		Verbose:                    verbose,
-		Workspace:                  projCfg.Workspace,
-		PolicySets:                 policySets,
-		PolicySetTarget:            ctx.PolicySet,
-		ClearPolicyApproval:        ctx.ClearPolicyApproval,
-		PullReqStatus:              pullReqStatus,
-		PullStatus:                 pullStatus,
-		JobID:                      uuid.New().String(),
-		ExecutionOrderGroup:        projCfg.ExecutionOrderGroup,
-		AbortOnExecutionOrderFail:  abortOnExecutionOrderFail,
-		SilencePRComments:          projCfg.SilencePRComments,
-		TeamAllowlistChecker:       teamAllowlistChecker,
+		CommandName:                     cmd,
+		SubCommand:                      subCommand,
+		ApplyCmd:                        applyCmd,
+		ApprovePoliciesCmd:              approvePoliciesCmd,
+		BaseRepo:                        ctx.Pull.BaseRepo,
+		CommentArgs:                     commentArgs,
+		EscapedCommentArgs:              escapedCommentArgs,
+		AutomergeEnabled:                automergeEnabled,
+		DeleteSourceBranchOnMerge:       projCfg.DeleteSourceBranchOnMerge,
+		RepoLocksMode:                   projCfg.RepoLocks.Mode,
+		CustomPolicyCheck:               projCfg.CustomPolicyCheck,
+		ParallelApplyEnabled:            parallelApplyEnabled,
+		ParallelPlanEnabled:             parallelPlanEnabled,
+		ParallelPolicyCheckEnabled:      parallelPlanEnabled,
+		DependsOn:                       projCfg.DependsOn,
+		AutoplanEnabled:                 projCfg.AutoplanEnabled,
+		AutoplanWhenModified:            projCfg.AutoplanWhenModified,
+		Steps:                           steps,
+		RequiresAtlantisManagedPlanFile: requiresAtlantisManagedPlanFile(projCfg.Workflow),
+		HeadRepo:                        ctx.HeadRepo,
+		Log:                             ctx.Log,
+		Scope:                           scope,
+		ProjectPlanStatus:               projectPlanStatus,
+		ProjectPolicyStatus:             projectPolicyStatus,
+		Pull:                            ctx.Pull,
+		ProjectName:                     projCfg.Name,
+		PlanRequirements:                projCfg.PlanRequirements,
+		ApplyRequirements:               projCfg.ApplyRequirements,
+		ImportRequirements:              projCfg.ImportRequirements,
+		RePlanCmd:                       planCmd,
+		RepoRelDir:                      projCfg.RepoRelDir,
+		RepoConfigVersion:               projCfg.RepoCfgVersion,
+		TerraformDistribution:           projCfg.TerraformDistribution,
+		TerraformVersion:                projCfg.TerraformVersion,
+		User:                            ctx.User,
+		Verbose:                         verbose,
+		Workspace:                       projCfg.Workspace,
+		PolicySets:                      policySets,
+		PolicySetTarget:                 ctx.PolicySet,
+		ClearPolicyApproval:             ctx.ClearPolicyApproval,
+		PullReqStatus:                   pullReqStatus,
+		PullStatus:                      pullStatus,
+		JobID:                           uuid.New().String(),
+		ExecutionOrderGroup:             projCfg.ExecutionOrderGroup,
+		AbortOnExecutionOrderFail:       abortOnExecutionOrderFail,
+		SilencePRComments:               projCfg.SilencePRComments,
+		TeamAllowlistChecker:            teamAllowlistChecker,
+		API:                             ctx.API,
+		SkipPRRequirements:              ctx.SkipPRRequirements,
+		RunPolicyChecks:                 ctx.RunPolicyChecks,
+		SuppressVCSStatus:               ctx.SuppressVCSStatus,
+		SuppressJobOutput:               ctx.SuppressJobOutput,
+		SuppressApplyWebhooks:           ctx.SuppressApplyWebhooks,
+		FailOnMissingDependencies:       ctx.FailOnMissingDependencies,
 	}
 }
 
 func escapeArgs(args []string) []string {
 	var escaped []string
 	for _, arg := range args {
-		var escapedArg string
+		var escapedArg strings.Builder
 		for i := range arg {
-			escapedArg += "\\" + string(arg[i])
+			escapedArg.WriteString("\\" + string(arg[i]))
 		}
-		escaped = append(escaped, escapedArg)
+		escaped = append(escaped, escapedArg.String())
 	}
 	return escaped
+}
+
+// requiresAtlantisManagedPlanFile reports whether Atlantis owns the convention
+// plan artifact (<workspace>.tfplan) for this workflow. That is true when the
+// workflow uses the built-in plan step (Atlantis writes the file) or the
+// built-in apply step (Atlantis reads it). A workflow built only from custom
+// run steps writes its plan wherever the user's commands choose, so Atlantis
+// must not require, hash, or delete a convention plan file for it.
+func requiresAtlantisManagedPlanFile(workflow valid.Workflow) bool {
+	return hasAtlantisManagedPlanStep(workflow.Plan.Steps) || hasAtlantisManagedApplyStep(workflow.Apply.Steps)
+}
+
+func hasAtlantisManagedPlanStep(steps []valid.Step) bool {
+	return hasStepNamed(steps, "plan")
+}
+
+func hasAtlantisManagedApplyStep(steps []valid.Step) bool {
+	return hasStepNamed(steps, "apply")
+}
+
+func hasStepNamed(steps []valid.Step, name string) bool {
+	for _, step := range steps {
+		if step.StepName == name {
+			return true
+		}
+	}
+	return false
 }

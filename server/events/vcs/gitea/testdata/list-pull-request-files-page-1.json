@@ -1,0 +1,28 @@
+[
+  {
+    "filename": "modules/network/main.tf",
+    "previous_filename": "",
+    "status": "modified",
+    "additions": 12,
+    "deletions": 3,
+    "changes": 15,
+    "html_url": "https://gitea.example.com/owner/repo/src/branch/main/modules/network/main.tf",
+    "contents_url": "https://gitea.example.com/api/v1/repos/owner/repo/contents/modules/network/main.tf",
+    "raw_url": "https://gitea.example.com/owner/repo/raw/branch/main/modules/network/main.tf",
+    "sha": "aab0c7d4f8f86f8a3bf1fdbe9a1f82f700000001",
+    "patch": "@@ -1,3 +1,7 @@\n module \"network\" {\n+  tags = {\n+    env = \"prod\"\n+  }\n }"
+  },
+  {
+    "filename": "modules/app/variables.tf",
+    "previous_filename": "modules/app/vars.tf",
+    "status": "renamed",
+    "additions": 1,
+    "deletions": 1,
+    "changes": 2,
+    "html_url": "https://gitea.example.com/owner/repo/src/branch/main/modules/app/variables.tf",
+    "contents_url": "https://gitea.example.com/api/v1/repos/owner/repo/contents/modules/app/variables.tf",
+    "raw_url": "https://gitea.example.com/owner/repo/raw/branch/main/modules/app/variables.tf",
+    "sha": "aab0c7d4f8f86f8a3bf1fdbe9a1f82f700000002",
+    "patch": "@@ -1 +1 @@\n-variable \"image\" {}\n+variable \"container_image\" {}"
+  }
+]

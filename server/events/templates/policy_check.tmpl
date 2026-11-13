@@ -1,9 +1,37 @@
 {{ define "policyCheck" -}}
 {{ $policy_sets := . }}
-{{ range $ps, $policy_sets }}
+{{ range $_, $ps := $policy_sets }}
 #### Policy Set: `{{ $ps.PolicySetName }}`
+{{- $approvedHashes := $ps.ApprovedHashes -}}
+{{- if and (ne $ps.PolicyItemRegex "") (gt (len $approvedHashes) 0) -}}
+{{- $unapproved := list -}}
+{{- $approved := list -}}
+{{- range $item := regexFindAll $ps.PolicyItemRegex $ps.PolicyOutput -1 -}}
+{{- if ne $item "" -}}
+{{- if has (sha256sum $item) $approvedHashes -}}
+{{- $approved = append $approved $item -}}
+{{- else -}}
+{{- $unapproved = append $unapproved $item -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- if gt (len $unapproved) 0 }}
+```diff
+{{ join "\n" $unapproved }}
+```
+{{- end -}}
+{{- if gt (len $approved) 0 }}
+<details><summary>:white_check_mark: {{ len $approved }} previously approved {{ if eq (len $approved) 1 }}item{{ else }}items{{ end }}</summary>
+
+```diff
+{{ join "\n" $approved }}
+```
+</details>
+{{- end }}
+{{- else }}
 ```diff
 {{ $ps.PolicyOutput }}
 ```
+{{- end }}
 {{ end }}
 {{ end }}

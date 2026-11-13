@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package valid_test
 
 import (
@@ -30,7 +33,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -53,7 +56,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -72,7 +75,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -83,7 +86,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -113,7 +116,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -124,7 +127,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -147,7 +150,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -158,7 +161,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -177,7 +180,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -200,7 +203,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -220,92 +223,41 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 func TestConfig_AutoDiscoverEnabled(t *testing.T) {
 	cases := []struct {
 		description         string
-		repoAutoDiscover    valid.AutoDiscoverMode
 		defaultAutoDiscover valid.AutoDiscoverMode
 		projects            []valid.Project
 		expEnabled          bool
 	}{
 		{
-			description:         "repo disabled autodiscover default enabled",
-			repoAutoDiscover:    valid.AutoDiscoverDisabledMode,
-			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
-			expEnabled:          false,
-		},
-		{
-			description:         "repo disabled autodiscover default disabled",
-			repoAutoDiscover:    valid.AutoDiscoverDisabledMode,
-			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
-			expEnabled:          false,
-		},
-		{
-			description:         "repo enabled autodiscover default enabled",
-			repoAutoDiscover:    valid.AutoDiscoverEnabledMode,
+			description:         "default enabled with no projects",
 			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
 			expEnabled:          true,
 		},
 		{
-			description:         "repo enabled autodiscover default disabled",
-			repoAutoDiscover:    valid.AutoDiscoverEnabledMode,
-			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
-			expEnabled:          true,
-		},
-		{
-			description:         "repo set auto autodiscover with no projects default enabled",
-			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
-			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
-			expEnabled:          true,
-		},
-		{
-			description:         "repo set auto autodiscover with no projects default disabled",
-			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
-			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
-			expEnabled:          true,
-		},
-		{
-			description:         "repo set auto autodiscover with a project default enabled",
-			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
-			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
-			projects:            []valid.Project{{}},
-			expEnabled:          false,
-		},
-		{
-			description:         "repo set auto autodiscover with a project default disabled",
-			repoAutoDiscover:    valid.AutoDiscoverAutoMode,
-			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
-			projects:            []valid.Project{{}},
-			expEnabled:          false,
-		},
-		{
-			description:         "repo unset autodiscover with no projects default enabled",
-			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
-			expEnabled:          true,
-		},
-		{
-			description:         "repo unset autodiscover with no projects default disabled",
+			description:         "default disabled with no projects",
 			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
 			expEnabled:          false,
 		},
 		{
-			description:         "repo unset autodiscover with no projects default auto",
+			description:         "auto mode with no projects",
 			defaultAutoDiscover: valid.AutoDiscoverAutoMode,
 			expEnabled:          true,
 		},
 		{
-			description:         "repo unset autodiscover with a project default enabled",
-			projects:            []valid.Project{{}},
+			description:         "default enabled with projects",
 			defaultAutoDiscover: valid.AutoDiscoverEnabledMode,
+			projects:            []valid.Project{{}},
 			expEnabled:          true,
 		},
 		{
-			description:         "repo unset autodiscover with a project default disabled",
-			projects:            []valid.Project{{}},
+			description:         "default disabled with projects",
 			defaultAutoDiscover: valid.AutoDiscoverDisabledMode,
+			projects:            []valid.Project{{}},
 			expEnabled:          false,
 		},
 		{
-			description:         "repo unset autodiscover with a project default auto",
-			projects:            []valid.Project{{}},
+			description:         "auto mode with projects",
 			defaultAutoDiscover: valid.AutoDiscoverAutoMode,
+			projects:            []valid.Project{{}},
 			expEnabled:          false,
 		},
 	}
@@ -315,103 +267,170 @@ func TestConfig_AutoDiscoverEnabled(t *testing.T) {
 				Projects:     c.projects,
 				AutoDiscover: nil,
 			}
-			if c.repoAutoDiscover != "" {
-				r.AutoDiscover = &valid.AutoDiscover{
-					Mode: c.repoAutoDiscover,
-				}
-			}
 			enabled := r.AutoDiscoverEnabled(c.defaultAutoDiscover)
 			Equals(t, c.expEnabled, enabled)
 		})
 	}
 }
 
-func TestConfig_IsPathIgnoredForAutoDiscover(t *testing.T) {
+func TestConfig_FindProjectsByDirPattern(t *testing.T) {
 	cases := []struct {
 		description string
-		repoCfg     valid.RepoCfg
-		path        string
-		expIgnored  bool
+		pattern     string
+		projects    []valid.Project
+		expProjects []valid.Project
 	}{
 		{
-			description: "auto discover unconfigured",
-			repoCfg:     valid.RepoCfg{},
-			path:        "foo",
-			expIgnored:  false,
+			description: "simple wildcard matches multiple projects",
+			pattern:     "modules/*",
+			projects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
+				{Dir: "modules/rds", Workspace: "default"},
+				{Dir: "apps/api", Workspace: "default"},
+			},
+			expProjects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
+				{Dir: "modules/rds", Workspace: "default"},
+			},
 		},
 		{
-			description: "auto discover configured, but not path",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{},
+			description: "double star matches nested directories",
+			pattern:     "environments/**",
+			projects: []valid.Project{
+				{Dir: "environments/prod/app", Workspace: "default"},
+				{Dir: "environments/staging/app", Workspace: "default"},
+				{Dir: "environments/dev", Workspace: "default"},
+				{Dir: "modules/vpc", Workspace: "default"},
 			},
-			path:       "foo",
-			expIgnored: false,
+			expProjects: []valid.Project{
+				{Dir: "environments/prod/app", Workspace: "default"},
+				{Dir: "environments/staging/app", Workspace: "default"},
+				{Dir: "environments/dev", Workspace: "default"},
+			},
 		},
 		{
-			description: "paths do not match pattern",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{
-					IgnorePaths: []string{
-						"bar",
-					},
-				},
+			description: "question mark matches single character",
+			pattern:     "env?/*",
+			projects: []valid.Project{
+				{Dir: "env1/app", Workspace: "default"},
+				{Dir: "env2/app", Workspace: "default"},
+				{Dir: "envX/app", Workspace: "default"},
+				{Dir: "environment/app", Workspace: "default"},
 			},
-			path:       "foo",
-			expIgnored: false,
+			expProjects: []valid.Project{
+				{Dir: "env1/app", Workspace: "default"},
+				{Dir: "env2/app", Workspace: "default"},
+				{Dir: "envX/app", Workspace: "default"},
+			},
 		},
 		{
-			description: "path does match pattern",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{
-					IgnorePaths: []string{
-						"fo?",
-					}},
+			description: "character class matches specific characters",
+			pattern:     "env[0-9]/*",
+			projects: []valid.Project{
+				{Dir: "env1/app", Workspace: "default"},
+				{Dir: "env2/app", Workspace: "default"},
+				{Dir: "envX/app", Workspace: "default"},
 			},
-			path:       "foo",
-			expIgnored: true,
+			expProjects: []valid.Project{
+				{Dir: "env1/app", Workspace: "default"},
+				{Dir: "env2/app", Workspace: "default"},
+			},
 		},
 		{
-			description: "one path matches pattern, another doesn't",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{
-					IgnorePaths: []string{
-						"fo*",
-						"ba*",
-					}},
+			description: "no matches returns empty slice",
+			pattern:     "nonexistent/*",
+			projects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
 			},
-			path:       "foo",
-			expIgnored: true,
-		},
-		{
-			description: "long path does match pattern",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{
-					IgnorePaths: []string{
-						"foo/*/baz",
-					},
-				},
-			},
-			path:       "foo/bar/baz",
-			expIgnored: true,
-		},
-		{
-			description: "long path does not match pattern",
-			repoCfg: valid.RepoCfg{
-				AutoDiscover: &valid.AutoDiscover{
-					IgnorePaths: []string{
-						"foo/*/baz",
-					},
-				},
-			},
-			path:       "foo/bar/boo",
-			expIgnored: false,
+			expProjects: nil,
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
+			r := valid.RepoCfg{
+				Projects: c.projects,
+			}
+			projects := r.FindProjectsByDirPattern(c.pattern)
+			Equals(t, c.expProjects, projects)
+		})
+	}
+}
 
-			ignored := c.repoCfg.IsPathIgnoredForAutoDiscover(c.path)
-			Equals(t, c.expIgnored, ignored)
+func TestConfig_FindProjectsByDirPatternWorkspace(t *testing.T) {
+	cases := []struct {
+		description string
+		pattern     string
+		workspace   string
+		projects    []valid.Project
+		expProjects []valid.Project
+	}{
+		{
+			description: "matches pattern and workspace",
+			pattern:     "modules/*",
+			workspace:   "default",
+			projects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
+				{Dir: "modules/vpc", Workspace: "staging"},
+				{Dir: "modules/rds", Workspace: "default"},
+			},
+			expProjects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
+				{Dir: "modules/rds", Workspace: "default"},
+			},
+		},
+		{
+			description: "workspace filter excludes non-matching",
+			pattern:     "modules/*",
+			workspace:   "production",
+			projects: []valid.Project{
+				{Dir: "modules/vpc", Workspace: "default"},
+				{Dir: "modules/vpc", Workspace: "staging"},
+			},
+			expProjects: nil,
+		},
+		{
+			description: "double star with workspace filter",
+			pattern:     "environments/**",
+			workspace:   "staging",
+			projects: []valid.Project{
+				{Dir: "environments/us-east/app", Workspace: "staging"},
+				{Dir: "environments/us-west/app", Workspace: "production"},
+				{Dir: "environments/eu/app", Workspace: "staging"},
+			},
+			expProjects: []valid.Project{
+				{Dir: "environments/us-east/app", Workspace: "staging"},
+				{Dir: "environments/eu/app", Workspace: "staging"},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			r := valid.RepoCfg{
+				Projects: c.projects,
+			}
+			projects := r.FindProjectsByDirPatternWorkspace(c.pattern, c.workspace)
+			Equals(t, c.expProjects, projects)
+		})
+	}
+}
+
+func TestContainsDirGlobPattern(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected bool
+	}{
+		{"modules/*", true},
+		{"modules/**", true},
+		{"env?/app", true},
+		{"env[0-9]/app", true},
+		{"modules/vpc", false},
+		{".", false},
+		{"path/to/dir", false},
+	}
+	for _, c := range cases {
+		t.Run(c.input, func(t *testing.T) {
+			result := valid.ContainsDirGlobPattern(c.input)
+			Equals(t, c.expected, result)
 		})
 	}
 }

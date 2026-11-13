@@ -13,14 +13,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9
+      - uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11
         with:
           stale-pr-message: 'This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
-          stale-issue-message: This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
+          stale-issue-message: 'This issue is stale because it has been open for 1 month with no activity. Remove stale label or comment or this will be closed in 1 month.'
           remove-stale-when-updated: true
           exempt-pr-labels: "never-stale"
           exempt-issue-labels: "never-stale"

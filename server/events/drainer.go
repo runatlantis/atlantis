@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -59,5 +62,8 @@ func (d *Drainer) ShutdownBlocking() {
 }
 
 func (d *Drainer) GetStatus() DrainStatus {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
 	return d.status
 }

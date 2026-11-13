@@ -22,7 +22,7 @@ spec:
         fsGroup: 1000 # Atlantis group (1000) read/write access to volumes.
       containers:
       - name: atlantis
-        image: ghcr.io/runatlantis/atlantis:latest
+        image: ghcr.io/runatlantis/atlantis:v0.42.0@sha256:a8873d7281491407249ffbd9d0f55fc5829f6ab7f7152643da05857c32f606a9
         env:
         - name: ATLANTIS_DATA_DIR
           value: /atlantis

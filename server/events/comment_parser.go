@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package events
@@ -17,13 +8,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/shlex"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -49,6 +42,31 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
+// DefaultBlockedExtraArgs is the set of Terraform CLI flags that are always
+// rejected when supplied as comment extra args (after "--").
+//
+// Two groups are blocked. -chdir and -plugin-dir move Terraform's working
+// directory or provider source somewhere the commenter controls. The rest
+// name a file Terraform will write to, or read state from, at a path the
+// commenter chooses: Atlantis passes its own -out before the comment args,
+// and Terraform keeps the last value it sees, so an unblocked -out would let
+// a comment drop the plan file anywhere the service account can write (for
+// example over another pull request's stored plan).
+//
+// Each flag is listed once because matching is done on the flag name (see
+// isBlockedExtraArg), which covers every dash spelling. These flags cannot be
+// unblocked: the --blocked-extra-args server flag adds to this list rather
+// than replacing it.
+var DefaultBlockedExtraArgs = []string{
+	"-chdir",
+	"-plugin-dir",
+	"-out",
+	"-generate-config-out",
+	"-state",
+	"-state-out",
+	"-backup",
+}
+
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
 // Atlantis commands. If the second line just has newlines then we let it pass
 // through because when you double click on a comment in GitHub and then you
@@ -56,7 +74,7 @@ const (
 // and pasting GitHub comments.
 var multiLineRegex = regexp.MustCompile(`.*\r?\n[^\r\n]+`)
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_parsing.go CommentParsing
 
 // CommentParsing handles parsing pull request comments.
 type CommentParsing interface {
@@ -65,7 +83,7 @@ type CommentParsing interface {
 	Parse(comment string, vcsHost models.VCSHostType) CommentParseResult
 }
 
-//go:generate pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_comment_building.go CommentBuilder
 
 // CommentBuilder builds comment commands that can be used on pull requests.
 type CommentBuilder interface {
@@ -86,10 +104,15 @@ type CommentParser struct {
 	AzureDevopsUser string
 	ExecutableName  string
 	AllowCommands   []command.Name
+	// BlockedExtraArgs is the set of Terraform CLI flags, on top of
+	// DefaultBlockedExtraArgs, that are rejected when supplied as comment
+	// extra args (after "--").
+	// Populated by NewCommentParser from UserConfig.ToBlockedExtraArgs().
+	BlockedExtraArgs []string
 }
 
-// NewCommentParser returns a CommentParser
-func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name) *CommentParser {
+// NewCommentParser returns a CommentParser.
+func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDevopsUser, executableName string, allowCommands []command.Name, blockedExtraArgs []string) *CommentParser {
 	var commentAllowCommands []command.Name
 	for _, acceptableCommand := range command.AllCommentCommands {
 		for _, allowCommand := range allowCommands {
@@ -101,13 +124,14 @@ func NewCommentParser(githubUser, gitlabUser, giteaUser, bitbucketUser, azureDev
 	}
 
 	return &CommentParser{
-		GithubUser:      githubUser,
-		GitlabUser:      gitlabUser,
-		GiteaUser:       giteaUser,
-		BitbucketUser:   bitbucketUser,
-		AzureDevopsUser: azureDevopsUser,
-		ExecutableName:  executableName,
-		AllowCommands:   commentAllowCommands,
+		GithubUser:       githubUser,
+		GitlabUser:       gitlabUser,
+		GiteaUser:        giteaUser,
+		BitbucketUser:    bitbucketUser,
+		AzureDevopsUser:  azureDevopsUser,
+		ExecutableName:   executableName,
+		AllowCommands:    commentAllowCommands,
+		BlockedExtraArgs: blockedExtraArgs,
 	}
 }
 
@@ -166,8 +190,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
 	}
 
-	// Helpfully warn the user that the command might be misspelled
-	if utils.IsSimilarWord(executableName, e.ExecutableName) {
+	// Helpfully warn the user that the command might be misspelled. Only do this
+	// when running under the default executable name — operators who've
+	// customized ExecutableName (e.g. running multiple Atlantis servers against
+	// one repo) can otherwise get spurious "did you mean" replies to ordinary
+	// comments that happen to be Levenshtein-close to their custom name.
+	if e.ExecutableName == defaultExecutableName && utils.IsSimilarWord(executableName, e.ExecutableName) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
@@ -187,7 +215,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		vcsUser = e.AzureDevopsUser
 	}
 	executableNames := []string{"run", e.ExecutableName, "@" + vcsUser}
-	if !e.stringInSlice(executableName, executableNames) {
+	if !slices.Contains(executableNames, executableName) {
 		return CommentParseResult{Ignore: true}
 	}
 
@@ -211,7 +239,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	cmd := strings.ToLower(args[1])
 
 	// Help output.
-	if e.stringInSlice(cmd, []string{"help", "-h", "--help"}) {
+	if slices.Contains([]string{"help", "-h", "--help"}, cmd) {
 		return CommentParseResult{CommentResponse: e.HelpComment()}
 	}
 
@@ -269,6 +297,10 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
+	case command.Cancel.String():
+		name = command.Cancel
+		flagSet = pflag.NewFlagSet(command.Cancel.String(), pflag.ContinueOnError)
+		flagSet.SetOutput(io.Discard)
 	case command.Version.String():
 		name = command.Version
 		flagSet = pflag.NewFlagSet(command.Version.String(), pflag.ContinueOnError)
@@ -306,11 +338,13 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
-	// we also don't allow '..'. We don't want the workspace to contain a path
-	// since we create files based on the name.
-	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
+	// The workspace ends up both in the string Atlantis runs via "sh -c" when
+	// invoking Terraform and in the paths of files we create, so it is
+	// restricted to the same character set as a repo-config workspace. The
+	// previous check here used url.PathEscape, which leaves shell
+	// metacharacters such as '&' untouched.
+	if err := valid.ValidateWorkspaceName(workspace); err != nil {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace %q: %s", workspace, err), cmd, flagSet)}
 	}
 
 	// If project is specified, dir or workspace should not be set. Since we
@@ -369,7 +403,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 			return "", nil, e.errMarkdown("subcommand required", name.String(), flagSet)
 		}
 		subCommand, commandArgs = commandArgs[0], commandArgs[1:]
-		isAvailableSubCommand := utils.SlicesContains(availableSubCommands, subCommand)
+		isAvailableSubCommand := slices.Contains(availableSubCommands, subCommand)
 		if !isAvailableSubCommand {
 			errMsg := fmt.Sprintf("invalid subcommand %s (not %s)", subCommand, strings.Join(availableSubCommands, ", "))
 			return "", nil, e.errMarkdown(errMsg, name.String(), flagSet)
@@ -400,7 +434,56 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	//     - from: `atlantis state rm ADDRESS1 ADDRESS2 -- -var foo=bar
 	//     - to: `terraform state rm -var foo=bar ADDRESS1 ADDRESS2` (subcommand=rm)
 	extraArgs = append(extraArgs, commandArgs...)
+
+	// Reject extra args that contain blocked Terraform CLI flags.
+	// These flags could be used to bypass security controls (e.g. directory
+	// traversal via -chdir, or loading malicious providers via -plugin-dir).
+	for _, arg := range extraArgs {
+		if e.isBlockedExtraArg(arg) {
+			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
+		}
+	}
 	return subCommand, extraArgs, ""
+}
+
+// isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
+// permitted in comment extra args: one of DefaultBlockedExtraArgs, which are
+// always enforced, or one the operator added through BlockedExtraArgs.
+//
+// The comparison is on the flag name with leading dashes removed and any
+// "=value" suffix dropped, so "-out", "--out" and "-out=path" all match a
+// blocklist entry of "-out". Terraform accepts both dash spellings for every
+// flag, and a blocklist that had to be told each spelling separately would be
+// bypassed by whichever one the operator forgot. Any dash count is treated as
+// the flag: Terraform would reject "---out" itself, so over-matching there
+// only ever blocks an argument that could not have worked anyway.
+func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+	name := extraArgFlagName(arg)
+	if name == "" {
+		return false
+	}
+	for _, blocked := range DefaultBlockedExtraArgs {
+		if name == extraArgFlagName(blocked) {
+			return true
+		}
+	}
+	for _, blocked := range e.BlockedExtraArgs {
+		if name == extraArgFlagName(blocked) {
+			return true
+		}
+	}
+	return false
+}
+
+// extraArgFlagName returns the bare flag name of a Terraform CLI argument:
+// leading dashes stripped and anything from the first "=" onwards removed.
+// It returns "" for an argument that is not a flag.
+func extraArgFlagName(arg string) string {
+	if !strings.HasPrefix(arg, "-") {
+		return ""
+	}
+	name, _, _ := strings.Cut(arg, "=")
+	return strings.TrimLeft(name, "-")
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
@@ -469,6 +552,31 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	if dir == "" {
 		return dir, nil
 	}
+
+	// Check if dir contains glob pattern characters
+	if containsGlobPattern(dir) {
+		// For glob patterns, we validate but don't clean (cleaning mangles glob chars)
+		// Security check: prevent directory traversal even in glob patterns
+		if strings.Contains(dir, "..") {
+			return "", fmt.Errorf("using '..' in glob pattern %q with -%s/--%s is not allowed", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Validate the glob pattern syntax
+		if !doublestar.ValidatePattern(dir) {
+			return "", fmt.Errorf("invalid glob pattern %q with -%s/--%s", dir, dirFlagShort, dirFlagLong)
+		}
+
+		// Clean leading ./ or / for consistency with non-glob paths
+		dir = strings.TrimPrefix(dir, "./")
+		dir = strings.TrimPrefix(dir, "/")
+		if dir == "" {
+			dir = "."
+		}
+
+		return dir, nil
+	}
+
+	// For non-glob patterns, use standard path cleaning
 	validatedDir := filepath.Clean(dir)
 	// Join with . so the path is relative. This helps us if they use '/',
 	// and is safe to do if their path is relative since it's a no-op.
@@ -483,13 +591,9 @@ func (e *CommentParser) validateDir(dir string) (string, error) {
 	return validatedDir, nil
 }
 
-func (e *CommentParser) stringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
+// containsGlobPattern returns true if the string contains glob pattern characters.
+func containsGlobPattern(s string) bool {
+	return strings.ContainsAny(s, "*?[")
 }
 
 func (e *CommentParser) isAllowedCommand(cmd string) bool {
@@ -513,6 +617,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion         bool
 		AllowPlan            bool
 		AllowApply           bool
+		AllowCancel          bool
 		AllowUnlock          bool
 		AllowApprovePolicies bool
 		AllowImport          bool
@@ -522,6 +627,7 @@ func (e *CommentParser) HelpComment() string {
 		AllowVersion:         e.isAllowedCommand(command.Version.String()),
 		AllowPlan:            e.isAllowedCommand(command.Plan.String()),
 		AllowApply:           e.isAllowedCommand(command.Apply.String()),
+		AllowCancel:          e.isAllowedCommand(command.Cancel.String()),
 		AllowUnlock:          e.isAllowedCommand(command.Unlock.String()),
 		AllowApprovePolicies: e.isAllowedCommand(command.ApprovePolicies.String()),
 		AllowImport:          e.isAllowedCommand(command.Import.String()),
@@ -565,6 +671,10 @@ Commands:
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
 {{- end }}
+{{- if .AllowCancel }}
+  cancel   Cancels all queued commands for this pull request.
+           Already running commands are not interrupted.
+{{- end }}
 {{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
            To unlock a specific plan you can use the Atlantis UI.
@@ -597,6 +707,14 @@ Use "{{ .ExecutableName }} [command] --help" for more information about a comman
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a misspelled command or terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
+
+// DefaultExecutableName is the value of ExecutableName Atlantis uses unless
+// an operator overrides it via --executable-name / ATLANTIS_EXECUTABLE_NAME.
+// This is intentionally a separate literal from cmd.DefaultExecutableName:
+// server/events cannot import cmd (cmd imports server, so the reverse would
+// be an import cycle). If the default executable name ever changes, update
+// both constants.
+const defaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.

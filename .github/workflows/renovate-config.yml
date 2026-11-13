@@ -20,10 +20,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-      - run: npx --package=renovate@latest -c renovate-config-validator
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .node-version
+      - run: npx --package="renovate@${RENOVATE_VERSION}" -c renovate-config-validator
+        env:
+          # renovate: datasource=npm depName=renovate
+          RENOVATE_VERSION: 44.186.4

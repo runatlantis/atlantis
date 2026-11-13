@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package cmd
 
 import (
@@ -16,7 +19,7 @@ import (
 //	 <description>
 //
 // We use it over the default template so that the output it easier to read.
-func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag) string {
+func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag, stringSliceFlags map[string]stringSliceFlag) string {
 	var flagNames []string
 	for name, f := range stringFlags {
 		if f.hidden {
@@ -35,6 +38,11 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 			continue
 		}
 		flagNames = append(flagNames, name)
+	}
+	for name, f := range stringSliceFlags {
+		if !f.hidden {
+			flagNames = append(flagNames, name)
+		}
 	}
 	sort.Strings(flagNames)
 
@@ -55,6 +63,12 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 			}
 			descrip = to80CharCols(descripWithDefault)
 			isBool = false
+		} else if f, ok := stringSliceFlags[name]; ok {
+			descripWithDefault := f.description
+			if len(f.defaultValue) > 0 {
+				descripWithDefault += fmt.Sprintf(" (default %q)", strings.Join(f.defaultValue, ","))
+			}
+			descrip = to80CharCols(descripWithDefault)
 		} else if f, ok := boolFlags[name]; ok {
 			descrip = to80CharCols(f.description)
 			isBool = true
@@ -78,13 +92,13 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 
 	tmpl := template.Must(template.New("").Parse(
 		"  --{{.Name}}{{if not .IsBoolFlag}}=<value>{{end}}\n{{.Description}}\n"))
-	var flagHelpOutput string
+	var flagHelpOutput strings.Builder
 	for _, f := range flags {
 		buf := &bytes.Buffer{}
 		if err := tmpl.Execute(buf, f); err != nil {
 			panic(err)
 		}
-		flagHelpOutput += buf.String()
+		flagHelpOutput.WriteString(buf.String())
 	}
 
 	// Most of this template is taken from cobra.Command.UsageTemplate()
@@ -113,27 +127,27 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
 
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
-`, flagHelpOutput)
+`, flagHelpOutput.String())
 }
 
 // to80CharCols takes a string s as input and returns a new string that is split
 // into multiple lines with each line having a maximum of 80 characters
 func to80CharCols(s string) string {
-	var splitAt80 string
+	var splitAt80 strings.Builder
 	splitSpaces := strings.Split(s, " ")
 	var nextLine string
 	for i, spaceSplit := range splitSpaces {
 		if len(nextLine)+len(spaceSplit)+1 > 80 {
-			splitAt80 += fmt.Sprintf("      %s\n", strings.TrimSuffix(nextLine, " "))
+			fmt.Fprintf(&splitAt80, "      %s\n", strings.TrimSuffix(nextLine, " "))
 			nextLine = ""
 		}
 		if i == len(splitSpaces)-1 {
 			nextLine += spaceSplit + " "
-			splitAt80 += fmt.Sprintf("      %s\n", strings.TrimSuffix(nextLine, " "))
+			fmt.Fprintf(&splitAt80, "      %s\n", strings.TrimSuffix(nextLine, " "))
 			break
 		}
 		nextLine += spaceSplit + " "
 	}
 
-	return splitAt80
+	return splitAt80.String()
 }

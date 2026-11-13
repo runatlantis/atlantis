@@ -1,5 +1,5 @@
 {{ define "policyCheckResultsUnwrapped" -}}
-{{- if eq .Command "Policy Check" }}
+{{- if eq .CommandName "policy_check" }}
 {{- if ne .PreConftestOutput "" }}
 ```diff
 {{ .PreConftestOutput }}

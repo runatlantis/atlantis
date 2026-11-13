@@ -1,14 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package vcs
@@ -45,8 +36,8 @@ func (a *NotConfiguredVCSClient) PullIsApproved(_ logging.SimpleLogging, _ model
 func (a *NotConfiguredVCSClient) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) error {
 	return nil
 }
-func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string, _ []string) (bool, error) {
-	return false, a.err()
+func (a *NotConfiguredVCSClient) PullIsMergeable(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
+	return models.MergeableStatus{}, a.err()
 }
 func (a *NotConfiguredVCSClient) UpdateStatus(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, _ models.CommitStatus, _ string, _ string, _ string) error {
 	return a.err()
@@ -68,7 +59,7 @@ func (a *NotConfiguredVCSClient) SupportsSingleFileDownload(_ models.Repo) bool 
 	return false
 }
 
-func (a *NotConfiguredVCSClient) GetFileContent(_ logging.SimpleLogging, _ models.PullRequest, _ string) (bool, []byte, error) {
+func (a *NotConfiguredVCSClient) GetFileContent(_ logging.SimpleLogging, _ models.Repo, _ string, _ string) (bool, []byte, error) {
 	return true, []byte{}, a.err()
 }
 func (a *NotConfiguredVCSClient) GetCloneURL(_ logging.SimpleLogging, _ models.VCSHostType, _ string) (string, error) {
@@ -77,4 +68,8 @@ func (a *NotConfiguredVCSClient) GetCloneURL(_ logging.SimpleLogging, _ models.V
 
 func (a *NotConfiguredVCSClient) GetPullLabels(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest) ([]string, error) {
 	return nil, a.err()
+}
+
+func (a *NotConfiguredVCSClient) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
 }

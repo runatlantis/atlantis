@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -24,6 +27,7 @@ func TestRun(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
 		RepoRelDir:         ".",

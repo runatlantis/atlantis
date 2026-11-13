@@ -1,6 +1,11 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime_test
 
 import (
+	"maps"
+	"strings"
 	"testing"
 
 	version "github.com/hashicorp/go-version"
@@ -21,14 +26,16 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 	cases := []struct {
 		Command     string
 		ProjectName string
-		Output      valid.PostProcessRunOutputOption
+		Env         map[string]string
+		Output      []valid.PostProcessRunOutputOption
 		ExpOut      string
 		ExpErr      string
+		ExpErrOmits string
 		ExpEnv      map[string]string
 	}{
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_ONE=value1'`,
-			Output:  valid.PostProcessRunOutputShow,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_ONE\n",
 			ExpEnv: map[string]string{
 				"TF_VAR_REPODEFINEDVARIABLE_ONE": "value1",
@@ -36,7 +43,7 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_TWO=value=1='`,
-			Output:  valid.PostProcessRunOutputShow,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR_REPODEFINEDVARIABLE_TWO\n",
 			ExpEnv: map[string]string{
 				"TF_VAR_REPODEFINEDVARIABLE_TWO": "value=1=",
@@ -44,13 +51,13 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_NO_VALUE'`,
-			Output:  valid.PostProcessRunOutputShow,
-			ExpErr:  "Invalid environment variable definition: TF_VAR_REPODEFINEDVARIABLE_NO_VALUE",
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpErr:  "invalid environment variable definition: remaining unparsed data at offset 0",
 			ExpEnv:  map[string]string{},
 		},
 		{
 			Command: `echo 'TF_VAR1_MULTILINE="foo\\nbar",TF_VAR2_VALUEWITHCOMMA="one,two",TF_VAR3_CONTROL=true'`,
-			Output:  valid.PostProcessRunOutputShow,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
 			ExpOut:  "Dynamic environment variables added:\nTF_VAR1_MULTILINE\nTF_VAR2_VALUEWITHCOMMA\nTF_VAR3_CONTROL\n",
 			ExpEnv: map[string]string{
 				"TF_VAR1_MULTILINE":      "foo\\nbar",
@@ -60,11 +67,40 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 		},
 		{
 			Command: `echo 'TF_VAR_REPODEFINEDVARIABLE_HIDE=value1'`,
-			Output:  valid.PostProcessRunOutputHide,
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
 			ExpOut:  "",
 			ExpEnv: map[string]string{
 				"TF_VAR_REPODEFINEDVARIABLE_HIDE": "value1",
 			},
+		},
+		{
+			// An unparseable line must never be echoed back: it is the
+			// name=value output this step exists to carry.
+			Command:     `echo 'A=1,B="x'`,
+			Output:      []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+			ExpErr:      "invalid environment variable definition: misquoted at offset 8",
+			ExpErrOmits: `A=1`,
+		},
+		{
+			Command:     `echo 'A=1,B="x'`,
+			Output:      []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpErr:      "invalid environment variable definition: misquoted at offset 8",
+			ExpErrOmits: `A=1`,
+		},
+		{
+			// A failing command with `output: hide` reports the failure
+			// without the output.
+			Command:     `echo "TOKEN=$SECRET"; exit 1`,
+			Env:         map[string]string{"SECRET": "hunter2"},
+			Output:      []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputHide},
+			ExpErr:      "exit status 1: running",
+			ExpErrOmits: "hunter2",
+		},
+		{
+			Command: `echo "TOKEN=$SECRET"; exit 1`,
+			Env:     map[string]string{"SECRET": "hunter2"},
+			Output:  []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+			ExpErr:  "TOKEN=hunter2",
 		},
 	}
 	RegisterMockTestingT(t)
@@ -111,9 +147,13 @@ func TestMultiEnvStepRunner_Run(t *testing.T) {
 				ProjectName:      c.ProjectName,
 			}
 			envMap := make(map[string]string)
+			maps.Copy(envMap, c.Env)
 			value, err := multiEnvStepRunner.Run(ctx, nil, c.Command, tmpDir, envMap, c.Output)
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
+				if c.ExpErrOmits != "" {
+					Assert(t, !strings.Contains(err.Error(), c.ExpErrOmits), "error %q should not contain %q", err.Error(), c.ExpErrOmits)
+				}
 				return
 			}
 			Ok(t, err)

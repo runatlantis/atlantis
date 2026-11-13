@@ -1,19 +1,12 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//    http://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 
 package server
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -47,6 +40,7 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 	if !l.WebAuthentication ||
 		r.URL.Path == "/events" ||
 		r.URL.Path == "/healthz" ||
+		r.URL.Path == "/readyz" ||
 		r.URL.Path == "/status" ||
 		strings.HasPrefix(r.URL.Path, "/api/") {
 		allowed = true
@@ -54,7 +48,7 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		user, pass, ok := r.BasicAuth()
 		if ok {
 			r.SetBasicAuth(user, pass)
-			if user == l.WebUsername && pass == l.WebPassword {
+			if l.credentialsMatch(user, pass) {
 				l.logger.Debug("[VALID] log in: >> url: %s", r.URL.RequestURI())
 				allowed = true
 			} else {
@@ -70,4 +64,24 @@ func (l *RequestLogger) ServeHTTP(rw http.ResponseWriter, r *http.Request, next 
 		next(rw, r)
 	}
 	l.logger.Debug("%s %s – respond HTTP %d", r.Method, r.URL.RequestURI(), rw.(negroni.ResponseWriter).Status())
+}
+
+// credentialsMatch reports whether the supplied basic-auth credentials equal
+// the configured ones. Each value is reduced to a SHA-256 digest before the
+// constant-time comparison: ConstantTimeCompare returns early when the lengths
+// differ, so comparing the raw values would reveal whether the supplied
+// length was right. Both comparisons always run, even when the username is
+// wrong, so the time taken to answer reveals neither how much of a value was
+// correct nor which of the two was wrong.
+func (l *RequestLogger) credentialsMatch(user, pass string) bool {
+	userMatch := digestsEqual(user, l.WebUsername)
+	passMatch := digestsEqual(pass, l.WebPassword)
+	return userMatch && passMatch
+}
+
+// digestsEqual compares the SHA-256 digests of got and want in constant time.
+func digestsEqual(got, want string) bool {
+	gotSum := sha256.Sum256([]byte(got))
+	wantSum := sha256.Sum256([]byte(want))
+	return subtle.ConstantTimeCompare(gotSum[:], wantSum[:]) == 1
 }

@@ -24,7 +24,7 @@ flag in the Atlantis server configuration.
 ## Atlantis Command Targeting
 
 By default, the workflow hook will run when any command is processed by Atlantis.
-This can be modified by specifying the `commands` key in the workflow hook containing a comma delimited list
+This can be modified by specifying the `commands` key in the workflow hook containing a comma-delimited list
 of Atlantis commands that the hook should be run for. Detail of the Atlantis commands
 can be found in [Using Atlantis](using-atlantis.md).
 
@@ -58,6 +58,10 @@ repos:
           description: Generating configs
 ```
 
+::: warning Treat the environment variables as untrusted data
+Values such as `HEAD_BRANCH_NAME`, `PULL_AUTHOR` and `COMMENT_ARGS` come from the pull request. Atlantis passes them to the hook as environment variables and never interpolates them into the command string, so a plain `$HEAD_BRANCH_NAME` in your command is safe: the shell does not re-parse an expanded value for command substitution. The protection is lost if the hook evaluates a value a second time, for example with `eval`, a nested `sh -c "... $HEAD_BRANCH_NAME"`, or by writing it into a script that is then executed. Avoid those patterns, and quote the variables as usual.
+:::
+
 ## Customizing the Shell
 
 By default, the command will be run using the 'sh' shell with an argument of '-c'. This
@@ -88,12 +92,12 @@ command](custom-workflows.md#custom-run-command).
 - run: custom-command
 ```
 
-| Key         | Type   | Default | Required | Description          |
-| ----------- | ------ | ------- | -------- | -------------------- |
-| run         | string | none    | no       | Run a custom command |
-| description | string | none    | no       | Pre hook description |
-| shell       | string | 'sh'    | no       | The shell to use for running the command |
-| shellArgs   | string | '-c'    | no       | The shell arguments to use for running the command |
+| Key | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- |
+| run | string | none | no | Run a custom command |
+| description | string | none | no | Pre hook description |
+| shell | string | 'sh' | no | The shell to use for running the command |
+| shellArgs | string | '-c' | no | The shell arguments to use for running the command |
 
 ::: tip Notes
 
@@ -114,4 +118,6 @@ command](custom-workflows.md#custom-run-command).
       every character is escaped, ex. `atlantis plan -- arg1 arg2` will result in `COMMENT_ARGS=\a\r\g\1,\a\r\g\2`.
   * `COMMAND_NAME` - The name of the command that is being executed, i.e. `plan`, `apply` etc.
   * `OUTPUT_STATUS_FILE` - An output file to customize the success or failure status. ex. `echo 'failure' > $OUTPUT_STATUS_FILE`.
+  * `PROJECT_NAME` - Project name passed by the `-p` option. If `-p` is not provided, this value is empty.
+
 :::

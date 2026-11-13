@@ -1,0 +1,14 @@
+{{ define "multiProjectPlan" -}}
+{{ template "multiProjectHeader" . -}}
+{{ $disableApplyAll := .DisableApplyAll -}}
+{{ $hideUnchangedPlans := .HideUnchangedPlanComments -}}
+{{ range $i, $result := .Results -}}
+{{ if (and $hideUnchangedPlans $result.NoChanges) }}{{continue}}{{end -}}
+### {{ add $i 1 }}. {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
+{{ $result.Rendered }}
+
+---
+{{ end -}}
+{{ template "multiProjectPlanFooter" . -}}
+{{ template "log" . -}}
+{{ end -}}

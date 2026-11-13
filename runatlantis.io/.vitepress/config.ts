@@ -1,9 +1,20 @@
 import { generateSitemap as sitemap } from "sitemap-ts"
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import footnote from 'markdown-it-footnote'
 import { defineConfig } from 'vitepress';
 import * as navbars from "./navbars";
 import * as sidebars from "./sidebars";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import { configureVersions, flagVersionBadges, versionedLinks } from './versioning.mjs';
+import { collectSharedPages } from './shared-pages.mjs';
+
+const docVersion = process.env.ATLANTIS_DOC_VERSION || '';
+const docVersions = process.env.ATLANTIS_DOC_VERSIONS_FILE
+    ? JSON.parse(readFileSync(process.env.ATLANTIS_DOC_VERSIONS_FILE, 'utf8')) : [];
+const docBuildMetadata = process.env.ATLANTIS_DOC_BUILD_METADATA_FILE
+    ? JSON.parse(readFileSync(process.env.ATLANTIS_DOC_BUILD_METADATA_FILE, 'utf8')) : {};
+const sharedPages = docBuildMetadata.sharedPages ?? collectSharedPages(fileURLToPath(new URL('../', import.meta.url)));
 
 // https://vitepress.dev/reference/site-config
 const config = defineConfig({
@@ -18,6 +29,41 @@ const config = defineConfig({
             themeConfig: {
                 nav: navbars.en,
                 sidebar: sidebars.en,
+            },
+        },
+        // Machine-translated, reviewed by maintainers before merge. Pages that
+        // have not been translated yet fall back to English in the nav and
+        // sidebar — see runatlantis.io/.vitepress/sidebars.ts.
+        es: {
+            label: 'Español',
+            lang: 'es-ES',
+            themeConfig: {
+                nav: navbars.es,
+                sidebar: sidebars.es,
+                editLink: {
+                    pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path',
+                    text: 'Editar esta página en GitHub',
+                },
+                docFooter: {
+                    prev: 'Anterior',
+                    next: 'Siguiente',
+                },
+                outline: {
+                    level: [2, 3],
+                    label: 'En esta página',
+                },
+                lastUpdated: {
+                    text: 'Última actualización',
+                },
+                darkModeSwitchLabel: 'Apariencia',
+                lightModeSwitchTitle: 'Cambiar a modo claro',
+                darkModeSwitchTitle: 'Cambiar a modo oscuro',
+                sidebarMenuLabel: 'Menú',
+                returnToTopLabel: 'Volver arriba',
+                langMenuLabel: 'Cambiar idioma',
+                footer: {
+                    message: 'Copyright Atlantis a Series of LF Projects, LLC. Para los términos de uso del sitio web, la política de marcas y otras políticas del proyecto, consulta <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
+                },
             },
         },
     },
@@ -48,16 +94,27 @@ const config = defineConfig({
                             },
                         },
                     },
+                    // NOTE: results stay English-only until the DocSearch
+                    // crawler is configured to index /es/ with a `lang` facet.
+                    // That change lives in Algolia's crawler config, not here.
+                    '/es/': {
+                        placeholder: 'Buscar en la documentación',
+                        translations: {
+                            button: {
+                                buttonText: 'Buscar',
+                            },
+                        },
+                    },
                 },
             }
         },
         socialLinks: [
-          { icon: "slack", link: "https://slack.cncf.io/" },
+          { icon: "slack", link: "https://cncf-slack.netlify.app/" },
           { icon: "twitter", link: "https://twitter.com/runatlantis" },
           { icon: "github", link: "https://github.com/runatlantis/atlantis" },
         ],
         footer: {
-            message: 'The Linux Foundation® (TLF) has registered trademarks and uses trademarks. For a list of TLF trademarks, see <a href="https://www.linuxfoundation.org/legal/trademark-usage">Trademark Usage</a>.',
+            message: 'Copyright Atlantis a Series of LF Projects, LLC. For website terms of use, trademark policy and other project policies please see <a href="https://lfprojects.org/policies/">LF Projects, LLC Policies</a>.',
         },
     },
     // SEO Improvement - sitemap.xml & robots.txt
@@ -122,6 +179,8 @@ const config = defineConfig({
     markdown: {
         config: (md) => {
           md.use(footnote)
+          md.use(flagVersionBadges)
+          md.use(versionedLinks, docVersion, docVersions, sharedPages, docBuildMetadata.rootVersion)
         }
     },
     vite: {
@@ -133,4 +192,4 @@ const config = defineConfig({
     }
 })
 
-export default withMermaid(config)
+export default withMermaid(configureVersions(config, docVersion, docVersions, sidebars.en, { ...docBuildMetadata, sharedPages }))

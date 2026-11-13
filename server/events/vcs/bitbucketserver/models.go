@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package bitbucketserver
 
 const (
@@ -25,12 +28,13 @@ type CommonEventData struct {
 }
 
 type PullRequest struct {
-	Version   *int    `json:"version,omitempty" validate:"required"`
-	ID        *int    `json:"id,omitempty" validate:"required"`
-	FromRef   *Ref    `json:"fromRef,omitempty" validate:"required"`
-	ToRef     *Ref    `json:"toRef,omitempty" validate:"required"`
-	State     *string `json:"state,omitempty" validate:"required"`
-	Reviewers []struct {
+	Version     *int    `json:"version,omitempty" validate:"required"`
+	ID          *int    `json:"id,omitempty" validate:"required"`
+	Description *string `json:"description,omitempty"`
+	FromRef     *Ref    `json:"fromRef,omitempty" validate:"required"`
+	ToRef       *Ref    `json:"toRef,omitempty" validate:"required"`
+	State       *string `json:"state,omitempty" validate:"required"`
+	Reviewers   []struct {
 		Approved *bool `json:"approved,omitempty" validate:"required"`
 	} `json:"reviewers,omitempty" validate:"required"`
 }
@@ -63,7 +67,7 @@ type Changes struct {
 	Values []struct {
 		Path struct {
 			ToString *string `json:"toString,omitempty" validate:"required"`
-		} `json:"path,omitempty" validate:"required"`
+		} `json:"path" validate:"required"`
 		SrcPath *struct {
 			ToString *string `json:"toString,omitempty"`
 		} `json:"srcPath,omitempty"`

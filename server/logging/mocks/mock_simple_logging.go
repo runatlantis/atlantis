@@ -25,7 +25,7 @@ func NewMockSimpleLogging(options ...pegomock.Option) *MockSimpleLogging {
 func (mock *MockSimpleLogging) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockSimpleLogging) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockSimpleLogging) Debug(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Debug(format string, a ...any) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -36,7 +36,7 @@ func (mock *MockSimpleLogging) Debug(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Debug", _params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Err(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Err(format string, a ...any) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -77,7 +77,7 @@ func (mock *MockSimpleLogging) GetHistory() string {
 	return _ret0
 }
 
-func (mock *MockSimpleLogging) Info(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Info(format string, a ...any) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -88,7 +88,7 @@ func (mock *MockSimpleLogging) Info(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Info", _params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Log(level logging.LogLevel, format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Log(level logging.LogLevel, format string, a ...any) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -107,7 +107,7 @@ func (mock *MockSimpleLogging) SetLevel(lvl logging.LogLevel) {
 	pegomock.GetGenericMockFrom(mock).Invoke("SetLevel", _params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) Warn(format string, a ...interface{}) {
+func (mock *MockSimpleLogging) Warn(format string, a ...any) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -118,7 +118,7 @@ func (mock *MockSimpleLogging) Warn(format string, a ...interface{}) {
 	pegomock.GetGenericMockFrom(mock).Invoke("Warn", _params, []reflect.Type{})
 }
 
-func (mock *MockSimpleLogging) With(a ...interface{}) logging.SimpleLogging {
+func (mock *MockSimpleLogging) With(a ...any) logging.SimpleLogging {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -136,7 +136,7 @@ func (mock *MockSimpleLogging) With(a ...interface{}) logging.SimpleLogging {
 	return _ret0
 }
 
-func (mock *MockSimpleLogging) WithHistory(a ...interface{}) logging.SimpleLogging {
+func (mock *MockSimpleLogging) WithHistory(a ...any) logging.SimpleLogging {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockSimpleLogging().")
 	}
@@ -191,7 +191,7 @@ type VerifierMockSimpleLogging struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockSimpleLogging) Debug(format string, a ...interface{}) *MockSimpleLogging_Debug_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Debug(format string, a ...any) *MockSimpleLogging_Debug_OngoingVerification {
 	_params := []pegomock.Param{format}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -205,12 +205,12 @@ type MockSimpleLogging_Debug_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_Debug_OngoingVerification) GetCapturedArguments() (string, []interface{}) {
+func (c *MockSimpleLogging_Debug_OngoingVerification) GetCapturedArguments() (string, []any) {
 	format, a := c.GetAllCapturedArguments()
 	return format[len(format)-1], a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_Debug_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]interface{}) {
+func (c *MockSimpleLogging_Debug_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -219,12 +219,12 @@ func (c *MockSimpleLogging_Debug_OngoingVerification) GetAllCapturedArguments() 
 				_param0[u] = param.(string)
 			}
 		}
-		_param1 = make([][]interface{}, len(c.methodInvocations))
+		_param1 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param1[u] = make([]interface{}, len(_params)-1)
+			_param1[u] = make([]any, len(_params)-1)
 			for x := 1; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param1[u][x-1] = _params[x][u].(interface{})
+					_param1[u][x-1] = _params[x][u].(any)
 				}
 			}
 		}
@@ -232,7 +232,7 @@ func (c *MockSimpleLogging_Debug_OngoingVerification) GetAllCapturedArguments() 
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Err(format string, a ...interface{}) *MockSimpleLogging_Err_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Err(format string, a ...any) *MockSimpleLogging_Err_OngoingVerification {
 	_params := []pegomock.Param{format}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -246,12 +246,12 @@ type MockSimpleLogging_Err_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_Err_OngoingVerification) GetCapturedArguments() (string, []interface{}) {
+func (c *MockSimpleLogging_Err_OngoingVerification) GetCapturedArguments() (string, []any) {
 	format, a := c.GetAllCapturedArguments()
 	return format[len(format)-1], a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_Err_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]interface{}) {
+func (c *MockSimpleLogging_Err_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -260,12 +260,12 @@ func (c *MockSimpleLogging_Err_OngoingVerification) GetAllCapturedArguments() (_
 				_param0[u] = param.(string)
 			}
 		}
-		_param1 = make([][]interface{}, len(c.methodInvocations))
+		_param1 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param1[u] = make([]interface{}, len(_params)-1)
+			_param1[u] = make([]any, len(_params)-1)
 			for x := 1; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param1[u][x-1] = _params[x][u].(interface{})
+					_param1[u][x-1] = _params[x][u].(any)
 				}
 			}
 		}
@@ -307,7 +307,7 @@ func (c *MockSimpleLogging_GetHistory_OngoingVerification) GetCapturedArguments(
 func (c *MockSimpleLogging_GetHistory_OngoingVerification) GetAllCapturedArguments() {
 }
 
-func (verifier *VerifierMockSimpleLogging) Info(format string, a ...interface{}) *MockSimpleLogging_Info_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Info(format string, a ...any) *MockSimpleLogging_Info_OngoingVerification {
 	_params := []pegomock.Param{format}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -321,12 +321,12 @@ type MockSimpleLogging_Info_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_Info_OngoingVerification) GetCapturedArguments() (string, []interface{}) {
+func (c *MockSimpleLogging_Info_OngoingVerification) GetCapturedArguments() (string, []any) {
 	format, a := c.GetAllCapturedArguments()
 	return format[len(format)-1], a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_Info_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]interface{}) {
+func (c *MockSimpleLogging_Info_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -335,12 +335,12 @@ func (c *MockSimpleLogging_Info_OngoingVerification) GetAllCapturedArguments() (
 				_param0[u] = param.(string)
 			}
 		}
-		_param1 = make([][]interface{}, len(c.methodInvocations))
+		_param1 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param1[u] = make([]interface{}, len(_params)-1)
+			_param1[u] = make([]any, len(_params)-1)
 			for x := 1; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param1[u][x-1] = _params[x][u].(interface{})
+					_param1[u][x-1] = _params[x][u].(any)
 				}
 			}
 		}
@@ -348,7 +348,7 @@ func (c *MockSimpleLogging_Info_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Log(level logging.LogLevel, format string, a ...interface{}) *MockSimpleLogging_Log_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Log(level logging.LogLevel, format string, a ...any) *MockSimpleLogging_Log_OngoingVerification {
 	_params := []pegomock.Param{level, format}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -362,12 +362,12 @@ type MockSimpleLogging_Log_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_Log_OngoingVerification) GetCapturedArguments() (logging.LogLevel, string, []interface{}) {
+func (c *MockSimpleLogging_Log_OngoingVerification) GetCapturedArguments() (logging.LogLevel, string, []any) {
 	level, format, a := c.GetAllCapturedArguments()
 	return level[len(level)-1], format[len(format)-1], a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_Log_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.LogLevel, _param1 []string, _param2 [][]interface{}) {
+func (c *MockSimpleLogging_Log_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.LogLevel, _param1 []string, _param2 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -382,12 +382,12 @@ func (c *MockSimpleLogging_Log_OngoingVerification) GetAllCapturedArguments() (_
 				_param1[u] = param.(string)
 			}
 		}
-		_param2 = make([][]interface{}, len(c.methodInvocations))
+		_param2 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param2[u] = make([]interface{}, len(_params)-2)
+			_param2[u] = make([]any, len(_params)-2)
 			for x := 2; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param2[u][x-2] = _params[x][u].(interface{})
+					_param2[u][x-2] = _params[x][u].(any)
 				}
 			}
 		}
@@ -424,7 +424,7 @@ func (c *MockSimpleLogging_SetLevel_OngoingVerification) GetAllCapturedArguments
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) Warn(format string, a ...interface{}) *MockSimpleLogging_Warn_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) Warn(format string, a ...any) *MockSimpleLogging_Warn_OngoingVerification {
 	_params := []pegomock.Param{format}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -438,12 +438,12 @@ type MockSimpleLogging_Warn_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_Warn_OngoingVerification) GetCapturedArguments() (string, []interface{}) {
+func (c *MockSimpleLogging_Warn_OngoingVerification) GetCapturedArguments() (string, []any) {
 	format, a := c.GetAllCapturedArguments()
 	return format[len(format)-1], a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_Warn_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]interface{}) {
+func (c *MockSimpleLogging_Warn_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -452,12 +452,12 @@ func (c *MockSimpleLogging_Warn_OngoingVerification) GetAllCapturedArguments() (
 				_param0[u] = param.(string)
 			}
 		}
-		_param1 = make([][]interface{}, len(c.methodInvocations))
+		_param1 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param1[u] = make([]interface{}, len(_params)-1)
+			_param1[u] = make([]any, len(_params)-1)
 			for x := 1; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param1[u][x-1] = _params[x][u].(interface{})
+					_param1[u][x-1] = _params[x][u].(any)
 				}
 			}
 		}
@@ -465,7 +465,7 @@ func (c *MockSimpleLogging_Warn_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) With(a ...interface{}) *MockSimpleLogging_With_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) With(a ...any) *MockSimpleLogging_With_OngoingVerification {
 	_params := []pegomock.Param{}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -479,20 +479,20 @@ type MockSimpleLogging_With_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_With_OngoingVerification) GetCapturedArguments() []interface{} {
+func (c *MockSimpleLogging_With_OngoingVerification) GetCapturedArguments() []any {
 	a := c.GetAllCapturedArguments()
 	return a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_With_OngoingVerification) GetAllCapturedArguments() (_param0 [][]interface{}) {
+func (c *MockSimpleLogging_With_OngoingVerification) GetAllCapturedArguments() (_param0 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
-		_param0 = make([][]interface{}, len(c.methodInvocations))
+		_param0 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param0[u] = make([]interface{}, len(_params)-0)
+			_param0[u] = make([]any, len(_params)-0)
 			for x := 0; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param0[u][x-0] = _params[x][u].(interface{})
+					_param0[u][x-0] = _params[x][u].(any)
 				}
 			}
 		}
@@ -500,7 +500,7 @@ func (c *MockSimpleLogging_With_OngoingVerification) GetAllCapturedArguments() (
 	return
 }
 
-func (verifier *VerifierMockSimpleLogging) WithHistory(a ...interface{}) *MockSimpleLogging_WithHistory_OngoingVerification {
+func (verifier *VerifierMockSimpleLogging) WithHistory(a ...any) *MockSimpleLogging_WithHistory_OngoingVerification {
 	_params := []pegomock.Param{}
 	for _, param := range a {
 		_params = append(_params, param)
@@ -514,20 +514,20 @@ type MockSimpleLogging_WithHistory_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockSimpleLogging_WithHistory_OngoingVerification) GetCapturedArguments() []interface{} {
+func (c *MockSimpleLogging_WithHistory_OngoingVerification) GetCapturedArguments() []any {
 	a := c.GetAllCapturedArguments()
 	return a[len(a)-1]
 }
 
-func (c *MockSimpleLogging_WithHistory_OngoingVerification) GetAllCapturedArguments() (_param0 [][]interface{}) {
+func (c *MockSimpleLogging_WithHistory_OngoingVerification) GetAllCapturedArguments() (_param0 [][]any) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
-		_param0 = make([][]interface{}, len(c.methodInvocations))
+		_param0 = make([][]any, len(c.methodInvocations))
 		for u := 0; u < len(c.methodInvocations); u++ {
-			_param0[u] = make([]interface{}, len(_params)-0)
+			_param0[u] = make([]any, len(_params)-0)
 			for x := 0; x < len(_params); x++ {
 				if _params[x][u] != nil {
-					_param0[u][x-0] = _params[x][u].(interface{})
+					_param0[u][x-0] = _params[x][u].(any)
 				}
 			}
 		}

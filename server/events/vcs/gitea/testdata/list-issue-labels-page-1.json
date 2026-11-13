@@ -1,0 +1,20 @@
+[
+  {
+    "id": 301,
+    "name": "label-one",
+    "color": "00aabb",
+    "description": "first label",
+    "exclusive": false,
+    "url": "https://gitea.example.com/api/v1/repos/owner/repo/labels/301",
+    "is_archived": false
+  },
+  {
+    "id": 302,
+    "name": "label-alpha",
+    "color": "0099ff",
+    "description": "alpha label",
+    "exclusive": false,
+    "url": "https://gitea.example.com/api/v1/repos/owner/repo/labels/302",
+    "is_archived": false
+  }
+]

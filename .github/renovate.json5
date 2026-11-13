@@ -31,17 +31,8 @@
     ],
   },
   packageRules: [
-    // enable release branches for security updates
-    {
-      matchBaseBranches: [
-        '/^release-.*/',
-      ],
-      matchUpdateTypes: [
-        'security',
-      ],
-      enabled: true,
-    },
-    // disable release branches for anything else
+    // Disable release branches. Vulnerability-fix PRs still open there,
+    // because vulnerabilityAlerts.enabled overrides this rule.
     {
       matchBaseBranches: [
         '/^release-.*/',
@@ -68,20 +59,12 @@
       ],
     },
     {
-      ignorePaths: [
-        'testing/**',
+      matchFileNames: [
+        '!testing/**',
       ],
       groupName: 'github-',
       matchPackageNames: [
         '/github-actions/',
-      ],
-    },
-    {
-      ignorePaths: [
-        'server/controllers/events/testdata/**/*.tf',
-      ],
-      matchDatasources: [
-        'terraform',
       ],
     },
     {
@@ -99,11 +82,43 @@
         'go',
         'golang',
       ],
-      versioning: 'go',
       groupName: 'go',
+    },
+    {
+      "matchFileNames": ["Dockerfile"],
+      "matchPackageNames": ["golang"],
+      "versioning": "docker",
+      "allowedVersions": "/-alpine3\\.24$/"
+    },
+    // Registries for the Dockerfile apk/apt pins. Keep the Alpine branch and
+    // Debian suite in sync with ALPINE_TAG / DEBIAN_TAG in Dockerfile.
+    // Only the trixie `main` suite is listed: Debian point releases fold
+    // security updates into it, and it is the only suite that still publishes
+    // the Packages.gz index the deb datasource reads (trixie-updates and
+    // trixie-security ship Packages.xz only).
+    {
+      matchFileNames: ['Dockerfile'],
+      matchDatasources: ['apk'],
+      registryUrls: [
+        'https://dl-cdn.alpinelinux.org/alpine?branch=v3.24&components=main,community&arch=x86_64',
+      ],
+    },
+    {
+      matchFileNames: ['Dockerfile'],
+      matchDatasources: ['deb'],
+      registryUrls: [
+        'https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64',
+      ],
     },
   ],
   customManagers: [
+    // Dockerfile apk/apt pins. Alpine pins use the native `apk` datasource,
+    // Debian pins the native `deb` datasource (repology.org, used before, went
+    // offline in 2026-09). Both return raw distro versions ("8.22.0-r0",
+    // "1:2.47.3-0+deb13u1"), so no extractVersionTemplate here; each
+    // datasource's default versioning (`apk` / `deb`) understands them.
+    // The registry URLs (Alpine branch, Debian suite) live in packageRules
+    // below and must be bumped together with ALPINE_TAG / DEBIAN_TAG.
     {
       customType: 'regex',
       managerFilePatterns: [
@@ -111,7 +126,22 @@
         '/(^|/)Dockerfile\\.[^/]*$/',
       ],
       matchStrings: [
-        'renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
+        'renovate: datasource=(?<datasource>apk|deb) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION="?(?<currentValue>[^"\\s]+)"?',
+      ],
+      versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}{{{datasource}}}{{/if}}',
+    },
+    // Dockerfile pins backed by github-releases / docker / other
+    // vX.Y.Z sources. Renovate's regex engine is RE2 — no lookahead —
+    // so we enumerate non-repology datasources explicitly instead of
+    // using a negative lookahead.
+    {
+      customType: 'regex',
+      managerFilePatterns: [
+        '/(^|/)Dockerfile$/',
+        '/(^|/)Dockerfile\\.[^/]*$/',
+      ],
+      matchStrings: [
+        'renovate: datasource=(?<datasource>github-releases|github-tags|docker) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s(ARG|ENV) .*?_VERSION=(?<currentValue>.*)\\s',
       ],
       versioningTemplate: '{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}',
       extractVersionTemplate: '^v(?<version>\\d+\\.\\d+\\.\\d+)',

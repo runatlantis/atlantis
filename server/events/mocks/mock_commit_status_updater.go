@@ -42,11 +42,11 @@ func (mock *MockCommitStatusUpdater) UpdateCombined(logger logging.SimpleLogging
 	return _ret0
 }
 
-func (mock *MockCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) error {
+func (mock *MockCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) error {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockCommitStatusUpdater().")
 	}
-	_params := []pegomock.Param{logger, repo, pull, status, cmdName, numSuccess, numTotal}
+	_params := []pegomock.Param{logger, repo, pull, status, cmdName, counts}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("UpdateCombinedCount", _params, []reflect.Type{reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 error
 	if len(_result) != 0 {
@@ -177,8 +177,8 @@ func (c *MockCommitStatusUpdater_UpdateCombined_OngoingVerification) GetAllCaptu
 	return
 }
 
-func (verifier *VerifierMockCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, numSuccess int, numTotal int) *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification {
-	_params := []pegomock.Param{logger, repo, pull, status, cmdName, numSuccess, numTotal}
+func (verifier *VerifierMockCommitStatusUpdater) UpdateCombinedCount(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, status models.CommitStatus, cmdName command.Name, counts models.ProjectCounts) *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification {
+	_params := []pegomock.Param{logger, repo, pull, status, cmdName, counts}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "UpdateCombinedCount", _params, verifier.timeout)
 	return &MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -188,12 +188,12 @@ type MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.PullRequest, models.CommitStatus, command.Name, int, int) {
-	logger, repo, pull, status, cmdName, numSuccess, numTotal := c.GetAllCapturedArguments()
-	return logger[len(logger)-1], repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], cmdName[len(cmdName)-1], numSuccess[len(numSuccess)-1], numTotal[len(numTotal)-1]
+func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, models.Repo, models.PullRequest, models.CommitStatus, command.Name, models.ProjectCounts) {
+	logger, repo, pull, status, cmdName, counts := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repo[len(repo)-1], pull[len(pull)-1], status[len(status)-1], cmdName[len(cmdName)-1], counts[len(counts)-1]
 }
 
-func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.CommitStatus, _param4 []command.Name, _param5 []int, _param6 []int) {
+func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []models.Repo, _param2 []models.PullRequest, _param3 []models.CommitStatus, _param4 []command.Name, _param5 []models.ProjectCounts) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -227,15 +227,9 @@ func (c *MockCommitStatusUpdater_UpdateCombinedCount_OngoingVerification) GetAll
 			}
 		}
 		if len(_params) > 5 {
-			_param5 = make([]int, len(c.methodInvocations))
+			_param5 = make([]models.ProjectCounts, len(c.methodInvocations))
 			for u, param := range _params[5] {
-				_param5[u] = param.(int)
-			}
-		}
-		if len(_params) > 6 {
-			_param6 = make([]int, len(c.methodInvocations))
-			for u, param := range _params[6] {
-				_param6[u] = param.(int)
+				_param5[u] = param.(models.ProjectCounts)
 			}
 		}
 	}

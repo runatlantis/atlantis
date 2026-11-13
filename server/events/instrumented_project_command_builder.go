@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package events
 
 import (
@@ -71,8 +74,12 @@ func (b *InstrumentedProjectCommandBuilder) buildAndEmitStats(
 	projectCmds, err := execute()
 
 	if err != nil {
-		executionError.Inc(1)
-		b.Logger.Err("Error building %s commands: %s", command, err)
+		if IsIgnoredTargetedDir(err) {
+			executionSuccess.Inc(1)
+		} else {
+			executionError.Inc(1)
+			b.Logger.Err("Error building %s commands: %s", command, err)
+		}
 	} else {
 		executionSuccess.Inc(1)
 	}

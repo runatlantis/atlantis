@@ -1,16 +1,5 @@
 // Copyright 2017 HootSuite Media Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the License);
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//	http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an AS IS BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 // Modified hereafter by contributors to runatlantis/atlantis.
 //
 // Package tfclient handles the actual running of terraform commands.
@@ -18,6 +7,7 @@ package tfclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,7 +20,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 
 	"github.com/runatlantis/atlantis/server/core/runtime/models"
 	"github.com/runatlantis/atlantis/server/core/terraform"
@@ -42,7 +31,9 @@ import (
 
 var LogStreamingValidCmds = [...]string{"init", "plan", "apply"}
 
-//go:generate pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
+const versionCommandTimeout = 10 * time.Second
+
+//go:generate go tool pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
@@ -53,8 +44,10 @@ type Client interface {
 	// EnsureVersion makes sure that terraform version `v` is available to use
 	EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error
 
-	// DetectVersion Extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-	DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version
+	// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+	// Non-exact constraints are resolved using the provided distribution, or the client default distribution when nil.
+	// Returns nil if unable to determine the version.
+	DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version
 }
 
 type DefaultClient struct {
@@ -78,6 +71,11 @@ type DefaultClient struct {
 	// to the absolute path of that binary on disk (if it exists).
 	// Use versionsLock to control access.
 	versions map[string]string
+	// versionLocks serializes install/remove operations for each Terraform version.
+	// Use versionsLock to control access.
+	versionLocks map[string]*sync.Mutex
+	// downloadLock serializes downloader installs that share intermediate paths in binDir.
+	downloadLock *sync.Mutex
 
 	// versionsLock is used to ensure versions isn't being concurrently written to.
 	versionsLock *sync.Mutex
@@ -119,7 +117,9 @@ func NewClientWithDefaultVersion(
 	var finalDefaultVersion *version.Version
 	var localVersion *version.Version
 	versions := make(map[string]string)
+	versionLocks := make(map[string]*sync.Mutex)
 	var versionsLock sync.Mutex
+	var downloadLock sync.Mutex
 
 	localPath, err := exec.LookPath(distribution.BinName())
 	if err != nil && defaultVersionStr == "" {
@@ -148,9 +148,7 @@ func NewClientWithDefaultVersion(
 		ensureVersionFunc := func() {
 			// Since ensureVersion might end up downloading terraform,
 			// we call it asynchronously so as to not delay server startup.
-			versionsLock.Lock()
-			_, err := ensureVersion(log, distribution, versions, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed)
-			versionsLock.Unlock()
+			_, err := ensureVersion(log, distribution, versions, versionLocks, &versionsLock, &downloadLock, defaultVersion, binDir, tfDownloadURL, tfDownloadAllowed, true)
 			if err != nil {
 				log.Err("could not download %s %s: %s", distribution.BinName(), defaultVersion.String(), err)
 			}
@@ -167,7 +165,7 @@ func NewClientWithDefaultVersion(
 	if tfeToken != "" {
 		home, err := homedir.Dir()
 		if err != nil {
-			return nil, errors.Wrap(err, "getting home dir to write ~/.terraformrc file")
+			return nil, fmt.Errorf("getting home dir to write ~/.terraformrc file: %w", err)
 		}
 		if err := generateRCFile(tfeToken, tfeHostname, home); err != nil {
 			return nil, err
@@ -182,6 +180,8 @@ func NewClientWithDefaultVersion(
 		downloadAllowed:         tfDownloadAllowed,
 		versionsLock:            &versionsLock,
 		versions:                versions,
+		versionLocks:            versionLocks,
+		downloadLock:            &downloadLock,
 		usePluginCache:          usePluginCache,
 		projectCmdOutputHandler: projectCmdOutputHandler,
 	}, nil
@@ -289,20 +289,18 @@ func (c *DefaultClient) ExtractExactRegex(log logging.SimpleLogging, version str
 	return tfVersions
 }
 
-// DetectVersion extracts required_version from Terraform configuration in the specified project directory. Returns nil if unable to determine the version.
-// It will also try to evaluate non-exact matches by passing the Constraints to the hc-install Releases API, which will return a list of available versions.
-// It will then select the highest version that satisfies the constraint.
-func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirectory string) *version.Version {
-	module, diags := tfconfig.LoadModule(projectDirectory)
-	if diags.HasErrors() {
-		log.Err("trying to detect required version: %s", diags.Error())
-	}
+// DetectVersion extracts required_version from Terraform/OpenTofu configuration in the specified project directory.
+// If downloads are allowed, non-exact constraints are resolved against the provided distribution, or the client
+// default distribution when nil, and the highest satisfying version is selected.
+// Returns nil if unable to determine the version.
+func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) *version.Version {
+	requiredCore := c.detectRequiredCore(log, d, projectDirectory)
 
-	if len(module.RequiredCore) != 1 {
-		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(module.RequiredCore))
+	if len(requiredCore) != 1 {
+		log.Info("cannot determine which version to use from terraform configuration, detected %d possibilities.", len(requiredCore))
 		return nil
 	}
-	requiredVersionSetting := module.RequiredCore[0]
+	requiredVersionSetting := requiredCore[0]
 	log.Debug("Found required_version setting of %q", requiredVersionSetting)
 
 	if !c.downloadAllowed {
@@ -321,7 +319,7 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 		return version
 	}
 
-	downloadVersion, err := c.distribution.ResolveConstraint(context.Background(), requiredVersionSetting)
+	downloadVersion, err := c.effectiveDistribution(d).ResolveConstraint(context.Background(), requiredVersionSetting)
 	if err != nil {
 		log.Err("%s", err)
 		return nil
@@ -330,16 +328,41 @@ func (c *DefaultClient) DetectVersion(log logging.SimpleLogging, projectDirector
 	return downloadVersion
 }
 
+// detectRequiredCore returns the required_version constraints from configuration files.
+// For OpenTofu distribution, it uses a local parser that supports .tofu/.tofu.json files
+// with proper precedence (.tofu overrides same-basename .tf). For Terraform distribution,
+// it uses hashicorp/terraform-config-inspect which only reads .tf/.tf.json files.
+func (c *DefaultClient) detectRequiredCore(log logging.SimpleLogging, d terraform.Distribution, projectDirectory string) []string {
+	dist := c.effectiveDistribution(d)
+	if dist.BinName() == "tofu" {
+		constraints, err := detectRequiredCoreFromTofu(projectDirectory)
+		if err != nil {
+			log.Err("trying to detect required version from OpenTofu config: %s", err)
+		}
+		if len(constraints) == 0 && err != nil {
+			return nil
+		}
+		return constraints
+	}
+
+	module, diags := tfconfig.LoadModule(projectDirectory)
+	if diags.HasErrors() {
+		log.Err("trying to detect required version: %s", diags.Error())
+	}
+	if module == nil {
+		return nil
+	}
+	return module.RequiredCore
+}
+
 // See Client.EnsureVersion.
 func (c *DefaultClient) EnsureVersion(log logging.SimpleLogging, d terraform.Distribution, v *version.Version) error {
 	if v == nil {
 		v = c.defaultVersion
 	}
 
-	var err error
-	c.versionsLock.Lock()
-	_, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
-	c.versionsLock.Unlock()
+	d = c.effectiveDistribution(d)
+	_, err := ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 	if err != nil {
 		return err
 	}
@@ -367,22 +390,17 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 		output = ansi.Strip(output)
 		return fmt.Sprintf("%s\n", output), err
 	}
-	tfCmd, cmd, err := c.prepExecCmd(ctx.Log, d, v, workspace, path, args)
+	tfCmd, cmd, err := c.prepExecCmd(ctx, d, v, workspace, path, args, customEnvVars)
 	if err != nil {
 		return "", err
 	}
-	envVars := cmd.Env
-	for key, val := range customEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-	}
-	cmd.Env = envVars
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
 	dur := time.Since(start)
 	log := ctx.Log.With("duration", dur)
 	if err != nil {
-		err = errors.Wrapf(err, "running '%s' in '%s'", tfCmd, path)
-		log.Err(err.Error())
+		err = fmt.Errorf("running '%s' in '%s': %w", tfCmd, path, err)
+		log.Err("%s", err.Error())
 		return ansi.Strip(string(out)), err
 	}
 	log.Info("Successfully ran '%s' in '%s'", tfCmd, path)
@@ -393,20 +411,24 @@ func (c *DefaultClient) RunCommandWithVersion(ctx command.ProjectContext, path s
 // prepExecCmd builds a ready to execute command based on the version of terraform
 // v, and args. It returns a printable representation of the command that will
 // be run and the actual command.
-func (c *DefaultClient) prepExecCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, *exec.Cmd, error) {
-	tfCmd, envVars, err := c.prepCmd(log, d, v, workspace, path, args)
+func (c *DefaultClient) prepExecCmd(ctx command.ProjectContext, d terraform.Distribution, v *version.Version, workspace string, path string, args []string, customEnvVars map[string]string) (string, *exec.Cmd, error) {
+	argv, display, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args, customEnvVars, ctx.ExpandableArgs, ctx.CommentArgs)
 	if err != nil {
 		return "", nil, err
 	}
-	cmd := exec.Command("sh", "-c", tfCmd)
+	cmd := exec.Command(argv[0], argv[1:]...) // #nosec G204 -- argv[0] is a resolved Terraform binary path, and the arguments are passed as a vector rather than as shell source
 	cmd.Dir = path
 	cmd.Env = envVars
-	return tfCmd, cmd, nil
+	return display, cmd, nil
 }
 
-// prepCmd prepares a shell command (to be interpreted with `sh -c <cmd>`) and set of environment
-// variables for running terraform.
-func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string) (string, []string, error) {
+// prepCmd prepares the argument vector and the set of environment variables for
+// running terraform. The vector is executed directly, without a shell, so that
+// a metacharacter in an argument is never interpreted. Arguments still undergo
+// environment variable expansion, because extra_args is documented to be able
+// to refer to $WORKSPACE and friends, but that expansion is performed here
+// rather than by a shell, so it neither word splits nor globs.
+func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribution, v *version.Version, workspace string, path string, args []string, customEnvVars map[string]string, expandable []string, literal []string) ([]string, string, []string, error) {
 
 	if v == nil {
 		v = c.defaultVersion
@@ -418,11 +440,10 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 		binPath = c.overrideTF
 	} else {
 		var err error
-		c.versionsLock.Lock()
-		binPath, err = ensureVersion(log, d, c.versions, v, c.binDir, c.downloadBaseURL, c.downloadAllowed)
-		c.versionsLock.Unlock()
+		d = c.effectiveDistribution(d)
+		binPath, err = ensureVersion(log, d, c.versions, c.versionLocks, c.versionsLock, c.downloadLock, v, c.binDir, c.downloadBaseURL, c.downloadAllowed, true)
 		if err != nil {
-			return "", nil, err
+			return nil, "", nil, err
 		}
 	}
 
@@ -442,8 +463,81 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 	// Append current Atlantis process's environment variables, ex.
 	// AWS_ACCESS_KEY.
 	envVars = append(envVars, os.Environ()...)
-	tfCmd := fmt.Sprintf("%s %s", binPath, strings.Join(args, " "))
-	return tfCmd, envVars, nil
+	// Appended last so that they win over the process environment, and before
+	// expansion so that an extra_args entry can refer to a variable a workflow
+	// set with an `env` step.
+	for key, val := range customEnvVars {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
+	}
+
+	argv := make([]string, 0, len(args)+1)
+	argv = append(argv, binPath)
+	expand := envLookup(envVars)
+	mayExpand := expansionSet(expandable, literal)
+	for _, arg := range args {
+		if mayExpand[arg] {
+			argv = append(argv, os.Expand(arg, expand))
+			continue
+		}
+		argv = append(argv, arg)
+	}
+
+	// The display string keeps variable references unexpanded. It ends up in
+	// logs and in the error comments Atlantis posts on pull requests, and an
+	// extra_args entry may well reference a variable holding a credential.
+	display := displayCmd(append([]string{binPath}, args...))
+
+	return argv, display, envVars, nil
+}
+
+// expansionSet returns the arguments whose environment variable references may
+// be expanded. Only operator-configured extra_args qualify. Anything that also
+// appears in literal, which is the set of arguments taken from a pull request
+// comment, is excluded, so that a commenter cannot have a value expanded by
+// repeating an operator's argument back.
+func expansionSet(expandable []string, literal []string) map[string]bool {
+	if len(expandable) == 0 {
+		return nil
+	}
+	fromComment := make(map[string]bool, len(literal))
+	for _, arg := range literal {
+		fromComment[arg] = true
+	}
+	set := make(map[string]bool, len(expandable))
+	for _, arg := range expandable {
+		if !fromComment[arg] {
+			set[arg] = true
+		}
+	}
+	return set
+}
+
+// envLookup returns a lookup function over environ, with later entries winning
+// over earlier ones. That matches how the child process resolves duplicates, so
+// expansion here sees the same values the process will.
+func envLookup(environ []string) func(string) string {
+	values := make(map[string]string, len(environ))
+	for _, kv := range environ {
+		if key, value, found := strings.Cut(kv, "="); found {
+			values[key] = value
+		}
+	}
+	return func(key string) string {
+		return values[key]
+	}
+}
+
+// displayCmd renders an argument vector for logs and error messages. It is
+// never executed.
+func displayCmd(argv []string) string {
+	return strings.Join(argv, " ")
+}
+
+func (c *DefaultClient) effectiveDistribution(d terraform.Distribution) terraform.Distribution {
+	if d != nil {
+		return d
+	}
+	return c.distribution
 }
 
 // RunCommandAsync runs terraform with args. It immediately returns an
@@ -453,7 +547,7 @@ func (c *DefaultClient) prepCmd(log logging.SimpleLogging, d terraform.Distribut
 // If any error is passed on the out channel, there will be no
 // further output (so callers are free to exit).
 func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string, args []string, customEnvVars map[string]string, d terraform.Distribution, v *version.Version, workspace string) (chan<- string, <-chan models.Line) {
-	cmd, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args)
+	argv, display, envVars, err := c.prepCmd(ctx.Log, d, v, workspace, path, args, customEnvVars, ctx.ExpandableArgs, ctx.CommentArgs)
 	if err != nil {
 		// The signature of `RunCommandAsync` doesn't provide for returning an immediate error, only one
 		// once reading the output. Since we won't be spawning a process, simulate that by sending the
@@ -468,11 +562,7 @@ func (c *DefaultClient) RunCommandAsync(ctx command.ProjectContext, path string,
 		return inCh, outCh
 	}
 
-	for key, val := range customEnvVars {
-		envVars = append(envVars, fmt.Sprintf("%s=%s", key, val))
-	}
-
-	runner := models.NewShellCommandRunner(nil, cmd, envVars, path, true, c.projectCmdOutputHandler)
+	runner := models.NewArgvCommandRunner(argv, display, envVars, path, !ctx.SuppressJobOutput, c.projectCmdOutputHandler)
 	inCh, outCh := runner.RunCommandAsync(ctx)
 	return inCh, outCh
 }
@@ -494,12 +584,82 @@ func ensureVersion(
 	log logging.SimpleLogging,
 	dist terraform.Distribution,
 	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+	downloadsAllowed bool,
+	redownloadOnFailedExecution bool,
+) (string, error) {
+	if dist == nil {
+		return "", errors.New("terraform distribution is nil")
+	}
+
+	binPath, err := findOrDownloadVersionBinaryPath(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binDir, downloadURL, downloadsAllowed)
+	if err != nil {
+		return "", err
+	}
+	if !redownloadOnFailedExecution {
+		return binPath, nil
+	}
+
+	binName := dist.BinName()
+	if err := validateVersionBinary(binPath, binName); err == nil {
+		return binPath, nil
+	} else if !downloadsAllowed {
+		return "", invalidVersionBinaryError(binPath, binName, err)
+	}
+
+	log.Warn("%s binary %s failed execution validation, attempting to re-download", binName, binPath)
+	binPath, err = redownloadVersionBinary(log, dist, versions, versionLocks, versionsLock, downloadLock, v, binPath, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	if err := validateVersionBinary(binPath, binName); err != nil {
+		return "", invalidVersionBinaryError(binPath, binName, err)
+	}
+	return binPath, nil
+}
+
+func validateVersionBinary(binPath string, binName string) error {
+	_, err := getVersion(binPath, binName)
+	return err
+}
+
+func invalidVersionBinaryError(binPath string, binName string, err error) error {
+	return fmt.Errorf("%s binary at %s failed to execute: %w", binName, binPath, err)
+}
+
+func isManagedVersionBinary(binPath string, binDir string) bool {
+	rel, err := filepath.Rel(binDir, binPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
+// findOrDownloadVersionBinaryPath returns the path to a terraform binary of version v.
+// It will download this version if we don't have it.
+func findOrDownloadVersionBinaryPath(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
 	v *version.Version,
 	binDir string,
 	downloadURL string,
 	downloadsAllowed bool,
 ) (string, error) {
-	if binPath, ok := versions[v.String()]; ok {
+	if binPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok {
+		return binPath, nil
+	}
+
+	versionLock := getVersionOperationLock(versionLocks, versionsLock, v)
+	versionLock.Lock()
+	defer versionLock.Unlock()
+
+	if binPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok {
 		return binPath, nil
 	}
 
@@ -508,7 +668,7 @@ func ensureVersion(
 	// terraform{version} binaries. In this case we don't want to re-download.
 	binFile := dist.BinName() + v.String()
 	if binPath, err := exec.LookPath(binFile); err == nil {
-		versions[v.String()] = binPath
+		setVersionBinaryPath(versions, versionsLock, v, binPath)
 		return binPath, nil
 	}
 
@@ -516,7 +676,7 @@ func ensureVersion(
 	// This could happen if Atlantis was restarted without losing its disk.
 	dest := filepath.Join(binDir, binFile)
 	if _, err := os.Stat(dest); err == nil {
-		versions[v.String()] = dest
+		setVersionBinaryPath(versions, versionsLock, v, dest)
 		return dest, nil
 	}
 	if !downloadsAllowed {
@@ -529,18 +689,106 @@ func ensureVersion(
 	}
 
 	log.Info("could not find %s version %s in PATH or %s", dist.BinName(), v.String(), binDir)
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	setVersionBinaryPath(versions, versionsLock, v, execPath)
+	return execPath, nil
+}
+
+func redownloadVersionBinary(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	versions map[string]string,
+	versionLocks map[string]*sync.Mutex,
+	versionsLock *sync.Mutex,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binPath string,
+	binDir string,
+	downloadURL string,
+) (string, error) {
+	versionLock := getVersionOperationLock(versionLocks, versionsLock, v)
+	versionLock.Lock()
+	defer versionLock.Unlock()
+
+	if currentPath, ok := getVersionBinaryPath(versions, versionsLock, v); ok && currentPath != binPath {
+		return currentPath, nil
+	} else if ok {
+		if err := validateVersionBinary(currentPath, dist.BinName()); err == nil {
+			return currentPath, nil
+		}
+	}
+	deleteVersionBinaryPath(versions, versionsLock, v, binPath)
+	if isManagedVersionBinary(binPath, binDir) {
+		if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("removing cached %s binary for redownload at %s: %w", dist.BinName(), binPath, err)
+		}
+	}
+
+	execPath, err := downloadVersionBinary(log, dist, downloadLock, v, binDir, downloadURL)
+	if err != nil {
+		return "", err
+	}
+	setVersionBinaryPath(versions, versionsLock, v, execPath)
+	return execPath, nil
+}
+
+func downloadVersionBinary(
+	log logging.SimpleLogging,
+	dist terraform.Distribution,
+	downloadLock *sync.Mutex,
+	v *version.Version,
+	binDir string,
+	downloadURL string,
+) (string, error) {
+	downloadLock.Lock()
+	defer downloadLock.Unlock()
 
 	log.Info("downloading %s version %s from download URL %s", dist.BinName(), v.String(), downloadURL)
 
 	execPath, err := dist.Downloader().Install(context.Background(), binDir, downloadURL, v)
-
 	if err != nil {
-		return "", errors.Wrapf(err, "error downloading %s version %s", dist.BinName(), v.String())
+		return "", fmt.Errorf("error downloading %s version %s: %w", dist.BinName(), v.String(), err)
 	}
 
 	log.Info("Downloaded %s %s to %s", dist.BinName(), v.String(), execPath)
-	versions[v.String()] = execPath
 	return execPath, nil
+}
+
+func getVersionOperationLock(versionLocks map[string]*sync.Mutex, versionsLock *sync.Mutex, v *version.Version) *sync.Mutex {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+
+	lockKey := v.String()
+	versionLock, ok := versionLocks[lockKey]
+	if !ok {
+		versionLock = &sync.Mutex{}
+		versionLocks[lockKey] = versionLock
+	}
+	return versionLock
+}
+
+func getVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version) (string, bool) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	binPath, ok := versions[v.String()]
+	return binPath, ok
+}
+
+func setVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version, binPath string) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	versions[v.String()] = binPath
+}
+
+func deleteVersionBinaryPath(versions map[string]string, versionsLock *sync.Mutex, v *version.Version, binPath string) {
+	versionsLock.Lock()
+	defer versionsLock.Unlock()
+	if versions[v.String()] == binPath {
+		delete(versions, v.String())
+	}
 }
 
 // generateRCFile generates a .terraformrc file containing config for tfeToken
@@ -557,7 +805,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	if _, err := os.Stat(rcFile); err == nil {
 		currContents, err := os.ReadFile(rcFile) // nolint: gosec
 		if err != nil {
-			return errors.Wrapf(err, "trying to read %s to ensure we're not overwriting it", rcFile)
+			return fmt.Errorf("trying to read %s to ensure we're not overwriting it: %w", rcFile, err)
 		}
 		if config != string(currContents) {
 			return fmt.Errorf("can't write TFE token to %s because that file has contents that would be overwritten", rcFile)
@@ -568,7 +816,7 @@ func generateRCFile(tfeToken string, tfeHostname string, home string) error {
 	}
 
 	if err := os.WriteFile(rcFile, []byte(config), 0600); err != nil {
-		return errors.Wrapf(err, "writing generated %s file with TFE token to %s", rcFilename, rcFile)
+		return fmt.Errorf("writing generated %s file with TFE token to %s: %w", rcFilename, rcFile, err)
 	}
 	return nil
 }
@@ -583,16 +831,35 @@ func isAsyncEligibleCommand(cmd string) bool {
 }
 
 func getVersion(tfBinary string, binName string) (*version.Version, error) {
-	versionOutBytes, err := exec.Command(tfBinary, "version").Output() // #nosec
+	ctx, cancel := context.WithTimeout(context.Background(), versionCommandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, tfBinary, "version") // #nosec
+	cmd.Env = terraformVersionEnv(os.Environ())
+	versionOutBytes, err := cmd.Output()
 	versionOutput := string(versionOutBytes)
+	if ctx.Err() == context.DeadlineExceeded {
+		return nil, fmt.Errorf("running %s version timed out after %s", binName, versionCommandTimeout)
+	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "running %s version: %s", binName, versionOutput)
+		return nil, fmt.Errorf("running %s version: %s: %w", binName, versionOutput, err)
 	}
 	match := versionRegex.FindStringSubmatch(versionOutput)
 	if len(match) <= 1 {
 		return nil, fmt.Errorf("could not parse %s version from %s", binName, versionOutput)
 	}
 	return version.NewVersion(match[1])
+}
+
+func terraformVersionEnv(env []string) []string {
+	out := make([]string, 0, len(env)+3)
+	for _, envVar := range env {
+		key, _, ok := strings.Cut(envVar, "=")
+		if ok && (key == "CHECKPOINT_DISABLE" || key == "TF_CLI_ARGS" || key == "TF_CLI_ARGS_version") {
+			continue
+		}
+		out = append(out, envVar)
+	}
+	return append(out, "CHECKPOINT_DISABLE=1", "TF_CLI_ARGS=", "TF_CLI_ARGS_version=")
 }
 
 // rcFileContents is a format string to be used with Sprintf that can be used

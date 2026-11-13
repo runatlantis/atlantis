@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
@@ -49,6 +52,7 @@ func TestRunDelegate(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
+			CommentArgs:        []string{"comment", "args"},
 			EscapedCommentArgs: []string{"comment", "args"},
 			TerraformVersion:   tfVersion,
 		}
@@ -77,6 +81,7 @@ func TestRunDelegate(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
+			CommentArgs:        []string{"comment", "args"},
 			EscapedCommentArgs: []string{"comment", "args"},
 			TerraformVersion:   tfVersion,
 		}
@@ -105,6 +110,7 @@ func TestRunDelegate(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
+			CommentArgs:        []string{"comment", "args"},
 			EscapedCommentArgs: []string{"comment", "args"},
 			TerraformVersion:   tfVersion,
 		}
@@ -133,6 +139,7 @@ func TestRunDelegate(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:          "workspace",
 			RepoRelDir:         ".",
+			CommentArgs:        []string{"comment", "args"},
 			EscapedCommentArgs: []string{"comment", "args"},
 			TerraformVersion:   tfVersion,
 		}
@@ -190,6 +197,7 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:             "workspace",
 			RepoRelDir:            ".",
+			CommentArgs:           []string{"comment", "args"},
 			EscapedCommentArgs:    []string{"comment", "args"},
 			TerraformDistribution: &tfDistribution,
 			TerraformVersion:      tfVersion,
@@ -219,6 +227,7 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:             "workspace",
 			RepoRelDir:            ".",
+			CommentArgs:           []string{"comment", "args"},
 			EscapedCommentArgs:    []string{"comment", "args"},
 			TerraformDistribution: &tfDistribution,
 			TerraformVersion:      tfVersion,
@@ -248,6 +257,7 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:             "workspace",
 			RepoRelDir:            ".",
+			CommentArgs:           []string{"comment", "args"},
 			EscapedCommentArgs:    []string{"comment", "args"},
 			TerraformDistribution: &tfDistribution,
 			TerraformVersion:      tfVersion,
@@ -277,6 +287,7 @@ func TestRunDelegate_UsesConfiguredDistribution(t *testing.T) {
 		ctx := command.ProjectContext{
 			Workspace:             "workspace",
 			RepoRelDir:            ".",
+			CommentArgs:           []string{"comment", "args"},
 			EscapedCommentArgs:    []string{"comment", "args"},
 			TerraformDistribution: &tfDistribution,
 			TerraformVersion:      tfVersion,

@@ -27,3 +27,8 @@
 - Use `closes #123`, if this PR closes a GitHub issue `#123`
 -->
 
+## architecture decision record
+
+- [ ] I checked the [ADR criteria](https://github.com/runatlantis/atlantis/blob/main/docs/adr/README.md#when-is-an-adr-required).
+
+**ADR:** <!-- Link the ADR, write "This PR", or "Not required". -->

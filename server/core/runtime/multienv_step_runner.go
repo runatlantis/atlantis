@@ -1,8 +1,13 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -22,10 +27,16 @@ func (r *MultiEnvStepRunner) Run(
 	command string,
 	path string,
 	envs map[string]string,
-	postProcessOutput valid.PostProcessRunOutputOption,
+	postProcessOutput []valid.PostProcessRunOutputOption,
 ) (string, error) {
-	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, valid.PostProcessRunOutputShow)
+	// The inner run must return the raw output on success because it is the
+	// name=value list this step parses, so the hide option is applied to the
+	// error path here rather than forwarded.
+	res, err := r.RunStepRunner.Run(ctx, shell, command, path, envs, false, []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow}, []*regexp.Regexp{})
 	if err != nil {
+		if slices.Contains(postProcessOutput, valid.PostProcessRunOutputHide) {
+			err = hideRunStepErrorOutput(err)
+		}
 		return "", err
 	}
 
@@ -37,7 +48,9 @@ func (r *MultiEnvStepRunner) Run(
 
 		vars, err := parseMultienvLine(res)
 		if err != nil {
-			return "", fmt.Errorf("Invalid environment variable definition: %s (%w)", res, err)
+			// Never echo the line back: it is the name=value output this
+			// step exists to carry and may contain secrets.
+			return "", fmt.Errorf("invalid environment variable definition: %w", err)
 		}
 
 		for i := 0; i < len(vars); i += 2 {
@@ -48,14 +61,19 @@ func (r *MultiEnvStepRunner) Run(
 		}
 	}
 
-	switch postProcessOutput {
-	case valid.PostProcessRunOutputHide:
-		return "", nil
-	case valid.PostProcessRunOutputShow:
-		return sb.String(), nil
-	default:
-		return sb.String(), nil
+	output := ""
+	for _, processOutput := range postProcessOutput {
+		switch processOutput {
+		case valid.PostProcessRunOutputHide:
+			output = ""
+		case valid.PostProcessRunOutputShow:
+			output = sb.String()
+		default:
+			output = sb.String()
+		}
 	}
+
+	return output, nil
 }
 
 func parseMultienvLine(in string) ([]string, error) {
@@ -64,7 +82,7 @@ func parseMultienvLine(in string) ([]string, error) {
 		return nil, nil
 	}
 	if len(in) < 3 {
-		return nil, errors.New("invalid syntax") // TODO
+		return nil, parseErrorAt(errInvalidSyntax, 0)
 	}
 
 	var res []string
@@ -79,7 +97,7 @@ func parseMultienvLine(in string) ([]string, error) {
 				i = j + 1
 			}
 			if r == ' ' || r == '\t' {
-				return nil, errInvalidKeySyntax
+				return nil, parseErrorAt(errInvalidKeySyntax, j)
 			}
 			if r == ',' && len(res) > 0 {
 				i = j + 1
@@ -97,7 +115,7 @@ func parseMultienvLine(in string) ([]string, error) {
 				dquoted = false
 				inValue = false
 			} else if in[j-1] != '\\' {
-				return nil, errMisquoted
+				return nil, parseErrorAt(errMisquoted, j)
 			} else if in[j-1] == '\\' {
 				escaped = true
 			}
@@ -126,16 +144,16 @@ func parseMultienvLine(in string) ([]string, error) {
 
 	if i < len(in) {
 		if !inValue {
-			return nil, errRemaining
+			return nil, parseErrorAt(errRemaining, i)
 		}
 		res = append(res, unescape(in[i:], escaped))
 		inValue = false
 	}
 	if dquoted || squoted {
-		return nil, errMisquoted
+		return nil, parseErrorAt(errMisquoted, len(in))
 	}
 	if inValue {
-		return nil, errRemaining
+		return nil, parseErrorAt(errRemaining, i)
 	}
 
 	return res, nil
@@ -149,7 +167,14 @@ func unescape(s string, escaped bool) string {
 }
 
 var (
+	errInvalidSyntax    = errors.New("invalid syntax")
 	errInvalidKeySyntax = errors.New("invalid key syntax")
 	errMisquoted        = errors.New("misquoted")
 	errRemaining        = errors.New("remaining unparsed data")
 )
+
+// parseErrorAt wraps a parser error with the byte offset it occurred at so
+// callers can report where parsing failed without quoting the input.
+func parseErrorAt(err error, offset int) error {
+	return fmt.Errorf("%w at offset %d", err, offset)
+}

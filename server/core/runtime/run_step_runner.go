@@ -1,9 +1,15 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-version"
@@ -31,7 +37,8 @@ func (r *RunStepRunner) Run(
 	path string,
 	envs map[string]string,
 	streamOutput bool,
-	postProcessOutput valid.PostProcessRunOutputOption,
+	postProcessOutput []valid.PostProcessRunOutputOption,
+	postProcessFilterRegexes []*regexp.Regexp,
 ) (string, error) {
 	tfDistribution := r.DefaultTFDistribution
 	tfVersion := r.DefaultTFVersion
@@ -49,6 +56,11 @@ func (r *RunStepRunner) Run(
 		return "", err
 	}
 
+	planFile := GetPlanFilePath(ctx, path)
+	if err := EnsurePlanFileDir(ctx, path); err != nil {
+		return "", err
+	}
+
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
 		"ATLANTIS_TERRAFORM_DISTRIBUTION": tfDistribution.BinName(),
@@ -63,7 +75,7 @@ func (r *RunStepRunner) Run(
 		"HEAD_REPO_NAME":                  ctx.HeadRepo.Name,
 		"HEAD_REPO_OWNER":                 ctx.HeadRepo.Owner,
 		"PATH":                            fmt.Sprintf("%s:%s", os.Getenv("PATH"), r.TerraformBinDir),
-		"PLANFILE":                        filepath.Join(path, GetPlanFilename(ctx.Workspace, ctx.ProjectName)),
+		"PLANFILE":                        planFile,
 		"SHOWFILE":                        filepath.Join(path, ctx.GetShowResultFileName()),
 		"POLICYCHECKFILE":                 filepath.Join(path, ctx.GetPolicyCheckResultFileName()),
 		"PROJECT_NAME":                    ctx.ProjectName,
@@ -73,6 +85,11 @@ func (r *RunStepRunner) Run(
 		"REPO_REL_DIR":                    ctx.RepoRelDir,
 		"USER_NAME":                       ctx.User.Username,
 		"WORKSPACE":                       ctx.Workspace,
+	}
+	// Add PR metadata environment variables for plan and apply steps
+	if ctx.CommandName.String() == "plan" || ctx.CommandName.String() == "apply" {
+		customEnvVars["ATLANTIS_PR_APPROVED"] = strconv.FormatBool(ctx.PullReqStatus.ApprovalStatus.IsApproved)
+		customEnvVars["ATLANTIS_PR_MERGEABLE"] = strconv.FormatBool(ctx.PullReqStatus.MergeableStatus.IsMergeable)
 	}
 
 	finalEnvVars := baseEnvVars
@@ -86,13 +103,18 @@ func (r *RunStepRunner) Run(
 	runner := models.NewShellCommandRunner(shell, command, finalEnvVars, path, streamOutput, r.ProjectCmdOutputHandler)
 	output, err := runner.Run(ctx)
 
-	if postProcessOutput == valid.PostProcessRunOutputStripRefreshing {
-		output = StripRefreshingFromPlanOutput(output, tfVersion)
-
-	}
+	// Post-process before the error check so that a failing command never
+	// carries output into the error that the step asked to hide or filter.
+	output = postProcessRunOutput(output, tfVersion, postProcessOutput, postProcessFilterRegexes)
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q in %q: \n%s", err, command, path, output)
+		err = runStepError{
+			err:          err,
+			command:      command,
+			path:         path,
+			output:       output,
+			streamOutput: streamOutput,
+		}
 		if !ctx.CustomPolicyCheck {
 			ctx.Log.Debug("error: %s", err)
 		} else {
@@ -101,14 +123,58 @@ func (r *RunStepRunner) Run(
 		return output, err
 	}
 
-	switch postProcessOutput {
-	case valid.PostProcessRunOutputHide:
-		return "", nil
-	case valid.PostProcessRunOutputStripRefreshing:
-		return output, nil
-	case valid.PostProcessRunOutputShow:
-		return output, nil
-	default:
-		return output, nil
+	return output, nil
+}
+
+// postProcessRunOutput applies the step's output options to the raw command
+// output. It is applied on both the success and the error path.
+func postProcessRunOutput(
+	output string,
+	tfVersion *version.Version,
+	postProcessOutput []valid.PostProcessRunOutputOption,
+	postProcessFilterRegexes []*regexp.Regexp,
+) string {
+	for _, processOutput := range postProcessOutput {
+		switch processOutput {
+		case valid.PostProcessRunOutputHide:
+			output = ""
+		case valid.PostProcessRunOutputStripRefreshing:
+			output = StripRefreshingFromPlanOutput(output, tfVersion)
+		case valid.PostProcessRunOutputFilterRegexKey:
+			for _, filterRegex := range postProcessFilterRegexes {
+				output = FilterRegexFromPlanOutput(output, filterRegex)
+			}
+		}
 	}
+	return output
+}
+
+// hideRunStepErrorOutput returns err with the command output removed from any
+// runStepError it carries. Callers that need the raw output on success but
+// must not report it on failure use this instead of the hide option.
+func hideRunStepErrorOutput(err error) error {
+	if stepErr, ok := errors.AsType[runStepError](err); ok {
+		stepErr.output = ""
+		return stepErr
+	}
+	return err
+}
+
+type runStepError struct {
+	err          error
+	command      string
+	path         string
+	output       string
+	streamOutput bool
+}
+
+func (e runStepError) Error() string {
+	return fmt.Sprintf("%s: running %q in %q: \n%s", e.err, e.command, e.path, e.output)
+}
+
+func (e runStepError) JobMessage() string {
+	if !e.streamOutput && e.output != "" {
+		return e.Error()
+	}
+	return e.err.Error()
 }

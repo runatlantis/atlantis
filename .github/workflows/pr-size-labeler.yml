@@ -1,6 +1,6 @@
 name: pr-size
 
-on: [pull_request]
+on: [pull_request_target]
 
 permissions:
   contents: read
@@ -13,11 +13,11 @@ jobs:
     name: Label the PR size
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: codelytv/pr-size-labeler@4ec67706cd878fbc1c8db0a5dcd28b6bb412e85a # v1
+      - uses: codelytv/pr-size-labeler@19c335e7695ba922de938806dd129f0a9b992644 # v1
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           xs_label: 'size/xs'

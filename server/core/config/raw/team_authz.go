@@ -1,3 +1,6 @@
+// Copyright 2025 The Atlantis Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package raw
 
 import "github.com/runatlantis/atlantis/server/core/config/valid"

@@ -1,6 +1,5 @@
 *
 !cmd/
-!scripts/download-release.sh
 !server/
 !testdrive/
 !main.go
@@ -8,3 +7,4 @@
 !go.sum
 !docker-entrypoint.sh
 !atlantis
+!.clusterfuzzlite/
