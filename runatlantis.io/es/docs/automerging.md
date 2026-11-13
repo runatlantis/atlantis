@@ -52,6 +52,25 @@ El valor `method` debe ser uno de:
 
 Esto actualmente solo está implementado para el VCS de GitHub.
 
+## Cómo reintentar una fusión automática fallida
+
+Algunos proveedores de VCS pueden rechazar brevemente una fusión justo después de que Atlantis aplica. Con
+la protección de rama de GitHub o los conjuntos de reglas del repositorio, las verificaciones de estado requeridas
+(incluyendo `atlantis/apply`) no siempre se registran como aprobadas en el momento en que
+Atlantis llama a la API de fusión, por lo que la fusión falla con un error como
+`required status checks are expected`. Estas fallas son transitorias y se resuelven
+en unos pocos segundos.
+
+Establece el flag del servidor `--automerge-retry-count` (o la variable de entorno
+`ATLANTIS_AUTOMERGE_RETRY_COUNT`) para reintentar la fusión, con un backoff exponencial, antes de
+rendirse.
+
+```shell
+atlantis server --automerge-retry-count 3
+```
+
+El valor predeterminado es `0`, lo que intenta la fusión exactamente una vez.
+
 ## Requisitos
 
 ### Todos los plans deben tener éxito

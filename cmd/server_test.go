@@ -63,6 +63,7 @@ var testFlags = map[string]any{
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
 	AutomergeMethodFlag:              "squash",
+	AutomergeRetryCountFlag:          3,
 	AutoplanFileListFlag:             "**/*.tf,**/*.yml",
 	BitbucketApiUserFlag:             "bitbucket-api-user",
 	BitbucketBaseURLFlag:             "https://bitbucket-base-url.com",
