@@ -523,6 +523,19 @@ func TestClient_GetMyUUID(t *testing.T) {
 	Equals(t, v, "{00000000-0000-0000-0000-000000000001}")
 }
 
+func TestClient_HidePRCommentsRequiresUserRead(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Equals(t, "/2.0/user", r.URL.Path)
+		http.Error(w, "missing account scope", http.StatusForbidden)
+	}))
+	defer server.Close()
+	client := bitbucketcloud.New(server.Client(), "user", "pass", "", "")
+	client.BaseURL = server.URL
+	err := client.HidePrevCommandComments(logging.NewNoopLogger(t), models.Repo{}, 1, "plan", "")
+	Assert(t, err != nil, "comment hiding must still require user-read permission")
+	Assert(t, strings.Contains(err.Error(), "check required scope"), "expected scope error, got %v", err)
+}
+
 func TestClient_GetComment(t *testing.T) {
 	json, err := os.ReadFile(filepath.Join("testdata", "comments.json"))
 	Ok(t, err)

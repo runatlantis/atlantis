@@ -21,9 +21,10 @@ import (
 
 // Client represents an Azure DevOps VCS client
 type Client struct {
-	Client   *azuredevops.Client
-	ctx      context.Context
-	UserName string
+	Client     *azuredevops.Client
+	ctx        context.Context
+	UserName   string
+	identities common.IdentityCache
 }
 
 // NewClient returns a valid Azure DevOps client.
@@ -150,6 +151,37 @@ func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 
 func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
 	return nil
+}
+
+func (g *Client) IsAtlantisUser(repo models.Repo, user models.User) (bool, error) {
+	if user.ID == "" {
+		return false, nil
+	}
+	owner, _, _ := SplitAzureDevopsRepoFullName(repo.FullName)
+	id, err := g.identities.Get(owner, func() (string, error) {
+		return g.authenticatedUserID(owner)
+	})
+	return strings.EqualFold(id, user.ID), err
+}
+
+func (g *Client) authenticatedUserID(owner string) (string, error) {
+	// Connection data identifies the PAT owner without requiring the user
+	// entitlement permissions used by the configured-user lookup for merging.
+	req, err := g.Client.NewRequest(http.MethodGet, url.PathEscape(owner)+"/_apis/connectionData", nil)
+	if err != nil {
+		return "", err
+	}
+	var connection struct {
+		AuthenticatedUser *azuredevops.IdentityRef `json:"authenticatedUser"`
+	}
+	if _, err := g.Client.Execute(g.ctx, req, &connection); err != nil {
+		return "", fmt.Errorf("getting authenticated user: %w", err)
+	}
+	id := connection.AuthenticatedUser.GetID()
+	if id == "" {
+		return "", errors.New("authenticated user id is missing")
+	}
+	return id, nil
 }
 
 // PullIsApproved returns true if the merge request was approved by another reviewer.

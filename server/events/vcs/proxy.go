@@ -52,6 +52,10 @@ func (d *ClientProxy) GetModifiedFiles(logger logging.SimpleLogging, repo models
 	return d.clients[repo.VCSHost.Type].GetModifiedFiles(logger, repo, pull)
 }
 
+func (d *ClientProxy) IsAtlantisUser(repo models.Repo, user models.User) (bool, error) {
+	return d.clients[repo.VCSHost.Type].IsAtlantisUser(repo, user)
+}
+
 func (d *ClientProxy) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	return d.clients[repo.VCSHost.Type].CreateComment(logger, repo, pullNum, comment, command)
 }
