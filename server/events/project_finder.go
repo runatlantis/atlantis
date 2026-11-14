@@ -346,9 +346,9 @@ func (p *DefaultProjectFinder) shouldIgnore(fileName string) bool {
 
 // getProjectDir attempts to determine based on the location of a modified
 // file, where the root of the Terraform project is. It also attempts to verify
-// if the root is valid by looking for a main.tf file. It returns a relative
-// path to the repo. If the project is at the root returns ".". If modified file
-// doesn't lead to a valid project path, returns an empty string.
+// if the root is valid by looking for a project indicator file. It returns a
+// relative path to the repo. If the project is at the root returns ".". If
+// modified file doesn't lead to a valid project path, returns an empty string.
 func getProjectDir(modifiedFilePath string, repoDir string) string {
 	return getProjectDirFromFs(os.DirFS(repoDir), modifiedFilePath)
 }
@@ -364,12 +364,11 @@ func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 		//   env/
 		//     dev.tfvars
 		//     staging.tfvars
-		return path.Dir(dir)
-	}
+		dir = path.Dir(dir)
+	} else if isModule(dir) {
+		// Surrounding dir with /'s so we can match on /modules/ even if dir is
+		// "modules" or "project1/modules"
 
-	// Surrounding dir with /'s so we can match on /modules/ even if dir is
-	// "modules" or "project1/modules"
-	if isModule(dir) {
 		// We treat changes inside modules/ folders specially. There are two cases:
 		// 1. modules folder inside project:
 		// root/
@@ -398,17 +397,17 @@ func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 		// split on "modules/" will fail.
 		dirWithTrailingSlash := dir + "/"
 		modulesSplit := strings.SplitN(dirWithTrailingSlash, "modules/", 2)
-		modulesParent := modulesSplit[0]
-
-		// Check whether the parent contains a Terraform/OpenTofu project file.
-		if !hasProjectIndicator(files, modulesParent) {
-			return ""
-		}
-		return path.Clean(modulesParent)
+		dir = path.Clean(modulesSplit[0])
 	}
 
-	// If it wasn't a modules directory, we assume we're in a project and return
-	// this directory.
+	// Check whether the candidate directory contains a Terraform/OpenTofu/Terragrunt
+	// project indicator file. This ensures directories that only contain
+	// subdirectories (e.g. after moving *.tf files into a subdirectory) are not
+	// treated as valid projects.
+	if !hasProjectIndicator(files, dir) {
+		return ""
+	}
+
 	return dir
 }
 
