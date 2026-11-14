@@ -415,6 +415,86 @@ func TestClone_CheckoutMergeGithubAppNoSourceRemote(t *testing.T) {
 	Assert(t, strings.Contains(remotes, "origin"), "expected \"origin\" remote, got remotes: %q", remotes)
 }
 
+// initRepoWithStalePullRef returns a repo where branch "branch" has two commits on
+// top of main, but refs/pull/1/head still points at the first one. GitHub updates
+// pull/<n>/head asynchronously after a push, so a webhook for the second commit
+// can arrive while the ref still points at the first.
+func initRepoWithStalePullRef(t *testing.T) (repoDir, oldHead, newHead string) {
+	repoDir = initRepo(t)
+	runCmd(t, repoDir, "git", "checkout", "branch")
+	runCmd(t, repoDir, "touch", "first-file")
+	runCmd(t, repoDir, "git", "add", "first-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "first")
+	oldHead = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "update-ref", "refs/pull/1/head", oldHead)
+	runCmd(t, repoDir, "touch", "second-file")
+	runCmd(t, repoDir, "git", "add", "second-file")
+	runCmd(t, repoDir, "git", "commit", "-m", "second")
+	newHead = strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+	runCmd(t, repoDir, "git", "checkout", "main")
+	return repoDir, oldHead, newHead
+}
+
+func githubAppMergeWorkspace(t *testing.T, repoDir string) *events.FileWorkspace {
+	overrideURL := fmt.Sprintf("file://%s", repoDir)
+	return &events.FileWorkspace{
+		DataDir:                     t.TempDir(),
+		CheckoutMerge:               true,
+		TestingOverrideHeadCloneURL: overrideURL,
+		TestingOverrideBaseCloneURL: overrideURL,
+		GpgNoSigningEnabled:         true,
+		GithubAppEnabled:            true,
+	}
+}
+
+func githubAppPull(headCommit string) models.PullRequest {
+	return models.PullRequest{
+		BaseRepo:   models.Repo{},
+		HeadBranch: "branch",
+		HeadCommit: headCommit,
+		BaseBranch: "main",
+		Num:        1,
+	}
+}
+
+// A new clone must merge the PR's head commit even when pull/<n>/head is stale.
+func TestClone_CheckoutMergeGithubAppStalePullRefNewClone(t *testing.T) {
+	repoDir, _, newHead := initRepoWithStalePullRef(t)
+	wd := githubAppMergeWorkspace(t, repoDir)
+
+	cloneDir, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, githubAppPull(newHead), "default")
+	Ok(t, err)
+	Equals(t, newHead, strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")))
+}
+
+// Updating an existing clone must merge the PR's head commit even when
+// pull/<n>/head is stale, including through the forced-clone fallback.
+func TestClone_CheckoutMergeGithubAppStalePullRefExistingClone(t *testing.T) {
+	repoDir, oldHead, newHead := initRepoWithStalePullRef(t)
+	wd := githubAppMergeWorkspace(t, repoDir)
+	logger := logging.NewNoopLogger(t)
+
+	cloneDir, err := wd.Clone(logger, models.Repo{}, githubAppPull(oldHead), "default")
+	Ok(t, err)
+	Equals(t, oldHead, strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")))
+
+	cloneDir, err = wd.Clone(logger, models.Repo{}, githubAppPull(newHead), "default")
+	Ok(t, err)
+	Equals(t, newHead, strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2")))
+}
+
+// When the PR's head commit cannot be fetched, Clone must fail rather than
+// return a checkout of whatever pull/<n>/head points at.
+func TestClone_CheckoutMergeGithubAppUnfetchableHeadFails(t *testing.T) {
+	repoDir, _, _ := initRepoWithStalePullRef(t)
+	wd := githubAppMergeWorkspace(t, repoDir)
+	missing := "0123456789abcdef0123456789abcdef01234567"
+
+	_, err := wd.Clone(logging.NewNoopLogger(t), models.Repo{}, githubAppPull(missing), "default")
+	Assert(t, err != nil, "expected an error when the PR head commit cannot be fetched")
+	Assert(t, strings.Contains(err.Error(), missing), "expected the error to name the PR head commit, got: %v", err)
+}
+
 func TestClone_CheckoutMergeGithubAppNonGithubUsesSourceRemote(t *testing.T) {
 	// Initialize the git repo.
 	repoDir := initRepo(t)

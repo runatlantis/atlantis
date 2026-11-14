@@ -860,14 +860,28 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 		fetchRemote = "origin"
 	}
 
-	// if no checkout depth, omit depth arg
-	if w.CheckoutDepth == 0 {
-		if err := w.wrappedGit(logger, c, "fetch", fetchRemote, fetchRef); err != nil {
-			return err
+	fetch := func(ref string) error {
+		// if no checkout depth, omit depth arg
+		if w.CheckoutDepth == 0 {
+			return w.wrappedGit(logger, c, "fetch", fetchRemote, ref)
 		}
-	} else {
-		if err := w.wrappedGit(logger, c, "fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, fetchRef); err != nil {
-			return err
+		return w.wrappedGit(logger, c, "fetch", "--depth", fmt.Sprint(w.CheckoutDepth), fetchRemote, ref)
+	}
+	if err := fetch(fetchRef); err != nil {
+		return err
+	}
+
+	// The fetched ref can lag the commit this event is about: GitHub updates
+	// pull/<n>/head asynchronously after a push. Merging it anyway would plan
+	// content the pull request no longer has, so fetch the head commit itself.
+	if !w.isFetchHeadAt(logger, c) {
+		if !isFullCommitSHA(c.pr.HeadCommit) {
+			return fmt.Errorf("fetched %s %s does not match pull request head %s", fetchRemote, fetchRef, c.pr.HeadCommit)
+		}
+		logger.Warn("fetched %s %s does not match pull request head %s, fetching the commit directly", fetchRemote, fetchRef, c.pr.HeadCommit)
+		fetchRef = c.pr.HeadCommit
+		if err := fetch(fetchRef); err != nil {
+			return fmt.Errorf("fetching pull request head %s: %w", c.pr.HeadCommit, err)
 		}
 	}
 
@@ -885,6 +899,10 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 		}
 	}
 
+	if !w.isFetchHeadAt(logger, c) {
+		return fmt.Errorf("fetched %s %s does not match pull request head %s", fetchRemote, fetchRef, c.pr.HeadCommit)
+	}
+
 	// We use --no-ff because we always want there to be a merge commit.
 	// This way, our branch will look the same regardless if the merge
 	// could be fast forwarded. This is useful later when we run
@@ -892,6 +910,28 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 	// always succeed whereas without --no-ff, if the merge was fast
 	// forwarded then git rev-parse HEAD^2 would fail.
 	return w.wrappedGit(logger, c, "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+}
+
+// isFetchHeadAt reports whether FETCH_HEAD is the pull request's head commit.
+// With no head commit to compare against there is nothing to check.
+func (w *FileWorkspace) isFetchHeadAt(logger logging.SimpleLogging, c wrappedGitContext) bool {
+	if c.pr.HeadCommit == "" {
+		return true
+	}
+	cmd := exec.Command("git", "rev-parse", "FETCH_HEAD") // #nosec
+	cmd.Dir = c.dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Debug("could not resolve FETCH_HEAD: %s", strings.TrimSpace(string(out)))
+		return false
+	}
+	// Prefix match, as in isBranchAtTargetRef: Bitbucket sends a 12 character commit.
+	return strings.HasPrefix(strings.TrimSpace(string(out)), c.pr.HeadCommit)
+}
+
+// isFullCommitSHA reports whether ref is a full SHA-1, which git servers accept in a fetch.
+func isFullCommitSHA(ref string) bool {
+	return len(ref) == 40 && isRawCommitRef(ref)
 }
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
