@@ -12,7 +12,7 @@ Related issue: to be filed before publication, as [ADR 0003](0003-govern-archite
 
 The Atlantis web UI is protected only by optional basic auth: one shared username and password, off by default, with no record of who did what. Anyone who reaches the UI can discard plans, unlock projects, and lock applies for every repository. Operators who want single sign-on put an authenticating proxy in front of Atlantis, but Atlantis cannot tell users apart behind it, so it cannot limit actions by person or name them in pull request comments.
 
-The experimental web UI behind the `web-ui` experiment adds more actions and more visible data, which makes this gap larger. Users have asked for OAuth and SSO in [#596](https://github.com/runatlantis/atlantis/issues/596) and [#4452](https://github.com/runatlantis/atlantis/issues/4452).
+The experimental web UI behind the `web-ui` experiment adds more actions and more visible data, which makes this gap larger. Users have asked for OAuth and SSO in [#596](https://github.com/runatlantis/atlantis/issues/596) and [#4452](https://github.com/runatlantis/atlantis/issues/4452). They also want only some people, or only some teams per repository, to be able to unlock projects or lock applies, and they want the same rule to apply to `atlantis unlock` comments.
 
 Constraints:
 
@@ -22,7 +22,7 @@ Constraints:
 
 ## Decision
 
-Atlantis will sign people in to the web UI natively and give each person a role. This applies to the pages at `/ui`. The existing UI and the API keep their current authentication.
+Atlantis will sign people in to the web UI natively, give each person a role, and decide what each role may do with an access policy that can differ per repository. This applies to the pages and the read-only JSON endpoints at `/ui`. When sign-in is on, the existing UI's pages redirect to `/ui` and its unlock and apply lock endpoints follow the same policy. The `/api` endpoints keep their API secret.
 
 ### Identity sources
 
@@ -35,13 +35,68 @@ Atlantis will not implement SAML. Organizations that need it can use a provider 
 
 ### Roles
 
-There are three roles. Viewers can read pull requests, plans, locks, and logs. Operators can also discard plans and unlock projects. Admins can also lock and unlock applies. Every route checks the role on the server.
+There are three roles: viewer, operator, and admin. Each role includes the ones below it.
 
-Roles come from rules that match groups, verified email addresses, email domains, or everyone who signed in. The highest matching role wins. People who match no rule are turned away unless operators set a default role. Atlantis refuses to start with sign-in enabled and no role rules.
+Roles come from rules. Each rule matches exactly one of:
+
+- an identity provider group
+- a GitHub organization or team (`github: ORG/TEAM`)
+- a GitHub user
+- a verified email address
+- an email domain
+- everyone who signed in
+
+The highest matching role wins. People who match no rule are turned away unless operators set a default role. Atlantis refuses to start with sign-in enabled and no role rules.
+
+### Access policy
+
+Each action needs a role. These are the defaults:
+
+| Action | Default role | Can differ per repository |
+| --- | --- | --- |
+| View pull requests, plans, locks, jobs, and drift | viewer | no |
+| Unlock projects and discard their plans | operator | yes |
+| Stop a running job | operator | yes |
+| Approve failing policy checks | operator | yes |
+| Start and end maintenance windows | admin | no |
+| Lock and unlock applies | admin | no |
+
+Simple setups use `--web-role-*` flags. Anything more goes in a new `access` section of the server-side repo config, `repos.yaml`, which operators already use to say what each repository may do:
+
+```yaml
+access:
+  roles:
+    admin:
+      - group: platform-admins
+    operator:
+      - github: acme/sre
+  default: none
+  permissions:
+    unlock: operator
+    lock_applies: admin
+  enforce_in_pr_comments: true
+repos:
+  - id: /github\.com\/acme\/prod-.*/
+    access:
+      permissions:
+        unlock: admin
+  - id: github.com/acme/data-lake
+    access:
+      roles:
+        operator:
+          - group: data-eng
+```
+
+- **Per repository.** A `repos` entry can grant extra roles for matching repositories and require a different role there for the actions marked above. When several entries match, the last one that sets a requirement wins, as with other repo settings. Viewing, maintenance windows, and the apply lock cover the whole server, so they are set only at the top level; Atlantis rejects them on a `repos` entry.
+- **Policy only in the server config.** The policy lives only in the server-side config, never in a repository's `atlantis.yaml`, so a pull request cannot grant its author more access.
+- **Checked on every request.** The server checks the policy on every request and action, and the UI hides controls a person can't use. An action that covers several repositories, such as unlocking every lock of a pull request, is checked for each repository before anything changes. Each person's role is recomputed from the policy on every request, so policy changes apply without signing in again. Group membership is read at sign-in.
+- **PR comments.** With `enforce_in_pr_comments`, `atlantis unlock` comments follow the same unlock rule. They are matched against the commenter's VCS user and GitHub teams, because identity provider groups and emails aren't known for a comment. It is off by default, so existing comment behavior doesn't change.
+- **Policy approvals.** Approving policies also requires being a policy owner as `policies.owners` already defines it. Atlantis matches the GitHub login and direct team memberships from a GitHub sign-in on the repository's host, and runs the same `approve_policies` command a comment would. People signed in another way are told to comment instead.
+- **Validation.** Atlantis validates the policy at startup and refuses mistakes such as a rule with two attributes or an unknown role. An Access page shows the policy in plain words and what the current person can do in each repository.
 
 ### Sessions
 
-Sessions are cookies encrypted with AES-256-GCM, with keys derived by HKDF. The cookie's purpose is bound as additional data, and every value carries an expiry. Sessions are short by default, four hours, because the role is fixed for the life of a session. Operators configure a list of secrets: the first encrypts and all decrypt, so secrets rotate without signing everyone out. Every replica uses the same secrets, so any replica can serve any request without sticky sessions or a shared store.
+Sessions are cookies encrypted with AES-256-GCM, with keys derived by HKDF. The cookie's purpose is bound as additional data, and every value carries an expiry. Sessions are short by default, four hours, because group membership is read at sign-in and kept for the life of a session. Operators configure a list of secrets: the first encrypts and all decrypt, so secrets rotate without signing everyone out. Every replica uses the same secrets, so any replica can serve any request without sticky sessions or a shared store.
 
 The sign-in state, nonce, and PKCE verifier travel in a separate short-lived encrypted cookie, so the provider's callback can reach any replica. The flow uses the authorization code grant with PKCE, a random state compared in constant time, and a nonce checked against the ID token.
 
@@ -56,6 +111,7 @@ The sign-in state, nonce, and PKCE verifier travel in a separate short-lived enc
 - Sign-in errors shown to users never include provider responses or internal hosts; details go to the log with a reference.
 - Calls to identity providers and key endpoints have timeouts and size limits, and unknown key IDs cannot cause repeated outbound requests.
 - Sign-ins, denials, and actions are logged with the user, provider, and role, and pull request comments name the user.
+- Read-only JSON endpoints return 401 or 403 instead of redirecting, never include session data, emails, groups, or sensitive plan values, and are not cached.
 
 ### Rollout
 
@@ -67,10 +123,13 @@ Sign-in ships behind the `web-ui` experiment and graduates with it under [ADR 00
 - **Embed Dex.** Covers SAML, LDAP, and Google groups, but adds a large dependency set, its own storage, and another service surface to the binary.
 - **Server-side sessions.** Allow instant revocation, but need a store shared by every replica. Revisit when durable storage is accepted.
 - **Role expressions over claims**, such as JMESPath. More flexible, but harder to review than a fixed list of rules. Revisit if the rules prove too limited.
+- **A policy engine such as OPA or Cedar.** Expressive, but a new language and dependency for what is a short list of roles and actions. The fixed schema can be translated to one later if needed.
+- **A separate access file or flag-only policy.** Flags can't express per-repository rules readably, and a separate file would duplicate the repository matching `repos.yaml` already has.
+- **Access rules in each repository's `atlantis.yaml`.** Rejected, because the author of a pull request could change them.
 
 ## Consequences
 
-Operators can use their existing identity provider, limit what each person can do, and see who discarded a plan or locked applies. Small installs need no new services.
+Operators can use their existing identity provider, limit what each person can do globally or per repository, apply the same unlock rule to PR comments, and see who discarded a plan, stopped a job, or locked applies. Small installs need no new services, and installs that don't configure `access` keep today's behavior.
 
 Atlantis takes on `coreos/go-oidc`, `go-jose`, and a direct dependency on `golang.org/x/oauth2`, and must keep its OIDC and OAuth handling current.
 
@@ -78,4 +137,6 @@ Ending one person's session before it expires is not possible without a shared s
 
 Google Workspace groups are not available natively, because Google does not include them in tokens. Entra ID users in more than 200 groups need app roles.
 
-The existing UI and the API keep their current authentication. Extending sign-in to them needs its own decision.
+The `/api` endpoints keep their API secret, and the JSON endpoints under `/ui` are read-only. API tokens tied to a person, and changing state through those endpoints, need their own decision.
+
+Comment enforcement can only use VCS identities. A person who is an operator through an identity provider group but not through a GitHub team can unlock in the UI but not by comment.
