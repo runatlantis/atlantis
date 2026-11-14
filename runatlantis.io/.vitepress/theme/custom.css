@@ -1,0 +1,7 @@
+/* On the narrowest phones the navbar logo leaves no room for the
+   documentation version selector, so show only the site title there. */
+@media (max-width: 359px) {
+  .VPNavBarTitle .logo {
+    display: none;
+  }
+}
