@@ -6,7 +6,7 @@ Date: 2026-11-13
 
 Proposed
 
-Related issue: to be filed before publication, as [ADR 0003](0003-govern-architecture-proposals.md) requires.
+Related issue: [#7101](https://github.com/runatlantis/atlantis/issues/7101).
 
 ## Context
 
