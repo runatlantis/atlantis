@@ -2073,8 +2073,9 @@ func TestRunCommentCommand_UnmatchedBranch(t *testing.T) {
 
 func TestRunUnlockCommand_VCSComment(t *testing.T) {
 	testCases := []struct {
-		name    string
-		prState *string
+		name        string
+		prState     *string
+		projectName string
 	}{
 		{
 			name:    "PR open",
@@ -2084,6 +2085,12 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 		{
 			name:    "PR closed",
 			prState: github.Ptr("closed"),
+		},
+		{
+			name: "project in open PR", prState: github.Ptr("open"), projectName: "production",
+		},
+		{
+			name: "project in closed PR", prState: github.Ptr("closed"), projectName: "production",
 		},
 	}
 
@@ -2097,19 +2104,30 @@ func TestRunUnlockCommand_VCSComment(t *testing.T) {
 				State: tc.prState,
 			}
 			modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+			if *tc.prState == "closed" {
+				modelPull.State = models.ClosedPullState
+			}
 			When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo),
 				Eq(testdata.Pull.Num))).ThenReturn(pull, nil)
 			When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(pull))).ThenReturn(modelPull, modelPull.BaseRepo,
 				testdata.GithubRepo, nil)
 
 			ch.RunCommentCommand(testdata.GithubRepo, &testdata.GithubRepo, nil, testdata.User, testdata.Pull.Num,
-				&events.CommentCommand{Name: command.Unlock})
+				&events.CommentCommand{Name: command.Unlock, ProjectName: tc.projectName})
 
-			deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(Any[logging.SimpleLogging](),
-				Eq(testdata.GithubRepo.FullName), Eq(testdata.Pull.Num))
+			message := "All Atlantis locks for this PR have been unlocked and plans discarded"
+			if tc.projectName == "" {
+				deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByPull(Any[logging.SimpleLogging](),
+					Eq(testdata.GithubRepo.FullName), Eq(testdata.Pull.Num))
+				deleteLockCommand.VerifyWasCalled(Never()).DeleteLocksByProject(Any[logging.SimpleLogging](), Any[string](), Any[int](), Any[string]())
+			} else {
+				deleteLockCommand.VerifyWasCalledOnce().DeleteLocksByProject(Any[logging.SimpleLogging](),
+					Eq(testdata.GithubRepo.FullName), Eq(testdata.Pull.Num), Eq(tc.projectName))
+				deleteLockCommand.VerifyWasCalled(Never()).DeleteLocksByPull(Any[logging.SimpleLogging](), Any[string](), Any[int]())
+				message = `Atlantis locks for project "production" in this PR have been unlocked and its plans discarded. Run plan again before applying.`
+			}
 			vcsClient.VerifyWasCalledOnce().CreateComment(
-				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num),
-				Eq("All Atlantis locks for this PR have been unlocked and plans discarded"), Eq("unlock"))
+				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num), Eq(message), Eq("unlock"))
 		})
 	}
 }
@@ -2830,7 +2848,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 		},
 	})
 	Ok(t, err)
-	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
+	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", "", models.DiscardedPlanStatus))
 	ghPull := &github.PullRequest{
 		State: github.Ptr("open"),
 	}

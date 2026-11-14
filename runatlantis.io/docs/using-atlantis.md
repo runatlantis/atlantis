@@ -348,8 +348,24 @@ atlantis unlock
 
 ### Explanation
 
-Removes all atlantis locks and discards all plans for this PR.
-To unlock a specific plan you can use the Atlantis UI.
+Removes all Atlantis locks and discards all saved plans for this PR.
+
+To discard only a named project's saved plan and lock, use:
+
+```bash
+atlantis unlock -p my-project
+# Long form:
+atlantis unlock --project my-project
+```
+
+The project name is the `name` configured in `atlantis.yaml`. Only that project's
+locks and plans in this PR are discarded; other projects and PRs are unchanged.
+An unknown project, or one without a lock in this PR, returns an error and does
+not unlock anything else. Run `atlantis plan -p my-project` again before applying.
+
+You can also discard individual plans through the Atlantis UI.
+This command removes Atlantis locks, not Terraform state locks. It does not run
+`terraform force-unlock`.
 
 ---
 
