@@ -185,7 +185,7 @@ func TestRun_SwitchesWorkspaceDistribution(t *testing.T) {
 					"select",
 					"workspace"}),
 				Eq(map[string]string(nil)),
-				NotEq(tfDistribution),
+				Eq(tf.SelectDistribution(tfDistribution, ctx.TerraformDistribution)),
 				Eq(tfVersion),
 				Eq("workspace"))
 		})
