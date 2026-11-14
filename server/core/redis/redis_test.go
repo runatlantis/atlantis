@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -1395,8 +1396,13 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	// that the current Go types cannot unmarshal (Approvals used to be int).
 	key := fmt.Sprintf("%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1,"BaseRepo":{"CloneURL":"https://atlantis:secret-token@github.com/runatlantis/atlantis.git"}}}`
 	Ok(t, s.Set(key, corrupt))
+
+	// Reading it fails without echoing the stored blob, which holds the clone URL token.
+	_, err := rdb.GetPullStatus(pull)
+	ErrContains(t, "deserializing pull", err)
+	Assert(t, !strings.Contains(err.Error(), "secret-token"), "error leaks clone URL: %s", err)
 
 	// Write fresh results. This must succeed despite the unreadable prior entry.
 	status, err := rdb.UpdatePullWithResults(pull, []command.ProjectResult{

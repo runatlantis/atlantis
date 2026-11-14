@@ -579,7 +579,7 @@ func (r *RedisDB) getPull(key string) (*models.PullStatus, error) {
 
 	var p models.PullStatus
 	if err := json.Unmarshal([]byte(val), &p); err != nil {
-		return nil, fmt.Errorf("deserializing pull at %q with contents %q: %w", key, val, err)
+		return nil, fmt.Errorf("deserializing pull at %q: %w", key, err)
 	}
 	return &p, nil
 }
