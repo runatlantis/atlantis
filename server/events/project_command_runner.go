@@ -632,14 +632,15 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 	outputs, err := p.runSteps(ctx.Steps, ctx, absPath)
 	var errs error
 	if err != nil {
+		err1 := err // don't override the original err - we need it later
 		for {
-			err = errors.Unwrap(err)
-			if err == nil {
+			err1 = errors.Unwrap(err1)
+			if err1 == nil {
 				break
 			}
 			// Exclude errors for failed policies
-			if !strings.Contains(err.Error(), "some policies failed") {
-				errs = errors.Join(errs, err)
+			if !strings.Contains(err1.Error(), "some policies failed") {
+				errs = errors.Join(errs, err1)
 			}
 		}
 
@@ -697,7 +698,9 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 				hasFailures := failureRegex.MatchString(output)
 				// Also check for FAIL prefix (conftest error output)
 				hasFailPrefix := strings.HasPrefix(strings.TrimSpace(output), "FAIL")
-				passed = !hasFailures && !hasFailPrefix
+				// A non-zero exit code from the custom policy tool is a policy failure,
+				// even when its output doesn't look like a failure.
+				passed = err == nil && !hasFailures && !hasFailPrefix
 				policyOutput = output
 			}
 
@@ -821,7 +824,7 @@ func (p *DefaultProjectCommandRunner) doPolicyCheck(ctx command.ProjectContext) 
 		ctx.Log.Debug("policy check outputs %s", strings.Join(outputs, "\n"))
 	}
 
-	return result, failure, nil
+	return result, failure, err
 }
 
 func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*models.PlanSuccess, string, error) {

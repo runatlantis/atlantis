@@ -69,6 +69,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 		Command                  string
 		ProjectName              string
 		ExpOut                   string
+		ExpOutContains           string
 		ExpErr                   string
 		Version                  string
 		Distribution             string
@@ -98,16 +99,18 @@ func TestRunStepRunner_Run(t *testing.T) {
 			ExpOut:  "green\n",
 		},
 		{
-			Command: "echo 'a",
-			ExpErr:  "exit status 2: running \"echo 'a\" in",
+			Command:        "echo 'a",
+			ExpOutContains: "error",
+			ExpErr:         "exit status 2: running \"echo 'a\" in",
 		},
 		{
 			Command: "echo hi >> file && cat file",
 			ExpOut:  "hi\n",
 		},
 		{
-			Command: "lkjlkj",
-			ExpErr:  "exit status 127: running \"lkjlkj\" in",
+			Command:        "lkjlkj",
+			ExpOutContains: "not found",
+			ExpErr:         "exit status 127: running \"lkjlkj\" in",
 		},
 		{
 			Command: "echo workspace=$WORKSPACE version=$ATLANTIS_TERRAFORM_VERSION dir=$DIR planfile=$PLANFILE showfile=$SHOWFILE project=$PROJECT_NAME",
@@ -225,15 +228,18 @@ func TestRunStepRunner_Run(t *testing.T) {
 					CustomPolicyCheck:     customPolicyCheck,
 				}
 				out, err := r.Run(ctx, nil, c.Command, tmpDir, map[string]string{"test": "var"}, true, c.PostProcessOutput, c.PostProcessFilterRegexes)
+				// Replace $DIR in the exp with the actual temp dir. We do this
+				// here because when constructing the cases we don't yet know the
+				// temp dir.
+				expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
+				if c.ExpOutContains != "" {
+					Assert(t, strings.Contains(out, c.ExpOutContains), "expected %q to contain %q", out, c.ExpOutContains)
+				}
 				if c.ExpErr != "" {
 					ErrContains(t, c.ExpErr, err)
 					return
 				}
 				Ok(t, err)
-				// Replace $DIR in the exp with the actual temp dir. We do this
-				// here because when constructing the cases we don't yet know the
-				// temp dir.
-				expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 				Equals(t, expOut, out)
 
 				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
@@ -288,7 +294,8 @@ func TestRunStepRunner_Run_HideOnError(t *testing.T) {
 
 			// streamOutput is false so JobMessage falls back to the full error text.
 			out, err := r.Run(ctx, nil, "echo $SECRET; exit 1", t.TempDir(), envs, false, c.PostProcessOutput, nil)
-			Equals(t, "", out)
+			// A failing command still returns its output, unless the step hides it.
+			Equals(t, c.ExpContainsSecret, strings.Contains(out, secret))
 			ErrContains(t, "exit status 1: running \"echo $SECRET; exit 1\" in", err)
 
 			jobErr, ok := err.(interface{ JobMessage() string })
