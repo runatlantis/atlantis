@@ -167,6 +167,24 @@ func (g GithubClient) CreateAtlantisWebhook(ctx context.Context, hookURL string)
 	return hook.GetID(), nil
 }
 
+func (g GithubClient) ListAtlantisHooks(ctx context.Context) ([]Webhook, error) {
+	var out []Webhook
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		hooks, resp, err := g.client.Repositories.ListHooks(ctx, g.ownerName, g.repoName, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range hooks {
+			out = append(out, Webhook{ID: h.GetID(), URL: h.GetConfig().GetURL()})
+		}
+		if resp.NextPage == 0 {
+			return out, nil
+		}
+		opts.Page = resp.NextPage
+	}
+}
+
 func (g GithubClient) DeleteAtlantisHook(ctx context.Context, hookID int64) error {
 	_, err := g.client.Repositories.DeleteHook(ctx, g.ownerName, g.repoName, hookID)
 	if err != nil {
