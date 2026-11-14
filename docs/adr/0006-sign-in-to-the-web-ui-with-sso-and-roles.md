@@ -28,7 +28,7 @@ Atlantis will sign people in to the web UI natively and give each person a role.
 
 Operators choose one of two modes:
 
-- **Sign-in pages.** Atlantis redirects to an OpenID Connect provider, GitHub, or both. OIDC covers Entra ID, Google, Okta, Keycloak, Auth0, GitLab, Amazon Cognito, and Dex through one generic implementation using `coreos/go-oidc` and `golang.org/x/oauth2`. GitHub is not an OIDC provider, so it has its own OAuth implementation; organizations and teams become groups, and child-team membership counts for the parent team, as the existing team allowlist does.
+- **Sign-in pages.** Atlantis redirects to an OpenID Connect provider, GitHub, or both. OIDC covers Entra ID, Google, Okta, Keycloak, Auth0, GitLab, Amazon Cognito, and Dex through one generic implementation using `coreos/go-oidc` and `golang.org/x/oauth2`. GitHub is not an OIDC provider, so it has its own OAuth implementation and requires an organization allowlist, because anyone can create a GitHub account. Organizations and teams become groups prefixed with `github:`, so a GitHub organization can never match another provider's group of the same name, and child-team membership counts for the parent team, as the existing team allowlist does.
 - **An authenticating proxy.** Atlantis takes the identity from a proxy in front of it and verifies it on every request: the signed `x-amzn-oidc-data` header from an AWS Application Load Balancer, checked against the load balancer's ARN; the signed assertion from Google Cloud Identity-Aware Proxy, checked for audience and issuer; or plain headers, accepted only from configured networks. This mode covers IAM Identity Center through Cognito behind a load balancer.
 
 Atlantis will not implement SAML. Organizations that need it can use a provider that bridges SAML to OIDC, such as Cognito, Keycloak, or Dex.
@@ -41,18 +41,20 @@ Roles come from rules that match groups, verified email addresses, email domains
 
 ### Sessions
 
-Sessions are cookies encrypted with AES-256-GCM. The cookie's purpose is bound as additional data, and every value carries an expiry. Operators configure a list of secrets: the first encrypts and all decrypt, so secrets rotate without signing everyone out. Every replica uses the same secrets, so any replica can serve any request without sticky sessions or a shared store.
+Sessions are cookies encrypted with AES-256-GCM, with keys derived by HKDF. The cookie's purpose is bound as additional data, and every value carries an expiry. Sessions are short by default, four hours, because the role is fixed for the life of a session. Operators configure a list of secrets: the first encrypts and all decrypt, so secrets rotate without signing everyone out. Every replica uses the same secrets, so any replica can serve any request without sticky sessions or a shared store.
 
 The sign-in state, nonce, and PKCE verifier travel in a separate short-lived encrypted cookie, so the provider's callback can reach any replica. The flow uses the authorization code grant with PKCE, a random state compared in constant time, and a nonce checked against the ID token.
 
 ### Security requirements
 
-- Cookies are `HttpOnly` and `SameSite=Lax`, and `Secure` when the Atlantis URL uses HTTPS.
+- Cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` except on a loopback host over plain http.
 - Every state-changing request, including sign-out, rejects cross-origin requests.
 - Return paths after sign-in must stay under `/ui`.
 - Signed-out visitors see only the sign-in page, which reveals nothing about the server.
 - Entra ID's group overage, where groups are left out of the token, fails closed with an explanation.
-- Unverified email addresses never match role rules.
+- Unverified email addresses never match role rules, including emails from proxies that omit `email_verified`.
+- Sign-in errors shown to users never include provider responses or internal hosts; details go to the log with a reference.
+- Calls to identity providers and key endpoints have timeouts and size limits, and unknown key IDs cannot cause repeated outbound requests.
 - Sign-ins, denials, and actions are logged with the user, provider, and role, and pull request comments name the user.
 
 ### Rollout
