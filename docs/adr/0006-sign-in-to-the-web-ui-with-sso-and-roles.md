@@ -94,6 +94,24 @@ repos:
 - **Policy approvals.** Approving policies also requires being a policy owner as `policies.owners` already defines it. Atlantis matches the GitHub login and direct team memberships from a GitHub sign-in on the repository's host, and runs the same `approve_policies` command a comment would. People signed in another way are told to comment instead.
 - **Validation.** Atlantis validates the policy at startup and refuses mistakes such as a rule with two attributes or an unknown role. An Access page shows the policy in plain words and what the current person can do in each repository.
 
+### What it looks like
+
+These screenshots come from a working prototype behind the `web-ui` experiment, with demo data. They illustrate the decision; the final pages may differ.
+
+The sign-in page lists the configured providers. Someone who signs in but matches no rule is told why:
+
+![Sign-in page with Microsoft Entra ID and GitHub](assets/0006/sign-in.png)
+
+![Sign-in page explaining that the account has no Atlantis role](assets/0006/no-role.png)
+
+The Access page shows the policy in plain words: what each action needs, who holds each role, the per-repository rules, and what the signed-in person can do in each repository:
+
+![Access page for a person who is a viewer everywhere and an operator on one repository](assets/0006/access.png)
+
+Controls follow the policy. Here an operator can select locks to unlock, except on `platform-eks`, where a repository rule requires admin:
+
+![Locks page for an operator, with no checkbox on a repository that needs admin to unlock](assets/0006/locks-operator.png)
+
 ### Sessions
 
 Sessions are cookies encrypted with AES-256-GCM, with keys derived by HKDF. The cookie's purpose is bound as additional data, and every value carries an expiry. Sessions are short by default, four hours, because group membership is read at sign-in and kept for the life of a session. Operators configure a list of secrets: the first encrypts and all decrypt, so secrets rotate without signing everyone out. Every replica uses the same secrets, so any replica can serve any request without sticky sessions or a shared store.
