@@ -69,6 +69,8 @@ const config = defineConfig({
     },
     themeConfig: {
         // https://vitepress.dev/reference/default-theme-config
+        // CNCF artwork: https://github.com/cncf/artwork/tree/main/projects/atlantis
+        logo: '/logo.png',
         editLink: {
             pattern: 'https://github.com/runatlantis/atlantis/edit/main/runatlantis.io/:path'
         },
