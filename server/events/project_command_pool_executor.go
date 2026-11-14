@@ -5,7 +5,6 @@ package events
 
 import (
 	"fmt"
-	"runtime/debug"
 	"sort"
 	"sync"
 
@@ -13,11 +12,12 @@ import (
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/logging"
+	"github.com/runatlantis/atlantis/server/recovery"
 )
 
 type prjCmdRunnerFunc func(ctx command.ProjectContext) command.ProjectCommandOutput
 
-func RunOneProjectCmd(
+func runOneProjectCmd(
 	runnerFunc prjCmdRunnerFunc,
 	cmd command.ProjectContext,
 ) command.ProjectResult {
@@ -32,6 +32,23 @@ func RunOneProjectCmd(
 		ProjectName:          cmd.ProjectName,
 		SilencePRComments:    cmd.SilencePRComments,
 	}
+}
+
+// RunOneProjectCmdRecovering runs cmd for callers outside the command runner's
+// panic recovery, like the parallel pool goroutines and the API controller. A
+// panic in runnerFunc is logged and becomes an errored result for cmd, instead
+// of crashing the server or skipping the caller's cleanup.
+func RunOneProjectCmdRecovering(
+	runnerFunc prjCmdRunnerFunc,
+	cmd command.ProjectContext,
+) (res command.ProjectResult) {
+	defer func() {
+		if r := recover(); r != nil {
+			cmd.Log.Err("panic running %s for project %q (dir %q, workspace %q): %v\n%s", cmd.CommandName, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, r, recovery.Stack(3))
+			res = errorProjectResult(cmd, fmt.Errorf("panic: %v", r))
+		}
+	}()
+	return runOneProjectCmd(runnerFunc, cmd)
 }
 
 func runProjectCmdsParallel(
@@ -67,7 +84,7 @@ func runProjectCmdsParallel(
 
 		execute := func(cmd command.ProjectContext) {
 			defer wg.Done()
-			res := RunOneProjectCmd(runnerFunc, cmd)
+			res := RunOneProjectCmdRecovering(runnerFunc, cmd)
 			mux.Lock()
 			results = append(results, res)
 			mux.Unlock()
@@ -129,13 +146,7 @@ func RunProjectCmdsParallelInOrder(
 		wg.Add()
 		go func() {
 			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					log.Err("panic running %s for project %q (dir %q, workspace %q): %v\n%s", cmd.CommandName, cmd.ProjectName, cmd.RepoRelDir, cmd.Workspace, r, debug.Stack())
-					results[i] = errorProjectResult(cmd, fmt.Errorf("panic: %v", r))
-				}
-			}()
-			results[i] = RunOneProjectCmd(runnerFunc, cmd)
+			results[i] = RunOneProjectCmdRecovering(runnerFunc, cmd)
 		}()
 	}
 	wg.Wait()
@@ -160,7 +171,7 @@ func runProjectCmds(
 ) command.Result {
 	var results []command.ProjectResult
 	for _, pCmd := range cmds {
-		res := RunOneProjectCmd(runnerFunc, pCmd)
+		res := runOneProjectCmd(runnerFunc, pCmd)
 
 		results = append(results, res)
 	}

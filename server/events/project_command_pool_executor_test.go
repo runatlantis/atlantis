@@ -256,10 +256,12 @@ func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
 	cases := []struct {
 		name     string
 		abort    bool
+		panics   bool
 		expRuns  []string
 		expError string
 	}{
 		{name: "aborts when set", abort: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
+		{name: "aborts after a panic", abort: true, panics: true, expRuns: []string{"p1"}, expError: "skipped because an earlier execution order group failed"},
 		{name: "keeps going otherwise", expRuns: []string{"p1", "p2", "p3"}},
 	}
 	for _, c := range cases {
@@ -270,12 +272,16 @@ func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
 				mu.Lock()
 				ran = append(ran, ctx.ProjectName)
 				mu.Unlock()
+				if c.panics {
+					panic("boom")
+				}
 				return command.ProjectCommandOutput{Error: errors.New("plan failed")}
 			}
+			log := logging.NewNoopLogger(t)
 			cmds := []command.ProjectContext{
-				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort},
-				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1},
-				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2},
+				{CommandName: command.Plan, ProjectName: "p1", ExecutionOrderGroup: 0, AbortOnExecutionOrderFail: c.abort, Log: log},
+				{CommandName: command.Plan, ProjectName: "p2", ExecutionOrderGroup: 1, Log: log},
+				{CommandName: command.Plan, ProjectName: "p3", ExecutionOrderGroup: 2, Log: log},
 			}
 
 			result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
@@ -294,21 +300,39 @@ func TestRunProjectCmdsParallelInOrder_AbortsAfterFailedGroup(t *testing.T) {
 	}
 }
 
-func TestRunProjectCmdsParallelInOrder_RecoversFromPanic(t *testing.T) {
-	runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
-		if ctx.ProjectName == "p1" {
-			panic("boom")
-		}
-		return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+func TestParallelPoolRunners_RecoverFromPanic(t *testing.T) {
+	pools := map[string]func(t *testing.T, cmds []command.ProjectContext, runner prjCmdRunnerFunc) command.Result{
+		"api": func(t *testing.T, cmds []command.ProjectContext, runner prjCmdRunnerFunc) command.Result {
+			return RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+		},
+		"pull request": func(_ *testing.T, cmds []command.ProjectContext, runner prjCmdRunnerFunc) command.Result {
+			return runProjectCmdsParallel(cmds, runner, 2, nil, models.PullRequest{})
+		},
 	}
-	cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+	for name, runPool := range pools {
+		t.Run(name, func(t *testing.T) {
+			runner := func(ctx command.ProjectContext) command.ProjectCommandOutput {
+				if ctx.ProjectName == "p1" {
+					panic("boom")
+				}
+				return command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}
+			}
+			cmds := []command.ProjectContext{makeProjectContext("p1"), makeProjectContext("p2")}
+			for i := range cmds {
+				cmds[i].Log = logging.NewNoopLogger(t)
+			}
 
-	result := RunProjectCmdsParallelInOrder(logging.NewNoopLogger(t), cmds, runner, 2)
+			result := runPool(t, cmds, runner)
 
-	require.Len(t, result.ProjectResults, 2)
-	Equals(t, "p1", result.ProjectResults[0].ProjectName)
-	Equals(t, "panic: boom", result.ProjectResults[0].Error.Error())
-	assert.NoError(t, result.ProjectResults[1].Error)
+			require.Len(t, result.ProjectResults, 2)
+			p1Result := findResult(result, "p1")
+			require.NotNil(t, p1Result)
+			Equals(t, "panic: boom", p1Result.Error.Error())
+			p2Result := findResult(result, "p2")
+			require.NotNil(t, p2Result)
+			assert.NoError(t, p2Result.Error)
+		})
+	}
 }
 
 func TestSplitByExecutionOrderGroup(t *testing.T) {
