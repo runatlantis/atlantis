@@ -107,3 +107,11 @@ func TestGetProjectDirFromFs_ModuleParentTerragrunt(t *testing.T) {
 	result := getProjectDirFromFs(fs.FS(files), "project/modules/foo/main.tf")
 	Equals(t, "project", result)
 }
+
+func TestGetProjectDirFromFs_ParentWithOnlySubdir(t *testing.T) {
+	files := fstest.MapFS{
+		"parent/subdir/main.tf": &fstest.MapFile{},
+	}
+	Equals(t, "", getProjectDirFromFs(fs.FS(files), "parent/main.tf"))
+	Equals(t, "parent/subdir", getProjectDirFromFs(fs.FS(files), "parent/subdir/main.tf"))
+}
