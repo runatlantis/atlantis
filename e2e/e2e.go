@@ -125,20 +125,23 @@ func (t *E2ETester) runPlanOnly(ctx context.Context) (*E2EResult, error) {
 	log.Printf("created pull request %s", url)
 
 	defer func() {
-		if cleanErr := cleanUp(ctx, t, pullID, branchName); cleanErr != nil {
+		// Close the PR even when the run was interrupted.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if cleanErr := cleanUp(cleanupCtx, t, pullID, branchName); cleanErr != nil {
 			log.Printf("cleanup failed: %v", cleanErr)
 		}
 	}()
 
 	// Wait for Atlantis to receive webhook and start processing.
-	time.Sleep(initialWait)
+	sleep(ctx, initialWait)
 
 	// Poll aggregate "atlantis/plan" status until terminal.
 	state := "not started"
 	var statusErr error
 	i := 0
 	for ; i < maxPolls && t.vcsClient.IsAtlantisInProgress(state); i++ {
-		time.Sleep(pollInterval)
+		sleep(ctx, pollInterval)
 		state, statusErr = t.vcsClient.GetAtlantisStatus(ctx, branchName)
 		if statusErr != nil {
 			log.Printf("[%s] error polling status: %v", tc.Name, statusErr)

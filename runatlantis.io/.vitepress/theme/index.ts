@@ -1,4 +1,5 @@
 import DefaultTheme from "vitepress/theme";
+import './custom.css';
 import { defineAsyncComponent, h } from 'vue';
 import DocumentationVersion from '../components/DocumentationVersion.vue';
 import SharedSidebar from '../components/SharedSidebar.vue';

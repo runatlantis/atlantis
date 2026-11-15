@@ -847,7 +847,7 @@ atlantis server --gh-app-slug="myappslug"
 ATLANTIS_GH_APP_SLUG="myappslug"
 ```
 
-A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses the value of this parameter to identify the comments it has left on GitHub pull requests. This is used for functions such as `--hide-prev-plan-comments`. You need to obtain this value from your GitHub app, one way is to go to your App settings and open "Public page" from the left sidebar. Your `--gh-app-slug` value will be the last part of the URL, e.g `https://github.com/apps/<slug>`.
+A slugged version of GitHub app name shown in pull requests comments, etc (not `Atlantis App` but something like `atlantis-app`). Atlantis uses this identity for functions such as `--hide-prev-plan-comments` and suppressing automatic replies to its own comments. When omitted, Atlantis attempts to discover the slug through the GitHub App API at startup. If discovery fails, Atlantis logs a warning and starts without these features. You can obtain the slug from your App settings by opening "Public page" from the left sidebar. The slug is the last part of the URL, e.g `https://github.com/apps/<slug>`.
 
 ### `--gh-hostname`
 
@@ -1111,7 +1111,7 @@ For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not
 
 For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
-When using the GitHub App, you need to set `--gh-app-slug` to enable this feature.
+When using a GitHub App, Atlantis automatically discovers its identity if `--gh-app-slug` is omitted. If discovery fails, the server still starts, but previous comments cannot be hidden and automatic replies to its own comments cannot be suppressed. Set `--gh-app-slug` explicitly if automatic discovery is unavailable.
 
 ### `--hide-unchanged-plan-comments`
 
