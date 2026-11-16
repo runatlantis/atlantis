@@ -1237,6 +1237,19 @@ func (p *DefaultProjectCommandBuilder) pathConfiguredOnlyOnAnotherBranch(ctx *co
 	return len(unfilteredRepoConfig.FindProjectsByDir(cleanDir)) > 0, nil
 }
 
+// noPullDirResult handles a missing pull dir with no plans to restore. If
+// this server never recorded a project for the pull (for example
+// --skip-clone-no-changes skipped the clone because none of its projects
+// changed), there is nothing to apply. Otherwise the plans were lost and
+// os.ErrNotExist is returned.
+func noPullDirResult(ctx *command.Context) ([]command.ProjectContext, error) {
+	if ctx.PullStatus == nil || len(ctx.PullStatus.Projects) == 0 {
+		ctx.Log.Info("pull directory missing and no projects recorded for this pull, nothing to apply")
+		return nil, nil
+	}
+	return nil, os.ErrNotExist
+}
+
 // buildAllProjectCommandsByPlan builds contexts for a command for every project that has
 // pending plans in this ctx.
 func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *command.Context, commentCmd *CommentCommand) ([]command.ProjectContext, error) {
@@ -1253,7 +1266,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		// Probe capability first to avoid pointless I/O on stores that don't
 		// support restore (e.g. LocalPlanStore).
 		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
-			return nil, os.ErrNotExist
+			return noPullDirResult(ctx)
 		}
 		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
 		if listErr != nil {
@@ -1261,7 +1274,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 		}
 		// No workspaces in the store means there's nothing to restore.
 		if len(workspaces) == 0 {
-			return nil, os.ErrNotExist
+			return noPullDirResult(ctx)
 		}
 		// Clone every workspace before restoring; this ensures each workspace
 		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
