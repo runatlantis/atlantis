@@ -12,6 +12,8 @@ Currently Statsd and Prometheus is supported. See configuration below for detail
 
 Metrics are configured through the [Server Side Config](server-side-repo-config.md#metrics).
 
+Some metrics include a `pr_number` tag, so each pull request adds new metric series. To leave this tag out, use [`--disable-metrics-pr-number-tag`](server-configuration.md#disable-metrics-pr-number-tag).
+
 ## Available Metrics
 
 Assuming metrics are exposed from the endpoint `/metrics` from the [metrics](server-side-repo-config.md#metrics) server side config e.g.

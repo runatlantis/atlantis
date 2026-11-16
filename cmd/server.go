@@ -75,6 +75,7 @@ const (
 	DisableAutoplanLabelFlag         = "disable-autoplan-label"
 	DisableAutomergeLabelFlag        = "disable-automerge-label"
 	DisableMarkdownFoldingFlag       = "disable-markdown-folding"
+	DisableMetricsPRNumberTagFlag    = "disable-metrics-pr-number-tag"
 	DisableRepoLockingFlag           = "disable-repo-locking"
 	DisableGlobalApplyLockFlag       = "disable-global-apply-lock"
 	DisableUnlockLabelFlag           = "disable-unlock-label"
@@ -664,6 +665,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	DisableMarkdownFoldingFlag: {
 		description:  "Toggle off folding in markdown output.",
+		defaultValue: false,
+	},
+	DisableMetricsPRNumberTagFlag: {
+		description:  "Remove the pr_number tag from metrics. Each pull request otherwise adds new metric series that are kept until Atlantis restarts.",
 		defaultValue: false,
 	},
 	WriteGitCredsFlag: {

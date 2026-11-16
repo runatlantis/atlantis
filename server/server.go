@@ -227,6 +227,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("instantiating metrics scope: %w", err)
 	}
+	if userConfig.DisableMetricsPRNumberTag {
+		statsScope = metrics.WithoutTags(statsScope, metrics.PullRequestNumberTag)
+	}
 
 	if userConfig.GithubUser != "" || userConfig.GithubAppID != 0 {
 		if userConfig.GithubAllowMergeableBypassApply {
