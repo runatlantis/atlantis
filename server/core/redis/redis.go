@@ -523,6 +523,7 @@ func (r *RedisDB) UpdatePullWithResults(pull models.PullRequest, newResults []co
 					res.ProjectName == proj.ProjectName {
 
 					proj.Status = res.PlanStatus()
+					proj.PlanHash = res.PlanHashAfterMerge(proj.PlanHash)
 
 					// Updating only policy sets which are included in results; keeping the rest.
 					if len(proj.PolicyStatus) > 0 {
@@ -631,6 +632,7 @@ func (r *RedisDB) projectResultToProject(p command.ProjectResult) models.Project
 		ProjectName:  p.ProjectName,
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
+		PlanHash:     p.PlanHashAfterMerge(""),
 	}
 }
 

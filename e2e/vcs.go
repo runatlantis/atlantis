@@ -19,6 +19,8 @@ type VCSClient interface {
 	Clone(cloneDir string) error
 	CreateAtlantisWebhook(ctx context.Context, hookURL string) (int64, error)
 	DeleteAtlantisHook(ctx context.Context, hookID int64) error
+	// ListAtlantisHooks lists the test repository's webhooks.
+	ListAtlantisHooks(ctx context.Context) ([]Webhook, error)
 	CreatePullRequest(ctx context.Context, title, branchName string) (string, int, error)
 	// PostPRComment posts a PR/MR comment that Atlantis treats as a command.
 	PostPRComment(ctx context.Context, pullNumber int, body string) error

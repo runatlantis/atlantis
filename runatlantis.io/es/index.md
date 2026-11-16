@@ -15,7 +15,7 @@ hero:
       link: /blog/2017/introducing-atlantis
     - theme: alt
       text: Únete a nosotros en Slack
-      link: https://slack.cncf.io/
+      link: https://cncf-slack.netlify.app/
 features:
   - title: Menos errores
     details: Detecta errores en la salida de Terraform plan antes de aplicar

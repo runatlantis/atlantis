@@ -469,6 +469,7 @@ func (b *BoltDB) UpdatePullWithResults(pull models.PullRequest, newResults []com
 						res.ProjectName == proj.ProjectName {
 
 						proj.Status = res.PlanStatus()
+						proj.PlanHash = res.PlanHashAfterMerge(proj.PlanHash)
 
 						// Updating only policy sets which are included in results; keeping the rest.
 						if len(proj.PolicyStatus) > 0 {
@@ -636,6 +637,7 @@ func (b *BoltDB) projectResultToProject(p command.ProjectResult) models.ProjectS
 		ProjectName:  p.ProjectName,
 		PolicyStatus: p.PolicyStatus(),
 		Status:       p.PlanStatus(),
+		PlanHash:     p.PlanHashAfterMerge(""),
 	}
 }
 

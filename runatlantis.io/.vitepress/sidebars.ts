@@ -59,6 +59,7 @@ const en: SidebarItem[] = [
           { text: "FAQ", link: "/docs/faq" },
         ]
       },
+      { text: "Experiments", link: "/docs/experiments" },
       {
         text: "Using Atlantis",
         collapsed: true,
@@ -96,6 +97,7 @@ const en: SidebarItem[] = [
     link: "/contributing",
     collapsed: false,
     items: [
+      { text: "Architecture Decisions", link: "/contributing/adr/" },
       {
         text: 'Implementation Details',
         items: [
@@ -187,8 +189,10 @@ const SITE_ROOT = path.resolve(import.meta.dirname, "..");
 // A locale is translated page by page. Point at the localized page when it
 // exists and fall back to English when it doesn't, so a partially translated
 // locale degrades to mixed-language navigation instead of dead links.
-const localizedLink = (link: string, locale: string): string =>
-  existsSync(path.join(SITE_ROOT, locale, `${link}.md`)) ? `/${locale}${link}` : link;
+const localizedLink = (link: string, locale: string): string => {
+  const source = link.endsWith('/') ? `${link}[record].paths.js` : `${link}.md`;
+  return existsSync(path.join(SITE_ROOT, locale, source)) ? `/${locale}${link}` : link;
+};
 
 const localizeSidebar = (
   items: SidebarItem[],
@@ -219,6 +223,7 @@ const esLabels: Record<string, string> = {
   "Configuring Webhooks": "Configurar webhooks",
   "Provider Credentials": "Credenciales del proveedor",
   "Configuring Atlantis": "Configurar Atlantis",
+  "Experiments": "Experimentos",
   "Overview": "Visión general",
   "Server Configuration": "Configuración del servidor",
   "Server Side Repo Config": "Configuración de repositorios en el servidor",
@@ -247,6 +252,7 @@ const esLabels: Record<string, string> = {
   "Troubleshooting": "Resolución de problemas",
   "HTTPS, SSL, TLS": "HTTPS, SSL, TLS",
   "Contributing": "Contribuir",
+  "Architecture Decisions": "Decisiones de arquitectura",
   "Implementation Details": "Detalles de implementación",
   "Events Controller": "Controlador de eventos",
   "Glossary": "Glosario",

@@ -185,6 +185,8 @@ Use the `--parallel-pool-size` to configure the max number of plans and applies 
 
 Parallel plans and applies work across both multiple directories and multiple workspaces.
 
+`parallel_plan` also applies to plans and policy checks started through the [API](api-endpoints.md), such as `POST /api/plan` and `POST /api/drift/detect`. Applies started through the API still run one project at a time.
+
 ### Configuring Planning
 
 Given the directory structure:
@@ -477,29 +479,52 @@ silence_pr_comments: ["apply"]
 workflow: myworkflow
 ```
 
-| Key                                     | Type                    | Default         | Required | Description                                                                                                                                                                                                                             |
-| --------------------------------------- | ----------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                       |
-| branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                     |
-| dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                      |
-| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for the project. Atlantis switches to it at plan/apply. No `/`, `\\`, `..`, `$`, whitespace or control chars, nor start with `-` or `~`. |
-| execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                         |
-| delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                       |
-| repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                           |
-| repo_locks                              | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Get a repository lock in this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                   |
-| custom_policy_check                     | bool                    | `false`         | no       | Enable using policy check tools other than Conftest                                                                                                                                                                                     |
-| autoplan                                | [Autoplan](#autoplan)   | none            | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.md).                                                                                                                   |
-| terraform_version                       | string                  | none            | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                            |
-| plan_requirements<br />_(restricted)_   | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.   |
-| apply_requirements<br />_(restricted)_  | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis apply` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
-| import_requirements<br />_(restricted)_ | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis import` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
-| silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                       |
-| workflow <br />_(restricted)_           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                            |
+| Key                                     | Type                    | Default         | Required | Description                                                                                                                                                                                                                                                     |
+| --------------------------------------- | ----------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| name                                    | string                  | none            | maybe    | Required if there is more than one project with the same `dir` and `workspace`. This project name can be used with the `-p` flag.                                                                                                                               |
+| branch                                  | string                  | none            | no       | Regex matching projects by the base branch of pull request (the branch the pull request is getting merged into). Only projects that match the PR's branch will be considered. By default, all branches are matched.                                             |
+| dir                                     | string                  | none            | **yes**  | The directory of this project relative to the repo root. For example if the project was under `./project1` then use `project1`. Use `.` to indicate the repo root.                                                                                              |
+| workspace                               | string                  | `"default"`     | no       | The [Terraform workspace](https://developer.hashicorp.com/terraform/language/state/workspaces) for the project. Atlantis switches to it at plan/apply. No `/`, `\\`, `..`, `$`, whitespace or control chars, nor start with `-` or `~`.                         |
+| execution_order_group                   | int                     | `0`             | no       | Index of execution order group. Projects will be sorted by this field before planning/applying.                                                                                                                                                                 |
+| delete_source_branch_on_merge           | bool                    | `false`         | no       | Automatically deletes the source branch on merge.                                                                                                                                                                                                               |
+| repo_locking                            | bool                    | `true`          | no       | (deprecated) Get a repository lock in this project when plan.                                                                                                                                                                                                   |
+| repo_locks                              | [RepoLocks](#repolocks) | `mode: on_plan` | no       | Get a repository lock in this project on plan or apply. See [RepoLocks](#repolocks) for more details.                                                                                                                                                           |
+| custom_policy_check                     | bool                    | `false`         | no       | Enable using policy check tools other than Conftest                                                                                                                                                                                                             |
+| autoplan                                | [Autoplan](#autoplan)   | none            | no       | A custom autoplan configuration. If not specified, will use the autoplan config. See [Autoplanning](autoplanning.md).                                                                                                                                           |
+| terraform_version                       | string                  | none            | no       | A specific Terraform version to use when running commands for this project. Must be [Semver compatible](https://semver.org/), ex. `v0.11.0`, `0.12.0-beta1`.                                                                                                    |
+| plan_requirements<br />_(restricted)_   | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.                           |
+| apply_requirements<br />_(restricted)_  | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis apply` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
+| import_requirements<br />_(restricted)_ | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis import` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
+| silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                                               |
+| workflow <br />_(restricted)_           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                                                    |
 
 ::: tip
 A project represents a Terraform state. Typically, there is one state per directory and workspace however it's possible to
 have multiple states in the same directory using `terraform init -backend-config=custom-config.tfvars`.
 Atlantis supports this but requires the `name` key to be specified. See [Custom Backend Config](custom-workflows.md#custom-backend-config) for more details.
+:::
+
+#### Symlinked project directories
+
+Atlantis resolves symlinks in a project's `dir` before running any command in
+it. A `dir` that is, or passes through, a symlink to another directory inside
+the repo works as before. A `dir` that resolves to a location outside the
+cloned repo is rejected with `project path traversal detected: path escapes base directory`.
+A `dir` whose symlink target does not exist fails with `dir "<dir>" does not exist`,
+and a `dir` that cannot be resolved for any other reason fails with
+`resolving project path: <error>`. If a plan file path inside the project
+directory is a symlink or anything other than a regular file, Atlantis deletes
+it before writing the new plan.
+
+::: warning Behavior change
+Previously, Atlantis checked the project `dir` as text only, so a symlink
+in the repo could point the project at a directory outside the clone, and a
+symlink at the plan file path was followed when the plan was written. Now
+symlinks are resolved first, a `dir` outside the clone is refused with
+`project path traversal detected: path escapes base directory`, a `dir` that
+cannot be resolved now fails instead of the error being ignored, and a symlinked plan file
+is replaced with a regular file. Repos whose project `dir` links outside the
+repo must move that code into the repo or use a real directory.
 :::
 
 ### Autoplan

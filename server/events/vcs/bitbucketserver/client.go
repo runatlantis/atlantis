@@ -24,6 +24,10 @@ import (
 // single comment.
 const maxCommentLength = 32768
 
+func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	return b.username != "" && user.Username != "" && strings.EqualFold(b.username, user.Username), nil
+}
+
 type Client struct {
 	httpClient  *http.Client
 	username    string

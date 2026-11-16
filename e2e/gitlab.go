@@ -88,6 +88,24 @@ func (g GitlabClient) CreateAtlantisWebhook(ctx context.Context, hookURL string)
 	return int64(hook.ID), err
 }
 
+func (g GitlabClient) ListAtlantisHooks(ctx context.Context) ([]Webhook, error) {
+	var out []Webhook
+	opts := &gitlab.ListProjectHooksOptions{PerPage: 100, Page: 1}
+	for {
+		hooks, resp, err := g.client.Projects.ListProjectHooks(g.projectId, opts, gitlab.WithContext(ctx))
+		if err != nil {
+			return nil, err
+		}
+		for _, h := range hooks {
+			out = append(out, Webhook{ID: int64(h.ID), URL: h.URL})
+		}
+		if resp.NextPage == 0 {
+			return out, nil
+		}
+		opts.Page = resp.NextPage
+	}
+}
+
 func (g GitlabClient) DeleteAtlantisHook(ctx context.Context, hookID int64) error {
 	_, err := g.client.Projects.DeleteProjectHook(g.projectId, int(hookID))
 	if err != nil {

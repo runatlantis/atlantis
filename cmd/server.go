@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -39,7 +40,7 @@ const (
 // To add a new flag you must:
 // 1. Add a const with the flag name (in alphabetic order).
 // 2. Add a new field to server.UserConfig and set the mapstructure tag equal to the flag name.
-// 3. Add your flag's description etc. to the stringFlags, intFlags, or boolFlags slices.
+// 3. Add your flag's description and default to stringFlags, stringSliceFlags, intFlags, or boolFlags.
 const (
 	// Flag names.
 	ADWebhookPasswordFlag            = "azuredevops-webhook-password" // nolint: gosec
@@ -85,6 +86,7 @@ const (
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
 	ExecutableName                   = "executable-name"
+	ExperimentsFlag                  = "experiments"
 	FailOnPreWorkflowHookError       = "fail-on-pre-workflow-hook-error"
 	HideUnchangedPlanComments        = "hide-unchanged-plan-comments"
 	GHHostnameFlag                   = "gh-hostname"
@@ -176,7 +178,6 @@ const (
 	DefaultAutoDiscoverMode             = "auto"
 	DefaultAutoplanFileList             = "**/*.tf,**/*.tf.json,**/*.tfvars,**/*.tfvars.json,**/*.tofu,**/*.tofu.json,**/terragrunt.hcl,**/.terraform.lock.hcl"
 	DefaultAllowCommands                = "version,plan,apply,unlock,approve_policies,cancel"
-	DefaultBlockedExtraArgs             = "-chdir,--chdir,-plugin-dir,--plugin-dir"
 	DefaultCheckoutStrategy             = CheckoutStrategyBranch
 	DefaultCheckoutDepth                = 0
 	DefaultBitbucketBaseURL             = bitbucketcloud.BaseURL
@@ -211,6 +212,12 @@ const (
 	DefaultWebPassword                  = "atlantis"
 )
 
+var stringSliceFlags = map[string]stringSliceFlag{
+	ExperimentsFlag: {
+		description: "Server experiment permissions, separated by commas. Required for experimental feature settings and routes; activation settings still apply. See " + server.ExperimentsDocumentationURL + ".",
+	},
+}
+
 var stringFlags = map[string]stringFlag{
 	ADTokenFlag: {
 		description: "Azure DevOps token of API user. Can also be specified via the ATLANTIS_AZUREDEVOPS_TOKEN environment variable.",
@@ -239,10 +246,9 @@ var stringFlags = map[string]stringFlag{
 		defaultValue: DefaultAllowCommands,
 	},
 	BlockedExtraArgsFlag: {
-		description: "Comma separated list of Terraform CLI flag prefixes that are not allowed " +
+		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
 			"in comment extra args (the flags after '--'). " +
-			"Defaults to " + DefaultBlockedExtraArgs + ".",
-		defaultValue: DefaultBlockedExtraArgs,
+			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
 	},
 	AtlantisURLFlag: {
 		description: "URL that Atlantis can be reached at. Defaults to http://$(hostname):$port where $port is from --" + PortFlag + ". Supports a base path ex. https://example.com/basepath.",
@@ -419,7 +425,7 @@ var stringFlags = map[string]stringFlag{
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
 	},
 	APISecretFlag: {
-		description: "Secret used to validate requests made to the /api/* endpoints",
+		description: "Secret used to validate requests made to the /api/* endpoints. Requires the api or drift-detection experiment for the corresponding routes.",
 	},
 	LockingDBType: {
 		description:  "The locking database type to use for storing plan and apply locks.",
@@ -698,11 +704,11 @@ var boolFlags = map[string]boolFlag{
 		defaultValue: false,
 	},
 	EnableDriftDetectionFlag: {
-		description:  "Enable drift detection API endpoints. Detection does not apply, but can run plan hooks and custom plan commands.",
+		description:  "Enable drift detection API endpoints. Requires --experiments=drift-detection and --api-secret. Detection does not apply, but can run plan hooks and custom plan commands.",
 		defaultValue: false,
 	},
 	EnableDriftRemediationFlag: {
-		description:  "Enable drift remediation apply API actions. Requires --enable-drift-detection.",
+		description:  "Enable drift remediation apply API actions. Requires --experiments=drift-detection, --api-secret, and --enable-drift-detection.",
 		defaultValue: false,
 	},
 	HideUnchangedPlanComments: {
@@ -773,6 +779,11 @@ var validVCSCommentNamespace = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,
 type stringFlag struct {
 	description  string
 	defaultValue string
+	hidden       bool
+}
+type stringSliceFlag struct {
+	description  string
+	defaultValue []string
 	hidden       bool
 }
 type intFlag struct {
@@ -846,7 +857,7 @@ func (s *ServerCmd) Init() *cobra.Command {
 	s.Viper.AutomaticEnv()
 	s.Viper.SetTypeByDefaultValue(true)
 
-	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags))
+	c.SetUsageTemplate(usageTmpl(stringFlags, intFlags, boolFlags, stringSliceFlags))
 	// If a user passes in an invalid flag, tell them what the flag was.
 	c.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
 		s.printErr(err)
@@ -860,6 +871,14 @@ func (s *ServerCmd) Init() *cobra.Command {
 			usage = fmt.Sprintf("%s (default %q)", usage, f.defaultValue)
 		}
 		c.Flags().String(name, "", usage+"\n")
+		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
+		if f.hidden {
+			c.Flags().MarkHidden(name) // nolint: errcheck
+		}
+	}
+
+	for name, f := range stringSliceFlags {
+		c.Flags().StringSlice(name, f.defaultValue, f.description+"\n")
 		s.Viper.BindPFlag(name, c.Flags().Lookup(name)) // nolint: errcheck
 		if f.hidden {
 			c.Flags().MarkHidden(name) // nolint: errcheck
@@ -995,9 +1014,6 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
-	if c.BlockedExtraArgs == "" {
-		c.BlockedExtraArgs = DefaultBlockedExtraArgs
-	}
 	if c.CheckoutStrategy == "" {
 		c.CheckoutStrategy = DefaultCheckoutStrategy
 	}
@@ -1085,6 +1101,10 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 }
 
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
+	// Check before preparing directories; NewServer also validates direct callers.
+	if err := userConfig.ValidateExperiments(); err != nil {
+		return err
+	}
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
 	if !isValidLogLevel(userConfig.LogLevel) {
 		return fmt.Errorf("invalid log level: must be one of %v", ValidLogLevels)

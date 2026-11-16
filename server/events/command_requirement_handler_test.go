@@ -899,3 +899,85 @@ func TestAggregateApplyRequirements_ValidateImportProject(t *testing.T) {
 		})
 	}
 }
+
+func TestAggregateApplyRequirements_ValidateStateRmProject(t *testing.T) {
+	repoDir := "repoDir"
+	tests := []struct {
+		name        string
+		ctx         command.ProjectContext
+		setup       func(workingDir *mocks.MockWorkingDir)
+		wantFailure string
+		wantErr     assert.ErrorAssertionFunc
+	}{
+		{
+			name:    "pass no requirements",
+			ctx:     command.ProjectContext{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "apply requirements gate state rm",
+			ctx: command.ProjectContext{
+				ApplyRequirements: []string{raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus: models.ApprovalStatus{IsApproved: false},
+				},
+			},
+			wantFailure: "Pull request must be approved according to the project's approval rules before running state.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "import requirements gate state rm",
+			ctx: command.ProjectContext{
+				ImportRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running state.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "both lists must be satisfied",
+			ctx: command.ProjectContext{
+				ApplyRequirements:  []string{raw.ApprovedRequirement},
+				ImportRequirements: []string{raw.MergeableRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: false},
+				},
+			},
+			wantFailure: "Pull request must be mergeable before running state.",
+			wantErr:     assert.NoError,
+		},
+		{
+			name: "pass when both lists are satisfied",
+			ctx: command.ProjectContext{
+				ApplyRequirements:  []string{raw.ApprovedRequirement, raw.UnDivergedRequirement},
+				ImportRequirements: []string{raw.MergeableRequirement, raw.ApprovedRequirement},
+				PullReqStatus: models.PullReqStatus{
+					ApprovalStatus:  models.ApprovalStatus{IsApproved: true},
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
+				},
+				ProjectPlanStatus: models.PassedPolicyCheckStatus,
+			},
+			setup: func(workingDir *mocks.MockWorkingDir) {
+				When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Any[string](), Any[string](), Any[[]string](), Any[models.PullRequest]())).ThenReturn(false)
+			},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			workingDir := mocks.NewMockWorkingDir()
+			if tt.setup != nil {
+				tt.setup(workingDir)
+			}
+			a := &events.DefaultCommandRequirementHandler{WorkingDir: workingDir}
+			tt.ctx.Log = logging.NewNoopLogger(t)
+			gotFailure, err := a.ValidateStateRmProject(repoDir, tt.ctx)
+			tt.wantErr(t, err, fmt.Sprintf("ValidateStateRmProject(%v, %v)", repoDir, tt.ctx))
+			assert.Equalf(t, tt.wantFailure, gotFailure, "ValidateStateRmProject(%v, %v)", repoDir, tt.ctx)
+		})
+	}
+}
