@@ -115,6 +115,7 @@ type Repo struct {
 	CustomPolicyCheck         *bool
 	AutoDiscover              *AutoDiscover
 	SilencePRComments         []string
+	APIAllowVars              []string
 }
 
 type MergedProjectCfg struct {
@@ -141,6 +142,9 @@ type MergedProjectCfg struct {
 	PolicyCheck               bool
 	CustomPolicyCheck         bool
 	SilencePRComments         []string
+	// APIAllowVars are the patterns of the variables an API plan request
+	// may set with -var. See APIVarAllowed.
+	APIAllowVars []string
 }
 
 // WorkflowHook is a map of custom run commands to run before or after workflows.
@@ -219,6 +223,7 @@ type GlobalCfgArgs struct {
 	PolicyCheckEnabled   bool
 	PreWorkflowHooks     []*WorkflowHook
 	PostWorkflowHooks    []*WorkflowHook
+	APIAllowVars         []string
 }
 
 func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
@@ -249,7 +254,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 	customPolicyCheck := false
 	var silencePRComments []string
 	if args.AllowAllRepoSettings {
-		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, RepoLocksKey, PolicyCheckKey, SilencePRCommentsKey}
+		allowedOverrides = []string{PlanRequirementsKey, ApplyRequirementsKey, ImportRequirementsKey, WorkflowKey, DeleteSourceBranchOnMergeKey, RepoLockingKey, RepoLocksKey, PolicyCheckKey, SilencePRCommentsKey, APIAllowVarsKey}
 		allowCustomWorkflows = true
 	}
 
@@ -273,6 +278,7 @@ func NewGlobalCfgFromArgs(args GlobalCfgArgs) GlobalCfg {
 				PolicyCheck:               &policyCheck,
 				CustomPolicyCheck:         &customPolicyCheck,
 				SilencePRComments:         silencePRComments,
+				APIAllowVars:              args.APIAllowVars,
 			},
 		},
 		Workflows: map[string]Workflow{
@@ -313,6 +319,7 @@ func (r Repo) IDString() string {
 func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, proj Project, rCfg RepoCfg) MergedProjectCfg {
 	log.Debug("MergeProjectCfg started")
 	planReqs, applyReqs, importReqs, workflow, allowedOverrides, allowCustomWorkflows, deleteSourceBranchOnMerge, repoLocks, policyCheck, customPolicyCheck, _, silencePRComments := g.getMatchingCfg(log, repoID)
+	apiAllowVars := g.repoAPIAllowVars(repoID)
 	// If repos are allowed to override certain keys then override them.
 	for _, key := range allowedOverrides {
 		switch key {
@@ -413,11 +420,16 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 				log.Debug("overriding server-defined %s with repo settings: [%s]", SilencePRCommentsKey, strings.Join(rCfg.SilencePRComments, ","))
 				silencePRComments = rCfg.SilencePRComments
 			}
+		case APIAllowVarsKey:
+			if proj.APIAllowVars != nil {
+				log.Debug("overriding server-defined %s with repo settings: [%s]", APIAllowVarsKey, strings.Join(proj.APIAllowVars, ","))
+				apiAllowVars = proj.APIAllowVars
+			}
 		}
 		log.Debug("MergeProjectCfg completed")
 	}
 
-	log.Debug("final settings: %s: [%s], %s: [%s], %s: [%s], %s: %s, %s: %t, %s: %s, %s: %t, %s: %t, %s: [%s]",
+	log.Debug("final settings: %s: [%s], %s: [%s], %s: [%s], %s: %s, %s: %t, %s: %s, %s: %t, %s: %t, %s: [%s], %s: [%s]",
 		PlanRequirementsKey, strings.Join(planReqs, ","),
 		ApplyRequirementsKey, strings.Join(applyReqs, ","),
 		ImportRequirementsKey, strings.Join(importReqs, ","),
@@ -427,6 +439,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		PolicyCheckKey, policyCheck,
 		CustomPolicyCheckKey, customPolicyCheck,
 		SilencePRCommentsKey, strings.Join(silencePRComments, ","),
+		APIAllowVarsKey, strings.Join(apiAllowVars, ","),
 	)
 
 	return MergedProjectCfg{
@@ -450,6 +463,7 @@ func (g GlobalCfg) MergeProjectCfg(log logging.SimpleLogging, repoID string, pro
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
 		SilencePRComments:         silencePRComments,
+		APIAllowVars:              apiAllowVars,
 	}
 }
 
@@ -476,7 +490,20 @@ func (g GlobalCfg) DefaultProjCfg(log logging.SimpleLogging, repoID string, repo
 		PolicyCheck:               policyCheck,
 		CustomPolicyCheck:         customPolicyCheck,
 		SilencePRComments:         silencePRComments,
+		APIAllowVars:              g.repoAPIAllowVars(repoID),
 	}
+}
+
+// repoAPIAllowVars returns api_allow_vars of the last matching server-side
+// repo config that sets it.
+func (g GlobalCfg) repoAPIAllowVars(repoID string) []string {
+	var patterns []string
+	for _, repo := range g.Repos {
+		if repo.IDMatches(repoID) && repo.APIAllowVars != nil {
+			patterns = repo.APIAllowVars
+		}
+	}
+	return patterns
 }
 
 // RepoAutoDiscoverCfg returns the inherited AutoDiscover config from matching
@@ -537,6 +564,9 @@ func (g GlobalCfg) ValidateRepoCfg(rCfg RepoCfg, repoID string) error {
 		}
 		if p.CustomPolicyCheck != nil && !slices.Contains(allowedOverrides, CustomPolicyCheckKey) {
 			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", CustomPolicyCheckKey, AllowedOverridesKey, CustomPolicyCheckKey)
+		}
+		if p.APIAllowVars != nil && !slices.Contains(allowedOverrides, APIAllowVarsKey) {
+			return fmt.Errorf("repo config not allowed to set '%s' key: server-side config needs '%s: [%s]'", APIAllowVarsKey, AllowedOverridesKey, APIAllowVarsKey)
 		}
 		if p.SilencePRComments != nil {
 			if !slices.Contains(allowedOverrides, SilencePRCommentsKey) {

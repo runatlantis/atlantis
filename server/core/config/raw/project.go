@@ -67,6 +67,7 @@ type Project struct {
 	PolicyCheck               *bool      `yaml:"policy_check,omitempty"`
 	CustomPolicyCheck         *bool      `yaml:"custom_policy_check,omitempty"`
 	SilencePRComments         []string   `yaml:"silence_pr_comments,omitempty"`
+	APIAllowVars              []string   `yaml:"api_allow_vars,omitempty"`
 }
 
 // IsTerraformProjectDir returns true if the directory contains files that make it look like a Terraform project
@@ -166,6 +167,7 @@ func (p Project) Validate() error {
 		validation.Field(&p.DependsOn, validation.By(DependsOn)),
 		validation.Field(&p.Name, validation.By(validName)),
 		validation.Field(&p.Branch, validation.By(branchValid)),
+		validation.Field(&p.APIAllowVars, validation.By(validAPIAllowVars)),
 	)
 }
 
@@ -240,6 +242,8 @@ func (p Project) ToValid() valid.Project {
 		v.SilencePRComments = p.SilencePRComments
 	}
 
+	v.APIAllowVars = p.APIAllowVars
+
 	return v
 }
 
@@ -277,6 +281,15 @@ func validImportReq(value any) error {
 	for _, r := range reqs {
 		if r != ApprovedRequirement && r != MergeableRequirement && r != UnDivergedRequirement {
 			return fmt.Errorf("%q is not a valid import_requirement, only %q, %q and %q are supported", r, ApprovedRequirement, MergeableRequirement, UnDivergedRequirement)
+		}
+	}
+	return nil
+}
+
+func validAPIAllowVars(value any) error {
+	for _, pattern := range value.([]string) {
+		if err := valid.ValidateAPIAllowVarPattern(pattern); err != nil {
+			return err
 		}
 	}
 	return nil

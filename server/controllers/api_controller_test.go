@@ -1440,6 +1440,196 @@ func TestAPIController_Plan_ValidPathDirectory(t *testing.T) {
 	projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
 }
 
+func TestAPIController_PlanArgsRejectedBeforeClone(t *testing.T) {
+	cases := []struct {
+		name   string
+		args   string
+		expErr string
+	}{
+		{name: "empty target", args: `"Targets": [""]`, expErr: `invalid Targets entry \"\": must be a resource address`},
+		{name: "blank replace", args: `"Replace": [" "]`, expErr: `invalid Replace entry \" \": must be a resource address`},
+		{name: "target that is a flag", args: `"Targets": ["-lock=false"]`, expErr: `invalid Targets entry \"-lock=false\": must be a resource address`},
+		{name: "var name with a space", args: `"Vars": {"foo bar": "1"}`, expErr: `invalid Vars entry: \"foo bar\" is not a valid variable name`},
+		{name: "var name with an equals sign", args: `"Vars": {"foo=bar": "1"}`, expErr: `invalid Vars entry: \"foo=bar\" is not a valid variable name`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			body := `{"Repository": "Repo", "Ref": "main", "Type": "Gitlab", "Projects": ["default"], ` + c.args + `}`
+
+			for _, handler := range []http.HandlerFunc{ac.Plan, ac.Apply} {
+				req, _ := http.NewRequest("POST", "", strings.NewReader(body))
+				req.Header.Set(atlantisTokenHeader, atlantisToken)
+				w := httptest.NewRecorder()
+				handler(w, req)
+				ResponseContains(t, w, http.StatusBadRequest, `{"error":"`+c.expErr+`"}`)
+			}
+
+			ac.WorkingDir.(*MockWorkingDir).VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+			projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		})
+	}
+}
+
+func TestAPIController_PlanArgsHonorBlockedExtraArgs(t *testing.T) {
+	cases := []struct {
+		name    string
+		blocked []string
+		args    string
+		expCode int
+		expErr  string
+	}{
+		{name: "blocked target", blocked: []string{"-target"}, args: `"Targets": ["module.foo"]`, expCode: http.StatusBadRequest,
+			expErr: `{"error":"invalid Targets: flag \"-target\" is not allowed in extra args"}`},
+		{name: "blocked replace with another dash spelling", blocked: []string{"--replace"}, args: `"Replace": ["module.foo"]`, expCode: http.StatusBadRequest,
+			expErr: `{"error":"invalid Replace: flag \"-replace\" is not allowed in extra args"}`},
+		{name: "blocked var", blocked: []string{"-var"}, args: `"Vars": {"foo_bar": "1"}`, expCode: http.StatusBadRequest,
+			expErr: `{"error":"invalid Vars: flag \"-var\" is not allowed in extra args"}`},
+		{name: "other fields unaffected", blocked: []string{"-target"}, args: `"Replace": ["module.foo"], "Vars": {"foo_bar": "1"}`, expCode: http.StatusOK},
+		{name: "blocked var-file does not block vars", blocked: []string{"-var-file"}, args: `"Vars": {"foo_bar": "1"}`, expCode: http.StatusOK},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, projectCommandBuilder, projectCommandRunner := setup(t)
+			ac.BlockedExtraArgs = c.blocked
+			When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+				ThenReturn([]command.ProjectContext{{CommandName: command.Plan, APIAllowVars: []string{"*"}}}, nil)
+
+			body := `{"Repository": "Repo", "Ref": "main", "Type": "Gitlab", "Projects": ["default"], ` + c.args + `}`
+			req, _ := http.NewRequest("POST", "", strings.NewReader(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			ac.Plan(w, req)
+			ResponseContains(t, w, c.expCode, c.expErr)
+
+			if c.expCode == http.StatusOK {
+				projectCommandRunner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]())
+				return
+			}
+			ac.WorkingDir.(*MockWorkingDir).VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+			projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+		})
+	}
+}
+
+func TestAPIController_PlanArgsPassedToPlanOnly(t *testing.T) {
+	ac, projectCommandBuilder, projectCommandRunner := setup(t)
+	When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{{
+			CommandName:  command.Plan,
+			APIAllowVars: []string{"foo_bar_*"},
+		}}, nil)
+	preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+	body, _ := json.Marshal(controllers.APIRequest{
+		Repository: "Repo",
+		Ref:        "main",
+		Type:       "Gitlab",
+		Projects:   []string{"default"},
+		Targets:    []string{"module.foo", `aws_instance.bar["a b"]`},
+		Replace:    []string{"aws_instance.baz"},
+		Vars:       map[string]string{"foo_bar_z": "x y=z", "foo_bar_a": "$(id)"},
+	})
+	req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	ac.Apply(w, req)
+	ResponseContains(t, w, http.StatusOK, "")
+
+	expFlags := []string{
+		"-target=module.foo",
+		`-target=aws_instance.bar["a b"]`,
+		"-replace=aws_instance.baz",
+		"-var=foo_bar_a=$(id)",
+		"-var=foo_bar_z=x y=z",
+	}
+	_, planCmd := projectCommandBuilder.VerifyWasCalledOnce().
+		BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, expFlags, planCmd.Flags)
+	_, applyCmd := projectCommandBuilder.VerifyWasCalledOnce().
+		BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetCapturedArguments()
+	Equals(t, 0, len(applyCmd.Flags))
+
+	_, hookCmds := preWorkflowHooksRunner.VerifyWasCalled(Times(2)).
+		RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]()).
+		GetAllCapturedArguments()
+	Equals(t, expFlags, hookCmds[0].Flags)
+	Equals(t, 0, len(hookCmds[1].Flags))
+	projectCommandRunner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]())
+}
+
+func TestAPIController_PlanVarsMustBeAllowedInEveryProject(t *testing.T) {
+	allowedVars := map[string][]string{
+		"a": {"foo_*"},
+		"b": {"foo_bar", "baz_*"},
+		"c": nil,
+	}
+	cases := []struct {
+		name    string
+		dirs    []string
+		vars    map[string]string
+		expCode int
+		expErr  string
+	}{
+		{name: "allowed everywhere", dirs: []string{"a", "b"}, vars: map[string]string{"foo_bar": "1"}, expCode: http.StatusOK},
+		{name: "not allowed in the second project", dirs: []string{"a", "b"}, vars: map[string]string{"foo_baz": "1"}, expCode: http.StatusBadRequest,
+			expErr: `variable \"foo_baz\" is not allowed for project \"b/default\"; allow it with api_allow_vars or --api-allow-vars`},
+		{name: "nothing allowed by default", dirs: []string{"c"}, vars: map[string]string{"foo_bar": "1"}, expCode: http.StatusBadRequest,
+			expErr: `variable \"foo_bar\" is not allowed for project \"c/default\"`},
+		{name: "no vars need no allowlist", dirs: []string{"c"}, expCode: http.StatusOK},
+	}
+	for _, c := range cases {
+		for _, endpoint := range []string{"plan", "apply"} {
+			t.Run(c.name+"/"+endpoint, func(t *testing.T) {
+				ac, projectCommandBuilder, projectCommandRunner := setup(t)
+				When(projectCommandBuilder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+					Then(func(args []Param) ReturnValues {
+						dir := args[1].(*events.CommentCommand).RepoRelDir
+						return ReturnValues{[]command.ProjectContext{{
+							CommandName:  command.Plan,
+							RepoRelDir:   dir,
+							Workspace:    "default",
+							APIAllowVars: allowedVars[dir],
+						}}, nil}
+					})
+				preWorkflowHooksRunner := ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner)
+
+				var paths []controllers.APIRequestPath
+				for _, dir := range c.dirs {
+					paths = append(paths, controllers.APIRequestPath{Directory: dir, Workspace: "default"})
+				}
+				body, _ := json.Marshal(controllers.APIRequest{
+					Repository: "Repo",
+					Ref:        "main",
+					Type:       "Gitlab",
+					Paths:      paths,
+					Vars:       c.vars,
+				})
+				req, _ := http.NewRequest("POST", "", bytes.NewBuffer(body))
+				req.Header.Set(atlantisTokenHeader, atlantisToken)
+				w := httptest.NewRecorder()
+				if endpoint == "plan" {
+					ac.Plan(w, req)
+				} else {
+					ac.Apply(w, req)
+				}
+				ResponseContains(t, w, c.expCode, c.expErr)
+
+				if c.expCode == http.StatusOK {
+					projectCommandRunner.VerifyWasCalled(Times(len(c.dirs))).Plan(Any[command.ProjectContext]())
+					return
+				}
+				preWorkflowHooksRunner.VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+				projectCommandRunner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+				projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+			})
+		}
+	}
+}
+
 func TestAPIController_Plan_AllIgnoredPathsNoOp(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t, func(config *apiControllerTestConfig) {
 		config.allowUnlockByPull = false

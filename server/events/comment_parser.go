@@ -439,16 +439,17 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	// These flags could be used to bypass security controls (e.g. directory
 	// traversal via -chdir, or loading malicious providers via -plugin-dir).
 	for _, arg := range extraArgs {
-		if e.isBlockedExtraArg(arg) {
+		if IsBlockedExtraArg(arg, e.BlockedExtraArgs) {
 			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
 		}
 	}
 	return subCommand, extraArgs, ""
 }
 
-// isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
-// permitted in comment extra args: one of DefaultBlockedExtraArgs, which are
-// always enforced, or one the operator added through BlockedExtraArgs.
+// IsBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
+// permitted in extra args from a comment or an API request: one of
+// DefaultBlockedExtraArgs, which are always enforced, or one of blocked, which
+// the operator adds with --blocked-extra-args.
 //
 // The comparison is on the flag name with leading dashes removed and any
 // "=value" suffix dropped, so "-out", "--out" and "-out=path" all match a
@@ -457,18 +458,18 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 // bypassed by whichever one the operator forgot. Any dash count is treated as
 // the flag: Terraform would reject "---out" itself, so over-matching there
 // only ever blocks an argument that could not have worked anyway.
-func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+func IsBlockedExtraArg(arg string, blocked []string) bool {
 	name := extraArgFlagName(arg)
 	if name == "" {
 		return false
 	}
-	for _, blocked := range DefaultBlockedExtraArgs {
-		if name == extraArgFlagName(blocked) {
+	for _, b := range DefaultBlockedExtraArgs {
+		if name == extraArgFlagName(b) {
 			return true
 		}
 	}
-	for _, blocked := range e.BlockedExtraArgs {
-		if name == extraArgFlagName(blocked) {
+	for _, b := range blocked {
+		if name == extraArgFlagName(b) {
 			return true
 		}
 	}

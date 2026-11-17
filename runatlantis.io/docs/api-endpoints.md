@@ -86,14 +86,17 @@ Projects with [`parallel_plan`](repo-level-atlantis-yaml.md#run-plans-and-applie
 
 #### Parameters
 
-| Name       | Type     | Required | Description                              |
-|------------|----------|----------|------------------------------------------|
-| Repository | string   | Yes      | Name of the Terraform repository         |
-| Ref        | string   | Yes      | Git reference, like a branch name        |
-| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Projects   | []string | No       | List of project names to run the plan    |
-| Paths      | []Path   | No       | Paths to the projects to run the plan    |
-| PR         | int      | No       | Pull Request number                      |
+| Name       | Type              | Required | Description                              |
+|------------|-------------------|----------|------------------------------------------|
+| Repository | string            | Yes      | Name of the Terraform repository         |
+| Ref        | string            | Yes      | Git reference, like a branch name        |
+| Type       | string            | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string          | No       | List of project names to run the plan    |
+| Paths      | []Path            | No       | Paths to the projects to run the plan    |
+| PR         | int               | No       | Pull Request number                      |
+| Targets    | []string          | No       | See [Plan Arguments](#plan-arguments)    |
+| Replace    | []string          | No       | See [Plan Arguments](#plan-arguments)    |
+| Vars       | map[string]string | No       | See [Plan Arguments](#plan-arguments)    |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.
@@ -138,6 +141,30 @@ At least one of `Directory` or `Workspace` should be specified.
 Previously, `Directory` only had trailing slashes removed. A leading slash was not rejected: `/modules/vpc` ran in `modules/vpc` under the clone but did not match that directory's `atlantis.yaml` project, so it ran with default settings; a bare `/` meant the repository root; glob patterns matched configured projects by pattern; and paths escaping the repository failed later during execution. Now all of these are rejected up front with HTTP 400 and `invalid directory "<value>": directory must be a clean repo-relative path`. Drop the leading slash (`modules/vpc`), use `.` for the repository root, and list each project directory explicitly instead of using a glob.
 :::
 
+#### Plan Arguments
+
+`Targets`, `Replace` and `Vars` add Terraform arguments to the plan of every selected project, like [additional Terraform flags](using-atlantis.md#additional-terraform-flags) after `--` in an `atlantis plan` comment. No other arguments can be passed.
+
+| Name    | Type              | Terraform argument    |
+|---------|-------------------|-----------------------|
+| Targets | []string          | `-target=<address>`   |
+| Replace | []string          | `-replace=<address>`  |
+| Vars    | map[string]string | `-var=<name>=<value>` |
+
+Atlantis passes each argument to Terraform as a single argument, targets first, then replacements, then variables sorted by name. Custom `run` steps and workflow hooks receive them in [`COMMENT_ARGS`](custom-workflows.md#native-environment-variables), escaped the same way as comment arguments. `POST /api/apply` passes them to its plan phase only: the apply phase applies the saved plan file.
+
+An address must not be empty or start with `-`. A variable name may contain only ASCII letters, digits, `_` and `-`, and must start with a letter or `_`. A field whose flag is listed in [`--blocked-extra-args`](server-configuration.md#blocked-extra-args) cannot be used. Otherwise, the request is rejected with HTTP 400 before Atlantis clones the repository.
+
+Variables must be allowed for each selected project by [`api_allow_vars`](repo-level-atlantis-yaml.md#project) in `atlantis.yaml`, if the server-side repo config permits that override, otherwise by [`api_allow_vars`](server-side-repo-config.md#repo) in the server-side repo config, otherwise by [`--api-allow-vars`](server-configuration.md#api-allow-vars). By default, no variables are allowed. If a project does not allow a variable, the whole request is rejected with HTTP 400 before any workflow hook or plan runs:
+
+```json
+{
+  "error": "variable \"foo_bar_baz\" is not allowed for project \"modules/vpc/default\"; allow it with api_allow_vars or --api-allow-vars"
+}
+```
+
+`api_allow_vars` does not restrict `Targets` and `Replace`. Variable values are passed in plain text, so do not use `Vars` for secrets.
+
 #### Sample Request (with PR)
 
 ```shell
@@ -153,6 +180,26 @@ curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
       "Workspace": "default"
     }],
     "PR": 2
+}'
+```
+
+#### Sample Request (with Plan Arguments)
+
+```shell
+curl --request POST 'https://<ATLANTIS_HOST_NAME>/api/plan' \
+--header 'X-Atlantis-Token: <ATLANTIS_API_SECRET>' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "Repository": "repo-name",
+    "Ref": "main",
+    "Type": "Github",
+    "Paths": [{
+      "Directory": "modules/vpc",
+      "Workspace": "default"
+    }],
+    "Targets": ["module.foo"],
+    "Replace": ["aws_instance.bar"],
+    "Vars": {"foo_bar_baz": "value"}
 }'
 ```
 
@@ -242,18 +289,21 @@ When a project-level error occurs:
 
 Execute [atlantis apply](using-atlantis.md#atlantis-apply) on the specified repository.
 
-The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-api-plan), then applies them one project at a time, even when [`parallel_apply`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) is enabled.
+The endpoint plans the projects first, the same way as [`POST /api/plan`](#post-api-plan), then applies them one project at a time, even when [`parallel_apply`](repo-level-atlantis-yaml.md#run-plans-and-applies-in-parallel) is enabled. [Plan arguments](#plan-arguments) apply to that plan only.
 
 #### Parameters
 
-| Name       | Type     | Required | Description                              |
-|------------|----------|----------|------------------------------------------|
-| Repository | string   | Yes      | Name of the Terraform repository         |
-| Ref        | string   | Yes      | Git reference, like a branch name        |
-| Type       | string   | Yes      | Type of the VCS provider (Github/Gitlab) |
-| Projects   | []string | No       | List of project names to run the apply   |
-| Paths      | []Path   | No       | Paths to the projects to run the apply   |
-| PR         | int      | No       | Pull Request number                      |
+| Name       | Type              | Required | Description                              |
+|------------|-------------------|----------|------------------------------------------|
+| Repository | string            | Yes      | Name of the Terraform repository         |
+| Ref        | string            | Yes      | Git reference, like a branch name        |
+| Type       | string            | Yes      | Type of the VCS provider (Github/Gitlab) |
+| Projects   | []string          | No       | List of project names to run the apply   |
+| Paths      | []Path            | No       | Paths to the projects to run the apply   |
+| PR         | int               | No       | Pull Request number                      |
+| Targets    | []string          | No       | See [Plan Arguments](#plan-arguments)    |
+| Replace    | []string          | No       | See [Plan Arguments](#plan-arguments)    |
+| Vars       | map[string]string | No       | See [Plan Arguments](#plan-arguments)    |
 
 ::: tip NOTE
 At least one of `Projects` or `Paths` must be specified.

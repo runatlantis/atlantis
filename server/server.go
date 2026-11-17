@@ -209,6 +209,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	globalCfg := valid.NewGlobalCfgFromArgs(
 		valid.GlobalCfgArgs{
 			PolicyCheckEnabled: userConfig.EnablePolicyChecksFlag,
+			APIAllowVars:       userConfig.ToAPIAllowVars(),
 		})
 	if userConfig.RepoConfig != "" {
 		globalCfg, err = parserValidator.ParseGlobalCfg(userConfig.RepoConfig, globalCfg)
@@ -1105,6 +1106,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PullStatusFetcher:               database,
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
+		BlockedExtraArgs:                userConfig.ToBlockedExtraArgs(),
 		ParallelPoolSize:                userConfig.ParallelPoolSize,
 	}
 

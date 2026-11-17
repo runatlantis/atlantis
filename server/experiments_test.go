@@ -35,6 +35,8 @@ func TestValidateExperiments(t *testing.T) {
 		{name: "remediation flag without permission", config: server.UserConfig{EnableDriftRemediation: true}, err: `enable-drift-remediation requires the "drift-detection" experiment`},
 		{name: "remediation requires detection", config: server.UserConfig{Experiments: []string{"drift-detection"}, APISecret: token, EnableDriftRemediation: true}, err: "--enable-drift-remediation requires --enable-drift-detection"},
 		{name: "drift requires authentication", config: server.UserConfig{Experiments: []string{"drift-detection"}, EnableDriftDetection: true}, err: "enable-drift-detection requires api-secret"},
+		{name: "allowed vars with API permission", config: server.UserConfig{Experiments: []string{"api"}, APISecret: token, APIAllowVars: "foo_bar_*"}},
+		{name: "allowed vars without permission", config: server.UserConfig{Experiments: []string{"drift-detection"}, APIAllowVars: "foo_bar_*"}, err: `api-allow-vars requires the "api" experiment`},
 		{name: "unknown", config: server.UserConfig{Experiments: []string{"unknown"}}, err: `unknown server experiment "unknown"`},
 	}
 	for _, tc := range cases {
@@ -75,6 +77,16 @@ func TestNewServer_WiresAPIExperimentPermission(t *testing.T) {
 	Assert(t, s.Router.Match(httptest.NewRequest("POST", "/api/plan", nil), &match), "API permission was not wired to routing")
 	Assert(t, !s.Router.Match(httptest.NewRequest("POST", "/api/drift/detect", nil), &match), "API permission exposed drift")
 	Assert(t, s.APIController.DriftStorage == nil, "API permission initialized drift storage")
+}
+
+func TestNewServer_WiresBlockedExtraArgsToAPI(t *testing.T) {
+	s, err := server.NewServer(server.UserConfig{
+		DataDir: t.TempDir(), AtlantisURL: testAtlantisUrl,
+		LockingDBType: testLockingDBType, GithubHostname: testGitHubHostName, GithubUser: testGitHubUser,
+		APISecret: "token", Experiments: []string{"api"}, BlockedExtraArgs: "-target, --var",
+	}, server.Config{AtlantisVersion: testAtlantisVersion})
+	Ok(t, err)
+	Equals(t, []string{"-target", "--var"}, s.APIController.BlockedExtraArgs)
 }
 
 func TestSetupRoutes_ExperimentGates(t *testing.T) {

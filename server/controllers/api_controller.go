@@ -9,11 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -80,6 +82,9 @@ type APIController struct {
 	DriftWebhookSender *webhooks.DriftWebhookSender
 	// SilenceVCSStatusNoProjects is whether API should set commit status if no projects are found
 	SilenceVCSStatusNoProjects bool
+	// BlockedExtraArgs are the flags added with --blocked-extra-args. Plan
+	// arguments of a request must not use them.
+	BlockedExtraArgs []string
 	// ParallelPoolSize is the max number of projects of one request that plan
 	// or policy check at once when their parallel_plan setting is enabled.
 	// Values below 2 keep the projects sequential.
@@ -141,6 +146,12 @@ type APIRequest struct {
 	PR         int
 	Projects   []string
 	Paths      []APIRequestPath
+	// Targets, Replace and Vars become the -target, -replace and -var
+	// arguments of plan commands. Apply commands do not get them: they apply
+	// the plan file saved by the plan, which already reflects them.
+	Targets []string
+	Replace []string
+	Vars    map[string]string
 	// DiscoverProjects enables all-project discovery when no projects or paths
 	// are specified. Only drift detection and remediation set this.
 	DiscoverProjects bool `json:"-"`
@@ -152,13 +163,92 @@ type APIRequestPath struct {
 	Workspace   string `json:"workspace,omitempty"`
 }
 
+// validatePlanArgs checks Targets, Replace and Vars against their format and
+// against blockedExtraArgs. Whether a project allows each variable is checked
+// by checkAPIAllowVars once the project configs are known.
+func (a *APIRequest) validatePlanArgs(blockedExtraArgs []string) error {
+	for _, field := range []struct {
+		name string
+		flag string
+		set  bool
+	}{
+		{"Targets", "-target", len(a.Targets) > 0},
+		{"Replace", "-replace", len(a.Replace) > 0},
+		{"Vars", "-var", len(a.Vars) > 0},
+	} {
+		if field.set && events.IsBlockedExtraArg(field.flag, blockedExtraArgs) {
+			return fmt.Errorf("invalid %s: flag %q is not allowed in extra args", field.name, field.flag)
+		}
+	}
+	for _, field := range []struct {
+		name      string
+		addresses []string
+	}{{"Targets", a.Targets}, {"Replace", a.Replace}} {
+		for _, address := range field.addresses {
+			if strings.TrimSpace(address) == "" || strings.HasPrefix(address, "-") {
+				return fmt.Errorf("invalid %s entry %q: must be a resource address", field.name, address)
+			}
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(a.Vars)) {
+		if err := valid.ValidateVariableName(name); err != nil {
+			return fmt.Errorf("invalid Vars entry: %w", err)
+		}
+	}
+	return nil
+}
+
+func (a *APIRequest) planFlags() []string {
+	var flags []string
+	for _, address := range a.Targets {
+		flags = append(flags, "-target="+address)
+	}
+	for _, address := range a.Replace {
+		flags = append(flags, "-replace="+address)
+	}
+	for _, name := range slices.Sorted(maps.Keys(a.Vars)) {
+		flags = append(flags, "-var="+name+"="+a.Vars[name])
+	}
+	return flags
+}
+
+type apiVarNotAllowedError struct {
+	name    string
+	project string
+}
+
+func (e *apiVarNotAllowedError) Error() string {
+	return fmt.Sprintf("variable %q is not allowed for project %q; allow it with %s or --api-allow-vars", e.name, e.project, valid.APIAllowVarsKey)
+}
+
+// checkAPIAllowVars fails unless every project in cmds allows every
+// variable in vars, so a request either plans all its projects with the
+// variables or none.
+func checkAPIAllowVars(vars map[string]string, cmds []command.ProjectContext) error {
+	names := slices.Sorted(maps.Keys(vars))
+	for _, cmd := range cmds {
+		for _, name := range names {
+			if !valid.APIVarAllowed(cmd.APIAllowVars, name) {
+				return &apiVarNotAllowedError{name: name, project: cmd.ProjectID()}
+			}
+		}
+	}
+	return nil
+}
+
 func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmdBuilder func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)) ([]command.ProjectContext, []*events.CommentCommand, error) {
 	cc := make([]*events.CommentCommand, 0)
+
+	var flags []string
+	if cmdName == command.Plan {
+		flags = a.planFlags()
+	}
 
 	for _, project := range a.Projects {
 		cc = append(cc, &events.CommentCommand{
 			Name:        cmdName,
 			ProjectName: project,
+			Flags:       flags,
 		})
 	}
 	for _, path := range a.Paths {
@@ -167,6 +257,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 			ProjectName: path.ProjectName,
 			RepoRelDir:  path.Directory,
 			Workspace:   path.Workspace,
+			Flags:       flags,
 		})
 	}
 
@@ -176,6 +267,7 @@ func (a *APIRequest) getCommands(ctx *command.Context, cmdName command.Name, cmd
 		cc = append(cc, &events.CommentCommand{
 			Name:                cmdName,
 			DiscoverAllProjects: true,
+			Flags:               flags,
 		})
 	}
 
@@ -251,6 +343,10 @@ func normalizeAPIBranchRef(ref string) string {
 func apiErrorStatusCode(err error) int {
 	if errors.Is(err, events.ErrTeamAllowlistDenied) {
 		return http.StatusForbidden
+	}
+	var varNotAllowed *apiVarNotAllowedError
+	if errors.As(err, &varNotAllowed) {
+		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
 }
@@ -728,6 +824,9 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *c
 	if err != nil {
 		return nil, err
 	}
+	if err := checkAPIAllowVars(request.Vars, cmds); err != nil {
+		return nil, err
+	}
 
 	if len(cmds) == 0 {
 		if err := a.validateNonPRAPIRefUnchanged(ctx); err != nil {
@@ -1109,6 +1208,9 @@ func (a *APIController) apiParseAndValidate(r *http.Request) (*APIRequest, *comm
 	}
 	if err = validator.New().Struct(request); err != nil {
 		return nil, nil, http.StatusBadRequest, fmt.Errorf("request %q is missing fields", string(bytes))
+	}
+	if err = request.validatePlanArgs(a.BlockedExtraArgs); err != nil {
+		return nil, nil, http.StatusBadRequest, err
 	}
 
 	// A workspace becomes a Terraform command argument, which Atlantis runs

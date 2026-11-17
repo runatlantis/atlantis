@@ -133,7 +133,7 @@ func TestNewGlobalCfg(t *testing.T) {
 
 			if c.allowAllRepoSettings {
 				exp.Repos[0].AllowCustomWorkflows = Bool(true)
-				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "repo_locks", "policy_check", "silence_pr_comments"}
+				exp.Repos[0].AllowedOverrides = []string{"plan_requirements", "apply_requirements", "import_requirements", "workflow", "delete_source_branch_on_merge", "repo_locking", "repo_locks", "policy_check", "silence_pr_comments", "api_allow_vars"}
 			}
 			if c.policyCheckEnabled {
 				exp.Repos[0].ApplyRequirements = append(exp.Repos[0].ApplyRequirements, "policies_passed")
@@ -527,6 +527,41 @@ func TestGlobalCfg_ValidateRepoCfg(t *testing.T) {
 			},
 			repoID: "github.com/owner/repo",
 			expErr: "repo config not allowed to set 'import_requirements' key: server-side config needs 'allowed_overrides: [import_requirements]'",
+		},
+		"repo sets api_allow_vars without allowed_overrides": {
+			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						APIAllowVars: []string{"foo_*"},
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
+			expErr: "repo config not allowed to set 'api_allow_vars' key: server-side config needs 'allowed_overrides: [api_allow_vars]'",
+		},
+		"repo sets api_allow_vars with allowed_overrides": {
+			gCfg: valid.GlobalCfg{
+				Repos: []valid.Repo{
+					valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}).Repos[0],
+					{
+						ID:               "github.com/owner/repo",
+						AllowedOverrides: []string{"api_allow_vars"},
+					},
+				},
+			},
+			rCfg: valid.RepoCfg{
+				Projects: []valid.Project{
+					{
+						Dir:          ".",
+						Workspace:    "default",
+						APIAllowVars: []string{"foo_*"},
+					},
+				},
+			},
+			repoID: "github.com/owner/repo",
 		},
 		"repo workflow doesn't exist": {
 			gCfg: valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{
