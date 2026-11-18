@@ -393,12 +393,16 @@ func getProjectDirFromFs(files fs.FS, modifiedFilePath string) string {
 		// so we won't suggest that as a project. So in this case we return nothing.
 		// The code below makes this happen.
 
-		// Need to add a trailing slash before splitting on modules/ because if
+		// Need to add a trailing slash before splitting on /modules/ because if
 		// the input was modules/file.tf then path.Dir will be "modules" and so our
-		// split on "modules/" will fail.
-		dirWithTrailingSlash := dir + "/"
-		modulesSplit := strings.SplitN(dirWithTrailingSlash, "modules/", 2)
-		modulesParent := modulesSplit[0]
+		// split on "/modules/" will fail. Split on the "/modules/" path element
+		// (not the "modules/" substring): a parent directory whose name merely
+		// ends in "modules" (e.g. "tf-modules") must not match, otherwise
+		// "tf-modules/network/modules/vpc" would resolve its parent as "tf-"
+		// instead of "tf-modules/network" and the project would be skipped.
+		dirSlashed := "/" + dir + "/"
+		modulesIdx := strings.Index(dirSlashed, "/modules/")
+		modulesParent := strings.TrimPrefix(dirSlashed[:modulesIdx], "/")
 
 		// Check whether the parent contains a Terraform/OpenTofu project file.
 		if !hasProjectIndicator(files, modulesParent) {
