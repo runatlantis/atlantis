@@ -5146,3 +5146,99 @@ Ran Plan for 3 projects:
 		})
 	}
 }
+
+func TestRenderPlanCommit(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	planResult := func(dir string) command.ProjectResult {
+		return command.ProjectResult{
+			RepoRelDir: dir,
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{TerraformOutput: "terraform-output", LockURL: "lock-url"},
+			},
+		}
+	}
+	render := func(language string, host models.VCSHostType, headCommit string, results ...command.ProjectResult) string {
+		renderer := events.NewMarkdownRenderer(true, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+		ctx := &command.Context{
+			Log: logging.NewNoopLogger(t).WithHistory(),
+			Pull: models.PullRequest{
+				URL:        "https://vcs.example.com/owner/repo/pull/1",
+				HeadCommit: headCommit,
+				BaseRepo:   models.Repo{VCSHost: models.VCSHost{Type: host}},
+			},
+		}
+		return renderer.Render(ctx, command.Result{ProjectResults: results}, &events.CommentCommand{Name: command.Plan})
+	}
+
+	cases := []struct {
+		name     string
+		language string
+		host     models.VCSHostType
+		results  []command.ProjectResult
+		expected string
+	}{
+		{
+			name:     "github single project links the commit",
+			language: "en",
+			host:     models.Github,
+			results:  []command.ProjectResult{planResult(".")},
+			expected: "  ```\n\n<sub>Ran on commit [`0123456`](https://vcs.example.com/owner/repo/pull/1/commits/" + sha + ")</sub>\n\n---",
+		},
+		{
+			name:     "github multi project shows the commit in the summary",
+			language: "en",
+			host:     models.Github,
+			results:  []command.ProjectResult{planResult("a"), planResult("b")},
+			expected: "2 projects, 2 with changes, 0 with no changes, 0 failed\n\n<sub>Ran on commit [`0123456`](https://vcs.example.com/owner/repo/pull/1/commits/" + sha + ")</sub>\n\n* :fast_forward:",
+		},
+		{
+			name:     "gitlab links to the merge request diff for the commit",
+			language: "en",
+			host:     models.Gitlab,
+			results:  []command.ProjectResult{planResult(".")},
+			expected: "<sub>Ran on commit [`0123456`](https://vcs.example.com/owner/repo/pull/1/diffs?commit_id=" + sha + ")</sub>",
+		},
+		{
+			name:     "bitbucket omits inline HTML",
+			language: "en",
+			host:     models.BitbucketCloud,
+			results:  []command.ProjectResult{planResult(".")},
+			expected: "\n\nRan on commit `0123456`\n\n---",
+		},
+		{
+			name:     "azure devops shows the commit without a link",
+			language: "en",
+			host:     models.AzureDevops,
+			results:  []command.ProjectResult{planResult(".")},
+			expected: "<sub>Ran on commit `0123456`</sub>",
+		},
+		{
+			name:     "spanish",
+			language: "es",
+			host:     models.Github,
+			results:  []command.ProjectResult{planResult(".")},
+			expected: "<sub>Ejecutado en el commit [`0123456`](https://vcs.example.com/owner/repo/pull/1/commits/" + sha + ")</sub>",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rendered := render(c.language, c.host, sha, c.results...)
+			if !strings.Contains(rendered, c.expected) {
+				t.Fatalf("expected %q in:\n%s", c.expected, rendered)
+			}
+			if c.host == models.BitbucketCloud && strings.Contains(rendered, "<sub>") {
+				t.Fatalf("expected no inline HTML for Bitbucket:\n%s", rendered)
+			}
+		})
+	}
+
+	t.Run("no head commit renders no commit line", func(t *testing.T) {
+		for _, results := range [][]command.ProjectResult{{planResult(".")}, {planResult("a"), planResult("b")}} {
+			rendered := render("en", models.Github, "", results...)
+			if strings.Contains(rendered, "Ran on commit") {
+				t.Fatalf("expected no commit line in:\n%s", rendered)
+			}
+		}
+	})
+}

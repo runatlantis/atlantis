@@ -69,6 +69,14 @@ type commonData struct {
 	HideUnchangedPlanComments bool
 	QuietPolicyChecks         bool
 	VcsRequestType            string
+	// PullHeadCommit is the pull request head commit the command ran against.
+	PullHeadCommit string
+	// PullHeadCommitShort is PullHeadCommit abbreviated for display.
+	PullHeadCommitShort string
+	// PullHeadCommitURL links to PullHeadCommit when the VCS host supports it.
+	PullHeadCommitURL string
+	// SupportsHTML is false for VCS hosts that render inline HTML as text.
+	SupportsHTML bool
 }
 
 // errData is data about an error response.
@@ -222,6 +230,10 @@ func (m *MarkdownRenderer) Render(ctx *command.Context, res command.Result, cmd 
 		HideUnchangedPlanComments: m.hideUnchangedPlanComments,
 		QuietPolicyChecks:         m.quietPolicyChecks,
 		VcsRequestType:            vcsRequestType,
+		PullHeadCommit:            ctx.Pull.HeadCommit,
+		PullHeadCommitShort:       shortSHA(ctx.Pull.HeadCommit),
+		PullHeadCommitURL:         WorkingDirLockMetadataForPull(ctx.Pull).CommitURL,
+		SupportsHTML:              supportsInlineHTML(ctx.Pull.BaseRepo.VCSHost.Type),
 	}
 
 	templates := m.markdownTemplates
@@ -444,6 +456,12 @@ func newErrData(err error, renderedContext string, common commonData) errData {
 		data.MultipleJobs = lockErr.multipleJobs
 	}
 	return data
+}
+
+// supportsInlineHTML returns false for VCS hosts that show inline HTML tags
+// such as <sub> as literal text.
+func supportsInlineHTML(vcsHost models.VCSHostType) bool {
+	return vcsHost != models.BitbucketServer && vcsHost != models.BitbucketCloud
 }
 
 // shouldUseWrappedTmpl returns true if we should use the wrapped markdown
