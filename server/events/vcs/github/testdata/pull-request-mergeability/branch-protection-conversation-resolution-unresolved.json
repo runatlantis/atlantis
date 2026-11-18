@@ -1,0 +1,49 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewDecision": null,
+        "latestOpinionatedReviews": {
+          "nodes": []
+        },
+        "reviewThreads": {
+          "nodes": [
+            {
+              "isResolved": false
+            }
+          ]
+        },
+        "baseRef": {
+          "branchProtectionRule": {
+            "requiresConversationResolution": true,
+            "requiredStatusChecks": []
+          },
+          "rules": {
+            "pageInfo": {
+              "endCursor": "QWERTY",
+              "hasNextPage": false
+            },
+            "nodes": []
+          }
+        },
+        "commits": {
+          "nodes": [
+            {
+              "commit": {
+                "statusCheckRollup": {
+                  "contexts": {
+                    "pageInfo": {
+                      "endCursor": "QWERTY",
+                      "hasNextPage": false
+                    },
+                    "nodes": []
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

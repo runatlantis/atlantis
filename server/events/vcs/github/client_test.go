@@ -1190,6 +1190,41 @@ func TestClient_PullIsMergeableWithAllowMergeableBypassApply(t *testing.T) {
 				IsMergeable: true,
 			},
 		},
+		// Required conversation resolution (rulesets and classic branch protection)
+		{
+			"blocked",
+			"ruleset-conversation-resolution-unresolved.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
+		{
+			"blocked",
+			"ruleset-conversation-resolution-resolved.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			"blocked",
+			"ruleset-conversation-resolution-not-required.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		{
+			"blocked",
+			"branch-protection-conversation-resolution-unresolved.json",
+			`"APPROVED"`,
+			models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "PR is in state blocked, and cannot bypass mergeable requirements",
+			},
+		},
 	}
 
 	// Use a real GitHub json response and edit the mergeable_state field.
