@@ -112,6 +112,7 @@ var testFlags = map[string]any{
 	IncludeGitUntrackedFiles:         false,
 	LanguageFlag:                     "es",
 	LanguageConfigFileFlag:           "",
+	LockAllProjectsBeforePlanFlag:    true,
 	LockingDBType:                    "boltdb",
 	LogLevelFlag:                     "debug",
 	MarkdownTemplateOverridesDirFlag: "/path2",
