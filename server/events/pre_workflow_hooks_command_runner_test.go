@@ -524,7 +524,12 @@ func TestRunPreHooks_Clone(t *testing.T) {
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithPlanCommand.RunCommand), Any[string](), Any[string](), Eq(repoDir))
-		Assert(t, *unlockCalled == true, "unlock function called")
+		// No applicable hooks for apply, so we must not lock or clone.
+		preWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Apply, events.WorkingDirLockMetadataForPull(newPull))
+		preWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))
+		Assert(t, *unlockCalled == false, "unlock function should not be called when no hooks apply")
 	})
 
 	t.Run("Commands 'plan, apply' set on webhook and plan command", func(t *testing.T) {
