@@ -54,6 +54,15 @@ func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context,
 
 	ctx.Log.Info("Pre-workflow hooks configured, running...")
 
+	switch cmd.Name {
+	case command.Plan, command.Autoplan, command.Apply:
+		unlockPull, err := w.WorkingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
+		if err != nil {
+			return err
+		}
+		defer unlockPull()
+	}
+
 	unlockFn, err := w.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, DefaultWorkspace, DefaultRepoRelDir, "", cmd.Name, WorkingDirLockMetadataForPull(ctx.Pull))
 	if err != nil {
 		return err
