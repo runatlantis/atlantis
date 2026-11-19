@@ -117,4 +117,4 @@ By locking the directory, we're essentially ensuring that the branch being `appl
 
 In conclusion, running `terraform apply` when you're working with a team of operators can be dangerous. Look to solutions like your own CI, Atlantis or Terraform Enterprise to ensure you're always working off the latest code that was `apply`'d.
 
-If you'd like to try Atlantis, you can get started here: <https://www.runatlantis.io/guide/>
+If you'd like to try Atlantis, you can get started here: [Test Drive](../../guide/test-drive.md).

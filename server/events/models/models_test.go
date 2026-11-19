@@ -2017,3 +2017,77 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 		})
 	}
 }
+
+func TestNewRepo_GithubCloneURLHost(t *testing.T) {
+	cases := []struct {
+		description string
+		hostname    string
+		cloneURL    string
+		expErr      string
+	}{
+		{
+			"host matches configured github.com",
+			"github.com",
+			"https://github.com/owner/repo.git",
+			"",
+		},
+		{
+			"host comparison ignores case",
+			"github.com",
+			"https://GitHub.com/owner/repo.git",
+			"",
+		},
+		{
+			"port on the clone url does not change the host",
+			"github.com",
+			"https://github.com:443/owner/repo.git",
+			"",
+		},
+		{
+			"port on the configured hostname is ignored",
+			"ghe.example.com:8443",
+			"https://ghe.example.com/owner/repo.git",
+			"",
+		},
+		{
+			"forged host with the right path is rejected",
+			"github.com",
+			"http://192.168.16.1:8001/owner/repo.git",
+			`expected clone url host "github.com" but had "192.168.16.1"`,
+		},
+		{
+			"empty host from a file scheme is rejected",
+			"github.com",
+			"file:///owner/repo.git",
+			`expected clone url host "github.com" but had ""`,
+		},
+		{
+			"bare path with no host is rejected",
+			"github.com",
+			"/owner/repo.git",
+			`expected clone url host "github.com" but had ""`,
+		},
+		{
+			"enterprise host must match the configured one",
+			"ghe.example.com",
+			"https://github.com/owner/repo.git",
+			`expected clone url host "ghe.example.com" but had "github.com"`,
+		},
+		{
+			"no configured hostname keeps the old path-only check",
+			"",
+			"http://192.168.16.1:8001/owner/repo.git",
+			"",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			_, err := models.NewRepo(models.Github, "owner/repo", c.cloneURL, "u", "p", c.hostname)
+			if c.expErr == "" {
+				Ok(t, err)
+			} else {
+				ErrEquals(t, c.expErr, err)
+			}
+		})
+	}
+}

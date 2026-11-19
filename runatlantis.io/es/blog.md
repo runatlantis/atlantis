@@ -24,6 +24,6 @@ Tenemos una amplia historia de publicaciones del blog que se remonta a 2017. Est
 
 Estamos emocionados de dar la bienvenida a nuevos autores a nuestro blog. Nuestro equipo diverso aporta una gran cantidad de conocimiento y experiencia para compartir con nuestros lectores. Mantente atento a nuevas perspectivas y artículos detallados sobre las últimas tendencias y tecnologías.
 
-Si tienes alguna pregunta o temas que te gustaría que cubriéramos, no dudes en contactarnos en [Slack](https://slack.cncf.io/). Siempre buscamos interactuar con nuestra comunidad y proporcionar contenido valioso.
+Si tienes alguna pregunta o temas que te gustaría que cubriéramos, no dudes en contactarnos en [Slack](https://cncf-slack.netlify.app/). Siempre buscamos interactuar con nuestra comunidad y proporcionar contenido valioso.
 
 ¡Feliz lectura!

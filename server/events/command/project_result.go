@@ -97,6 +97,28 @@ func (p ProjectResult) PlanStatus() models.ProjectPlanStatus {
 	panic("PlanStatus() missing a combination")
 }
 
+// PlanHashAfterMerge returns the plan hash a project's stored status should
+// carry once this result is merged into it. A plan result replaces the
+// previous hash with the hash of the plan file it produced, which is empty
+// when the plan failed or the workflow manages its own plan file. Any other
+// result keeps the previous hash while the project can still be applied, so a
+// policy check or a failed apply does not unbind the reviewed plan, and drops
+// it once the plan has been applied or discarded.
+func (p ProjectResult) PlanHashAfterMerge(existing string) string {
+	if p.Command == Plan {
+		if p.PlanSuccess == nil || p.Error != nil || p.Failure != "" {
+			return ""
+		}
+		return p.PlanSuccess.PlanHash
+	}
+	switch p.PlanStatus() {
+	case models.PassedPolicyCheckStatus, models.ErroredPolicyCheckStatus, models.ErroredApplyStatus:
+		return existing
+	default:
+		return ""
+	}
+}
+
 // IsSuccessful returns true if this project result had no errors.
 func (p ProjectResult) IsSuccessful() bool {
 	return p.PlanSuccess != nil || (p.PolicyCheckResults != nil && p.Error == nil && p.Failure == "") || p.ApplySuccess != ""

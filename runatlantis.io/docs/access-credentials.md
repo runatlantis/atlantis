@@ -50,6 +50,14 @@ Your Atlantis user must also have "Write permissions" (for repos in an organizat
 Available in Atlantis versions **newer** than 0.13.0.
 :::
 
+::: warning
+While no GitHub App is configured, the `/github-app/setup` and `/github-app/exchange-code` pages are reachable by anyone who can reach Atlantis, and the exchange page displays the new app's private key and webhook secret. Protect them during installation by also passing `--web-basic-auth --web-username <user> --web-password <password>`, and only run the setup from a trusted network. Atlantis ties the GitHub redirect to the setup page with a one-time `state` nonce and an `HttpOnly` cookie set on the browser that opened the setup page. Both expire after 10 minutes, so complete the flow in one sitting from the same browser, with cookies enabled, and reload the setup page if it expires or the exchange fails.
+:::
+
+::: warning Behavior change
+Previously, `/github-app/exchange-code` accepted any `code` without checking where the flow started, and both pages kept working after an app had been created until Atlantis was restarted with GitHub credentials. Now the redirect must carry the `state` issued by `/github-app/setup` and arrive in the same browser within 10 minutes, and both pages return HTTP 400 `Atlantis already has GitHub credentials` as soon as one exchange succeeds, so record the credentials shown before leaving the page. A redirect from another browser, with cookies blocked, or after 10 minutes returns HTTP 400 `GitHub app setup state is not valid for this browser, start again from /github-app/setup` or `GitHub app setup state expired, start again from /github-app/setup`; open `/github-app/setup` again in one browser and finish without delay.
+:::
+
 * Start Atlantis with fake github username and token (`atlantis server --gh-user fake --gh-token fake --repo-allowlist 'github.com/your-org/*' --atlantis-url https://$ATLANTIS_HOST`). If installing as an **Organization**, remember to add `--gh-org your-github-org` to this command.
 * Visit `https://$ATLANTIS_HOST/github-app/setup` and click on **Setup** to create the app on GitHub. You'll be redirected back to Atlantis
 * A link to install your app, along with its secrets, will be shown on the screen. Record your app's credentials and install your app for your user/org by following said link.
@@ -87,7 +95,7 @@ Repositories must be manually registered with the created GitHub app to allow At
 :::
 
 ::: tip NOTE
-Passing the additional flag `--gh-app-slug` will modify the name of the App when posting comments on a Pull Request.
+Atlantis uses the GitHub App slug to identify its own comments. If `--gh-app-slug` is omitted, Atlantis attempts to discover it automatically at startup. If discovery fails, Atlantis logs a warning and starts without hiding previous comments or suppressing automatic replies to its own comments. See [GitHub App slug](server-configuration.md#gh-app-slug).
 :::
 
 #### Permissions
@@ -136,6 +144,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
 * Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
+* **Account**: **Read** also allows Atlantis to identify and ignore its own comments. For scoped API tokens, the equivalent permission is `read:user:bitbucket`. If the identity lookup fails, Atlantis logs a warning and continues normal command processing. In that case, its own comments may still be parsed as commands, including producing parsing errors.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)

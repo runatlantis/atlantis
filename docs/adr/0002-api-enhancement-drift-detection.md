@@ -1,10 +1,12 @@
 # 2. API Enhancement and Drift Detection
 
-Date: 2025-01-21
+Date: 2026-06-27
 
 ## Status
 
-Proposed
+Accepted
+
+The API and drift detection are implemented and remain experimental. Ongoing development and graduation are tracked separately in [API #6162](https://github.com/runatlantis/atlantis/issues/6162) and [drift detection #7033](https://github.com/runatlantis/atlantis/issues/7033) under [ADR 0004](0004-govern-feature-lifecycles.md).
 
 ## Context
 

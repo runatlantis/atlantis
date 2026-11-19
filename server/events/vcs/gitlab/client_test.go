@@ -47,7 +47,10 @@ type UpdateStatusJsonBody struct {
 
 /* GetCommit response last_pipeline JSON object */
 type GetCommitResponseLastPipeline struct {
-	ID int `json:"id"`
+	ID     int    `json:"id"`
+	SHA    string `json:"sha,omitempty"`
+	Ref    string `json:"ref,omitempty"`
+	Source string `json:"source,omitempty"`
 }
 
 /* GetCommit response JSON object */
@@ -375,7 +378,9 @@ func TestClient_UpdateStatus(t *testing.T) {
 
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: &GetCommitResponseLastPipeline{
-								ID: gitlabPipelineSuccessMrID,
+								ID:  gitlabPipelineSuccessMrID,
+								SHA: "sha",
+								Ref: updateStatusHeadBranch,
 							},
 						}
 						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -506,7 +511,9 @@ func TestClient_UpdateStatusGetCommitRetryable(t *testing.T) {
 						} else {
 							getCommitResponse := GetCommitResponse{
 								LastPipeline: &GetCommitResponseLastPipeline{
-									ID: gitlabPipelineSuccessMrID,
+									ID:  gitlabPipelineSuccessMrID,
+									SHA: "sha",
+									Ref: updateStatusHeadBranch,
 								},
 							}
 							getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -633,7 +640,9 @@ func TestClient_UpdateStatusSetCommitStatusConflictRetryable(t *testing.T) {
 
 						getCommitResponse := GetCommitResponse{
 							LastPipeline: &GetCommitResponseLastPipeline{
-								ID: gitlabPipelineSuccessMrID,
+								ID:  gitlabPipelineSuccessMrID,
+								SHA: "sha",
+								Ref: updateStatusHeadBranch,
 							},
 						}
 						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
@@ -731,7 +740,9 @@ func TestClient_UpdateStatusWithRetryEnabled(t *testing.T) {
 						if getCommitRequests > c.nullPipelineResponses {
 							getCommitResponse = GetCommitResponse{
 								LastPipeline: &GetCommitResponseLastPipeline{
-									ID: gitlabPipelineSuccessMrID,
+									ID:  gitlabPipelineSuccessMrID,
+									SHA: "sha",
+									Ref: updateStatusHeadBranch,
 								},
 							}
 						}
@@ -804,6 +815,217 @@ func TestClient_UpdateStatusWithRetryEnabled(t *testing.T) {
 			Ok(t, err)
 
 			Equals(t, c.expGetCommitRequests, getCommitRequests)
+		})
+	}
+}
+
+func TestIsPipelineAdoptable(t *testing.T) {
+	pull := models.PullRequest{
+		Num:        7,
+		HeadCommit: "sha",
+		HeadBranch: updateStatusHeadBranch,
+	}
+
+	cases := []struct {
+		name     string
+		pipeline *gitlab.PipelineInfo
+		exp      bool
+	}{
+		{
+			name:     "nil pipeline",
+			pipeline: nil,
+			exp:      false,
+		},
+		{
+			name:     "external pipeline on bare branch ref",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "test", Source: "external"},
+			exp:      true,
+		},
+		{
+			name:     "push pipeline on bare branch ref",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "test", Source: "push"},
+			exp:      true,
+		},
+		{
+			name:     "push pipeline on fully qualified branch ref",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "refs/heads/test", Source: "push"},
+			exp:      true,
+		},
+		{
+			name:     "merge request pipeline",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "refs/merge-requests/7/head", Source: "merge_request_event"},
+			exp:      true,
+		},
+		{
+			name:     "external pipeline on fully qualified branch ref",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "refs/heads/test", Source: "external"},
+			exp:      false,
+		},
+		{
+			name:     "external pipeline on merge request ref",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "refs/merge-requests/7/head", Source: "external"},
+			exp:      false,
+		},
+		{
+			name:     "pipeline on another branch",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "other", Source: "push"},
+			exp:      false,
+		},
+		{
+			name:     "pipeline on another merge request",
+			pipeline: &gitlab.PipelineInfo{SHA: "sha", Ref: "refs/merge-requests/8/head", Source: "merge_request_event"},
+			exp:      false,
+		},
+		{
+			name:     "pipeline for another commit",
+			pipeline: &gitlab.PipelineInfo{SHA: "other-sha", Ref: "test", Source: "push"},
+			exp:      false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			Equals(t, c.exp, isPipelineAdoptable(c.pipeline, pull))
+		})
+	}
+}
+
+// Test that UpdateStatus only attaches the commit status to a pipeline that
+// belongs to the merge request, and that it falls back to the Ref without
+// retrying when the commit's last pipeline belongs to someone else.
+// See https://github.com/runatlantis/atlantis/issues/6871 and
+// https://github.com/runatlantis/atlantis/issues/5228.
+func TestClient_UpdateStatusPipelineAdoption(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	const foreignPipelineID = 999
+
+	cases := []struct {
+		name          string
+		lastPipeline  GetCommitResponseLastPipeline
+		expPipelineId int
+		expRef        string
+	}{
+		{
+			name:          "adopts external pipeline on bare branch ref",
+			lastPipeline:  GetCommitResponseLastPipeline{ID: gitlabPipelineSuccessMrID, SHA: "sha", Ref: updateStatusHeadBranch, Source: "external"},
+			expPipelineId: gitlabPipelineSuccessMrID,
+		},
+		{
+			name:          "adopts push pipeline on bare branch ref",
+			lastPipeline:  GetCommitResponseLastPipeline{ID: gitlabPipelineSuccessMrID, SHA: "sha", Ref: updateStatusHeadBranch, Source: "push"},
+			expPipelineId: gitlabPipelineSuccessMrID,
+		},
+		{
+			name:          "adopts push pipeline on fully qualified branch ref",
+			lastPipeline:  GetCommitResponseLastPipeline{ID: gitlabPipelineSuccessMrID, SHA: "sha", Ref: "refs/heads/" + updateStatusHeadBranch, Source: "push"},
+			expPipelineId: gitlabPipelineSuccessMrID,
+		},
+		{
+			name:          "adopts merge request pipeline",
+			lastPipeline:  GetCommitResponseLastPipeline{ID: gitlabPipelineSuccessMrID, SHA: "sha", Ref: "refs/merge-requests/7/head", Source: "merge_request_event"},
+			expPipelineId: gitlabPipelineSuccessMrID,
+		},
+		{
+			name:         "rejects external pipeline from another status poster",
+			lastPipeline: GetCommitResponseLastPipeline{ID: foreignPipelineID, SHA: "sha", Ref: "refs/heads/" + updateStatusHeadBranch, Source: "external"},
+			expRef:       updateStatusHeadBranch,
+		},
+		{
+			name:         "rejects pipeline on another branch",
+			lastPipeline: GetCommitResponseLastPipeline{ID: foreignPipelineID, SHA: "sha", Ref: "other-branch", Source: "push"},
+			expRef:       updateStatusHeadBranch,
+		},
+		{
+			name:         "rejects pipeline for another commit",
+			lastPipeline: GetCommitResponseLastPipeline{ID: foreignPipelineID, SHA: "other-sha", Ref: updateStatusHeadBranch, Source: "push"},
+			expRef:       updateStatusHeadBranch,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			getCommitRequests := 0
+			setStatusRequests := 0
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+						getCommitRequests++
+						w.WriteHeader(http.StatusOK)
+
+						getCommitResponse := GetCommitResponse{
+							LastPipeline: &c.lastPipeline,
+						}
+						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						Ok(t, err)
+						_, err = w.Write(getCommitJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						setStatusRequests++
+						var updateStatusJsonBody UpdateStatusJsonBody
+						err := json.NewDecoder(r.Body).Decode(&updateStatusJsonBody)
+						Ok(t, err)
+						defer r.Body.Close() // nolint: errcheck
+
+						Equals(t, c.expPipelineId, updateStatusJsonBody.PipelineId)
+						Equals(t, c.expRef, updateStatusJsonBody.Ref)
+
+						w.WriteHeader(http.StatusOK)
+						setStatusJsonResponse, err := json.Marshal(EmptyStruct{})
+						Ok(t, err)
+						_, err = w.Write(setStatusJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			defer testServer.Close()
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+
+			// Enable status retries so that any retry on a rejected pipeline
+			// would show up as additional GetCommit requests.
+			client := &Client{
+				Client:             internalClient,
+				Version:            nil,
+				StatusRetryEnabled: true,
+				PollingInterval:    10 * time.Millisecond,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        7,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: updateStatusHeadBranch,
+				},
+				models.PendingCommitStatus,
+				updateStatusSrc,
+				updateStatusDescription,
+				updateStatusTargetUrl,
+			)
+			Ok(t, err)
+
+			Equals(t, 1, getCommitRequests)
+			Equals(t, 1, setStatusRequests)
 		})
 	}
 }
@@ -2326,7 +2548,9 @@ func TestClient_UpdateStatusTransitionAlreadyComplete(t *testing.T) {
 
 				getCommitResponse := GetCommitResponse{
 					LastPipeline: &GetCommitResponseLastPipeline{
-						ID: gitlabPipelineSuccessMrID,
+						ID:  gitlabPipelineSuccessMrID,
+						SHA: "sha",
+						Ref: updateStatusHeadBranch,
 					},
 				}
 				getCommitJsonResponse, err := json.Marshal(getCommitResponse)

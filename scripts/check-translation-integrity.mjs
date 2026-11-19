@@ -14,6 +14,7 @@
 
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const SITE_DIR = 'runatlantis.io';
@@ -236,6 +237,47 @@ async function sourceFiles() {
   return [...new Set(files)].sort();
 }
 
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+
+// Without history every file looks like it was added in the same commit, so
+// staleness cannot be told apart and every translation is checked. CI checks
+// out full history: translate-docs restores pages that fail to their committed
+// translation, which is stale against the new source and must be skipped.
+const shallow = git('rev-parse', '--is-shallow-repository') === 'true';
+
+// Git blob hash of the English source each translation was generated from,
+// keyed by "<locale>/<path relative to runatlantis.io>". translate-docs writes
+// it (scripts/record-translation-sources.mjs) for every page it translates.
+const SOURCES_FILE = 'i18n.sources.json';
+const translatedFrom = existsSync(SOURCES_FILE)
+  ? JSON.parse(await readFile(SOURCES_FILE, 'utf8'))
+  : {};
+
+/**
+ * Reports whether a committed translation was generated from an older version
+ * of its English source. translate-docs regenerates those pages after the
+ * source change merges, so comparing them now would fail every pull request
+ * that edits a translated page.
+ *
+ * The recorded source hash is authoritative. Merge order is not: a translation
+ * pull request generated before a source change can merge after it. Pages with
+ * no record fall back to commit ancestry, i.e. some commit in HEAD touches the
+ * source but is not contained in the translation's last commit.
+ *
+ * Translations with uncommitted changes (the translate-docs output, or a
+ * local edit) are never stale: that is the content being checked.
+ */
+function isStale(source, target, key) {
+  if (git('status', '--porcelain', '--', target) !== '') return false;
+  if (key in translatedFrom) {
+    return translatedFrom[key] !== git('hash-object', source);
+  }
+  if (shallow) return false;
+  const lastTranslated = git('log', '-1', '--format=%H', '--', target);
+  if (lastTranslated === '') return false;
+  return git('rev-list', '-1', `${lastTranslated}..HEAD`, '--', source) !== '';
+}
+
 const locales = process.argv.slice(2);
 if (locales.length === 0) {
   console.error('usage: node scripts/check-translation-integrity.mjs <locale> [...locales]');
@@ -244,12 +286,22 @@ if (locales.length === 0) {
 
 let failures = 0;
 let checked = 0;
+let stale = 0;
+
+if (shallow) {
+  console.log('Shallow clone: checking every translation, including ones older than their source.');
+}
 
 for (const locale of locales) {
   for (const relative of await sourceFiles()) {
     const target = path.join(SITE_DIR, locale, relative);
     if (!existsSync(target)) continue; // not translated yet — that is allowed
     const source = path.join(SITE_DIR, relative);
+    if (isStale(source, target, `${locale}/${relative.split(path.sep).join('/')}`)) {
+      stale += 1;
+      console.log(`~ ${target} skipped: its source changed after it was translated; translate-docs refreshes it after merge`);
+      continue;
+    }
     const [sourceText, targetText] = await Promise.all([
       readFile(source, 'utf8'),
       readFile(target, 'utf8'),
@@ -275,4 +327,4 @@ if (failures > 0) {
   process.exit(1);
 }
 
-console.log(`Translation integrity: ${checked} file(s) checked, no problems found.`);
+console.log(`Translation integrity: ${checked} file(s) checked, ${stale} stale file(s) skipped, no problems found.`);

@@ -1,17 +1,10 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # what distro is the image being built for
-ARG ALPINE_TAG=3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+ARG ALPINE_TAG=3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.27.1-alpine3.24@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414
+ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
 
-# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG TERRAFORM_1_15_VERSION=1.15.9
-# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG TERRAFORM_1_16_VERSION=1.16.5
-ARG DEFAULT_TERRAFORM_VERSION=${TERRAFORM_1_16_VERSION}
-# renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.12.6
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.70.1
 
@@ -30,8 +23,6 @@ ENV ATLANTIS_COMMIT=${ATLANTIS_COMMIT}
 ARG ATLANTIS_DATE=unknown
 ENV ATLANTIS_DATE=${ATLANTIS_DATE}
 
-ARG DEFAULT_TERRAFORM_VERSION
-ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
@@ -60,9 +51,9 @@ FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
 # renovate: datasource=deb depName=ca-certificates
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419"
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419+deb13u1"
 # renovate: datasource=deb depName=curl
-ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u5"
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u7"
 # renovate: datasource=deb depName=git
 ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
 # renovate: datasource=deb depName=unzip
@@ -74,7 +65,7 @@ ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
 # renovate: datasource=deb depName=gnupg
 ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
 # renovate: datasource=deb depName=openssl
-ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u2"
+ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u3"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
@@ -128,14 +119,14 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.8.0
+ENV GIT_LFS_VERSION=3.8.1
 
 # Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
 # SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e455e00f15d9b95661b8d53498ffb0c3367962cf1ec73c31ab7369516cd6ab8d ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=ac9c8efac980bb0505ead384d087e2acb6486fd8498691a2165fa174ec6118c2 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=67144f93c2342f46456d22dbf33077f54e0581cb91f2966393151871ca328553 ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e72cf723a4a660438862282e8aecf3885fc8123e88bfcad534cf6b941a354b75 ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=67895dd77b63329796bc5efdd47b57f218e1f7b98717ebaf936a8238dbcaec0f ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=51850fba78f08c8ffe86e162ce277a36fb41929ba699c2853f4b0ff178cf0eb2 ;; \
         *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
@@ -145,47 +136,21 @@ RUN case ${TARGETPLATFORM} in \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version
 
-# Terraform and OpenTofu live in their own stage so the slim targets never
-# download them. The full targets copy from tf-deps; the slim targets do not.
-FROM deps AS tf-deps
-
-ARG TARGETPLATFORM
-WORKDIR /tmp/build
-
-# install terraform binaries
-ARG TERRAFORM_1_15_VERSION
-ARG TERRAFORM_1_16_VERSION
-ARG DEFAULT_TERRAFORM_VERSION
-ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
-ARG DEFAULT_OPENTOFU_VERSION
-ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
-
-# COPY scripts/download-release.sh .
-COPY --from=builder /app/scripts/download-release.sh download-release.sh
-
-# HashiCorp patches only the two most recent minor releases.
-RUN ./download-release.sh \
-        "terraform" \
-        "${TARGETPLATFORM}" \
-        "${DEFAULT_TERRAFORM_VERSION}" \
-        "${TERRAFORM_1_15_VERSION} ${TERRAFORM_1_16_VERSION}" \
-    && ./download-release.sh \
-        "tofu" \
-        "${TARGETPLATFORM}" \
-        "${DEFAULT_OPENTOFU_VERSION}" \
-        "${DEFAULT_OPENTOFU_VERSION}"
-
 # Stage 2 - Alpine
 # Creating the individual distro builds using targets.
 #
-# Each distro has a runtime stage with everything except the Terraform and
-# OpenTofu binaries, and two final targets built on it:
-#   <distro>-slim  no Terraform or OpenTofu. Atlantis downloads the version it
-#                  needs at runtime (see --tf-download), so this image carries
-#                  none of the advisories filed against bundled binaries.
-#   <distro>       the runtime stage plus the bundled binaries. This is the
-#                  image that has always been published.
-FROM alpine:${ALPINE_TAG} AS alpine-runtime
+# Since v0.49.0 the images ship no Terraform or OpenTofu binaries. Atlantis
+# downloads the version it needs at runtime (see --default-tf-version and
+# --tf-download), so the image carries none of the advisories filed against
+# bundled third-party binaries.
+#
+# With no terraform on PATH, Atlantis refuses to start until
+# --default-tf-version is set (flag, ATLANTIS_DEFAULT_TF_VERSION, or the
+# server config file). Deliberately no ENV ATLANTIS_DEFAULT_TF_VERSION here:
+# environment variables take precedence over the server config file, so a
+# version baked into the image would silently override a version pinned in
+# that file.
+FROM alpine:${ALPINE_TAG} AS alpine
 
 ARG ATLANTIS_PORT=4141
 
@@ -208,17 +173,17 @@ COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # renovate: datasource=apk depName=ca-certificates
-ENV CA_CERTIFICATES_VERSION="20260909-r0"
+ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
-ENV CURL_VERSION="8.22.0-r0"
+ENV CURL_VERSION="8.23.0-r0"
 # renovate: datasource=apk depName=git
-ENV GIT_VERSION="2.54.0-r0"
+ENV GIT_VERSION="2.54.1-r0"
 # renovate: datasource=apk depName=unzip
 ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash
 ENV BASH_VERSION="5.3.9-r1"
 # renovate: datasource=apk depName=openssh
-ENV OPENSSH_VERSION="10.3_p1-r1"
+ENV OPENSSH_VERSION="10.3_p1-r2"
 # renovate: datasource=apk depName=dumb-init
 ENV DUMB_INIT_VERSION="1.2.5-r4"
 # renovate: datasource=apk depName=gcompat
@@ -272,25 +237,8 @@ USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
 
-FROM alpine-runtime AS alpine-slim
-
-# Nothing to add. With no terraform on PATH, Atlantis refuses to start until
-# --default-tf-version is set (flag, ATLANTIS_DEFAULT_TF_VERSION, or the
-# server config file) and then downloads that version on first use.
-#
-# Deliberately no ENV ATLANTIS_DEFAULT_TF_VERSION here: environment variables
-# take precedence over the server config file, so a version baked into the
-# image would silently override a version pinned in that file.
-
-FROM alpine-runtime AS alpine
-
-# copy terraform binaries. These come out of release zip files, which carry no
-# file capabilities, so the capability strip in alpine-runtime still holds.
-COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/
-
 # Stage 2 - Debian
-FROM debian-base AS debian-runtime
+FROM debian-base AS debian
 
 ARG ATLANTIS_PORT=4141
 
@@ -341,14 +289,3 @@ RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
 USER atlantis
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["server"]
-
-FROM debian-runtime AS debian-slim
-
-# Nothing to add. See alpine-slim for why no default Terraform version is set.
-
-FROM debian-runtime AS debian
-
-# copy terraform binaries. See the alpine target for why this is safe to do
-# after the capability strip.
-COPY --from=tf-deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=tf-deps /usr/local/bin/tofu/tofu* /usr/local/bin/

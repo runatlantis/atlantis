@@ -546,6 +546,156 @@ func TestClient_PullIsApproved(t *testing.T) {
 	Equals(t, false, approvalStatus.IsApproved)
 }
 
+// githubReview is a compact description of a GitHub pull request review used
+// to build API responses for approval tests.
+type githubReview struct {
+	id        int
+	login     string
+	state     string
+	submitted string
+}
+
+func githubReviewsJSON(reviews []githubReview) string {
+	entries := make([]string, 0, len(reviews))
+	for _, r := range reviews {
+		entries = append(entries, fmt.Sprintf(`{
+  "id": %d,
+  "user": {"login": %q, "id": %d},
+  "body": "",
+  "commit_id": "ecdd80bb57125d7ba9641ffaa4d7d2c19d3f3091",
+  "state": %q,
+  "submitted_at": %q
+}`, r.id, r.login, 1000+r.id, r.state, r.submitted))
+	}
+	return "[" + strings.Join(entries, ",") + "]"
+}
+
+func TestClient_PullIsApproved_EffectiveReviewState(t *testing.T) {
+	cases := []struct {
+		description   string
+		reviews       []githubReview
+		expApproved   bool
+		expApprovedBy string
+	}{
+		{
+			description: "approval superseded by changes requested from the same user is not approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "CHANGES_REQUESTED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "changes requested followed by approval from the same user is approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "CHANGES_REQUESTED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "dismissed review is not approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "DISMISSED", submitted: "2026-01-10T01:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "approval followed by a dismissed review from the same user is not approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "DISMISSED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved: false,
+		},
+		{
+			description: "dismissed review followed by approval from the same user is approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "DISMISSED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "APPROVED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "approval by one user plus dismissed review by another is approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "bob", state: "DISMISSED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "approval by one user plus changes requested by another is approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "bob", state: "CHANGES_REQUESTED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "comment after approval does not revoke the approval",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+				{id: 2, login: "alice", state: "COMMENTED", submitted: "2026-01-10T02:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+		{
+			description: "normal approval is approved",
+			reviews: []githubReview{
+				{id: 1, login: "alice", state: "APPROVED", submitted: "2026-01-10T01:00:00Z"},
+			},
+			expApproved:   true,
+			expApprovedBy: "alice",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			logger := logging.NewNoopLogger(t)
+			body := githubReviewsJSON(c.reviews)
+			testServer := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.RequestURI != "/api/v3/repos/owner/repo/pulls/1/reviews?per_page=300" {
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+						return
+					}
+					w.Write([]byte(body)) // nolint: errcheck
+				}))
+			defer testServer.Close()
+
+			testServerURL, err := url.Parse(testServer.URL)
+			Ok(t, err)
+			client, err := github.New(testServerURL.Host, &github.UserCredentials{"user", "pass", ""}, github.Config{}, 0, logging.NewNoopLogger(t))
+			Ok(t, err)
+			defer disableSSLVerification()()
+
+			approvalStatus, err := client.PullIsApproved(
+				logger,
+				models.Repo{
+					FullName: "owner/repo",
+					Owner:    "owner",
+					Name:     "repo",
+					VCSHost: models.VCSHost{
+						Type:     models.Github,
+						Hostname: "github.com",
+					},
+				}, models.PullRequest{
+					Num: 1,
+				})
+			Ok(t, err)
+			Equals(t, c.expApproved, approvalStatus.IsApproved)
+			Equals(t, c.expApprovedBy, approvalStatus.ApprovedBy)
+		})
+	}
+}
+
 func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	vcsStatusName := "atlantis-test"

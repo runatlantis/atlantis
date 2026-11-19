@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
@@ -149,6 +148,9 @@ type UserConfig struct {
 	WriteGitCreds              bool            `mapstructure:"write-git-creds"`
 	WebsocketCheckOrigin       bool            `mapstructure:"websocket-check-origin"`
 	UseTFPluginCache           bool            `mapstructure:"use-tf-plugin-cache"`
+
+	// Experiments grants server-only permissions for experimental settings and routes.
+	Experiments []string `mapstructure:"experiments"`
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName
@@ -175,12 +177,10 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 	return allowCommands, nil
 }
 
-// ToBlockedExtraArgs parses BlockedExtraArgs into a slice of flag prefixes.
-// When BlockedExtraArgs is empty, events.DefaultBlockedExtraArgs is returned.
+// ToBlockedExtraArgs parses BlockedExtraArgs into the flags the operator
+// blocks in addition to events.DefaultBlockedExtraArgs, which the comment
+// parser always enforces. It returns nil when no extra flags are configured.
 func (u UserConfig) ToBlockedExtraArgs() []string {
-	if u.BlockedExtraArgs == "" {
-		return events.DefaultBlockedExtraArgs
-	}
 	var args []string
 	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
 		if trimmed := strings.TrimSpace(arg); trimmed != "" {
