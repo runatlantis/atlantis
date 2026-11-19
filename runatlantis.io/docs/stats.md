@@ -26,21 +26,21 @@ To see all the metrics exposed from atlantis service, make a GET request to the 
 
 ```bash
 curl localhost:4141/metrics
-# HELP atlantis_cmd_autoplan_builder_execution_error atlantis_cmd_autoplan_builder_execution_error counter
-# TYPE atlantis_cmd_autoplan_builder_execution_error counter
-atlantis_cmd_autoplan_builder_execution_error 0
-# HELP atlantis_cmd_autoplan_builder_execution_success atlantis_cmd_autoplan_builder_execution_success counter
-# TYPE atlantis_cmd_autoplan_builder_execution_success counter
-atlantis_cmd_autoplan_builder_execution_success 10
-# HELP atlantis_cmd_autoplan_builder_execution_time atlantis_cmd_autoplan_builder_execution_time summary
-# TYPE atlantis_cmd_autoplan_builder_execution_time summary
-atlantis_cmd_autoplan_builder_execution_time{quantile="0.5"} NaN
-atlantis_cmd_autoplan_builder_execution_time{quantile="0.75"} NaN
-atlantis_cmd_autoplan_builder_execution_time{quantile="0.95"} NaN
-atlantis_cmd_autoplan_builder_execution_time{quantile="0.99"} NaN
-atlantis_cmd_autoplan_builder_execution_time{quantile="0.999"} NaN
-atlantis_cmd_autoplan_builder_execution_time_sum 11.42403017
-atlantis_cmd_autoplan_builder_execution_time_count 10
+# HELP atlantis_builder_execution_error atlantis_builder_execution_error counter
+# TYPE atlantis_builder_execution_error counter
+atlantis_builder_execution_error 0
+# HELP atlantis_builder_execution_success atlantis_builder_execution_success counter
+# TYPE atlantis_builder_execution_success counter
+atlantis_builder_execution_success 10
+# HELP atlantis_builder_execution_time atlantis_builder_execution_time summary
+# TYPE atlantis_builder_execution_time summary
+atlantis_builder_execution_time{quantile="0.5"} NaN
+atlantis_builder_execution_time{quantile="0.75"} NaN
+atlantis_builder_execution_time{quantile="0.95"} NaN
+atlantis_builder_execution_time{quantile="0.99"} NaN
+atlantis_builder_execution_time{quantile="0.999"} NaN
+atlantis_builder_execution_time_sum 11.42403017
+atlantis_builder_execution_time_count 10
 .....
 .....
 .....
@@ -52,13 +52,18 @@ The output shown above is trimmed, since with every new version release this met
 
 Important metrics to monitor are
 
-| Metric Name                                    | Metric Type                                                          | Purpose                                                                             |
-|------------------------------------------------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| `atlantis_cmd_autoplan_execution_error`        | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.md#autoplanning) has thrown error.     |
-| `atlantis_cmd_comment_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis plan` has thrown error.                |
-| `atlantis_cmd_autoplan_execution_success`      | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when [autoplan](autoplanning.md#autoplanning) has run successfully. |
-| `atlantis_cmd_comment_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has thrown error.               |
-| `atlantis_cmd_comment_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times when on commenting `atlantis apply` has run successfully.           |
+| Metric Name                                | Metric Type                                                          | Purpose                                               |
+|--------------------------------------------|----------------------------------------------------------------------|-------------------------------------------------------|
+| `atlantis_project_plan_execution_success`  | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project plan has run successfully.  |
+| `atlantis_project_plan_execution_error`    | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project plan has thrown an error.   |
+| `atlantis_project_plan_execution_failure`  | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project plan was not run.           |
+| `atlantis_project_apply_execution_success` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project apply has run successfully. |
+| `atlantis_project_apply_execution_error`   | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project apply has thrown an error.  |
+| `atlantis_project_apply_execution_failure` | [counter](https://prometheus.io/docs/concepts/metric_types/#counter) | number of times a project apply was not run.          |
+
+An error means something went wrong while running the command, for example a workflow step such as `terraform plan` failed. A failure means Atlantis did not run the command, for example because the project is [locked](locking.md) by another pull request or a [plan or apply requirement](command-requirements.md) is not met.
+
+These counters are reported per project and labelled with the pull request and project they ran for, for example `base_repo`, `pr_number` and `project_path`. The plan counters include both [autoplan](autoplanning.md#autoplanning) and `atlantis plan` comments. To see how long a whole command took, use the `atlantis_cmd_autoplan_execution_time`, `atlantis_cmd_comment_plan_execution_time` and `atlantis_cmd_comment_apply_execution_time` summaries.
 
 ::: tip NOTE
 There are plenty of additional metrics exposed by atlantis that are not described above.
