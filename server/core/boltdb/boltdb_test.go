@@ -5,6 +5,7 @@
 package boltdb_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -584,6 +585,59 @@ func TestUnlockByPullMatching(t *testing.T) {
 	ls, err = b.List()
 	Ok(t, err)
 	Equals(t, 0, len(ls))
+}
+
+func TestUnlockByPullSiblingRepo(t *testing.T) {
+	t.Log("UnlockByPull should not delete locks of a repo whose name starts with the same repo name")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	sibling := lock
+	sibling.Project = models.NewProject(project.RepoFullName+"2", project.Path, project.ProjectName)
+	_, _, err = b.TryLock(sibling)
+	Ok(t, err)
+
+	unlocked, err := b.UnlockByPull(project.RepoFullName, pullNum)
+	Ok(t, err)
+	Equals(t, 1, len(unlocked))
+	Equals(t, project, unlocked[0].Project)
+
+	ls, err := b.List()
+	Ok(t, err)
+	Equals(t, 1, len(ls))
+	Equals(t, sibling.Project, ls[0].Project)
+}
+
+func TestUnlockByPullBadLockRollsBack(t *testing.T) {
+	t.Log("UnlockByPull should delete no locks if one of the scanned locks can't be read")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	// This key sorts after the valid lock's key, so the valid lock is matched
+	// before the scan hits the bad one.
+	validKey := []byte(models.GenerateLockKey(project, workspace))
+	badKey := []byte(project.RepoFullName + "/zzz/" + workspace + "/")
+	Assert(t, bytes.Compare(badKey, validKey) > 0, "expected bad key to sort after valid key")
+	err = db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte(lockBucket)).Put(badKey, []byte("not json"))
+	})
+	Ok(t, err)
+
+	unlocked, err := b.UnlockByPull(project.RepoFullName, pullNum)
+	Assert(t, err != nil, "expected error")
+	Equals(t, []models.ProjectLock(nil), unlocked)
+
+	var stored []byte
+	err = db.View(func(tx *bolt.Tx) error {
+		stored = tx.Bucket([]byte(lockBucket)).Get(validKey)
+		return nil
+	})
+	Ok(t, err)
+	Assert(t, stored != nil, "expected valid lock to still be stored")
 }
 
 func TestGetLockNotThere(t *testing.T) {

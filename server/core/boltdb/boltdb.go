@@ -346,30 +346,39 @@ func (b *BoltDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) {
 // UnlockByPull deletes all locks associated with that pull request and returns them.
 func (b *BoltDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	var locks []models.ProjectLock
-	err := b.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(b.locksBucketName).Cursor()
+	// Scan and delete in a single transaction so a lock taken by another
+	// pull between the two steps can't be deleted.
+	err := b.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(b.locksBucketName)
+		c := bucket.Cursor()
 
-		// we can use the repoFullName as a prefix search since that's the first part of the key
-		for k, v := c.Seek([]byte(repoFullName)); k != nil && bytes.HasPrefix(k, []byte(repoFullName)); k, v = c.Next() {
+		// Keys start with "<repoFullName>/", so we can use that as a prefix search.
+		// The trailing slash keeps "owner/repo" from matching "owner/repo2".
+		prefix := []byte(repoFullName + "/")
+		var keys [][]byte
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			var lock models.ProjectLock
 			if err := json.Unmarshal(v, &lock); err != nil {
 				return fmt.Errorf("deserializing lock at key %q: %w", string(k), err)
 			}
 			if lock.Pull.Num == pullNum {
 				locks = append(locks, lock)
+				keys = append(keys, bytes.Clone(k))
+			}
+		}
+
+		// Delete after the scan: modifying the bucket while iterating with a
+		// cursor can skip keys.
+		for _, k := range keys {
+			if err := bucket.Delete(k); err != nil {
+				return fmt.Errorf("deleting lock at key %q: %w", string(k), err)
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		return locks, err
-	}
-
-	// delete the locks
-	for _, lock := range locks {
-		if _, err = b.Unlock(lock.Project, lock.Workspace); err != nil {
-			return locks, fmt.Errorf("unlocking repo %s, path %s, workspace %s: %w", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace, err)
-		}
+		// The transaction was rolled back, so no locks were deleted.
+		return nil, err
 	}
 	return locks, nil
 }
