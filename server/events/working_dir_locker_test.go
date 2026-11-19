@@ -5,8 +5,10 @@
 package events_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -301,4 +303,245 @@ func TestWorkingDirLocker_ProjectLocksStillUseExactWorkspaceDirProjectIdentity(t
 	ErrContains(t, "currently locked", err)
 	_, err = locker.TryLock("group/repo/1", 2, "default", "dir", "other", command.Apply, events.WorkingDirLockMetadata{})
 	Ok(t, err)
+}
+
+const (
+	oldSHA   = "1111111111111111111111111111111111111111"
+	newSHA   = "2222222222222222222222222222222222222222"
+	newerSHA = "3333333333333333333333333333333333333333"
+)
+
+type lockPullResult struct {
+	unlock func()
+	err    error
+}
+
+// lockPullAfterStalePlanAsync starts LockPullAfterStalePlan in a goroutine
+// and returns once the call is either waiting or finished.
+func lockPullAfterStalePlanAsync(locker *events.DefaultWorkingDirLocker, headCommit string) (<-chan lockPullResult, <-chan events.WorkingDirLockMetadata) {
+	result := make(chan lockPullResult, 1)
+	waiting := make(chan events.WorkingDirLockMetadata, 1)
+	go func() {
+		unlock, err := locker.LockPullAfterStalePlan(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: headCommit}, func(holder events.WorkingDirLockMetadata) {
+			waiting <- holder
+		})
+		result <- lockPullResult{unlock: unlock.Unlock, err: err}
+	}()
+	return result, waiting
+}
+
+func awaitWaiting(t *testing.T, waiting <-chan events.WorkingDirLockMetadata, result <-chan lockPullResult) events.WorkingDirLockMetadata {
+	t.Helper()
+	select {
+	case holder := <-waiting:
+		return holder
+	case r := <-result:
+		t.Fatalf("expected LockPullAfterStalePlan to wait, it returned err=%v", r.err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for LockPullAfterStalePlan to start waiting")
+	}
+	return events.WorkingDirLockMetadata{}
+}
+
+func awaitResult(t *testing.T, result <-chan lockPullResult) lockPullResult {
+	t.Helper()
+	select {
+	case r := <-result:
+		return r
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for LockPullAfterStalePlan to return")
+	}
+	return lockPullResult{}
+}
+
+func TestLockPullAfterStalePlan_LocksImmediatelyWhenFree(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	unlock, err := locker.LockPullAfterStalePlan(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: newSHA}, func(events.WorkingDirLockMetadata) {
+		t.Fatal("did not expect to wait")
+	})
+	Ok(t, err)
+	Assert(t, locker.HasCommandLock(repo, 1, command.Plan), "expected plan lock")
+	unlock.Unlock()
+	Assert(t, !locker.HasCommandLock(repo, 1, command.Plan), "expected plan lock to be released")
+}
+
+func TestLockPullAfterStalePlan_WaitsForPlanOfOlderCommit(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockOld, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: oldSHA})
+	Ok(t, err)
+
+	result, waiting := lockPullAfterStalePlanAsync(locker, newSHA)
+	holder := awaitWaiting(t, waiting, result)
+	Equals(t, oldSHA, holder.HeadCommit)
+
+	unlockOld()
+	r := awaitResult(t, result)
+	Ok(t, r.err)
+
+	// The new commit now owns the pull lock.
+	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "for commit 2222222", err)
+	r.unlock()
+	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	Ok(t, err)
+}
+
+func TestLockPullAfterStalePlan_WaitsForProjectPlanOfOlderCommit(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockOld, err := locker.TryLock(repo, 1, workspace, path, projectName, command.Plan, events.WorkingDirLockMetadata{HeadCommit: oldSHA})
+	Ok(t, err)
+
+	result, waiting := lockPullAfterStalePlanAsync(locker, newSHA)
+	awaitWaiting(t, waiting, result)
+
+	unlockOld()
+	r := awaitResult(t, result)
+	Ok(t, r.err)
+	r.unlock()
+}
+
+func TestLockPullAfterStalePlan_DoesNotWaitForOtherConflicts(t *testing.T) {
+	cases := []struct {
+		name   string
+		holder command.Name
+		sha    string
+	}{
+		{name: "plan for the same commit", holder: command.Plan, sha: newSHA},
+		{name: "plan without commit metadata", holder: command.Plan, sha: ""},
+		{name: "apply for an older commit", holder: command.Apply, sha: oldSHA},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			locker := events.NewDefaultWorkingDirLocker()
+			unlock, err := locker.TryLockPull(repo, 1, c.holder, events.WorkingDirLockMetadata{HeadCommit: c.sha})
+			Ok(t, err)
+			defer unlock()
+
+			_, err = locker.LockPullAfterStalePlan(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: newSHA}, func(events.WorkingDirLockMetadata) {
+				t.Fatal("did not expect to wait")
+			})
+			ErrContains(t, "is currently locked by", err)
+		})
+	}
+}
+
+func TestLockPullAfterStalePlan_NewerCommitSupersedesWaiter(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	unlockOld, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: oldSHA})
+	Ok(t, err)
+
+	first, firstWaiting := lockPullAfterStalePlanAsync(locker, newSHA)
+	awaitWaiting(t, firstWaiting, first)
+	second, secondWaiting := lockPullAfterStalePlanAsync(locker, newerSHA)
+	awaitWaiting(t, secondWaiting, second)
+
+	r := awaitResult(t, first)
+	Assert(t, errors.Is(r.err, events.ErrPullLockSuperseded), "expected superseded, got %v", r.err)
+	Assert(t, locker.HasCommandLock(repo, 1, command.Plan), "old plan should still hold the lock")
+
+	unlockOld()
+	r = awaitResult(t, second)
+	Ok(t, r.err)
+	_, err = locker.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{})
+	ErrContains(t, "for commit 3333333", err)
+	r.unlock()
+}
+
+func TestLockPullAfterStalePlan_UnlockByPullCancelsWaiter(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	_, err := locker.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: oldSHA})
+	Ok(t, err)
+
+	result, waiting := lockPullAfterStalePlanAsync(locker, newSHA)
+	awaitWaiting(t, waiting, result)
+
+	locker.UnlockByPull(repo, 1)
+	r := awaitResult(t, result)
+	Assert(t, errors.Is(r.err, events.ErrPullLockCancelled), "expected cancelled, got %v", r.err)
+	Assert(t, !locker.HasCommandLock(repo, 1, command.Plan), "expected no plan lock after cancellation")
+}
+
+func TestTryLockPullShared_TargetedAppliesShareThePullLock(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	metadata := events.WorkingDirLockMetadata{HeadCommit: newSHA}
+
+	unlockFirst, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
+	Ok(t, err)
+	unlockSecond, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
+	Ok(t, err)
+
+	// Plans and full applies still have to wait for every targeted apply.
+	_, err = locker.TryLockPull(repo, 1, command.Plan, metadata)
+	ErrContains(t, `currently locked by "apply"`, err)
+	_, err = locker.TryLockPull(repo, 1, command.Apply, metadata)
+	ErrContains(t, `currently locked by "apply"`, err)
+
+	unlockFirst()
+	unlockFirst() // releasing twice must not drop the other holder
+	_, err = locker.TryLockPull(repo, 1, command.Plan, metadata)
+	ErrContains(t, `currently locked by "apply"`, err)
+
+	unlockSecond()
+	unlockPlan, err := locker.TryLockPull(repo, 1, command.Plan, metadata)
+	Ok(t, err)
+	unlockPlan()
+}
+
+func TestTryLockPullShared_ConflictsWithOtherLocks(t *testing.T) {
+	cases := []struct {
+		name string
+		hold func(*events.DefaultWorkingDirLocker) (func(), error)
+	}{
+		{
+			name: "full apply",
+			hold: func(l *events.DefaultWorkingDirLocker) (func(), error) {
+				return l.TryLockPull(repo, 1, command.Apply, events.WorkingDirLockMetadata{HeadCommit: newSHA})
+			},
+		},
+		{
+			name: "plan",
+			hold: func(l *events.DefaultWorkingDirLocker) (func(), error) {
+				return l.TryLockPull(repo, 1, command.Plan, events.WorkingDirLockMetadata{HeadCommit: newSHA})
+			},
+		},
+		{
+			name: "project plan",
+			hold: func(l *events.DefaultWorkingDirLocker) (func(), error) {
+				return l.TryLock(repo, 1, workspace, path, projectName, command.Plan, events.WorkingDirLockMetadata{HeadCommit: newSHA})
+			},
+		},
+		{
+			name: "targeted apply for another commit",
+			hold: func(l *events.DefaultWorkingDirLocker) (func(), error) {
+				return l.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{HeadCommit: oldSHA})
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			locker := events.NewDefaultWorkingDirLocker()
+			unlock, err := c.hold(locker)
+			Ok(t, err)
+			defer unlock()
+
+			_, err = locker.TryLockPullShared(repo, 1, command.Apply, events.WorkingDirLockMetadata{HeadCommit: newSHA})
+			ErrContains(t, "is currently locked by", err)
+		})
+	}
+}
+
+func TestTryLockPullShared_StaleUnlockDoesNotReleaseNewLock(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	metadata := events.WorkingDirLockMetadata{HeadCommit: newSHA}
+	staleUnlock, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
+	Ok(t, err)
+
+	locker.UnlockByPull(repo, 1)
+	unlock, err := locker.TryLockPullShared(repo, 1, command.Apply, metadata)
+	Ok(t, err)
+	defer unlock()
+
+	staleUnlock()
+	_, err = locker.TryLockPull(repo, 1, command.Plan, metadata)
+	ErrContains(t, `currently locked by "apply"`, err)
 }

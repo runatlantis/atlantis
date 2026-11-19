@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
@@ -2985,5 +2986,190 @@ func TestRunCommentCommand_VarFileOutsideAllowlistRejectedForEveryCommand(t *tes
 				Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num),
 				Eq("```\nvar file path /etc/passwd is not allowed by the current allowlist: []\n```"), Eq(""))
 		})
+	}
+}
+
+type notifyingAutoplanLocker struct {
+	events.WorkingDirLocker
+	waiting chan struct{}
+}
+
+func (l *notifyingAutoplanLocker) LockPullAfterStalePlan(repo string, num int, name command.Name, metadata events.WorkingDirLockMetadata, onWait func(events.WorkingDirLockMetadata)) (events.PullLock, error) {
+	return l.WorkingDirLocker.LockPullAfterStalePlan(repo, num, name, metadata, func(holder events.WorkingDirLockMetadata) {
+		if onWait != nil {
+			onWait(holder)
+		}
+		l.waiting <- struct{}{}
+	})
+}
+
+type fixedAutoplanHead string
+
+func (h fixedAutoplanHead) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return models.PullRequest{HeadCommit: string(h)}, nil
+}
+
+func awaitAutoplanSignal(t *testing.T, signal <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for autoplan")
+	}
+}
+
+func TestRunAutoplanCommand_WaitsBeforeHooksAndUsesLiveHead(t *testing.T) {
+	locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
+	setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+	planCommandRunner.LivePullHeadFetcher = fixedAutoplanHead("live")
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
+	unlockOld, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+	unlockWorkspace, err := locker.TryLock(modelPull.BaseRepo.FullName, modelPull.Num, "default", ".", "", command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+	ch.FailOnPreWorkflowHookError = true
+	hooks := make(chan struct{}, 2)
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		ctx := args[0].(*command.Context)
+		Equals(t, "live", ctx.Pull.HeadCommit)
+		unlock, err := locker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, "default", ".", "", command.Plan, events.WorkingDirLockMetadataForPull(ctx.Pull))
+		if err == nil {
+			unlock()
+		}
+		hooks <- struct{}{}
+		return ReturnValues{err}
+	})
+	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
+		Equals(t, "live", args[0].(*command.Context).Pull.HeadCommit)
+		hooks <- struct{}{}
+		return ReturnValues{nil}
+	})
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(t.TempDir(), nil)
+	done := make(chan struct{})
+	go func() {
+		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+		close(done)
+	}()
+	awaitAutoplanSignal(t, locker.waiting)
+	Equals(t, 0, len(hooks))
+	unlockWorkspace()
+	unlockOld()
+	awaitAutoplanSignal(t, done)
+	Equals(t, 2, len(hooks))
+	livePull := modelPull
+	livePull.HeadCommit = "live"
+	pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(livePull))
+	for _, cmd := range []command.Name{command.Plan, command.PolicyCheck, command.Apply} {
+		commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(livePull), Eq(models.SuccessCommitStatus), Eq(cmd), Eq(models.ProjectCounts{}))
+	}
+	status, err := dbUpdater.Database.GetPullStatus(livePull)
+	Ok(t, err)
+	Assert(t, status != nil, "expected empty state for live head")
+	Equals(t, "live", status.Pull.HeadCommit)
+}
+
+func TestRunAutoplanCommand_SupersededAndCancelledWaitersSkipHooks(t *testing.T) {
+	locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
+	client := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "first"}
+	unlockOld, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+	defer unlockOld()
+	first, second := make(chan struct{}), make(chan struct{})
+	go func() {
+		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+		close(first)
+	}()
+	awaitAutoplanSignal(t, locker.waiting)
+	newer := modelPull
+	newer.HeadCommit = "second"
+	go func() {
+		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, newer, testdata.User)
+		close(second)
+	}()
+	awaitAutoplanSignal(t, locker.waiting)
+	awaitAutoplanSignal(t, first)
+	locker.CancelAutoplanWaiter(modelPull.BaseRepo.FullName, modelPull.Num)
+	awaitAutoplanSignal(t, second)
+	preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+	client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+	Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan), "running plan must retain its lock")
+}
+
+type autoplanHeadFetcherFunc func(command.ProjectContext) (models.PullRequest, error)
+
+func (f autoplanHeadFetcherFunc) GetLivePullIdentity(ctx command.ProjectContext) (models.PullRequest, error) {
+	return f(ctx)
+}
+
+func TestRunAutoplanCommand_CloseOrCancelBeforeAuthorization(t *testing.T) {
+	for _, action := range []string{"close", "cancel"} {
+		for _, phase := range []string{"queued", "refreshing"} {
+			t.Run(action+"/"+phase, func(t *testing.T) {
+				t.Log("issue #7050 requires close/cancel to discard an autoplan before hooks start, including during live-head lookup")
+				locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
+				client := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+				modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
+				started, resume := make(chan struct{}), make(chan struct{})
+				planCommandRunner.LivePullHeadFetcher = autoplanHeadFetcherFunc(func(command.ProjectContext) (models.PullRequest, error) {
+					close(started)
+					<-resume
+					live := modelPull
+					live.HeadCommit = "live"
+					return live, nil
+				})
+				unlockOld, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+				Ok(t, err)
+				defer unlockOld()
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+				}()
+				awaitAutoplanSignal(t, locker.waiting)
+				if phase == "refreshing" {
+					unlockOld()
+					awaitAutoplanSignal(t, started)
+				}
+				if action == "close" {
+					lockingLocker.EXPECT().UnlockByPull(modelPull.BaseRepo.FullName, modelPull.Num).Return(nil, nil)
+					cleaner := &events.PullClosedExecutor{WorkingDirLocker: locker, Locker: lockingLocker, Database: dbUpdater.Database, WorkingDir: workingDir}
+					Ok(t, cleaner.CleanUpPull(logging.NewNoopLogger(t), testdata.GithubRepo, modelPull))
+				} else {
+					cancel := events.NewCancelCommandRunner(client, &events.DefaultProjectCommandRunner{CancellationTracker: events.NewCancellationTracker(), WorkingDirLocker: locker}, pullUpdater, locker, false)
+					cancel.Run(&command.Context{Log: logging.NewNoopLogger(t), Pull: modelPull}, &events.CommentCommand{Name: command.Cancel})
+				}
+				var unlockReplacement func()
+				if action == "cancel" && phase == "refreshing" {
+					unlockReplacement, err = locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Apply, events.WorkingDirLockMetadata{HeadCommit: "replacement"})
+					Ok(t, err)
+					defer unlockReplacement()
+				}
+				close(resume)
+				awaitAutoplanSignal(t, done)
+				preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+				postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+				projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombined(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name]())
+				commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[models.CommitStatus](), Any[command.Name](), Any[models.ProjectCounts]())
+				if action == "cancel" {
+					client.VerifyWasCalledOnce().CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				} else {
+					client.VerifyWasCalled(Never()).CreateComment(Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
+				}
+				if unlockReplacement != nil {
+					Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, command.Apply), "cancelled autoplan must preserve replacement apply lock")
+				}
+				if action == "close" && phase == "queued" {
+					Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan), "close must preserve already running plan")
+				}
+				status, err := dbUpdater.Database.GetPullStatus(modelPull)
+				Ok(t, err)
+				Assert(t, status == nil, "cancelled autoplan must not recreate database state")
+			})
+		}
 	}
 }

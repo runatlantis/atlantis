@@ -41,6 +41,7 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
+	WorkingDirLocker         WorkingDirLocker
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
@@ -73,6 +74,9 @@ func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	if p.WorkingDirLocker != nil {
+		p.WorkingDirLocker.CancelAutoplanWaiter(repo.FullName, pull.Num)
+	}
 	pullStatus, err := p.Database.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.

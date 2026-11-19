@@ -3036,6 +3036,23 @@ func (l *trackingWorkingDirLocker) TryLockPull(string, int, command.Name, events
 	return func() { l.locked = false }, nil
 }
 
+func (l *trackingWorkingDirLocker) LockPullAfterStalePlan(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata, _ func(events.WorkingDirLockMetadata)) (events.PullLock, error) {
+	unlock, err := l.TryLockPull(repoFullName, pullNum, cmdName, metadata)
+	return events.PullLock{Start: func() bool { return l.locked }, Unlock: unlock, UpdateMetadata: func(metadata events.WorkingDirLockMetadata) bool {
+		if !l.locked {
+			return false
+		}
+		l.metadata = metadata
+		return true
+	}}, err
+}
+
+func (l *trackingWorkingDirLocker) CancelAutoplanWaiter(string, int) {}
+
+func (l *trackingWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata) (func(), error) {
+	return l.TryLockPull(repoFullName, pullNum, cmdName, metadata)
+}
+
 func (l *trackingWorkingDirLocker) HasCommandLock(string, int, command.Name) bool {
 	return l.locked
 }

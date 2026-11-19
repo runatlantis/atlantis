@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/jobs"
@@ -432,4 +433,51 @@ func (s *countingPlanStore) DeleteForPull(string, string, int) error {
 }
 func (s *countingPlanStore) DeletePlanForProject(string, string, int, string, string, string) error {
 	return nil
+}
+
+func TestCleanUpPullCancelsWaitingAutoplan(t *testing.T) {
+	for _, workspaceErr := range []error{nil, errors.New("disk full")} {
+		t.Run(fmt.Sprint(workspaceErr), func(t *testing.T) {
+			RegisterMockTestingT(t)
+			logger := logging.NewNoopLogger(t)
+			w := mocks.NewMockWorkingDir()
+			database, err := boltdb.New(t.TempDir())
+			Ok(t, err)
+			t.Cleanup(func() { database.Close() })
+			locker := events.NewDefaultWorkingDirLocker()
+			unlock, err := locker.TryLockPull(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+			Ok(t, err)
+			defer unlock()
+			waiting := make(chan struct{}, 1)
+			result := make(chan error, 1)
+			go func() {
+				_, err := locker.LockPullAfterStalePlan(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "new"}, func(events.WorkingDirLockMetadata) { waiting <- struct{}{} })
+				result <- err
+			}()
+			select {
+			case <-waiting:
+			case <-time.After(5 * time.Second):
+				t.Fatal("autoplan did not wait")
+			}
+			When(w.Delete(logger, testdata.GithubRepo, testdata.Pull)).ThenReturn(workspaceErr)
+			persistentLocker := lockmocks.NewMockLocker(gomock.NewController(t))
+			if workspaceErr == nil {
+				persistentLocker.EXPECT().UnlockByPull(testdata.GithubRepo.FullName, testdata.Pull.Num).Return(nil, nil)
+			}
+			pce := events.PullClosedExecutor{Locker: persistentLocker, WorkingDir: w, Database: database, WorkingDirLocker: locker}
+			err = pce.CleanUpPull(logger, testdata.GithubRepo, testdata.Pull)
+			if workspaceErr == nil {
+				Ok(t, err)
+			} else {
+				Equals(t, "cleaning workspace: disk full", err.Error())
+			}
+			select {
+			case err := <-result:
+				Assert(t, errors.Is(err, events.ErrPullLockCancelled), "close must cancel waiting autoplan")
+			case <-time.After(5 * time.Second):
+				t.Fatal("closed pull's autoplan is still waiting")
+			}
+			Assert(t, locker.HasCommandLock(testdata.GithubRepo.FullName, testdata.Pull.Num, command.Plan), "close must preserve running plan ownership")
+		})
+	}
 }

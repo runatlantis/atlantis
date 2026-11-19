@@ -131,7 +131,13 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 
 	var unlockPullApply func()
 	if a.workingDirLocker != nil {
-		unlockPullApply, err = a.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
+		lockPull := a.workingDirLocker.TryLockPull
+		if cmd.IsForSpecificProject() {
+			// Targeted applies (-d/-p/-w) only touch the projects they name,
+			// so several can run at once; project locks keep them apart.
+			lockPull = a.workingDirLocker.TryLockPullShared
+		}
+		unlockPullApply, err = lockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Apply, WorkingDirLockMetadataForPull(ctx.Pull))
 		if err != nil {
 			ctx.CommandHasErrors = true
 			if statusErr := a.commitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, cmd.CommandName()); statusErr != nil {
