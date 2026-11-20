@@ -1,1 +1,3 @@
-export { default } from '../../../contributing/adr/[record].paths.js';
+import { createRecordPaths } from '../../../contributing/adr/[record].paths.js';
+
+export default createRecordPaths('../../../../docs/adr/assets/');
