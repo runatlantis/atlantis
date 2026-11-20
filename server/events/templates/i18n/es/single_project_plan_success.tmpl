@@ -3,6 +3,7 @@
 Se ejecutó {{ .Command }} para {{ if $result.ProjectName }}proyecto: `{{ $result.ProjectName }}` {{ end }}directorio: `{{ $result.RepoRelDir }}` espacio de trabajo: `{{ $result.Workspace }}`
 
 {{ $result.Rendered }}
+{{ template "planCommit" . -}}
 {{ if ne .DisableApplyAll true }}
 ---
 * :fast_forward: Para **aplicar** todos los planes pendientes de esta {{ .VcsRequestType }}, comenta:
