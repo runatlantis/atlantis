@@ -178,6 +178,72 @@ key:
 	}
 }
 
+func TestStepConfig_RunPlanStore(t *testing.T) {
+	input := `run:
+  command: terragrunt plan -out $PLANFILE
+  plan_store:
+    mode: save
+    skip_if_empty: true`
+	var got raw.Step
+	Ok(t, unmarshalString(input, &got))
+	Equals(t, raw.Step{
+		CommandMap: EnvType{
+			"run": {
+				"command": "terragrunt plan -out $PLANFILE",
+				"plan_store": map[string]any{
+					"mode":          "save",
+					"skip_if_empty": true,
+				},
+			},
+		},
+	}, got)
+	Ok(t, got.Validate())
+	Equals(t, valid.Step{
+		StepName:   "run",
+		RunCommand: "terragrunt plan -out $PLANFILE",
+		Output:     []valid.PostProcessRunOutputOption{valid.PostProcessRunOutputShow},
+		PlanStore: &valid.RunPlanStore{
+			Mode:        valid.RunPlanStoreSaveMode,
+			SkipIfEmpty: true,
+		},
+	}, got.ToValid())
+
+	encoded, err := yaml.Marshal(got)
+	Ok(t, err)
+	var roundTripped raw.Step
+	Ok(t, yaml.Unmarshal(encoded, &roundTripped))
+	Equals(t, got, roundTripped)
+}
+
+func TestStepConfig_RunPlanStoreValidation(t *testing.T) {
+	tests := []struct {
+		name      string
+		planStore any
+		wantErr   string
+	}{
+		{name: "save", planStore: map[string]any{"mode": "save"}},
+		{name: "consume", planStore: map[string]any{"mode": "consume"}},
+		{name: "must be map", planStore: "save", wantErr: `run step "plan_store" option must be a map`},
+		{name: "missing mode", planStore: map[string]any{}, wantErr: `run step "plan_store" option must have a string "mode" key set`},
+		{name: "invalid mode", planStore: map[string]any{"mode": "delete"}, wantErr: `run step "plan_store" option "mode" must be "save" or "consume", found "delete"`},
+		{name: "non-boolean skip", planStore: map[string]any{"mode": "save", "skip_if_empty": "true"}, wantErr: `run step "plan_store" option "skip_if_empty" must be a boolean, found true`},
+		{name: "skip on consume", planStore: map[string]any{"mode": "consume", "skip_if_empty": true}, wantErr: `run step "plan_store" option "skip_if_empty" is only valid with mode "save"`},
+		{name: "unknown option", planStore: map[string]any{"mode": "save", "unknown": true}, wantErr: `run step "plan_store" option only supports keys "mode" and "skip_if_empty", found "unknown"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			step := raw.Step{CommandMap: EnvType{"run": {"command": "custom", "plan_store": tt.planStore}}}
+			err := step.Validate()
+			if tt.wantErr == "" {
+				Ok(t, err)
+				return
+			}
+			ErrEquals(t, tt.wantErr, err)
+		})
+	}
+}
+
 func TestStep_Validate(t *testing.T) {
 	cases := []struct {
 		description string

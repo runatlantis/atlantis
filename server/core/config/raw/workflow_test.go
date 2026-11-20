@@ -137,6 +137,84 @@ func TestWorkflow_Validate(t *testing.T) {
 	Ok(t, (raw.Workflow{}).Validate())
 }
 
+func TestWorkflow_ValidatePlanStoreStepPlacement(t *testing.T) {
+	tests := []struct {
+		name     string
+		workflow raw.Workflow
+		wantErr  string
+	}{
+		{
+			name: "custom steps in matching stages",
+			workflow: raw.Workflow{
+				Plan:  &raw.Stage{Steps: []raw.Step{runPlanStoreStep("save")}},
+				Apply: &raw.Stage{Steps: []raw.Step{runPlanStoreStep("consume")}},
+			},
+		},
+		{
+			name: "save in apply stage",
+			workflow: raw.Workflow{
+				Apply: &raw.Stage{Steps: []raw.Step{runPlanStoreStep("save")}},
+			},
+			wantErr: `apply: run step plan_store mode "save" is only valid in the plan stage`,
+		},
+		{
+			name: "consume in plan stage",
+			workflow: raw.Workflow{
+				Plan: &raw.Stage{Steps: []raw.Step{runPlanStoreStep("consume")}},
+			},
+			wantErr: `plan: run step plan_store mode "consume" is only valid in the apply stage`,
+		},
+		{
+			name: "duplicate save markers",
+			workflow: raw.Workflow{
+				Plan: &raw.Stage{Steps: []raw.Step{runPlanStoreStep("save"), runPlanStoreStep("save")}},
+			},
+			wantErr: `plan: run step plan_store mode "save" may only be configured once`,
+		},
+		{
+			name: "duplicate consume markers",
+			workflow: raw.Workflow{
+				Apply: &raw.Stage{Steps: []raw.Step{runPlanStoreStep("consume"), runPlanStoreStep("consume")}},
+			},
+			wantErr: `apply: run step plan_store mode "consume" may only be configured once`,
+		},
+		{
+			name: "store plan with built-in plan",
+			workflow: raw.Workflow{
+				Plan: &raw.Stage{Steps: []raw.Step{{Key: String("plan")}, runPlanStoreStep("save")}},
+			},
+			wantErr: `plan: run step plan_store mode "save" cannot be combined with the built-in "plan" step`,
+		},
+		{
+			name: "remove plan with built-in apply",
+			workflow: raw.Workflow{
+				Apply: &raw.Stage{Steps: []raw.Step{{Key: String("apply")}, runPlanStoreStep("consume")}},
+			},
+			wantErr: `apply: run step plan_store mode "consume" cannot be combined with the built-in "apply" step`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.workflow.Validate()
+			if tt.wantErr == "" {
+				Ok(t, err)
+				return
+			}
+			ErrEquals(t, tt.wantErr, err)
+		})
+	}
+}
+
+func runPlanStoreStep(mode string) raw.Step {
+	return raw.Step{CommandMap: EnvType{
+		"run": {
+			"command":    "custom",
+			"plan_store": map[string]any{"mode": mode},
+		},
+	}}
+}
+
 func TestWorkflow_ToValid(t *testing.T) {
 	cases := []struct {
 		description string
