@@ -236,7 +236,7 @@ func TestRunStepRunner_Run(t *testing.T) {
 				expOut := strings.ReplaceAll(c.ExpOut, "$DIR", tmpDir)
 				Equals(t, expOut, out)
 
-				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), NotEq(defaultDistribution), Eq(projVersion))
+				terraform.VerifyWasCalledOnce().EnsureVersion(Eq(logger), Eq(tf.SelectDistribution(defaultDistribution, ctx.TerraformDistribution)), Eq(projVersion))
 				terraform.VerifyWasCalled(Never()).EnsureVersion(Eq(logger), Eq(defaultDistribution), Eq(defaultVersion))
 
 			})

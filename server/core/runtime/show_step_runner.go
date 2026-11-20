@@ -34,11 +34,8 @@ type showStepRunner struct {
 }
 
 func (p *showStepRunner) Run(ctx command.ProjectContext, _ []string, path string, envs map[string]string) (string, error) {
-	tfDistribution := p.defaultTfDistribution
+	tfDistribution := terraform.SelectDistribution(p.defaultTfDistribution, ctx.TerraformDistribution)
 	tfVersion := p.defaultTFVersion
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
-	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}

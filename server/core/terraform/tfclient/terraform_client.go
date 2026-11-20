@@ -36,6 +36,9 @@ const versionCommandTimeout = 10 * time.Second
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_terraform_client.go Client
 
 type Client interface {
+	// DefaultDistribution includes the configured alternatives for project overrides.
+	DefaultDistribution() terraform.Distribution
+
 	// RunCommandWithVersion executes terraform with args in path. If v is nil,
 	// it will use the default Terraform version. workspace is the Terraform
 	// workspace which should be set as an environment variable.
