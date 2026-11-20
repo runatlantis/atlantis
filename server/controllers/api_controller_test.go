@@ -76,6 +76,145 @@ func (f *recordingPullStatusFetcher) GetPullStatus(pull models.PullRequest) (*mo
 	return status, nil
 }
 
+func TestAPIController_RejectsBlockedExtraArgs(t *testing.T) {
+	cases := []struct {
+		args    []string
+		blocked []string
+	}{
+		{args: []string{"-chdir=../other"}},
+		{args: []string{"--chdir", "../other"}},
+		{args: []string{"-plugin-dir=/tmp/plugins"}},
+		{args: []string{"--plugin-dir=/tmp/plugins"}},
+		{args: []string{"-out=/tmp/plan"}},
+		{args: []string{"--out", "/tmp/plan"}},
+		{args: []string{"---out=/tmp/plan"}},
+		{args: []string{"-generate-config-out=/tmp/generated.tf"}},
+		{args: []string{"--generate-config-out=/tmp/generated.tf"}},
+		{args: []string{"-state=/tmp/state"}},
+		{args: []string{"--state=/tmp/state"}},
+		{args: []string{"-state-out=/tmp/state"}},
+		{args: []string{"--state-out=/tmp/state"}},
+		{args: []string{"-backup=/tmp/backup"}},
+		{args: []string{"--backup=/tmp/backup"}},
+		{args: []string{"-raw", "endpoint"}, blocked: []string{"-raw"}},
+		{args: []string{"--raw=true", "endpoint"}, blocked: []string{"-raw"}},
+		{args: []string{"-json"}, blocked: []string{"--json"}},
+		{args: []string{"--json=false"}, blocked: []string{"-json"}},
+		{args: []string{"-out=/tmp/plan"}, blocked: []string{"-raw"}},
+	}
+	for _, endpoint := range []string{"plan", "apply"} {
+		for _, tc := range cases {
+			t.Run(endpoint+"/"+tc.args[0], func(t *testing.T) {
+				ac, builder, runner := setup(t)
+				ac.BlockedExtraArgs = tc.blocked
+				body, err := json.Marshal(controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", PR: 1, Projects: []string{"app"}, Arguments: tc.args})
+				Ok(t, err)
+				req := httptest.NewRequest(http.MethodPost, "/api/"+endpoint, bytes.NewReader(body))
+				req.Header.Set(atlantisTokenHeader, atlantisToken)
+				w := httptest.NewRecorder()
+				handler := ac.Plan
+				if endpoint == "apply" {
+					handler = ac.Apply
+				}
+				handler(w, req)
+				ResponseContains(t, w, http.StatusBadRequest, "is not allowed in extra args")
+				var response map[string]string
+				Ok(t, json.Unmarshal(w.Body.Bytes(), &response))
+				Equals(t, fmt.Sprintf("flag %q is not allowed in extra args", tc.args[0]), response["error"])
+				ac.VCSClient.(*MockClient).VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+				builder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+				builder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+				runner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+				runner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+				ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+				ac.PostWorkflowHooksCommandRunner.(*MockPostWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			})
+		}
+	}
+}
+
+func TestAPIController_RejectsDisallowedVarFilesBeforeExecution(t *testing.T) {
+	for _, endpoint := range []string{"plan", "apply"} {
+		for _, args := range [][]string{{"-var-file=/etc/private.tfvars"}, {"--var-file", "/etc/private.tfvars"}, {"-var-file=../private.tfvars"}} {
+			t.Run(endpoint+"/"+strings.Join(args, ","), func(t *testing.T) {
+				ac, builder, runner := setup(t)
+				checker, err := events.NewVarFileAllowlistChecker("")
+				Ok(t, err)
+				ac.VarFileAllowlistChecker = checker
+				body, err := json.Marshal(controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", PR: 1, Projects: []string{"app"}, Arguments: args})
+				Ok(t, err)
+				req := httptest.NewRequest(http.MethodPost, "/api/"+endpoint, bytes.NewReader(body))
+				req.Header.Set(atlantisTokenHeader, atlantisToken)
+				w := httptest.NewRecorder()
+				handler := ac.Plan
+				if endpoint == "apply" {
+					handler = ac.Apply
+				}
+				handler(w, req)
+				ResponseContains(t, w, http.StatusBadRequest, "var file path")
+				ac.VCSClient.(*MockClient).VerifyWasCalled(Never()).GetCloneURL(Any[logging.SimpleLogging](), Any[models.VCSHostType](), Any[string]())
+				builder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+				builder.VerifyWasCalled(Never()).BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+				runner.VerifyWasCalled(Never()).Plan(Any[command.ProjectContext]())
+				runner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+				ac.PreWorkflowHooksCommandRunner.(*MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+			})
+		}
+	}
+}
+
+func TestAPIController_ForwardsUnblockedExtraArgs(t *testing.T) {
+	for _, endpoint := range []string{"plan", "apply"} {
+		for _, selector := range []string{"project", "path"} {
+			for _, args := range [][]string{nil, {"-var-file=vars/project.tfvars"}, {"-parallelism=1"}, {"-var=message=-out=value"}, {"-outline=true"}, {"-var=message=$(touch /tmp/unwanted)"}} {
+				t.Run(endpoint+"/"+selector+"/"+strings.Join(args, ","), func(t *testing.T) {
+					ac, builder, runner := setup(t)
+					ac.BlockedExtraArgs = []string{"-raw"}
+					checker, err := events.NewVarFileAllowlistChecker("")
+					Ok(t, err)
+					ac.VarFileAllowlistChecker = checker
+					build := func(name command.Name) func([]Param) ReturnValues {
+						return func(params []Param) ReturnValues {
+							cc := params[1].(*events.CommentCommand)
+							Equals(t, name, cc.Name)
+							Equals(t, args, cc.Flags)
+							return ReturnValues{[]command.ProjectContext{{CommandName: name, CommentArgs: cc.Flags}}, nil}
+						}
+					}
+					When(builder.BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(build(command.Plan))
+					When(builder.BuildApplyCommands(Any[*command.Context](), Any[*events.CommentCommand]())).Then(build(command.Apply))
+					request := controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", PR: 1, Arguments: args}
+					if selector == "project" {
+						request.Projects = []string{"app"}
+					} else {
+						request.Paths = []controllers.APIRequestPath{{Directory: ".", Workspace: "default"}}
+					}
+					body, err := json.Marshal(request)
+					Ok(t, err)
+					req := httptest.NewRequest(http.MethodPost, "/api/"+endpoint, bytes.NewReader(body))
+					req.Header.Set(atlantisTokenHeader, atlantisToken)
+					w := httptest.NewRecorder()
+					handler := ac.Plan
+					if endpoint == "apply" {
+						handler = ac.Apply
+					}
+					handler(w, req)
+					Equals(t, http.StatusOK, w.Code)
+					builder.VerifyWasCalledOnce().BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+					planCtx := runner.VerifyWasCalledOnce().Plan(Any[command.ProjectContext]()).GetCapturedArguments()
+					Equals(t, args, planCtx.CommentArgs)
+					if endpoint == "apply" {
+						applyCtx := runner.VerifyWasCalledOnce().Apply(Any[command.ProjectContext]()).GetCapturedArguments()
+						Equals(t, args, applyCtx.CommentArgs)
+					} else {
+						runner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestAPIController_Plan(t *testing.T) {
 	ac, projectCommandBuilder, projectCommandRunner := setup(t)
 

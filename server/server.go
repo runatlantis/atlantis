@@ -1093,6 +1093,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		ApplyLockChecker:                applyLockingClient,
 		EnableDriftRemediation:          userConfig.EnableDriftRemediation,
 		FailOnPreWorkflowHookError:      userConfig.FailOnPreWorkflowHookError,
+		BlockedExtraArgs:                userConfig.ToBlockedExtraArgs(),
+		VarFileAllowlistChecker:         varFileAllowlistChecker,
 		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
 		RepoAllowlistChecker:            repoAllowlist,

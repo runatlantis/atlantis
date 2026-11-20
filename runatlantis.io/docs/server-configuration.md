@@ -413,7 +413,7 @@ atlantis server --blocked-extra-args="-lock-timeout,-parallelism"
 ATLANTIS_BLOCKED_EXTRA_ARGS='-lock-timeout,-parallelism'
 ```
 
-Comma-separated list of additional Terraform CLI flags that are not allowed in comment extra args (the flags after `--`).
+Comma-separated list of additional Terraform CLI flags that are not allowed in comment extra args (after `--`) or API request `arguments`.
 These flags are always blocked, whether or not this flag is set: `-chdir,-plugin-dir,-out,-generate-config-out,-state,-state-out,-backup`.
 
 Notes:
@@ -421,10 +421,10 @@ Notes:
 - `-chdir` and `-plugin-dir` are blocked because they move Terraform's working directory or provider source to a location the commenter controls.
 - `-out`, `-generate-config-out`, `-state`, `-state-out` and `-backup` are blocked because they make Terraform write a file, or read state, at a path the commenter chooses. Atlantis manages the plan and state file locations itself.
 - Setting this flag **adds** to the always-blocked list; it cannot unblock any of them.
-- A comment that uses a blocked flag is rejected with `flag "<arg>" is not allowed in extra args`.
+- Blocked flags are rejected with `flag "<arg>" is not allowed in extra args`; API requests return HTTP 400.
 - To generate configuration for `import` blocks, which needs `-generate-config-out`, define a server-side [custom workflow](custom-workflows.md) whose `plan` step passes the flag in `extra_args`, for example `- plan: {extra_args: ["-generate-config-out=generated.tf"]}`, and select it for the project only while generating config.
 - A flag is matched by name, so listing `-lock-timeout` blocks `-lock-timeout`, `--lock-timeout`, `-lock-timeout=VALUE` and `--lock-timeout=VALUE`. You do not need to list both dash spellings.
-- Only comment extra args are checked. Flags set by the server operator, such as `extra_args` in a server-side workflow or in a repo-level workflow that the server allows, are passed to Terraform unchanged.
+- Only caller-supplied comment and API arguments are checked. Flags set by the server operator, such as `extra_args` in a server-side workflow or in a repo-level workflow that the server allows, are passed to Terraform unchanged.
 - Accepts a comma separated list, ex. `-flag1,-flag2`.
 
 ::: warning Behavior change

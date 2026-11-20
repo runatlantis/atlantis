@@ -244,7 +244,7 @@ var stringFlags = map[string]stringFlag{
 	},
 	BlockedExtraArgsFlag: {
 		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
-			"in comment extra args (the flags after '--'). " +
+			"in comment extra args (after '--') or API arguments. " +
 			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
 	},
 	AtlantisURLFlag: {

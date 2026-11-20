@@ -57,6 +57,21 @@ func TestNewServer_GitHubUser(t *testing.T) {
 	Ok(t, err)
 }
 
+func TestNewServer_WiresAPIArgumentRestrictions(t *testing.T) {
+	s, err := server.NewServer(server.UserConfig{
+		DataDir:          t.TempDir(),
+		AtlantisURL:      testAtlantisUrl,
+		LockingDBType:    testLockingDBType,
+		GithubHostname:   testGitHubHostName,
+		GithubUser:       testGitHubUser,
+		BlockedExtraArgs: " -raw, --json ",
+	}, server.Config{AtlantisVersion: testAtlantisVersion})
+	Ok(t, err)
+	Equals(t, []string{"-raw", "--json"}, s.APIController.BlockedExtraArgs)
+	Assert(t, s.APIController.VarFileAllowlistChecker != nil, "expected API var-file restrictions")
+	Assert(t, s.APIController.VarFileAllowlistChecker.Check([]string{"-var-file=/etc/private.tfvars"}) != nil, "expected external var file to be rejected")
+}
+
 func TestNewServer_EnableDriftDetectionWiresServices(t *testing.T) {
 	tmpDir := t.TempDir()
 	s, err := server.NewServer(
