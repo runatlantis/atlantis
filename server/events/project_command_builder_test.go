@@ -6317,3 +6317,74 @@ projects:
 	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
 		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }
+
+// A server that never cloned the pull (for example --skip-clone-no-changes
+// skipped it because none of its projects changed) has no pull dir and no
+// recorded projects, so a plain `atlantis apply` finds nothing to apply. If
+// projects were recorded, the plans were lost and the error is kept.
+func TestDefaultProjectCommandBuilder_ApplyWithoutPullDir(t *testing.T) {
+	cases := map[string]struct {
+		pullStatus *models.PullStatus
+		expErr     error
+	}{
+		"no pull status":       {pullStatus: nil},
+		"no recorded projects": {pullStatus: &models.PullStatus{}},
+		"recorded projects": {
+			pullStatus: &models.PullStatus{Projects: []models.ProjectStatus{
+				{RepoRelDir: "project1", Workspace: "default", Status: models.PlannedPlanStatus},
+			}},
+			expErr: os.ErrNotExist,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			RegisterMockTestingT(t)
+
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).
+				ThenReturn("", os.ErrNotExist)
+
+			logger := logging.NewNoopLogger(t)
+			userConfig := defaultUserConfig
+			scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+			builder := events.NewProjectCommandBuilder(
+				false,
+				&config.ParserValidator{},
+				&events.DefaultProjectFinder{},
+				nil,
+				workingDir,
+				events.NewDefaultWorkingDirLocker(),
+				valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{}),
+				&events.DefaultPendingPlanFinder{},
+				&events.CommentParser{ExecutableName: "atlantis"},
+				true,
+				userConfig.EnableRegExpCmd,
+				userConfig.EnableAutoMerge,
+				userConfig.EnableParallelPlan,
+				userConfig.EnableParallelApply,
+				userConfig.AutoDetectModuleFiles,
+				userConfig.AutoplanFileList,
+				userConfig.RestrictFileList,
+				userConfig.DefaultTFDistribution,
+				userConfig.SilenceNoProjects,
+				userConfig.IncludeGitUntrackedFiles,
+				userConfig.AutoDiscoverMode,
+				scope,
+				tfclientmocks.NewMockClient(),
+				&runtime.LocalPlanStore{},
+			)
+
+			ctxs, err := builder.BuildApplyCommands(
+				&command.Context{Log: logger, Scope: scope, PullStatus: c.pullStatus},
+				&events.CommentCommand{Name: command.Apply})
+			if c.expErr != nil {
+				Assert(t, errors.Is(err, c.expErr), "expected %v, got %v", c.expErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, 0, len(ctxs))
+			workingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+		})
+	}
+}
