@@ -8,9 +8,10 @@ type Result struct {
 	Error          error
 	Failure        string
 	ProjectResults []ProjectResult
-	// PlansDeleted is true if all plans created during this command were
-	// deleted. This happens if automerging is enabled and one project has an
-	// error since automerging requires all plans to succeed.
+	// PlansDeleted is always false. Atlantis no longer deletes successful plans
+	// when another project errors with automerge enabled.
+	//
+	// Deprecated: kept so the API response JSON keeps its existing shape.
 	PlansDeleted bool
 }
 

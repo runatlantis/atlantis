@@ -3,9 +3,6 @@
 {{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
 ```
 
-{{ if .PlanWasDeleted -}}
-This plan was not saved because one or more projects failed and automerge requires all plans pass.
-{{ else -}}
 {{ if not .DisableApply -}}
 * :arrow_forward: To **apply** this plan, comment:
   ```shell
@@ -19,6 +16,5 @@ This plan was not saved because one or more projects failed and automerge requir
   ```shell
   {{ .RePlanCmd }}
   ```
-{{ end -}}
 {{ template "mergedAgain" . -}}
 {{ end -}}
