@@ -80,8 +80,9 @@ type ProjectCommandOutputHandler interface {
 	SendWorkflowHook(ctx models.WorkflowHookCommandContext, msg string, operationComplete bool)
 
 	// Register registers a channel and blocks until it is caught up. Callers should call this asynchronously when attempting
-	// to read the channel in the same goroutine
-	Register(jobID string, receiver chan string)
+	// to read the channel in the same goroutine. Closing done abandons the backfill and skips registration once the
+	// receiver stops reading; a nil done never fires.
+	Register(jobID string, receiver chan string, done <-chan struct{})
 
 	// Deregister removes a channel from successive updates and closes it.
 	Deregister(jobID string, receiver chan string)
@@ -179,8 +180,8 @@ func (p *AsyncProjectCommandOutputHandler) SendWorkflowHook(ctx models.WorkflowH
 	}
 }
 
-func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string) {
-	p.addChan(receiver, jobID)
+func (p *AsyncProjectCommandOutputHandler) Register(jobID string, receiver chan string, done <-chan struct{}) {
+	p.addChan(receiver, jobID, done)
 }
 
 func (p *AsyncProjectCommandOutputHandler) Handle() {
@@ -231,13 +232,20 @@ func (p *AsyncProjectCommandOutputHandler) completeJob(jobID string) {
 
 }
 
-func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string) {
+// addChan backfills ch with the buffered output, then registers it for new
+// lines. Closing done stops both: the receiver has gone, so a blocked
+// backfill send would otherwise leak this goroutine.
+func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string, done <-chan struct{}) {
 	p.projectOutputBuffersLock.RLock()
 	outputBuffer := p.projectOutputBuffers[jobID]
 	p.projectOutputBuffersLock.RUnlock()
 
 	for _, line := range outputBuffer.Buffer {
-		ch <- line
+		select {
+		case ch <- line:
+		case <-done:
+			return
+		}
 	}
 
 	// No need register receiver since all the logs have been streamed
@@ -249,11 +257,18 @@ func (p *AsyncProjectCommandOutputHandler) addChan(ch chan string, jobID string)
 	// add the channel to our registry after we backfill the contents of the buffer,
 	// to prevent new messages coming in interleaving with this backfill.
 	p.receiverBuffersLock.Lock()
+	defer p.receiverBuffersLock.Unlock()
+	// Checked under the lock that Deregister takes, so a receiver that left
+	// is either skipped here or removed by its Deregister afterwards.
+	select {
+	case <-done:
+		return
+	default:
+	}
 	if p.receiverBuffers[jobID] == nil {
 		p.receiverBuffers[jobID] = map[chan string]bool{}
 	}
 	p.receiverBuffers[jobID][ch] = true
-	p.receiverBuffersLock.Unlock()
 }
 
 // Add log line to buffer and send to all current channels
@@ -343,7 +358,7 @@ func (p *NoopProjectOutputHandler) Send(_ command.ProjectContext, _ string, _ bo
 func (p *NoopProjectOutputHandler) SendWorkflowHook(_ models.WorkflowHookCommandContext, _ string, _ bool) {
 }
 
-func (p *NoopProjectOutputHandler) Register(_ string, _ chan string) {}
+func (p *NoopProjectOutputHandler) Register(_ string, _ chan string, _ <-chan struct{}) {}
 
 func (p *NoopProjectOutputHandler) Deregister(_ string, _ chan string) {}
 
