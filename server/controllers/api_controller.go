@@ -712,11 +712,15 @@ func checkedOutCommitReachableFromAPIBase(repoDir string, headCommit string, rem
 }
 
 func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *command.Result, err error) {
-	// The callers only unlock after a successful apiPlan, so an error after
-	// some plans ran would leave their project locks behind.
+	// The callers only unlock after a successful apiPlan, so an error or a
+	// panic after some plans ran would leave their project locks behind.
 	defer func() {
-		if err != nil && !ctx.CommandSkipped {
+		r := recover()
+		if (err != nil || r != nil) && !ctx.CommandSkipped {
 			a.Locker.UnlockByPull(ctx.HeadRepo.FullName, ctx.Pull.Num) // nolint: errcheck
+		}
+		if r != nil {
+			panic(r)
 		}
 	}()
 
@@ -786,7 +790,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *c
 				return nil, err
 			}
 
-			res := events.RunOneProjectCmd(a.ProjectPlanCommandRunner.Plan, cmd)
+			res := events.RunOneProjectCmdRecovering(a.ProjectPlanCommandRunner.Plan, cmd)
 			projectResults = append(projectResults, res)
 
 			a.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, planCC[i]) // nolint: errcheck
@@ -807,7 +811,7 @@ func (a *APIController) apiPlan(request *APIRequest, ctx *command.Context) (_ *c
 		return &command.Result{ProjectResults: append(projectResults, policyResult.ProjectResults...)}, nil
 	}
 	for _, cmd := range policyCmds {
-		res := events.RunOneProjectCmd(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
+		res := events.RunOneProjectCmdRecovering(a.ProjectPolicyCheckCommandRunner.PolicyCheck, cmd)
 		projectResults = append(projectResults, res)
 	}
 	return &command.Result{ProjectResults: projectResults}, nil
@@ -928,7 +932,7 @@ func (a *APIController) apiApply(request *APIRequest, ctx *command.Context) (*co
 			return nil, err
 		}
 
-		res := events.RunOneProjectCmd(a.ProjectApplyCommandRunner.Apply, cmd)
+		res := events.RunOneProjectCmdRecovering(a.ProjectApplyCommandRunner.Apply, cmd)
 		projectResults = append(projectResults, res)
 		if res.Error != nil || res.Failure != "" {
 			currentGroupHasErrors = true
