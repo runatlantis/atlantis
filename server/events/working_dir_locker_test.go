@@ -545,3 +545,29 @@ func TestTryLockPullShared_StaleUnlockDoesNotReleaseNewLock(t *testing.T) {
 	_, err = locker.TryLockPull(repo, 1, command.Plan, metadata)
 	ErrContains(t, `currently locked by "apply"`, err)
 }
+
+func TestLockPullAfterStalePlan_DuplicateAutoplanForRunningCommitExitsQuietly(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	metadata := events.WorkingDirLockMetadata{HeadCommit: newSHA}
+	running, err := locker.LockPullAfterStalePlan(repo, 1, command.Plan, metadata, nil)
+	Ok(t, err)
+	Assert(t, running.Start(), "expected the first autoplan to start")
+	defer running.Unlock()
+
+	// A late or redelivered webhook for the same commit.
+	_, err = locker.LockPullAfterStalePlan(repo, 1, command.Plan, metadata, func(events.WorkingDirLockMetadata) {
+		t.Fatal("did not expect to wait")
+	})
+	Assert(t, errors.Is(err, events.ErrPullLockSuperseded), "expected superseded, got %v", err)
+}
+
+func TestLockPullAfterStalePlan_CommentPlanForSameCommitStillFails(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	metadata := events.WorkingDirLockMetadata{HeadCommit: newSHA}
+	unlock, err := locker.TryLockPull(repo, 1, command.Plan, metadata)
+	Ok(t, err)
+	defer unlock()
+
+	_, err = locker.LockPullAfterStalePlan(repo, 1, command.Plan, metadata, nil)
+	ErrContains(t, `currently locked by "plan" for commit 2222222`, err)
+}

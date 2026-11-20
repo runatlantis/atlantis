@@ -41,8 +41,10 @@ type workingDirLock struct {
 	owner *pullLockWaiter
 	// shared counts the holders of a pull-level lock taken with
 	// TryLockPullShared. It is zero for exclusive locks.
-	shared  int
-	Command command.Name
+	shared int
+	// autoplan marks a pull-level lock taken by LockPullAfterStalePlan.
+	autoplan bool
+	Command  command.Name
 	WorkingDirLockMetadata
 }
 
@@ -154,7 +156,7 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	if currentLock, blocked := d.blockingPullLock(repoFullName, pullNum, metadata); blocked {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
 	}
-	return d.lockPull(repoFullName, pullNum, cmdName, metadata, &pullLockWaiter{}).Unlock, nil
+	return d.lockPull(repoFullName, pullNum, cmdName, metadata, &pullLockWaiter{}, false).Unlock, nil
 }
 
 func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -227,12 +229,14 @@ func (d *DefaultWorkingDirLocker) LockPullAfterStalePlan(repoFullName string, pu
 				d.waiters[prefix] = waiter
 			}
 			acquired = true
-			return d.lockPull(repoFullName, pullNum, cmdName, metadata, waiter), nil
+			return d.lockPull(repoFullName, pullNum, cmdName, metadata, waiter, true), nil
 		}
 		if !isStalePlanLock(currentLock, metadata) {
-			if waiter != nil && currentLock.Command == command.Plan && currentLock.HeadCommit == metadata.HeadCommit {
-				// Another plan for our commit got the lock first, so there is
-				// nothing left for this waiter to do.
+			if currentLock.Command == command.Plan && currentLock.HeadCommit == metadata.HeadCommit && (waiter != nil || currentLock.autoplan) {
+				// A plan for our commit is already running: either another
+				// plan got the lock while we waited, or an autoplan already
+				// adopted this commit as the live head (a late or redelivered
+				// webhook). Nothing is left for this autoplan to do.
 				return PullLock{}, ErrPullLockSuperseded
 			}
 			return PullLock{}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
@@ -286,10 +290,10 @@ func (d *DefaultWorkingDirLocker) blockingPullLock(repoFullName string, pullNum 
 }
 
 // lockPull records the pull-level lock. d.mutex must be held.
-func (d *DefaultWorkingDirLocker) lockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata, owner *pullLockWaiter) PullLock {
+func (d *DefaultWorkingDirLocker) lockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata, owner *pullLockWaiter, autoplan bool) PullLock {
 	key := d.pullKey(repoFullName, pullNum)
 	prefix := d.pullLockPrefix(repoFullName, pullNum)
-	d.locks[key] = workingDirLock{owner: owner, Command: cmdName, WorkingDirLockMetadata: metadata}
+	d.locks[key] = workingDirLock{owner: owner, autoplan: autoplan, Command: cmdName, WorkingDirLockMetadata: metadata}
 	return PullLock{
 		Start: func() bool {
 			d.mutex.Lock()

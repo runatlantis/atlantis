@@ -456,26 +456,31 @@ func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCo
 		p.handleNoProjectPlanStateError(ctx, cmd, err)
 		return nil, false
 	}
+	// Release the lock on every path that doesn't hand it to the caller,
+	// including a panic while fetching the live head.
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			lock.Unlock()
+		}
+	}()
 	if waited {
 		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
-			lock.Unlock()
 			return nil, false
 		}
 		liveHead, ok := p.livePullHead(ctx)
 		if !ok {
-			lock.Unlock()
 			return nil, false
 		}
 		ctx.Pull.HeadCommit = liveHead
 		if !lock.UpdateMetadata(WorkingDirLockMetadataForPull(ctx.Pull)) {
-			lock.Unlock()
 			return nil, false
 		}
 	}
 	if (p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown) || !lock.Start() {
-		lock.Unlock()
 		return nil, false
 	}
+	handedOff = true
 	return lock.Unlock, true
 }
 
