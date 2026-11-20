@@ -1363,6 +1363,7 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			}
 			for i := range commentCmds {
 				commentCmds[i].ExpectedPlanHash = planHash
+				commentCmds[i].PauseApplyBetweenExecutionOrderGroups = repoCfg.PauseApplyBetweenExecutionOrderGroups
 			}
 		}
 		cmds = append(cmds, commentCmds...)
