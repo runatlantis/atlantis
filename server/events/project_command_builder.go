@@ -337,6 +337,49 @@ func (p *DefaultProjectCommandBuilder) restorePullDir(pullDir string, r models.R
 	return planPullDir, nil
 }
 
+// restorePlansFromStore re-clones the workspaces that have plans in the
+// external store and restores those plans into the pull directory, returning
+// that directory. It returns os.ErrNotExist when the store cannot restore or
+// holds nothing for this pull.
+func (p *DefaultProjectCommandBuilder) restorePlansFromStore(ctx *command.Context) (string, error) {
+	// Probe capability first to avoid pointless I/O on stores that don't
+	// support restore (e.g. LocalPlanStore).
+	if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
+		return "", os.ErrNotExist
+	}
+	workspaces, err := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
+	if err != nil {
+		return "", fmt.Errorf("listing workspaces from external store: %w", err)
+	}
+	// No workspaces in the store means there's nothing to restore.
+	if len(workspaces) == 0 {
+		return "", os.ErrNotExist
+	}
+	// Clone every workspace before restoring; this ensures each workspace
+	// dir has a .git so PendingPlanFinder's `git ls-files --others` works,
+	// and that Clone does not fall through to forceClone (os.RemoveAll) and
+	// wipe the just-restored plans. The default workspace is always cloned
+	// because it is read as the source of truth for atlantis.yaml, even when
+	// it holds no plans.
+	for _, workspace := range withDefaultWorkspace(workspaces) {
+		if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
+			return "", fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
+		}
+	}
+	pullDir, err := p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return "", err
+	}
+	restoreDir, err := p.restorePullDir(pullDir, ctx.Pull.BaseRepo, ctx.Pull)
+	if err != nil {
+		return "", err
+	}
+	if err := p.PlanStore.RestorePlans(restoreDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); err != nil {
+		return "", fmt.Errorf("restoring plans from external store: %w", err)
+	}
+	return pullDir, nil
+}
+
 // withDefaultWorkspace appends DefaultWorkspace to workspaces if it isn't
 // already present, preserving the original order.
 func withDefaultWorkspace(workspaces []string) []string {
@@ -1246,48 +1289,43 @@ func (p *DefaultProjectCommandBuilder) buildAllProjectCommandsByPlan(ctx *comman
 			return nil, err
 		}
 		// Working dir is gone (e.g. container restart with emptyDir). Try to
-		// recover via the plan store. We must clone each workspace that has
-		// stored plans BEFORE restoring, otherwise Clone falls through to
-		// forceClone (os.RemoveAll) and wipes the just-restored plans.
+		// recover via the plan store.
 		ctx.Log.Info("pull directory missing, attempting to restore plans")
-		// Probe capability first to avoid pointless I/O on stores that don't
-		// support restore (e.g. LocalPlanStore).
-		if errors.Is(p.PlanStore.RestorePlans("", "", "", 0), runtime.ErrRestoreNotSupported) {
-			return nil, os.ErrNotExist
-		}
-		workspaces, listErr := p.PlanStore.ListWorkspaces(ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num)
-		if listErr != nil {
-			return nil, fmt.Errorf("listing workspaces from external store: %w", listErr)
-		}
-		// No workspaces in the store means there's nothing to restore.
-		if len(workspaces) == 0 {
-			return nil, os.ErrNotExist
-		}
-		// Clone every workspace before restoring; this ensures each workspace
-		// dir has a .git so PendingPlanFinder's `git ls-files --others` works.
-		// The default workspace is always cloned because it is read below as
-		// the source of truth for atlantis.yaml, even when it holds no plans.
-		for _, workspace := range withDefaultWorkspace(workspaces) {
-			if _, cloneErr := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace); cloneErr != nil {
-				return nil, fmt.Errorf("cloning workspace %q for apply: %w", workspace, cloneErr)
-			}
-		}
-		pullDir, err = p.WorkingDir.GetPullDir(ctx.Pull.BaseRepo, ctx.Pull)
+		pullDir, err = p.restorePlansFromStore(ctx)
 		if err != nil {
 			return nil, err
-		}
-		restoreDir, err := p.restorePullDir(pullDir, ctx.Pull.BaseRepo, ctx.Pull)
-		if err != nil {
-			return nil, err
-		}
-		if restoreErr := p.PlanStore.RestorePlans(restoreDir, ctx.Pull.BaseRepo.Owner, ctx.Pull.BaseRepo.Name, ctx.Pull.Num); restoreErr != nil {
-			return nil, fmt.Errorf("restoring plans from external store: %w", restoreErr)
 		}
 	}
 
 	plans, err := p.PendingPlanFinder.Find(pullDir)
 	if err != nil {
 		return nil, err
+	}
+
+	// The pull directory can exist on this replica without holding every plan:
+	// an earlier event may have created it, other projects may have been
+	// planned on another replica, or the plans may have been removed while the
+	// authoritative copy still lives in the external store. That is the common
+	// case with more than one replica, where the apply can land on a different
+	// replica than the plan did. Restore and look again before giving up,
+	// otherwise the apply fails with "plan file is missing" even though the
+	// plan is in the store.
+	if missingPlanFiles(ctx.PullStatus, plans) {
+		ctx.Log.Info("plans in pull status are missing from pull directory, attempting to restore plans")
+		restoredDir, restoreErr := p.restorePlansFromStore(ctx)
+		if restoreErr != nil {
+			// Nothing to restore. Keep the empty plan list so the caller
+			// reports the usual "plan file is missing" error.
+			if !errors.Is(restoreErr, os.ErrNotExist) {
+				return nil, restoreErr
+			}
+		} else {
+			pullDir = restoredDir
+			plans, err = p.PendingPlanFinder.Find(pullDir)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	// use the default repository workspace because it is the only one guaranteed to have an atlantis.yaml,
@@ -1524,6 +1562,28 @@ func newApplyPlanKey(workspace, repoRelDir, projectName string) applyPlanKey {
 		repoRelDir:  filepath.Clean(repoRelDir),
 		projectName: projectName,
 	}
+}
+
+// missingPlanFiles reports whether a project in the pull status needs a plan
+// file that is not among plans. Without a pull status it falls back to
+// whether no plans were found at all.
+func missingPlanFiles(pullStatus *models.PullStatus, plans []PendingPlan) bool {
+	if pullStatus == nil {
+		return len(plans) == 0
+	}
+	planKeys := make(map[applyPlanKey]struct{}, len(plans))
+	for _, plan := range plans {
+		planKeys[newApplyPlanKey(plan.Workspace, plan.RepoRelDir, plan.ProjectName)] = struct{}{}
+	}
+	for _, proj := range pullStatus.Projects {
+		if _, ok := planKeys[newApplyPlanKey(proj.Workspace, proj.RepoRelDir, proj.ProjectName)]; ok {
+			continue
+		}
+		if statusRequiresPlanFileForGenericApply(proj.Status) {
+			return true
+		}
+	}
+	return false
 }
 
 func validatePullStatusHasPlanFiles(pullStatus *models.PullStatus, planKeys map[applyPlanKey]struct{}) error {
