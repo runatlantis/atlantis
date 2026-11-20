@@ -493,6 +493,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	var lockingClient locking.Locker
 	var applyLockingClient locking.ApplyLocker
 	var database db.Database
+	var redisDatabase *redis.RedisDB
 
 	switch dbtype := userConfig.LockingDBType; dbtype {
 	case "redis":
@@ -512,7 +513,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		default:
 			logger.Info("Utilizing Redis DB in single-node mode, host: %s, port: %d", userConfig.RedisHost, userConfig.RedisPort)
 		}
-		database, err = redis.NewWithConfig(redis.Config{
+		redisDatabase, err = redis.NewWithConfig(redis.Config{
 			Hostname:           userConfig.RedisHost,
 			Port:               userConfig.RedisPort,
 			Password:           userConfig.RedisPassword,
@@ -525,6 +526,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		database = redisDatabase
 	case "boltdb":
 		logger.Info("Utilizing BoltDB")
 		database, err = boltdb.New(userConfig.DataDir)
@@ -543,7 +545,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	disableGlobalApplyLock := userConfig.DisableGlobalApplyLock
 
 	applyLockingClient = locking.NewApplyClient(database, disableApply, disableGlobalApplyLock)
-	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	var workingDirLocker events.WorkingDirLocker = events.NewDefaultWorkingDirLocker()
+	if redisDatabase != nil {
+		workingDirLocker = events.NewLeasedWorkingDirLocker(workingDirLocker, redisDatabase, logger, 30*time.Second)
+	}
 
 	var workingDir events.WorkingDir = &events.FileWorkspace{
 		DataDir:           userConfig.DataDir,
