@@ -3174,6 +3174,116 @@ func TestAPIController_RemediateRejectsNonAllowlistedRepoBeforeMutation(t *testi
 	projectCommandRunner.VerifyWasCalled(Never()).Apply(Any[command.ProjectContext]())
 }
 
+func TestAPIController_MutatingEndpointsRejectRequestsWhileShuttingDown(t *testing.T) {
+	cases := []struct {
+		name    string
+		path    string
+		body    any
+		handler func(*controllers.APIController) http.HandlerFunc
+	}{
+		{
+			name:    "plan",
+			path:    "/api/plan",
+			body:    controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", Projects: []string{"default"}},
+			handler: func(ac *controllers.APIController) http.HandlerFunc { return ac.Plan },
+		},
+		{
+			name:    "apply",
+			path:    "/api/apply",
+			body:    controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", Projects: []string{"default"}},
+			handler: func(ac *controllers.APIController) http.HandlerFunc { return ac.Apply },
+		},
+		{
+			name:    "drift detect",
+			path:    "/api/drift/detect",
+			body:    models.DriftDetectionRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", Projects: []string{"app"}},
+			handler: func(ac *controllers.APIController) http.HandlerFunc { return ac.DetectDrift },
+		},
+		{
+			name:    "drift remediate",
+			path:    "/api/drift/remediate",
+			body:    models.RemediationRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", Projects: []string{"app"}, Action: models.RemediationPlanOnly},
+			handler: func(ac *controllers.APIController) http.HandlerFunc { return ac.Remediate },
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ac, projectCommandBuilder, _ := setup(t)
+			ac.DriftStorage = driftmocks.NewMockStorage()
+			remediationService := driftmocks.NewMockRemediationService()
+			ac.RemediationService = remediationService
+			workingDir := ac.WorkingDir.(*MockWorkingDir)
+			ac.Drainer = &events.Drainer{}
+			// Nothing is in progress, so this returns right away and leaves
+			// the drainer shutting down.
+			ac.Drainer.ShutdownBlocking()
+
+			body, _ := json.Marshal(c.body)
+			req, _ := http.NewRequest("POST", c.path, bytes.NewBuffer(body))
+			req.Header.Set(atlantisTokenHeader, atlantisToken)
+			w := httptest.NewRecorder()
+			c.handler(ac)(w, req)
+
+			Equals(t, http.StatusServiceUnavailable, w.Code)
+			Assert(t, strings.Contains(w.Body.String(), "shutting down"), "expected a shutting down message, got %s", w.Body.String())
+			workingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+			projectCommandBuilder.VerifyWasCalled(Never()).BuildPlanCommands(Any[*command.Context](), Any[*events.CommentCommand]())
+			remediationService.VerifyWasCalled(Never()).Remediate(Any[models.RemediationRequest](), Any[drift.RemediationExecutor]())
+			Equals(t, 0, ac.Drainer.GetStatus().InProgressOps)
+		})
+	}
+}
+
+func TestAPIController_ShutdownWaitsForInFlightPlan(t *testing.T) {
+	ac, _, projectCommandRunner := setup(t)
+	ac.Drainer = &events.Drainer{}
+	planStarted := make(chan struct{})
+	releasePlan := make(chan struct{})
+	When(projectCommandRunner.Plan(Any[command.ProjectContext]())).Then(func([]Param) ReturnValues {
+		close(planStarted)
+		<-releasePlan
+		return ReturnValues{command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{}}}
+	})
+
+	body, _ := json.Marshal(controllers.APIRequest{Repository: "Repo", Ref: "main", Type: "Gitlab", Projects: []string{"default"}})
+	req, _ := http.NewRequest("POST", "/api/plan", bytes.NewBuffer(body))
+	req.Header.Set(atlantisTokenHeader, atlantisToken)
+	w := httptest.NewRecorder()
+	requestDone := make(chan struct{})
+	go func() {
+		defer close(requestDone)
+		ac.Plan(w, req)
+	}()
+	select {
+	case <-planStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the plan to start")
+	}
+	Equals(t, 1, ac.Drainer.GetStatus().InProgressOps)
+
+	shutdownDone := make(chan struct{})
+	go func() {
+		ac.Drainer.ShutdownBlocking()
+		close(shutdownDone)
+	}()
+	select {
+	case <-shutdownDone:
+		t.Fatal("shutdown finished while the API plan was still running")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(releasePlan)
+	select {
+	case <-shutdownDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for shutdown after the API plan finished")
+	}
+	<-requestDone
+	ResponseContains(t, w, http.StatusOK, "")
+	Equals(t, 0, ac.Drainer.GetStatus().InProgressOps)
+}
+
 func TestAPIController_Remediate_InvalidRepositoryReturnsBadRequest(t *testing.T) {
 	ac, _, _ := setup(t)
 	remediationService := driftmocks.NewMockRemediationService()
