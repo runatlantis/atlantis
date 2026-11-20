@@ -11,6 +11,7 @@ import (
 
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/db/mocks"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
@@ -139,6 +140,75 @@ func TestUnlockByPull(t *testing.T) {
 	l := locking.NewClient(database)
 	_, err := l.UnlockByPull("owner/repo", 1)
 	Equals(t, errExpected, err)
+}
+
+func TestUnlockNonPRLocks(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	apiLock := models.ProjectLock{Project: models.NewProject("owner/repo", "api", ""), Workspace: workspace, Pull: models.PullRequest{Num: -100}}
+	prLock := models.ProjectLock{Project: models.NewProject("owner/repo", "pr", ""), Workspace: workspace, Pull: models.PullRequest{Num: 7}}
+	// Its owner changed between List and the delete, so nothing is deleted.
+	movedLock := models.ProjectLock{Project: models.NewProject("owner/repo", "moved", ""), Workspace: workspace, Pull: models.PullRequest{Num: -200}}
+	database.EXPECT().List().Return([]models.ProjectLock{apiLock, prLock, movedLock}, nil)
+	database.EXPECT().UnlockIfOwnedByPull(apiLock.Project, workspace, -100).Return(&apiLock, nil)
+	database.EXPECT().UnlockIfOwnedByPull(movedLock.Project, workspace, -200).Return(nil, nil)
+
+	unlocked, err := locking.UnlockNonPRLocks(locking.NewClient(database))
+	Ok(t, err)
+	Equals(t, []models.ProjectLock{apiLock}, unlocked)
+}
+
+func TestUnlockNonPRLocks_ListErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	database.EXPECT().List().Return(nil, errExpected)
+
+	_, err := locking.UnlockNonPRLocks(locking.NewClient(database))
+	Assert(t, errors.Is(err, errExpected), "expected the list error, got %v", err)
+}
+
+func TestUnlockNonPRLocks_UnlockErrKeepsGoing(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	database := mocks.NewMockDatabase(ctrl)
+	failing := models.ProjectLock{Project: models.NewProject("owner/repo", "a", ""), Workspace: workspace, Pull: models.PullRequest{Num: -1}}
+	other := models.ProjectLock{Project: models.NewProject("owner/repo", "b", ""), Workspace: workspace, Pull: models.PullRequest{Num: -2}}
+	database.EXPECT().List().Return([]models.ProjectLock{failing, other}, nil)
+	database.EXPECT().UnlockIfOwnedByPull(failing.Project, workspace, -1).Return(nil, errExpected)
+	database.EXPECT().UnlockIfOwnedByPull(other.Project, workspace, -2).Return(&other, nil)
+
+	unlocked, err := locking.UnlockNonPRLocks(locking.NewClient(database))
+	Assert(t, errors.Is(err, errExpected), "expected the unlock error, got %v", err)
+	Equals(t, []models.ProjectLock{other}, unlocked)
+}
+
+func TestUnlockNonPRLocks_BoltDBAfterRestart(t *testing.T) {
+	dataDir := t.TempDir()
+	database, err := boltdb.New(dataDir)
+	Ok(t, err)
+	l := locking.NewClient(database)
+	apiProject := models.NewProject("owner/repo", "api", "")
+	prProject := models.NewProject("owner/repo", "pr", "")
+	_, err = l.TryLock(apiProject, workspace, models.PullRequest{Num: -993524529, BaseRepo: models.Repo{FullName: "owner/repo"}}, user)
+	Ok(t, err)
+	_, err = l.TryLock(prProject, workspace, models.PullRequest{Num: 7, BaseRepo: models.Repo{FullName: "owner/repo"}}, user)
+	Ok(t, err)
+	// The process dies without the API request releasing its lock.
+	Ok(t, database.Close())
+
+	database, err = boltdb.New(dataDir)
+	Ok(t, err)
+	defer database.Close() // nolint: errcheck
+	l = locking.NewClient(database)
+	unlocked, err := locking.UnlockNonPRLocks(l)
+	Ok(t, err)
+	Equals(t, 1, len(unlocked))
+	Equals(t, -993524529, unlocked[0].Pull.Num)
+
+	remaining, err := l.List()
+	Ok(t, err)
+	Equals(t, 1, len(remaining))
+	_, ok := remaining[models.GenerateLockKey(prProject, workspace)]
+	Assert(t, ok, "expected the pull request lock to stay, got %v", remaining)
 }
 
 func TestGetLock_BadKey(t *testing.T) {

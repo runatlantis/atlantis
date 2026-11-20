@@ -7,7 +7,10 @@ package locking
 
 import (
 	"errors"
+	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/runatlantis/atlantis/server/core/db"
@@ -100,6 +103,35 @@ func (c *Client) List() (map[string]models.ProjectLock, error) {
 // UnlockByPull deletes all locks associated with that pull request.
 func (c *Client) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
 	return c.database.UnlockByPull(repoFullName, pullNum)
+}
+
+// UnlockNonPRLocks deletes the locks held by negative pull numbers, which API
+// requests without a pull request take their locks under. Only the request that
+// took such a lock releases it, so the lock stays behind when the process dies
+// mid-request. Call this only when no other process can own these locks, such
+// as at startup with a single-process database. It returns the deleted locks.
+func UnlockNonPRLocks(l Locker) ([]models.ProjectLock, error) {
+	locks, err := l.List()
+	if err != nil {
+		return nil, fmt.Errorf("listing locks: %w", err)
+	}
+	var unlocked []models.ProjectLock
+	var errs []error
+	for _, key := range slices.Sorted(maps.Keys(locks)) {
+		lock := locks[key]
+		if lock.Pull.Num >= 0 {
+			continue
+		}
+		deleted, err := l.UnlockIfOwnedByPull(lock.Project, lock.Workspace, lock.Pull.Num)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("unlocking %q: %w", key, err))
+			continue
+		}
+		if deleted != nil {
+			unlocked = append(unlocked, *deleted)
+		}
+	}
+	return unlocked, errors.Join(errs...)
 }
 
 // GetLock attempts to get the lock stored at key. If successful,
