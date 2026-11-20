@@ -84,6 +84,22 @@ func TestParse_Ignored(t *testing.T) {
 	}
 }
 
+// Atlantis must not treat the comments it posts itself as commands, otherwise
+// it replies to them with an "unknown command" error.
+func TestParse_IgnoresAtlantisComments(t *testing.T) {
+	comments := []string{
+		events.ShutdownComment,
+		fmt.Sprintf(events.ForkPullComment, "allow-fork-prs", "silence-fork-pr-errors"),
+		events.ClosedPullComment,
+	}
+	for _, vcsHost := range []models.VCSHostType{models.Github, models.Gitlab, models.Gitea, models.BitbucketCloud, models.BitbucketServer, models.AzureDevops} {
+		for _, c := range comments {
+			r := commentParser.Parse(c, vcsHost)
+			Assert(t, r.Ignore, "expected Ignore to be true for comment %q on %s, got response %q", c, vcsHost.String(), r.CommentResponse)
+		}
+	}
+}
+
 func TestParse_ExecutableName(t *testing.T) {
 	cases := []struct {
 		user      string
