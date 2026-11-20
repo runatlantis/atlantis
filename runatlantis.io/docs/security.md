@@ -74,6 +74,7 @@ To prevent this, you could:
    }
    ```
 
+   If you use OpenTofu, put this block in `~/.tofurc` and use `registry.opentofu.org` in provider addresses.
    Do not let repositories set environment variables for `plan`, for example with custom workflows.
    Otherwise a pull request can set `TF_CLI_CONFIG_FILE` to its own file and skip this check.
 
