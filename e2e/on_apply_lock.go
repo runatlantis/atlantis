@@ -68,7 +68,7 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 	result.branchName = pr1.branchName
 
 	log.Printf("[%s] PR1 branch %q pull request %s", tc.Name, pr1.branchName, pr1.url)
-	time.Sleep(initialWait)
+	sleep(ctx, initialWait)
 
 	state, err := pollAtlantisCommandStatusAfter(ctx, t.vcsClient, pr1.branchName, "plan", tc.Name, CommitStatus{})
 	if err != nil {
@@ -126,7 +126,7 @@ func (t *E2ETester) runOnApplyLockPreservationBody(ctx context.Context, result *
 	*prs = append(*prs, pr2)
 	result.pullRequestURL = fmt.Sprintf("PR1: %s PR2: %s", pr1.url, pr2.url)
 	log.Printf("[%s] PR2 branch %q pull request %s", tc.Name, pr2.branchName, pr2.url)
-	time.Sleep(initialWait)
+	sleep(ctx, initialWait)
 
 	state, err = pollAtlantisCommandStatusAfter(ctx, t.vcsClient, pr2.branchName, "plan", tc.Name, CommitStatus{})
 	if err != nil {
@@ -325,7 +325,7 @@ func pollCommitStatusAfter(ctx context.Context, client VCSClient, branchName, st
 	state := "not started"
 	var statusErr error
 	for range lifecycleCommandMaxPolls {
-		time.Sleep(pollInterval)
+		sleep(ctx, pollInterval)
 		status, err := client.GetCommitStatus(ctx, branchName, statusContext)
 		if err != nil {
 			statusErr = err
@@ -476,7 +476,7 @@ func assertLockConflictComment(ctx context.Context, client VCSClient, pullNumber
 			log.Printf("[%s] found expected lock conflict comment: %q", caseName, truncateForLog(comment, 160))
 			return nil
 		}
-		time.Sleep(pollInterval)
+		sleep(ctx, pollInterval)
 	}
 	if commentsErr != nil {
 		return fmt.Errorf("[%s] expected lock conflict comment for lock owner pull #%d on pull #%d but comment polling failed: %w", caseName, lockOwnerPullNumber, pullNumber, commentsErr)

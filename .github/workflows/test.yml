@@ -137,6 +137,11 @@ jobs:
 
   e2e-github:
     runs-on: ubuntu-24.04
+    # Every run shares the atlantis-tests repo, so concurrent runs autoplan
+    # each other's PRs and collide on project locks. Run one at a time.
+    concurrency:
+      group: e2e-github
+      cancel-in-progress: false
     # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
     if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
@@ -184,6 +189,11 @@ jobs:
           ./scripts/e2e.sh
   e2e-gitlab:
     runs-on: ubuntu-24.04
+    # Every run shares the atlantis-tests repo, so concurrent runs autoplan
+    # each other's MRs and collide on project locks. Run one at a time.
+    concurrency:
+      group: e2e-gitlab
+      cancel-in-progress: false
     # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
     if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
