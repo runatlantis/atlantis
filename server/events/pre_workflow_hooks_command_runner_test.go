@@ -494,11 +494,6 @@ func TestRunPreHooks_Clone(t *testing.T) {
 	t.Run("Commands 'plan' set on webhook and non-plan command", func(t *testing.T) {
 		preWorkflowHooksSetup(t)
 
-		var unlockCalled = newBool(false)
-		unlockFn := func() {
-			unlockCalled = newBool(true)
-		}
-
 		globalCfg := valid.GlobalCfg{
 			Repos: []valid.Repo{
 				{
@@ -512,19 +507,15 @@ func TestRunPreHooks_Clone(t *testing.T) {
 
 		preWh.GlobalCfg = globalCfg
 
-		When(preWhWorkingDirLocker.TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
-			events.DefaultRepoRelDir, "", command.Apply, events.WorkingDirLockMetadataForPull(newPull))).ThenReturn(unlockFn, nil)
-		When(preWhWorkingDir.Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
-			Eq(events.DefaultWorkspace))).ThenReturn(repoDir, nil)
-		When(whPreWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Eq(testHookWithPlanCommand.RunCommand),
-			Any[string](), Any[string](), Eq(repoDir))).ThenReturn(result, runtimeDesc, nil)
-
 		err := preWh.RunPreHooks(ctx, applyCmd)
 
 		Ok(t, err)
 		whPreWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](),
 			Eq(testHookWithPlanCommand.RunCommand), Any[string](), Any[string](), Eq(repoDir))
-		Assert(t, *unlockCalled == true, "unlock function called")
+		preWhWorkingDirLocker.VerifyWasCalled(Never()).TryLock(testdata.GithubRepo.FullName, newPull.Num, events.DefaultWorkspace,
+			events.DefaultRepoRelDir, "", command.Apply, events.WorkingDirLockMetadataForPull(newPull))
+		preWhWorkingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newPull),
+			Eq(events.DefaultWorkspace))
 	})
 
 	t.Run("Commands 'plan, apply' set on webhook and plan command", func(t *testing.T) {

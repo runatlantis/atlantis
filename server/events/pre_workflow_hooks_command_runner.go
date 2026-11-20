@@ -45,9 +45,9 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
-	preWorkflowHooks := w.preWorkflowHooks(ctx)
+	preWorkflowHooks := w.preWorkflowHooksForCommand(ctx, cmd)
 
-	// short circuit any other calls if there are no pre-hooks configured
+	// short circuit any other calls if there are no pre-hooks configured for this command
 	if len(preWorkflowHooks) == 0 {
 		return nil
 	}
@@ -101,6 +101,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) HasPreWorkflowHooks(ctx *command.
 	return len(w.preWorkflowHooks(ctx)) > 0
 }
 
+
 func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Context) []*valid.WorkflowHook {
 	preWorkflowHooks := make([]*valid.WorkflowHook, 0)
 	for _, repo := range w.GlobalCfg.Repos {
@@ -109,6 +110,29 @@ func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Con
 		}
 	}
 	return preWorkflowHooks
+}
+
+func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooksForCommand(ctx *command.Context, cmd *CommentCommand) []*valid.WorkflowHook {
+	all := w.preWorkflowHooks(ctx)
+	if cmd == nil {
+		return all
+	}
+	filtered := make([]*valid.WorkflowHook, 0, len(all))
+	commandName := cmd.Name.String()
+	for _, hook := range all {
+		if hookAppliesToCommand(hook, commandName) {
+			filtered = append(filtered, hook)
+		}
+	}
+	return filtered
+}
+
+func hookAppliesToCommand(hook *valid.WorkflowHook, commandName string) bool {
+	if hook == nil {
+		return false
+	}
+	// Empty Commands means the hook runs for every command.
+	return hook.Commands == "" || strings.Contains(hook.Commands, commandName)
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
@@ -127,7 +151,7 @@ func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
 
 		ctx.Log.Debug("Processing pre workflow hook '%s', Command '%s', Target commands [%s]",
 			ctx.HookDescription, ctx.CommandName, hook.Commands)
-		if hook.Commands != "" && !strings.Contains(hook.Commands, ctx.CommandName) {
+		if !hookAppliesToCommand(hook, ctx.CommandName) {
 			ctx.Log.Debug("Skipping pre workflow hook '%s' as command '%s' is not in Commands [%s]",
 				ctx.HookDescription, ctx.CommandName, hook.Commands)
 			continue
