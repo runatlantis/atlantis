@@ -62,6 +62,26 @@ to delete the lock.
 
 Once a plan is discarded, you'll need to run `plan` again prior to running `apply` when you go back to that pull request.
 
+## Overlapping Commands on a Pull Request
+
+If you push a new commit while Atlantis is still planning an earlier commit of the same pull request, the autoplan for the new commit
+waits for that plan to finish instead of failing with a lock error. It then fetches the pull request's
+current head and plans that commit. The earlier plan isn't cancelled: its comment and commit status
+apply to the earlier commit.
+
+If you push several commits while a plan is running, only one autoplan waits, and it plans the latest
+head. The autoplans it replaces stop without running workflow hooks or posting comments or statuses.
+
+The waiting autoplan also stops without posting anything if the pull request is closed, someone runs
+`atlantis cancel`, Atlantis starts shutting down, or the pull request's current head can't be fetched.
+
+Targeted applies (`atlantis apply -d`, `-p` or `-w`) for the same commit can run at the same time,
+because each one only touches the projects it names. Two applies of the same project still can't run
+at once. A plan, or an `atlantis apply` without flags, still fails right away while any apply is running.
+
+Any other comment command (such as `atlantis plan`) that conflicts with a running command fails right
+away with a message that says which command and commit hold the lock.
+
 ## Relationship to Terraform State Locking
 
 Atlantis does not conflict with [Terraform State Locking](https://developer.hashicorp.com/terraform/language/state/locking). Under the hood, all

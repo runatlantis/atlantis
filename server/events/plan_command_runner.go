@@ -107,17 +107,18 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	// LivePullHeadFetcher fetches the pull request's current head commit. An
+	// autoplan that waited behind a plan of an older commit uses it to plan
+	// the live head.
+	LivePullHeadFetcher LivePullHeadFetcher
+	// Drainer reports whether Atlantis is shutting down, so that an autoplan
+	// that waited doesn't start a new plan during shutdown. Optional.
+	Drainer *Drainer
 }
 
 func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
-	if !ok {
-		return
-	}
-	defer unlockPullPlan()
-
 	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -372,9 +373,31 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.Trigger == command.AutoTrigger {
-		p.runAutoplan(ctx)
+		p.RunAutoplanWithHooks(ctx, nil, nil)
 	} else {
 		p.run(ctx, cmd)
+	}
+}
+
+// RunAutoplanWithHooks takes the pull-level plan lock, then runs before
+// (pre-workflow hooks), the autoplan, and after (post-workflow hooks) while
+// holding it. If the autoplan waited and was superseded or cancelled, neither
+// hook runs.
+func (p *PlanCommandRunner) RunAutoplanWithHooks(ctx *command.Context, before func() bool, after func()) {
+	unlock, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
+	if !ok {
+		return
+	}
+	defer unlock()
+	if before != nil && !before() {
+		return
+	}
+	if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+		return
+	}
+	p.runAutoplan(ctx)
+	if after != nil {
+		after()
 	}
 }
 
@@ -393,12 +416,89 @@ func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullComman
 	if p.workingDirLocker == nil {
 		return func() {}, true
 	}
-	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
-	if err != nil {
+	repoFullName, pullNum, metadata := ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, WorkingDirLockMetadataForPull(ctx.Pull)
+	if ctx.Trigger != command.AutoTrigger {
+		unlockFn, err := p.workingDirLocker.TryLockPull(repoFullName, pullNum, command.Plan, metadata)
+		if err != nil {
+			p.handleNoProjectPlanStateError(ctx, cmd, err)
+			return nil, false
+		}
+		return unlockFn, true
+	}
+
+	return p.lockPullForAutoplan(ctx, cmd)
+}
+
+// lockPullForAutoplan takes the pull-level plan lock for an autoplan. Autoplan
+// runs because a new commit was pushed, so if this pull request is still
+// planning an older commit it waits for that plan to finish instead of
+// failing the new head (#7050).
+//
+// Waiters are ordered by arrival, not by commit, and webhooks can arrive out
+// of order. After waiting, the pull request's live head is fetched so the plan
+// runs for the commit that is HEAD now, not the one the event carried.
+func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCommand) (func(), bool) {
+	repoFullName, pullNum := ctx.Pull.BaseRepo.FullName, ctx.Pull.Num
+	metadata := WorkingDirLockMetadataForPull(ctx.Pull)
+	waited := false
+	lock, err := p.workingDirLocker.LockPullAfterStalePlan(repoFullName, pullNum, command.Plan, metadata, func(holder WorkingDirLockMetadata) {
+		waited = true
+		ctx.Log.Info("pull request is still planning commit %s; autoplan for commit %s will start when it finishes", shortSHA(holder.HeadCommit), shortSHA(metadata.HeadCommit))
+	})
+	switch {
+	case errors.Is(err, ErrPullLockSuperseded):
+		ctx.Log.Info("skipping autoplan for commit %s: a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
+		return nil, false
+	case errors.Is(err, ErrPullLockCancelled):
+		ctx.Log.Info("skipping autoplan for commit %s: the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
+		return nil, false
+	case err != nil:
 		p.handleNoProjectPlanStateError(ctx, cmd, err)
 		return nil, false
 	}
-	return unlockFn, true
+	// Release the lock on every path that doesn't hand it to the caller,
+	// including a panic while fetching the live head.
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			lock.Unlock()
+		}
+	}()
+	if waited {
+		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+			return nil, false
+		}
+		liveHead, ok := p.livePullHead(ctx)
+		if !ok {
+			return nil, false
+		}
+		ctx.Pull.HeadCommit = liveHead
+		if !lock.UpdateMetadata(WorkingDirLockMetadataForPull(ctx.Pull)) {
+			return nil, false
+		}
+	}
+	if (p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown) || !lock.Start() {
+		return nil, false
+	}
+	handedOff = true
+	return lock.Unlock, true
+}
+
+// livePullHead returns the pull request's current head commit from the VCS.
+// It returns false if the head cannot be fetched.
+func (p *PlanCommandRunner) livePullHead(ctx *command.Context) (string, bool) {
+	if p.LivePullHeadFetcher == nil {
+		return "", false
+	}
+	livePull, err := p.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{Log: ctx.Log, Pull: ctx.Pull})
+	if err != nil {
+		ctx.Log.Warn("unable to fetch live head for pull request %d: %s", ctx.Pull.Num, err)
+		return "", false
+	}
+	if livePull.HeadCommit == "" || livePull.State == models.ClosedPullState {
+		return "", false
+	}
+	return livePull.HeadCommit, true
 }
 
 func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {

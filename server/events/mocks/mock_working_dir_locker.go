@@ -26,6 +26,14 @@ func NewMockWorkingDirLocker(options ...pegomock.Option) *MockWorkingDirLocker {
 func (mock *MockWorkingDirLocker) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockWorkingDirLocker) FailHandler() pegomock.FailHandler      { return mock.fail }
 
+func (mock *MockWorkingDirLocker) CancelAutoplanWaiter(repoFullName string, pullNum int) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum}
+	pegomock.GetGenericMockFrom(mock).Invoke("CancelAutoplanWaiter", _params, []reflect.Type{})
+}
+
 func (mock *MockWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
@@ -39,6 +47,25 @@ func (mock *MockWorkingDirLocker) HasCommandLock(repoFullName string, pullNum in
 		}
 	}
 	return _ret0
+}
+
+func (mock *MockWorkingDirLocker) LockPullAfterStalePlan(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata, onWait func(events.WorkingDirLockMetadata)) (events.PullLock, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName, metadata, onWait}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("LockPullAfterStalePlan", _params, []reflect.Type{reflect.TypeOf((*events.PullLock)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 events.PullLock
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(events.PullLock)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
 }
 
 func (mock *MockWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name, metadata events.WorkingDirLockMetadata) (func(), error) {
@@ -66,6 +93,25 @@ func (mock *MockWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	}
 	_params := []pegomock.Param{repoFullName, pullNum, cmdName, metadata}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLockPull", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 func()
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(func())
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
+func (mock *MockWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata) (func(), error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockWorkingDirLocker().")
+	}
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName, metadata}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("TryLockPullShared", _params, []reflect.Type{reflect.TypeOf((*func())(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 func()
 	var _ret1 error
 	if len(_result) != 0 {
@@ -124,6 +170,41 @@ type VerifierMockWorkingDirLocker struct {
 	timeout                time.Duration
 }
 
+func (verifier *VerifierMockWorkingDirLocker) CancelAutoplanWaiter(repoFullName string, pullNum int) *MockWorkingDirLocker_CancelAutoplanWaiter_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "CancelAutoplanWaiter", _params, verifier.timeout)
+	return &MockWorkingDirLocker_CancelAutoplanWaiter_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_CancelAutoplanWaiter_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_CancelAutoplanWaiter_OngoingVerification) GetCapturedArguments() (string, int) {
+	repoFullName, pullNum := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1]
+}
+
+func (c *MockWorkingDirLocker_CancelAutoplanWaiter_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+	}
+	return
+}
+
 func (verifier *VerifierMockWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) *MockWorkingDirLocker_HasCommandLock_OngoingVerification {
 	_params := []pegomock.Param{repoFullName, pullNum, cmdName}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "HasCommandLock", _params, verifier.timeout)
@@ -159,6 +240,59 @@ func (c *MockWorkingDirLocker_HasCommandLock_OngoingVerification) GetAllCaptured
 			_param2 = make([]command.Name, len(c.methodInvocations))
 			for u, param := range _params[2] {
 				_param2[u] = param.(command.Name)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) LockPullAfterStalePlan(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata, onWait func(events.WorkingDirLockMetadata)) *MockWorkingDirLocker_LockPullAfterStalePlan_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName, metadata, onWait}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "LockPullAfterStalePlan", _params, verifier.timeout)
+	return &MockWorkingDirLocker_LockPullAfterStalePlan_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_LockPullAfterStalePlan_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_LockPullAfterStalePlan_OngoingVerification) GetCapturedArguments() (string, int, command.Name, events.WorkingDirLockMetadata, func(events.WorkingDirLockMetadata)) {
+	repoFullName, pullNum, cmdName, metadata, onWait := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], cmdName[len(cmdName)-1], metadata[len(metadata)-1], onWait[len(onWait)-1]
+}
+
+func (c *MockWorkingDirLocker_LockPullAfterStalePlan_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []command.Name, _param3 []events.WorkingDirLockMetadata, _param4 []func(events.WorkingDirLockMetadata)) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]command.Name, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.Name)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]events.WorkingDirLockMetadata, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(events.WorkingDirLockMetadata)
+			}
+		}
+		if len(_params) > 4 {
+			_param4 = make([]func(events.WorkingDirLockMetadata), len(c.methodInvocations))
+			for u, param := range _params[4] {
+				_param4[u] = param.(func(events.WorkingDirLockMetadata))
 			}
 		}
 	}
@@ -247,6 +381,53 @@ func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetCapturedArgume
 }
 
 func (c *MockWorkingDirLocker_TryLockPull_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []command.Name, _param3 []events.WorkingDirLockMetadata) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(string)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(int)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]command.Name, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(command.Name)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]events.WorkingDirLockMetadata, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(events.WorkingDirLockMetadata)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata events.WorkingDirLockMetadata) *MockWorkingDirLocker_TryLockPullShared_OngoingVerification {
+	_params := []pegomock.Param{repoFullName, pullNum, cmdName, metadata}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "TryLockPullShared", _params, verifier.timeout)
+	return &MockWorkingDirLocker_TryLockPullShared_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockWorkingDirLocker_TryLockPullShared_OngoingVerification struct {
+	mock              *MockWorkingDirLocker
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockWorkingDirLocker_TryLockPullShared_OngoingVerification) GetCapturedArguments() (string, int, command.Name, events.WorkingDirLockMetadata) {
+	repoFullName, pullNum, cmdName, metadata := c.GetAllCapturedArguments()
+	return repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], cmdName[len(cmdName)-1], metadata[len(metadata)-1]
+}
+
+func (c *MockWorkingDirLocker_TryLockPullShared_OngoingVerification) GetAllCapturedArguments() (_param0 []string, _param1 []int, _param2 []command.Name, _param3 []events.WorkingDirLockMetadata) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
