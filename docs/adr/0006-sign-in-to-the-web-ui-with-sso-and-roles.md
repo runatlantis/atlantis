@@ -25,6 +25,25 @@ Constraints:
 
 Atlantis will sign people in to the web UI natively, give each person a role, and decide what each role may do with an access policy that can differ per repository. This applies to the pages and the read-only JSON endpoints at `/ui`. When sign-in is on, the existing UI's pages redirect to `/ui` and its unlock and apply lock endpoints follow the same policy. The `/api` endpoints keep their API secret.
 
+### Configuration
+
+Sign-in and access are configured together in a new `access` section of the server-side repo config, `repos.yaml`, which operators already use to say what each repository may do. Atlantis adds no flags for providers or roles, so a change to who can sign in, or what they can do, is reviewed like any other change to that file. Secrets are never written there: each provider names the environment variable that holds its client secret, and Atlantis refuses to start if it is empty. The session secrets, `--web-session-secrets`, are the one new server setting, because every replica needs them before it reads any config. VCS providers sign in on the hosts Atlantis is already configured for.
+
+```yaml
+access:
+  sign_in:
+    providers:
+      - type: gitlab                       # or github, gitea, oidc, google
+        client_id: 0123456789abcdef
+        client_secret_env: GITLAB_SIGN_IN_SECRET
+        allowed_groups: [acme]
+  roles:
+    admin:
+      - gitlab: acme/platform
+```
+
+Instead of `providers`, `sign_in.proxy` names an authenticating proxy. Atlantis validates the section at startup, including settings that don't apply to a provider's type.
+
 ### Identity sources
 
 Operators choose one of two modes:
@@ -66,7 +85,7 @@ Each action needs a role. These are the defaults:
 | Start and end maintenance windows | admin | no |
 | Lock and unlock applies | admin | no |
 
-Simple setups use `--web-role-*` flags. Anything more goes in a new `access` section of the server-side repo config, `repos.yaml`, which operators already use to say what each repository may do:
+Roles and permissions go in the same `access` section:
 
 ```yaml
 access:
@@ -149,7 +168,9 @@ Sign-in ships behind the `web-ui` experiment and graduates with it under [ADR 00
 - **Server-side sessions.** Allow instant revocation, but need a store shared by every replica. Revisit when durable storage is accepted.
 - **Role expressions over claims**, such as JMESPath. More flexible, but harder to review than a fixed list of rules. Revisit if the rules prove too limited.
 - **A policy engine such as OPA or Cedar.** Expressive, but a new language and dependency for what is a short list of roles and actions. The fixed schema can be translated to one later if needed.
-- **A separate access file or flag-only policy.** Flags can't express per-repository rules readably, and a separate file would duplicate the repository matching `repos.yaml` already has.
+- **Flags for providers and roles.** Flags can't express per-repository rules readably, spread one configuration over many settings, and aren't reviewed with the rest of the policy.
+- **A separate access file.** It would duplicate the repository matching `repos.yaml` already has.
+- **Client secrets in `repos.yaml`.** Simpler, but the file is often committed to a repository, so secrets would leak with it.
 - **Access rules in each repository's `atlantis.yaml`.** Rejected, because the author of a pull request could change them.
 
 ## Consequences
