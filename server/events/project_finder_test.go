@@ -111,6 +111,8 @@ func setupTmpRepos(t *testing.T) {
 	envDir = t.TempDir()
 	err = os.MkdirAll(filepath.Join(envDir, "env"), 0700)
 	Ok(t, err)
+	_, err = os.Create(filepath.Join(envDir, "main.tf"))
+	Ok(t, err)
 	_, err = os.Create(filepath.Join(envDir, "env/staging.tfvars"))
 	Ok(t, err)
 	_, err = os.Create(filepath.Join(envDir, "env/production.tfvars"))
@@ -411,7 +413,7 @@ func TestDetermineProjects(t *testing.T) {
 			"Should de-duplicate when multiple files changed in the same dir",
 			[]string{"env/staging.tfvars", "main.tf", "other.tf"},
 			[]string{"."},
-			"",
+			envDir,
 			defaultAutoplanFileList,
 		},
 		{
@@ -743,4 +745,32 @@ func TestDetermineWorkspaceFromHCL_RejectsUnsafeName(t *testing.T) {
 
 	ErrContains(t, "cannot contain '/'", err)
 	Equals(t, "", got)
+}
+
+func TestDetermineProjects_MovedToSubdir(t *testing.T) {
+	// When migrating files from parent/*.tf to parent/subdir/*.tf, parent/
+	// still exists on disk (because it contains subdir/), but no longer contains
+	// any Terraform project indicator files. Only parent/subdir should be planned.
+	tmpDir := DirStructure(t, map[string]any{
+		"parent": map[string]any{
+			"subdir": map[string]any{
+				"main.tf": nil,
+			},
+		},
+	})
+
+	modifiedFiles := []string{"parent/main.tf", "parent/subdir/main.tf"}
+
+	finder := &events.DefaultProjectFinder{}
+	projects := finder.DetermineProjects(
+		logging.NewNoopLogger(t),
+		modifiedFiles,
+		"owner/repo",
+		tmpDir,
+		"**/*.tf,**/*.tfvars,**/*.hcl",
+		nil,
+	)
+
+	Equals(t, 1, len(projects))
+	Equals(t, "parent/subdir", projects[0].Path)
 }
