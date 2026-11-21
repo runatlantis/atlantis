@@ -297,6 +297,7 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		name = command.Unlock
 		flagSet = pflag.NewFlagSet(command.Unlock.String(), pflag.ContinueOnError)
 		flagSet.SetOutput(io.Discard)
+		flagSet.StringVarP(&project, projectFlagLong, projectFlagShort, "", "Discard the saved plan and Atlantis lock for this named project in this PR.")
 	case command.Cancel.String():
 		name = command.Cancel
 		flagSet = pflag.NewFlagSet(command.Cancel.String(), pflag.ContinueOnError)
@@ -331,6 +332,11 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 	subName, extraArgs, errResult := e.parseArgs(name, args, flagSet)
 	if errResult != "" {
 		return CommentParseResult{CommentResponse: errResult}
+	}
+
+	// An explicitly empty target must never become a PR-wide unlock.
+	if name == command.Unlock && flagSet.Changed(projectFlagLong) && strings.TrimSpace(project) == "" {
+		return CommentParseResult{CommentResponse: e.errMarkdown("project name must not be empty", cmd, flagSet)}
 	}
 
 	dir, err = e.validateDir(dir)
@@ -422,6 +428,12 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	var extraArgs []string // command extra_args
 	if flagSet.ArgsLenAtDash() != -1 {
 		extraArgs = append(extraArgs, flagSet.Args()[flagSet.ArgsLenAtDash():]...)
+	}
+
+	// Unlock does not invoke Terraform. Reject trailing arguments so a misplaced
+	// project flag (after --) cannot silently become a PR-wide unlock.
+	if name == command.Unlock && len(extraArgs) > 0 {
+		return "", nil, e.errMarkdown("unlock does not accept extra arguments", name.String(), flagSet)
 	}
 
 	// pass commandArgs into extraArgs after extra args.
@@ -677,7 +689,7 @@ Commands:
 {{- end }}
 {{- if .AllowUnlock }}
   unlock   Removes all atlantis locks and discards all plans for this PR.
-           To unlock a specific plan you can use the Atlantis UI.
+           To unlock a specific project, use -p/--project or the Atlantis UI.
 {{- end }}
 {{- if .AllowApprovePolicies }}
   approve_policies
@@ -717,12 +729,12 @@ var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
 const defaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
-// `atlantis unlock` with flags.
+// `atlantis unlock` with invalid flags.
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`%s unlock
+	`%s unlock [-p project]
 
   Unlocks the entire PR and discards all plans in this PR.
-  Arguments or flags are not supported at the moment.
-  If you need to unlock a specific project please use the atlantis UI.` +
+  Use -p/--project to discard only a named project's saved plan and Atlantis lock.
+  This does not release Terraform state locks.` +
 	"\n```"
