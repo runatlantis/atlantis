@@ -102,6 +102,7 @@ type Repo struct {
 	CustomPolicyCheck         *bool          `yaml:"custom_policy_check,omitempty" json:"custom_policy_check,omitempty"`
 	AutoDiscover              *AutoDiscover  `yaml:"autodiscover,omitempty" json:"autodiscover,omitempty"`
 	SilencePRComments         []string       `yaml:"silence_pr_comments,omitempty" json:"silence_pr_comments,omitempty"`
+	APIAllowVars              []string       `yaml:"api_allow_vars,omitempty" json:"api_allow_vars,omitempty"`
 }
 
 func (g GlobalCfg) Validate() error {
@@ -289,8 +290,8 @@ func (r Repo) Validate() error {
 	overridesValid := func(value any) error {
 		overrides := value.([]string)
 		for _, o := range overrides {
-			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.RepoLocksKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey && o != valid.SilencePRCommentsKey {
-				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.RepoLocksKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey, valid.SilencePRCommentsKey)
+			if o != valid.PlanRequirementsKey && o != valid.ApplyRequirementsKey && o != valid.ImportRequirementsKey && o != valid.WorkflowKey && o != valid.DeleteSourceBranchOnMergeKey && o != valid.RepoLockingKey && o != valid.RepoLocksKey && o != valid.PolicyCheckKey && o != valid.CustomPolicyCheckKey && o != valid.SilencePRCommentsKey && o != valid.APIAllowVarsKey {
+				return fmt.Errorf("%q is not a valid override, only %q, %q, %q, %q, %q, %q, %q, %q, %q, %q, and %q are supported", o, valid.PlanRequirementsKey, valid.ApplyRequirementsKey, valid.ImportRequirementsKey, valid.WorkflowKey, valid.DeleteSourceBranchOnMergeKey, valid.RepoLockingKey, valid.RepoLocksKey, valid.PolicyCheckKey, valid.CustomPolicyCheckKey, valid.SilencePRCommentsKey, valid.APIAllowVarsKey)
 			}
 		}
 		return nil
@@ -335,6 +336,7 @@ func (r Repo) Validate() error {
 		validation.Field(&r.DeleteSourceBranchOnMerge, validation.By(deleteSourceBranchOnMergeValid)),
 		validation.Field(&r.AutoDiscover, validation.By(autoDiscoverValid)),
 		validation.Field(&r.RepoLocks, validation.By(repoLocksValid)),
+		validation.Field(&r.APIAllowVars, validation.By(validAPIAllowVars)),
 	)
 }
 
@@ -460,5 +462,6 @@ OuterGlobalImportReqs:
 		CustomPolicyCheck:         r.CustomPolicyCheck,
 		AutoDiscover:              autoDiscover,
 		SilencePRComments:         r.SilencePRComments,
+		APIAllowVars:              r.APIAllowVars,
 	}
 }

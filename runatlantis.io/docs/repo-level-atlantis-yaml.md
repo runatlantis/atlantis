@@ -82,6 +82,7 @@ projects:
   apply_requirements: [mergeable, approved, undiverged] # Available since v0.17.0
   import_requirements: [mergeable, approved, undiverged] # Available since v0.17.0
   silence_pr_comments: ["apply"] # Available since v0.17.0
+  api_allow_vars: ["foo_bar_*"]
   execution_order_group: 1 # Available since v0.17.0
   depends_on: # Available since v0.20.0
     - project-1
@@ -476,6 +477,7 @@ plan_requirements: ["approved"]
 apply_requirements: ["approved"]
 import_requirements: ["approved"]
 silence_pr_comments: ["apply"]
+api_allow_vars: ["foo_bar_*"]
 workflow: myworkflow
 ```
 
@@ -496,6 +498,7 @@ workflow: myworkflow
 | apply_requirements<br />_(restricted)_  | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis apply` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details.  |
 | import_requirements<br />_(restricted)_ | array\[string\]         | none            | no       | Requirements that must be satisfied before `atlantis import` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | silence_pr_comments                     | array\[string\]         | none            | no       | Silence PR comments from defined stages while preserving PR status checks. Supported values are: `plan`, `apply`.                                                                                                                                               |
+| api_allow_vars<br />_(restricted)_      | array\[string\]         | none            | no       | Terraform variables that `POST /api/plan` and `POST /api/apply` may set with `Vars`, as names or prefixes ending in `*`. Replaces the server-side list. See [Plan arguments](api-endpoints.md#plan-arguments).                                                  |
 | workflow <br />_(restricted)_           | string                  | none            | no       | A custom workflow. If not specified, Atlantis will use its default workflow.                                                                                                                                                                                    |
 
 ::: tip

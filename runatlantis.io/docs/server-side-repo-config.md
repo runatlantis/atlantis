@@ -85,6 +85,11 @@ repos:
   # If false (default), only Conftest JSON output is allowed
   custom_policy_check: false
 
+  # api_allow_vars lists the Terraform variables that API plan and apply
+  # requests may set: names, prefixes ending in `*`, or `*` for any variable.
+  # By default, no variables are allowed.
+  api_allow_vars: [foo_bar_*]
+
   # pre_workflow_hooks defines arbitrary list of scripts to execute before workflow execution.
   pre_workflow_hooks:
     - run: my-pre-workflow-hook-command arg1
@@ -235,6 +240,36 @@ projects:
   apply_requirements: []
   import_requirements: []
 ```
+
+### Allow API Requests To Set Variables
+
+[`POST /api/plan` and `POST /api/apply`](api-endpoints.md#plan-arguments) can pass
+`-var` arguments to the plan, but only for variables that `api_allow_vars` allows.
+The [`--api-allow-vars`](server-configuration.md#api-allow-vars) flag sets the default
+for all repos, and `api_allow_vars` in `repos.yaml` replaces it for the repos that match:
+
+```yaml
+# repos.yaml
+repos:
+- id: /.*/
+  api_allow_vars: [foo_bar_*]
+
+# Allow a specific repo to set its own list per project.
+- id: github.com/myorg/myrepo
+  allowed_overrides: [api_allow_vars]
+```
+
+A project in an allowed repo's `atlantis.yaml` then replaces the list. An empty list allows no variables.
+
+```yaml
+# atlantis.yaml
+version: 3
+projects:
+- dir: .
+  api_allow_vars: [foo_bar_baz, foo_qux_*]
+```
+
+`atlantis.yaml` is read from the branch being planned, so allow this override only for repos whose branches you trust to choose these variables.
 
 ### Running Scripts Before Atlantis Workflows
 
@@ -555,7 +590,7 @@ If you set a workflow with the key `default`, it will override this.
 | plan_requirements | []string | none | no | Requirements that must be satisfied before `atlantis plan` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | apply_requirements | []string | none | no | Requirements that must be satisfied before `atlantis apply` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
 | import_requirements | []string | none | no | Requirements that must be satisfied before `atlantis import` and `atlantis state rm` can be run. Currently the only supported requirements are `approved`, `mergeable`, and `undiverged`. See [Command Requirements](command-requirements.md) for more details. |
-| allowed_overrides | []string | none | no | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks`, and `custom_policy_check` |
+| allowed_overrides | []string | none | no | A list of restricted keys that `atlantis.yaml` files can override. The only supported keys are `apply_requirements`, `workflow`, `delete_source_branch_on_merge`,`repo_locking`, `repo_locks`, `custom_policy_check`, and `api_allow_vars` |
 | allowed_workflows | []string | none | no | A list of server-side workflows that projects in `atlantis.yaml` files can select from. Checked for every project. |
 | allow_custom_workflows | bool | false | no | Whether or not to allow [Custom Workflows](custom-workflows.md). |
 | delete_source_branch_on_merge | bool | false | no | Whether or not to delete the source branch on merge. |
@@ -565,6 +600,7 @@ If you set a workflow with the key `default`, it will override this.
 | custom_policy_check | bool | false | no | Whether or not to enable custom policy check tools outside of Conftest on this repository. |
 | autodiscover | AutoDiscover | none | no | Auto discover settings for this repo |
 | silence_pr_comments | []string | none | no | Silence PR comments from defined stages while preserving PR status checks. Useful in large environments with many Atlantis instances and/or projects, when the comments are too big and too many, therefore it is preferable to rely solely on PR status checks. Supported values are: `plan`, `apply`. |
+| api_allow_vars | []string | none | no | Terraform variables that [`POST /api/plan` and `POST /api/apply`](api-endpoints.md#plan-arguments) requests may set with `Vars`: names, prefixes ending in `*`, or `*` for any variable. Replaces [`--api-allow-vars`](server-configuration.md#api-allow-vars). By default, no variables are allowed. |
 
 :::tip Notes
 
