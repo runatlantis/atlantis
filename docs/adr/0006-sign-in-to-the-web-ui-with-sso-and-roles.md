@@ -27,11 +27,12 @@ Atlantis will sign people in to the web UI natively, give each person a role, an
 
 ### Configuration
 
-Sign-in and access are configured together in a new `access` section of the server-side repo config, `repos.yaml`, which operators already use to say what each repository may do. Atlantis adds no flags for providers or roles, so a change to who can sign in, or what they can do, is reviewed like any other change to that file. Secrets are never written there: each provider names the environment variable that holds its client secret, and Atlantis refuses to start if it is empty. The session secrets, `--web-session-secrets`, are the one new server setting, because every replica needs them before it reads any config. VCS providers sign in on the hosts Atlantis is already configured for.
+Sign-in and access are configured together in a new `access` section of the server-side repo config, `repos.yaml`, which operators already use to say what each repository may do. Sign-in adds no server flags, so a change to who can sign in, or what they can do, is reviewed like any other change to that file. Secrets are never written there: the config names the environment variables that hold the session secrets and each provider's client secret, and Atlantis refuses to start if one is empty. VCS providers sign in on the hosts Atlantis is already configured for.
 
 ```yaml
 access:
   sign_in:
+    session_secrets_env: ATLANTIS_SESSION_SECRETS
     providers:
       - type: gitlab                       # or github, gitea, oidc, google
         client_id: 0123456789abcdef
