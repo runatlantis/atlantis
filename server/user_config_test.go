@@ -33,14 +33,14 @@ func TestUserConfig_ToAllowCommandNames(t *testing.T) {
 			name:          "all",
 			allowCommands: "all",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State,
+				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State, command.Output, command.StateList, command.StateShow,
 			},
 		},
 		{
 			name:          "all with others returns same with all result",
 			allowCommands: "all,plan",
 			want: []command.Name{
-				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State,
+				command.Version, command.Plan, command.Apply, command.Cancel, command.Unlock, command.ApprovePolicies, command.Import, command.State, command.Output, command.StateList, command.StateShow,
 			},
 		},
 		{

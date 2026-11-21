@@ -688,3 +688,39 @@ func TestRunPostHooksSuppressesVCSStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestRunPostHooks_MatchesExactCommands(t *testing.T) {
+	for _, tc := range []struct {
+		commands string
+		name     command.Name
+		want     bool
+	}{
+		{"", command.State, true},
+		{"state_list", command.State, false},
+		{"state_show", command.State, false},
+		{"state_list,state_show", command.State, false},
+		{"state_list", command.StateList, true},
+		{"state_show", command.StateShow, true},
+		{"state", command.StateList, false},
+		{"plan, state_list , apply", command.StateList, true},
+		{"plan, state , apply", command.State, true},
+	} {
+		t.Run(tc.commands+"/"+tc.name.String(), func(t *testing.T) {
+			postWorkflowHooksSetup(t)
+			pull := testdata.Pull
+			pull.BaseRepo = testdata.GithubRepo
+			ctx := &command.Context{Pull: pull, HeadRepo: testdata.GithubRepo, Log: logging.NewNoopLogger(t), SuppressVCSStatus: true}
+			hook := &valid.WorkflowHook{RunCommand: "echo hook", Commands: tc.commands}
+			postWh.GlobalCfg = valid.GlobalCfg{Repos: []valid.Repo{{ID: testdata.GithubRepo.ID(), PostWorkflowHooks: []*valid.WorkflowHook{hook}}}}
+			When(postWhWorkingDirLocker.TryLock(Any[string](), Any[int](), Any[string](), Any[string](), Any[string](), Any[command.Name](), Any[events.WorkingDirLockMetadata]())).ThenReturn(func() {}, nil)
+			When(postWhWorkingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn("checkout", nil)
+			When(whPostWorkflowHookRunner.Run(Any[models.WorkflowHookCommandContext](), Any[string](), Any[string](), Any[string](), Any[string]())).ThenReturn("", "", nil)
+			Ok(t, postWh.RunPostHooks(ctx, &events.CommentCommand{Name: tc.name}))
+			if tc.want {
+				whPostWorkflowHookRunner.VerifyWasCalledOnce().Run(Any[models.WorkflowHookCommandContext](), Eq("echo hook"), Any[string](), Any[string](), Eq("checkout"))
+			} else {
+				whPostWorkflowHookRunner.VerifyWasCalled(Never()).Run(Any[models.WorkflowHookCommandContext](), Any[string](), Any[string](), Any[string](), Any[string]())
+			}
+		})
+	}
+}

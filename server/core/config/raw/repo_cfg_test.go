@@ -401,6 +401,9 @@ func TestConfig_ToValid(t *testing.T) {
 						PolicyCheck: valid.DefaultPolicyCheckStage,
 						Apply:       valid.DefaultApplyStage,
 						Import:      valid.DefaultImportStage,
+						Output:      valid.DefaultOutputStage,
+						StateList:   valid.DefaultStateListStage,
+						StateShow:   valid.DefaultStateShowStage,
 						StateRm:     valid.DefaultStateRmStage,
 					},
 				},
@@ -504,6 +507,9 @@ func TestConfig_ToValid(t *testing.T) {
 								},
 							},
 						},
+						Output:    valid.DefaultOutputStage,
+						StateList: valid.DefaultStateListStage,
+						StateShow: valid.DefaultStateShowStage,
 						StateRm: valid.Stage{
 							Steps: []valid.Step{
 								{

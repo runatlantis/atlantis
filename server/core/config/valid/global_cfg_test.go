@@ -58,6 +58,9 @@ func TestNewGlobalCfg(t *testing.T) {
 				},
 			},
 		},
+		Output:    valid.DefaultOutputStage,
+		StateList: valid.DefaultStateListStage,
+		StateShow: valid.DefaultStateShowStage,
 		StateRm: valid.Stage{
 			Steps: []valid.Step{
 				{
@@ -591,6 +594,9 @@ policies:
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Import:      valid.DefaultImportStage,
+					Output:      valid.DefaultOutputStage,
+					StateList:   valid.DefaultStateListStage,
+					StateShow:   valid.DefaultStateShowStage,
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
@@ -642,6 +648,9 @@ policies:
 					Plan:        valid.DefaultPlanStage,
 					PolicyCheck: valid.DefaultPolicyCheckStage,
 					Import:      valid.DefaultImportStage,
+					Output:      valid.DefaultOutputStage,
+					StateList:   valid.DefaultStateListStage,
+					StateShow:   valid.DefaultStateShowStage,
 					StateRm:     valid.DefaultStateRmStage,
 				},
 				PolicySets: valid.PolicySets{
@@ -703,6 +712,9 @@ func TestGlobalCfg_MergeProjectCfg(t *testing.T) {
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Plan:        valid.DefaultPlanStage,
 		Import:      valid.DefaultImportStage,
+		Output:      valid.DefaultOutputStage,
+		StateList:   valid.DefaultStateListStage,
+		StateShow:   valid.DefaultStateShowStage,
 		StateRm:     valid.DefaultStateRmStage,
 	}
 	cases := map[string]struct {
@@ -743,8 +755,11 @@ workflows:
 							},
 						},
 					},
-					Import:  valid.DefaultImportStage,
-					StateRm: valid.DefaultStateRmStage,
+					Import:    valid.DefaultImportStage,
+					Output:    valid.DefaultOutputStage,
+					StateList: valid.DefaultStateListStage,
+					StateShow: valid.DefaultStateShowStage,
+					StateRm:   valid.DefaultStateRmStage,
 				},
 				RepoRelDir:        ".",
 				Workspace:         "default",
@@ -1288,6 +1303,9 @@ func TestGlobalCfg_PolicyCheckOverride(t *testing.T) {
 		PolicyCheck: valid.DefaultPolicyCheckStage,
 		Plan:        valid.DefaultPlanStage,
 		Import:      valid.DefaultImportStage,
+		Output:      valid.DefaultOutputStage,
+		StateList:   valid.DefaultStateListStage,
+		StateShow:   valid.DefaultStateShowStage,
 		StateRm:     valid.DefaultStateRmStage,
 	}
 	cases := map[string]struct {

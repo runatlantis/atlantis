@@ -81,6 +81,9 @@ func TestSetupRoutes_ExperimentGates(t *testing.T) {
 	routes := []struct{ method, path, experiment string }{
 		{"POST", "/api/plan", "api"},
 		{"POST", "/api/apply", "api"},
+		{"POST", "/api/output", "api"},
+		{"POST", "/api/state/list", "api"},
+		{"POST", "/api/state/show", "api"},
 		{"GET", "/api/locks", "api"},
 		{"GET", "/api/drift/status", "drift-detection"},
 		{"POST", "/api/drift/detect", "drift-detection"},

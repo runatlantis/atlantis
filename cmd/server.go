@@ -19,6 +19,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server"
 	"github.com/runatlantis/atlantis/server/events"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
@@ -47,6 +48,7 @@ const (
 	ADTokenFlag                      = "azuredevops-token" // nolint: gosec
 	ADUserFlag                       = "azuredevops-user"
 	ADHostnameFlag                   = "azuredevops-hostname"
+	AllowAPICommandsFlag             = "allow-api-commands"
 	AllowCommandsFlag                = "allow-commands"
 	BlockedExtraArgsFlag             = "blocked-extra-args"
 	AllowForkPRsFlag                 = "allow-fork-prs"
@@ -209,6 +211,14 @@ const (
 	DefaultWebPassword                  = "atlantis"
 )
 
+var DefaultAllowAPICommands = func() string {
+	var names []string
+	for _, name := range command.DefaultAPICommands {
+		names = append(names, name.String())
+	}
+	return strings.Join(names, ",")
+}()
+
 var stringSliceFlags = map[string]stringSliceFlag{
 	ExperimentsFlag: {
 		description: "Server experiment permissions, separated by commas. Required for experimental feature settings and routes; activation settings still apply. See " + server.ExperimentsDocumentationURL + ".",
@@ -237,6 +247,10 @@ var stringFlags = map[string]stringFlag{
 	ADHostnameFlag: {
 		description:  "Azure DevOps hostname to support cloud and self hosted instances.",
 		defaultValue: "dev.azure.com",
+	},
+	AllowAPICommandsFlag: {
+		description:  "Comma separated list of allowed Terraform API commands: plan, apply, output, state_list, state_show, all, or none.",
+		defaultValue: DefaultAllowAPICommands,
 	},
 	AllowCommandsFlag: {
 		description:  "Comma separated list of acceptable atlantis commands.",
@@ -1001,6 +1015,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 	if c.CheckoutDepth <= 0 {
 		c.CheckoutDepth = DefaultCheckoutDepth
 	}
+	if c.AllowAPICommands == "" {
+		c.AllowAPICommands = DefaultAllowAPICommands
+	}
 	if c.AllowCommands == "" {
 		c.AllowCommands = DefaultAllowCommands
 	}
@@ -1224,6 +1241,10 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	_, patternErr := patternmatcher.New(strings.Split(userConfig.AutoplanFileList, ","))
 	if patternErr != nil {
 		return fmt.Errorf("invalid pattern in --%s, %s: %w", AutoplanFileListFlag, userConfig.AutoplanFileList, patternErr)
+	}
+
+	if _, err := userConfig.ToAllowAPICommandNames(); err != nil {
+		return fmt.Errorf("invalid --%s: %w", AllowAPICommandsFlag, err)
 	}
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {

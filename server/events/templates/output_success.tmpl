@@ -1,0 +1,13 @@
+{{ define "outputSuccessUnwrapped" -}}
+```text
+{{ if .Output }}{{ .Output }}{{ else }}No results.{{ end }}
+```
+{{ end -}}
+{{ define "outputSuccessWrapped" -}}
+<details><summary>Show output</summary>
+
+```text
+{{ if .Output }}{{ .Output }}{{ else }}No results.{{ end }}
+```
+</details>
+{{ end -}}
