@@ -17,6 +17,7 @@ The experimental web UI behind the `web-ui` experiment adds more actions and mor
 Constraints:
 
 - Atlantis may run as several replicas behind a load balancer. Today there is no shared session store, and [ADR 0005](0005-use-durable-storage-with-one-data-model.md) is still proposed.
+- Everyone who works with Atlantis already has an account on its VCS, and is usually signed in to it, often through the organization's single sign-on. Permissions for repositories already live in the VCS's organizations, teams, and groups, and Atlantis already uses GitHub teams and GitLab groups for its command allowlists. A second set of identity provider groups for Atlantis would have to be kept in step with them.
 - Organizations use different identity providers: Microsoft Entra ID, Google Workspace, Okta, Keycloak, Auth0, GitLab, GitHub, and AWS IAM Identity Center are the most common. IAM Identity Center supports only SAML for application sign-in.
 - Atlantis is a single binary configured through flags, environment variables, and YAML. A required extra service would be a large change for small installs.
 
@@ -28,7 +29,11 @@ Atlantis will sign people in to the web UI natively, give each person a role, an
 
 Operators choose one of two modes:
 
-- **Sign-in pages.** Atlantis redirects to an OpenID Connect provider, GitHub, or both. OIDC covers Entra ID, Google, Okta, Keycloak, Auth0, GitLab, Amazon Cognito, and Dex through one generic implementation using `coreos/go-oidc` and `golang.org/x/oauth2`. GitHub is not an OIDC provider, so it has its own OAuth implementation and requires an organization allowlist, because anyone can create a GitHub account. Organizations and teams become groups prefixed with `github:`, so a GitHub organization can never match another provider's group of the same name, and child-team membership counts for the parent team, as the existing team allowlist does.
+- **Sign-in pages.** Atlantis redirects to one or more providers. The recommended one is the VCS people already use, so roles follow the teams and groups already managed there:
+  - **GitHub** is not an OIDC provider, so it has its own OAuth implementation. Organizations and teams become groups like `github:acme/sre`, and child-team membership counts for the parent team, as the existing team allowlist does.
+  - **GitLab** and **Gitea** (including Forgejo) are OIDC providers on `--gitlab-hostname` and `--gitea-base-url`. GitLab groups become `gitlab:FULL/PATH`, as GitLab lists them, including subgroups of groups a person belongs to. Gitea organizations and teams become `gitea:ORG` and `gitea:ORG/TEAM`.
+  - Each VCS provider requires an allowlist of organizations or groups, because anyone can create an account on github.com or gitlab.com. Only the provider of a VCS may report groups with its prefix, so no identity provider group can pose as a VCS team, and a VCS group never matches another provider's group of the same name.
+  - **Other identity providers** use one generic OpenID Connect implementation, with `coreos/go-oidc` and `golang.org/x/oauth2`: Entra ID, Google, Okta, Keycloak, Auth0, Amazon Cognito, and Dex. Entra ID is the choice for Azure DevOps, whose users are Entra ID users. Bitbucket offers neither OpenID Connect nor a reliable way to read group membership with a user's token, so Bitbucket installs use an identity provider.
 - **An authenticating proxy.** Atlantis takes the identity from a proxy in front of it and verifies it on every request: the signed `x-amzn-oidc-data` header from an AWS Application Load Balancer, checked against the load balancer's ARN; the signed assertion from Google Cloud Identity-Aware Proxy, checked for audience and issuer; or plain headers, accepted only from configured networks. This mode covers IAM Identity Center through Cognito behind a load balancer.
 
 Atlantis will not implement SAML. Organizations that need it can use a provider that bridges SAML to OIDC, such as Cognito, Keycloak, or Dex.
@@ -39,9 +44,9 @@ There are three roles: viewer, operator, and admin. Each role includes the ones 
 
 Roles come from rules. Each rule matches exactly one of:
 
+- a VCS organization, team, or group (`github: ORG/TEAM`, `gitlab: GROUP/SUBGROUP`, `gitea: ORG/TEAM`)
+- a VCS user (`github_user`, `gitlab_user`, `gitea_user`), matched only for someone signed in with that VCS, so the same username on two VCSes is two people
 - an identity provider group
-- a GitHub organization or team (`github: ORG/TEAM`)
-- a GitHub user
 - a verified email address
 - an email domain
 - everyone who signed in
@@ -70,6 +75,7 @@ access:
       - group: platform-admins
     operator:
       - github: acme/sre
+      - gitlab: acme/platform
   default: none
   permissions:
     unlock: operator
@@ -90,7 +96,7 @@ repos:
 - **Per repository.** A `repos` entry can grant extra roles for matching repositories and require a different role there for the actions marked above. When several entries match, the last one that sets a requirement wins, as with other repo settings. Viewing, maintenance windows, and the apply lock cover the whole server, so they are set only at the top level; Atlantis rejects them on a `repos` entry.
 - **Policy only in the server config.** The policy lives only in the server-side config, never in a repository's `atlantis.yaml`, so a pull request cannot grant its author more access.
 - **Checked on every request.** The server checks the policy on every request and action, and the UI hides controls a person can't use. An action that covers several repositories, such as unlocking every lock of a pull request, is checked for each repository before anything changes. Each person's role is recomputed from the policy on every request, so policy changes apply without signing in again. Group membership is read at sign-in.
-- **PR comments.** With `enforce_in_pr_comments`, `atlantis unlock` comments follow the same unlock rule. They are matched against the commenter's VCS user and GitHub teams, because identity provider groups and emails aren't known for a comment. It is off by default, so existing comment behavior doesn't change.
+- **PR comments.** With `enforce_in_pr_comments`, `atlantis unlock` comments follow the same unlock rule. They are matched against the commenter's user and teams on the pull request's VCS: GitHub users and teams, or GitLab users and the groups in `--gitlab-group-allowlist`, because identity provider groups and emails aren't known for a comment. This is another reason to prefer VCS sign-in: the same rules then apply in the UI and in comments. It is off by default, so existing comment behavior doesn't change.
 - **Policy approvals.** Approving policies also requires being a policy owner as `policies.owners` already defines it. Atlantis matches the GitHub login and direct team memberships from a GitHub sign-in on the repository's host, and runs the same `approve_policies` command a comment would. People signed in another way are told to comment instead.
 - **Validation.** Atlantis validates the policy at startup and refuses mistakes such as a rule with two attributes or an unknown role. An Access page shows the policy in plain words and what the current person can do in each repository.
 
@@ -137,6 +143,7 @@ Sign-in ships behind the `web-ui` experiment and graduates with it under [ADR 00
 
 ### Alternatives considered
 
+- **Identity provider sign-in only.** One OIDC integration covers most providers, but people would have to be put in identity provider groups again for Atlantis, and those groups can't be checked for PR comments. Identity providers stay supported for VCSes without sign-in and for people outside the VCS organization.
 - **Require an external proxy only.** Simplest for Atlantis, but every install needs another component, and plain header trust is unsafe unless the network is locked down. The proxy mode keeps this option for those who already run one.
 - **Embed Dex.** Covers SAML, LDAP, and Google groups, but adds a large dependency set, its own storage, and another service surface to the binary.
 - **Server-side sessions.** Allow instant revocation, but need a store shared by every replica. Revisit when durable storage is accepted.
@@ -147,7 +154,7 @@ Sign-in ships behind the `web-ui` experiment and graduates with it under [ADR 00
 
 ## Consequences
 
-Operators can use their existing identity provider, limit what each person can do globally or per repository, apply the same unlock rule to PR comments, and see who discarded a plan, stopped a job, or locked applies. Small installs need no new services, and installs that don't configure `access` keep today's behavior.
+Operators can let people sign in with the VCS account they already use, or with their identity provider, limit what each person can do globally or per repository, apply the same unlock rule to PR comments, and see who discarded a plan, stopped a job, or locked applies. Small installs need no new services, and installs that don't configure `access` keep today's behavior.
 
 Atlantis takes on `coreos/go-oidc`, `go-jose`, and a direct dependency on `golang.org/x/oauth2`, and must keep its OIDC and OAuth handling current.
 
@@ -157,4 +164,6 @@ Google Workspace groups are not available natively, because Google does not incl
 
 The `/api` endpoints keep their API secret, and the JSON endpoints under `/ui` are read-only. API tokens tied to a person, and changing state through those endpoints, need their own decision.
 
-Comment enforcement can only use VCS identities. A person who is an operator through an identity provider group but not through a GitHub team can unlock in the UI but not by comment.
+Comment enforcement can only use VCS identities. A person who is an operator through an identity provider group but not through a VCS team or group can unlock in the UI but not by comment. On Bitbucket and Azure DevOps, comments match only `everyone: true` rules.
+
+Approving policies from the UI needs GitHub sign-in for now, because policy owners are matched by GitHub login and team. GitLab owners can still approve by comment.
