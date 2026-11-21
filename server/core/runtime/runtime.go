@@ -46,9 +46,9 @@ type TerraformExec interface {
 //
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_async_tfexec.go AsyncTFExec
 type AsyncTFExec interface {
-	// RunCommandAsync runs terraform with args. It immediately returns an
-	// input and output channel. Callers can use the output channel to
-	// get the realtime output from the command.
+	// RunCommandAsync prepares terraform and acquires any shared plugin-cache
+	// lock, then returns an input and output channel. Callers can use the
+	// output channel to get the realtime output from the command.
 	// Callers can use the input channel to pass stdin input to the command.
 	// If any error is passed on the out channel, there will be no
 	// further output (so callers are free to exit).

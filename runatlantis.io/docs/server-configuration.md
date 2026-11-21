@@ -1720,6 +1720,8 @@ This flag is useful when having multiple projects that need to run a plan and ap
 
 The effect of the race condition is more evident when using parallel configuration to run plan and apply. Disabling the use of plugin cache will impact the performance when starting a new plan or apply, but in large Atlantis deployments with multiple projects and shared modules the use of `--parallel_plan` and `--parallel_apply` is mandatory for an efficient management of the PRs.
 
+> **Note:** Atlantis coordinates access to the shared plugin cache itself: `terraform init` (the only command that writes provider binaries into the cache) takes an exclusive lock on a `.atlantis.lock` file inside the plugin cache directory, while every other command (plan, apply, ...) takes a shared lock. This prevents the "text file busy" / corrupt provider binary errors that occur when many parallel project plans share one plugin cache (see [issue #2242](https://github.com/runatlantis/atlantis/issues/2242)), while keeping plans and applies running in parallel. The lock is an advisory file lock (`flock` on Unix, `LockFileEx` on Windows) inside the data dir, so it also coordinates multiple Atlantis processes sharing the same cache directory on the same host; it is not reliable across all network file systems, in which case the cache directory should be local to each Atlantis instance.
+
 ### `--var-file-allowlist`
 
 ```bash
