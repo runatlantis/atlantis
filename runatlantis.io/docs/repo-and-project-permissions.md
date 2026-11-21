@@ -60,6 +60,20 @@ with other systems or business requirements.  An example would be allowing
 users to apply changes to lower environments like dev and test environments
 while restricting changes to production or other sensitive environments.
 
+Atlantis runs the command as `<command> <args...> <atlantis command> <repo> <teams...>`.
+The configured `command` and `args` are interpreted by `sh`. The Atlantis command
+name, the repository full name, and each `<owner>/<team>` value are passed as
+separate arguments after any configured `args`, and are never parsed as shell
+source. With no configured `args`, the script receives the Atlantis command as
+`$1`, the repository as `$2`, and the teams from `$3` on. Each configured `args`
+entry shifts these positions by one: with `args: ["--mode", "strict"]`, the
+Atlantis command is `$3` and the repository is `$4`.
+
+Repository and project names come from the VCS host and can contain spaces or
+shell metacharacters, so always quote the repository argument in your script
+(for example `REPO="$2"` when no `args` are configured), and do not pass it to
+`eval` or `sh -c`.
+
 ::: warning
 These options are mutually exclusive.  If an external command is defined,
 the `--gh-team-allowlist` option is ignored.
