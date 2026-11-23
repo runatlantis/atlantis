@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -322,6 +323,94 @@ func TestClient_MergePull(t *testing.T) {
 				ErrContains(t, c.expErr, err)
 				ErrContains(t, "unable to merge merge request, it may not be in a mergeable state", err)
 			}
+		})
+	}
+}
+
+func TestClient_MergePull_Squash(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	mergeSuccess, err := os.ReadFile("testdata/pull-request.json")
+	Ok(t, err)
+
+	withFields := func(t *testing.T, file string, fields map[string]any) []byte {
+		raw, err := os.ReadFile(file)
+		Ok(t, err)
+		var m map[string]any
+		Ok(t, json.Unmarshal(raw, &m))
+		maps.Copy(m, fields)
+		out, err := json.Marshal(m)
+		Ok(t, err)
+		return out
+	}
+
+	cases := []struct {
+		description   string
+		mrSquash      bool
+		squashOnMerge bool
+		squashOption  string
+		expSquash     *bool
+	}{
+		{"project requires squash", false, true, "always", gitlab.Ptr(true)},
+		{"squash_on_merge missing, project requires squash", false, false, "always", gitlab.Ptr(true)},
+		{"MR squashes on merge", true, true, "default_off", gitlab.Ptr(true)},
+		{"project never squashes", true, false, "never", nil},
+		{"no squash", false, false, "default_off", nil},
+	}
+
+	for _, c := range cases {
+		t.Run(c.description, func(t *testing.T) {
+			mrResp := withFields(t, "testdata/pipeline-success.json", map[string]any{
+				"squash":          c.mrSquash,
+				"squash_on_merge": c.squashOnMerge,
+			})
+			projectResp := withFields(t, "testdata/project-success.json", map[string]any{
+				"squash_option": c.squashOption,
+			})
+
+			var mergeBody struct {
+				Squash *bool `json:"squash"`
+			}
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1/merge":
+						err := json.NewDecoder(r.Body).Decode(&mergeBody)
+						Ok(t, err)
+						defer r.Body.Close() // nolint: errcheck
+						w.WriteHeader(http.StatusOK)
+						w.Write(mergeSuccess) // nolint: errcheck
+					case "/api/v4/projects/runatlantis%2Fatlantis/merge_requests/1":
+						w.WriteHeader(http.StatusOK)
+						w.Write(mrResp) // nolint: errcheck
+					case "/api/v4/projects/4580910":
+						w.WriteHeader(http.StatusOK)
+						w.Write(projectResp) // nolint: errcheck
+					case "/api/v4/":
+						w.WriteHeader(http.StatusOK)
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			defer testServer.Close()
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+			client := &Client{Client: internalClient}
+
+			err = client.MergePull(
+				logger,
+				models.PullRequest{
+					Num: 1,
+					BaseRepo: models.Repo{
+						FullName: "runatlantis/atlantis",
+						Owner:    "runatlantis",
+						Name:     "atlantis",
+					},
+				}, models.PullRequestOptions{})
+			Ok(t, err)
+
+			Equals(t, c.expSquash, mergeBody.Squash)
 		})
 	}
 }
