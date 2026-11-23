@@ -15,14 +15,14 @@ import (
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_external_team_allowlist_runner.go ExternalTeamAllowlistRunner
 type ExternalTeamAllowlistRunner interface {
-	Run(ctx models.TeamAllowlistCheckerContext, shell, shellArgs, command string) (string, error)
+	// Run executes shell with args directly, without further shell parsing of args.
+	Run(ctx models.TeamAllowlistCheckerContext, shell string, args []string) (string, error)
 }
 
 type DefaultExternalTeamAllowlistRunner struct{}
 
-func (r DefaultExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell, shellArgs, command string) (string, error) {
-	shellArgsSlice := append(strings.Split(shellArgs, " "), command)
-	cmd := exec.CommandContext(context.TODO(), shell, shellArgsSlice...) // #nosec
+func (r DefaultExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell string, args []string) (string, error) {
+	cmd := exec.CommandContext(context.TODO(), shell, args...) // #nosec
 
 	baseEnvVars := os.Environ()
 	customEnvVars := map[string]string{
@@ -52,7 +52,7 @@ func (r DefaultExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerC
 	out, err := cmd.CombinedOutput()
 
 	if err != nil {
-		err = fmt.Errorf("%s: running %q: \n%s", err, shell+" "+shellArgs+" "+command, out)
+		err = fmt.Errorf("running %q %q: %w\n%s", shell, args, err, out)
 		ctx.Log.Debug("error: %s", err)
 		return string(out), err
 	}
