@@ -202,7 +202,8 @@ func TestAutoplan_PanicDuringLiveHeadFetchReleasesPullLock(t *testing.T) {
 		Ok(t, lockErr)
 	case <-time.After(500 * time.Millisecond):
 		locker.UnlockByPull(repo.FullName, 1)
-		<-later
+		lockErr := <-later
+		Ok(t, lockErr)
 		t.Fatal("panic during live-head fetch leaked the pull lock; a later autoplan stayed blocked until UnlockByPull")
 	}
 }
@@ -440,14 +441,14 @@ func TestApply_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
 // It is expected to pass; a leftover lock or a blocked waiter is a failure.
 func TestWorkingDirLocker_StressAutoplanWaitersAndSharedApplies(t *testing.T) {
 	const repo = "owner/repo"
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		locker := NewDefaultWorkingDirLocker()
 		unlock, err := locker.TryLockPull(repo, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: "base"})
 		Ok(t, err)
 
 		var wg sync.WaitGroup
 		wg.Add(8)
-		for n := 0; n < 8; n++ {
+		for n := range 8 {
 			sha := fmt.Sprintf("sha-%d-%d", i, n)
 			go func() {
 				defer wg.Done()
