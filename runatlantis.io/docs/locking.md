@@ -72,8 +72,9 @@ apply to the earlier commit.
 If you push several commits while a plan is running, only one autoplan waits, and it plans the latest
 head. The autoplans it replaces stop without running workflow hooks or posting comments or statuses.
 
-The waiting autoplan also stops without posting anything if the pull request is closed, someone runs
-`atlantis cancel`, Atlantis starts shutting down, or the pull request's current head can't be fetched.
+The waiting autoplan stops without posting anything if the pull request is closed, someone runs
+`atlantis cancel`, or Atlantis starts shutting down. If the pull request's current head can't be fetched,
+Atlantis posts a failed plan status and comment instead of silently dropping the plan.
 
 Targeted applies (`atlantis apply -d`, `-p` or `-w`) for the same commit can run at the same time,
 because each one only touches the projects it names. Two applies of the same project still can't run

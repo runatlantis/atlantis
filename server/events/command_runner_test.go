@@ -3003,10 +3003,10 @@ func (l *notifyingAutoplanLocker) LockPullAfterStalePlan(repo string, num int, n
 	})
 }
 
-type fixedAutoplanHead string
+type fixedAutoplanIdentity models.PullRequest
 
-func (h fixedAutoplanHead) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
-	return models.PullRequest{HeadCommit: string(h)}, nil
+func (p fixedAutoplanIdentity) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
+	return models.PullRequest(p), nil
 }
 
 func awaitAutoplanSignal(t *testing.T, signal <-chan struct{}) {
@@ -3018,20 +3018,33 @@ func awaitAutoplanSignal(t *testing.T, signal <-chan struct{}) {
 	}
 }
 
-func TestRunAutoplanCommand_WaitsBeforeHooksAndUsesLiveHead(t *testing.T) {
+func TestRunAutoplanCommand_WaitsBeforeHooksAndRefreshesPull(t *testing.T) {
 	locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
 	setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
-	planCommandRunner.LivePullHeadFetcher = fixedAutoplanHead("live")
-	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event", BaseBranch: "main"}
+	livePull := modelPull
+	livePull.HeadCommit = "live"
+	livePull.BaseBranch = "release"
+	planCommandRunner.LivePullHeadFetcher = fixedAutoplanIdentity(livePull)
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{plannedProjectResult("stale", "default", "stale")})
+	Ok(t, err)
 	unlockOld, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
 	Ok(t, err)
 	unlockWorkspace, err := locker.TryLock(modelPull.BaseRepo.FullName, modelPull.Num, "default", ".", "", command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
 	Ok(t, err)
 	ch.FailOnPreWorkflowHookError = true
 	hooks := make(chan struct{}, 2)
+	assertFreshContext := func(ctx *command.Context) {
+		Equals(t, livePull.HeadCommit, ctx.Pull.HeadCommit)
+		Equals(t, livePull.BaseBranch, ctx.Pull.BaseBranch)
+		Assert(t, ctx.PullStatus != nil, "expected pull status to be refreshed after waiting")
+		Equals(t, livePull.HeadCommit, ctx.PullStatus.Pull.HeadCommit)
+		Equals(t, livePull.BaseBranch, ctx.PullStatus.Pull.BaseBranch)
+		Equals(t, "fresh", ctx.PullStatus.Projects[0].ProjectName)
+	}
 	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
 		ctx := args[0].(*command.Context)
-		Equals(t, "live", ctx.Pull.HeadCommit)
+		assertFreshContext(ctx)
 		unlock, err := locker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, "default", ".", "", command.Plan, events.WorkingDirLockMetadataForPull(ctx.Pull))
 		if err == nil {
 			unlock()
@@ -3040,11 +3053,14 @@ func TestRunAutoplanCommand_WaitsBeforeHooksAndUsesLiveHead(t *testing.T) {
 		return ReturnValues{err}
 	})
 	When(postWorkflowHooksCommandRunner.RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func(args []Param) ReturnValues {
-		Equals(t, "live", args[0].(*command.Context).Pull.HeadCommit)
+		assertFreshContext(args[0].(*command.Context))
 		hooks <- struct{}{}
 		return ReturnValues{nil}
 	})
-	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).Then(func(args []Param) ReturnValues {
+		assertFreshContext(args[0].(*command.Context))
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
 	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(t.TempDir(), nil)
 	done := make(chan struct{})
 	go func() {
@@ -3053,12 +3069,12 @@ func TestRunAutoplanCommand_WaitsBeforeHooksAndUsesLiveHead(t *testing.T) {
 	}()
 	awaitAutoplanSignal(t, locker.waiting)
 	Equals(t, 0, len(hooks))
+	_, err = dbUpdater.Database.UpdatePullWithResults(livePull, []command.ProjectResult{plannedProjectResult("fresh", "default", "fresh")})
+	Ok(t, err)
 	unlockWorkspace()
 	unlockOld()
 	awaitAutoplanSignal(t, done)
 	Equals(t, 2, len(hooks))
-	livePull := modelPull
-	livePull.HeadCommit = "live"
 	pullReqStatusFetcher.VerifyWasCalledOnce().FetchPullStatus(Any[logging.SimpleLogging](), Eq(livePull))
 	for _, cmd := range []command.Name{command.Plan, command.PolicyCheck, command.Apply} {
 		commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(livePull), Eq(models.SuccessCommitStatus), Eq(cmd), Eq(models.ProjectCounts{}))
@@ -3066,7 +3082,64 @@ func TestRunAutoplanCommand_WaitsBeforeHooksAndUsesLiveHead(t *testing.T) {
 	status, err := dbUpdater.Database.GetPullStatus(livePull)
 	Ok(t, err)
 	Assert(t, status != nil, "expected empty state for live head")
-	Equals(t, "live", status.Pull.HeadCommit)
+	Equals(t, livePull.HeadCommit, status.Pull.HeadCommit)
+	Equals(t, livePull.BaseBranch, status.Pull.BaseBranch)
+}
+
+func TestRunAutoplanCommand_ShutdownDuringPreHooksCompletesAdmittedPlan(t *testing.T) {
+	setup(t)
+	planCommandRunner.Drainer = drainer
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
+	shutdownDone := make(chan struct{})
+	When(preWorkflowHooksCommandRunner.RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())).Then(func([]Param) ReturnValues {
+		go func() {
+			drainer.ShutdownBlocking()
+			close(shutdownDone)
+		}()
+		deadline := time.After(5 * time.Second)
+		for !drainer.GetStatus().ShuttingDown {
+			select {
+			case <-deadline:
+				t.Fatal("timed out waiting for shutdown to start")
+			default:
+				time.Sleep(time.Millisecond)
+			}
+		}
+		return ReturnValues{nil}
+	})
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(t.TempDir(), nil)
+
+	ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+	awaitAutoplanSignal(t, shutdownDone)
+	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
+	postWorkflowHooksCommandRunner.(*mocks.MockPostWorkflowHooksCommandRunner).VerifyWasCalledOnce().RunPostHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+}
+
+func TestRunAutoplanCommand_LiveHeadFetchFailureIsReported(t *testing.T) {
+	locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
+	client := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
+	planCommandRunner.LivePullHeadFetcher = autoplanHeadFetcherFunc(func(command.ProjectContext) (models.PullRequest, error) {
+		return models.PullRequest{}, errors.New("vcs unavailable")
+	})
+	unlockOld, err := locker.TryLockPull(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+	done := make(chan struct{})
+	go func() {
+		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, modelPull, testdata.User)
+		close(done)
+	}()
+	awaitAutoplanSignal(t, locker.waiting)
+	unlockOld()
+	awaitAutoplanSignal(t, done)
+
+	commitUpdater.VerifyWasCalledOnce().UpdateCombined(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	_, _, _, comment, _ := client.VerifyWasCalledOnce().CreateComment(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(modelPull.Num), Any[string](), Any[string]()).GetCapturedArguments()
+	Assert(t, strings.Contains(comment, "fetching live pull request: vcs unavailable"), "unexpected failure comment: %s", comment)
+	preWorkflowHooksCommandRunner.(*mocks.MockPreWorkflowHooksCommandRunner).VerifyWasCalled(Never()).RunPreHooks(Any[*command.Context](), Any[*events.CommentCommand]())
+	projectCommandBuilder.VerifyWasCalled(Never()).BuildAutoplanCommands(Any[*command.Context]())
 }
 
 func TestRunAutoplanCommand_SupersededAndCancelledWaitersSkipHooks(t *testing.T) {

@@ -392,9 +392,6 @@ func (p *PlanCommandRunner) RunAutoplanWithHooks(ctx *command.Context, before fu
 	if before != nil && !before() {
 		return
 	}
-	if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
-		return
-	}
 	p.runAutoplan(ctx)
 	if after != nil {
 		after()
@@ -468,37 +465,64 @@ func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCo
 		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
 			return nil, false
 		}
-		liveHead, ok := p.livePullHead(ctx)
-		if !ok {
+		livePull, err := p.livePullIdentity(ctx)
+		if err != nil {
+			if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+				return nil, false
+			}
+			if !lock.Start() {
+				return nil, false
+			}
+			p.handleNoProjectPlanStateError(ctx, cmd, fmt.Errorf("fetching live pull request: %w", err))
 			return nil, false
 		}
-		ctx.Pull.HeadCommit = liveHead
+		if livePull.State == models.ClosedPullState {
+			return nil, false
+		}
+		ctx.Pull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			ctx.Pull.BaseBranch = livePull.BaseBranch
+		}
 		if !lock.UpdateMetadata(WorkingDirLockMetadataForPull(ctx.Pull)) {
 			return nil, false
 		}
+		if p.pullStatusFetcher != nil {
+			pullStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+			if err != nil {
+				if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+					return nil, false
+				}
+				if !lock.Start() {
+					return nil, false
+				}
+				p.handleNoProjectPlanStateError(ctx, cmd, fmt.Errorf("fetching current pull status: %w", err))
+				return nil, false
+			}
+			ctx.PullStatus = pullStatus
+		}
+		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+			return nil, false
+		}
 	}
-	if (p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown) || !lock.Start() {
+	if !lock.Start() {
 		return nil, false
 	}
 	handedOff = true
 	return lock.Unlock, true
 }
 
-// livePullHead returns the pull request's current head commit from the VCS.
-// It returns false if the head cannot be fetched.
-func (p *PlanCommandRunner) livePullHead(ctx *command.Context) (string, bool) {
+func (p *PlanCommandRunner) livePullIdentity(ctx *command.Context) (models.PullRequest, error) {
 	if p.LivePullHeadFetcher == nil {
-		return "", false
+		return models.PullRequest{}, errors.New("live pull request fetcher is not configured")
 	}
-	livePull, err := p.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{Log: ctx.Log, Pull: ctx.Pull})
+	livePull, err := p.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{Log: ctx.Log, Pull: ctx.Pull, PullStatus: ctx.PullStatus})
 	if err != nil {
-		ctx.Log.Warn("unable to fetch live head for pull request %d: %s", ctx.Pull.Num, err)
-		return "", false
+		return models.PullRequest{}, err
 	}
-	if livePull.HeadCommit == "" || livePull.State == models.ClosedPullState {
-		return "", false
+	if livePull.State != models.ClosedPullState && livePull.HeadCommit == "" {
+		return models.PullRequest{}, errors.New("live pull request head is empty")
 	}
-	return livePull.HeadCommit, true
+	return livePull, nil
 }
 
 func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {

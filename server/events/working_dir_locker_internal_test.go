@@ -13,6 +13,7 @@ import (
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -418,17 +419,36 @@ func TestPlanCommandRunnerAutoplanPlansLiveHeadAfterWaiting(t *testing.T) {
 	Equals(t, 1, fetcher.calls)
 }
 
-func TestPlanCommandRunnerAutoplanStopsWhenLiveHeadUnavailable(t *testing.T) {
-	for _, fetcher := range []*stubLivePullHeadFetcher{nil, {err: errors.New("boom")}, {}} {
-		locker := NewDefaultWorkingDirLocker()
-		runner := &PlanCommandRunner{workingDirLocker: locker}
-		if fetcher != nil {
-			runner.LivePullHeadFetcher = fetcher
-		}
-		_, _, ok := runAutoplanLockBehindStalePlan(t, runner, locker)
-		Assert(t, !ok, "must not plan an unverified event head")
-		_, locked := pullLockHeadCommit(locker, "owner/repo", 1)
-		Assert(t, !locked, "expected pull lock to be released")
+func TestPlanCommandRunnerAutoplanReportsUnavailableLiveHead(t *testing.T) {
+	for name, fetcher := range map[string]*stubLivePullHeadFetcher{
+		"not configured": nil,
+		"fetch error":    {err: errors.New("boom")},
+		"empty head":     {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			locker := NewDefaultWorkingDirLocker()
+			statuses := &issue7050StatusRecorder{}
+			comments := &issue7050CommentClient{NotConfiguredVCSClient: &vcs.NotConfiguredVCSClient{}}
+			runner := &PlanCommandRunner{
+				workingDirLocker:    locker,
+				commitStatusUpdater: statuses,
+				pullUpdater: &PullUpdater{
+					VCSClient:        comments,
+					MarkdownRenderer: NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
+				},
+			}
+			if fetcher != nil {
+				runner.LivePullHeadFetcher = fetcher
+			}
+			_, _, ok := runAutoplanLockBehindStalePlan(t, runner, locker)
+			Assert(t, !ok, "must not plan an unverified event head")
+			_, locked := pullLockHeadCommit(locker, "owner/repo", 1)
+			Assert(t, !locked, "expected pull lock to be released")
+			updates := statuses.snapshot()
+			Equals(t, 1, len(updates))
+			Equals(t, models.FailedCommitStatus, updates[0].status)
+			Equals(t, 1, len(comments.snapshot()))
+		})
 	}
 }
 
@@ -548,17 +568,17 @@ func TestAutoplanFreeLockSupersedesPreviousWaiter(t *testing.T) {
 	}
 }
 
-func TestPlanCommandRunnerAutoplanShutdownDuringPreHooks(t *testing.T) {
+func TestPlanCommandRunnerAdmittedAutoplanCanLockDuringShutdown(t *testing.T) {
 	locker := NewDefaultWorkingDirLocker()
 	drainer := &Drainer{}
+	drainer.ShutdownBlocking()
 	runner := &PlanCommandRunner{workingDirLocker: locker, Drainer: drainer}
 	ctx := &command.Context{Log: logging.NewNoopLogger(t), Pull: models.PullRequest{BaseRepo: models.Repo{FullName: "owner/repo"}, Num: 1, HeadCommit: "new"}, Trigger: command.AutoTrigger}
-	runner.RunAutoplanWithHooks(ctx, func() bool {
-		drainer.ShutdownBlocking()
-		return true
-	}, func() { t.Fatal("post hooks must not run for skipped plan") })
+	unlock, ok := runner.lockPullForPlan(ctx, AutoplanCommand{})
+	Assert(t, ok, "an autoplan already admitted by the drainer must continue")
+	unlock()
 	_, locked := pullLockHeadCommit(locker, "owner/repo", 1)
-	Assert(t, !locked, "shutdown must release plan lock")
+	Assert(t, !locked, "completed plan must release its lock")
 }
 
 func TestPlanCommandRunnerAutoplanCancellationDuringLiveHeadFetch(t *testing.T) {
