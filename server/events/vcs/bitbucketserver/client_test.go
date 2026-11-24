@@ -143,6 +143,77 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	Equals(t, []string{"file1.txt", "file2.txt", "file3.txt"}, files)
 }
 
+func TestClient_PullIsMergeable(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := map[string]struct {
+		MergeStatus  string
+		ExpMergeable models.MergeableStatus
+	}{
+		"mergeable": {
+			MergeStatus: `{"canMerge": true, "conflicted": false, "outcome": "CLEAN", "vetoes": []}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		"not mergeable without vetoes": {
+			MergeStatus: `{"canMerge": false, "conflicted": false}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+			},
+		},
+		"merge conflict": {
+			MergeStatus: `{"canMerge": false, "conflicted": true, "outcome": "CONFLICTED", "vetoes": []}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Has conflicts",
+			},
+		},
+		"merge conflict and vetoes": {
+			MergeStatus: `{"canMerge": false, "conflicted": true, "outcome": "CONFLICTED", "vetoes": [
+				{"summaryMessage": "First veto", "detailedMessage": "First details"},
+				{"summaryMessage": "Second veto", "detailedMessage": "Second details"}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Has conflicts; First veto; Second veto",
+			},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge":
+					w.Write([]byte(c.MergeStatus)) // nolint: errcheck
+					return
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+					return
+				}
+			}))
+			defer testServer.Close()
+
+			client, err := bitbucketserver.NewClient(http.DefaultClient, "user", "pass", testServer.URL, "runatlantis.io")
+			Ok(t, err)
+
+			actMergeable, err := client.PullIsMergeable(
+				logger,
+				models.Repo{
+					FullName:          "owner/repo",
+					Owner:             "owner",
+					Name:              "repo",
+					SanitizedCloneURL: fmt.Sprintf("%s/scm/ow/repo.git", testServer.URL),
+				}, models.PullRequest{
+					Num: 1,
+				}, "atlantis-test", []string{})
+			Ok(t, err)
+			Equals(t, c.ExpMergeable, actMergeable)
+		})
+	}
+}
+
 // Test that we use the correct version parameter in our call to merge the pull
 // request.
 func TestClient_MergePull(t *testing.T) {

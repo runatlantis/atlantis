@@ -79,4 +79,8 @@ type Changes struct {
 type MergeStatus struct {
 	CanMerge   *bool `json:"canMerge,omitempty" validate:"required"`
 	Conflicted *bool `json:"conflicted,omitempty" validate:"required"`
+	// Vetoes are the merge checks that are preventing the merge.
+	Vetoes []struct {
+		SummaryMessage string `json:"summaryMessage,omitempty"`
+	} `json:"vetoes,omitempty"`
 }

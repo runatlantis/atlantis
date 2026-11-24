@@ -234,11 +234,9 @@ including the pull request being a draft.
 
 #### Bitbucket Server (Stash)
 
-For Bitbucket Server, we just check if there is a conflict that is preventing a
-merge. We don't check anything else because Bitbucket's API doesn't support it.
-
-If you need a specific check, please
-[open an issue](https://github.com/runatlantis/atlantis/issues/new).
+For Bitbucket Server, a pull request is mergeable if it has no conflicts and no
+[merge check](https://confluence.atlassian.com/bitbucketserver/checks-for-merging-pull-requests-776640039.html)
+is vetoing the merge.
 
 #### Azure DevOps
 

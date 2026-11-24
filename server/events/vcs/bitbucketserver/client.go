@@ -259,8 +259,16 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			IsMergeable: true,
 		}, nil
 	}
+	var reasons []string
+	if *mergeStatus.Conflicted {
+		reasons = append(reasons, "Has conflicts")
+	}
+	for _, veto := range mergeStatus.Vetoes {
+		reasons = append(reasons, veto.SummaryMessage)
+	}
 	return models.MergeableStatus{
 		IsMergeable: false,
+		Reason:      strings.Join(reasons, "; "),
 	}, nil
 }
 
