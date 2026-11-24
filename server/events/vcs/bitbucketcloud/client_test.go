@@ -308,6 +308,14 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				IsMergeable: true,
 			},
 		},
+		"atlantis user not allowed to merge": {
+			Checks: `{"values": [
+				{"type": "current_user_permission_check", "status": "FAILED", "required": true, "blocking": true}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
 		"merge conflict": {
 			Checks: `{"values": [
 				{"type": "pullrequest_state_check", "status": "PASSED", "required": true, "blocking": false, "state": "OPEN"},
@@ -326,7 +334,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 			]}`,
 			ExpMergeable: models.MergeableStatus{
 				IsMergeable: false,
-				Reason:      "Blocked by current_user_permission_check, minimum_approvals, My check",
+				Reason:      "Blocked by minimum_approvals, My check",
 			},
 		},
 		"draft": {

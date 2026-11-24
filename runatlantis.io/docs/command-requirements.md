@@ -209,7 +209,8 @@ For Bitbucket Cloud, a pull request is mergeable if none of the checks returned 
 Bitbucket's [mergeability checks API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/#api-repositories-workspace-repo-slug-pullrequests-pull-request-id-mergeability-checks-get)
 are blocking the merge. This covers conflicts, the merge checks configured in the repository
 (e.g. approvals, builds and unresolved tasks), custom merge checks and the merge queue.
-Failed checks that Bitbucket doesn't enforce are ignored.
+Failed checks that Bitbucket doesn't enforce are ignored. Atlantis itself doesn't need to be
+allowed to merge.
 
 ::: warning Behavior change
 Previously, only conflicts were checked. Now, any check that is blocking the merge prevents the apply too,

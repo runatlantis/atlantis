@@ -309,6 +309,9 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		switch {
 		case !*check.Blocking:
 			continue
+		case *check.Type == "current_user_permission_check":
+			// The pull request can be mergeable even if we are not allowed to merge it.
+			continue
 		case check.State == "DRAFT":
 			blockers = append(blockers, check.State)
 		case check.Check.Kind == "failed_builds" || check.Check.Kind == "in_progress_builds":
