@@ -381,6 +381,38 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      "Blocked by failed_builds, in_progress_builds",
 			},
 		},
+		"builds blocked by ignored atlantis": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "ignored/plan", "state": "INPROGRESS"}, {"key": "ignored/apply: p1", "state": "FAILED"}, {"key": "atlantis/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		"builds blocked by ignored atlantis and plan status": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "ignored/apply", "state": "FAILED"}, {"key": "atlantis/plan", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
+		"builds blocked by atlantis with similar name": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "ignored-not/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
 		"builds blocked by another atlantis": {
 			Checks: `{"values": [
 				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
@@ -463,7 +495,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 					},
 				}, models.PullRequest{
 					Num: 1,
-				}, "atlantis", []string{})
+				}, "atlantis", []string{"ignored"})
 			if c.ExpErr != "" {
 				ErrContains(t, c.ExpErr, err)
 				return

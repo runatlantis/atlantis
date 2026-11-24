@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -289,7 +290,7 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 
 // PullIsMergeable returns true if none of Bitbucket's mergeability checks are
 // blocking the merge of the pull request.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	// This endpoint is not paginated.
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/mergeability/checks", b.BaseURL, repo.FullName, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
@@ -318,11 +319,11 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 	if len(buildBlockers) > 0 {
 		// Our own apply statuses must not prevent us from applying again.
-		onlyApply, err := b.onlyApplyStatusesUnsuccessful(repo, pull, vcsstatusname)
+		onlyIgnored, err := b.onlyIgnoredStatusesUnsuccessful(repo, pull, vcsstatusname, ignoreVCSStatusNames)
 		if err != nil {
 			return models.MergeableStatus{}, err
 		}
-		if !onlyApply {
+		if !onlyIgnored {
 			blockers = append(blockers, buildBlockers...)
 		}
 	}
@@ -337,9 +338,10 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}, nil
 }
 
-// onlyApplyStatusesUnsuccessful returns true if there are unsuccessful commit
-// statuses in the pull request and all of them are Atlantis apply statuses.
-func (b *Client) onlyApplyStatusesUnsuccessful(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+// onlyIgnoredStatusesUnsuccessful returns true if there are unsuccessful commit
+// statuses in the pull request and all of them are either our apply statuses or
+// from the ignored Atlantis services.
+func (b *Client) onlyIgnoredStatusesUnsuccessful(repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
 	// The key may have been truncated by UpdateStatus.
 	applyPrefix := fmt.Sprintf("%.*s", truncatedStatusKeyLength, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String()))
 	found := false
@@ -362,7 +364,8 @@ func (b *Client) onlyApplyStatusesUnsuccessful(repo models.Repo, pull models.Pul
 			if *status.State == "SUCCESSFUL" {
 				continue
 			}
-			if !strings.HasPrefix(*status.Key, applyPrefix) {
+			statusName, _, _ := strings.Cut(*status.Key, "/")
+			if !strings.HasPrefix(*status.Key, applyPrefix) && !slices.Contains(ignoreVCSStatusNames, statusName) {
 				return false, nil
 			}
 			found = true
