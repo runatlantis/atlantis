@@ -41,6 +41,26 @@ type DiffStatFile struct {
 	Path *string `json:"path,omitempty" validate:"required"`
 }
 
+type MergeabilityChecks struct {
+	Values []MergeabilityCheck `json:"values,omitempty" validate:"required,dive"`
+}
+type MergeabilityCheck struct {
+	Type *string `json:"type,omitempty" validate:"required"`
+	// Blocking is whether this check currently prevents the merge. A failed
+	// check is not necessarily blocking.
+	Blocking *bool `json:"blocking,omitempty" validate:"required"`
+	// State is only set for pull request state checks.
+	State string `json:"state,omitempty"`
+	// Reason is only set for git mergeability checks.
+	Reason string `json:"reason,omitempty"`
+	// Check is only set for standard merge checks, which have a kind, and
+	// custom merge checks, which have a name.
+	Check struct {
+		Kind string `json:"kind,omitempty"`
+		Name string `json:"name,omitempty"`
+	} `json:"check"`
+}
+
 type Actor struct {
 	AccountID *string `json:"account_id,omitempty" validate:"required"`
 	UUID      *string `json:"uuid,omitempty"`

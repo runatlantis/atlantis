@@ -62,7 +62,7 @@
 
 **VCS provider:** Create `server/events/vcs/<provider>/` → Implement `Client` interface (`server/events/vcs/common/common.go`) → Update `server/server.go`
 
-**VCS pagination:** When following provider-returned pagination links, validate the next URL against the configured provider API origin before issuing the request. Bitbucket Cloud diffstat pagination uses this guard in both modified-file and mergeability checks.
+**VCS pagination:** When following provider-returned pagination links, validate the next URL against the configured provider API origin before issuing the request. Bitbucket Cloud diffstat pagination uses this guard when getting modified files.
 
 **Config changes:** Edit `server/core/config/valid/` or `raw/` → Update `server/user_config.go` → Test in `server/core/config/*_test.go`
 **i18n changes:** Keep command routing/template selection keyed on stable command identifiers (`command.Name`), and use localized titles only for display text.

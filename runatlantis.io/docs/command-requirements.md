@@ -203,9 +203,28 @@ For Jobs with allow_failure setting set to true, will be ignored. If the pipelin
 
 For per-project `atlantis apply` commands, Atlantis scopes GitLab's `mergeable` requirement to the project being applied when GitLab reports blocking commit statuses. Atlantis ignores blocking Atlantis plan statuses from other projects in the same merge request, but the project's own plan status and any non-Atlantis blocker still prevent the apply.
 
-#### Bitbucket.org (Bitbucket Cloud) and Bitbucket Server (Stash)
+#### Bitbucket.org (Bitbucket Cloud)
 
-For Bitbucket, we just check if there is a conflict that is preventing a
+For Bitbucket Cloud, a pull request is mergeable if none of the checks returned by
+Bitbucket's [mergeability checks API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/#api-repositories-workspace-repo-slug-pullrequests-pull-request-id-mergeability-checks-get)
+are blocking the merge. This covers conflicts, the merge checks configured in the repository
+(e.g. approvals, builds and unresolved tasks), custom merge checks and the merge queue.
+Failed checks that Bitbucket doesn't enforce are ignored.
+
+::: warning Behavior change
+Previously, only conflicts were checked. Now, any check that is blocking the merge prevents the apply too,
+including the pull request being a draft.
+:::
+
+::: warning
+
+* A pull request that is a draft or is already in the merge queue is not mergeable.
+
+:::
+
+#### Bitbucket Server (Stash)
+
+For Bitbucket Server, we just check if there is a conflict that is preventing a
 merge. We don't check anything else because Bitbucket's API doesn't support it.
 
 If you need a specific check, please

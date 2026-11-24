@@ -8,6 +8,7 @@ package bitbucketcloud
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -276,38 +277,38 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 	return pull, nil
 }
 
-// PullIsMergeable returns true if the merge request has no conflicts and can be merged.
+// PullIsMergeable returns true if none of Bitbucket's mergeability checks are
+// blocking the merge of the pull request.
 func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
-	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
-	// We'll only loop 1000 times as a safety measure.
-	maxLoops := 1000
-	for range maxLoops {
-		resp, err := b.makeRequest("GET", nextPageURL, nil)
-		if err != nil {
-			return models.MergeableStatus{}, err
+	// This endpoint is not paginated.
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/mergeability/checks", b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	var checks MergeabilityChecks
+	if err := json.Unmarshal(resp, &checks); err != nil {
+		return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(checks); err != nil {
+		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	var blockers []string
+	for _, check := range checks.Values {
+		switch {
+		case !*check.Blocking:
+			continue
+		case check.State == "DRAFT":
+			blockers = append(blockers, check.State)
+		default:
+			blockers = append(blockers, cmp.Or(check.Check.Kind, check.Check.Name, check.Reason, *check.Type))
 		}
-		var diffStat DiffStat
-		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
-		}
-		if err := validator.New().Struct(diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
-		}
-		for _, v := range diffStat.Values {
-			// These values are undocumented, found via manual testing.
-			if *v.Status == "merge conflict" || *v.Status == "local deleted" {
-				return models.MergeableStatus{
-					IsMergeable: false,
-				}, nil
-			}
-		}
-		if diffStat.Next == nil || *diffStat.Next == "" {
-			break
-		}
-		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("checking pull mergeability: %w", err)
-		}
-		nextPageURL = *diffStat.Next
+	}
+	if len(blockers) > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Blocked by %s", strings.Join(blockers, ", ")),
+		}, nil
 	}
 	return models.MergeableStatus{
 		IsMergeable: true,
