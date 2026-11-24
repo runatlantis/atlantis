@@ -306,8 +306,11 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	}
 	var blockers, buildBlockers []string
 	for _, check := range checks.Values {
+		// Bitbucket couldn't determine whether there are conflicts, so we can't
+		// assume there are none.
+		unknownConflicts := *check.Type == "git_mergeability_check" && *check.Status == "UNKNOWN"
 		switch {
-		case !*check.Blocking:
+		case !*check.Blocking && !unknownConflicts:
 			continue
 		case *check.Type == "current_user_permission_check":
 			// The pull request can be mergeable even if we are not allowed to merge it.

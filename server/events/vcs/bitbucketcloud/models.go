@@ -45,7 +45,8 @@ type MergeabilityChecks struct {
 	Values []MergeabilityCheck `json:"values,omitempty" validate:"required,dive"`
 }
 type MergeabilityCheck struct {
-	Type *string `json:"type,omitempty" validate:"required"`
+	Type   *string `json:"type,omitempty" validate:"required"`
+	Status *string `json:"status,omitempty" validate:"required"`
 	// Blocking is whether this check currently prevents the merge. A failed
 	// check is not necessarily blocking.
 	Blocking *bool `json:"blocking,omitempty" validate:"required"`

@@ -228,6 +228,7 @@ including the pull request being a draft.
 * Failed plans count as failed builds, so avoid `mergeable` in `plan_requirements` if the
   repository enforces the builds merge checks.
 * A pull request that is a draft or is already in the merge queue is not mergeable.
+* If Bitbucket can't determine whether there are conflicts, the pull request is not mergeable.
 
 :::
 

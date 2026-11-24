@@ -326,6 +326,15 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      "Blocked by conflicts",
 			},
 		},
+		"unknown conflicts": {
+			Checks: `{"values": [
+				{"type": "git_mergeability_check", "status": "UNKNOWN", "required": true, "blocking": false}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by git_mergeability_check",
+			},
+		},
 		"multiple blocking checks": {
 			Checks: `{"values": [
 				{"type": "current_user_permission_check", "status": "FAILED", "required": true, "blocking": true},
