@@ -5,6 +5,7 @@ package bitbucketcloud_test
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +22,7 @@ import (
 const (
 	diffstatURL     = "/2.0/repositories/owner/repo/pullrequests/1/diffstat"
 	mergeabilityURL = "/2.0/repositories/owner/repo/pullrequests/1/mergeability/checks"
+	statusesURL     = "/2.0/repositories/owner/repo/pullrequests/1/statuses"
 )
 
 // Should follow pagination properly.
@@ -283,6 +285,7 @@ func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		Checks       string
+		Statuses     string
 		Status       int
 		ExpMergeable models.MergeableStatus
 		ExpErr       string
@@ -335,6 +338,79 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      "Blocked by DRAFT",
 			},
 		},
+		"builds blocked by apply statuses": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "atlantis/plan", "state": "SUCCESSFUL"}, {"key": "atlantis/apply", "state": "INPROGRESS"}, {"key": "atlantis/apply: p1", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: true,
+			},
+		},
+		"builds blocked by apply statuses and another check": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "resolved_tasks"}}
+			]}`,
+			Statuses: `{"values": [{"key": "atlantis/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by resolved_tasks",
+			},
+		},
+		"builds blocked by plan status": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "atlantis/plan", "state": "FAILED"}, {"key": "atlantis/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
+		"builds blocked by another build": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "ci", "state": "STOPPED"}, {"key": "atlantis/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
+		"builds blocked by another atlantis": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "other/apply", "state": "FAILED"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
+		"builds blocked but all statuses successful": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "atlantis/apply", "state": "SUCCESSFUL"}]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds, in_progress_builds",
+			},
+		},
+		"missing status state": {
+			Checks: `{"values": [
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},
+				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "in_progress_builds"}}
+			]}`,
+			Statuses: `{"values": [{"key": "atlantis/apply"}]}`,
+			ExpErr:   "was missing fields",
+		},
 		"missing values": {
 			Checks: `{}`,
 			ExpErr: "was missing fields",
@@ -358,6 +434,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 						w.WriteHeader(c.Status)
 					}
 					w.Write([]byte(c.Checks)) // nolint: errcheck
+					return
+				case statusesURL:
+					w.Write([]byte(c.Statuses)) // nolint: errcheck
 					return
 				default:
 					t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -394,6 +473,115 @@ func TestClient_PullIsMergeable(t *testing.T) {
 		})
 	}
 
+}
+
+// Should recognize the apply statuses even if UpdateStatus truncated their keys.
+func TestClient_PullIsMergeableTruncatedStatuses(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := []struct {
+		nameLength   int
+		failed       string
+		expMergeable bool
+	}{
+		{nameLength: 8, failed: "apply", expMergeable: true},
+		{nameLength: 8, failed: "plan", expMergeable: false},
+		{nameLength: bitbucketcloud.MaxVCSStatusNameLength, failed: "apply", expMergeable: true},
+		{nameLength: bitbucketcloud.MaxVCSStatusNameLength, failed: "plan", expMergeable: false},
+		{nameLength: bitbucketcloud.MaxVCSStatusNameLength, failed: "policy_check", expMergeable: false},
+		{nameLength: bitbucketcloud.MaxVCSStatusNameLength, failed: "pre_workflow_hook", expMergeable: false},
+	}
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("%d characters and failed %s", c.nameLength, c.failed), func(t *testing.T) {
+			var statuses []string
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case "/2.0/repositories/owner/repo/commit/sha/statuses/build":
+					body, err := io.ReadAll(r.Body)
+					Ok(t, err)
+					statuses = append(statuses, string(body))
+				case mergeabilityURL:
+					w.Write([]byte(`{"values": [{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}}]}`)) // nolint: errcheck
+				case statusesURL:
+					fmt.Fprintf(w, `{"values": [%s]}`, strings.Join(statuses, ",")) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+			defer testServer.Close()
+
+			client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+			client.BaseURL = testServer.URL
+			repo := models.Repo{FullName: "owner/repo"}
+			pull := models.PullRequest{Num: 1, HeadCommit: "sha"}
+			name := strings.Repeat("a", c.nameLength)
+
+			for _, suffix := range []string{"", ": a/long/project/directory"} {
+				Ok(t, client.UpdateStatus(logger, repo, pull, models.FailedCommitStatus, fmt.Sprintf("%s/%s%s", name, c.failed, suffix), "", ""))
+			}
+
+			actMergeable, err := client.PullIsMergeable(logger, repo, pull, name, []string{})
+			Ok(t, err)
+			Equals(t, c.expMergeable, actMergeable.IsMergeable)
+		})
+	}
+}
+
+// Should follow the pagination of the commit statuses properly, and reject next
+// page URLs from a different origin to prevent SSRF.
+func TestClient_PullIsMergeableStatusesPagination(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+	cases := map[string]struct {
+		NextOrigin   string
+		ExpMergeable models.MergeableStatus
+		ExpErr       string
+	}{
+		"same origin": {
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by failed_builds",
+			},
+		},
+		"different origin": {
+			NextOrigin: "http://internal.evil.host",
+			ExpErr:     "does not match base URL origin",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			nextOrigin := c.NextOrigin
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.RequestURI {
+				case mergeabilityURL:
+					w.Write([]byte(`{"values": [{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}}]}`)) // nolint: errcheck
+				case statusesURL:
+					fmt.Fprintf(w, `{"values": [{"key": "atlantis/apply", "state": "FAILED"}], "next": "%s%s?page=2"}`, nextOrigin, statusesURL) // nolint: errcheck
+				case statusesURL + "?page=2":
+					w.Write([]byte(`{"values": [{"key": "ci", "state": "FAILED"}]}`)) // nolint: errcheck
+				default:
+					t.Errorf("got unexpected request at %q", r.RequestURI)
+					http.Error(w, "not found", http.StatusNotFound)
+				}
+			}))
+			defer testServer.Close()
+			if nextOrigin == "" {
+				nextOrigin = testServer.URL
+			}
+
+			client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+			client.BaseURL = testServer.URL
+
+			actMergeable, err := client.PullIsMergeable(logger, models.Repo{FullName: "owner/repo"}, models.PullRequest{Num: 1}, "atlantis", []string{})
+			if c.ExpErr != "" {
+				ErrContains(t, c.ExpErr, err)
+				return
+			}
+			Ok(t, err)
+			Equals(t, c.ExpMergeable, actMergeable)
+		})
+	}
 }
 
 // TestClient_GetModifiedFiles_SSRFPrevented verifies that a malicious "next"

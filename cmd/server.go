@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -1174,6 +1175,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
+	}
+
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL &&
+		utf8.RuneCountInString(userConfig.VCSStatusName) > bitbucketcloud.MaxVCSStatusNameLength {
+		return fmt.Errorf("--%s cannot be longer than %d characters when using Bitbucket Cloud, got %q", VCSStatusName, bitbucketcloud.MaxVCSStatusNameLength, userConfig.VCSStatusName)
 	}
 
 	parsed, err = url.Parse(userConfig.GiteaBaseURL)

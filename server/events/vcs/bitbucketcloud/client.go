@@ -20,12 +20,22 @@ import (
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const BaseURL = "https://api.bitbucket.org"
+
+// truncatedStatusKeyLength is how much of a commit status key is kept when it is
+// truncated.
+const truncatedStatusKeyLength = 37
+
+// MaxVCSStatusNameLength is the maximum length of the VCS status name that still
+// allows telling the apply statuses apart from the others ("/a" from "/p") when
+// their keys are truncated.
+const MaxVCSStatusNameLength = truncatedStatusKeyLength - len("/a")
 
 type Client struct {
 	httpClient  *http.Client
@@ -279,7 +289,7 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 
 // PullIsMergeable returns true if none of Bitbucket's mergeability checks are
 // blocking the merge of the pull request.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	// This endpoint is not paginated.
 	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/mergeability/checks", b.BaseURL, repo.FullName, pull.Num)
 	resp, err := b.makeRequest("GET", path, nil)
@@ -293,15 +303,27 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if err := validator.New().Struct(checks); err != nil {
 		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
-	var blockers []string
+	var blockers, buildBlockers []string
 	for _, check := range checks.Values {
 		switch {
 		case !*check.Blocking:
 			continue
 		case check.State == "DRAFT":
 			blockers = append(blockers, check.State)
+		case check.Check.Kind == "failed_builds" || check.Check.Kind == "in_progress_builds":
+			buildBlockers = append(buildBlockers, check.Check.Kind)
 		default:
 			blockers = append(blockers, cmp.Or(check.Check.Kind, check.Check.Name, check.Reason, *check.Type))
+		}
+	}
+	if len(buildBlockers) > 0 {
+		// Our own apply statuses must not prevent us from applying again.
+		onlyApply, err := b.onlyApplyStatusesUnsuccessful(repo, pull, vcsstatusname)
+		if err != nil {
+			return models.MergeableStatus{}, err
+		}
+		if !onlyApply {
+			blockers = append(blockers, buildBlockers...)
 		}
 	}
 	if len(blockers) > 0 {
@@ -313,6 +335,47 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	return models.MergeableStatus{
 		IsMergeable: true,
 	}, nil
+}
+
+// onlyApplyStatusesUnsuccessful returns true if there are unsuccessful commit
+// statuses in the pull request and all of them are Atlantis apply statuses.
+func (b *Client) onlyApplyStatusesUnsuccessful(repo models.Repo, pull models.PullRequest, vcsstatusname string) (bool, error) {
+	// The key may have been truncated by UpdateStatus.
+	applyPrefix := fmt.Sprintf("%.*s", truncatedStatusKeyLength, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String()))
+	found := false
+	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/statuses", b.BaseURL, repo.FullName, pull.Num)
+	// We'll only loop 1000 times as a safety measure.
+	maxLoops := 1000
+	for range maxLoops {
+		resp, err := b.makeRequest("GET", nextPageURL, nil)
+		if err != nil {
+			return false, err
+		}
+		var statuses CommitStatuses
+		if err := json.Unmarshal(resp, &statuses); err != nil {
+			return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
+		}
+		if err := validator.New().Struct(statuses); err != nil {
+			return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+		}
+		for _, status := range statuses.Values {
+			if *status.State == "SUCCESSFUL" {
+				continue
+			}
+			if !strings.HasPrefix(*status.Key, applyPrefix) {
+				return false, nil
+			}
+			found = true
+		}
+		if statuses.Next == nil || *statuses.Next == "" {
+			return found, nil
+		}
+		if err := b.validateNextPageURL(*statuses.Next); err != nil {
+			return false, fmt.Errorf("getting commit statuses: %w", err)
+		}
+		nextPageURL = *statuses.Next
+	}
+	return false, nil
 }
 
 // UpdateStatus updates the status of a commit.
@@ -337,7 +400,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 	// Ensure key has at most 40 characters
 	if utf8.RuneCountInString(src) > 40 {
-		src = fmt.Sprintf("%.37s...", src)
+		src = fmt.Sprintf("%.*s...", truncatedStatusKeyLength, src)
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{

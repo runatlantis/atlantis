@@ -218,6 +218,11 @@ including the pull request being a draft.
 
 ::: warning
 
+* Bitbucket counts the Atlantis commit statuses as builds. Atlantis ignores failed and in
+  progress builds if they are all from `atlantis apply`, so Bitbucket may still prevent the
+  merge until the apply succeeds.
+* Failed plans count as failed builds, so avoid `mergeable` in `plan_requirements` if the
+  repository enforces the builds merge checks.
 * A pull request that is a draft or is already in the merge queue is not mergeable.
 
 :::

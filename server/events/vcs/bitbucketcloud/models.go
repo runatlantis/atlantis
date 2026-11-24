@@ -61,6 +61,15 @@ type MergeabilityCheck struct {
 	} `json:"check"`
 }
 
+type CommitStatuses struct {
+	Values []CommitStatus `json:"values,omitempty" validate:"required,dive"`
+	Next   *string        `json:"next,omitempty"`
+}
+type CommitStatus struct {
+	Key   *string `json:"key,omitempty" validate:"required"`
+	State *string `json:"state,omitempty" validate:"required"`
+}
+
 type Actor struct {
 	AccountID *string `json:"account_id,omitempty" validate:"required"`
 	UUID      *string `json:"uuid,omitempty"`

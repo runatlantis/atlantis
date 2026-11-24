@@ -1755,6 +1755,12 @@ Name used to identify Atlantis when updating a pull request status. Defaults to 
 This is useful when running multiple Atlantis servers against a single repository so you can
 give each Atlantis server its own unique name to prevent the statuses clashing.
 
+::: warning Behavior change
+Previously, the name could have any length. Now, when using Bitbucket Cloud, Atlantis refuses to start if
+the name is longer than 35 characters, since it truncates the statuses there and would not be able to tell
+the plan and apply ones apart.
+:::
+
 ### `--web-basic-auth`
 
 ```bash
