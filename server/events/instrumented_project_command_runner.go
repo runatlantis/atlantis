@@ -5,6 +5,7 @@ package events
 
 import (
 	"github.com/runatlantis/atlantis/server/events/command"
+	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/metrics"
 	tally "github.com/uber-go/tally/v4"
 )
@@ -47,6 +48,14 @@ func (p *InstrumentedProjectCommandRunner) PolicyCheck(ctx command.ProjectContex
 
 func (p *InstrumentedProjectCommandRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
 	return RunAndEmitStats(ctx, p.projectCommandRunner.Apply, p.scope)
+}
+
+func (p *InstrumentedProjectCommandRunner) PublishDeferredApplyStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	publisher, ok := p.projectCommandRunner.(DeferredApplyStatusPublisher)
+	if !ok {
+		return
+	}
+	publisher.PublishDeferredApplyStatuses(projectCmds, result, status)
 }
 
 func (p *InstrumentedProjectCommandRunner) ApprovePolicies(ctx command.ProjectContext) command.ProjectCommandOutput {
@@ -93,4 +102,10 @@ func RunAndEmitStats(ctx command.ProjectContext, execute func(ctx command.Projec
 	executionSuccess.Inc(1)
 	return result
 
+}
+
+func (p *InstrumentedProjectCommandRunner) PublishDeferredPlanStatuses(projectCmds []command.ProjectContext, result command.Result, status models.CommitStatus) {
+	if publisher, ok := p.projectCommandRunner.(DeferredPlanStatusPublisher); ok {
+		publisher.PublishDeferredPlanStatuses(projectCmds, result, status)
+	}
 }

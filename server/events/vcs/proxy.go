@@ -52,6 +52,10 @@ func (d *ClientProxy) GetModifiedFiles(logger logging.SimpleLogging, repo models
 	return d.clients[repo.VCSHost.Type].GetModifiedFiles(logger, repo, pull)
 }
 
+func (d *ClientProxy) IsAtlantisUser(repo models.Repo, user models.User) (bool, error) {
+	return d.clients[repo.VCSHost.Type].IsAtlantisUser(repo, user)
+}
+
 func (d *ClientProxy) CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error {
 	return d.clients[repo.VCSHost.Type].CreateComment(logger, repo, pullNum, comment, command)
 }
@@ -106,4 +110,8 @@ func (d *ClientProxy) GetCloneURL(logger logging.SimpleLogging, VCSHostType mode
 
 func (d *ClientProxy) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error) {
 	return d.clients[repo.VCSHost.Type].GetPullLabels(logger, repo, pull)
+}
+
+func (d *ClientProxy) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	return d.clients[repo.VCSHost.Type].GetChildTeams(logger, repo, teamSlug)
 }

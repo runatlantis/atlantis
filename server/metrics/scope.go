@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cactus/go-statsd-client/v5/statsd"
+	"github.com/cactus/go-statsd-client/v6/statsd"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/logging"
 	tally "github.com/uber-go/tally/v4"
@@ -74,5 +74,5 @@ func newStatsReporter(cfg valid.Metrics) (tally.StatsReporter, error) {
 		return nil, fmt.Errorf("initializing statsd client: %w", err)
 	}
 
-	return tallystatsd.NewReporter(client, tallystatsd.Options{}), nil
+	return tallystatsd.NewReporter(newStatsdV6StatterAdapter(client), tallystatsd.Options{}), nil
 }

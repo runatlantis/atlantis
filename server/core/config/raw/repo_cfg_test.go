@@ -48,7 +48,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.RepoCfg",
+			expErr: "yaml: construct errors: line 1: field invalid not found in type raw.RepoCfg",
 		},
 		{
 			description: "version set to 2",
@@ -94,7 +94,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!map into []raw.Project",
+			expErr: "yaml: construct errors: line 2: cannot construct !!map into []raw.Project",
 		},
 		{
 			description: "projects with a scalar",
@@ -104,7 +104,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `value` into []raw.Project",
+			expErr: "yaml: construct errors: line 1: cannot construct !!str `value` into []raw.Project",
 		},
 		{
 			description: "automerge not a boolean",
@@ -114,7 +114,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+			expErr: "yaml: construct errors: line 2: cannot construct !!str `notabool` into bool",
 		},
 		{
 			description: "parallel apply not a boolean",
@@ -124,7 +124,7 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 				Projects:  nil,
 				Workflows: nil,
 			},
-			expErr: "yaml: unmarshal errors:\n  line 2: cannot unmarshal !!str `notabool` into bool",
+			expErr: "yaml: construct errors: line 2: cannot construct !!str `notabool` into bool",
 		},
 		{
 			description: "should use values if set",
@@ -518,7 +518,7 @@ func TestConfig_ToValid(t *testing.T) {
 						Dir:       "mydir",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},

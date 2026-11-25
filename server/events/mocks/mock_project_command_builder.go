@@ -159,6 +159,21 @@ func (mock *MockProjectCommandBuilder) BuildVersionCommands(ctx *command.Context
 	return _ret0, _ret1
 }
 
+func (mock *MockProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Context, comment *events.CommentCommand) bool {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	_params := []pegomock.Param{ctx, comment}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("ShouldIgnoreTargetedDir", _params, []reflect.Type{reflect.TypeOf((*bool)(nil)).Elem()})
+	var _ret0 bool
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(bool)
+		}
+	}
+	return _ret0
+}
+
 func (mock *MockProjectCommandBuilder) VerifyWasCalledOnce() *VerifierMockProjectCommandBuilder {
 	return &VerifierMockProjectCommandBuilder{
 		mock:                   mock,
@@ -417,6 +432,41 @@ func (c *MockProjectCommandBuilder_BuildVersionCommands_OngoingVerification) Get
 }
 
 func (c *MockProjectCommandBuilder_BuildVersionCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *command.Context, comment *events.CommentCommand) *MockProjectCommandBuilder_ShouldIgnoreTargetedDir_OngoingVerification {
+	_params := []pegomock.Param{ctx, comment}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "ShouldIgnoreTargetedDir", _params, verifier.timeout)
+	return &MockProjectCommandBuilder_ShouldIgnoreTargetedDir_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_ShouldIgnoreTargetedDir_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_ShouldIgnoreTargetedDir_OngoingVerification) GetCapturedArguments() (*command.Context, *events.CommentCommand) {
+	ctx, comment := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], comment[len(comment)-1]
+}
+
+func (c *MockProjectCommandBuilder_ShouldIgnoreTargetedDir_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 []*events.CommentCommand) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {

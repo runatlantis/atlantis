@@ -218,3 +218,21 @@ func TestPreWorkflowHookRunner_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestPreWorkflowHookRunnerSuppressesJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	tmpDir := t.TempDir()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	r := runtime.DefaultPreWorkflowHookRunner{OutputHandler: projectCmdOutputHandler}
+
+	ctx := models.WorkflowHookCommandContext{
+		Log:               logger,
+		CommandName:       "plan",
+		SuppressJobOutput: true,
+	}
+	_, _, err := r.Run(ctx, "echo hidden", "sh", "-c", tmpDir)
+
+	Ok(t, err)
+	projectCmdOutputHandler.VerifyWasCalled(Never()).SendWorkflowHook(Any[models.WorkflowHookCommandContext](), Any[string](), Any[bool]())
+}

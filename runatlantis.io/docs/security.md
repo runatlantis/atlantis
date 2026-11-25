@@ -66,8 +66,9 @@ To prevent this, you could:
 The files on your Atlantis install may be accessible as [variable definition files](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files)
 from pull requests by adding  
 `atlantis plan -- -var-file=/path/to/file` comments. To mitigate this security risk, Atlantis has limited such access
-only to the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
-Atlantis' data directory.
+only to the files in the repository and the files allowlisted by the `--var-file-allowlist` flag. If this argument is not provided, it defaults to
+Atlantis' data directory. The check covers every comment command that accepts extra args and resolves symbolic links in the
+cloned repository. See [--var-file-allowlist](server-configuration.md#var-file-allowlist).
 
 ### Webhook Secrets
 

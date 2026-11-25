@@ -33,7 +33,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -56,7 +56,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -75,7 +75,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -86,7 +86,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -116,7 +116,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -127,7 +127,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -150,7 +150,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -161,7 +161,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},
@@ -180,7 +180,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 						Workspace:        "myworkspace",
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -203,7 +203,7 @@ func TestConfig_FindProjectsByDir(t *testing.T) {
 					Workspace:        "myworkspace",
 					TerraformVersion: tfVersion,
 					Autoplan: valid.Autoplan{
-						WhenModified: raw.DefaultAutoPlanWhenModified,
+						WhenModified: raw.DefaultAutoPlanWhenModified(),
 						Enabled:      false,
 					},
 					ApplyRequirements: []string{"approved"},

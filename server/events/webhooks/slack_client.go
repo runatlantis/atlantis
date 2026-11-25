@@ -7,12 +7,17 @@ package webhooks
 import (
 	"fmt"
 
+	"github.com/rivo/uniseg"
 	"github.com/slack-go/slack"
 )
 
 const (
 	slackSuccessColour = "good"
 	slackFailureColour = "danger"
+	// maxDescriptionGraphemeClusters is a readability cap for the pull request
+	// description, counted in user-visible grapheme clusters. It includes the
+	// trailing ellipsis when the description is truncated.
+	maxDescriptionGraphemeClusters = 1000
 )
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_slack_client.go SlackClient
@@ -22,6 +27,7 @@ type SlackClient interface {
 	AuthTest() error
 	TokenIsSet() bool
 	PostMessage(channel string, applyResult ApplyResult) error
+	PostDriftMessage(channel string, driftResult DriftResult) error
 }
 
 //go:generate go tool pegomock generate --package mocks -o mocks/mock_underlying_slack_client.go UnderlyingSlackClient
@@ -66,6 +72,56 @@ func (d *DefaultSlackClient) PostMessage(channel string, applyResult ApplyResult
 	return err
 }
 
+func (d *DefaultSlackClient) PostDriftMessage(channel string, driftResult DriftResult) error {
+	attachment := d.createDriftAttachment(driftResult)
+	_, _, err := d.Slack.PostMessage(
+		channel,
+		slack.MsgOptionAsUser(true),
+		slack.MsgOptionText("", false),
+		slack.MsgOptionAttachments(attachment),
+	)
+	return err
+}
+
+func (d *DefaultSlackClient) createDriftAttachment(result DriftResult) slack.Attachment {
+	var colour string
+	var text string
+	if result.ProjectsWithDrift > 0 {
+		colour = slackFailureColour
+		text = fmt.Sprintf("Drift detected in %s", result.Repository)
+	} else {
+		colour = slackSuccessColour
+		text = fmt.Sprintf("No drift in %s", result.Repository)
+	}
+
+	return slack.Attachment{
+		Color: colour,
+		Text:  text,
+		Fields: []slack.AttachmentField{
+			{
+				Title: "Repository",
+				Value: result.Repository,
+				Short: true,
+			},
+			{
+				Title: "Ref",
+				Value: result.Ref,
+				Short: true,
+			},
+			{
+				Title: "Projects with drift",
+				Value: fmt.Sprintf("%d / %d", result.ProjectsWithDrift, result.TotalProjects),
+				Short: true,
+			},
+			{
+				Title: "Detection ID",
+				Value: result.DetectionID,
+				Short: true,
+			},
+		},
+	}
+}
+
 func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.Attachment {
 	var colour string
 	var successWord string
@@ -95,7 +151,7 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 			},
 			{
 				Title: "Branch",
-				Value: applyResult.Pull.BaseBranch,
+				Value: applyResult.Pull.HeadBranch,
 				Short: true,
 			},
 			{
@@ -110,5 +166,47 @@ func (d *DefaultSlackClient) createAttachments(applyResult ApplyResult) []slack.
 			},
 		},
 	}
+
+	// Include the pull request description when present, rendered as a
+	// full-width field and truncated so a long description can't exceed Slack's
+	// message size limits.
+	if applyResult.Pull.Body != "" {
+		attachment.Fields = append(attachment.Fields, slack.AttachmentField{
+			Title: "Description",
+			Value: truncateGraphemeClusters(applyResult.Pull.Body, maxDescriptionGraphemeClusters),
+			Short: false,
+		})
+	}
+
 	return []slack.Attachment{attachment}
+}
+
+// truncateGraphemeClusters returns s unchanged when it has at most max
+// grapheme clusters. Otherwise it is cut at a cluster boundary to max-1
+// clusters with an ellipsis appended. It walks the string without allocating a
+// slice for the whole input.
+func truncateGraphemeClusters(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+
+	count := 0
+	keepUntil := 0
+	offset := 0
+	state := -1
+	rest := s
+	for len(rest) > 0 {
+		cluster, remaining, _, nextState := uniseg.FirstGraphemeClusterInString(rest, state)
+		if count == max-1 {
+			keepUntil = offset
+		}
+		if count == max {
+			return s[:keepUntil] + "…"
+		}
+		offset += len(cluster)
+		rest = remaining
+		state = nextState
+		count++
+	}
+	return s
 }

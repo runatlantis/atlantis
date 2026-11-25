@@ -8,3 +8,6 @@ https://gitlab.com/gitlab-org/gitlab/-/blob/master/fixtures/emojis/digests.json
 
 # These sites intermittently time out for the link checker
 https://grafana.com/docs/pyroscope/
+
+# ADR routes are generated; VitePress validates them against the route inventory.
+/contributing/adr/

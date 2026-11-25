@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/i18n"
 	"github.com/runatlantis/atlantis/server/logging"
 	. "github.com/runatlantis/atlantis/testing"
 )
@@ -65,7 +67,7 @@ func TestRenderErr(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -97,6 +99,132 @@ func TestRenderErr(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRenderWorkingDirLockMetadata(t *testing.T) {
+	const sha = "0123456789abcdef0123456789abcdef01234567"
+	const commitURL = "https://github.com/owner/repo/commit/" + sha
+	const jobURL = "https://atlantis.example.com/jobs/job-id"
+	metadata := events.WorkingDirLockMetadata{HeadCommit: sha, CommitURL: commitURL, JobURL: jobURL}
+	newLockError := func(ownerMetadata events.WorkingDirLockMetadata) error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLock("owner/repo", 1, "default", ".", "project", command.Plan, ownerMetadata)
+		Ok(t, err)
+		_, err = locker.TryLock("owner/repo", 1, "default", ".", "project", command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newMultipleJobsLockError := func() error {
+		locker := events.NewDefaultWorkingDirLocker()
+		_, err := locker.TryLockPull("owner/repo", 1, command.Plan, metadata)
+		Ok(t, err)
+		for i, url := range []string{jobURL + "-1", jobURL + "-2"} {
+			_, err = locker.TryLock("owner/repo", 1, "default", ".", fmt.Sprintf("project-%d", i), command.Plan, events.WorkingDirLockMetadata{HeadCommit: sha, JobURL: url})
+			Ok(t, err)
+		}
+		_, err = locker.TryLockPull("owner/repo", 1, command.Apply, events.WorkingDirLockMetadata{})
+		return err
+	}
+	newRenderer := func(language string) *events.MarkdownRenderer {
+		return events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+	}
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{BaseRepo: models.Repo{VCSHost: models.VCSHost{Type: models.Github}}},
+	}
+	ctx.Log.Info("log output")
+
+	t.Run("command error renders links before log", func(t *testing.T) {
+		rendered := newRenderer("en").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan, Verbose: true})
+		commitLink := "- Commit: [" + sha + "](" + commitURL + ")"
+		jobLink := "- Blocking job: [View Atlantis execution](" + jobURL + ")"
+		for _, text := range []string{"```\ncannot run", commitLink + "\n" + jobLink, "<details><summary>Log</summary>"} {
+			if !strings.Contains(rendered, text) {
+				t.Fatalf("expected %q in:\n%s", text, rendered)
+			}
+		}
+		if strings.Index(rendered, "```") >= strings.Index(rendered, commitLink) || strings.Index(rendered, commitLink) >= strings.Index(rendered, jobLink) || strings.Index(rendered, jobLink) >= strings.Index(rendered, "<details><summary>Log</summary>") {
+			t.Fatalf("unexpected command error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("link fallbacks are independent", func(t *testing.T) {
+		shaOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{HeadCommit: sha})}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(shaOnly, "for commit 0123456") || strings.Contains(shaOnly, "for commit "+sha) || strings.Contains(shaOnly, "- Commit:") || strings.Contains(shaOnly, "- Blocking job:") {
+			t.Fatalf("unexpected SHA-only fallback:\n%s", shaOnly)
+		}
+		jobOnly := newRenderer("en").Render(ctx, command.Result{Error: newLockError(events.WorkingDirLockMetadata{JobURL: jobURL})}, &events.CommentCommand{Name: command.Plan})
+		if strings.Contains(jobOnly, "- Commit:") || !strings.Contains(jobOnly, "- Blocking job: [View Atlantis execution]("+jobURL+")") {
+			t.Fatalf("unexpected job-only fallback:\n%s", jobOnly)
+		}
+	})
+
+	t.Run("project error renders links before context", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: newLockError(metadata),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(rendered, "```\ncannot run") || strings.Index(rendered, "- Commit:") <= strings.Index(rendered, "```\ncannot run") || strings.Index(rendered, "rendered context") <= strings.Index(rendered, "- Blocking job:") {
+			t.Fatalf("unexpected unwrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("wrapped project error keeps context in details and links after", func(t *testing.T) {
+		result := command.ProjectResult{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), newLockError(metadata)),
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "rendered context",
+				},
+			},
+		}
+		rendered := newRenderer("en").Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Plan})
+		closeDetails := strings.Index(rendered, "</details>")
+		if strings.Index(rendered, "rendered context") >= closeDetails || closeDetails >= strings.Index(rendered, "- Commit:") || strings.Index(rendered, "- Commit:") >= strings.Index(rendered, "- Blocking job:") {
+			t.Fatalf("unexpected wrapped error ordering:\n%s", rendered)
+		}
+	})
+
+	t.Run("Spanish template has the same link structure", func(t *testing.T) {
+		rendered := newRenderer("es").Render(ctx, command.Result{Error: newLockError(metadata)}, &events.CommentCommand{Name: command.Plan})
+		if !strings.Contains(rendered, "- Commit: ["+sha+"]("+commitURL+")") || !strings.Contains(rendered, "- Trabajo bloqueante: [Ver ejecución de Atlantis]("+jobURL+")") {
+			t.Fatalf("expected localized links in:\n%s", rendered)
+		}
+	})
+
+	t.Run("multiple jobs notice is localized and outside error details", func(t *testing.T) {
+		for _, tt := range []struct {
+			language string
+			notice   string
+		}{
+			{language: "en", notice: "- Multiple Atlantis jobs are currently running for this commit."},
+			{language: "es", notice: "- Actualmente se están ejecutando varios trabajos de Atlantis para este commit."},
+		} {
+			t.Run(tt.language, func(t *testing.T) {
+				err := newMultipleJobsLockError()
+				unwrapped := newRenderer(tt.language).Render(ctx, command.Result{Error: err}, &events.CommentCommand{Name: command.Apply})
+				fence := strings.Index(unwrapped, "\n```\n- Commit:")
+				if notice := strings.Index(unwrapped, tt.notice); fence < 0 || notice < fence {
+					t.Fatalf("expected notice below fenced error:\n%s", unwrapped)
+				}
+
+				result := command.ProjectResult{ProjectCommandOutput: command.ProjectCommandOutput{Error: fmt.Errorf("%s%w", strings.Repeat("line\n", 13), err)}}
+				wrapped := newRenderer(tt.language).Render(ctx, command.Result{ProjectResults: []command.ProjectResult{result}}, &events.CommentCommand{Name: command.Apply})
+				details := strings.Index(wrapped, "</details>")
+				if notice := strings.Index(wrapped, tt.notice); details < 0 || notice < details {
+					t.Fatalf("expected notice below wrapped error details:\n%s", wrapped)
+				}
+			})
+		}
+	})
 }
 
 func TestRenderFailure(t *testing.T) {
@@ -140,7 +268,7 @@ func TestRenderFailure(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -172,6 +300,333 @@ func TestRenderFailure(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestRenderSpanishLocalization(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es", // language
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	planResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+	planOutput := r.Render(ctx, planResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(planOutput, "Se ejecutó Planificar para directorio:") {
+		t.Fatalf("expected Spanish plan header, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar**") {
+		t.Fatalf("expected Spanish plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish nested plan apply instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **eliminar** este plan y bloqueo") {
+		t.Fatalf("expected Spanish nested plan delete instruction, got: %s", planOutput)
+	}
+	if !strings.Contains(planOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish nested plan rerun instruction, got: %s", planOutput)
+	}
+	if strings.Contains(planOutput, "To **apply** this plan") || strings.Contains(planOutput, "To **delete** this plan and lock") || strings.Contains(planOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English nested plan instructions, got: %s", planOutput)
+	}
+
+	wrappedPlanResult := planResult
+	wrappedPlanResult.ProjectResults[0].PlanSuccess = &models.PlanSuccess{
+		TerraformOutput: strings.Repeat("terraform-output\n", 14),
+		LockURL:         "lock-url",
+		RePlanCmd:       "atlantis plan -d path -w workspace",
+		ApplyCmd:        "atlantis apply -d path -w workspace",
+	}
+	wrappedPlanOutput := r.Render(ctx, wrappedPlanResult, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(wrappedPlanOutput, "<details><summary>Mostrar salida</summary>") {
+		t.Fatalf("expected Spanish wrapped plan output summary, got: %s", wrappedPlanOutput)
+	}
+	if !strings.Contains(wrappedPlanOutput, "Para **aplicar** este plan") {
+		t.Fatalf("expected Spanish wrapped plan apply instruction, got: %s", wrappedPlanOutput)
+	}
+	if strings.Contains(wrappedPlanOutput, "Show Output") || strings.Contains(wrappedPlanOutput, "To **apply** this plan") {
+		t.Fatalf("expected no English wrapped plan text, got: %s", wrappedPlanOutput)
+	}
+
+	failureOutput := r.Render(ctx, command.Result{Failure: "fallo"}, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(failureOutput, "**Aplicar falló**: fallo") {
+		t.Fatalf("expected Spanish failure rendering, got: %s", failureOutput)
+	}
+
+	importResult := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ImportSuccess: &models.ImportSuccess{
+						Output:    "import-output",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+					},
+				},
+				Workspace:   "workspace",
+				RepoRelDir:  "path",
+				ProjectName: "projectname",
+			},
+		},
+	}
+	importOutput := r.Render(ctx, importResult, &events.CommentCommand{Name: command.Import})
+	if !strings.Contains(importOutput, "Se ejecutó Importar para proyecto:") {
+		t.Fatalf("expected Spanish import header, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Se descartó un archivo de plan") {
+		t.Fatalf("expected Spanish import discarded-plan message, got: %s", importOutput)
+	}
+	if !strings.Contains(importOutput, "Para **planificar** este proyecto de nuevo") {
+		t.Fatalf("expected Spanish import re-plan instruction, got: %s", importOutput)
+	}
+	if strings.Contains(importOutput, "Ran Importar") || strings.Contains(importOutput, "A plan file was discarded") || strings.Contains(importOutput, "To **plan** this project again") {
+		t.Fatalf("expected no English import fallback text, got: %s", importOutput)
+	}
+}
+
+func TestRenderCustomLanguageConfigOverride(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "custom-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+pull_request_label: Pull Request (custom)
+command_titles:
+  plan: Plan (custom)
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",              // unsupported without custom file
+			CatalogPath:  customCatalogPath, // custom language config file
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{
+						TerraformOutput: "terraform-output",
+						LockURL:         "lock-url",
+						RePlanCmd:       "atlantis plan -d path -w workspace",
+						ApplyCmd:        "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Plan})
+	if !strings.Contains(output, "Ran Plan (custom) for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected command title override, got: %s", output)
+	}
+	if !strings.Contains(output, "Pull Request (custom)") {
+		t.Fatalf("expected pull request label override, got: %s", output)
+	}
+}
+
+func TestRenderUsesStableCommandIdentifierWhenTitlesCollide(t *testing.T) {
+	tempDir := t.TempDir()
+	customCatalogPath := filepath.Join(tempDir, "colliding-language.yaml")
+	err := os.WriteFile(customCatalogPath, []byte(`
+command_titles:
+  plan: Run
+  apply: Run
+`), 0o600)
+	Ok(t, err)
+
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "de",
+			CatalogPath:  customCatalogPath,
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					ApplySuccess: "apply-success-output",
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.Apply})
+	if !strings.Contains(output, "Ran Run for dir: `path` workspace: `workspace`") {
+		t.Fatalf("expected localized custom command title in output, got: %s", output)
+	}
+	if strings.Contains(output, "To **apply** all unapplied plans") {
+		t.Fatalf("expected apply template selection despite colliding titles, got: %s", output)
+	}
+}
+
+func TestRenderPolicyCheckIncludesPolicyOutputForLocalizedCommand(t *testing.T) {
+	r := events.NewMarkdownRenderer(
+		false,      // gitlabSupportsCommonMark
+		false,      // disableApplyAll
+		false,      // disableApply
+		false,      // disableMarkdownFolding
+		false,      // disableRepoLocking
+		false,      // enableDiffMarkdownFormat
+		"",         // markdownTemplateOverridesDir
+		"atlantis", // executableName
+		false,      // hideUnchangedPlanComments
+		false,      // quietPolicyChecks
+		i18n.TranslatorConfig{
+			LanguageCode: "es",
+		},
+	)
+	ctx := &command.Context{
+		Log: logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{
+			BaseRepo: models.Repo{
+				VCSHost: models.VCSHost{
+					Type: models.Github,
+				},
+			},
+		},
+	}
+
+	res := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PreConftestOutput: "pre-policy-output",
+						PolicySetResults: []models.PolicySetResult{
+							{PolicySetName: "set-a", PolicyOutput: "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions", Passed: true},
+						},
+						PostConftestOutput: "post-policy-output",
+						LockURL:            "lock-url",
+						RePlanCmd:          "atlantis plan -d path -w workspace",
+						ApplyCmd:           "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	output := r.Render(ctx, res, &events.CommentCommand{Name: command.PolicyCheck})
+	if !strings.Contains(output, "pre-policy-output") {
+		t.Fatalf("expected policy pre-conftest output in localized rendering, got: %s", output)
+	}
+	if !strings.Contains(output, "post-policy-output") {
+		t.Fatalf("expected policy post-conftest output in localized rendering, got: %s", output)
+	}
+
+	wrappedRes := command.Result{
+		ProjectResults: []command.ProjectResult{
+			{
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PolicyCheckResults: &models.PolicyCheckResults{
+						PolicySetResults: []models.PolicySetResult{
+							{
+								PolicySetName: "set-a",
+								PolicyOutput:  strings.Repeat("policy-output\n", 14) + "1 test, 1 passed, 0 warnings, 0 failures, 0 exceptions",
+								Passed:        true,
+							},
+						},
+						LockURL:   "lock-url",
+						RePlanCmd: "atlantis plan -d path -w workspace",
+						ApplyCmd:  "atlantis apply -d path -w workspace",
+					},
+				},
+				Workspace:  "workspace",
+				RepoRelDir: "path",
+			},
+		},
+	}
+
+	wrappedOutput := r.Render(ctx, wrappedRes, &events.CommentCommand{Name: command.PolicyCheck})
+	if strings.Count(wrappedOutput, "<details") != strings.Count(wrappedOutput, "</details>") {
+		t.Fatalf("expected balanced details tags in wrapped localized policy output, got: %s", wrappedOutput)
+	}
+	closeDetailsIndex := strings.Index(wrappedOutput, "</details>")
+	applyInstructionIndex := strings.Index(wrappedOutput, "Para **aplicar** este plan")
+	if closeDetailsIndex == -1 || applyInstructionIndex == -1 || closeDetailsIndex > applyInstructionIndex {
+		t.Fatalf("expected Spanish policy apply instruction after closed output details block, got: %s", wrappedOutput)
 	}
 }
 
@@ -1506,7 +1961,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -1894,7 +2349,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2103,7 +2558,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2296,7 +2751,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2355,7 +2810,7 @@ func TestRenderCustomPolicyCheckTemplate_DisableApplyAll(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2432,7 +2887,7 @@ func TestRenderProjectResults_DisableFolding(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2544,7 +2999,7 @@ func TestRenderProjectResults_WrappedErr(t *testing.T) {
 				)
 				logger := logging.NewNoopLogger(t).WithHistory()
 				logText := "log"
-				logger.Info(logText)
+				logger.Info("%s", logText)
 				ctx := &command.Context{
 					Log: logger,
 					Pull: models.PullRequest{
@@ -2692,7 +3147,7 @@ func TestRenderProjectResults_WrapSingleProject(t *testing.T) {
 					)
 					logger := logging.NewNoopLogger(t).WithHistory()
 					logText := "log"
-					logger.Info(logText)
+					logger.Info("%s", logText)
 					ctx := &command.Context{
 						Log: logger,
 						Pull: models.PullRequest{
@@ -2847,7 +3302,7 @@ func TestRenderProjectResults_MultiProjectApplyWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -2931,7 +3386,7 @@ func TestRenderProjectResults_MultiProjectPlanWrapped(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -3172,7 +3627,7 @@ This plan was not saved because one or more projects failed and automerge requir
 			)
 			logger := logging.NewNoopLogger(t).WithHistory()
 			logText := "log"
-			logger.Info(logText)
+			logger.Info("%s", logText)
 			ctx := &command.Context{
 				Log: logger,
 				Pull: models.PullRequest{
@@ -3769,7 +4224,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	ctx := &command.Context{
 		Log: logger,
 		Pull: models.PullRequest{
@@ -3911,7 +4366,7 @@ $$$
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
 			ctx := &command.Context{
@@ -4373,7 +4828,7 @@ func TestRenderProjectResultsWithEnableDiffMarkdownFormat(t *testing.T) {
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {
@@ -4429,7 +4884,7 @@ func BenchmarkRenderProjectResultsWithEnableDiffMarkdownFormat(b *testing.B) {
 	)
 	logger := logging.NewNoopLogger(b).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		b.Run(c.Description, func(b *testing.B) {
@@ -4654,7 +5109,7 @@ Ran Plan for 3 projects:
 	)
 	logger := logging.NewNoopLogger(t).WithHistory()
 	logText := "log"
-	logger.Info(logText)
+	logger.Info("%s", logText)
 
 	for _, c := range cases {
 		t.Run(c.Description, func(t *testing.T) {

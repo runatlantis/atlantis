@@ -6,11 +6,14 @@ package gitlab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,7 +31,8 @@ import (
 const maxCommentLength = 1000000 - 100
 
 type Client struct {
-	Client *gitlab.Client
+	Client   *gitlab.Client
+	identity common.IdentityCache
 	// Version is set to the server version.
 	Version *version.Version
 	// All GitLab groups configured in allowlists and policies
@@ -39,6 +43,30 @@ type Client struct {
 	PollingTimeout time.Duration
 	// StatusRetryEnabled enables enhanced retry logic for pipeline status updates.
 	StatusRetryEnabled bool
+}
+
+// legacyMergeRequest captures fields that GitLab still returns in the API but
+// gitlab.com/gitlab-org/api/client-go no longer exposes on MergeRequest.
+type legacyMergeRequest struct {
+	gitlab.MergeRequest
+	MergeStatus          string `json:"merge_status"`
+	ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
+}
+
+func (m *legacyMergeRequest) UnmarshalJSON(data []byte) error {
+	if err := m.MergeRequest.UnmarshalJSON(data); err != nil {
+		return err
+	}
+	var legacyFields struct {
+		MergeStatus          string `json:"merge_status"`
+		ApprovalsBeforeMerge int    `json:"approvals_before_merge"`
+	}
+	if err := json.Unmarshal(data, &legacyFields); err != nil {
+		return err
+	}
+	m.MergeStatus = legacyFields.MergeStatus
+	m.ApprovalsBeforeMerge = legacyFields.ApprovalsBeforeMerge
+	return nil
 }
 
 // commonMarkSupported is a version constraint that is true when this version of
@@ -116,38 +144,40 @@ func (g *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 	const maxPerPage = 100
 	var files []string
 	nextPage := 1
-	// Constructing the api url by hand so we can do pagination.
-	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d/changes", url.QueryEscape(repo.FullName), pull.Num)
+	apiURL := fmt.Sprintf("/projects/%s/merge_requests/%d", repo.FullName, pull.Num)
+	pollingStart := time.Now()
 	for {
-		opts := gitlab.ListOptions{
-			Page:    nextPage,
-			PerPage: maxPerPage,
+		mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+		if resp != nil {
+			logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
 		}
-		req, err := g.Client.NewRequest("GET", apiURL, opts, nil)
 		if err != nil {
 			return nil, err
 		}
-		resp := new(gitlab.Response)
-		mr := new(gitlab.MergeRequest)
-		pollingStart := time.Now()
-		for {
-			resp, err = g.Client.Do(req, mr)
-			if resp != nil {
-				logger.Debug("GET %s returned: %d", apiURL, resp.StatusCode)
-			}
-			if err != nil {
-				return nil, err
-			}
-			if mr.ChangesCount != "" {
-				break
-			}
-			if time.Since(pollingStart) > g.PollingTimeout {
-				return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
-			}
-			time.Sleep(g.PollingInterval)
+		if mr.ChangesCount != "" {
+			break
+		}
+		if time.Since(pollingStart) > g.PollingTimeout {
+			return nil, fmt.Errorf("giving up polling %q after %s", apiURL, g.PollingTimeout.String())
+		}
+		time.Sleep(g.PollingInterval)
+	}
+	for {
+		opts := &gitlab.ListMergeRequestDiffsOptions{
+			ListOptions: gitlab.ListOptions{
+				Page:    nextPage,
+				PerPage: maxPerPage,
+			},
+		}
+		diffs, resp, err := g.Client.MergeRequests.ListMergeRequestDiffs(repo.FullName, pull.Num, opts)
+		if resp != nil {
+			logger.Debug("GET /projects/%s/merge_requests/%d/diffs returned: %d", repo.FullName, pull.Num, resp.StatusCode)
+		}
+		if err != nil {
+			return nil, err
 		}
 
-		for _, f := range mr.Changes {
+		for _, f := range diffs {
 			files = append(files, f.NewPath)
 
 			// If the file was renamed, we'll want to run plan in the directory
@@ -189,6 +219,27 @@ func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 		logger.Debug("POST /projects/%s/merge_requests/%d/notes/%d/award_emoji returned: %d", repo.FullName, pullNum, commentID, resp.StatusCode)
 	}
 	return err
+}
+
+func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	username, err := g.identity.Get("", g.fetchCurrentUsername)
+	return strings.EqualFold(username, user.Username), err
+}
+
+func (g *Client) fetchCurrentUsername() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	currentUser, _, err := g.Client.Users.CurrentUser(gitlab.WithContext(ctx))
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+	if currentUser == nil {
+		return "", nil
+	}
+	return currentUser.Username, nil
 }
 
 func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
@@ -293,13 +344,20 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 // - https://gitlab.com/gitlab-org/gitlab-ce/issues/42344
 func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, _ []string) (models.MergeableStatus, error) {
 	logger.Debug("Checking if GitLab merge request %d is mergeable", pull.Num)
-	mr, resp, err := g.Client.MergeRequests.GetMergeRequest(repo.FullName, pull.Num, nil)
+	apiURL := fmt.Sprintf("projects/%s/merge_requests/%d", gitlab.PathEscape(repo.FullName), pull.Num)
+	req, err := g.Client.NewRequest("GET", apiURL, nil, nil)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	lmr := &legacyMergeRequest{}
+	resp, err := g.Client.Do(req, lmr)
 	if resp != nil {
 		logger.Debug("GET /projects/%s/merge_requests/%d returned: %d", repo.FullName, pull.Num, resp.StatusCode)
 	}
 	if err != nil {
 		return models.MergeableStatus{}, err
 	}
+	mr := &lmr.MergeRequest
 
 	// Prevent nil pointer error when mr.HeadPipeline is empty
 	// See: https://github.com/runatlantis/atlantis/issues/1852
@@ -317,16 +375,82 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 		return models.MergeableStatus{}, err
 	}
 
-	// Get Commit Statuses
-	statuses, _, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, nil)
-	if resp != nil {
-		logger.Debug("GET /projects/%d/commits/%s/statuses returned: %d", mr.ProjectID, commit, resp.StatusCode)
-	}
-	if err != nil {
-		return models.MergeableStatus{}, err
+	// Get Commit Statuses — paginate so the head-ref filter below cannot be
+	// defeated by a noisy MR pushing the MR-owned status past the first page.
+	const maxPerPage = 100
+	var statuses []*gitlab.CommitStatus
+	nextPage := 1
+	for {
+		statusOpts := &gitlab.GetCommitStatusesOptions{
+			ListOptions: gitlab.ListOptions{Page: nextPage, PerPage: maxPerPage},
+		}
+		page, statusResp, err := g.Client.Commits.GetCommitStatuses(mr.ProjectID, commit, statusOpts)
+		if statusResp != nil {
+			logger.Debug("GET /projects/%d/commits/%s/statuses page %d returned: %d", mr.ProjectID, commit, nextPage, statusResp.StatusCode)
+		}
+		if err != nil {
+			return models.MergeableStatus{}, err
+		}
+		statuses = append(statuses, page...)
+		if statusResp.NextPage == 0 {
+			break
+		}
+		nextPage = statusResp.NextPage
 	}
 
+	// GET /repository/commits/:sha/statuses returns every status posted against
+	// the SHA across all refs. When the same SHA appears in multiple MRs
+	// (force-pushed shared source branch, etc.) a status from another MR
+	// leaks here and can self-block the current MR.
+	//
+	// Filter strategy:
+	//   1. Statuses whose Ref equals refs/merge-requests/<iid>/head or
+	//      refs/merge-requests/<iid>/merge are unambiguously owned by this MR.
+	//   2. If any such MR-ref status exists for this SHA, restrict the
+	//      evaluation to MR-ref + refless statuses + branch-only source_branch
+	//      statuses. If the same status name appears on a current MR ref, the
+	//      source_branch copy is dropped because the same branch may back several
+	//      MRs and a stale status could leak.
+	//   3. Otherwise fall back to source_branch + refless statuses, preserving
+	//      behaviour for external CIs that post against the branch ref.
+	// Empty Ref is always treated as MR-owned (backward-compat for callers
+	// that post refless statuses).
+	expectedHeadRef := fmt.Sprintf("refs/merge-requests/%d/head", mr.IID)
+	expectedMergeRef := fmt.Sprintf("refs/merge-requests/%d/merge", mr.IID)
+	isCurrentMRRef := func(ref string) bool {
+		return ref == expectedHeadRef || ref == expectedMergeRef
+	}
+	hasMRRefStatus := false
+	currentMRStatusNames := make(map[string]struct{})
 	for _, status := range statuses {
+		if isCurrentMRRef(status.Ref) {
+			hasMRRefStatus = true
+			currentMRStatusNames[status.Name] = struct{}{}
+		}
+	}
+	isBranchOnlySourceBranchStatus := func(status *gitlab.CommitStatus) bool {
+		if status.Ref != mr.SourceBranch {
+			return false
+		}
+		_, hasCurrentMRStatusWithSameName := currentMRStatusNames[status.Name]
+		return !hasCurrentMRStatusWithSameName
+	}
+	// Collect every blocking status (rather than returning on the first) so that
+	// a per-project command requirement check can tell whether the only blockers
+	// are plan statuses belonging to other projects in the same merge request.
+	// See DefaultCommandRequirementHandler.
+	blockingStatusState := make(map[string]string)
+	var blockingStatuses []string
+	for _, status := range statuses {
+		if status.Ref != "" {
+			if hasMRRefStatus {
+				if !isCurrentMRRef(status.Ref) && !isBranchOnlySourceBranchStatus(status) {
+					continue
+				}
+			} else if status.Ref != mr.SourceBranch {
+				continue
+			}
+		}
 		// Ignore Atlantis-owned commit statuses that can self-block apply.
 		// Keep plan statuses in this check: a later failed or running specific
 		// plan can leave an older .tfplan on disk, so it must still block apply.
@@ -334,13 +458,12 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		}
 		if !status.AllowFailure && project.OnlyAllowMergeIfPipelineSucceeds && status.Status != "success" {
-			return models.MergeableStatus{
-				IsMergeable: false,
-				Reason:      fmt.Sprintf("Pipeline %s has status %s", status.Name, status.Status),
-			}, nil
+			if _, seen := blockingStatusState[status.Name]; !seen {
+				blockingStatusState[status.Name] = status.Status
+				blockingStatuses = append(blockingStatuses, status.Name)
+			}
 		}
 	}
-
 	supportsDetailedMergeStatus, err := g.SupportsDetailedMergeStatus(logger)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -349,10 +472,24 @@ func (g *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if supportsDetailedMergeStatus {
 		logger.Debug("Detailed merge status: '%s'", mr.DetailedMergeStatus)
 	} else {
-		logger.Debug("Merge status: '%s'", mr.MergeStatus) //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
+		logger.Debug("Merge status: '%s'", lmr.MergeStatus)
 	}
 
-	res := isMergeable(mr, project, supportsDetailedMergeStatus)
+	res := isMergeable(mr, project, supportsDetailedMergeStatus, lmr.MergeStatus, lmr.ApprovalsBeforeMerge)
+	if !res.IsMergeable {
+		logger.Debug("Merge request is not mergeable")
+		return res, nil
+	}
+	if len(blockingStatuses) > 0 {
+		// Sort so the reported Reason and the BlockingStatuses slice are
+		// deterministic, independent of the order GitLab returns statuses in.
+		sort.Strings(blockingStatuses)
+		res = models.MergeableStatus{
+			IsMergeable:      false,
+			Reason:           fmt.Sprintf("Pipeline %s has status %s", blockingStatuses[0], blockingStatusState[blockingStatuses[0]]),
+			BlockingStatuses: blockingStatuses,
+		}
+	}
 	if res.IsMergeable {
 		logger.Debug("Merge request is mergeable")
 	} else {
@@ -379,16 +516,16 @@ func isSkippableAtlantisCommitStatus(statusName string, vcsStatusName string) bo
 
 // gitlabIsMergeable a pure function that encapsulates the tricky logic behind determining whether a gitlab MR is mergeable
 // It doesn't make any external calls and cannot error, so is much easier to test
-func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool) models.MergeableStatus {
+func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetailedMergeStatus bool, legacyMergeStatus string, legacyApprovalsBeforeMerge int) models.MergeableStatus {
 	isPipelineSkipped := false
 	if mr.HeadPipeline != nil {
 		isPipelineSkipped = mr.HeadPipeline.Status == "skipped"
 	}
 
-	if mr.ApprovalsBeforeMerge > 0 {
+	if legacyApprovalsBeforeMerge > 0 {
 		return models.MergeableStatus{
 			IsMergeable: false,
-			Reason:      fmt.Sprintf("Still require %d approvals", mr.ApprovalsBeforeMerge),
+			Reason:      fmt.Sprintf("Still require %d approvals", legacyApprovalsBeforeMerge),
 		}
 	}
 	if !mr.BlockingDiscussionsResolved {
@@ -397,7 +534,7 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 			Reason:      "Blocking discussions unresolved",
 		}
 	}
-	if mr.WorkInProgress {
+	if mr.Draft || mr.WorkInProgress { //nolint:staticcheck // WorkInProgress is retained for older GitLab JSON responses.
 		return models.MergeableStatus{
 			IsMergeable: false,
 			Reason:      "Work in progress",
@@ -424,15 +561,14 @@ func isMergeable(mr *gitlab.MergeRequest, project *gitlab.Project, supportsDetai
 		}
 	}
 
-	mergeStatus := mr.MergeStatus //nolint:staticcheck // Need to reference deprecated field for backwards compatibility
-	if mergeStatus == "can_be_merged" {
+	if legacyMergeStatus == "can_be_merged" {
 		return models.MergeableStatus{
 			IsMergeable: true,
 		}
 	}
 	return models.MergeableStatus{
 		IsMergeable: false,
-		Reason:      fmt.Sprintf("Merge status is %s", mergeStatus),
+		Reason:      fmt.Sprintf("Merge status is %s", legacyMergeStatus),
 	}
 }
 
@@ -448,6 +584,33 @@ func (g *Client) SupportsDetailedMergeStatus(logger logging.SimpleLogging) (bool
 		return false, err
 	}
 	return cons.Check(v), nil
+}
+
+// adoptablePipelineRefs returns the pipeline refs that belong to the merge
+// request: the bare source branch name, its fully qualified form, and the ref
+// GitLab uses for merge request pipelines.
+func adoptablePipelineRefs(pull models.PullRequest) []string {
+	return []string{
+		pull.HeadBranch,
+		"refs/heads/" + pull.HeadBranch,
+		fmt.Sprintf("refs/merge-requests/%d/head", pull.Num),
+	}
+}
+
+// isPipelineAdoptable reports whether UpdateStatus may attach its commit status
+// to the given pipeline. The pipeline must run for the pull request's head
+// commit and one of its refs. An external pipeline (created through the commit
+// status API rather than by CI) is only adopted on the bare branch ref, which
+// is the ref Atlantis itself uses when no pipeline exists yet; an external
+// pipeline on any other ref was created by another commit status poster.
+func isPipelineAdoptable(pipeline *gitlab.PipelineInfo, pull models.PullRequest) bool {
+	if pipeline == nil || pipeline.SHA != pull.HeadCommit {
+		return false
+	}
+	if pipeline.Source == "external" {
+		return pipeline.Ref == pull.HeadBranch
+	}
+	return slices.Contains(adoptablePipelineRefs(pull), pipeline.Ref)
 }
 
 // UpdateStatus updates the build status of a commit.
@@ -495,12 +658,24 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		attempt := int(pipelineRetryer.Attempt()) + 1
 		commit, resp, err = g.Client.Commits.GetCommit(repo.FullName, pull.HeadCommit, nil)
 		if resp != nil {
-			logger.Debug("GET /projects/%s/repository/commits/%d: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
+			logger.Debug("GET /projects/%s/repository/commits/%s: %d", pull.BaseRepo.ID(), pull.HeadCommit, resp.StatusCode)
 		}
 		if err != nil {
 			return err
 		}
 		if commit.LastPipeline != nil {
+			if !isPipelineAdoptable(commit.LastPipeline, pull) {
+				// A pipeline exists but it does not belong to this merge request's
+				// ref, or it was created by another commit status poster. Retrying
+				// would not change that, so fall back to the Ref straight away.
+				// See https://github.com/runatlantis/atlantis/issues/6871 and
+				// https://github.com/runatlantis/atlantis/issues/5228.
+				logger.Info("ignoring pipeline %d for commit %q (sha %q, ref %q, source %q) since it does not belong to this pull request, setting Ref to %q (an external pipeline is adopted only on ref %q, any other on one of %q)",
+					commit.LastPipeline.ID, pull.HeadCommit, commit.LastPipeline.SHA, commit.LastPipeline.Ref, commit.LastPipeline.Source,
+					pull.HeadBranch, pull.HeadBranch, adoptablePipelineRefs(pull))
+				setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
+				break
+			}
 			logger.Info("Pipeline found for commit %s, setting pipeline ID to %d", pull.HeadCommit, commit.LastPipeline.ID)
 			// Set the pipeline ID to the last pipeline that ran for the commit
 			setCommitStatusOptions.PipelineID = gitlab.Ptr(commit.LastPipeline.ID)
@@ -575,7 +750,7 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 		sleep := retryer.Duration()
 
-		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %w", err)
+		logger.With("retry_in", sleep).Warn("GitLab errored when updating commit status: %s", err)
 		time.Sleep(sleep)
 	}
 }
@@ -711,10 +886,13 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo
 	var teamNames []string
 
 	users, resp, err := g.Client.Users.ListUsers(&gitlab.ListUsersOptions{Username: &user.Username})
-	if resp.StatusCode == http.StatusNotFound {
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return teamNames, nil
 	}
 	if err != nil {
+		if resp == nil {
+			return nil, fmt.Errorf("GET /users: %w", err)
+		}
 		return nil, fmt.Errorf("GET /users returned: %d: %w", resp.StatusCode, err)
 	} else if len(users) == 0 {
 		return nil, errors.New("GET /users returned no user")
@@ -725,13 +903,16 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, _ models.Repo
 	userID := users[0].ID
 	for _, groupName := range g.ConfiguredGroups {
 		membership, resp, err := g.Client.GroupMembers.GetGroupMember(groupName, userID)
-		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden {
+		if resp != nil && (resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusForbidden) {
 			continue
 		}
 		if err != nil {
+			if resp == nil {
+				return nil, fmt.Errorf("GET /groups/%s/members/%d: %w", groupName, userID, err)
+			}
 			return nil, fmt.Errorf("GET /groups/%s/members/%d returned: %d: %w", groupName, userID, resp.StatusCode, err)
 		}
-		if resp.StatusCode == http.StatusOK && membership.State == "active" {
+		if resp != nil && resp.StatusCode == http.StatusOK && membership.State == "active" {
 			teamNames = append(teamNames, groupName)
 		}
 	}
@@ -788,4 +969,8 @@ func (g *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 	}
 
 	return mr.Labels, nil
+}
+
+func (g *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
 }

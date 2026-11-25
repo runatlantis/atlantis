@@ -1,0 +1,11 @@
+{{ define "log" -}}
+{{ if .Verbose -}}
+<details><summary>Registro</summary>
+<p>
+
+```
+{{.Log}}
+```
+</p></details>
+{{ end -}}
+{{ end -}}

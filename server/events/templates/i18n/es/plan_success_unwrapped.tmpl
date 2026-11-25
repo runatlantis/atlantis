@@ -1,0 +1,24 @@
+{{ define "planSuccessUnwrapped" -}}
+```diff
+{{ if .EnableDiffMarkdownFormat }}{{ .DiffMarkdownFormattedTerraformOutput }}{{ else }}{{ .TerraformOutput }}{{ end }}
+```
+
+{{ if .PlanWasDeleted -}}
+Este plan no se guardó porque uno o más proyectos fallaron y automerge requiere que todos los planes pasen.
+{{ else -}}
+{{ if not .DisableApply -}}
+* :arrow_forward: Para **aplicar** este plan, comenta:
+  ```shell
+  {{ .ApplyCmd }}
+  ```
+{{ end -}}
+{{ if not .DisableRepoLocking -}}
+* :put_litter_in_its_place: Para **eliminar** este plan y bloqueo, haz clic [aquí]({{ .LockURL }})
+{{ end -}}
+* :repeat: Para **planificar** este proyecto de nuevo, comenta:
+  ```shell
+  {{ .RePlanCmd }}
+  ```
+{{ end -}}
+{{ template "mergedAgain" . -}}
+{{ end -}}

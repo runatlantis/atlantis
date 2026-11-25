@@ -7,7 +7,9 @@ package events_test
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	. "github.com/petergtz/pegomock/v4"
@@ -19,15 +21,24 @@ import (
 var parser = events.DefaultGitlabRequestParserValidator{}
 
 func TestValidate_InvalidSecret(t *testing.T) {
-	t.Log("If the secret header is set and doesn't match expected an error is returned")
-	RegisterMockTestingT(t)
-	buf := bytes.NewBufferString("")
-	req, err := http.NewRequest("POST", "http://localhost/event", buf)
-	Ok(t, err)
-	req.Header.Set("X-Gitlab-Token", "does-not-match")
-	_, err = parser.ParseAndValidate(req, []byte("secret"))
-	Assert(t, err != nil, "should be an error")
-	Equals(t, "header X-Gitlab-Token=does-not-match did not match expected secret", err.Error())
+	const expectedSecret = "expected-server-token"
+	for _, header := range []string{"", "rejected-client-token", expectedSecret + "-suffix"} {
+		t.Run(header, func(t *testing.T) {
+			// Authentication must reject the request before parsing its malformed body.
+			req := httptest.NewRequest(http.MethodPost, "/events", strings.NewReader("{"))
+			req.Header.Set("X-Gitlab-Token", header)
+			req.Header.Set("X-Gitlab-Event", "Merge Request Hook")
+
+			event, err := parser.ParseAndValidate(req, []byte(expectedSecret))
+
+			Equals(t, nil, event)
+			ErrEquals(t, "header X-Gitlab-Token did not match expected secret", err)
+			Assert(t, !strings.Contains(err.Error(), expectedSecret), "error contains configured token")
+			if header != "" {
+				Assert(t, !strings.Contains(err.Error(), header), "error contains supplied token")
+			}
+		})
+	}
 }
 
 func TestValidate_ValidSecret(t *testing.T) {

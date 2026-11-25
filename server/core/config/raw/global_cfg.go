@@ -16,11 +16,69 @@ import (
 
 // GlobalCfg is the raw schema for server-side repo config.
 type GlobalCfg struct {
-	Repos      []Repo              `yaml:"repos" json:"repos"`
-	Workflows  map[string]Workflow `yaml:"workflows" json:"workflows"`
-	PolicySets PolicySets          `yaml:"policies" json:"policies"`
-	Metrics    Metrics             `yaml:"metrics" json:"metrics"`
-	TeamAuthz  TeamAuthz           `yaml:"team_authz" json:"team_authz"`
+	Repos          []Repo              `yaml:"repos" json:"repos"`
+	Workflows      map[string]Workflow `yaml:"workflows" json:"workflows"`
+	PolicySets     PolicySets          `yaml:"policies" json:"policies"`
+	Metrics        Metrics             `yaml:"metrics" json:"metrics"`
+	TeamAuthz      TeamAuthz           `yaml:"team_authz" json:"team_authz"`
+	ExternalStores ExternalStores      `yaml:"external_stores" json:"external_stores"`
+}
+
+// ExternalStores is the raw schema for external storage backends.
+type ExternalStores struct {
+	PlanStore PlanStoreConfig `yaml:"plan_store" json:"plan_store"`
+}
+
+// PlanStoreConfig is the raw schema for plan storage configuration.
+type PlanStoreConfig struct {
+	Type string        `yaml:"type" json:"type"`
+	S3   S3StoreConfig `yaml:"s3" json:"s3"`
+}
+
+// S3StoreConfig is the raw schema for S3 plan store configuration.
+type S3StoreConfig struct {
+	Bucket         string `yaml:"bucket" json:"bucket"`
+	Region         string `yaml:"region" json:"region"`
+	Prefix         string `yaml:"prefix" json:"prefix"`
+	Endpoint       string `yaml:"endpoint" json:"endpoint"`
+	ForcePathStyle bool   `yaml:"force_path_style" json:"force_path_style"`
+	Profile        string `yaml:"profile" json:"profile"`
+}
+
+func (e ExternalStores) Validate() error {
+	return e.PlanStore.Validate()
+}
+
+func (p PlanStoreConfig) Validate() error {
+	if p.Type == "" {
+		return nil
+	}
+	if p.Type != "s3" {
+		return fmt.Errorf("unsupported plan store type %q: only 's3' is supported", p.Type)
+	}
+	if p.S3.Bucket == "" {
+		return fmt.Errorf("external_stores.plan_store.s3.bucket is required when type is 's3'")
+	}
+	if p.S3.Region == "" {
+		return fmt.Errorf("external_stores.plan_store.s3.region is required when type is 's3'")
+	}
+	return nil
+}
+
+func (e ExternalStores) ToValid() valid.ExternalStores {
+	return valid.ExternalStores{
+		PlanStore: valid.PlanStoreConfig{
+			Type: e.PlanStore.Type,
+			S3: valid.S3StoreConfig{
+				Bucket:         e.PlanStore.S3.Bucket,
+				Region:         e.PlanStore.S3.Region,
+				Prefix:         e.PlanStore.S3.Prefix,
+				Endpoint:       e.PlanStore.S3.Endpoint,
+				ForcePathStyle: e.PlanStore.S3.ForcePathStyle,
+				Profile:        e.PlanStore.S3.Profile,
+			},
+		},
+	}
 }
 
 // Repo is the raw schema for repos in the server-side repo config.
@@ -53,6 +111,10 @@ func (g GlobalCfg) Validate() error {
 		validation.Field(&g.Metrics),
 	)
 	if err != nil {
+		return err
+	}
+
+	if err := g.ExternalStores.Validate(); err != nil {
 		return err
 	}
 
@@ -161,11 +223,12 @@ func (g GlobalCfg) ToValid(defaultCfg valid.GlobalCfg) valid.GlobalCfg {
 	repos = append(defaultCfg.Repos, repos...)
 
 	return valid.GlobalCfg{
-		Repos:      repos,
-		Workflows:  workflows,
-		PolicySets: g.PolicySets.ToValid(),
-		Metrics:    g.Metrics.ToValid(),
-		TeamAuthz:  g.TeamAuthz.ToValid(),
+		Repos:          repos,
+		Workflows:      workflows,
+		PolicySets:     g.PolicySets.ToValid(),
+		Metrics:        g.Metrics.ToValid(),
+		TeamAuthz:      g.TeamAuthz.ToValid(),
+		ExternalStores: g.ExternalStores.ToValid(),
 	}
 }
 

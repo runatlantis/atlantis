@@ -13,6 +13,7 @@ import (
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -27,6 +28,8 @@ type Client struct {
 	token       string
 	pageSize    int
 	ctx         context.Context
+	baseURL     string
+	identity    common.IdentityCache
 }
 
 type GiteaPRReviewSummary struct {
@@ -67,6 +70,7 @@ func New(baseURL string, username string, token string, pagesize int, logger log
 		token:       token,
 		pageSize:    pagesize,
 		ctx:         context.Background(),
+		baseURL:     baseURL,
 	}, nil
 }
 
@@ -76,7 +80,14 @@ func (c *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 	pr, resp, err := c.giteaClient.GetPullRequest(repo.Owner, repo.Name, int64(pullNum))
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		// Network errors before a response is received leave `resp` nil, the
+		// previous unconditional `resp.StatusCode` access panicked Atlantis on
+		// every other request when the upstream Gitea returned 502 (#5580).
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /repos/%v/%v/pulls/%d returned: %v", repo.Owner, repo.Name, pullNum, status)
 		return nil, err
 	}
 
@@ -103,7 +114,11 @@ func (c *Client) GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo
 		listOptions.Page = page
 		files, resp, err := c.giteaClient.ListPullRequestFiles(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 		if err != nil {
-			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("[page %d] GET /repos/%v/%v/pulls/%d/files returned: %v", page, repo.Owner, repo.Name, pull.Num, status)
 			return nil, err
 		}
 
@@ -133,7 +148,11 @@ func (c *Client) CreateComment(logger logging.SimpleLogging, repo models.Repo, p
 	_, resp, err := c.giteaClient.CreateIssueComment(repo.Owner, repo.Name, int64(pullNum), opt)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, status)
 		return err
 	}
 
@@ -149,11 +168,41 @@ func (c *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	_, resp, err := c.giteaClient.PostIssueCommentReaction(repo.Owner, repo.Name, commentID, reaction)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/issues/comments/%d/reactions returned: %v", repo.Owner, repo.Name, commentID, status)
 		return err
 	}
 
 	return nil
+}
+
+func (c *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	username, err := c.identity.Get("", c.fetchCurrentUsername)
+	return strings.EqualFold(username, user.Username), err
+}
+
+func (c *Client) fetchCurrentUsername() (string, error) {
+	ctx, cancel := context.WithTimeout(c.ctx, 10*time.Second)
+	defer cancel()
+	// New already checked the version; isolate this deadline from concurrent SDK calls.
+	client, err := gitea.NewClient(c.baseURL, gitea.SetToken(c.token), gitea.SetUserAgent("atlantis"), gitea.SetContext(ctx), gitea.SetGiteaVersion(""))
+	if err != nil {
+		return "", fmt.Errorf("creating identity client: %w", err)
+	}
+	currentUser, _, err := client.GetMyUserInfo()
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+	if currentUser == nil {
+		return "", nil
+	}
+	return currentUser.UserName, nil
 }
 
 // HidePrevCommandComments hides the previous command comments from the pull
@@ -175,7 +224,11 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 		comments, resp, err := c.giteaClient.ListIssueComments(repo.Owner, repo.Name, int64(pullNum), opts)
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/issues/%d/comments returned: %v", repo.Owner, repo.Name, pullNum, status)
 			return err
 		}
 
@@ -190,7 +243,11 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 	currentUser, resp, err := c.giteaClient.GetMyUserInfo()
 	if err != nil {
-		logger.Debug("GET /user returned: %v", resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /user returned: %v", status)
 		return err
 	}
 
@@ -210,7 +267,7 @@ func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 		supersededComment := summaryHeader + lineFeed + comment.Body + lineFeed + summaryFooter + lineFeed
 
-		logger.Debug("Hiding comment %s", comment.ID)
+		logger.Debug("Hiding comment %d", comment.ID)
 		_, _, err := c.giteaClient.EditIssueComment(repo.Owner, repo.Name, comment.ID, gitea.EditIssueCommentOption{
 			Body: supersededComment,
 		})
@@ -240,24 +297,26 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		},
 	}
 
+	// Every page must be read before deciding: a later page can hold a
+	// REQUEST_CHANGES that supersedes an approval on an earlier page.
+	effective := newEffectiveReviews()
+
 	for page < nextPage {
 		page++
 		listOptions.Page = page
 		pullReviews, resp, err := c.giteaClient.ListPullReviews(repo.Owner, repo.Name, int64(pull.Num), listOptions)
 
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/pulls/%d/reviews returned: %v", repo.Owner, repo.Name, pull.Num, status)
 			return approvalStatus, err
 		}
 
 		for _, review := range pullReviews {
-			if review.State == gitea.ReviewStateApproved {
-				approvalStatus.IsApproved = true
-				approvalStatus.ApprovedBy = review.Reviewer.UserName
-				approvalStatus.Date = review.Submitted
-
-				return approvalStatus, nil
-			}
+			effective.record(review)
 		}
 
 		nextPage = resp.NextPage
@@ -268,7 +327,79 @@ func (c *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 		}
 	}
 
+	if review := effective.firstApproval(); review != nil {
+		approvalStatus.IsApproved = true
+		approvalStatus.ApprovedBy = review.Reviewer.UserName
+		approvalStatus.Date = review.Submitted
+	}
+
 	return approvalStatus, nil
+}
+
+// effectiveReviews tracks, for each reviewer, the review that currently
+// determines their stance on a pull request.
+//
+// Gitea keeps every review a user ever submitted and leaves State as
+// APPROVED on reviews that were later dismissed or went stale, so a review
+// row on its own says nothing about whether the approval is still in force.
+// The reviewer's latest APPROVED or REQUEST_CHANGES review (by Submitted,
+// falling back to API order for equal times) is their effective stance, and
+// it grants approval only when it is APPROVED and neither:
+//
+//   - dismissed (Dismissed), because Gitea explicitly revoked it; nor
+//   - stale (Stale), because the pull request changed after the review was
+//     submitted and the approval no longer covers the current head.
+//
+// A dismissed or stale latest review is a tombstone: it grants nothing and
+// still supersedes every earlier review by the same user, so an older
+// approval is never revived when a newer one is revoked. COMMENT, PENDING,
+// REQUEST_REVIEW and unknown states neither grant nor revoke approval and
+// are ignored, as are reviews with no reviewer (team review requests).
+type effectiveReviews struct {
+	latestByReviewer map[string]*gitea.PullReview
+	// reviewers holds reviewer names in the order they were first seen so
+	// that the reported approver is deterministic.
+	reviewers []string
+}
+
+func newEffectiveReviews() *effectiveReviews {
+	return &effectiveReviews{latestByReviewer: make(map[string]*gitea.PullReview)}
+}
+
+func (e *effectiveReviews) record(review *gitea.PullReview) {
+	if review == nil || review.Reviewer == nil {
+		return
+	}
+	if review.State != gitea.ReviewStateApproved && review.State != gitea.ReviewStateRequestChanges {
+		return
+	}
+
+	key := review.Reviewer.UserName
+	existing, seen := e.latestByReviewer[key]
+	if seen && review.Submitted.Before(existing.Submitted) {
+		return
+	}
+	if !seen {
+		e.reviewers = append(e.reviewers, key)
+	}
+	e.latestByReviewer[key] = review
+}
+
+// firstApproval returns the first reviewer's effective review that is an
+// approval, or nil when no reviewer currently approves the pull request.
+func (e *effectiveReviews) firstApproval() *gitea.PullReview {
+	for _, key := range e.reviewers {
+		if review := e.latestByReviewer[key]; grantsApproval(review) {
+			return review
+		}
+	}
+	return nil
+}
+
+// grantsApproval reports whether a reviewer's effective review is an
+// approval that is still in force.
+func grantsApproval(review *gitea.PullReview) bool {
+	return review.State == gitea.ReviewStateApproved && !review.Dismissed && !review.Stale
 }
 
 // PullIsMergeable returns true if the pull request is mergeable
@@ -319,7 +450,11 @@ func (c *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 	_, resp, err := c.giteaClient.CreateStatus(repo.Owner, repo.Name, pull.HeadCommit, newStatusOption)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/statuses/%s returned: %v", repo.Owner, repo.Name, pull.HeadCommit, status)
 		return err
 	}
 
@@ -388,7 +523,11 @@ func (c *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	succeeded, resp, err := c.giteaClient.MergePullRequest(pull.BaseRepo.Owner, pull.BaseRepo.Name, int64(pull.Num), mergeOptions)
 
 	if err != nil {
-		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.Num, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("POST /repos/%v/%v/pulls/%d/merge returned: %v", pull.BaseRepo.Owner, pull.BaseRepo.Name, pull.Num, status)
 		return err
 	}
 
@@ -418,7 +557,11 @@ func (c *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 	content, resp, err := c.giteaClient.GetContents(repo.Owner, repo.Name, branch, fileName)
 
 	if err != nil {
-		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, resp.StatusCode)
+		status := "no response"
+		if resp != nil {
+			status = fmt.Sprintf("%d", resp.StatusCode)
+		}
+		logger.Debug("GET /repos/%v/%v/contents/%s?ref=%v returned: %v", repo.Owner, repo.Name, fileName, branch, status)
 		return false, nil, err
 	}
 
@@ -476,7 +619,11 @@ func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 		labels, resp, err := c.giteaClient.GetIssueLabels(repo.Owner, repo.Name, int64(pull.Num), opts)
 
 		if err != nil {
-			logger.Debug("GET /repos/%v/%v/issues/%d/labels?%v returned: %v", repo.Owner, repo.Name, pull.Num, "unknown", resp.StatusCode)
+			status := "no response"
+			if resp != nil {
+				status = fmt.Sprintf("%d", resp.StatusCode)
+			}
+			logger.Debug("GET /repos/%v/%v/issues/%d/labels?%v returned: %v", repo.Owner, repo.Name, pull.Num, "unknown", status)
 			return nil, err
 		}
 
@@ -493,6 +640,10 @@ func (c *Client) GetPullLabels(logger logging.SimpleLogging, repo models.Repo, p
 	}
 
 	return results, nil
+}
+
+func (c *Client) GetChildTeams(_ logging.SimpleLogging, _ models.Repo, _ string) ([]string, error) {
+	return nil, nil
 }
 
 func ValidateSignature(payload []byte, signature string, secretKey []byte) error {

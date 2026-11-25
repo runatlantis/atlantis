@@ -59,8 +59,10 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 	out, err := cmd.CombinedOutput()
 
 	outString := strings.ReplaceAll(string(out), "\n", "\r\n")
-	wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
-	wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	if !ctx.SuppressJobOutput {
+		wh.OutputHandler.SendWorkflowHook(ctx, outString, false)
+		wh.OutputHandler.SendWorkflowHook(ctx, "\n", true)
+	}
 
 	if err != nil {
 		err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
@@ -75,7 +77,7 @@ func (wh DefaultPreWorkflowHookRunner) Run(ctx models.WorkflowHookCommandContext
 		var customStatusErr error
 		customStatusOut, customStatusErr = os.ReadFile(outputFilePath)
 		if customStatusErr != nil {
-			err = fmt.Errorf("%s: running %q in %q: \n%s", err, shell+" "+shellArgs+" "+command, path, out)
+			err = fmt.Errorf("reading workflow hook status file %q after running %q in %q: %w\n%s", outputFilePath, shell+" "+shellArgs+" "+command, path, customStatusErr, out)
 			ctx.Log.Debug("error: %s", err)
 			return string(out), "", err
 		}

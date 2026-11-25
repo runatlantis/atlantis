@@ -24,7 +24,9 @@ permissions:
 
 env:
   TERRAFORM_VERSION: 1.11.1
+  # Keep the checksum in sync with the versioned archive URL.
   NGROK_DOWNLOAD_URL: https://bin.equinox.io/a/bNzUz3YQtcB/ngrok-v3-3.33.1-linux-amd64.tar.gz
+  NGROK_DOWNLOAD_SHA256: 7d5cf30be47a38d937958dff61a2b175a289bdbf72fdc20774a6dceeaaaa3dbf
 
 jobs:
   changes:
@@ -37,20 +39,26 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: changes
         with:
           filters: |
             go:
-              - '**.go'
-              - '**.txt' # golden file test output
+              - '**/*.go'
+              - '**/*.txt' # golden file test output
               - 'go.*'
-              - '**.tmpl'
+              - '**/go.mod'
+              - '**/go.sum'
+              - '**/*.tmpl'
+              - 'Makefile'
+              - 'Dockerfile'
+              - 'testing/Dockerfile'
+              - 'scripts/verify-go-toolchain.sh'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
@@ -59,22 +67,23 @@ jobs:
     runs-on: ubuntu-24.04
     # Use latest testing environment for automatic updates
     # Previous: ghcr.io/runatlantis/testing-env:latest@sha256:725981e9090c977f8055f5ec5ba7a63430a8f0337ab955978e6b8cc2cd0236c3
-    container: ghcr.io/runatlantis/testing-env:latest@sha256:949bd6f67e6b110f8e497a0cebe695372069216c1e26d339f424273ac08f90a3
+    container: ghcr.io/runatlantis/testing-env:latest@sha256:dc683c36e7fb8f26fcc8628fdcf328f42d3b1903e130aebb8484223fbdedfd98
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # need to setup go toolchain explicitly
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
 
       - run: make test-all
       - run: make check-fmt
+      - run: make check-go-toolchain
 
       ###########################################################
       # Notifying #contributors about test failure on main branch
@@ -123,7 +132,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
@@ -131,8 +140,13 @@ jobs:
 
   e2e-github:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # Every run shares the atlantis-tests repo, so concurrent runs autoplan
+    # each other's PRs and collide on project locks. Run one at a time.
+    concurrency:
+      group: e2e-github
+      cancel-in-progress: false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GH_APP_ID: ${{ secrets.ATLANTISBOT_GH_APP_ID }}
       ATLANTIS_GH_APP_KEY: ${{ secrets.ATLANTISBOT_GH_APP_KEY }}
@@ -140,12 +154,12 @@ jobs:
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
 
@@ -153,13 +167,14 @@ jobs:
       # We do this instead of setting --default-tf-version because setting
       # that flag starts the download asynchronously so we'd have a race
       # condition.
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version
@@ -177,20 +192,25 @@ jobs:
           ./scripts/e2e.sh
   e2e-gitlab:
     runs-on: ubuntu-24.04
-    # dont run e2e tests on forked PRs
-    if: github.event.pull_request.head.repo.fork == false
+    # Every run shares the atlantis-tests repo, so concurrent runs autoplan
+    # each other's MRs and collide on project locks. Run one at a time.
+    concurrency:
+      group: e2e-gitlab
+      cancel-in-progress: false
+    # dont run e2e tests on forked PRs or Dependabot PRs, where repository secrets are unavailable
+    if: github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]'
     env:
       ATLANTIS_GITLAB_USER: ${{ secrets.ATLANTISBOT_GITLAB_USERNAME }}
       ATLANTIS_GITLAB_TOKEN: ${{ secrets.ATLANTISBOT_GITLAB_TOKEN }}
       NGROK_AUTH_TOKEN: ${{ secrets.ATLANTISBOT_NGROK_AUTH_TOKEN }}
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2.19.3
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7
         with:
           go-version-file: go.mod
 
@@ -198,13 +218,14 @@ jobs:
       # We do this instead of setting --default-tf-version because setting
       # that flag starts the download asynchronously so we'd have a race
       # condition.
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Setup ngrok
         run: |
-          wget -q -O ngrok.tar.gz ${NGROK_DOWNLOAD_URL}
+          wget -q -O ngrok.tar.gz "${NGROK_DOWNLOAD_URL}"
+          echo "${NGROK_DOWNLOAD_SHA256}  ngrok.tar.gz" | sha256sum --check --strict
           tar -xzf ngrok.tar.gz
           chmod +x ngrok
           ./ngrok version

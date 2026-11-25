@@ -82,18 +82,23 @@ func TestParseRepoCfg_BadPermissions(t *testing.T) {
 func TestParseCfgs_InvalidYAML(t *testing.T) {
 	cases := []struct {
 		description string
-		input       string
+		input       []byte
 		expErr      string
 	}{
 		{
 			"random characters",
-			"slkjds",
-			"yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `slkjds` into",
+			[]byte("slkjds"),
+			"yaml: construct errors: line 1: cannot construct !!str `slkjds` into",
 		},
 		{
 			"just a colon",
-			":",
-			"yaml: did not find expected key",
+			[]byte(":"),
+			"go-yaml load error in parser (while parsing a block mapping) at L1.C1: did not find expected key",
+		},
+		{
+			"invalid merge key from fuzzing",
+			[]byte("? [foo]\n: bar\n<<: {}\nversion: 3\n"),
+			"go-yaml load error in constructor at L1.C3: runtime error: hash of unhashable type []interface {}",
 		},
 	}
 
@@ -102,7 +107,7 @@ func TestParseCfgs_InvalidYAML(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.description, func(t *testing.T) {
 			confPath := filepath.Join(tmpDir, "atlantis.yaml")
-			err := os.WriteFile(confPath, []byte(c.input), 0600)
+			err := os.WriteFile(confPath, c.input, 0600)
 			Ok(t, err)
 			r := config.ParserValidator{}
 			_, err = r.ParseRepoCfg(tmpDir, globalCfg, "", "")
@@ -216,10 +221,36 @@ projects:
 						WorkflowName:     nil,
 						TerraformVersion: nil,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: nil,
+					},
+				},
+				Workflows: map[string]valid.Workflow{},
+			},
+		},
+		{
+			description: "timestamp-like strings are preserved",
+			input: `
+version: 3
+projects:
+- dir: 2026-06-26
+  name: 2026-06-27
+  autoplan:
+    when_modified:
+    - 2026-06-28`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       "2026-06-26",
+						Workspace: "default",
+						Name:      String("2026-06-27"),
+						Autoplan: valid.Autoplan{
+							WhenModified: []string{"2026-06-28"},
+							Enabled:      true,
+						},
 					},
 				},
 				Workflows: map[string]valid.Workflow{},
@@ -239,7 +270,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -285,7 +316,7 @@ projects:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -308,7 +339,7 @@ workflows: ~
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -336,7 +367,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -367,7 +398,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -401,7 +432,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"approved"},
@@ -435,7 +466,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable"},
@@ -469,7 +500,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged"},
@@ -503,7 +534,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"mergeable", "approved"},
@@ -537,7 +568,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "approved"},
@@ -571,7 +602,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable"},
@@ -605,7 +636,7 @@ workflows:
 						WorkflowName:     String("myworkflow"),
 						TerraformVersion: tfVersion,
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      false,
 						},
 						ApplyRequirements: []string{"undiverged", "mergeable", "approved"},
@@ -633,7 +664,7 @@ projects:
 						Workspace:             "myworkspace",
 						TerraformDistribution: String("opentofu"),
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -674,7 +705,7 @@ projects:
 version: 3
 projects:
 - unknown: value`,
-			expErr: "yaml: unmarshal errors:\n  line 4: field unknown not found in type raw.Project",
+			expErr: "yaml: construct errors: line 4: field unknown not found in type raw.Project",
 		},
 		{
 			description: "referencing workflow that doesn't exist",
@@ -740,7 +771,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -749,7 +780,7 @@ projects:
 						Dir:       ".",
 						Workspace: "workspace",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -791,7 +822,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -890,7 +921,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -981,7 +1012,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1074,7 +1105,7 @@ workflows:
 						Dir:       ".",
 						Workspace: "default",
 						Autoplan: valid.Autoplan{
-							WhenModified: raw.DefaultAutoPlanWhenModified,
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
 							Enabled:      true,
 						},
 					},
@@ -1277,7 +1308,7 @@ func TestParseGlobalCfg(t *testing.T) {
 		},
 		"invalid fields": {
 			input:  "invalid: key",
-			expErr: "yaml: unmarshal errors:\n  line 1: field invalid not found in type raw.GlobalCfg",
+			expErr: "yaml: construct errors: line 1: field invalid not found in type raw.GlobalCfg",
 		},
 		"no id specified": {
 			input: `repos:

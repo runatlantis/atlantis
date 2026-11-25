@@ -5,6 +5,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -23,6 +24,8 @@ import (
 const workingDirPrefix = "repos"
 
 const prSourceRemote = "source"
+
+var errInvalidManagedPath = errors.New("invalid managed path")
 
 // gitLocks holds per-clone-dir locks: "repo-lock/<cloneDir>" -> *sync.RWMutex (read for steps, write for clone/reset/merge), "ref-lock/<cloneDir>" -> *sync.Mutex (serialize fetch).
 var gitLocks sync.Map
@@ -54,15 +57,21 @@ type WorkingDir interface {
 	// GetWorkingDir returns the path to the workspace for this repo and pull.
 	// If workspace does not exist on disk, error will be of type os.IsNotExist.
 	GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error)
-	// HasDiverged checks if the branch has diverged from the base branch.
+	// HasDiverged checks if the checkout has diverged from the base branch.
 	// When autoplanWhenModified patterns are provided, only divergence affecting
 	// files matching those patterns is considered. When patterns are empty,
 	// any divergence is reported.
 	HasDiverged(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
+	// HasDivergedFromPullHead checks if the pull request head has diverged from
+	// the base branch.
+	HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool
 	// GetDivergedFiles returns the files changed on the base branch since the
 	// current checkout. When merge checkout is disabled there is no divergence
 	// check, so this returns no files and no error.
 	GetDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error)
+	// GetDivergedFilesFromPullHead returns the files changed on the base branch
+	// since the pull request head.
+	GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error)
 	GetPullDir(r models.Repo, p models.PullRequest) (string, error)
 	// Delete deletes the workspace for this repo and pull.
 	Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error
@@ -78,6 +87,9 @@ type WorkingDir interface {
 // FileWorkspace implements WorkingDir with the file system.
 type FileWorkspace struct {
 	DataDir string
+	// LocalSharePlanDir is the root directory for local Terraform plan files.
+	// If empty, DataDir is used for backward compatibility.
+	LocalSharePlanDir string
 	// CheckoutMerge is true if we should check out the branch that corresponds
 	// to what the base branch will look like *after* the pull request is merged.
 	// If this is false, then we will check out the head branch from the pull
@@ -93,14 +105,19 @@ type FileWorkspace struct {
 	// TestingOverrideBaseCloneURL can be used during testing to override the
 	// URL of the base repo to be cloned. If it's empty then we clone normally.
 	TestingOverrideBaseCloneURL string
-	// GithubAppEnabled is true and a PR number is supplied, we should fetch
-	// the ref "pull/PR_NUMBER/head" from the "origin" remote. If this is false,
-	// we fetch "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
+	// GithubAppEnabled enables GitHub App-specific PR fetching for GitHub repos.
+	// When this is true for a GitHub PR with a pull number, merge checkouts fetch
+	// "pull/PR_NUMBER/head" from "origin". Other VCS hosts still fetch
+	// "+refs/heads/$HEAD_BRANCH" from the "<prSourceRemote>" remote.
 	GithubAppEnabled bool
 	// use the global setting without overriding
 	GpgNoSigningEnabled bool
 	// flag indicating if we have to merge with potential new changes upstream (directly after grabbing project lock)
 	CheckForUpstreamChanges bool
+}
+
+func (w *FileWorkspace) CheckoutMergeEnabled() bool {
+	return w.CheckoutMerge
 }
 
 // Clone git clones headRepo, checks out the branch and then returns the absolute
@@ -192,7 +209,10 @@ func (w *FileWorkspace) MergeAgain(
 	p models.PullRequest,
 	workspace string) (bool, error) {
 
-	if !w.CheckoutMerge {
+	// Synthetic API requests use negative pull numbers and can target branch,
+	// tag, or raw commit refs. They are checked out directly, not merged into a
+	// PR base branch.
+	if !w.CheckoutMerge || p.Num < 0 {
 		return false, nil
 	}
 
@@ -269,12 +289,17 @@ func (w *FileWorkspace) recheckDiverged(logger logging.SimpleLogging, p models.P
 		{
 			"git", "remote", "set-url", "origin", p.BaseRepo.CloneURL,
 		},
-		{
-			"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL,
-		},
-		{
-			"git", "remote", "update",
-		},
+	}
+	if w.usesPRSourceRemote(headRepo, p) {
+		cmds = append(cmds,
+			[]string{"git", "remote", "set-url", prSourceRemote, headRepo.CloneURL},
+			[]string{"git", "remote", "update"},
+		)
+	} else {
+		// On the GitHub App path the source (fork) remote isn't used to fetch the
+		// PR head, so only refresh origin. This avoids fetching a possibly
+		// inaccessible fork, which would fail and make us assume divergence.
+		cmds = append(cmds, []string{"git", "remote", "update", "origin"})
 	}
 
 	for _, args := range cmds {
@@ -307,9 +332,28 @@ func (w *FileWorkspace) HasDiverged(logger logging.SimpleLogging, cloneDir strin
 	defer unlockGitRefLock()
 
 	if len(autoplanWhenModified) > 0 {
-		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest)
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFiles)
 	}
 	return w.hasDiverged(logger, cloneDir)
+}
+
+func (w *FileWorkspace) HasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+	logger.Debug("HasDivergedFromPullHead: starting divergence check in %s", cloneDir)
+	if !w.CheckoutMerge {
+		logger.Debug("HasDivergedFromPullHead: CheckoutMerge is false, skipping divergence check")
+		return false
+	}
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	if len(autoplanWhenModified) > 0 {
+		return w.hasDivergedForPatterns(logger, cloneDir, projectPath, autoplanWhenModified, pullRequest, w.getDivergedFilesFromPullHead)
+	}
+	return w.hasDivergedFromPullHead(logger, cloneDir, pullRequest)
 }
 
 func (w *FileWorkspace) GetDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
@@ -326,6 +370,22 @@ func (w *FileWorkspace) GetDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	defer unlockGitRefLock()
 
 	return w.getDivergedFiles(logger, cloneDir, pullRequest)
+}
+
+func (w *FileWorkspace) GetDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	logger.Debug("GetDivergedFilesFromPullHead: getting diverged files in %s", cloneDir)
+	if !w.CheckoutMerge {
+		logger.Debug("GetDivergedFilesFromPullHead: CheckoutMerge is false, skipping diverged file lookup")
+		return nil, nil
+	}
+
+	unlockGitReadLock := w.gitReadLock(cloneDir)
+	defer unlockGitReadLock()
+
+	unlockGitRefLock := w.gitRefLock(cloneDir)
+	defer unlockGitRefLock()
+
+	return w.getDivergedFilesFromPullHead(logger, cloneDir, pullRequest)
 }
 
 // hasDiverged runs fetch and git status to detect divergence. Caller must hold
@@ -355,13 +415,30 @@ func (w *FileWorkspace) hasDiverged(logger logging.SimpleLogging, cloneDir strin
 	return hasDiverged
 }
 
+func (w *FileWorkspace) hasDivergedFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) bool {
+	if pullRequest.BaseBranch == "" {
+		logger.Debug("HasDiverged: pull request base branch is empty, using git status divergence check")
+		return w.hasDiverged(logger, cloneDir)
+	}
+
+	divergedFiles, err := w.getDivergedFilesFromPullHead(logger, cloneDir, pullRequest)
+	if err != nil {
+		logger.Warn("HasDiverged: getting changed files has failed: %s", err)
+		return true
+	}
+
+	hasDiverged := len(divergedFiles) > 0
+	logger.Debug("HasDiverged: result=%t", hasDiverged)
+	return hasDiverged
+}
+
 // hasDivergedForPatterns checks if the base branch has new commits that affect files
 // matching the given when_modified patterns. Caller must hold gitRefLock and gitReadLock.
-func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest) bool {
+func (w *FileWorkspace) hasDivergedForPatterns(logger logging.SimpleLogging, cloneDir string, projectPath string, autoplanWhenModified []string, pullRequest models.PullRequest, getDivergedFiles func(logging.SimpleLogging, string, models.PullRequest) ([]string, error)) bool {
 	logger.Debug("HasDiverged: running targeted divergence check for project %s with %d patterns",
 		projectPath, len(autoplanWhenModified))
 
-	nonEmptyChangedFiles, err := w.getDivergedFiles(logger, cloneDir, pullRequest)
+	nonEmptyChangedFiles, err := getDivergedFiles(logger, cloneDir, pullRequest)
 	if err != nil {
 		logger.Warn("HasDiverged: getting changed files has failed: %s", err)
 		return true
@@ -422,6 +499,15 @@ func divergedFilesCommandError(action string, err error, output []byte) error {
 }
 
 func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	return w.getDivergedFilesFromRef(logger, cloneDir, pullRequest, "HEAD")
+}
+
+func (w *FileWorkspace) getDivergedFilesFromPullHead(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest) ([]string, error) {
+	pullHeadRef := w.pullHeadRef(logger, cloneDir)
+	return w.getDivergedFilesFromRef(logger, cloneDir, pullRequest, pullHeadRef)
+}
+
+func (w *FileWorkspace) getDivergedFilesFromRef(logger logging.SimpleLogging, cloneDir string, pullRequest models.PullRequest, startRef string) ([]string, error) {
 	logger.Debug("GetDivergedFiles: running git fetch")
 	fetchCmd := exec.Command("git", "fetch")
 	fetchCmd.Dir = cloneDir
@@ -431,7 +517,7 @@ func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	}
 
 	remoteRef := fmt.Sprintf("origin/%s", pullRequest.BaseBranch)
-	revisionRange := fmt.Sprintf("HEAD..%s", remoteRef)
+	revisionRange := fmt.Sprintf("%s..%s", startRef, remoteRef)
 
 	logger.Debug("GetDivergedFiles: getting changed files in %s", revisionRange)
 	changedFilesCmd := exec.Command("git", "log", revisionRange, "--name-only", "--format=") //nolint:gosec // remoteRef is from pullRequest.BaseBranch, a controlled VCS branch name
@@ -452,6 +538,19 @@ func (w *FileWorkspace) getDivergedFiles(logger logging.SimpleLogging, cloneDir 
 	return nonEmptyChangedFiles, nil
 }
 
+func (w *FileWorkspace) pullHeadRef(logger logging.SimpleLogging, cloneDir string) string {
+	headParentCmd := exec.Command("git", "rev-parse", "--verify", "HEAD^2")
+	headParentCmd.Dir = cloneDir
+	output, err := headParentCmd.CombinedOutput()
+	if err == nil {
+		logger.Debug("GetDivergedFiles: using pull request head ref %q", strings.TrimSpace(string(output)))
+		return "HEAD^2"
+	}
+
+	logger.Debug("GetDivergedFiles: HEAD^2 unavailable, using HEAD")
+	return "HEAD"
+}
+
 func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedGitContext, branch string) bool {
 	ref := "refs/remotes/origin/" + branch
 
@@ -467,14 +566,28 @@ func (w *FileWorkspace) remoteHasBranch(logger logging.SimpleLogging, c wrappedG
 // Locks are acquired by the caller.
 func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
 
-	// We use both `<prSourceRemote>` and `origin` remotes, update them both
-	if err := w.wrappedGit(logger, c, "fetch", "--all"); err != nil {
+	if c.pr.Num < 0 && c.pr.HardenedNonPRRefCheckout {
+		return w.checkoutNonPRRef(logger, c, targetRef)
+	}
+
+	// We use both `<prSourceRemote>` and `origin` remotes, update them both.
+	// On the GitHub App path the source (fork) remote isn't used to fetch the PR
+	// head (mergeToBaseBranch fetches pull/<n>/head from origin), so only update
+	// origin and avoid fetching a possibly inaccessible fork.
+	fetchArgs := []string{"fetch", "--all"}
+	if !w.usesPRSourceRemote(c.head, c.pr) {
+		fetchArgs = []string{"fetch", "origin"}
+	}
+	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
 		return err
 	}
 
 	// For branch strategy it's easy: just *go to* the ref we're supposed to be at.
 	if !w.CheckoutMerge {
-		return w.wrappedGit(logger, c, "reset", "--hard", targetRef)
+		if err := w.wrappedGit(logger, c, "reset", "--hard", targetRef); err != nil {
+			return err
+		}
+		return w.cleanStalePlanFiles(logger, c)
 	}
 
 	// For merge strategy, we have to "redo" the merge
@@ -499,7 +612,25 @@ func (w *FileWorkspace) updateToRef(logger logging.SimpleLogging, c wrappedGitCo
 		return fmt.Errorf("post-merge verification failed: HEAD^2 != %s", targetRef)
 	}
 
-	return nil
+	return w.cleanStalePlanFiles(logger, c)
+}
+
+func (w *FileWorkspace) cleanStalePlanFiles(logger logging.SimpleLogging, c wrappedGitContext) error {
+	if filepath.Clean(w.localSharePlanDir()) != filepath.Clean(w.DataDir) {
+		workspace, err := w.workspaceFromCloneDir(c.pr.BaseRepo, c.pr, c.dir)
+		if err != nil {
+			return err
+		}
+		planWorkspaceDir, err := w.planWorkspaceDir(c.pr.BaseRepo, c.pr, workspace)
+		if err != nil {
+			return err
+		}
+		return removeTfPlanFiles(planWorkspaceDir)
+	}
+
+	// Plan files are untracked, so git reset --hard does not remove them.
+	// Use -x because Terraform plan files are commonly ignored by repos.
+	return w.wrappedGit(logger, c, "clean", "-f", "-x", "-e", ".terragrunt-cache", "--", ":(glob)**/*.tfplan")
 }
 
 // isBranchAtTargetRef confirm
@@ -529,10 +660,35 @@ func (w *FileWorkspace) isBranchAtTargetRef(logger logging.SimpleLogging, c wrap
 	return strings.HasPrefix(currCommit, targetRef), nil
 }
 
+// usesPRSourceRemote reports whether the "source" remote (the PR's head repo,
+// e.g. a fork) is actually used to fetch the PR head. On the GitHub App path
+// mergeToBaseBranch fetches "pull/<n>/head" from origin instead (see
+// GithubAppEnabled handling there), so the source remote is never used and we
+// skip creating/updating it. Fetching the head repo otherwise only slows down
+// "git remote update"/"git fetch --all" and, when the App installation can't
+// read the fork, fails and makes recheckDiverged spuriously assume divergence.
+func (w *FileWorkspace) usesPRSourceRemote(head models.Repo, p models.PullRequest) bool {
+	return head.VCSHost.Type != models.Github || !w.GithubAppEnabled || p.Num <= 0
+}
+
 func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitContext) error {
+	// Plans held in a separate store are only invalidated when we are replacing
+	// an existing checkout. When the checkout is merely absent — a restart with
+	// an ephemeral repo volume — the stored plans still describe the commit
+	// they were created at, and apply re-validates them against the recorded
+	// pull status and plan hash before using them. Discarding them here would
+	// stop a separate plan store from ever outliving the working dir.
+	_, statErr := os.Stat(c.dir)
+	replacingCheckout := statErr == nil
+
 	err := os.RemoveAll(c.dir)
 	if err != nil {
 		return fmt.Errorf("deleting dir '%s' before cloning: %w", c.dir, err)
+	}
+	if replacingCheckout {
+		if err := w.deletePlanWorkspaceIfSeparate(c.pr.BaseRepo, c.pr, c.dir); err != nil {
+			return err
+		}
 	}
 
 	// Create the directory and parents if necessary.
@@ -549,6 +705,12 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 	baseCloneURL := c.pr.BaseRepo.CloneURL
 	if w.TestingOverrideBaseCloneURL != "" {
 		baseCloneURL = w.TestingOverrideBaseCloneURL
+	}
+
+	if c.pr.Num < 0 && c.pr.HardenedNonPRRefCheckout {
+		// API refs may be branch names, tags, or raw commit SHAs. Fetch the ref
+		// directly instead of assuming it exists under refs/heads.
+		return w.cloneNonPRRef(logger, c, headCloneURL)
 	}
 
 	// if branch strategy, use depth=1
@@ -569,8 +731,10 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 		}
 	}
 
-	if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
-		return err
+	if w.usesPRSourceRemote(c.head, c.pr) {
+		if err := w.wrappedGit(logger, c, "remote", "add", prSourceRemote, headCloneURL); err != nil {
+			return err
+		}
 	}
 	if w.GpgNoSigningEnabled {
 		if err := w.wrappedGit(logger, c, "config", "--local", "commit.gpgsign", "false"); err != nil {
@@ -579,6 +743,70 @@ func (w *FileWorkspace) forceClone(logger logging.SimpleLogging, c wrappedGitCon
 	}
 
 	return w.mergeToBaseBranch(logger, c)
+}
+
+func (w *FileWorkspace) cloneNonPRRef(logger logging.SimpleLogging, c wrappedGitContext, cloneURL string) error {
+	if err := w.wrappedGit(logger, c, "init"); err != nil {
+		return err
+	}
+	if err := w.wrappedGit(logger, c, "remote", "add", "origin", cloneURL); err != nil {
+		return err
+	}
+	if w.GpgNoSigningEnabled {
+		if err := w.wrappedGit(logger, c, "config", "--local", "commit.gpgsign", "false"); err != nil {
+			return err
+		}
+	}
+	return w.checkoutNonPRRef(logger, c, nonPRTargetRef(c.pr))
+}
+
+func (w *FileWorkspace) checkoutNonPRRef(logger logging.SimpleLogging, c wrappedGitContext, targetRef string) error {
+	if targetRef == "" {
+		return fmt.Errorf("checking out API ref: empty ref")
+	}
+	if models.IsUnsafeAPIRef(targetRef) {
+		return fmt.Errorf("checking out API ref: unsafe refs are not allowed")
+	}
+	fetchRef := nonPRFetchRef(targetRef)
+	fetchArgs := []string{"fetch", "--depth=1", "origin", "--", fetchRef}
+	if w.CheckoutDepth > 0 {
+		fetchArgs = []string{"fetch", "--depth", fmt.Sprint(w.CheckoutDepth), "origin", "--", fetchRef}
+	}
+	if err := w.wrappedGit(logger, c, fetchArgs...); err != nil {
+		return err
+	}
+	if err := w.wrappedGit(logger, c, "checkout", "--detach", "FETCH_HEAD"); err != nil {
+		return err
+	}
+	return w.cleanStalePlanFiles(logger, c)
+}
+
+func nonPRFetchRef(targetRef string) string {
+	ref := strings.TrimSpace(targetRef)
+	if strings.HasPrefix(ref, "refs/heads/") || strings.HasPrefix(ref, "refs/tags/") || isRawCommitRef(ref) {
+		return ref
+	}
+	return "refs/heads/" + ref
+}
+
+func isRawCommitRef(ref string) bool {
+	if len(ref) < 7 || len(ref) > 40 {
+		return false
+	}
+	for _, r := range ref {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func nonPRTargetRef(p models.PullRequest) string {
+	if p.HeadCommit != "" {
+		return p.HeadCommit
+	}
+	return p.HeadBranch
 }
 
 // There is a new upstream update that we need, and we want to update to it
@@ -627,7 +855,7 @@ func (w *FileWorkspace) wrappedGit(logger logging.SimpleLogging, c wrappedGitCon
 func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappedGitContext) error {
 	fetchRef := fmt.Sprintf("+refs/heads/%s:", c.pr.HeadBranch)
 	fetchRemote := prSourceRemote
-	if w.GithubAppEnabled && c.pr.Num > 0 {
+	if c.head.VCSHost.Type == models.Github && w.GithubAppEnabled && c.pr.Num > 0 {
 		fetchRef = fmt.Sprintf("pull/%d/head:", c.pr.Num)
 		fetchRemote = "origin"
 	}
@@ -668,7 +896,10 @@ func (w *FileWorkspace) mergeToBaseBranch(logger logging.SimpleLogging, c wrappe
 
 // GetWorkingDir returns the path to the workspace for this repo and pull.
 func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
-	repoDir := w.cloneDir(r, p, workspace)
+	repoDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(repoDir); err != nil {
 		return "", fmt.Errorf("checking if workspace exists: %w", err)
 	}
@@ -678,7 +909,10 @@ func (w *FileWorkspace) GetWorkingDir(r models.Repo, p models.PullRequest, works
 // GetPullDir returns the dir where the workspaces for this pull are cloned.
 // If the dir doesn't exist it will return an error.
 func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string, error) {
-	dir := w.repoPullDir(r, p)
+	dir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(dir); err != nil {
 		return "", err
 	}
@@ -687,24 +921,196 @@ func (w *FileWorkspace) GetPullDir(r models.Repo, p models.PullRequest) (string,
 
 // Delete deletes the workspace for this repo and pull.
 func (w *FileWorkspace) Delete(logger logging.SimpleLogging, r models.Repo, p models.PullRequest) error {
-	repoPullDir := w.repoPullDir(r, p)
-	logger.Info("Deleting repo pull directory: " + repoPullDir)
-	return os.RemoveAll(repoPullDir)
+	repoPullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	logger.Info("Deleting repo pull directory: %s", repoPullDir)
+	cloneErr := removeAllSubPath(filepath.Join(w.DataDir, workingDirPrefix), repoPullDir)
+
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(planPullDir) == filepath.Clean(repoPullDir) {
+		return cloneErr
+	}
+	logger.Info("Deleting plan pull directory: %s", planPullDir)
+	planErr := removeAllSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), planPullDir)
+	if cloneErr != nil {
+		return cloneErr
+	}
+	return planErr
 }
 
 // DeleteForWorkspace deletes the working dir for this workspace.
 func (w *FileWorkspace) DeleteForWorkspace(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string) error {
-	workspaceDir := w.cloneDir(r, p, workspace)
-	logger.Info("Deleting workspace directory: " + workspaceDir)
-	return os.RemoveAll(workspaceDir)
+	workspaceDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	logger.Info("Deleting workspace directory: %s", workspaceDir)
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	cloneErr := removeAllSubPath(pullDir, workspaceDir)
+
+	planWorkspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	if filepath.Clean(planWorkspaceDir) == filepath.Clean(workspaceDir) {
+		return cloneErr
+	}
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	logger.Info("Deleting plan workspace directory: %s", planWorkspaceDir)
+	planErr := removeAllSubPath(planPullDir, planWorkspaceDir)
+	if cloneErr != nil {
+		return cloneErr
+	}
+	return planErr
 }
 
-func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) string {
-	return filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
+func removeAllSubPath(baseDir, targetDir string) error {
+	baseDir = filepath.Clean(baseDir)
+	targetDir = filepath.Clean(targetDir)
+	if err := utils.EnsureSubPath(baseDir, targetDir); err != nil {
+		return err
+	}
+	relativeTarget, err := filepath.Rel(baseDir, targetDir)
+	if err != nil {
+		return errInvalidManagedPath
+	}
+	if relativeTarget == "." {
+		return errInvalidManagedPath
+	}
+	root, err := os.OpenRoot(baseDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return root.RemoveAll(relativeTarget)
 }
 
-func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) string {
-	return filepath.Join(w.repoPullDir(r, p), workspace)
+func (w *FileWorkspace) repoPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	dir := filepath.Join(w.DataDir, workingDirPrefix, r.FullName, strconv.Itoa(p.Num))
+	if err := utils.EnsureSubPath(filepath.Join(w.DataDir, workingDirPrefix), dir); err != nil {
+		return "", fmt.Errorf("repo path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) localSharePlanDir() string {
+	if w.LocalSharePlanDir == "" {
+		return w.DataDir
+	}
+	return w.LocalSharePlanDir
+}
+
+func (w *FileWorkspace) planPullDir(r models.Repo, p models.PullRequest) (string, error) {
+	dir := runtime.GetPlanPullDir(w.localSharePlanDir(), r, p)
+	if err := utils.EnsureSubPath(filepath.Join(w.localSharePlanDir(), workingDirPrefix), dir); err != nil {
+		return "", fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) planWorkspaceDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	pullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(pullDir, workspace)
+	if err := utils.EnsureSubPath(pullDir, dir); err != nil {
+		return "", fmt.Errorf("plan workspace path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) planProjectDir(r models.Repo, p models.PullRequest, workspace string, projectPath string) (string, error) {
+	workspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(workspaceDir, projectPath)
+	if err := utils.EnsureSubPath(workspaceDir, dir); err != nil {
+		return "", fmt.Errorf("plan project path traversal detected: %w", err)
+	}
+	return dir, nil
+}
+
+func (w *FileWorkspace) workspaceFromCloneDir(r models.Repo, p models.PullRequest, cloneDir string) (string, error) {
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	workspace, err := filepath.Rel(pullDir, cloneDir)
+	if err != nil {
+		return "", fmt.Errorf("checking clone directory %q: %w", cloneDir, err)
+	}
+	if workspace == "." || workspace == ".." || filepath.IsAbs(workspace) || strings.HasPrefix(workspace, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("clone directory %q escapes pull directory %q", cloneDir, pullDir)
+	}
+	return workspace, nil
+}
+
+func (w *FileWorkspace) deletePlanWorkspaceIfSeparate(r models.Repo, p models.PullRequest, cloneDir string) error {
+	if filepath.Clean(w.localSharePlanDir()) == filepath.Clean(w.DataDir) {
+		return nil
+	}
+	workspace, err := w.workspaceFromCloneDir(r, p, cloneDir)
+	if err != nil {
+		return err
+	}
+	planWorkspaceDir, err := w.planWorkspaceDir(r, p, workspace)
+	if err != nil {
+		return err
+	}
+	planPullDir, err := w.planPullDir(r, p)
+	if err != nil {
+		return err
+	}
+	return removeAllSubPath(planPullDir, planWorkspaceDir)
+}
+
+func removeTfPlanFiles(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if path == root && os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".terragrunt-cache" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) != ".tfplan" {
+			return nil
+		}
+		return utils.RemoveIgnoreNonExistent(path)
+	})
+}
+
+func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
+	pullDir, err := w.repoPullDir(r, p)
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(pullDir, workspace)
+	if err := utils.EnsureSubPath(pullDir, dir); err != nil {
+		return "", fmt.Errorf("workspace path traversal detected: %w", err)
+	}
+	return dir, nil
 }
 
 // validateCloneDir computes the clone dir for the given repo/PR/workspace and
@@ -712,7 +1118,11 @@ func (w *FileWorkspace) cloneDir(r models.Repo, p models.PullRequest, workspace 
 // pass through ATLANTIS_REPO_ALLOWLIST, but this explicit check makes the bound
 // provable to static analyzers that taint-track user input into filesystem APIs.
 func (w *FileWorkspace) validateCloneDir(r models.Repo, p models.PullRequest, workspace string) (string, error) {
-	cloneDir := filepath.Clean(w.cloneDir(r, p, workspace))
+	cloneDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return "", err
+	}
+	cloneDir = filepath.Clean(cloneDir)
 	expectedPrefix := filepath.Clean(filepath.Join(w.DataDir, workingDirPrefix)) + string(filepath.Separator)
 	if !strings.HasPrefix(cloneDir, expectedPrefix) {
 		return "", fmt.Errorf("clone dir %q escapes managed data directory %q", cloneDir, expectedPrefix)
@@ -733,8 +1143,15 @@ func (w *FileWorkspace) SetCheckForUpstreamChanges() {
 }
 
 func (w *FileWorkspace) DeletePlan(logger logging.SimpleLogging, r models.Repo, p models.PullRequest, workspace string, projectPath string, projectName string) error {
-	planPath := filepath.Join(w.cloneDir(r, p, workspace), projectPath, runtime.GetPlanFilename(workspace, projectName))
-	logger.Info("Deleting plan: " + planPath)
+	planDir, err := w.planProjectDir(r, p, workspace, projectPath)
+	if err != nil {
+		return err
+	}
+	planPath := filepath.Join(planDir, runtime.GetPlanFilename(workspace, projectName))
+	if err := utils.EnsureSubPath(planDir, planPath); err != nil {
+		return fmt.Errorf("plan path traversal detected: %w", err)
+	}
+	logger.Info("Deleting plan: %s", planPath)
 	return utils.RemoveIgnoreNonExistent(planPath)
 }
 
@@ -772,7 +1189,11 @@ func (w *FileWorkspace) gitWriteLock(cloneDir string) func() {
 // GitReadLock acquires a shared lock so that clone/reset/merge (write lock) cannot run
 // while steps are using the working dir. Call the returned function when steps are done.
 func (w *FileWorkspace) GitReadLock(r models.Repo, p models.PullRequest, workspace string) func() {
-	return w.gitReadLock(w.cloneDir(r, p, workspace))
+	cloneDir, err := w.cloneDir(r, p, workspace)
+	if err != nil {
+		return func() {}
+	}
+	return w.gitReadLock(cloneDir)
 }
 
 // gitReadLock acquires the same shared lock as GitReadLock but by workspace dir path.

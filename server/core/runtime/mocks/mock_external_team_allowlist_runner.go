@@ -25,11 +25,11 @@ func NewMockExternalTeamAllowlistRunner(options ...pegomock.Option) *MockExterna
 func (mock *MockExternalTeamAllowlistRunner) SetFailHandler(fh pegomock.FailHandler) { mock.fail = fh }
 func (mock *MockExternalTeamAllowlistRunner) FailHandler() pegomock.FailHandler      { return mock.fail }
 
-func (mock *MockExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell string, shellArgs string, command string) (string, error) {
+func (mock *MockExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell string, args []string) (string, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockExternalTeamAllowlistRunner().")
 	}
-	_params := []pegomock.Param{ctx, shell, shellArgs, command}
+	_params := []pegomock.Param{ctx, shell, args}
 	_result := pegomock.GetGenericMockFrom(mock).Invoke("Run", _params, []reflect.Type{reflect.TypeOf((*string)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
 	var _ret0 string
 	var _ret1 error
@@ -81,8 +81,8 @@ type VerifierMockExternalTeamAllowlistRunner struct {
 	timeout                time.Duration
 }
 
-func (verifier *VerifierMockExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell string, shellArgs string, command string) *MockExternalTeamAllowlistRunner_Run_OngoingVerification {
-	_params := []pegomock.Param{ctx, shell, shellArgs, command}
+func (verifier *VerifierMockExternalTeamAllowlistRunner) Run(ctx models.TeamAllowlistCheckerContext, shell string, args []string) *MockExternalTeamAllowlistRunner_Run_OngoingVerification {
+	_params := []pegomock.Param{ctx, shell, args}
 	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "Run", _params, verifier.timeout)
 	return &MockExternalTeamAllowlistRunner_Run_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
 }
@@ -92,12 +92,12 @@ type MockExternalTeamAllowlistRunner_Run_OngoingVerification struct {
 	methodInvocations []pegomock.MethodInvocation
 }
 
-func (c *MockExternalTeamAllowlistRunner_Run_OngoingVerification) GetCapturedArguments() (models.TeamAllowlistCheckerContext, string, string, string) {
-	ctx, shell, shellArgs, command := c.GetAllCapturedArguments()
-	return ctx[len(ctx)-1], shell[len(shell)-1], shellArgs[len(shellArgs)-1], command[len(command)-1]
+func (c *MockExternalTeamAllowlistRunner_Run_OngoingVerification) GetCapturedArguments() (models.TeamAllowlistCheckerContext, string, []string) {
+	ctx, shell, args := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], shell[len(shell)-1], args[len(args)-1]
 }
 
-func (c *MockExternalTeamAllowlistRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.TeamAllowlistCheckerContext, _param1 []string, _param2 []string, _param3 []string) {
+func (c *MockExternalTeamAllowlistRunner_Run_OngoingVerification) GetAllCapturedArguments() (_param0 []models.TeamAllowlistCheckerContext, _param1 []string, _param2 [][]string) {
 	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
 	if len(_params) > 0 {
 		if len(_params) > 0 {
@@ -113,15 +113,9 @@ func (c *MockExternalTeamAllowlistRunner_Run_OngoingVerification) GetAllCaptured
 			}
 		}
 		if len(_params) > 2 {
-			_param2 = make([]string, len(c.methodInvocations))
+			_param2 = make([][]string, len(c.methodInvocations))
 			for u, param := range _params[2] {
-				_param2[u] = param.(string)
-			}
-		}
-		if len(_params) > 3 {
-			_param3 = make([]string, len(c.methodInvocations))
-			for u, param := range _params[3] {
-				_param3[u] = param.(string)
+				_param2[u] = param.([]string)
 			}
 		}
 	}

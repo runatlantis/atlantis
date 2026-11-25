@@ -19,7 +19,7 @@ import (
 //	 <description>
 //
 // We use it over the default template so that the output it easier to read.
-func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag) string {
+func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, boolFlags map[string]boolFlag, stringSliceFlags map[string]stringSliceFlag) string {
 	var flagNames []string
 	for name, f := range stringFlags {
 		if f.hidden {
@@ -38,6 +38,11 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 			continue
 		}
 		flagNames = append(flagNames, name)
+	}
+	for name, f := range stringSliceFlags {
+		if !f.hidden {
+			flagNames = append(flagNames, name)
+		}
 	}
 	sort.Strings(flagNames)
 
@@ -58,6 +63,12 @@ func usageTmpl(stringFlags map[string]stringFlag, intFlags map[string]intFlag, b
 			}
 			descrip = to80CharCols(descripWithDefault)
 			isBool = false
+		} else if f, ok := stringSliceFlags[name]; ok {
+			descripWithDefault := f.description
+			if len(f.defaultValue) > 0 {
+				descripWithDefault += fmt.Sprintf(" (default %q)", strings.Join(f.defaultValue, ","))
+			}
+			descrip = to80CharCols(descripWithDefault)
 		} else if f, ok := boolFlags[name]; ok {
 			descrip = to80CharCols(f.description)
 			isBool = true

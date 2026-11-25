@@ -19,7 +19,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestStateRmStepRunner_Run_Success(t *testing.T) {
+func TestStateRmStepRunner_Run_UsesRawCommentArgs(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	tmpDir := t.TempDir()
@@ -29,7 +29,8 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
-		EscapedCommentArgs: []string{"-lock=false", "addr1", "addr2", "addr3"},
+		CommentArgs:        []string{"-lock=false", "addr1", "addr2", "addr3"},
+		EscapedCommentArgs: []string{`\-\l\o\c\k\=\f\a\l\s\e`, `\a\d\d\r\1`, `\a\d\d\r\2`, `\a\d\d\r\3`},
 		Workspace:          workspace,
 	}
 
@@ -38,7 +39,7 @@ func TestStateRmStepRunner_Run_Success(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -61,6 +62,7 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"-lock=false", "addr1", "addr2", "addr3"},
 		EscapedCommentArgs: []string{"-lock=false", "addr1", "addr2", "addr3"},
 		Workspace:          workspace,
 	}
@@ -70,7 +72,7 @@ func TestStateRmStepRunner_Run_Workspace(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -102,6 +104,7 @@ func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                   logger,
+		CommentArgs:           []string{"-lock=false", "addr1", "addr2", "addr3"},
 		EscapedCommentArgs:    []string{"-lock=false", "addr1", "addr2", "addr3"},
 		Workspace:             workspace,
 		TerraformDistribution: &projTFDistribution,
@@ -112,7 +115,7 @@ func TestStateRmStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewStateRmStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)

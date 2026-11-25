@@ -207,3 +207,21 @@ func TestPostWorkflowHookRunner_Run(t *testing.T) {
 		})
 	}
 }
+
+func TestPostWorkflowHookRunnerSuppressesJobOutput(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	tmpDir := t.TempDir()
+	projectCmdOutputHandler := jobmocks.NewMockProjectCommandOutputHandler()
+	r := runtime.DefaultPostWorkflowHookRunner{OutputHandler: projectCmdOutputHandler}
+
+	ctx := models.WorkflowHookCommandContext{
+		Log:               logger,
+		CommandName:       "apply",
+		SuppressJobOutput: true,
+	}
+	_, _, err := r.Run(ctx, "echo hidden", "sh", "-c", tmpDir)
+
+	Ok(t, err)
+	projectCmdOutputHandler.VerifyWasCalled(Never()).SendWorkflowHook(Any[models.WorkflowHookCommandContext](), Any[string](), Any[bool]())
+}

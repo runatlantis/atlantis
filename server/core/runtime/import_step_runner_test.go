@@ -19,7 +19,7 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-func TestImportStepRunner_Run_Success(t *testing.T) {
+func TestImportStepRunner_Run_UsesRawCommentArgs(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	workspace := "default"
 	tmpDir := t.TempDir()
@@ -29,7 +29,8 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
-		EscapedCommentArgs: []string{"-var", "foo=bar", "addr", "id"},
+		CommentArgs:        []string{"-var", "foo=bar", "addr", "id"},
+		EscapedCommentArgs: []string{`\-\v\a\r`, `\f\o\o\=\b\a\r`, `\a\d\d\r`, `\i\d`},
 		Workspace:          workspace,
 	}
 
@@ -38,7 +39,7 @@ func TestImportStepRunner_Run_Success(t *testing.T) {
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
 	tfVersion, _ := version.NewVersion("0.15.0")
-	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewImportStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -61,6 +62,7 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"-var", "foo=bar", "addr", "id"},
 		EscapedCommentArgs: []string{"-var", "foo=bar", "addr", "id"},
 		Workspace:          workspace,
 	}
@@ -70,7 +72,7 @@ func TestImportStepRunner_Run_Workspace(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewImportStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)
@@ -101,6 +103,7 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	projTFDistribution := "opentofu"
 	context := command.ProjectContext{
 		Log:                   logger,
+		CommentArgs:           []string{"-var", "foo=bar", "addr", "id"},
 		EscapedCommentArgs:    []string{"-var", "foo=bar", "addr", "id"},
 		Workspace:             workspace,
 		TerraformDistribution: &projTFDistribution,
@@ -111,7 +114,7 @@ func TestImportStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	tfVersion, _ := version.NewVersion("0.15.0")
 	mockDownloader := mocks.NewMockDownloader()
 	tfDistribution := tf.NewDistributionTerraformWithDownloader(mockDownloader)
-	s := NewImportStepRunner(terraform, tfDistribution, tfVersion)
+	s := NewImportStepRunner(terraform, tfDistribution, tfVersion, &LocalPlanStore{})
 
 	When(terraform.RunCommandWithVersion(Any[command.ProjectContext](), Any[string](), Any[[]string](), Any[map[string]string](), Any[tf.Distribution](), Any[*version.Version](), Any[string]())).
 		ThenReturn("output", nil)

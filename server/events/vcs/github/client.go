@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofri/go-github-ratelimit/github_ratelimit"
+	"github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 	"github.com/google/go-github/v88/github"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
@@ -29,6 +29,10 @@ import (
 // maxCommentLength is the maximum number of chars allowed in a single comment
 // by GitHub.
 const maxCommentLength = 65536
+
+func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	return g.user != "" && user.Username != "" && strings.EqualFold(g.user, user.Username), nil
+}
 
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
@@ -116,19 +120,14 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		return nil, fmt.Errorf("error initializing github authentication transport: %w", err)
 	}
 
-	transportWithRateLimit, err := github_ratelimit.NewRateLimitWaiterClient(transport.Transport)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing github rate limit transport: %w", err)
-	}
+	transportWithRateLimit := newSecondaryRateLimitHTTPClient(transport)
 
-	var graphqlURL string
 	var client *github.Client
 	if hostname == "github.com" {
 		client, err = github.NewClient(github.WithHTTPClient(transportWithRateLimit))
 		if err != nil {
 			return nil, fmt.Errorf("creating github client: %w", err)
 		}
-		graphqlURL = "https://api.github.com/graphql"
 	} else {
 		apiURL := resolveGithubAPIURL(hostname)
 		client, err = github.NewClient(
@@ -138,8 +137,9 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		if err != nil {
 			return nil, fmt.Errorf("creating github enterprise client: %w", err)
 		}
-		graphqlURL = fmt.Sprintf("https://%s/api/graphql", apiURL.Host)
 	}
+
+	graphqlURL := resolveGraphQLURL(hostname)
 
 	// Use the client from shurcooL's githubv4 library for queries.
 	v4Client := githubv4.NewEnterpriseClient(graphqlURL, transportWithRateLimit)
@@ -148,7 +148,13 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 	logger.Debug("GH User: %s", user)
 
 	if err != nil {
-		return nil, fmt.Errorf("getting user: %w", err)
+		if app, ok := credentials.(*AppCredentials); ok && app.AppSlug == "" {
+			// Slug discovery is optional, as it was before self-comment filtering.
+			logger.Warn("unable to discover github app identity, continuing without self-comment filtering with error %q", err)
+			user = ""
+		} else {
+			return nil, fmt.Errorf("getting user: %w", err)
+		}
 	}
 
 	return &Client{
@@ -160,6 +166,12 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 		maxCommentsPerCommand: maxCommentsPerCommand,
 		repoIdCache:           NewGitHubRepoIdCache(),
 	}, nil
+}
+
+func newSecondaryRateLimitHTTPClient(client *http.Client) *http.Client {
+	clientWithRateLimit := *client
+	clientWithRateLimit.Transport = github_ratelimit.NewSecondaryLimiter(client.Transport)
+	return &clientWithRateLimit
 }
 
 // GetModifiedFiles returns the names of files that were modified in the pull request
@@ -193,7 +205,7 @@ listloop:
 			}
 			if err != nil {
 				ghErr, ok := err.(*github.ErrorResponse)
-				if ok && ghErr.Response.StatusCode == 404 {
+				if ok && ghErr.Response != nil && ghErr.Response.StatusCode == 404 {
 					// (hopefully) transient 404, retry after backoff
 					continue
 				}
@@ -373,6 +385,9 @@ func (g *Client) getPRReviews(repo models.Repo, pull models.PullRequest) (Github
 // PullIsApproved returns true if the pull request was approved.
 func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	logger.Debug("Checking if GitHub pull request %d is approved", pull.Num)
+	// Every page must be read before deciding: a later page can hold a
+	// CHANGES_REQUESTED that supersedes an approval on an earlier page.
+	effective := newEffectiveReviews()
 	nextPage := 0
 	for {
 		opts := github.ListOptions{
@@ -389,20 +404,77 @@ func (g *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, 
 			return approvalStatus, fmt.Errorf("getting reviews: %w", err)
 		}
 		for _, review := range pageReviews {
-			if review != nil && review.GetState() == "APPROVED" {
-				return models.ApprovalStatus{
-					IsApproved: true,
-					ApprovedBy: *review.User.Login,
-					Date:       review.SubmittedAt.Time,
-				}, nil
-			}
+			effective.record(review)
 		}
 		if resp.NextPage == 0 {
 			break
 		}
 		nextPage = resp.NextPage
 	}
+	if review := effective.firstApproval(); review != nil {
+		return models.ApprovalStatus{
+			IsApproved: true,
+			ApprovedBy: review.GetUser().GetLogin(),
+			Date:       review.GetSubmittedAt().Time,
+		}, nil
+	}
 	return approvalStatus, nil
+}
+
+// effectiveReviews tracks, for each reviewer, the review that currently
+// determines their stance on a pull request.
+//
+// GitHub keeps every review a user ever submitted, so an APPROVED row on its
+// own does not mean the approval is still in force: the same user may have
+// submitted CHANGES_REQUESTED afterwards, or a later review of theirs may
+// have been dismissed. The reviewer's latest APPROVED, CHANGES_REQUESTED or
+// DISMISSED review (by SubmittedAt, falling back to API order for equal
+// times) is their effective stance, and only an APPROVED stance grants
+// approval. DISMISSED acts as a tombstone: it grants nothing and supersedes
+// every earlier review by the same user, so a dismissal never revives an
+// older approval. COMMENTED, PENDING and any other state neither grant nor
+// revoke approval and are ignored, as are reviews with no user.
+type effectiveReviews struct {
+	latestByReviewer map[string]*github.PullRequestReview
+	// reviewers holds reviewer logins in the order they were first seen so
+	// that the reported approver is deterministic.
+	reviewers []string
+}
+
+func newEffectiveReviews() *effectiveReviews {
+	return &effectiveReviews{latestByReviewer: make(map[string]*github.PullRequestReview)}
+}
+
+func (e *effectiveReviews) record(review *github.PullRequestReview) {
+	if review == nil || review.GetUser() == nil {
+		return
+	}
+	switch review.GetState() {
+	case "APPROVED", "CHANGES_REQUESTED", "DISMISSED":
+	default:
+		return
+	}
+
+	key := review.GetUser().GetLogin()
+	existing, seen := e.latestByReviewer[key]
+	if seen && review.GetSubmittedAt().Before(existing.GetSubmittedAt().Time) {
+		return
+	}
+	if !seen {
+		e.reviewers = append(e.reviewers, key)
+	}
+	e.latestByReviewer[key] = review
+}
+
+// firstApproval returns the first reviewer's effective review that is an
+// approval, or nil when no reviewer currently approves the pull request.
+func (e *effectiveReviews) firstApproval() *github.PullRequestReview {
+	for _, key := range e.reviewers {
+		if review := e.latestByReviewer[key]; review.GetState() == "APPROVED" {
+			return review
+		}
+	}
+	return nil
 }
 
 // DiscardReviews dismisses all reviews on a pull request
@@ -965,7 +1037,7 @@ func (g *Client) GetPullRequest(logger logging.SimpleLogging, repo models.Repo, 
 			return pull, nil
 		}
 		ghErr, ok := err.(*github.ErrorResponse)
-		if !ok || ghErr.Response.StatusCode != 404 {
+		if !ok || ghErr.Response == nil || ghErr.Response.StatusCode != 404 {
 			return pull, err
 		}
 	}
@@ -1126,6 +1198,52 @@ func (g *Client) GetTeamNamesForUser(logger logging.SimpleLogging, repo models.R
 	return teamNames, nil
 }
 
+// GetChildTeams returns the slugs of the direct child teams of the given team.
+// Use this with fetchDescendantTeams in the command runner to expand an allowlisted team
+// to all its descendants, supporting GitHub team hierarchy.
+// https://docs.github.com/en/graphql/reference/objects#team
+func (g *Client) GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error) {
+	logger.Debug("Getting child teams for GitHub team '%s'", teamSlug)
+	orgName := repo.Owner
+	variables := map[string]any{
+		"orgName":     githubv4.String(orgName),
+		"teamSlug":    githubv4.String(teamSlug),
+		"childCursor": (*githubv4.String)(nil),
+	}
+	var q struct {
+		Organization struct {
+			Team struct {
+				ChildTeams struct {
+					Nodes []struct {
+						Slug string
+					}
+					PageInfo struct {
+						EndCursor   githubv4.String
+						HasNextPage bool
+					}
+				} `graphql:"childTeams(first: 100, after: $childCursor)"`
+			} `graphql:"team(slug: $teamSlug)"`
+		} `graphql:"organization(login: $orgName)"`
+	}
+	var childSlugs []string
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for {
+		err := g.v4Client.Query(ctx, &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range q.Organization.Team.ChildTeams.Nodes {
+			childSlugs = append(childSlugs, node.Slug)
+		}
+		if !q.Organization.Team.ChildTeams.PageInfo.HasNextPage {
+			break
+		}
+		variables["childCursor"] = githubv4.NewString(q.Organization.Team.ChildTeams.PageInfo.EndCursor)
+	}
+	return childSlugs, nil
+}
+
 // ExchangeCode returns a newly created app's info
 func (g *Client) ExchangeCode(logger logging.SimpleLogging, code string) (*GithubAppTemporarySecrets, error) {
 	logger.Debug("Exchanging code for app secrets")
@@ -1157,7 +1275,7 @@ func (g *Client) GetFileContent(logger logging.SimpleLogging, repo models.Repo, 
 		logger.Debug("GET /repos/%v/%v/contents/%s returned: %v", repo.Owner, repo.Name, fileName, resp.StatusCode)
 	}
 
-	if resp.StatusCode == http.StatusNotFound {
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
 		return false, []byte{}, nil
 	}
 	if err != nil {

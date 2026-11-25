@@ -13,6 +13,9 @@ import (
 
 // Client is used to make API calls to a VCS host like GitHub or GitLab.
 type Client interface {
+	// IsAtlantisUser reports whether user is the account used by this client.
+	// Missing identity values must never match. Lookup errors must be returned.
+	IsAtlantisUser(repo models.Repo, user models.User) (bool, error)
 	// GetModifiedFiles returns the names of files that were modified in the merge request
 	// relative to the repo root, e.g. parent/child/file.txt.
 	GetModifiedFiles(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error)
@@ -44,4 +47,8 @@ type Client interface {
 
 	// GetPullLabels returns the labels of a pull request
 	GetPullLabels(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) ([]string, error)
+
+	// GetChildTeams returns the slugs of all teams that are children of the given team.
+	// Returns nil, nil for VCS providers that don't support team hierarchies.
+	GetChildTeams(logger logging.SimpleLogging, repo models.Repo, teamSlug string) ([]string, error)
 }

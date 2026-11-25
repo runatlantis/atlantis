@@ -13,18 +13,26 @@
   <b>Terraform Pull Request Automation</b>
 </p>
 
+- [Get involved](#get-involved)
 - [Resources](#resources)
 - [What is Atlantis?](#what-is-atlantis)
 - [What does it do?](#what-does-it-do)
 - [Why should you use it?](#why-should-you-use-it)
 - [Stargazers over time](#stargazers-over-time)
 
+## Get involved
+
+Help shape Atlantis! Share feedback, discuss ideas, report issues, or contribute code and documentation.
+
+- **Community meetings:** Join the conversation at an [Atlantis community meeting](https://zoom-lfx.platform.linuxfoundation.org/meetings/atlantis).
+- **Slack:** Join [CNCF Slack](https://slack.cncf.io/) and find **#atlantis** for questions and feedback, or **#atlantis-contributors** to discuss ideas and contributions.
+- **Issues:** [Report a bug or suggest an improvement](https://github.com/runatlantis/atlantis/issues).
+- **Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+
 ## Resources
 * How to get started: [www.runatlantis.io/guide](https://www.runatlantis.io/guide)
 * Full documentation: [www.runatlantis.io/docs](https://www.runatlantis.io/docs)
 * Download the latest release: [github.com/runatlantis/atlantis/releases/latest](https://github.com/runatlantis/atlantis/releases/latest)
-* Get help in our [Slack channel](https://slack.cncf.io/) in channel #atlantis and development in #atlantis-contributors
-* Start Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What is Atlantis?
 A self-hosted golang application that listens for Terraform pull request events via webhooks.

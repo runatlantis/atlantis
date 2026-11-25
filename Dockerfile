@@ -1,16 +1,12 @@
-# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # what distro is the image being built for
-ARG ALPINE_TAG=3.23.4@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11
-ARG DEBIAN_TAG=12.13-slim@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3
+ARG ALPINE_TAG=3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
+ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.25.8-alpine@sha256:8e02eb337d9e0ea459e041f1ee5eece41cbb61f1d83e7d883a3e2fb4862063fa
+ARG GOLANG_TAG=1.27.4-alpine3.24@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280
 
-# renovate: datasource=github-releases depName=hashicorp/terraform versioning=hashicorp
-ARG DEFAULT_TERRAFORM_VERSION=1.14.9
-# renovate: datasource=github-releases depName=opentofu/opentofu versioning=hashicorp
-ARG DEFAULT_OPENTOFU_VERSION=1.12.0
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
-ARG DEFAULT_CONFTEST_VERSION=0.66.0
+ARG DEFAULT_CONFTEST_VERSION=0.70.1
 
 # Stage 1: build artifact and download deps
 
@@ -27,8 +23,6 @@ ENV ATLANTIS_COMMIT=${ATLANTIS_COMMIT}
 ARG ATLANTIS_DATE=unknown
 ENV ATLANTIS_DATE=${ATLANTIS_DATE}
 
-ARG DEFAULT_TERRAFORM_VERSION
-ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
 ARG DEFAULT_CONFTEST_VERSION
 ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 
@@ -37,8 +31,8 @@ WORKDIR /app
 # This is needed to download transitive dependencies instead of compiling them
 # https://github.com/montanaflynn/golang-docker-cache
 # https://github.com/golang/go/issues/27719
-# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BUILDER_BASH_VERSION="5.3.3-r1"
+# renovate: datasource=apk depName=bash
+ENV BUILDER_BASH_VERSION="5.3.9-r1"
 
 RUN apk add --no-cache \
     bash=${BUILDER_BASH_VERSION}
@@ -56,22 +50,22 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM debian:${DEBIAN_TAG} AS debian-base
 
 # Define package versions for Debian
-# renovate: datasource=repology depName=debian_12/ca-certificates versioning=loose
-ENV DEBIAN_CA_CERTIFICATES_VERSION="20230311+deb12u1"
-# renovate: datasource=repology depName=debian_12/curl versioning=loose
-ENV DEBIAN_CURL_VERSION="7.88.1-10+deb12u14"
-# renovate: datasource=repology depName=debian_12/git versioning=loose
-ENV DEBIAN_GIT_VERSION="1:2.39.5-0+deb12u3"
-# renovate: datasource=repology depName=debian_12/unzip versioning=loose
-ENV DEBIAN_UNZIP_VERSION="6.0-28"
-# renovate: datasource=repology depName=debian_12/openssh-server versioning=loose
-ENV DEBIAN_OPENSSH_SERVER_VERSION="1:9.2p1-2+deb12u10"
-# renovate: datasource=repology depName=debian_12/dumb-init versioning=loose
-ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-2"
-# renovate: datasource=repology depName=debian_12/gnupg versioning=loose
-ENV DEBIAN_GNUPG_VERSION="2.2.40-1.1+deb12u2"
-# renovate: datasource=repology depName=debian_12/openssl versioning=loose
-ENV DEBIAN_OPENSSL_VERSION="3.0.20-1~deb12u1"
+# renovate: datasource=deb depName=ca-certificates
+ENV DEBIAN_CA_CERTIFICATES_VERSION="20250419+deb13u1"
+# renovate: datasource=deb depName=curl
+ENV DEBIAN_CURL_VERSION="8.14.1-2+deb13u7"
+# renovate: datasource=deb depName=git
+ENV DEBIAN_GIT_VERSION="1:2.47.3-0+deb13u1"
+# renovate: datasource=deb depName=unzip
+ENV DEBIAN_UNZIP_VERSION="6.0-29+deb13u1"
+# renovate: datasource=deb depName=openssh-server
+ENV DEBIAN_OPENSSH_SERVER_VERSION="1:10.0p1-7+deb13u4"
+# renovate: datasource=deb depName=dumb-init
+ENV DEBIAN_DUMB_INIT_VERSION="1.2.5-3"
+# renovate: datasource=deb depName=gnupg
+ENV DEBIAN_GNUPG_VERSION="2.4.7-21+deb13u1"
+# renovate: datasource=deb depName=openssl
+ENV DEBIAN_OPENSSL_VERSION="3.5.7-1~deb13u3"
 
 # Set up the 'atlantis' user and adjust permissions. User with uid 1000 is for backwards compatibility
 RUN groupadd --gid 1000 atlantis && \
@@ -125,46 +119,42 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.7.1
+ENV GIT_LFS_VERSION=3.8.1
 
+# Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
+# SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64 ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e72cf723a4a660438862282e8aecf3885fc8123e88bfcad534cf6b941a354b75 ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=67895dd77b63329796bc5efdd47b57f218e1f7b98717ebaf936a8238dbcaec0f ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=51850fba78f08c8ffe86e162ce277a36fb41929ba699c2853f4b0ff178cf0eb2 ;; \
+        *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
+    echo "${GIT_LFS_SHA256}  git-lfs.tar.gz" | sha256sum -c - && \
     tar --strip-components=1 -xf git-lfs.tar.gz && \
     chmod +x git-lfs && \
     mv git-lfs /usr/bin/git-lfs && \
     git-lfs --version
 
-# install terraform binaries
-ARG DEFAULT_TERRAFORM_VERSION
-ENV DEFAULT_TERRAFORM_VERSION=${DEFAULT_TERRAFORM_VERSION}
-ARG DEFAULT_OPENTOFU_VERSION
-ENV DEFAULT_OPENTOFU_VERSION=${DEFAULT_OPENTOFU_VERSION}
-
-# COPY scripts/download-release.sh .
-COPY --from=builder /app/scripts/download-release.sh download-release.sh
-
-# In the official Atlantis image, we only have the latest of each Terraform version.
-# Each binary is about 80 MB so we limit it to the 4 latest minor releases or fewer
-RUN ./download-release.sh \
-        "terraform" \
-        "${TARGETPLATFORM}" \
-        "${DEFAULT_TERRAFORM_VERSION}" \
-        "1.8.5 1.9.8 1.10.5 ${DEFAULT_TERRAFORM_VERSION}" \
-    && ./download-release.sh \
-        "tofu" \
-        "${TARGETPLATFORM}" \
-        "${DEFAULT_OPENTOFU_VERSION}" \
-        "${DEFAULT_OPENTOFU_VERSION}"
-
 # Stage 2 - Alpine
-# Creating the individual distro builds using targets
+# Creating the individual distro builds using targets.
+#
+# Since v0.49.0 the images ship no Terraform or OpenTofu binaries. Atlantis
+# downloads the version it needs at runtime (see --default-tf-version and
+# --tf-download), so the image carries none of the advisories filed against
+# bundled third-party binaries.
+#
+# With no terraform on PATH, Atlantis refuses to start until
+# --default-tf-version is set (flag, ATLANTIS_DEFAULT_TF_VERSION, or the
+# server config file). Deliberately no ENV ATLANTIS_DEFAULT_TF_VERSION here:
+# environment variables take precedence over the server config file, so a
+# version baked into the image would silently override a version pinned in
+# that file.
 FROM alpine:${ALPINE_TAG} AS alpine
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
     CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
@@ -177,32 +167,29 @@ RUN addgroup --gid 1000 atlantis && \
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-# renovate: datasource=repology depName=alpine_3_23/ca-certificates versioning=loose
-ENV CA_CERTIFICATES_VERSION="20260413-r0"
-# renovate: datasource=repology depName=alpine_3_23/curl versioning=loose
-ENV CURL_VERSION="8.19.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/git versioning=loose
-ENV GIT_VERSION="2.52.0-r0"
-# renovate: datasource=repology depName=alpine_3_23/unzip versioning=loose
+# renovate: datasource=apk depName=ca-certificates
+ENV CA_CERTIFICATES_VERSION="20261020-r0"
+# renovate: datasource=apk depName=curl
+ENV CURL_VERSION="8.23.0-r0"
+# renovate: datasource=apk depName=git
+ENV GIT_VERSION="2.54.1-r0"
+# renovate: datasource=apk depName=unzip
 ENV UNZIP_VERSION="6.0-r16"
-# renovate: datasource=repology depName=alpine_3_23/bash versioning=loose
-ENV BASH_VERSION="5.3.3-r1"
-# renovate: datasource=repology depName=alpine_3_23/openssh versioning=loose
-ENV OPENSSH_VERSION="10.2_p1-r0"
-# renovate: datasource=repology depName=alpine_3_23/dumb-init versioning=loose
-ENV DUMB_INIT_VERSION="1.2.5-r3"
-# renovate: datasource=repology depName=alpine_3_23/gcompat versioning=loose
+# renovate: datasource=apk depName=bash
+ENV BASH_VERSION="5.3.9-r1"
+# renovate: datasource=apk depName=openssh
+ENV OPENSSH_VERSION="10.3_p1-r2"
+# renovate: datasource=apk depName=dumb-init
+ENV DUMB_INIT_VERSION="1.2.5-r4"
+# renovate: datasource=apk depName=gcompat
 ENV GCOMPAT_VERSION="1.1.0-r4"
-# renovate: datasource=repology depName=alpine_3_23/coreutils versioning=loose
-ENV COREUTILS_ENV_VERSION="9.8-r1"
+# renovate: datasource=apk depName=coreutils-env
+ENV COREUTILS_ENV_VERSION="9.11-r0"
 
 # Install packages needed to run Atlantis.
 # We place this last as it will bust less docker layer caches when packages update
@@ -223,7 +210,7 @@ RUN apk add --no-cache \
 # etc. and is slow/noisy. Anything outside fcap_scan_dirs is not checked. Strip
 # and verify share the same list; post-pass getcap|grep fails the build if
 # capabilities remain under that scope.
-# renovate: datasource=repology depName=alpine_3_23/libcap versioning=loose
+# renovate: datasource=apk depName=libcap
 ENV LIBCAP_VERSION="2.78-r0"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
@@ -253,16 +240,15 @@ CMD ["server"]
 # Stage 2 - Debian
 FROM debian-base AS debian
 
-EXPOSE ${ATLANTIS_PORT:-4141}
+ARG ATLANTIS_PORT=4141
+
+EXPOSE ${ATLANTIS_PORT}
 
 HEALTHCHECK --interval=5m --timeout=3s \
     CMD curl -f http://localhost:${ATLANTIS_PORT:-4141}/healthz || exit 1
 
 # copy atlantis binary
 COPY --from=builder /app/atlantis /usr/local/bin/atlantis
-# copy terraform binaries
-COPY --from=deps /usr/local/bin/terraform/terraform* /usr/local/bin/
-COPY --from=deps /usr/local/bin/tofu/tofu* /usr/local/bin/
 # copy dependencies
 COPY --from=deps /usr/local/bin/conftest /usr/local/bin/conftest
 COPY --from=deps /usr/bin/git-lfs /usr/bin/git-lfs
@@ -276,8 +262,8 @@ ENV DEFAULT_CONFTEST_VERSION=${DEFAULT_CONFTEST_VERSION}
 # trees, not the entire image). Post-pass: if getcap still reports any
 # "path = cap_set" line under that scope, the build fails. Strip may use
 # 2>/dev/null and setcap || true; verification is the hard guarantee.
-# renovate: datasource=repology depName=debian_12/libcap2-bin versioning=loose
-ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.66-4+deb12u3+b1"
+# renovate: datasource=deb depName=libcap2-bin
+ENV DEBIAN_LIBCAP2_BIN_VERSION="1:2.75-10+deb13u1+b3"
 # hadolint ignore=DL4006
 RUN fcap_scan_dirs="/bin /sbin /usr /opt /lib /lib64" && \
     apt-get update && \

@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/google/shlex"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/utils"
@@ -42,16 +42,29 @@ const (
 	clearPolicyApprovalFlagShort = ""
 )
 
-// DefaultBlockedExtraArgs is the default set of Terraform CLI flag prefixes
-// that are rejected when supplied as comment extra args (after "--"). These
-// flags could be used to bypass security controls (e.g. working-directory
-// traversal via -chdir, or loading of malicious providers via -plugin-dir).
-// Operators may override this list via the --blocked-extra-args server flag.
+// DefaultBlockedExtraArgs is the set of Terraform CLI flags that are always
+// rejected when supplied as comment extra args (after "--").
+//
+// Two groups are blocked. -chdir and -plugin-dir move Terraform's working
+// directory or provider source somewhere the commenter controls. The rest
+// name a file Terraform will write to, or read state from, at a path the
+// commenter chooses: Atlantis passes its own -out before the comment args,
+// and Terraform keeps the last value it sees, so an unblocked -out would let
+// a comment drop the plan file anywhere the service account can write (for
+// example over another pull request's stored plan).
+//
+// Each flag is listed once because matching is done on the flag name (see
+// isBlockedExtraArg), which covers every dash spelling. These flags cannot be
+// unblocked: the --blocked-extra-args server flag adds to this list rather
+// than replacing it.
 var DefaultBlockedExtraArgs = []string{
 	"-chdir",
-	"--chdir",
 	"-plugin-dir",
-	"--plugin-dir",
+	"-out",
+	"-generate-config-out",
+	"-state",
+	"-state-out",
+	"-backup",
 }
 
 // multiLineRegex is used to ignore multi-line comments since those aren't valid
@@ -91,8 +104,9 @@ type CommentParser struct {
 	AzureDevopsUser string
 	ExecutableName  string
 	AllowCommands   []command.Name
-	// BlockedExtraArgs is the set of Terraform CLI flag prefixes that are
-	// rejected when supplied as comment extra args (after "--").
+	// BlockedExtraArgs is the set of Terraform CLI flags, on top of
+	// DefaultBlockedExtraArgs, that are rejected when supplied as comment
+	// extra args (after "--").
 	// Populated by NewCommentParser from UserConfig.ToBlockedExtraArgs().
 	BlockedExtraArgs []string
 }
@@ -176,8 +190,12 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, "terraform")}
 	}
 
-	// Helpfully warn the user that the command might be misspelled
-	if utils.IsSimilarWord(executableName, e.ExecutableName) {
+	// Helpfully warn the user that the command might be misspelled. Only do this
+	// when running under the default executable name — operators who've
+	// customized ExecutableName (e.g. running multiple Atlantis servers against
+	// one repo) can otherwise get spurious "did you mean" replies to ordinary
+	// comments that happen to be Levenshtein-close to their custom name.
+	if e.ExecutableName == defaultExecutableName && utils.IsSimilarWord(executableName, e.ExecutableName) {
 		return CommentParseResult{CommentResponse: fmt.Sprintf(DidYouMeanAtlantisComment, e.ExecutableName, args[0])}
 	}
 
@@ -320,15 +338,13 @@ func (e *CommentParser) Parse(rawComment string, vcsHost models.VCSHostType) Com
 		return CommentParseResult{CommentResponse: e.errMarkdown(err.Error(), cmd, flagSet)}
 	}
 
-	// Use the same validation that Terraform uses: https://git.io/vxGhU. Plus
-	// we also don't allow '..'. We don't want the workspace to contain a path
-	// since we create files based on the name.
-	// Additionally reject workspace names that start with '~': the shell
-	// expands leading tildes (tilde expansion) when the workspace name is
-	// used as a word in a "sh -c" command, which would produce unexpected and
-	// potentially unsafe behaviour.
-	if workspace != url.PathEscape(workspace) || strings.Contains(workspace, "..") || strings.HasPrefix(workspace, "~") {
-		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace: %q", workspace), cmd, flagSet)}
+	// The workspace ends up both in the string Atlantis runs via "sh -c" when
+	// invoking Terraform and in the paths of files we create, so it is
+	// restricted to the same character set as a repo-config workspace. The
+	// previous check here used url.PathEscape, which leaves shell
+	// metacharacters such as '&' untouched.
+	if err := valid.ValidateWorkspaceName(workspace); err != nil {
+		return CommentParseResult{CommentResponse: e.errMarkdown(fmt.Sprintf("invalid workspace %q: %s", workspace, err), cmd, flagSet)}
 	}
 
 	// If project is specified, dir or workspace should not be set. Since we
@@ -431,14 +447,43 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 }
 
 // isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
-// permitted in comment extra args for security reasons.
+// permitted in comment extra args: one of DefaultBlockedExtraArgs, which are
+// always enforced, or one the operator added through BlockedExtraArgs.
+//
+// The comparison is on the flag name with leading dashes removed and any
+// "=value" suffix dropped, so "-out", "--out" and "-out=path" all match a
+// blocklist entry of "-out". Terraform accepts both dash spellings for every
+// flag, and a blocklist that had to be told each spelling separately would be
+// bypassed by whichever one the operator forgot. Any dash count is treated as
+// the flag: Terraform would reject "---out" itself, so over-matching there
+// only ever blocks an argument that could not have worked anyway.
 func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+	name := extraArgFlagName(arg)
+	if name == "" {
+		return false
+	}
+	for _, blocked := range DefaultBlockedExtraArgs {
+		if name == extraArgFlagName(blocked) {
+			return true
+		}
+	}
 	for _, blocked := range e.BlockedExtraArgs {
-		if arg == blocked || strings.HasPrefix(arg, blocked+"=") {
+		if name == extraArgFlagName(blocked) {
 			return true
 		}
 	}
 	return false
+}
+
+// extraArgFlagName returns the bare flag name of a Terraform CLI argument:
+// leading dashes stripped and anything from the first "=" onwards removed.
+// It returns "" for an argument that is not a flag.
+func extraArgFlagName(arg string) string {
+	if !strings.HasPrefix(arg, "-") {
+		return ""
+	}
+	name, _, _ := strings.Cut(arg, "=")
+	return strings.TrimLeft(name, "-")
 }
 
 // BuildPlanComment builds a plan comment for the specified args.
@@ -662,6 +707,14 @@ Use "{{ .ExecutableName }} [command] --help" for more information about a comman
 // DidYouMeanAtlantisComment is the comment we add to the pull request when
 // someone runs a misspelled command or terraform instead of atlantis.
 var DidYouMeanAtlantisComment = "Did you mean to use `%s` instead of `%s`?"
+
+// DefaultExecutableName is the value of ExecutableName Atlantis uses unless
+// an operator overrides it via --executable-name / ATLANTIS_EXECUTABLE_NAME.
+// This is intentionally a separate literal from cmd.DefaultExecutableName:
+// server/events cannot import cmd (cmd imports server, so the reverse would
+// be an import cycle). If the default executable name ever changes, update
+// both constants.
+const defaultExecutableName = "atlantis"
 
 // UnlockUsage is the comment we add to the pull request when someone runs
 // `atlantis unlock` with flags.

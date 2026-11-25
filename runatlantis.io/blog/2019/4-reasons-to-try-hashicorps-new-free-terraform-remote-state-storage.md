@@ -15,7 +15,7 @@ Update (May 20/19) — Free State Storage is now called Terraform Cloud and is o
 
 HashiCorp is planning to offer free Terraform Remote State Storage and they have a beta version available now. In this article, I talk about 4 reasons you should try it (Disclosure: I work at HashiCorp).
 
-> _Sign up for Terraform Cloud [here](https://goo.gl/X5t5EM)._
+> _[Sign up for Terraform Cloud](https://goo.gl/X5t5EM)._
 
 ## What is Terraform State?
 

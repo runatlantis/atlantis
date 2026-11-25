@@ -12,6 +12,11 @@ linters:
     misspell:
       ignore-rules:
         - noteable
+    modernize:
+      disable:
+        - newexpr
+        # Keep the Go 1.27 upgrade separate from repository-wide literal rewrites.
+        - embedlit
     revive:
       rules:
         - name: dot-imports

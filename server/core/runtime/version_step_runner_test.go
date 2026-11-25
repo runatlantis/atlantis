@@ -24,6 +24,7 @@ func TestRunVersionStep(t *testing.T) {
 
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
 		RepoRelDir:         ".",
@@ -64,6 +65,7 @@ func TestVersionStepRunner_Run_UsesConfiguredDistribution(t *testing.T) {
 	projTFDistribution := "opentofu"
 	context := command.ProjectContext{
 		Log:                logger,
+		CommentArgs:        []string{"comment", "args"},
 		EscapedCommentArgs: []string{"comment", "args"},
 		Workspace:          workspace,
 		RepoRelDir:         ".",

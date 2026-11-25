@@ -449,6 +449,55 @@ func TestUnlockingMultiple(t *testing.T) {
 	Equals(t, 0, len(ls))
 }
 
+func TestUnlockIfOwnedByPullMissingLock(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should ignore missing locks")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+}
+
+func TestUnlockIfOwnedByPullOtherPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should not delete another pull's lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum+1)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), deleted)
+
+	existing, err := b.GetLock(project, workspace)
+	Ok(t, err)
+	Assert(t, existing != nil, "expected lock to remain")
+	Equals(t, pullNum, existing.Pull.Num)
+}
+
+func TestUnlockIfOwnedByPullCurrentPull(t *testing.T) {
+	t.Log("UnlockIfOwnedByPull should delete the current pull's lock")
+	db, b := newTestDB()
+	defer cleanupDB(db)
+
+	_, _, err := b.TryLock(lock)
+	Ok(t, err)
+
+	deleted, err := b.UnlockIfOwnedByPull(project, workspace, pullNum)
+	Ok(t, err)
+	Assert(t, deleted != nil, "expected deleted lock")
+	Equals(t, lock.Project, deleted.Project)
+	Equals(t, lock.Workspace, deleted.Workspace)
+	Equals(t, lock.Pull, deleted.Pull)
+	Equals(t, lock.User, deleted.User)
+
+	existing, err := b.GetLock(project, workspace)
+	Ok(t, err)
+	Equals(t, (*models.ProjectLock)(nil), existing)
+}
+
 func TestUnlockByPullNone(t *testing.T) {
 	t.Log("UnlockByPull should be successful when there are no locks")
 	db, b := newTestDB()
@@ -794,6 +843,140 @@ func TestPullStatus_UpdateNewCommit(t *testing.T) {
 			Status:      models.AppliedPlanStatus,
 		},
 	}, maybeStatus.Projects)
+	b.Close()
+}
+
+func TestPullStatus_UpdateSameCommitNewBaseBranch(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := b.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "release"
+	status, err := b.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, 1, len(status.Projects))
+
+	maybeStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, pull, maybeStatus.Pull)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, maybeStatus.Projects)
+	b.Close()
+}
+
+func TestBoltDB_SameCommitBackfillBaseDoesNotPromoteLegacyOldBaseProjects(t *testing.T) {
+	b := newTestDB2(t)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	_, err := b.UpdatePullWithResults(
+		pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: "old-base",
+				Workspace:  "default",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+	Ok(t, err)
+
+	pull.BaseBranch = "main"
+	status, err := b.UpdatePullWithResults(pull,
+		[]command.ProjectResult{
+			{
+				Command:    command.Plan,
+				RepoRelDir: ".",
+				Workspace:  "staging",
+				ProjectCommandOutput: command.ProjectCommandOutput{
+					PlanSuccess: &models.PlanSuccess{},
+				},
+			},
+		})
+
+	Ok(t, err)
+	Equals(t, "main", status.Pull.BaseBranch)
+	Equals(t, []models.ProjectStatus{
+		{
+			Workspace:   "staging",
+			RepoRelDir:  ".",
+			ProjectName: "",
+			Status:      models.PlannedPlanStatus,
+		},
+	}, status.Projects)
+
+	maybeStatus, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, "main", maybeStatus.Pull.BaseBranch)
+	Equals(t, status.Projects, maybeStatus.Projects)
 	b.Close()
 }
 
@@ -1244,4 +1427,80 @@ func newTestDB2(t *testing.T) *boltdb.BoltDB {
 func cleanupDB(db *bolt.DB) {
 	db.Close()           // nolint: errcheck
 	os.Remove(db.Path()) // nolint: errcheck
+}
+
+// The plan hash recorded by a plan result must survive the policy check and
+// apply-failure results that follow it, and must be dropped once the plan has
+// been applied or replaced; apply verifies the plan file against it.
+func TestPullStatus_PlanHashPreservedAcrossLaterResults(t *testing.T) {
+	b := newTestDB2(t)
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+	result := func(cmd command.Name, out command.ProjectCommandOutput) command.ProjectResult {
+		return command.ProjectResult{
+			Command:              cmd,
+			RepoRelDir:           ".",
+			Workspace:            "default",
+			ProjectName:          "projA",
+			ProjectCommandOutput: out,
+		}
+	}
+	const planHash = "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+
+	status, err := b.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Plan, command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{PlanHash: planHash}}),
+	})
+	Ok(t, err)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	status, err = b.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.PolicyCheck, command.ProjectCommandOutput{PolicyCheckResults: &models.PolicyCheckResults{}}),
+	})
+	Ok(t, err)
+	Equals(t, models.PassedPolicyCheckStatus, status.Projects[0].Status)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	stored, err := b.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, planHash, stored.Projects[0].PlanHash)
+
+	status, err = b.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Apply, command.ProjectCommandOutput{Error: errors.New("apply failed")}),
+	})
+	Ok(t, err)
+	Equals(t, models.ErroredApplyStatus, status.Projects[0].Status)
+	Equals(t, planHash, status.Projects[0].PlanHash)
+
+	status, err = b.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Apply, command.ProjectCommandOutput{ApplySuccess: "applied"}),
+	})
+	Ok(t, err)
+	Equals(t, models.AppliedPlanStatus, status.Projects[0].Status)
+	Equals(t, "", status.Projects[0].PlanHash)
+
+	const replanHash = "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+	status, err = b.UpdatePullWithResults(pull, []command.ProjectResult{
+		result(command.Plan, command.ProjectCommandOutput{PlanSuccess: &models.PlanSuccess{PlanHash: replanHash}}),
+	})
+	Ok(t, err)
+	Equals(t, replanHash, status.Projects[0].PlanHash)
+	b.Close()
 }
