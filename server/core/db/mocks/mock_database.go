@@ -235,17 +235,17 @@ func (mr *MockDatabaseMockRecorder) UnlockIfOwnedByPull(project, workspace, pull
 }
 
 // UpdateProjectStatus mocks base method.
-func (m *MockDatabase) UpdateProjectStatus(pull models.PullRequest, workspace, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (m *MockDatabase) UpdateProjectStatus(pull models.PullRequest, workspace, repoRelDir, projectName string, newStatus models.ProjectPlanStatus) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateProjectStatus", pull, workspace, repoRelDir, newStatus)
+	ret := m.ctrl.Call(m, "UpdateProjectStatus", pull, workspace, repoRelDir, projectName, newStatus)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // UpdateProjectStatus indicates an expected call of UpdateProjectStatus.
-func (mr *MockDatabaseMockRecorder) UpdateProjectStatus(pull, workspace, repoRelDir, newStatus any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) UpdateProjectStatus(pull, workspace, repoRelDir, projectName, newStatus any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectStatus", reflect.TypeOf((*MockDatabase)(nil).UpdateProjectStatus), pull, workspace, repoRelDir, newStatus)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProjectStatus", reflect.TypeOf((*MockDatabase)(nil).UpdateProjectStatus), pull, workspace, repoRelDir, projectName, newStatus)
 }
 
 // UpdatePullWithResults mocks base method.

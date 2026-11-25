@@ -402,7 +402,7 @@ func (r *RedisDB) CheckCommandLock(cmdName command.Name) (*command.Lock, error) 
 
 // UpdateProjectStatus updates pull's status with the latest project results.
 // It returns the new PullStatus object.
-func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, newStatus models.ProjectPlanStatus) error {
+func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string, repoRelDir string, projectName string, newStatus models.ProjectPlanStatus) error {
 	key, err := r.pullKey(pull)
 	if err != nil {
 		return err
@@ -422,7 +422,7 @@ func (r *RedisDB) UpdateProjectStatus(pull models.PullRequest, workspace string,
 		// NOTE: We're using a reference here because we are
 		// in-place updating its Status field.
 		proj := &currStatus.Projects[i]
-		if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir {
+		if proj.Workspace == workspace && proj.RepoRelDir == repoRelDir && proj.ProjectName == projectName {
 			proj.Status = newStatus
 			break
 		}

@@ -347,6 +347,59 @@ func TestDeleteLock_UpdateProjectStatus(t *testing.T) {
 	}, status.Projects)
 }
 
+func TestDeleteLock_UpdateProjectStatusMatchesProjectName(t *testing.T) {
+	t.Log("Discarding one named project's lock must not discard another project in the same dir and workspace")
+	RegisterMockTestingT(t)
+
+	repoName := "owner/repo"
+	projectPath := "path"
+	workspaceName := "workspace"
+
+	cp := vcsmocks.NewMockClient()
+	l := mocks2.NewMockDeleteLockCommand()
+	workingDir := mocks2.NewMockWorkingDir()
+	workingDirLocker := events.NewDefaultWorkingDirLocker()
+	pull := models.PullRequest{
+		BaseRepo: models.Repo{FullName: repoName},
+	}
+	When(l.DeleteLock(Any[logging.SimpleLogging](), Eq("id"))).ThenReturn(&models.ProjectLock{
+		Pull:      pull,
+		Workspace: workspaceName,
+		Project:   models.NewProject(repoName, projectPath, "b"),
+	}, nil)
+	tmp := t.TempDir()
+	database, err := boltdb.New(tmp)
+	Ok(t, err)
+	defer closeTestDatabase(t, database)
+	planned := command.ProjectCommandOutput{
+		PlanSuccess: &models.PlanSuccess{TerraformOutput: "tf-output", LockURL: "lock-url"},
+	}
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		{Command: command.Plan, RepoRelDir: projectPath, Workspace: workspaceName, ProjectName: "a", ProjectCommandOutput: planned},
+		{Command: command.Plan, RepoRelDir: projectPath, Workspace: workspaceName, ProjectName: "b", ProjectCommandOutput: planned},
+	})
+	Ok(t, err)
+	lc := controllers.LocksController{
+		DeleteLockCommand: l,
+		Logger:            logging.NewNoopLogger(t),
+		VCSClient:         cp,
+		WorkingDirLocker:  workingDirLocker,
+		WorkingDir:        workingDir,
+		Database:          database,
+	}
+	req, _ := http.NewRequest("GET", "", bytes.NewBuffer(nil))
+	req = mux.SetURLVars(req, map[string]string{"id": "id"})
+	w := httptest.NewRecorder()
+	lc.DeleteLock(w, req)
+	ResponseContains(t, w, http.StatusOK, "Deleted lock id 'id'")
+	status, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	Equals(t, []models.ProjectStatus{
+		{Workspace: workspaceName, RepoRelDir: projectPath, ProjectName: "a", Status: models.PlannedPlanStatus},
+		{Workspace: workspaceName, RepoRelDir: projectPath, ProjectName: "b", Status: models.DiscardedPlanStatus},
+	}, status.Projects)
+}
+
 func TestDeleteLock_CommentFailed(t *testing.T) {
 	t.Log("If the commenting fails we still return success")
 	RegisterMockTestingT(t)

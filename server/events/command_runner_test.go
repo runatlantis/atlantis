@@ -2830,7 +2830,7 @@ func TestRunApply_DiscardedProjects(t *testing.T) {
 		},
 	})
 	Ok(t, err)
-	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", models.DiscardedPlanStatus))
+	Ok(t, boltDB.UpdateProjectStatus(pull, "default", ".", "", models.DiscardedPlanStatus))
 	ghPull := &github.PullRequest{
 		State: github.Ptr("open"),
 	}
