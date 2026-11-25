@@ -56,6 +56,9 @@ jobs:
               - '**/go.sum'
               - '**/*.tmpl'
               - 'Makefile'
+              - 'Dockerfile'
+              - 'testing/Dockerfile'
+              - 'scripts/verify-go-toolchain.sh'
               - '.github/workflows/test.yml'
   test:
     needs: [changes]
