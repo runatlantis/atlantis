@@ -52,9 +52,9 @@ If you're using GitLab, navigate to your project's home page in GitLab
 * set **Secret Token** to the Webhook Secret you generated previously
   * **NOTE** If you're adding a webhook to multiple repositories, each repository will need to use the **same** secret.
 * check the boxes
-  * **Push events**
   * **Comments**
   * **Merge Request events**
+  * **NOTE** **Push events** aren't needed. Atlantis learns about new commits on a merge request from **Merge Request events**.
 * leave **Enable SSL verification** checked
 * click **Add webhook**
 * See [Next Steps](#next-steps)
