@@ -36,9 +36,9 @@ Given the directory structure:
 * If `project1/modules/module1/main.tf` were modified, we would look one level above `project1/modules`
 into `project1/`, see that there was a `main.tf` file and so run plan in `project1/`
 
-## Bitbucket-Specific Notes
+## Bitbucket Cloud-Specific Notes
 
-Bitbucket does not have a webhook that triggers only upon a new PR or commit. To fix this we cache the last commit to see if it has changed. If the cache is emptied, Atlantis will think your commit is new and you may see extra plans.
+Bitbucket Cloud does not have a webhook that triggers only upon a new PR or commit. To fix this we cache the last commit to see if it has changed. If the cache is emptied, Atlantis will think your commit is new and you may see extra plans.
 This scenario can happen if:
 
 * Atlantis restarts

@@ -203,13 +203,13 @@ For Jobs with allow_failure setting set to true, will be ignored. If the pipelin
 
 For per-project `atlantis apply` commands, Atlantis scopes GitLab's `mergeable` requirement to the project being applied when GitLab reports blocking commit statuses. Atlantis ignores blocking Atlantis plan statuses from other projects in the same merge request, but the project's own plan status and any non-Atlantis blocker still prevent the apply.
 
-#### Bitbucket.org (Bitbucket Cloud)
+#### Bitbucket Cloud (bitbucket.org)
 
 For Bitbucket Cloud, a pull request is mergeable if none of the checks returned by
-Bitbucket's [mergeability checks API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/#api-repositories-workspace-repo-slug-pullrequests-pull-request-id-mergeability-checks-get)
+its [mergeability checks API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/#api-repositories-workspace-repo-slug-pullrequests-pull-request-id-mergeability-checks-get)
 are blocking the merge. This covers conflicts, the merge checks configured in the repository
 (e.g. approvals, builds and unresolved tasks), custom merge checks and the merge queue.
-Failed checks that Bitbucket doesn't enforce are ignored. Atlantis itself doesn't need to be
+Failed checks that Bitbucket Cloud doesn't enforce are ignored. Atlantis itself doesn't need to be
 allowed to merge.
 
 ::: warning Behavior change
@@ -219,20 +219,20 @@ including the pull request being a draft.
 
 ::: warning
 
-* Bitbucket counts the Atlantis commit statuses as builds. Atlantis ignores failed and in
-  progress builds if they are all from `atlantis apply`, so Bitbucket may still prevent the
-  merge until the apply succeeds.
+* Bitbucket Cloud counts the Atlantis commit statuses as builds. Atlantis ignores failed and
+  in progress builds if they are all from `atlantis apply`, so Bitbucket Cloud may still
+  prevent the merge until the apply succeeds.
 * If you run multiple Atlantis servers against the repository, use
   [`--ignore-vcs-status-names`](server-configuration.md#ignore-vcs-status-names) so that they
   don't prevent each other from applying.
 * Failed plans count as failed builds, so avoid `mergeable` in `plan_requirements` if the
   repository enforces the builds merge checks.
 * A pull request that is a draft or is already in the merge queue is not mergeable.
-* If Bitbucket can't determine whether there are conflicts, the pull request is not mergeable.
+* If Bitbucket Cloud can't determine whether there are conflicts, the pull request is not mergeable.
 
 :::
 
-#### Bitbucket Server (Stash)
+#### Bitbucket Server (aka Stash)
 
 For Bitbucket Server, a pull request is mergeable if it's not a draft, has no conflicts and no
 [merge check](https://confluence.atlassian.com/bitbucketserver/checks-for-merging-pull-requests-776640039.html)
@@ -245,11 +245,11 @@ to merge them. Now, they are not mergeable.
 
 ::: warning
 
-* Bitbucket counts the Atlantis commit statuses as builds. Atlantis ignores failed and in
-  progress builds if they are all from `atlantis apply`, so Bitbucket may still prevent the
-  merge until the apply succeeds. This only covers the minimum successful builds merge check,
-  which Atlantis recognizes by its message in English. So the profile of the user it runs as
-  must not have another language set.
+* Bitbucket Server counts the Atlantis commit statuses as builds. Atlantis ignores failed and
+  in progress builds if they are all from `atlantis apply`, so Bitbucket Server may still
+  prevent the merge until the apply succeeds. This only covers the minimum successful builds
+  merge check, which Atlantis recognizes by its message in English. So the profile of the user
+  it runs as must not have another language set.
 * If you run multiple Atlantis servers against the repository, use
   [`--ignore-vcs-status-names`](server-configuration.md#ignore-vcs-status-names) so that they
   don't prevent each other from applying.

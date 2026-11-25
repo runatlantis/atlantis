@@ -50,7 +50,7 @@ type DeleteSourceBranch struct {
 	DryRun bool   `json:"dryRun"`
 }
 
-// NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
+// NewClient builds a bitbucket server client. Returns an error if the baseURL is
 // malformed. httpClient is the client to use to make the requests, username
 // and password are used as basic auth in the requests, baseURL is the API's
 // baseURL, ex. https://corp.com:7990. Don't include the API version, ex.

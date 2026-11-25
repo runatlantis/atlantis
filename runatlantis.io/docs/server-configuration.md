@@ -378,7 +378,7 @@ atlantis server --bitbucket-token="token"
 ATLANTIS_BITBUCKET_TOKEN="token"
 ```
 
-Bitbucket app password of API user.
+API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server (aka Stash).
 
 ### `--bitbucket-user`
 
@@ -1105,9 +1105,9 @@ ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
 Hide previous plan comments to declutter PRs. This is only supported in
-GitHub and GitLab and Bitbucket currently and is not enabled by default.
+GitHub, GitLab and Bitbucket Cloud currently and is not enabled by default.
 
-For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+For Bitbucket Cloud, the comments are deleted rather than hidden as it does not support hiding comments.
 
 For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
@@ -1136,7 +1136,7 @@ ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
 Comma separated list of VCS status names from other atlantis services.
 Their status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
 are ignored when checking if the PR is mergeable.
-Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, and Bitbucket.
+Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, Bitbucket Cloud and Bitbucket Server.
 
 ### `--include-git-untracked-files`
 
