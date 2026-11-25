@@ -671,6 +671,24 @@ func TestClient_GetModifiedFiles_SSRFPrevented(t *testing.T) {
 	Assert(t, strings.Contains(err.Error(), "does not match base URL origin"), "error should mention origin mismatch, got: %s", err.Error())
 }
 
+// Test that it's not an error if the pull request is added to a merge queue
+// instead of being merged.
+func TestClient_MergePullMergeQueue(t *testing.T) {
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Equals(t, "POST", r.Method)
+		Equals(t, "/2.0/repositories/owner/repo/pullrequests/1/merge", r.RequestURI)
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer testServer.Close()
+
+	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
+	client.BaseURL = testServer.URL
+	Ok(t, client.MergePull(logging.NewNoopLogger(t), models.PullRequest{
+		Num:      1,
+		BaseRepo: models.Repo{FullName: "owner/repo"},
+	}, models.PullRequestOptions{}))
+}
+
 func TestClient_MarkdownPullLink(t *testing.T) {
 	client := bitbucketcloud.New(http.DefaultClient, "user", "pass", "", "runatlantis.io")
 	pull := models.PullRequest{Num: 1}

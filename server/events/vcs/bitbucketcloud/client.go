@@ -477,7 +477,7 @@ func (b *Client) makeRequestWithContext(ctx context.Context, method string, path
 	defer resp.Body.Close() // nolint: errcheck
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNoContent {
 		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}
