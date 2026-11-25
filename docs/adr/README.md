@@ -11,6 +11,7 @@ Architecture Decision Records (ADRs) preserve important design choices and their
 | [0003](0003-govern-architecture-proposals.md) | Govern architecture proposals | Accepted |
 | [0004](0004-govern-feature-lifecycles.md) | Govern feature lifecycles | Accepted |
 | [0005](0005-use-durable-storage-with-one-data-model.md) | Use durable storage with one data model | Accepted |
+| [0006](0006-group-related-projects.md) | Group related projects | Proposed |
 
 Update this table when adding or changing an ADR.
 
