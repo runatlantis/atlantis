@@ -372,3 +372,31 @@ func TestAutomergeCommitMsg(t *testing.T) {
 		})
 	}
 }
+
+// Regression test for https://github.com/runatlantis/atlantis/issues/7090.
+// A split that lands inside a <details> block but outside any code fence must
+// not open a ```diff fence in the continuation comment: the DetailsBlock
+// SepEnd only closes </details>, so such a fence would never be closed and
+// would swallow the rest of the comment. Unlike the tests above, this test
+// uses the real separators from GenerateSeparators.
+func TestSplitComment_DetailsBlockDoesNotOpenCodeFence(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	comment := "<details><summary>Show Output</summary>\n\n" +
+		strings.Repeat("#### Policy Set: `some_policy`\nplain markdown line inside details\n", 20) +
+		"</details>"
+
+	for _, maxComments := range []int{0, 2} {
+		split := common.SplitComment(logger, comment, 300, maxComments, "policy_check")
+		Assert(t, len(split) > 1, "expected the comment to be split, got %d part(s)", len(split))
+		for i, part := range split {
+			if len(part) > 300 {
+				t.Errorf("maxComments=%d: part %d exceeds maxSize: length %d > 300", maxComments, i, len(part))
+			}
+			fences := strings.Count(part, "```")
+			Assert(t, fences%2 == 0,
+				"maxComments=%d: part %d has an unbalanced code fence (%d fence markers): %q",
+				maxComments, i, fences, part)
+		}
+	}
+}
