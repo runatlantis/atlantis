@@ -24,7 +24,7 @@ generate an access token. Read on for the instructions for your specific Git hos
 * [GitLab](#gitlab)
 * [Gitea](#gitea)
 * [Bitbucket Cloud (bitbucket.org)](#bitbucket-cloud-bitbucket-org)
-* [Bitbucket Server (aka Stash)](#bitbucket-server-aka-stash)
+* [Bitbucket Server](#bitbucket-server)
 * [Azure DevOps](#azure-devops)
 
 ### GitHub user
@@ -147,7 +147,7 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 * **Account**: **Read** also allows Atlantis to identify and ignore its own comments. For scoped API tokens, the equivalent permission is `read:user:bitbucket`. If the identity lookup fails, Atlantis logs a warning and continues normal command processing. In that case, its own comments may still be parsed as commands, including producing parsing errors.
 * Record the access token
 
-### Bitbucket Server (aka Stash)
+### Bitbucket Server
 
 * Click on your avatar in the top right and select **Manage account**
 * Click **Personal access tokens** in the sidebar

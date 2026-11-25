@@ -232,7 +232,7 @@ including the pull request being a draft.
 
 :::
 
-#### Bitbucket Server (aka Stash)
+#### Bitbucket Server
 
 For Bitbucket Server, a pull request is mergeable if it's not a draft, has no conflicts and no
 [merge check](https://confluence.atlassian.com/bitbucketserver/checks-for-merging-pull-requests-776640039.html)

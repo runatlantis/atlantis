@@ -283,10 +283,10 @@ var stringFlags = map[string]stringFlag{
 		description: "Bitbucket username for git operations.",
 	},
 	BitbucketTokenFlag: {
-		description: "API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server (aka Stash). Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
+		description: "API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
 	},
 	BitbucketBaseURLFlag: {
-		description: "Base URL of Bitbucket Server (aka Stash) installation." +
+		description: "Base URL of Bitbucket Server installation." +
 			" Must include 'http://' or 'https://'." +
 			" If using Bitbucket Cloud (bitbucket.org), do not set.",
 		defaultValue: DefaultBitbucketBaseURL,

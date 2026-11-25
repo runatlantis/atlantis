@@ -366,7 +366,7 @@ atlantis server --bitbucket-base-url="http://bitbucket.corp:7990/basepath"
 ATLANTIS_BITBUCKET_BASE_URL="http://bitbucket.corp:7990/basepath"
 ```
 
-Base URL of Bitbucket Server (aka Stash) installation. Must include
+Base URL of Bitbucket Server installation. Must include
 `http://` or `https://`. If using Bitbucket Cloud (bitbucket.org), do not set. Defaults to
 `https://api.bitbucket.org`.
 
@@ -378,7 +378,7 @@ atlantis server --bitbucket-token="token"
 ATLANTIS_BITBUCKET_TOKEN="token"
 ```
 
-API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server (aka Stash).
+API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server.
 
 ### `--bitbucket-user`
 

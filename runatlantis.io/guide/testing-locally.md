@@ -130,7 +130,7 @@ Take the URL that ngrok output and create a webhook in your GitHub, GitLab or Bi
     </ul>
 </details>
 
-### Bitbucket Server (aka Stash) Webhook
+### Bitbucket Server Webhook
 
 <details>
     <summary>Expand</summary>
@@ -216,7 +216,7 @@ TOKEN="{YOUR_TOKEN}"
 TOKEN="{YOUR_TOKEN}"
 ```
 
-### Bitbucket Server (aka Stash) Access Token
+### Bitbucket Server Access Token
 
 - Click on your avatar in the top right and select **Manage account**
 - Click **HTTP access tokens** in the sidebar
@@ -312,7 +312,7 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-### Bitbucket Server (aka Stash) Command
+### Bitbucket Server Command
 
 ```bash
 BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990
