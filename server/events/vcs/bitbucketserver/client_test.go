@@ -4,6 +4,8 @@
 package bitbucketserver_test
 
 import (
+	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -143,10 +145,18 @@ func TestClient_GetModifiedFilesPagination(t *testing.T) {
 	Equals(t, []string{"file1.txt", "file2.txt", "file3.txt"}, files)
 }
 
+// pullRequestJSON returns the pull request in testdata, as a draft or not.
+func pullRequestJSON(t *testing.T, draft bool) []byte {
+	pull, err := os.ReadFile(filepath.Join("testdata", "pull-request.json"))
+	Ok(t, err)
+	return bytes.Replace(pull, []byte("{"), fmt.Appendf(nil, `{"draft": %t,`, draft), 1)
+}
+
 func TestClient_PullIsMergeable(t *testing.T) {
 	logger := logging.NewNoopLogger(t)
 	cases := map[string]struct {
 		MergeStatus  string
+		Draft        bool
 		ExpMergeable models.MergeableStatus
 	}{
 		"mergeable": {
@@ -168,6 +178,22 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      "Has conflicts",
 			},
 		},
+		"draft": {
+			MergeStatus: `{"canMerge": true, "conflicted": false, "outcome": "CLEAN", "vetoes": []}`,
+			Draft:       true,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Is a draft",
+			},
+		},
+		"draft with merge conflict and veto": {
+			MergeStatus: `{"canMerge": false, "conflicted": true, "outcome": "CONFLICTED", "vetoes": [{"summaryMessage": "First veto", "detailedMessage": "First details"}]}`,
+			Draft:       true,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Is a draft; Has conflicts; First veto",
+			},
+		},
 		"merge conflict and vetoes": {
 			MergeStatus: `{"canMerge": false, "conflicted": true, "outcome": "CONFLICTED", "vetoes": [
 				{"summaryMessage": "First veto", "detailedMessage": "First details"},
@@ -186,6 +212,9 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				switch r.RequestURI {
 				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge":
 					w.Write([]byte(c.MergeStatus)) // nolint: errcheck
+					return
+				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+					w.Write(pullRequestJSON(t, c.Draft)) // nolint: errcheck
 					return
 				default:
 					t.Errorf("got unexpected request at %q", r.RequestURI)
@@ -228,6 +257,7 @@ func TestClient_PullIsMergeableBuilds(t *testing.T) {
 	cases := map[string]struct {
 		vetoes     string
 		conflicted bool
+		draft      bool
 		required   int
 		pages      []string
 		exp        models.MergeableStatus
@@ -306,6 +336,11 @@ func TestClient_PullIsMergeableBuilds(t *testing.T) {
 			pages:  []string{`{"key": "atlantis/apply", "state": "FAILED"}`},
 			exp:    models.MergeableStatus{Reason: "Other"},
 		},
+		"draft too": {
+			vetoes: failedVeto, draft: true,
+			pages: []string{`{"key": "atlantis/apply", "state": "FAILED"}`},
+			exp:   models.MergeableStatus{Reason: "Is a draft"},
+		},
 		"conflicts too": {
 			vetoes: failedVeto, conflicted: true,
 			pages: []string{`{"key": "atlantis/apply", "state": "FAILED"}`},
@@ -326,6 +361,8 @@ func TestClient_PullIsMergeableBuilds(t *testing.T) {
 				switch r.RequestURI {
 				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge":
 					fmt.Fprintf(w, `{"canMerge": false, "conflicted": %t, "vetoes": [%s]}`, c.conflicted, c.vetoes) // nolint: errcheck
+				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+					w.Write(pullRequestJSON(t, c.draft)) // nolint: errcheck
 				case "/rest/api/1.0/projects/ow/repos/repo/settings/pull-requests":
 					fmt.Fprintf(w, `{"requiredSuccessfulBuilds": %d}`, c.required) // nolint: errcheck
 				default:
@@ -359,17 +396,21 @@ func TestClient_PullIsMergeableBuilds(t *testing.T) {
 func TestClient_PullIsMergeableBuildsErrors(t *testing.T) {
 	const settings = `{"requiredSuccessfulBuilds": 1}`
 	cases := map[string]struct {
+		pull     string
 		settings string
 		statuses string
 		expErr   string
 	}{
-		"settings not found":   {expErr: "unexpected status code: 404"},
-		"missing minimum":      {settings: `{}`, expErr: "was missing fields"},
-		"invalid settings":     {settings: `[`, expErr: "parsing response"},
-		"statuses not found":   {settings: settings, expErr: "unexpected status code: 404"},
-		"missing status state": {settings: settings, statuses: `{"values": [{"key": "a"}], "isLastPage": true}`, expErr: "was missing fields"},
-		"missing next page":    {settings: settings, statuses: `{"values": [], "isLastPage": false}`, expErr: "was missing nextPageStart"},
-		"invalid statuses":     {settings: settings, statuses: `[`, expErr: "parsing response"},
+		"pull request not found":     {pull: "-", expErr: "unexpected status code: 404"},
+		"invalid pull request":       {pull: "[", expErr: "parsing response"},
+		"missing pull request state": {pull: "{}", expErr: "was missing fields"},
+		"settings not found":         {expErr: "unexpected status code: 404"},
+		"missing minimum":            {settings: `{}`, expErr: "was missing fields"},
+		"invalid settings":           {settings: `[`, expErr: "parsing response"},
+		"statuses not found":         {settings: settings, expErr: "unexpected status code: 404"},
+		"missing status state":       {settings: settings, statuses: `{"values": [{"key": "a"}], "isLastPage": true}`, expErr: "was missing fields"},
+		"missing next page":          {settings: settings, statuses: `{"values": [], "isLastPage": false}`, expErr: "was missing nextPageStart"},
+		"invalid statuses":           {settings: settings, statuses: `[`, expErr: "parsing response"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -378,12 +419,14 @@ func TestClient_PullIsMergeableBuildsErrors(t *testing.T) {
 				switch r.RequestURI {
 				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1/merge":
 					body = `{"canMerge": false, "conflicted": false, "vetoes": [{"detailedMessage": "You cannot merge this pull request while it has failed builds."}]}`
+				case "/rest/api/1.0/projects/ow/repos/repo/pull-requests/1":
+					body = cmp.Or(c.pull, string(pullRequestJSON(t, false)))
 				case "/rest/api/1.0/projects/ow/repos/repo/settings/pull-requests":
 					body = c.settings
 				case "/rest/build-status/1.0/commits/abc?start=0":
 					body = c.statuses
 				}
-				if body == "" {
+				if body == "" || body == "-" {
 					http.Error(w, "not found", http.StatusNotFound)
 					return
 				}

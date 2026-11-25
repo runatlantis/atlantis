@@ -182,23 +182,31 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 	return err
 }
 
+func (b *Client) getPullRequest(projectKey string, repoName string, pullNum int) (PullRequest, error) {
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repoName, pullNum)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return PullRequest{}, err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	return pullResp, nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return approvalStatus, err
 	}
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
 	if err != nil {
 		return approvalStatus, err
-	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
@@ -223,17 +231,9 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 	if err != nil {
 		return models.PullRequest{}, err
 	}
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
 	if err != nil {
 		return models.PullRequest{}, err
-	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return models.PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return models.PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	pull.HeadCommit = *pullResp.FromRef.LatestCommit
 	pull.BaseBranch = *pullResp.ToRef.DisplayID
@@ -245,7 +245,8 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 	return nil
 }
 
-// PullIsMergeable returns true if the merge request has no conflicts and can be merged.
+// PullIsMergeable returns true if the pull request is not a draft, has no
+// conflicts and can be merged.
 func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
@@ -263,12 +264,20 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if err := validator.New().Struct(mergeStatus); err != nil {
 		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
-	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted {
+	// Bitbucket refuses to merge drafts, despite saying that they can be merged.
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted && !pullResp.Draft {
 		return models.MergeableStatus{
 			IsMergeable: true,
 		}, nil
 	}
 	var reasons []string
+	if pullResp.Draft {
+		reasons = append(reasons, "Is a draft")
+	}
 	if *mergeStatus.Conflicted {
 		reasons = append(reasons, "Has conflicts")
 	}
@@ -403,19 +412,11 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	}
 
 	// We need to make a get pull request API call to get the correct "version".
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, pull.BaseRepo.Name, pull.Num)
 	if err != nil {
 		return err
 	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return fmt.Errorf("response %q was missing fields: %w", string(resp), err)
-	}
-	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
 	if err != nil {
 		return err

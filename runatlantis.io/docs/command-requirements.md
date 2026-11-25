@@ -234,9 +234,14 @@ including the pull request being a draft.
 
 #### Bitbucket Server (Stash)
 
-For Bitbucket Server, a pull request is mergeable if it has no conflicts and no
+For Bitbucket Server, a pull request is mergeable if it's not a draft, has no conflicts and no
 [merge check](https://confluence.atlassian.com/bitbucketserver/checks-for-merging-pull-requests-776640039.html)
 is vetoing the merge.
+
+::: warning Behavior change
+Previously, drafts could be applied, since Bitbucket Server doesn't count that as a veto even though it refuses
+to merge them. Now, they are not mergeable.
+:::
 
 ::: warning
 
@@ -250,7 +255,6 @@ is vetoing the merge.
   don't prevent each other from applying.
 * Failed plans count as failed builds, so avoid `mergeable` in `plan_requirements` if the
   repository requires successful builds.
-* Drafts are mergeable, since Bitbucket doesn't count that as a veto.
 
 :::
 

@@ -37,6 +37,8 @@ type PullRequest struct {
 	Reviewers   []struct {
 		Approved *bool `json:"approved,omitempty" validate:"required"`
 	} `json:"reviewers,omitempty" validate:"required"`
+	// Draft is missing in versions that don't support drafts.
+	Draft bool `json:"draft,omitempty"`
 }
 
 type Ref struct {
