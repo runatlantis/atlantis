@@ -50,6 +50,8 @@ type MergeabilityCheck struct {
 	// Blocking is whether this check currently prevents the merge. A failed
 	// check is not necessarily blocking.
 	Blocking *bool `json:"blocking,omitempty" validate:"required"`
+	// Queued is only set for merge queue checks.
+	Queued bool `json:"queued,omitempty"`
 	// State is only set for pull request state checks.
 	State string `json:"state,omitempty"`
 	// Reason is only set for git mergeability checks.

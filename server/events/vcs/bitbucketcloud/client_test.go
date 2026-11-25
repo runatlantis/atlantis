@@ -355,6 +355,45 @@ func TestClient_PullIsMergeable(t *testing.T) {
 				Reason:      "Blocked by DRAFT",
 			},
 		},
+		"already in the merge queue": {
+			Checks: `{"values": [
+				{"type": "pullrequest_state_check", "status": "FAILED", "required": true, "blocking": true, "state": "OPEN"},
+				{"type": "merge_queue_check", "status": "PASSED", "required": true, "blocking": false, "queued": true}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by QUEUED",
+			},
+		},
+		"already in the merge queue and blocked by it": {
+			Checks: `{"values": [
+				{"type": "merge_queue_check", "status": "FAILED", "required": true, "blocking": true, "queued": true},
+				{"type": "pullrequest_state_check", "status": "FAILED", "required": true, "blocking": true, "state": "OPEN"}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by merge_queue_check, QUEUED",
+			},
+		},
+		"merge queue draining": {
+			Checks: `{"values": [
+				{"type": "merge_queue_check", "status": "FAILED", "required": true, "blocking": true, "queued": false},
+				{"type": "pullrequest_state_check", "status": "PASSED", "required": true, "blocking": false, "state": "OPEN"}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by merge_queue_check",
+			},
+		},
+		"not open": {
+			Checks: `{"values": [
+				{"type": "pullrequest_state_check", "status": "FAILED", "required": true, "blocking": true, "state": "MERGED"}
+			]}`,
+			ExpMergeable: models.MergeableStatus{
+				IsMergeable: false,
+				Reason:      "Blocked by pullrequest_state_check",
+			},
+		},
 		"builds blocked by apply statuses": {
 			Checks: `{"values": [
 				{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true, "check": {"kind": "failed_builds"}},

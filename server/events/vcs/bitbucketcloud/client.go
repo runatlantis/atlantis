@@ -304,6 +304,9 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if err := validator.New().Struct(checks); err != nil {
 		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
+	// Already queued pull requests are still open, and it's the state check that
+	// blocks them.
+	queued := slices.ContainsFunc(checks.Values, func(check MergeabilityCheck) bool { return check.Queued })
 	var blockers, buildBlockers []string
 	for _, check := range checks.Values {
 		// Bitbucket couldn't determine whether there are conflicts, so we can't
@@ -317,6 +320,8 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 			continue
 		case check.State == "DRAFT":
 			blockers = append(blockers, check.State)
+		case *check.Type == "pullrequest_state_check" && queued:
+			blockers = append(blockers, "QUEUED")
 		case check.Check.Kind == "failed_builds" || check.Check.Kind == "in_progress_builds":
 			buildBlockers = append(buildBlockers, check.Check.Kind)
 		default:
