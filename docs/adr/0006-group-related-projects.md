@@ -61,23 +61,27 @@ projects:
   - name: prod-api
     dir: terraform/prod/api
     group: prod
-    run_after: [prod-database]
+    run_after:
+      - target: prod-database
+        commands: [apply]
 ```
 
-Atlantis evaluates autoplan for each project. `atlantis plan --group prod` explicitly selects all projects in `prod`. `atlantis apply --group prod` selects the pending production plans. Both production projects inherit the server's `guarded` workflow from their group. If the PR affects `staging-api`, that project must have applied or have a current plan with no changes. `prod-api` waits for the database when both are selected. A later apply that selects only `prod-api` still checks staging and can proceed without selecting the database.
+Atlantis evaluates autoplan for each project. `atlantis plan --group prod` explicitly selects all projects in `prod`. `atlantis apply --group prod` selects the pending production plans. Both production projects inherit the server's `guarded` workflow from their group.
+
+Before either production project can apply, an affected `staging-api` must have applied or have a current plan with no changes. During apply, `prod-api` waits for `prod-database` when both are selected. They can plan in parallel. A later apply that selects only `prod-api` still checks staging and can proceed without selecting the database.
 
 ### Order and dependencies
 
 | Setting | What it does |
 | --- | --- |
-| `run_after` | Waits for the named work to finish when it's part of the same command. The next project can still run after a failure. |
-| `depends_on` | Orders work within a command and skips projects whose prerequisites fail. Before apply, each prerequisite affected by the PR must have applied or have a current plan with no changes, even if it wasn't selected. |
+| `run_after` | Orders work selected in the same invocation. A rule can limit that ordering to specific commands. The next project can still run after a failure. |
+| `depends_on` | Applies only to `apply`. Each affected prerequisite must have applied or have a current plan with no changes, even if it is outside the selection. With named ordering, Atlantis runs selected prerequisites first. |
 
 Projects can name other projects or groups. Groups can name other groups. Atlantis matches dependency names exactly and rejects unknown names. It expands each group to its projects and rejects cycles. It reports unmet prerequisites without adding work to the command. Independent projects can run in parallel. With `abort_on_failure`, any failure skips work that hasn't started. Locks and results stay per project.
 
 ## Transition
 
-Project groups and named ordering ship alongside numeric ordering. The same release deprecates `execution_order_group`. Repositories can keep their numeric ordering and `abort_on_execution_order_fail` during the deprecation period. A repository uses one ordering model at a time. Existing project-to-project `depends_on` works with either. Removal follows Atlantis's deprecation policy.
+Project groups and named ordering ship alongside numeric ordering. The same release deprecates `execution_order_group`. Repositories can keep their numeric ordering and `abort_on_execution_order_fail` during the deprecation period. A repository uses one ordering model at a time. Repositories keep their current scheduling and apply checks until they adopt named ordering. This includes repositories that use `depends_on` without numeric groups. Removal follows Atlantis's deprecation policy.
 
 ## Consequences
 
