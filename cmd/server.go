@@ -511,7 +511,7 @@ var stringFlags = map[string]stringFlag{
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
 			" Their status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) are ignored when checking if the PR is mergeable." +
-			" Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, and Bitbucket Cloud.",
+			" Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, and Bitbucket.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
 	},
 	LanguageFlag: {

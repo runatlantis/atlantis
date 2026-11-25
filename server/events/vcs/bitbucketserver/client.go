@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -23,6 +25,13 @@ import (
 // maxCommentLength is the maximum number of chars allowed by Bitbucket in a
 // single comment.
 const maxCommentLength = 32768
+
+// buildVetoes are the messages of the vetoes caused by failed or in progress
+// builds. Bitbucket doesn't identify vetoes in any other way.
+var buildVetoes = []string{
+	"You cannot merge this pull request while it has failed builds.",
+	"You cannot merge this pull request while it has in-progress builds.",
+}
 
 func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 	return b.username != "" && user.Username != "" && strings.EqualFold(b.username, user.Username), nil
@@ -237,7 +246,7 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 }
 
 // PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -263,13 +272,92 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if *mergeStatus.Conflicted {
 		reasons = append(reasons, "Has conflicts")
 	}
+	ignoredVetoes := 0
 	for _, veto := range mergeStatus.Vetoes {
+		if slices.Contains(buildVetoes, veto.DetailedMessage) {
+			// Our own apply statuses must not prevent us from applying again.
+			onlyIgnored, err := b.onlyIgnoredStatusesUnsuccessful(projectKey, repo, pull, vcsstatusname, ignoreVCSStatusNames)
+			if err != nil {
+				return models.MergeableStatus{}, err
+			}
+			if onlyIgnored {
+				ignoredVetoes++
+				continue
+			}
+		}
 		reasons = append(reasons, veto.SummaryMessage)
+	}
+	if ignoredVetoes > 0 && len(reasons) == 0 {
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
 	}
 	return models.MergeableStatus{
 		IsMergeable: false,
 		Reason:      strings.Join(reasons, "; "),
 	}, nil
+}
+
+// onlyIgnoredStatusesUnsuccessful returns true if there are unsuccessful commit
+// statuses in the pull request, all of them are either our apply statuses or
+// from the ignored Atlantis services, and the minimum of successful builds is
+// met without our apply statuses.
+func (b *Client) onlyIgnoredStatusesUnsuccessful(projectKey string, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+	// Failed and in progress builds count towards the minimum in the veto, so it
+	// doesn't tell if there are successful builds missing.
+	resp, err := b.makeRequest("GET", fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/settings/pull-requests", b.BaseURL, projectKey, repo.Name), nil)
+	if err != nil {
+		return false, err
+	}
+	var settings PullRequestSettings
+	if err := json.Unmarshal(resp, &settings); err != nil {
+		return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(settings); err != nil {
+		return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+
+	applyPrefix := fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())
+	found := false
+	successful := 0
+	nextPageStart := 0
+	// We'll only loop 1000 times as a safety measure.
+	maxLoops := 1000
+	for range maxLoops {
+		resp, err := b.makeRequest("GET", fmt.Sprintf("%s/rest/build-status/1.0/commits/%s?start=%d", b.BaseURL, pull.HeadCommit, nextPageStart), nil)
+		if err != nil {
+			return false, err
+		}
+		var statuses CommitStatuses
+		if err := json.Unmarshal(resp, &statuses); err != nil {
+			return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
+		}
+		if err := validator.New().Struct(statuses); err != nil {
+			return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+		}
+		for _, status := range statuses.Values {
+			statusName, _, _ := strings.Cut(*status.Key, "/")
+			ownApply := strings.HasPrefix(*status.Key, applyPrefix)
+			switch {
+			case *status.State == "SUCCESSFUL":
+				if !ownApply {
+					successful++
+				}
+			case ownApply || slices.Contains(ignoreVCSStatusNames, statusName):
+				found = true
+			default:
+				return false, nil
+			}
+		}
+		if *statuses.IsLastPage {
+			return found && successful >= *settings.RequiredSuccessfulBuilds, nil
+		}
+		if statuses.NextPageStart == nil {
+			return false, fmt.Errorf("response %q was missing nextPageStart", string(resp))
+		}
+		nextPageStart = *statuses.NextPageStart
+	}
+	return false, nil
 }
 
 // UpdateStatus updates the status of a commit.
@@ -369,6 +457,8 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	// Add this header to disable CSRF checks.
 	// See https://confluence.atlassian.com/cloudkb/xsrf-check-failed-when-calling-cloud-apis-826874382.html
 	req.Header.Add("X-Atlassian-Token", "no-check")
+	// Vetoes are translated otherwise, and we need to recognize some of them.
+	req.Header.Add("Accept-Language", "en")
 	return req, nil
 }
 

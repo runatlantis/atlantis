@@ -238,6 +238,22 @@ For Bitbucket Server, a pull request is mergeable if it has no conflicts and no
 [merge check](https://confluence.atlassian.com/bitbucketserver/checks-for-merging-pull-requests-776640039.html)
 is vetoing the merge.
 
+::: warning
+
+* Bitbucket counts the Atlantis commit statuses as builds. Atlantis ignores failed and in
+  progress builds if they are all from `atlantis apply`, so Bitbucket may still prevent the
+  merge until the apply succeeds. This only covers the minimum successful builds merge check,
+  which Atlantis recognizes by its message in English. So the profile of the user it runs as
+  must not have another language set.
+* If you run multiple Atlantis servers against the repository, use
+  [`--ignore-vcs-status-names`](server-configuration.md#ignore-vcs-status-names) so that they
+  don't prevent each other from applying.
+* Failed plans count as failed builds, so avoid `mergeable` in `plan_requirements` if the
+  repository requires successful builds.
+* Drafts are mergeable, since Bitbucket doesn't count that as a veto.
+
+:::
+
 #### Azure DevOps
 
 In Azure DevOps, all pull requests are mergeable unless there is a conflict. You can set a pull request to "Complete" right away, or set "Auto-Complete", which will merge after all branch policies are met. See [Review code with pull requests](https://docs.microsoft.com/en-us/azure/devops/repos/git/pull-requests?view=azure-devops).
