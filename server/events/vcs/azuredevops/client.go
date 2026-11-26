@@ -149,7 +149,7 @@ func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 	return nil
 }
 
-func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error { //nolint: revive
+func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, project string) error { //nolint: revive
 	return nil
 }
 

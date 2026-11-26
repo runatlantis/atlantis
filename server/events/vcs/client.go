@@ -22,7 +22,7 @@ type Client interface {
 	CreateComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, comment string, command string) error
 
 	ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error
-	HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error
+	HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, project string) error
 	PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (models.ApprovalStatus, error)
 	PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error)
 	// UpdateStatus updates the commit status to state for pull. src is the

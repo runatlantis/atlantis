@@ -80,7 +80,7 @@ func (c *InstrumentedClient) ReactToComment(logger logging.SimpleLogging, repo m
 	return nil
 }
 
-func (c *InstrumentedClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
+func (c *InstrumentedClient) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, project string) error {
 	scope := c.StatsScope.SubScope("hide_prev_plan_comments")
 	scope = SetGitScopeTags(scope, repo.FullName, pullNum)
 
@@ -90,7 +90,7 @@ func (c *InstrumentedClient) HidePrevCommandComments(logger logging.SimpleLoggin
 	executionSuccess := scope.Counter(metrics.ExecutionSuccessMetric)
 	executionError := scope.Counter(metrics.ExecutionErrorMetric)
 
-	if err := c.Client.HidePrevCommandComments(logger, repo, pullNum, command, dir); err != nil {
+	if err := c.Client.HidePrevCommandComments(logger, repo, pullNum, command, dir, project); err != nil {
 		executionError.Inc(1)
 		logger.Err("Unable to hide previous %s comments, error: %s", command, err.Error())
 		return err

@@ -2087,10 +2087,10 @@ func TestClient_HideOldComments(t *testing.T) {
 	pullNum := 123
 
 	userCommentIDs := [1]string{"1"}
-	planCommentIDs := [2]string{"3", "5"}
+	planCommentIDs := [4]string{"3", "5", "6", "7"}
 	systemCommentIDs := [1]string{"4"}
 	summaryCommentIDs := [1]string{"2"}
-	planComments := [3]string{"Ran Plan for 2 projects:", "Ran Plan for dir: `stack1` workspace: `default`", "Ran Plan for 2 projects:"}
+	planComments := [5]string{"Ran Plan for 2 projects:", "Ran Plan for dir: `stack1` workspace: `default`", "Ran Plan for 2 projects:", "Ran Plan for project: `projecta` dir: `.` workspace: `default`", "Ran Plan for project: `projectb` dir: `.` workspace: `default`"}
 	summaryHeader := fmt.Sprintf("<!--- +-Superseded Command-+ ---><details><summary>Superseded Atlantis %s</summary>",
 		command.Plan.TitleString())
 	summaryFooter := "</details>"
@@ -2106,7 +2106,11 @@ func TestClient_HideOldComments(t *testing.T) {
 		fmt.Sprintf(`{"id":%s,"body":"System comment","author":{"id": %d, "username":"%s", "email":"%s"},"system": true,"project_id": %d}`,
 			systemCommentIDs[0], authorID, authorUserName, authorEmail, pullNum) + "," +
 		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
-			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) +
+			planCommentIDs[1], planComments[1], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[2], planComments[3], authorID, authorUserName, authorEmail, pullNum) + "," +
+		fmt.Sprintf(`{"id":%s,"body":"%s","author":{"id": %d, "username":"%s", "email":"%s"},"system": false,"project_id": %d}`,
+			planCommentIDs[3], planComments[4], authorID, authorUserName, authorEmail, pullNum) +
 		"]"
 
 	repo := models.Repo{
@@ -2120,25 +2124,60 @@ func TestClient_HideOldComments(t *testing.T) {
 	}
 
 	cases := []struct {
+		name                 string
 		dir                  string
+		project              string
 		processedComments    int
 		processedCommentIds  []string
 		processedPlanComment []string
 	}{
 		{
+			"no dir or project",
 			"",
-			2,
-			[]string{planCommentIDs[0], planCommentIDs[1]},
-			[]string{planComments[0], planComments[1]},
+			"",
+			4,
+			[]string{planCommentIDs[0], planCommentIDs[1], planCommentIDs[2], planCommentIDs[3]},
+			[]string{planComments[0], planComments[1], planComments[3], planComments[4]},
 		},
 		{
+			"dir stack1",
 			"stack1",
+			"",
 			1,
 			[]string{planCommentIDs[1]},
 			[]string{planComments[1]},
 		},
 		{
+			"dir stack2",
 			"stack2",
+			"",
+			0,
+			[]string{},
+			[]string{},
+		},
+		{
+			// Only the plan comment left for projecta may be superseded;
+			// the one left for projectb must be left alone.
+			"project projecta",
+			"",
+			"projecta",
+			1,
+			[]string{planCommentIDs[2]},
+			[]string{planComments[3]},
+		},
+		{
+			"project projectb",
+			"",
+			"projectb",
+			1,
+			[]string{planCommentIDs[3]},
+			[]string{planComments[4]},
+		},
+		{
+			// No comment matches both a dir of "stack1" and projecta.
+			"project projecta and dir stack1",
+			"stack1",
+			"projecta",
 			0,
 			[]string{},
 			[]string{},
@@ -2146,7 +2185,7 @@ func TestClient_HideOldComments(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.dir, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			gitlabClientUnderTest = true
 			defer func() { gitlabClientUnderTest = false }()
 			gotNotePutCalls := make([]notePutCallDetails, 0, 1)
@@ -2199,7 +2238,7 @@ func TestClient_HideOldComments(t *testing.T) {
 				Version: nil,
 			}
 
-			err = client.HidePrevCommandComments(logger, repo, pullNum, command.Plan.TitleString(), c.dir)
+			err = client.HidePrevCommandComments(logger, repo, pullNum, command.Plan.TitleString(), c.dir, c.project)
 			Ok(t, err)
 
 			// Check the correct number of plan comments have been processed

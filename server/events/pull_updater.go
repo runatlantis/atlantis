@@ -16,6 +16,16 @@ type PullUpdater struct {
 	MarkdownRenderer     *MarkdownRenderer
 }
 
+// projectName returns the name of the project the command was scoped to,
+// or "" if it was not scoped to a specific project. Only comment commands
+// can be scoped to a project, via -p/--project.
+func projectName(cmd PullCommand) string {
+	if commentCmd, ok := cmd.(*CommentCommand); ok {
+		return commentCmd.ProjectName
+	}
+	return ""
+}
+
 func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res command.Result) {
 	// Log if we got any errors or failures.
 	if res.Error != nil {
@@ -28,8 +38,8 @@ func (c *PullUpdater) updatePull(ctx *command.Context, cmd PullCommand, res comm
 	// clutter in a pull/merge request. This will not delete the comment, since the
 	// comment trail may be useful in auditing or backtracing problems.
 	if c.HidePrevPlanComments {
-		ctx.Log.Debug("hiding previous plan comments for command: '%v', directory: '%v'", cmd.CommandName().TitleString(), cmd.Dir())
-		if err := c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir()); err != nil {
+		ctx.Log.Debug("hiding previous plan comments for command: '%v', directory: '%v', project: '%v'", cmd.CommandName().TitleString(), cmd.Dir(), projectName(cmd))
+		if err := c.VCSClient.HidePrevCommandComments(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, cmd.CommandName().TitleString(), cmd.Dir(), projectName(cmd)); err != nil {
 			ctx.Log.Err("unable to hide old comments: %s", err)
 		}
 	}

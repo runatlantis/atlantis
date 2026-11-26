@@ -154,7 +154,7 @@ func (b *Client) ReactToComment(_ logging.SimpleLogging, _ models.Repo, _ int, _
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
+func (b *Client) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string, _ string) error {
 	return nil
 }
 

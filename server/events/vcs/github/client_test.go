@@ -265,6 +265,7 @@ func TestClient_PaginatesComments(t *testing.T) {
 		123,
 		command.Plan.TitleString(),
 		"",
+		"",
 	)
 	Ok(t, err)
 	Equals(t, 2, len(gotMinimizeCalls))
@@ -288,7 +289,9 @@ func TestClient_HideOldComments(t *testing.T) {
 	{"node_id": "7", "body": "Ran Apply for 2 projects:", "user": {"login": "AtlantisUser"}},
 	{"node_id": "8", "body": "Ran Plan for dir: 'stack1' workspace: 'default'", "user": {"login": "AtlantisUser"}},
 	{"node_id": "9", "body": "Ran Plan for dir: 'stack2' workspace: 'default'", "user": {"login": "AtlantisUser"}},
-	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}}
+	{"node_id": "10", "body": "Continued Plan from previous comment\nasd", "user": {"login": "AtlantisUser"}},
+	{"node_id": "11", "body": "Ran Plan for project: 'projecta' dir: '.' workspace: 'default'", "user": {"login": "AtlantisUser"}},
+	{"node_id": "12", "body": "Ran Plan for project: 'projectb' dir: '.' workspace: 'default'", "user": {"login": "AtlantisUser"}}
 ]`, "'", "`")
 	minimizeResp := "{}"
 	type graphQLCall struct {
@@ -298,32 +301,74 @@ func TestClient_HideOldComments(t *testing.T) {
 	}
 
 	cases := []struct {
+		name                string
 		dir                 string
+		project             string
 		processedComments   int
 		processedCommentIds []string
 	}{
 		{
-			// With no dir specified, comments 6, 8, 9 and 10 should be minimized.
+			// With no dir or project specified, comments 6, 8, 9, 10, 11 and 12 should be minimized.
+			"no dir or project",
 			"",
-			4,
-			[]string{"6", "8", "9", "10"},
+			"",
+			6,
+			[]string{"6", "8", "9", "10", "11", "12"},
 		},
 		{
 			// With a dir of "stack1", comment 8 should be minimized.
+			"dir stack1",
 			"stack1",
+			"",
 			1,
 			[]string{"8"},
 		},
 		{
 			// With a dir of "stack2", comment 9 should be minimized.
+			"dir stack2",
 			"stack2",
+			"",
 			1,
 			[]string{"9"},
+		},
+		{
+			// With a project of "projecta", only comment 11 should be minimized:
+			// the plan comment left for projectb must be left alone.
+			"project projecta",
+			"",
+			"projecta",
+			1,
+			[]string{"11"},
+		},
+		{
+			// With a project of "projectb", only comment 12 should be minimized.
+			"project projectb",
+			"",
+			"projectb",
+			1,
+			[]string{"12"},
+		},
+		{
+			// With a project of "projecta" and a dir of ".", comment 11 should be minimized.
+			"project projecta and dir .",
+			".",
+			"projecta",
+			1,
+			[]string{"11"},
+		},
+		{
+			// With a project of "projecta" and a dir of "stack1", no comment
+			// matches both, so nothing should be minimized.
+			"project projecta and dir stack1",
+			"stack1",
+			"projecta",
+			0,
+			[]string{},
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.dir, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			gotMinimizeCalls := make([]graphQLCall, 0, 1)
 			testServer := httptest.NewTLSServer(
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -382,6 +427,7 @@ func TestClient_HideOldComments(t *testing.T) {
 				pullRequestNum,
 				command.Plan.TitleString(),
 				c.dir,
+				c.project,
 			)
 			Ok(t, err)
 			Equals(t, c.processedComments, len(gotMinimizeCalls))

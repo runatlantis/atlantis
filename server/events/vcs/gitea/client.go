@@ -207,7 +207,7 @@ func (c *Client) fetchCurrentUsername() (string, error) {
 
 // HidePrevCommandComments hides the previous command comments from the pull
 // request.
-func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
+func (c *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, _ string) error {
 	logger.Debug("Hiding previous command comments on Gitea pull request %d", pullNum)
 
 	var allComments []*gitea.Comment

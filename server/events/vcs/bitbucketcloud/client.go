@@ -129,7 +129,7 @@ func (b *Client) ReactToComment(_ logging.SimpleLogging, _ models.Repo, _ int, _
 	return nil
 }
 
-func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, _ string) error {
+func (b *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, _ string, _ string) error {
 	// there is no way to hide comment, so delete them instead
 	me, err := b.GetMyUUID()
 	if err != nil {
