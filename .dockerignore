@@ -2,6 +2,7 @@
 !cmd/
 !server/
 !testdrive/
+!testing/
 !main.go
 !go.mod
 !go.sum
