@@ -55,8 +55,12 @@ test-e2e-module: ## Run tests for the e2e Go module
 test-ranking-module: ## Run tests for the top-issues ranking Go module
 	@cd .github/scripts/update_top_issues_ranking && go test $(NESTED_TEST_FLAGS) ./...
 
+.PHONY: test-debian-pins-module
+test-debian-pins-module: ## Run tests for the Debian pin updater Go module
+	@cd .github/scripts/update_debian_pins && go test $(NESTED_TEST_FLAGS) ./...
+
 .PHONY: test-nested-modules
-test-nested-modules: test-e2e-module test-ranking-module ## Run tests for nested Go modules
+test-nested-modules: test-e2e-module test-ranking-module test-debian-pins-module ## Run tests for nested Go modules
 
 .PHONY: test
 test: NESTED_TEST_FLAGS = -short
