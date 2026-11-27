@@ -45,6 +45,25 @@ func (mock *MockDeleteLockCommand) DeleteLock(logger logging.SimpleLogging, id s
 	return _ret0, _ret1
 }
 
+func (mock *MockDeleteLockCommand) DeleteLocksByProject(logger logging.SimpleLogging, repoFullName string, pullNum int, projectName string) (int, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
+	}
+	_params := []pegomock.Param{logger, repoFullName, pullNum, projectName}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("DeleteLocksByProject", _params, []reflect.Type{reflect.TypeOf((*int)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 int
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].(int)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockDeleteLockCommand) DeleteLocksByPull(logger logging.SimpleLogging, repoFullName string, pullNum int) (int, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockDeleteLockCommand().")
@@ -130,6 +149,53 @@ func (c *MockDeleteLockCommand_DeleteLock_OngoingVerification) GetAllCapturedArg
 			_param1 = make([]string, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(string)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockDeleteLockCommand) DeleteLocksByProject(logger logging.SimpleLogging, repoFullName string, pullNum int, projectName string) *MockDeleteLockCommand_DeleteLocksByProject_OngoingVerification {
+	_params := []pegomock.Param{logger, repoFullName, pullNum, projectName}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "DeleteLocksByProject", _params, verifier.timeout)
+	return &MockDeleteLockCommand_DeleteLocksByProject_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockDeleteLockCommand_DeleteLocksByProject_OngoingVerification struct {
+	mock              *MockDeleteLockCommand
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockDeleteLockCommand_DeleteLocksByProject_OngoingVerification) GetCapturedArguments() (logging.SimpleLogging, string, int, string) {
+	logger, repoFullName, pullNum, projectName := c.GetAllCapturedArguments()
+	return logger[len(logger)-1], repoFullName[len(repoFullName)-1], pullNum[len(pullNum)-1], projectName[len(projectName)-1]
+}
+
+func (c *MockDeleteLockCommand_DeleteLocksByProject_OngoingVerification) GetAllCapturedArguments() (_param0 []logging.SimpleLogging, _param1 []string, _param2 []int, _param3 []string) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]logging.SimpleLogging, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(logging.SimpleLogging)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.(string)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([]int, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.(int)
+			}
+		}
+		if len(_params) > 3 {
+			_param3 = make([]string, len(c.methodInvocations))
+			for u, param := range _params[3] {
+				_param3[u] = param.(string)
 			}
 		}
 	}

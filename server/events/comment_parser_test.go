@@ -253,6 +253,43 @@ func TestParse_UnusedArguments(t *testing.T) {
 	}
 }
 
+func TestParse_Unlock(t *testing.T) {
+	for _, suffix := range []string{"", "-p production", "--project production", "--project=production"} {
+		t.Run(suffix, func(t *testing.T) {
+			result := commentParser.Parse("atlantis unlock "+suffix, models.Github)
+			Equals(t, "", result.CommentResponse)
+			Assert(t, result.Command != nil, "expected an unlock command")
+			expected := &events.CommentCommand{Name: command.Unlock}
+			if suffix != "" {
+				expected.ProjectName = "production"
+			}
+			Equals(t, expected, result.Command)
+		})
+	}
+}
+
+func TestParse_UnlockRejectsInvalidTargets(t *testing.T) {
+	for _, suffix := range []string{
+		"-p", "--project", "-p ''", "--project=", "--project ' '",
+		"-p production --project=", "-d .", "-w default", "production",
+		"-p production extra", "-- -p production", "-p production -- extra",
+	} {
+		t.Run(suffix, func(t *testing.T) {
+			result := commentParser.Parse("atlantis unlock "+suffix, models.Github)
+			Assert(t, result.Command == nil, "invalid target must not run unlock")
+			Assert(t, result.CommentResponse != "", "expected an error response")
+		})
+	}
+}
+
+func TestParse_UnlockHelp(t *testing.T) {
+	for _, flag := range []string{"-h", "--help"} {
+		result := commentParser.Parse("atlantis unlock "+flag, models.Github)
+		Assert(t, result.Command == nil, "help must not run unlock")
+		Assert(t, strings.Contains(result.CommentResponse, "-p, --project"), "help must document project targeting")
+	}
+}
+
 func TestParse_UnknownShorthandFlag(t *testing.T) {
 	comment := "atlantis unlock -d ."
 	r := commentParser.Parse(comment, models.Github)
@@ -1206,7 +1243,7 @@ Commands:
   cancel   Cancels all queued commands for this pull request.
            Already running commands are not interrupted.
   unlock   Removes all atlantis locks and discards all plans for this PR.
-           To unlock a specific plan you can use the Atlantis UI.
+           To unlock a specific project, use -p/--project or the Atlantis UI.
   approve_policies
            Approves all current policy checking failures for the PR.
   version  Print the output of 'terraform version'
@@ -1274,7 +1311,7 @@ Commands:
   apply    Runs 'terraform apply' on all unapplied plans from this pull request.
            To only apply a specific plan, use the -d, -w and -p flags.
   unlock   Removes all atlantis locks and discards all plans for this PR.
-           To unlock a specific plan you can use the Atlantis UI.
+           To unlock a specific project, use -p/--project or the Atlantis UI.
   help     View help.
 
 Flags:
@@ -1380,11 +1417,11 @@ var ApprovePolicyUsage = `Usage of approve_policies:
 `
 
 var UnlockUsage = "`Usage of unlock:`\n\n ```cmake\n" +
-	`atlantis unlock
+	`atlantis unlock [-p project]
 
   Unlocks the entire PR and discards all plans in this PR.
-  Arguments or flags are not supported at the moment.
-  If you need to unlock a specific project please use the atlantis UI.` +
+  Use -p/--project to discard only a named project's saved plan and Atlantis lock.
+  This does not release Terraform state locks.` +
 	"\n```"
 
 var ImportUsage = `Usage of import ADDRESS ID:
