@@ -1158,6 +1158,46 @@ func TestExecute_BitbucketServerBaseURLPort(t *testing.T) {
 	Equals(t, "http://mydomain.com:7990", passedConfig.BitbucketBaseURL)
 }
 
+// Bitbucket Cloud limits the length of the status keys.
+func TestExecute_VCSStatusNameLength(t *testing.T) {
+	longest := strings.Repeat("a", 35)
+	cases := map[string]struct {
+		flags  map[string]any
+		name   string
+		expErr string
+	}{
+		"bitbucket cloud longest": {
+			flags: map[string]any{BitbucketUserFlag: "user", BitbucketTokenFlag: "token"},
+			name:  longest,
+		},
+		"bitbucket cloud too long": {
+			flags:  map[string]any{BitbucketUserFlag: "user", BitbucketTokenFlag: "token"},
+			name:   longest + "a",
+			expErr: fmt.Sprintf("--vcs-status-name cannot be longer than 35 characters when using Bitbucket Cloud, got %q", longest+"a"),
+		},
+		"bitbucket server": {
+			flags: map[string]any{BitbucketUserFlag: "user", BitbucketTokenFlag: "token", BitbucketBaseURLFlag: "http://mydomain.com"},
+			name:  longest + "a",
+		},
+		"github": {
+			flags: map[string]any{GHUserFlag: "user", GHTokenFlag: "token"},
+			name:  longest + "a",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			c.flags[RepoAllowlistFlag] = "*"
+			c.flags[VCSStatusName] = c.name
+			err := setup(c.flags, t).Execute()
+			if c.expErr != "" {
+				ErrEquals(t, c.expErr, err)
+				return
+			}
+			Ok(t, err)
+		})
+	}
+}
+
 // Can't use both --repo-config and --repo-config-json.
 func TestExecute_RepoCfgFlags(t *testing.T) {
 	c := setup(map[string]any{

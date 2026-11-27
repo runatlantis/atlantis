@@ -792,7 +792,7 @@ atlantis server \
 --repo-allowlist="$REPO_ALLOWLIST"
 ```
 
-##### Bitbucket Server (aka Stash)
+##### Bitbucket Server
 
 ```bash
 BASE_URL=YOUR_BITBUCKET_SERVER_URL # ex. http://bitbucket.mycorp:7990

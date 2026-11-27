@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 
@@ -23,6 +25,13 @@ import (
 // maxCommentLength is the maximum number of chars allowed by Bitbucket in a
 // single comment.
 const maxCommentLength = 32768
+
+// buildVetoes are the messages of the vetoes caused by failed or in progress
+// builds. Bitbucket doesn't identify vetoes in any other way.
+var buildVetoes = []string{
+	"You cannot merge this pull request while it has failed builds.",
+	"You cannot merge this pull request while it has in-progress builds.",
+}
 
 func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
 	return b.username != "" && user.Username != "" && strings.EqualFold(b.username, user.Username), nil
@@ -41,7 +50,7 @@ type DeleteSourceBranch struct {
 	DryRun bool   `json:"dryRun"`
 }
 
-// NewClient builds a bitbucket cloud client. Returns an error if the baseURL is
+// NewClient builds a bitbucket server client. Returns an error if the baseURL is
 // malformed. httpClient is the client to use to make the requests, username
 // and password are used as basic auth in the requests, baseURL is the API's
 // baseURL, ex. https://corp.com:7990. Don't include the API version, ex.
@@ -173,23 +182,31 @@ func (b *Client) postComment(repo models.Repo, pullNum int, comment string) erro
 	return err
 }
 
+func (b *Client) getPullRequest(projectKey string, repoName string, pullNum int) (PullRequest, error) {
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repoName, pullNum)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return PullRequest{}, err
+	}
+	var pullResp PullRequest
+	if err := json.Unmarshal(resp, &pullResp); err != nil {
+		return PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(pullResp); err != nil {
+		return PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	return pullResp, nil
+}
+
 // PullIsApproved returns true if the merge request was approved.
 func (b *Client) PullIsApproved(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) (approvalStatus models.ApprovalStatus, err error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return approvalStatus, err
 	}
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
 	if err != nil {
 		return approvalStatus, err
-	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return approvalStatus, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	for _, reviewer := range pullResp.Reviewers {
 		if *reviewer.Approved {
@@ -214,17 +231,9 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 	if err != nil {
 		return models.PullRequest{}, err
 	}
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, repo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
 	if err != nil {
 		return models.PullRequest{}, err
-	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return models.PullRequest{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return models.PullRequest{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
 	pull.HeadCommit = *pullResp.FromRef.LatestCommit
 	pull.BaseBranch = *pullResp.ToRef.DisplayID
@@ -236,8 +245,9 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 	return nil
 }
 
-// PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
+// PullIsMergeable returns true if the pull request is not a draft, has no
+// conflicts and can be merged.
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
 	projectKey, err := b.GetProjectKey(repo.Name, repo.SanitizedCloneURL)
 	if err != nil {
 		return models.MergeableStatus{}, err
@@ -254,14 +264,109 @@ func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo,
 	if err := validator.New().Struct(mergeStatus); err != nil {
 		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 	}
-	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted {
+	// Bitbucket refuses to merge drafts, despite saying that they can be merged.
+	pullResp, err := b.getPullRequest(projectKey, repo.Name, pull.Num)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	if *mergeStatus.CanMerge && !*mergeStatus.Conflicted && !pullResp.Draft {
+		return models.MergeableStatus{
+			IsMergeable: true,
+		}, nil
+	}
+	var reasons []string
+	if pullResp.Draft {
+		reasons = append(reasons, "Is a draft")
+	}
+	if *mergeStatus.Conflicted {
+		reasons = append(reasons, "Has conflicts")
+	}
+	ignoredVetoes := 0
+	for _, veto := range mergeStatus.Vetoes {
+		if slices.Contains(buildVetoes, veto.DetailedMessage) {
+			// Our own apply statuses must not prevent us from applying again.
+			onlyIgnored, err := b.onlyIgnoredStatusesUnsuccessful(projectKey, repo, pull, vcsstatusname, ignoreVCSStatusNames)
+			if err != nil {
+				return models.MergeableStatus{}, err
+			}
+			if onlyIgnored {
+				ignoredVetoes++
+				continue
+			}
+		}
+		reasons = append(reasons, veto.SummaryMessage)
+	}
+	if ignoredVetoes > 0 && len(reasons) == 0 {
 		return models.MergeableStatus{
 			IsMergeable: true,
 		}, nil
 	}
 	return models.MergeableStatus{
 		IsMergeable: false,
+		Reason:      strings.Join(reasons, "; "),
 	}, nil
+}
+
+// onlyIgnoredStatusesUnsuccessful returns true if there are unsuccessful commit
+// statuses in the pull request, all of them are either our apply statuses or
+// from the ignored Atlantis services, and the minimum of successful builds is
+// met without our apply statuses.
+func (b *Client) onlyIgnoredStatusesUnsuccessful(projectKey string, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+	// Failed and in progress builds count towards the minimum in the veto, so it
+	// doesn't tell if there are successful builds missing.
+	resp, err := b.makeRequest("GET", fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/settings/pull-requests", b.BaseURL, projectKey, repo.Name), nil)
+	if err != nil {
+		return false, err
+	}
+	var settings PullRequestSettings
+	if err := json.Unmarshal(resp, &settings); err != nil {
+		return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(settings); err != nil {
+		return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+
+	applyPrefix := fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String())
+	found := false
+	successful := 0
+	nextPageStart := 0
+	// We'll only loop 1000 times as a safety measure.
+	maxLoops := 1000
+	for range maxLoops {
+		resp, err := b.makeRequest("GET", fmt.Sprintf("%s/rest/build-status/1.0/commits/%s?start=%d", b.BaseURL, pull.HeadCommit, nextPageStart), nil)
+		if err != nil {
+			return false, err
+		}
+		var statuses CommitStatuses
+		if err := json.Unmarshal(resp, &statuses); err != nil {
+			return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
+		}
+		if err := validator.New().Struct(statuses); err != nil {
+			return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+		}
+		for _, status := range statuses.Values {
+			statusName, _, _ := strings.Cut(*status.Key, "/")
+			ownApply := strings.HasPrefix(*status.Key, applyPrefix)
+			switch {
+			case *status.State == "SUCCESSFUL":
+				if !ownApply {
+					successful++
+				}
+			case ownApply || slices.Contains(ignoreVCSStatusNames, statusName):
+				found = true
+			default:
+				return false, nil
+			}
+		}
+		if *statuses.IsLastPage {
+			return found && successful >= *settings.RequiredSuccessfulBuilds, nil
+		}
+		if statuses.NextPageStart == nil {
+			return false, fmt.Errorf("response %q was missing nextPageStart", string(resp))
+		}
+		nextPageStart = *statuses.NextPageStart
+	}
+	return false, nil
 }
 
 // UpdateStatus updates the status of a commit.
@@ -307,19 +412,11 @@ func (b *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 	}
 
 	// We need to make a get pull request API call to get the correct "version".
-	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num)
-	resp, err := b.makeRequest("GET", path, nil)
+	pullResp, err := b.getPullRequest(projectKey, pull.BaseRepo.Name, pull.Num)
 	if err != nil {
 		return err
 	}
-	var pullResp PullRequest
-	if err := json.Unmarshal(resp, &pullResp); err != nil {
-		return fmt.Errorf("parsing response %q: %w", string(resp), err)
-	}
-	if err := validator.New().Struct(pullResp); err != nil {
-		return fmt.Errorf("response %q was missing fields: %w", string(resp), err)
-	}
-	path = fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
+	path := fmt.Sprintf("%s/rest/api/1.0/projects/%s/repos/%s/pull-requests/%d/merge?version=%d", b.BaseURL, projectKey, pull.BaseRepo.Name, pull.Num, *pullResp.Version)
 	_, err = b.makeRequest("POST", path, nil)
 	if err != nil {
 		return err
@@ -361,6 +458,8 @@ func (b *Client) prepRequest(method string, path string, body io.Reader) (*http.
 	// Add this header to disable CSRF checks.
 	// See https://confluence.atlassian.com/cloudkb/xsrf-check-failed-when-calling-cloud-apis-826874382.html
 	req.Header.Add("X-Atlassian-Token", "no-check")
+	// Vetoes are translated otherwise, and we need to recognize some of them.
+	req.Header.Add("Accept-Language", "en")
 	return req, nil
 }
 

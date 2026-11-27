@@ -37,6 +37,8 @@ type PullRequest struct {
 	Reviewers   []struct {
 		Approved *bool `json:"approved,omitempty" validate:"required"`
 	} `json:"reviewers,omitempty" validate:"required"`
+	// Draft is missing in versions that don't support drafts.
+	Draft bool `json:"draft,omitempty"`
 }
 
 type Ref struct {
@@ -79,4 +81,22 @@ type Changes struct {
 type MergeStatus struct {
 	CanMerge   *bool `json:"canMerge,omitempty" validate:"required"`
 	Conflicted *bool `json:"conflicted,omitempty" validate:"required"`
+	// Vetoes are the merge checks that are preventing the merge.
+	Vetoes []struct {
+		SummaryMessage  string `json:"summaryMessage,omitempty"`
+		DetailedMessage string `json:"detailedMessage,omitempty"`
+	} `json:"vetoes,omitempty"`
+}
+
+type PullRequestSettings struct {
+	RequiredSuccessfulBuilds *int `json:"requiredSuccessfulBuilds,omitempty" validate:"required"`
+}
+
+type CommitStatuses struct {
+	Values []struct {
+		Key   *string `json:"key,omitempty" validate:"required"`
+		State *string `json:"state,omitempty" validate:"required"`
+	} `json:"values,omitempty" validate:"required,dive"`
+	NextPageStart *int  `json:"nextPageStart,omitempty"`
+	IsLastPage    *bool `json:"isLastPage,omitempty" validate:"required"`
 }

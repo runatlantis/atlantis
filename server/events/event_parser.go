@@ -31,7 +31,7 @@ import (
 const gitlabPullOpened = "opened"
 const usagesCols = 90
 
-var lastBitbucketSha, _ = lru.New[string, string](300)
+var lastBitbucketCloudSha, _ = lru.New[string, string](300)
 
 // PullCommand is a command to run on a pull request.
 type PullCommand interface {
@@ -394,15 +394,15 @@ func (e *EventParser) ParseAPIPlanRequest(vcsHostType models.VCSHostType, repoFu
 func (e *EventParser) GetBitbucketCloudPullEventType(eventTypeHeader string, sha string, pr string) models.PullRequestEventType {
 	switch eventTypeHeader {
 	case bitbucketcloud.PullCreatedHeader:
-		lastBitbucketSha.Add(pr, sha)
+		lastBitbucketCloudSha.Add(pr, sha)
 		return models.OpenedPullEvent
 	case bitbucketcloud.PullUpdatedHeader:
-		lastSha, _ := lastBitbucketSha.Get(pr)
+		lastSha, _ := lastBitbucketCloudSha.Get(pr)
 		if sha == lastSha {
 			// No change, ignore
 			return models.OtherPullEvent
 		}
-		lastBitbucketSha.Add(pr, sha)
+		lastBitbucketCloudSha.Add(pr, sha)
 		return models.UpdatedPullEvent
 	case bitbucketcloud.PullFulfilledHeader, bitbucketcloud.PullRejectedHeader:
 		return models.ClosedPullEvent

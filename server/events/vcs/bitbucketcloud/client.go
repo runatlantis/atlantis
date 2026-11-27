@@ -8,23 +8,35 @@ package bitbucketcloud
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
+	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
 const BaseURL = "https://api.bitbucket.org"
+
+// truncatedStatusKeyLength is how much of a commit status key is kept when it is
+// truncated.
+const truncatedStatusKeyLength = 37
+
+// MaxVCSStatusNameLength is the maximum length of the VCS status name that still
+// allows telling the apply statuses apart from the others ("/a" from "/p") when
+// their keys are truncated.
+const MaxVCSStatusNameLength = truncatedStatusKeyLength - len("/a")
 
 type Client struct {
 	httpClient  *http.Client
@@ -276,42 +288,108 @@ func (b *Client) GetPullRequestIdentity(logger logging.SimpleLogging, repo model
 	return pull, nil
 }
 
-// PullIsMergeable returns true if the merge request has no conflicts and can be merged.
-func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, _ string, _ []string) (models.MergeableStatus, error) {
-	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/diffstat", b.BaseURL, repo.FullName, pull.Num)
+// PullIsMergeable returns true if none of Bitbucket's mergeability checks are
+// blocking the merge of the pull request.
+func (b *Client) PullIsMergeable(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (models.MergeableStatus, error) {
+	// This endpoint is not paginated.
+	path := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/mergeability/checks", b.BaseURL, repo.FullName, pull.Num)
+	resp, err := b.makeRequest("GET", path, nil)
+	if err != nil {
+		return models.MergeableStatus{}, err
+	}
+	var checks MergeabilityChecks
+	if err := json.Unmarshal(resp, &checks); err != nil {
+		return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+	}
+	if err := validator.New().Struct(checks); err != nil {
+		return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+	}
+	// Already queued pull requests are still open, and it's the state check that
+	// blocks them.
+	queued := slices.ContainsFunc(checks.Values, func(check MergeabilityCheck) bool { return check.Queued })
+	var blockers, buildBlockers []string
+	for _, check := range checks.Values {
+		// Bitbucket couldn't determine whether there are conflicts, so we can't
+		// assume there are none.
+		unknownConflicts := *check.Type == "git_mergeability_check" && *check.Status == "UNKNOWN"
+		switch {
+		case !*check.Blocking && !unknownConflicts:
+			continue
+		case *check.Type == "current_user_permission_check":
+			// The pull request can be mergeable even if we are not allowed to merge it.
+			continue
+		case check.State == "DRAFT":
+			blockers = append(blockers, check.State)
+		case *check.Type == "pullrequest_state_check" && queued:
+			blockers = append(blockers, "QUEUED")
+		case check.Check.Kind == "failed_builds" || check.Check.Kind == "in_progress_builds":
+			buildBlockers = append(buildBlockers, check.Check.Kind)
+		default:
+			blockers = append(blockers, cmp.Or(check.Check.Kind, check.Check.Name, check.Reason, *check.Type))
+		}
+	}
+	if len(buildBlockers) > 0 {
+		// Our own apply statuses must not prevent us from applying again.
+		onlyIgnored, err := b.onlyIgnoredStatusesUnsuccessful(repo, pull, vcsstatusname, ignoreVCSStatusNames)
+		if err != nil {
+			return models.MergeableStatus{}, err
+		}
+		if !onlyIgnored {
+			blockers = append(blockers, buildBlockers...)
+		}
+	}
+	if len(blockers) > 0 {
+		return models.MergeableStatus{
+			IsMergeable: false,
+			Reason:      fmt.Sprintf("Blocked by %s", strings.Join(blockers, ", ")),
+		}, nil
+	}
+	return models.MergeableStatus{
+		IsMergeable: true,
+	}, nil
+}
+
+// onlyIgnoredStatusesUnsuccessful returns true if there are unsuccessful commit
+// statuses in the pull request and all of them are either our apply statuses or
+// from the ignored Atlantis services.
+func (b *Client) onlyIgnoredStatusesUnsuccessful(repo models.Repo, pull models.PullRequest, vcsstatusname string, ignoreVCSStatusNames []string) (bool, error) {
+	// The key may have been truncated by UpdateStatus.
+	applyPrefix := fmt.Sprintf("%.*s", truncatedStatusKeyLength, fmt.Sprintf("%s/%s", vcsstatusname, command.Apply.String()))
+	found := false
+	nextPageURL := fmt.Sprintf("%s/2.0/repositories/%s/pullrequests/%d/statuses", b.BaseURL, repo.FullName, pull.Num)
 	// We'll only loop 1000 times as a safety measure.
 	maxLoops := 1000
 	for range maxLoops {
 		resp, err := b.makeRequest("GET", nextPageURL, nil)
 		if err != nil {
-			return models.MergeableStatus{}, err
+			return false, err
 		}
-		var diffStat DiffStat
-		if err := json.Unmarshal(resp, &diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("parsing response %q: %w", string(resp), err)
+		var statuses CommitStatuses
+		if err := json.Unmarshal(resp, &statuses); err != nil {
+			return false, fmt.Errorf("parsing response %q: %w", string(resp), err)
 		}
-		if err := validator.New().Struct(diffStat); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
+		if err := validator.New().Struct(statuses); err != nil {
+			return false, fmt.Errorf("response %q was missing fields: %w", string(resp), err)
 		}
-		for _, v := range diffStat.Values {
-			// These values are undocumented, found via manual testing.
-			if *v.Status == "merge conflict" || *v.Status == "local deleted" {
-				return models.MergeableStatus{
-					IsMergeable: false,
-				}, nil
+		for _, status := range statuses.Values {
+			if *status.State == "SUCCESSFUL" {
+				continue
 			}
+			statusName, _, _ := strings.Cut(*status.Key, "/")
+			if !strings.HasPrefix(*status.Key, applyPrefix) && !slices.Contains(ignoreVCSStatusNames, statusName) {
+				return false, nil
+			}
+			found = true
 		}
-		if diffStat.Next == nil || *diffStat.Next == "" {
-			break
+		if statuses.Next == nil || *statuses.Next == "" {
+			return found, nil
 		}
-		if err := b.validateNextPageURL(*diffStat.Next); err != nil {
-			return models.MergeableStatus{}, fmt.Errorf("checking pull mergeability: %w", err)
+		if err := b.validateNextPageURL(*statuses.Next); err != nil {
+			return false, fmt.Errorf("getting commit statuses: %w", err)
 		}
-		nextPageURL = *diffStat.Next
+		nextPageURL = *statuses.Next
 	}
-	return models.MergeableStatus{
-		IsMergeable: true,
-	}, nil
+	return false, nil
 }
 
 // UpdateStatus updates the status of a commit.
@@ -336,7 +414,7 @@ func (b *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 
 	// Ensure key has at most 40 characters
 	if utf8.RuneCountInString(src) > 40 {
-		src = fmt.Sprintf("%.37s...", src)
+		src = fmt.Sprintf("%.*s...", truncatedStatusKeyLength, src)
 	}
 
 	bodyBytes, err := json.Marshal(map[string]string{
@@ -404,7 +482,7 @@ func (b *Client) makeRequestWithContext(ctx context.Context, method string, path
 	defer resp.Body.Close() // nolint: errcheck
 	requestStr := fmt.Sprintf("%s %s", method, path)
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNoContent {
 		respBody, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("making request %q unexpected status code: %d, body: %s", requestStr, resp.StatusCode, string(respBody))
 	}

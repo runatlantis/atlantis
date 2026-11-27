@@ -100,7 +100,7 @@ If you're using Gitea, navigate to your project's home page in Gitea
 <img src="../guide/images/bitbucket-webhook.png" alt="Bitbucket Webhook" style="max-height: 500px">
 * See [Next Steps](#next-steps)
 
-## Bitbucket Server (aka Stash)
+## Bitbucket Server
 
 * Go to your repo's home page
 * Click **Settings** in the sidebar

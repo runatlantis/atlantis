@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/moby/patternmatcher"
@@ -285,10 +286,10 @@ var stringFlags = map[string]stringFlag{
 		description: "Bitbucket username for git operations.",
 	},
 	BitbucketTokenFlag: {
-		description: "Bitbucket app password of API user. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
+		description: "API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server. Can also be specified via the ATLANTIS_BITBUCKET_TOKEN environment variable.",
 	},
 	BitbucketBaseURLFlag: {
-		description: "Base URL of Bitbucket Server (aka Stash) installation." +
+		description: "Base URL of Bitbucket Server installation." +
 			" Must include 'http://' or 'https://'." +
 			" If using Bitbucket Cloud (bitbucket.org), do not set.",
 		defaultValue: DefaultBitbucketBaseURL,
@@ -524,8 +525,8 @@ var stringFlags = map[string]stringFlag{
 	},
 	IgnoreVCSStatusNames: {
 		description: "Comma separated list of VCS status names from other atlantis services." +
-			" When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) from other Atlantis services when checking if the PR is mergeable." +
-			" Currently only implemented for GitHub.",
+			" Their status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`) are ignored when checking if the PR is mergeable." +
+			" Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, Bitbucket Cloud and Bitbucket Server.",
 		defaultValue: DefaultIgnoreVCSStatusNames,
 	},
 	LanguageFlag: {
@@ -1192,6 +1193,11 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return fmt.Errorf("--%s must have http:// or https://, got %q", BitbucketBaseURLFlag, userConfig.BitbucketBaseURL)
+	}
+
+	if userConfig.BitbucketUser != "" && userConfig.BitbucketBaseURL == DefaultBitbucketBaseURL &&
+		utf8.RuneCountInString(userConfig.VCSStatusName) > bitbucketcloud.MaxVCSStatusNameLength {
+		return fmt.Errorf("--%s cannot be longer than %d characters when using Bitbucket Cloud, got %q", VCSStatusName, bitbucketcloud.MaxVCSStatusNameLength, userConfig.VCSStatusName)
 	}
 
 	parsed, err = url.Parse(userConfig.GiteaBaseURL)

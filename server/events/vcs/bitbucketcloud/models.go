@@ -41,6 +41,38 @@ type DiffStatFile struct {
 	Path *string `json:"path,omitempty" validate:"required"`
 }
 
+type MergeabilityChecks struct {
+	Values []MergeabilityCheck `json:"values,omitempty" validate:"required,dive"`
+}
+type MergeabilityCheck struct {
+	Type   *string `json:"type,omitempty" validate:"required"`
+	Status *string `json:"status,omitempty" validate:"required"`
+	// Blocking is whether this check currently prevents the merge. A failed
+	// check is not necessarily blocking.
+	Blocking *bool `json:"blocking,omitempty" validate:"required"`
+	// Queued is only set for merge queue checks.
+	Queued bool `json:"queued,omitempty"`
+	// State is only set for pull request state checks.
+	State string `json:"state,omitempty"`
+	// Reason is only set for git mergeability checks.
+	Reason string `json:"reason,omitempty"`
+	// Check is only set for standard merge checks, which have a kind, and
+	// custom merge checks, which have a name.
+	Check struct {
+		Kind string `json:"kind,omitempty"`
+		Name string `json:"name,omitempty"`
+	} `json:"check"`
+}
+
+type CommitStatuses struct {
+	Values []CommitStatus `json:"values,omitempty" validate:"required,dive"`
+	Next   *string        `json:"next,omitempty"`
+}
+type CommitStatus struct {
+	Key   *string `json:"key,omitempty" validate:"required"`
+	State *string `json:"state,omitempty" validate:"required"`
+}
+
 type Actor struct {
 	AccountID *string `json:"account_id,omitempty" validate:"required"`
 	UUID      *string `json:"uuid,omitempty"`

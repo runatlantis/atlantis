@@ -366,7 +366,7 @@ atlantis server --bitbucket-base-url="http://bitbucket.corp:7990/basepath"
 ATLANTIS_BITBUCKET_BASE_URL="http://bitbucket.corp:7990/basepath"
 ```
 
-Base URL of Bitbucket Server (aka Stash) installation. Must include
+Base URL of Bitbucket Server installation. Must include
 `http://` or `https://`. If using Bitbucket Cloud (bitbucket.org), do not set. Defaults to
 `https://api.bitbucket.org`.
 
@@ -378,7 +378,7 @@ atlantis server --bitbucket-token="token"
 ATLANTIS_BITBUCKET_TOKEN="token"
 ```
 
-Bitbucket app password of API user.
+API token or app password of the API user for Bitbucket Cloud, or HTTP access token for Bitbucket Server.
 
 ### `--bitbucket-user`
 
@@ -1105,9 +1105,9 @@ ATLANTIS_HIDE_PREV_PLAN_COMMENTS=true
 ```
 
 Hide previous plan comments to declutter PRs. This is only supported in
-GitHub and GitLab and Bitbucket currently and is not enabled by default.
+GitHub, GitLab and Bitbucket Cloud currently and is not enabled by default.
 
-For Bitbucket, the comments are deleted rather than hidden as Bitbucket does not support hiding comments.
+For Bitbucket Cloud, the comments are deleted rather than hidden as it does not support hiding comments.
 
 For GitHub, ensure the `--gh-user` is set appropriately or comments will not be hidden.
 
@@ -1134,10 +1134,9 @@ ATLANTIS_IGNORE_VCS_STATUS_NAMES=status1,status2
 ```
 
 Comma separated list of VCS status names from other atlantis services.
-When `gh-allow-mergeable-bypass-apply` is true, will ignore status checks
-(e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
-from other Atlantis services when checking if the PR is mergeable.
-Currently only implemented for GitHub.
+Their status checks (e.g. `status1/plan`, `status1/apply`, `status2/plan`, `status2/apply`)
+are ignored when checking if the PR is mergeable.
+Currently only implemented for GitHub, when `gh-allow-mergeable-bypass-apply` is true, Bitbucket Cloud and Bitbucket Server.
 
 ### `--include-git-untracked-files`
 
@@ -1803,6 +1802,12 @@ Name used to identify Atlantis when updating a pull request status. Defaults to 
 
 This is useful when running multiple Atlantis servers against a single repository so you can
 give each Atlantis server its own unique name to prevent the statuses clashing.
+
+::: warning Behavior change
+Previously, the name could have any length. Now, when using Bitbucket Cloud, Atlantis refuses to start if
+the name is longer than 35 characters, since it truncates the statuses there and would not be able to tell
+the plan and apply ones apart.
+:::
 
 ### `--web-basic-auth`
 
