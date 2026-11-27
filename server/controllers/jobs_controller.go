@@ -68,13 +68,17 @@ func (j *JobsController) GetProjectJobs(w http.ResponseWriter, r *http.Request) 
 
 func (j *JobsController) getProjectJobsWS(w http.ResponseWriter, r *http.Request) error {
 	err := j.WsMux.Handle(w, r)
-
-	if err != nil {
-		j.respond(w, logging.Error, http.StatusInternalServerError, "%s", err.Error())
+	if err == nil {
+		return nil
+	}
+	if websocket.IsResponseCommitted(err) {
+		// The response was already written by the upgrader or hijacked, so
+		// writing another one would only be dropped by net/http.
+		j.Logger.Err("%s", err.Error())
 		return err
 	}
-
-	return nil
+	j.respond(w, logging.Error, http.StatusInternalServerError, "%s", err.Error())
+	return err
 }
 
 func (j *JobsController) GetProjectJobsWS(w http.ResponseWriter, r *http.Request) {
