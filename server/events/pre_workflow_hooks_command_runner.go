@@ -45,9 +45,10 @@ type DefaultPreWorkflowHooksCommandRunner struct {
 
 // RunPreHooks runs pre_workflow_hooks when PR is opened or updated.
 func (w *DefaultPreWorkflowHooksCommandRunner) RunPreHooks(ctx *command.Context, cmd *CommentCommand) error {
-	preWorkflowHooks := w.preWorkflowHooks(ctx)
+	preWorkflowHooks := w.preWorkflowHooksForCommand(ctx, cmd)
 
 	// short circuit any other calls if there are no pre-hooks configured
+	// for this command (including hooks whose commands filter excludes it)
 	if len(preWorkflowHooks) == 0 {
 		return nil
 	}
@@ -109,6 +110,25 @@ func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooks(ctx *command.Con
 		}
 	}
 	return preWorkflowHooks
+}
+
+// preWorkflowHooksForCommand returns the pre-workflow hooks that apply to cmd.
+// Hooks with an empty Commands field apply to every command; otherwise the
+// command name must appear in Commands (same rule as runHooks).
+func (w *DefaultPreWorkflowHooksCommandRunner) preWorkflowHooksForCommand(ctx *command.Context, cmd *CommentCommand) []*valid.WorkflowHook {
+	all := w.preWorkflowHooks(ctx)
+	if cmd == nil {
+		return all
+	}
+	commandName := cmd.Name.String()
+	filtered := make([]*valid.WorkflowHook, 0, len(all))
+	for _, hook := range all {
+		if hook.Commands != "" && !strings.Contains(hook.Commands, commandName) {
+			continue
+		}
+		filtered = append(filtered, hook)
+	}
+	return filtered
 }
 
 func (w *DefaultPreWorkflowHooksCommandRunner) runHooks(
