@@ -43,7 +43,7 @@ const (
 )
 
 // DefaultBlockedExtraArgs is the set of Terraform CLI flags that are always
-// rejected when supplied as comment extra args (after "--").
+// rejected in caller-supplied Terraform arguments.
 //
 // Two groups are blocked. -chdir and -plugin-dir move Terraform's working
 // directory or provider source somewhere the commenter controls. The rest
@@ -438,16 +438,24 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 	// Reject extra args that contain blocked Terraform CLI flags.
 	// These flags could be used to bypass security controls (e.g. directory
 	// traversal via -chdir, or loading malicious providers via -plugin-dir).
-	for _, arg := range extraArgs {
-		if e.isBlockedExtraArg(arg) {
-			return "", nil, e.errMarkdown(fmt.Sprintf("flag %q is not allowed in extra args", arg), name.String(), flagSet)
-		}
+	if err := ValidateExtraArgs(extraArgs, e.BlockedExtraArgs); err != nil {
+		return "", nil, e.errMarkdown(err.Error(), name.String(), flagSet)
 	}
 	return subCommand, extraArgs, ""
 }
 
+// ValidateExtraArgs rejects built-in and operator-blocked Terraform flags.
+func ValidateExtraArgs(args, blockedExtraArgs []string) error {
+	for _, arg := range args {
+		if isBlockedExtraArg(arg, blockedExtraArgs) {
+			return fmt.Errorf("flag %q is not allowed in extra args", arg)
+		}
+	}
+	return nil
+}
+
 // isBlockedExtraArg returns true if arg is a Terraform CLI flag that is not
-// permitted in comment extra args: one of DefaultBlockedExtraArgs, which are
+// permitted in caller-supplied args: one of DefaultBlockedExtraArgs, which are
 // always enforced, or one the operator added through BlockedExtraArgs.
 //
 // The comparison is on the flag name with leading dashes removed and any
@@ -457,7 +465,7 @@ func (e *CommentParser) parseArgs(name command.Name, args []string, flagSet *pfl
 // bypassed by whichever one the operator forgot. Any dash count is treated as
 // the flag: Terraform would reject "---out" itself, so over-matching there
 // only ever blocks an argument that could not have worked anyway.
-func (e *CommentParser) isBlockedExtraArg(arg string) bool {
+func isBlockedExtraArg(arg string, blockedExtraArgs []string) bool {
 	name := extraArgFlagName(arg)
 	if name == "" {
 		return false
@@ -467,7 +475,7 @@ func (e *CommentParser) isBlockedExtraArg(arg string) bool {
 			return true
 		}
 	}
-	for _, blocked := range e.BlockedExtraArgs {
+	for _, blocked := range blockedExtraArgs {
 		if name == extraArgFlagName(blocked) {
 			return true
 		}
