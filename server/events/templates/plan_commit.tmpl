@@ -1,0 +1,5 @@
+{{ define "planCommit" -}}
+{{ if .PullHeadCommit }}
+{{ if .SupportsHTML }}<sub>{{ end }}Ran on commit {{ if .PullHeadCommitURL }}[`{{ .PullHeadCommitShort }}`]({{ .PullHeadCommitURL }}){{ else }}`{{ .PullHeadCommitShort }}`{{ end }}{{ if .SupportsHTML }}</sub>{{ end }}
+{{ end -}}
+{{ end -}}

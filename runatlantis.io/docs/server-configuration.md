@@ -1246,6 +1246,13 @@ Markdown templates which may have overrides can be found [markdown templates dir
 Please be mindful that settings like `--enable-diff-markdown-format` depend on logic defined in the templates. It is
 possible to diverge from expected behavior, if care is not taken when overriding default templates.
 
+Plan comments end with a small line naming the pull request head commit the plan ran on. To change or hide it,
+override the `planCommit` template. Go templates ignore an override with an empty body, so hide the line with:
+
+```text
+{{ define "planCommit" -}}{{ if false }}{{ end -}}{{ end -}}
+```
+
 Defaults to the atlantis home directory `/home/atlantis/.markdown_templates/` in `/$HOME/.markdown_templates`.
 
 ### `--max-comments-per-command`
