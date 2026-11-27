@@ -124,8 +124,9 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all plan's will need this status,
 		// only if they rely on the mergeability requirement.
-		// All PullRequestStatus fields are set to false by default when error.
-		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		// A status that could not be fetched is false; the approval status is
+		// kept when only the mergeability check failed.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with statuses that could not be fetched assumed false", err)
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildAutoplanCommands(ctx)
@@ -229,8 +230,9 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		// On error we continue the request with mergeable assumed false.
 		// We want to continue because not all apply's will need this status,
 		// only if they rely on the mergeability requirement.
-		// All PullRequestStatus fields are set to false by default when error.
-		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		// A status that could not be fetched is false; the approval status is
+		// kept when only the mergeability check failed.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with statuses that could not be fetched assumed false", err)
 	}
 
 	projectCmds, err := p.prjCmdBuilder.BuildPlanCommands(ctx, cmd)
