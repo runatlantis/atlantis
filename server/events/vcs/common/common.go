@@ -77,10 +77,13 @@ func GenerateSeparators(command string) map[ClosureType]SeparatorSet {
 	}
 
 	// DetailsBlock separators
+	// Unlike CodeInDetails, a split landing here is not inside a code fence,
+	// so the continuation must not open one: SepEnd only closes </details>
+	// and a ```diff opened here would never be closed.
 	separators[DetailsBlock] = SeparatorSet{
 		SepEnd:           fmt.Sprintf("\n</details>\n%s", baseEnd),
-		SepStart:         fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n```diff\n", baseStart),
-		TruncationHeader: fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n```diff\n", baseTruncation),
+		SepStart:         fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n", baseStart),
+		TruncationHeader: fmt.Sprintf("%s<details><summary>Show Output</summary>\n\n", baseTruncation),
 	}
 
 	// CodeInDetails separators
