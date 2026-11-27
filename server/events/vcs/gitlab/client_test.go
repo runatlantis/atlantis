@@ -1030,6 +1030,163 @@ func TestClient_UpdateStatusPipelineAdoption(t *testing.T) {
 	}
 }
 
+// Test that UpdateStatus stops retrying and falls back to the Ref when GitLab
+// rejects a commit status because the adopted pipeline failed with a CI
+// configuration error. GitLab validates that only when a pipeline ID is sent,
+// so dropping the ID both unblocks the status and stops the ten retries.
+// See https://github.com/runatlantis/atlantis/issues/7134.
+func TestClient_UpdateStatusPipelineConfigurationError(t *testing.T) {
+	logger := logging.NewNoopLogger(t)
+
+	const (
+		configurationErrorBody = `{"message":"Cannot add status to pipeline with configuration errors"}`
+		unrelatedErrorBody     = `{"message":"Something else went wrong"}`
+	)
+
+	cases := []struct {
+		name string
+		// rejectBody is the body the server answers with HTTP 400. Requests that
+		// the fallback already stripped of a pipeline ID are rejected as well, so
+		// the loop budget stays observable.
+		rejectBody        string
+		rejectAll         bool
+		expSetStatusCount int
+		expLastPipelineId int
+		expLastRef        string
+		expError          string
+	}{
+		{
+			name:              "falls back to the ref on the first rejection",
+			rejectBody:        configurationErrorBody,
+			expSetStatusCount: 2,
+			expLastPipelineId: 0,
+			expLastRef:        updateStatusHeadBranch,
+		},
+		{
+			// The fallback does not consume an attempt, so one rejected request
+			// plus nine retries with the Ref reach the ten-attempt budget.
+			name:              "does not fall back a second time once the pipeline ID is gone",
+			rejectBody:        configurationErrorBody,
+			rejectAll:         true,
+			expSetStatusCount: 11,
+			expLastPipelineId: 0,
+			expLastRef:        updateStatusHeadBranch,
+			expError:          "Cannot add status to pipeline with configuration errors",
+		},
+		{
+			name:              "keeps the pipeline ID and retries unrelated 400 responses",
+			rejectBody:        unrelatedErrorBody,
+			rejectAll:         true,
+			expSetStatusCount: 10,
+			expLastPipelineId: gitlabPipelineSuccessMrID,
+			expError:          "Something else went wrong",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			setStatusRequests := 0
+			var lastUpdateStatusJsonBody UpdateStatusJsonBody
+
+			testServer := httptest.NewServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch r.RequestURI {
+					case "/api/v4/projects/runatlantis%2Fatlantis/repository/commits/sha":
+						w.WriteHeader(http.StatusOK)
+
+						getCommitResponse := GetCommitResponse{
+							LastPipeline: &GetCommitResponseLastPipeline{
+								ID:     gitlabPipelineSuccessMrID,
+								SHA:    "sha",
+								Ref:    "refs/merge-requests/7/head",
+								Source: "merge_request_event",
+							},
+						}
+						getCommitJsonResponse, err := json.Marshal(getCommitResponse)
+						Ok(t, err)
+						_, err = w.Write(getCommitJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/projects/runatlantis%2Fatlantis/statuses/sha":
+						setStatusRequests++
+						var updateStatusJsonBody UpdateStatusJsonBody
+						err := json.NewDecoder(r.Body).Decode(&updateStatusJsonBody)
+						Ok(t, err)
+						defer r.Body.Close() // nolint: errcheck
+
+						Equals(t, updateStatusSrc, updateStatusJsonBody.Context)
+						Equals(t, updateStatusTargetUrl, updateStatusJsonBody.TargetUrl)
+						Equals(t, updateStatusDescription, updateStatusJsonBody.Description)
+						lastUpdateStatusJsonBody = updateStatusJsonBody
+
+						if c.rejectAll || setStatusRequests == 1 {
+							w.WriteHeader(http.StatusBadRequest)
+							_, err = w.Write([]byte(c.rejectBody))
+							Ok(t, err)
+							return
+						}
+
+						w.WriteHeader(http.StatusOK)
+						setStatusJsonResponse, err := json.Marshal(EmptyStruct{})
+						Ok(t, err)
+						_, err = w.Write(setStatusJsonResponse)
+						Ok(t, err)
+
+					case "/api/v4/":
+						// Rate limiter requests.
+						w.WriteHeader(http.StatusOK)
+
+					default:
+						t.Errorf("got unexpected request at %q", r.RequestURI)
+						http.Error(w, "not found", http.StatusNotFound)
+					}
+				}))
+			defer testServer.Close()
+
+			internalClient, err := gitlab.NewClient("token", gitlab.WithBaseURL(testServer.URL))
+			Ok(t, err)
+
+			client := &Client{
+				Client:          internalClient,
+				Version:         nil,
+				PollingInterval: 10 * time.Millisecond,
+			}
+
+			repo := models.Repo{
+				FullName: "runatlantis/atlantis",
+				Owner:    "runatlantis",
+				Name:     "atlantis",
+			}
+
+			err = client.UpdateStatus(
+				logger,
+				repo,
+				models.PullRequest{
+					Num:        7,
+					BaseRepo:   repo,
+					HeadCommit: "sha",
+					HeadBranch: updateStatusHeadBranch,
+				},
+				models.PendingCommitStatus,
+				updateStatusSrc,
+				updateStatusDescription,
+				updateStatusTargetUrl,
+			)
+
+			if c.expError != "" {
+				ErrContains(t, "failed to update commit status for 'runatlantis/atlantis' @ 'sha' to 'src' after 10 attempts", err)
+				ErrContains(t, c.expError, err)
+			} else {
+				Ok(t, err)
+			}
+
+			Equals(t, c.expSetStatusCount, setStatusRequests)
+			Equals(t, c.expLastPipelineId, lastUpdateStatusJsonBody.PipelineId)
+			Equals(t, c.expLastRef, lastUpdateStatusJsonBody.Ref)
+		})
+	}
+}
+
 func mustReadFile(t *testing.T, filename string) []byte {
 	ret, err := os.ReadFile(filename)
 	Ok(t, err)

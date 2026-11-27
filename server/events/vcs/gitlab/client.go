@@ -613,6 +613,18 @@ func isPipelineAdoptable(pipeline *gitlab.PipelineInfo, pull models.PullRequest)
 	return slices.Contains(adoptablePipelineRefs(pull), pipeline.Ref)
 }
 
+// isPipelineConfigurationError reports whether GitLab rejected a commit status
+// because the pipeline it was attached to failed with a CI configuration error.
+// GitLab validates this only when the request carries a pipeline ID; without
+// one it creates a new pipeline for the status instead.
+// See https://github.com/runatlantis/atlantis/issues/7134.
+func isPipelineConfigurationError(err error) bool {
+	var errResponse *gitlab.ErrorResponse
+	return errors.As(err, &errResponse) &&
+		errResponse.HasStatusCode(http.StatusBadRequest) &&
+		strings.Contains(errResponse.Message, "Cannot add status to pipeline with configuration errors")
+}
+
 // UpdateStatus updates the build status of a commit.
 func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest, state models.CommitStatus, src string, description string, url string) error {
 	gitlabState := gitlab.Pending
@@ -724,6 +736,19 @@ func (g *Client) UpdateStatus(logger logging.SimpleLogging, repo models.Repo, pu
 		if gitlabState == gitlab.Running && strings.Contains(err.Error(), "Cannot transition status via :run from :running") {
 			logger.Info("Commit status is already 'running'; ignoring redundant update.")
 			return nil
+		}
+
+		// GitLab refuses any status attached to a pipeline that failed with a CI
+		// configuration error, and retrying cannot change that. Falling back to
+		// the Ref lets GitLab create a pipeline for the status instead, which is
+		// what GitLab does on its own when no pipeline ID is sent.
+		// See https://github.com/runatlantis/atlantis/issues/7134.
+		if setCommitStatusOptions.PipelineID != nil && isPipelineConfigurationError(err) {
+			pipelineID := *setCommitStatusOptions.PipelineID
+			logger.Warn("GitLab returned HTTP [400 Bad Request] for pipeline %d because its configuration has errors; retrying without the pipeline ID", pipelineID)
+			setCommitStatusOptions.PipelineID = nil
+			setCommitStatusOptions.Ref = gitlab.Ptr(pull.HeadBranch)
+			continue
 		}
 
 		if attempt == maxAttempts {
