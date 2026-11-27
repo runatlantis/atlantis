@@ -1391,11 +1391,12 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 		},
 	}
 
-	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
-	// that the current Go types cannot unmarshal (Approvals used to be int).
+	// Inject a corrupt pull-status blob whose Status is a string where the
+	// current Go shape has an int. A legacy int Approvals is no longer corrupt;
+	// see TestPullStatus_PreservesLegacyPolicyApprovals.
 	key := fmt.Sprintf("%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false}],"Status":"planned"}],"Pull":{"Num":1}}`
 	Ok(t, s.Set(key, corrupt))
 
 	// Write fresh results. This must succeed despite the unreadable prior entry.
@@ -1421,6 +1422,51 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 	Assert(t, got != nil, "expected non-nil pull status")
 	Equals(t, 1, len(got.Projects))
 	Equals(t, models.PlannedPlanStatus, got.Projects[0].Status)
+}
+
+// TestPullStatus_PreservesLegacyPolicyApprovals verifies that a pull status
+// written before approvals recorded an approver still loads, instead of being
+// treated as corrupt and overwritten.
+func TestPullStatus_PreservesLegacyPolicyApprovals(t *testing.T) {
+	s := miniredis.RunT(t)
+	rdb := newTestRedis(s)
+
+	pull := models.PullRequest{
+		Num:        1,
+		HeadCommit: "sha-A",
+		URL:        "url",
+		HeadBranch: "head",
+		BaseBranch: "base",
+		Author:     "lkysow",
+		State:      models.OpenPullState,
+		BaseRepo: models.Repo{
+			FullName:          "runatlantis/atlantis",
+			Owner:             "runatlantis",
+			Name:              "atlantis",
+			CloneURL:          "clone-url",
+			SanitizedCloneURL: "clone-url",
+			VCSHost: models.VCSHost{
+				Hostname: "github.com",
+				Type:     models.Github,
+			},
+		},
+	}
+
+	key := fmt.Sprintf("%s::%s::%d",
+		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
+	legacy := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":true,"Approvals":2}],"Status":2}],"Pull":{"Num":1}}`
+	Ok(t, s.Set(key, legacy))
+
+	got, err := rdb.GetPullStatus(pull)
+	Ok(t, err)
+	Assert(t, got != nil, "expected non-nil pull status")
+	Equals(t, 1, len(got.Projects))
+	Equals(t, "mydir", got.Projects[0].RepoRelDir)
+	// The policy set survives; the count yields no approvals, so it must be
+	// approved again rather than crediting an approver nobody recorded.
+	Equals(t, 1, len(got.Projects[0].PolicyStatus))
+	Equals(t, "policy1", got.Projects[0].PolicyStatus[0].PolicySetName)
+	Equals(t, 0, got.Projects[0].PolicyStatus[0].GetCurApprovals())
 }
 
 func newTestRedis(mr *miniredis.Miniredis) *redis.RedisDB {
