@@ -808,13 +808,18 @@ func (g *Client) MergePull(logger logging.SimpleLogging, pull models.PullRequest
 		g.WaitForSuccessPipeline(logger, context.Background(), pull)
 	}
 
-	_, resp, err = g.Client.MergeRequests.AcceptMergeRequest(
-		pull.BaseRepo.FullName,
-		pull.Num,
-		&gitlab.AcceptMergeRequestOptions{
-			MergeCommitMessage:       &commitMsg,
-			ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
-		})
+	opts := &gitlab.AcceptMergeRequestOptions{
+		MergeCommitMessage:       &commitMsg,
+		ShouldRemoveSourceBranch: &pullOptions.DeleteSourceBranchOnMerge,
+	}
+	// GitLab rejects API merges on "Require squash" projects when the MR was
+	// created with squash=false, unless squash=true is sent with the merge.
+	// The project check covers GitLab versions without squash_on_merge.
+	if mr.SquashOnMerge || (project != nil && project.SquashOption == gitlab.SquashOptionAlways) {
+		opts.Squash = gitlab.Ptr(true)
+	}
+
+	_, resp, err = g.Client.MergeRequests.AcceptMergeRequest(pull.BaseRepo.FullName, pull.Num, opts)
 	if resp != nil {
 		logger.Debug("PUT /projects/%s/merge_requests/%d/merge returned: %d", pull.BaseRepo.FullName, pull.Num, resp.StatusCode)
 	}
