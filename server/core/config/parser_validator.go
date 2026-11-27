@@ -365,6 +365,7 @@ func (p *ParserValidator) copyProjectWithDir(original raw.Project, newDir string
 		PolicyCheck:               original.PolicyCheck,
 		CustomPolicyCheck:         original.CustomPolicyCheck,
 		SilencePRComments:         original.SilencePRComments,
+		APIAllowVars:              original.APIAllowVars,
 	}
 
 	// Note: We intentionally do NOT copy the Name field.

@@ -635,6 +635,49 @@ projects:
 			expPlanSteps:  []string{"plan"},
 			expApplySteps: []string{"apply"},
 		},
+		"api_allow_vars from repo cfg when allowed": {
+			globalCfg: `
+repos:
+- id: /.*/
+  allowed_overrides: [api_allow_vars]
+  api_allow_vars: [foo_*]
+`,
+			repoCfg: `
+version: 3
+projects:
+- dir: project1
+  workspace: myworkspace
+  api_allow_vars: [bar_*]
+`,
+			expCtx: command.ProjectContext{
+				ApplyCmd:             "atlantis apply -d project1 -w myworkspace",
+				ApprovePoliciesCmd:   "atlantis approve_policies -d project1 -w myworkspace",
+				BaseRepo:             baseRepo,
+				CommentArgs:          []string{"flag"},
+				EscapedCommentArgs:   []string{`\f\l\a\g`},
+				AutoplanEnabled:      true,
+				AutoplanWhenModified: []string{"**/*.tf*", "**/*.tofu", "**/*.tofu.json", "**/terragrunt.hcl", "**/.terraform.lock.hcl"},
+				Log:                  logger,
+				Scope:                statsScope,
+				PullReqStatus: models.PullReqStatus{
+					MergeableStatus: models.MergeableStatus{IsMergeable: true},
+				},
+				Pull:               pull,
+				PlanRequirements:   []string{},
+				ApplyRequirements:  []string{},
+				ImportRequirements: []string{},
+				RepoConfigVersion:  3,
+				RePlanCmd:          "atlantis plan -d project1 -w myworkspace -- flag",
+				RepoRelDir:         "project1",
+				Verbose:            true,
+				Workspace:          "myworkspace",
+				PolicySets:         emptyPolicySets,
+				RepoLocksMode:      valid.DefaultRepoLocksMode,
+				APIAllowVars:       []string{"bar_*"},
+			},
+			expPlanSteps:  []string{"init", "plan"},
+			expApplySteps: []string{"apply"},
+		},
 	}
 
 	for name, c := range cases {

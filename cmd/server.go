@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/runatlantis/atlantis/server"
+	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/events"
 	"github.com/runatlantis/atlantis/server/events/vcs/bitbucketcloud"
 	"github.com/runatlantis/atlantis/server/i18n"
@@ -113,6 +114,7 @@ const (
 	GitlabWebhookSecretFlag          = "gitlab-webhook-secret" // nolint: gosec
 	GitlabStatusRetryEnabledFlag     = "gitlab-status-retry-enabled"
 	IncludeGitUntrackedFiles         = "include-git-untracked-files"
+	APIAllowVarsFlag                 = "api-allow-vars"
 	APISecretFlag                    = "api-secret"
 	HidePrevPlanComments             = "hide-prev-plan-comments"
 	QuietPolicyChecks                = "quiet-policy-checks"
@@ -247,7 +249,7 @@ var stringFlags = map[string]stringFlag{
 	},
 	BlockedExtraArgsFlag: {
 		description: "Comma separated list of additional Terraform CLI flags that are not allowed " +
-			"in comment extra args (the flags after '--'). " +
+			"in comment extra args (the flags after '--') and in the plan arguments of API requests. " +
 			"These are added to the flags that are always blocked: " + strings.Join(events.DefaultBlockedExtraArgs, ",") + ".",
 	},
 	AtlantisURLFlag: {
@@ -423,6 +425,11 @@ var stringFlags = map[string]stringFlag{
 			" SECURITY WARNING: If not specified, Atlantis won't be able to validate that the incoming webhook call came from GitLab. " +
 			"This means that an attacker could spoof calls to Atlantis and cause it to perform malicious actions. " +
 			"Should be specified via the ATLANTIS_GITLAB_WEBHOOK_SECRET environment variable.",
+	},
+	APIAllowVarsFlag: {
+		description: "Comma separated list of the Terraform variables that POST /api/plan and /api/apply requests may set with 'Vars'. " +
+			"An entry is a variable name, a prefix ending in '*' (e.g. 'foo_bar_*'), or '*' for any variable. " +
+			"The repo config key api_allow_vars overrides it. By default no variables are allowed. Requires the api experiment.",
 	},
 	APISecretFlag: {
 		description: "Secret used to validate requests made to the /api/* endpoints. Requires the api or drift-detection experiment for the corresponding routes.",
@@ -1246,6 +1253,12 @@ func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 
 	if _, err := userConfig.ToAllowCommandNames(); err != nil {
 		return fmt.Errorf("invalid --%s: %w", AllowCommandsFlag, err)
+	}
+
+	for _, pattern := range userConfig.ToAPIAllowVars() {
+		if err := valid.ValidateAPIAllowVarPattern(pattern); err != nil {
+			return fmt.Errorf("invalid --%s: %w", APIAllowVarsFlag, err)
+		}
 	}
 
 	if _, err := userConfig.ToWebhookHttpHeaders(); err != nil {

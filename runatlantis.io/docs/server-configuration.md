@@ -103,6 +103,24 @@ repository is on the same host as its base repository.
 Previously, Atlantis did not compare the hosts of the head and base repositories. Now, if the head repository's clone URL host differs from the base repository's (case-insensitive), or has no host, Atlantis does not run the command and posts no comment. Look for the server log line `head repo host "<head>" does not match base repo host "<base>", not running command`. For GitHub, see also [`--gh-hostname`](#gh-hostname).
 :::
 
+### `--api-allow-vars` <Badge text="Experimental" type="warning"/>
+
+```bash
+atlantis server --api-allow-vars="foo_bar_*,baz"
+# or
+ATLANTIS_API_ALLOW_VARS="foo_bar_*,baz"
+```
+
+Comma-separated list of the Terraform variables that [`POST /api/plan` and `POST /api/apply`](api-endpoints.md#plan-arguments) requests may set with `Vars`. Each entry is one of:
+
+- a variable name, such as `baz`, which allows only that variable;
+- a prefix ending in `*`, such as `foo_bar_*`, which allows every variable whose name starts with `foo_bar_`;
+- `*`, which allows any variable.
+
+`*` is only allowed at the end of an entry. By default, no variables are allowed. The [`api_allow_vars`](server-side-repo-config.md#reference) key of a repo in the server-side repo config, and of a project in the repo-level `atlantis.yaml` when `allowed_overrides` permits it, replace this list for the repos and projects they match.
+
+Requires `api` in [`experiments`](experiments.md#api). Otherwise, startup fails.
+
 ### `--api-secret` <Badge text="Experimental" type="warning"/>
 
 See the [API experiment](experiments.md#api) for limitations and graduation requirements. This shared secret requires `api` or `drift-detection` in `experiments`, according to the routes you intend to use. Otherwise, startup fails.
@@ -413,7 +431,7 @@ atlantis server --blocked-extra-args="-lock-timeout,-parallelism"
 ATLANTIS_BLOCKED_EXTRA_ARGS='-lock-timeout,-parallelism'
 ```
 
-Comma-separated list of additional Terraform CLI flags that are not allowed in comment extra args (the flags after `--`).
+Comma-separated list of additional Terraform CLI flags that are not allowed in comment extra args (the flags after `--`) and in the [plan arguments](api-endpoints.md#plan-arguments) of API requests.
 These flags are always blocked, whether or not this flag is set: `-chdir,-plugin-dir,-out,-generate-config-out,-state,-state-out,-backup`.
 
 Notes:

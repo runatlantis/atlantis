@@ -175,6 +175,10 @@ type ProjectContext struct {
 	// a PR comment.
 	API bool
 
+	// APIAllowVars are the patterns of the variables an API plan request may
+	// set for this project.
+	APIAllowVars []string
+
 	// SkipPRRequirements allows explicitly opted-in non-PR API workflows to skip
 	// PR-only requirements like approved and mergeable.
 	SkipPRRequirements bool

@@ -198,6 +198,7 @@ type Project struct {
 	PolicyCheck               *bool
 	CustomPolicyCheck         *bool
 	SilencePRComments         []string
+	APIAllowVars              []string
 }
 
 // GetName returns the name of the project or an empty string if there is no

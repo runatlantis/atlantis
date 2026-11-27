@@ -39,6 +39,9 @@ func (c UserConfig) ValidateExperiments() error {
 			return fmt.Errorf("%s requires the %q experiment; add it to experiments or disable %s; see %s", setting.name, driftExperiment, setting.name, ExperimentsDocumentationURL)
 		}
 	}
+	if c.APIAllowVars != "" && !api {
+		return fmt.Errorf("api-allow-vars requires the %q experiment; add it to experiments or remove api-allow-vars; see %s", apiExperiment, ExperimentsDocumentationURL)
+	}
 	// Both route groups use the secret; either experiment may authorize it.
 	if c.APISecret != "" && !api && !drift {
 		return fmt.Errorf("api-secret requires the %q experiment for command/lock endpoints or %q for drift endpoints; add the matching name to experiments or remove api-secret; see %s", apiExperiment, driftExperiment, ExperimentsDocumentationURL)

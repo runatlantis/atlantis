@@ -59,6 +59,7 @@ var testFlags = map[string]any{
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	BlockedExtraArgsFlag:             "-no-color,-lock-timeout",
 	AllowForkPRsFlag:                 true,
+	APIAllowVarsFlag:                 "foo_bar_*,baz",
 	APISecretFlag:                    "api-secret",
 	AutoDiscoverModeFlag:             "auto",
 	AutomergeFlag:                    true,
@@ -1000,6 +1001,32 @@ func TestExecute_ValidateAllowCommands(t *testing.T) {
 		} else {
 			Ok(t, err)
 		}
+	}
+}
+
+func TestExecute_ValidateAPIAllowVars(t *testing.T) {
+	cases := []struct {
+		name   string
+		flag   string
+		expErr string
+	}{
+		{name: "names and prefixes", flag: "foo_bar_*, baz,*"},
+		{name: "wildcard in the middle", flag: "foo_*_bar", expErr: `invalid --api-allow-vars: invalid api_allow_vars pattern "foo_*_bar": '*' is only allowed at the end`},
+		{name: "not a variable name", flag: "foo bar", expErr: `invalid --api-allow-vars: invalid api_allow_vars pattern "foo bar": must be a variable name, optionally ending in '*'`},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{
+				APIAllowVarsFlag: testCase.flag,
+				ExperimentsFlag:  []string{"api"},
+			}, t)
+			err := c.Execute()
+			if testCase.expErr != "" {
+				ErrEquals(t, testCase.expErr, err)
+			} else {
+				Ok(t, err)
+			}
+		})
 	}
 }
 

@@ -673,6 +673,50 @@ projects:
 			},
 		},
 		{
+			description: "project with api_allow_vars",
+			input: `
+version: 3
+projects:
+- dir: a
+  api_allow_vars: ["*", foo_bar_*, baz]
+- dir: b
+  api_allow_vars: []
+`,
+			exp: valid.RepoCfg{
+				Version: 3,
+				Projects: []valid.Project{
+					{
+						Dir:       "a",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
+							Enabled:      true,
+						},
+						APIAllowVars: []string{"*", "foo_bar_*", "baz"},
+					},
+					{
+						Dir:       "b",
+						Workspace: "default",
+						Autoplan: valid.Autoplan{
+							WhenModified: raw.DefaultAutoPlanWhenModified(),
+							Enabled:      true,
+						},
+						APIAllowVars: []string{},
+					},
+				},
+				Workflows: make(map[string]valid.Workflow),
+			},
+		},
+		{
+			description: "project api_allow_vars with a wildcard in the middle",
+			input: `
+version: 3
+projects:
+- dir: .
+  api_allow_vars: [foo_*_bar]`,
+			expErr: "projects: (0: (api_allow_vars: invalid api_allow_vars pattern \"foo_*_bar\": '*' is only allowed at the end.).).",
+		},
+		{
 			description: "project dir with ..",
 			input: `
 version: 3
@@ -1348,7 +1392,7 @@ func TestParseGlobalCfg(t *testing.T) {
 			input: `repos:
 - id: /.*/
   allowed_overrides: [invalid]`,
-			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"repo_locks\", \"policy_check\", \"custom_policy_check\", and \"silence_pr_comments\" are supported.).).",
+			expErr: "repos: (0: (allowed_overrides: \"invalid\" is not a valid override, only \"plan_requirements\", \"apply_requirements\", \"import_requirements\", \"workflow\", \"delete_source_branch_on_merge\", \"repo_locking\", \"repo_locks\", \"policy_check\", \"custom_policy_check\", \"silence_pr_comments\", and \"api_allow_vars\" are supported.).).",
 		},
 		"invalid plan_requirement": {
 			input: `repos:
@@ -1367,6 +1411,12 @@ func TestParseGlobalCfg(t *testing.T) {
 - id: /.*/
   import_requirements: [invalid]`,
 			expErr: "repos: (0: (import_requirements: \"invalid\" is not a valid import_requirement, only \"approved\", \"mergeable\" and \"undiverged\" are supported.).).",
+		},
+		"invalid api_allow_vars": {
+			input: `repos:
+- id: /.*/
+  api_allow_vars: [foo-bar.baz]`,
+			expErr: "repos: (0: (api_allow_vars: invalid api_allow_vars pattern \"foo-bar.baz\": must be a variable name, optionally ending in '*'.).).",
 		},
 		"invalid silence_pr_comments": {
 			input: `repos:
@@ -2277,6 +2327,7 @@ projects:
   workspace: staging
   terraform_version: v1.0.0
   apply_requirements: [approved, mergeable]
+  api_allow_vars: [foo_bar_*]
   autoplan:
     enabled: false
     when_modified: ["*.tf"]
@@ -2297,6 +2348,7 @@ projects:
 		Assert(t, p.TerraformVersion != nil, "TerraformVersion should not be nil")
 		Equals(t, "1.0.0", p.TerraformVersion.String())
 		Equals(t, []string{"approved", "mergeable"}, p.ApplyRequirements)
+		Equals(t, []string{"foo_bar_*"}, p.APIAllowVars)
 		Equals(t, false, p.Autoplan.Enabled)
 		Equals(t, []string{"*.tf"}, p.Autoplan.WhenModified)
 	}

@@ -91,6 +91,7 @@ type UserConfig struct {
 	GitlabWebhookSecret             string `mapstructure:"gitlab-webhook-secret"`
 	GitlabStatusRetryEnabled        bool   `mapstructure:"gitlab-status-retry-enabled"`
 	IncludeGitUntrackedFiles        bool   `mapstructure:"include-git-untracked-files"`
+	APIAllowVars                    string `mapstructure:"api-allow-vars"`
 	APISecret                       string `mapstructure:"api-secret"`
 	HidePrevPlanComments            bool   `mapstructure:"hide-prev-plan-comments"`
 	LockingDBType                   string `mapstructure:"locking-db-type"`
@@ -201,8 +202,8 @@ func (u UserConfig) ToAllowCommandNames() ([]command.Name, error) {
 }
 
 // ToBlockedExtraArgs parses BlockedExtraArgs into the flags the operator
-// blocks in addition to events.DefaultBlockedExtraArgs, which the comment
-// parser always enforces. It returns nil when no extra flags are configured.
+// blocks in addition to events.DefaultBlockedExtraArgs, which are always
+// enforced. It returns nil when no extra flags are configured.
 func (u UserConfig) ToBlockedExtraArgs() []string {
 	var args []string
 	for arg := range strings.SplitSeq(u.BlockedExtraArgs, ",") {
@@ -211,6 +212,18 @@ func (u UserConfig) ToBlockedExtraArgs() []string {
 		}
 	}
 	return args
+}
+
+// ToAPIAllowVars parses APIAllowVars into the patterns of the variables
+// that API plan requests may set. It returns nil when none are configured.
+func (u UserConfig) ToAPIAllowVars() []string {
+	var patterns []string
+	for pattern := range strings.SplitSeq(u.APIAllowVars, ",") {
+		if trimmed := strings.TrimSpace(pattern); trimmed != "" {
+			patterns = append(patterns, trimmed)
+		}
+	}
+	return patterns
 }
 
 // ToWebhookHttpHeaders parses WebhookHttpHeaders into a map of HTTP headers.
