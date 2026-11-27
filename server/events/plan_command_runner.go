@@ -87,20 +87,23 @@ type PlanCommandRunner struct {
 	// SilenceVCSStatusNoPlans is whether any plan should set commit status if no projects
 	// are found
 	silenceVCSStatusNoProjects bool
-	commitStatusUpdater        CommitStatusUpdater
-	pendingPlanFinder          PendingPlanFinder
-	workingDir                 WorkingDir
-	workingDirLocker           WorkingDirLocker
-	prjCmdBuilder              ProjectPlanCommandBuilder
-	prjCmdRunner               ProjectPlanCommandRunner
-	cancellationTracker        CancellationTracker
-	dbUpdater                  *DBUpdater
-	pullUpdater                *PullUpdater
-	policyCheckCommandRunner   *PolicyCheckCommandRunner
-	autoMerger                 *AutoMerger
-	parallelPoolSize           int
-	pullStatusFetcher          PullStatusFetcher
-	lockingLocker              locking.Locker
+	// PlanOutputDependents enables automatically planning projects that read
+	// the outputs of a project planned in this run when those outputs change.
+	PlanOutputDependents     bool
+	commitStatusUpdater      CommitStatusUpdater
+	pendingPlanFinder        PendingPlanFinder
+	workingDir               WorkingDir
+	workingDirLocker         WorkingDirLocker
+	prjCmdBuilder            ProjectPlanCommandBuilder
+	prjCmdRunner             ProjectPlanCommandRunner
+	cancellationTracker      CancellationTracker
+	dbUpdater                *DBUpdater
+	pullUpdater              *PullUpdater
+	policyCheckCommandRunner *PolicyCheckCommandRunner
+	autoMerger               *AutoMerger
+	parallelPoolSize         int
+	pullStatusFetcher        PullStatusFetcher
+	lockingLocker            locking.Locker
 	// DiscardApprovalOnPlan controls if all already existing approvals should be removed/dismissed before executing
 	// a plan.
 	DiscardApprovalOnPlan bool
@@ -178,6 +181,15 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+
+	if p.PlanOutputDependents {
+		dependentPlanCmds, dependentPolicyCheckCmds, dependentResults := p.planOutputDependents(ctx, projectCmds, result.ProjectResults)
+		projectCmds = append(projectCmds, dependentPlanCmds...)
+		policyCheckCmds = append(policyCheckCmds, dependentPolicyCheckCmds...)
+		// Dependent plans produce results of their own; append them so status
+		// publication, persistence and policy checks see the whole run.
+		result.ProjectResults = append(result.ProjectResults, dependentResults...)
+	}
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -325,6 +337,14 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+
+	if p.PlanOutputDependents {
+		dependentPlanCmds, dependentPolicyCheckCmds, dependentResults := p.planOutputDependents(ctx, projectCmds, result.ProjectResults)
+		projectCmds = append(projectCmds, dependentPlanCmds...)
+		policyCheckCmds = append(policyCheckCmds, dependentPolicyCheckCmds...)
+		result.ProjectResults = append(result.ProjectResults, dependentResults...)
+	}
+
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -601,6 +621,88 @@ func (p *PlanCommandRunner) partitionProjectCmds(
 
 func (p *PlanCommandRunner) isParallelEnabled(projectCmds []command.ProjectContext) bool {
 	return len(projectCmds) > 0 && projectCmds[0].ParallelPlanEnabled
+}
+
+// maxOutputDependentPlanRounds bounds the cascade of dependent plans. Every
+// round must add at least one project that was not planned before, so this is
+// only a guard against a bug producing a project identity that the exclusion
+// set does not recognise.
+const maxOutputDependentPlanRounds = 10
+
+// planOutputDependents plans projects that read the outputs changed by a
+// project planned earlier in this run. Their results are fed back into the
+// next round, so a chain of dependent projects is followed through to the end.
+// It is best effort: a failure to resolve dependencies is logged and the
+// already successful plans are left untouched.
+func (p *PlanCommandRunner) planOutputDependents(
+	ctx *command.Context,
+	planned []command.ProjectContext,
+	plannedResults []command.ProjectResult,
+) (planCmds []command.ProjectContext, policyCheckCmds []command.ProjectContext, results []command.ProjectResult) {
+	alreadyPlanned := slices.Clone(planned)
+	currentResults := plannedResults
+
+	for round := 0; round < maxOutputDependentPlanRounds; round++ {
+		triggers := outputDependentTriggers(currentResults)
+		if len(triggers) == 0 {
+			return
+		}
+
+		newCmds, err := p.prjCmdBuilder.BuildOutputDependentPlanCommands(ctx, triggers, alreadyPlanned)
+		if err != nil {
+			ctx.Log.Warn("unable to determine projects that depend on changed outputs: %s", err)
+			return
+		}
+		if len(newCmds) == 0 {
+			return
+		}
+
+		newPlanCmds, newPolicyCheckCmds := p.partitionProjectCmds(ctx, newCmds)
+		policyCheckCmds = append(policyCheckCmds, newPolicyCheckCmds...)
+		if len(newPlanCmds) == 0 {
+			return
+		}
+
+		ctx.Log.Info("running plans for %d project(s) that depend on changed outputs", len(newPlanCmds))
+		dependentResult := runProjectCmdsWithCancellationTracker(
+			ctx,
+			newPlanCmds,
+			p.cancellationTracker,
+			p.parallelPoolSize,
+			p.isParallelEnabled(newPlanCmds),
+			p.prjCmdRunner.Plan,
+		)
+
+		planCmds = append(planCmds, newPlanCmds...)
+		alreadyPlanned = append(alreadyPlanned, newPlanCmds...)
+		results = append(results, dependentResult.ProjectResults...)
+		currentResults = dependentResult.ProjectResults
+	}
+
+	ctx.Log.Warn("stopped planning dependent projects after %d rounds; check for a dependency cycle", maxOutputDependentPlanRounds)
+	return
+}
+
+// outputDependentTriggers returns the projects whose plans changed at least
+// one output.
+func outputDependentTriggers(results []command.ProjectResult) []OutputDependentTrigger {
+	var triggers []OutputDependentTrigger
+	for _, result := range results {
+		if result.PlanSuccess == nil {
+			continue
+		}
+		changed := ChangedOutputNames(result.PlanSuccess.OutputChanges)
+		if len(changed) == 0 {
+			continue
+		}
+		triggers = append(triggers, OutputDependentTrigger{
+			RepoRelDir:     result.RepoRelDir,
+			ProjectName:    result.ProjectName,
+			Workspace:      result.Workspace,
+			ChangedOutputs: changed,
+		})
+	}
+	return triggers
 }
 
 // Successful project checks are deferred until the command's results are durable.

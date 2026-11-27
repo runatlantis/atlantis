@@ -5789,6 +5789,62 @@ func TestDefaultProjectCommandRunner_PlanWithoutBuiltInPlanStepRecordsNoHash(t *
 	Equals(t, "", res.PlanSuccess.PlanHash)
 }
 
+func TestDefaultProjectCommandRunner_PlanRecordsOutputChanges(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: []byte("reviewed plan")}, repoDir)
+	mockTerraform := tfclientmocks.NewMockClient()
+	planJSON := `{"output_changes":{
+		"vpc_id":{"actions":["update"]},
+		"stable":{"actions":["no-op"]}
+	}}`
+	When(mockTerraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Eq(repoDir),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)).ThenReturn(planJSON, nil)
+	runner.TerraformExecutor = mockTerraform
+	runner.DetectPlanOutputChanges = true
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Equals(t, 2, len(res.PlanSuccess.OutputChanges))
+	Assert(t, res.PlanSuccess.OutputChanges["vpc_id"].Changed(), "expected vpc_id to change")
+	Assert(t, !res.PlanSuccess.OutputChanges["stable"].Changed(), "expected stable to be unchanged")
+}
+
+func TestDefaultProjectCommandRunner_PlanOutputInspectionFailureIsNotFatal(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: []byte("reviewed plan")}, repoDir)
+	mockTerraform := tfclientmocks.NewMockClient()
+	When(mockTerraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)).ThenReturn("", errors.New("show failed"))
+	runner.TerraformExecutor = mockTerraform
+	runner.DetectPlanOutputChanges = true
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Assert(t, res.PlanSuccess.OutputChanges == nil, "expected output changes to be unknown")
+}
+
 func newRecordedHashApplyRunner(t *testing.T, applyStep events.StepRunner, repoDir string, ctx command.ProjectContext) (*events.DefaultProjectCommandRunner, *boltdb.BoltDB) {
 	t.Helper()
 	mockWorkingDir := mocks.NewMockWorkingDir()

@@ -24,6 +24,7 @@ type UserConfig struct {
 	Automerge                   bool   `mapstructure:"automerge"`
 	AutomergeMethod             string `mapstructure:"automerge-method"`
 	AutoplanFileList            string `mapstructure:"autoplan-file-list"`
+	AutoplanDependentProjects   bool   `mapstructure:"autoplan-dependent-projects"`
 	AutoplanModules             bool   `mapstructure:"autoplan-modules"`
 	AutoplanModulesFromProjects string `mapstructure:"autoplan-modules-from-projects"`
 	AzureDevopsToken            string `mapstructure:"azuredevops-token"`

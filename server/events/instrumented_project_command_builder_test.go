@@ -58,6 +58,10 @@ func (f fakeInstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Co
 	return nil, f.err
 }
 
+func (f fakeInstrumentedProjectCommandBuilder) BuildOutputDependentPlanCommands(ctx *command.Context, producers []OutputDependentTrigger, alreadyPlanned []command.ProjectContext) ([]command.ProjectContext, error) {
+	return nil, f.err
+}
+
 func (f fakeInstrumentedProjectCommandBuilder) BuildApplyCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	return nil, f.err
 }

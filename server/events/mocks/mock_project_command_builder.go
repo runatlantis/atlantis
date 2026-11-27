@@ -102,6 +102,25 @@ func (mock *MockProjectCommandBuilder) BuildImportCommands(ctx *command.Context,
 	return _ret0, _ret1
 }
 
+func (mock *MockProjectCommandBuilder) BuildOutputDependentPlanCommands(ctx *command.Context, producers []events.OutputDependentTrigger, alreadyPlanned []command.ProjectContext) ([]command.ProjectContext, error) {
+	if mock == nil {
+		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
+	}
+	_params := []pegomock.Param{ctx, producers, alreadyPlanned}
+	_result := pegomock.GetGenericMockFrom(mock).Invoke("BuildOutputDependentPlanCommands", _params, []reflect.Type{reflect.TypeOf((*[]command.ProjectContext)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()})
+	var _ret0 []command.ProjectContext
+	var _ret1 error
+	if len(_result) != 0 {
+		if _result[0] != nil {
+			_ret0 = _result[0].([]command.ProjectContext)
+		}
+		if _result[1] != nil {
+			_ret1 = _result[1].(error)
+		}
+	}
+	return _ret0, _ret1
+}
+
 func (mock *MockProjectCommandBuilder) BuildPlanCommands(ctx *command.Context, comment *events.CommentCommand) ([]command.ProjectContext, error) {
 	if mock == nil {
 		panic("mock must not be nil. Use myMock := NewMockProjectCommandBuilder().")
@@ -339,6 +358,47 @@ func (c *MockProjectCommandBuilder_BuildImportCommands_OngoingVerification) GetA
 			_param1 = make([]*events.CommentCommand, len(c.methodInvocations))
 			for u, param := range _params[1] {
 				_param1[u] = param.(*events.CommentCommand)
+			}
+		}
+	}
+	return
+}
+
+func (verifier *VerifierMockProjectCommandBuilder) BuildOutputDependentPlanCommands(ctx *command.Context, producers []events.OutputDependentTrigger, alreadyPlanned []command.ProjectContext) *MockProjectCommandBuilder_BuildOutputDependentPlanCommands_OngoingVerification {
+	_params := []pegomock.Param{ctx, producers, alreadyPlanned}
+	methodInvocations := pegomock.GetGenericMockFrom(verifier.mock).Verify(verifier.inOrderContext, verifier.invocationCountMatcher, "BuildOutputDependentPlanCommands", _params, verifier.timeout)
+	return &MockProjectCommandBuilder_BuildOutputDependentPlanCommands_OngoingVerification{mock: verifier.mock, methodInvocations: methodInvocations}
+}
+
+type MockProjectCommandBuilder_BuildOutputDependentPlanCommands_OngoingVerification struct {
+	mock              *MockProjectCommandBuilder
+	methodInvocations []pegomock.MethodInvocation
+}
+
+func (c *MockProjectCommandBuilder_BuildOutputDependentPlanCommands_OngoingVerification) GetCapturedArguments() (*command.Context, []events.OutputDependentTrigger, []command.ProjectContext) {
+	ctx, producers, alreadyPlanned := c.GetAllCapturedArguments()
+	return ctx[len(ctx)-1], producers[len(producers)-1], alreadyPlanned[len(alreadyPlanned)-1]
+}
+
+func (c *MockProjectCommandBuilder_BuildOutputDependentPlanCommands_OngoingVerification) GetAllCapturedArguments() (_param0 []*command.Context, _param1 [][]events.OutputDependentTrigger, _param2 [][]command.ProjectContext) {
+	_params := pegomock.GetGenericMockFrom(c.mock).GetInvocationParams(c.methodInvocations)
+	if len(_params) > 0 {
+		if len(_params) > 0 {
+			_param0 = make([]*command.Context, len(c.methodInvocations))
+			for u, param := range _params[0] {
+				_param0[u] = param.(*command.Context)
+			}
+		}
+		if len(_params) > 1 {
+			_param1 = make([][]events.OutputDependentTrigger, len(c.methodInvocations))
+			for u, param := range _params[1] {
+				_param1[u] = param.([]events.OutputDependentTrigger)
+			}
+		}
+		if len(_params) > 2 {
+			_param2 = make([][]command.ProjectContext, len(c.methodInvocations))
+			for u, param := range _params[2] {
+				_param2[u] = param.([]command.ProjectContext)
 			}
 		}
 	}

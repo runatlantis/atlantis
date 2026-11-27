@@ -852,6 +852,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CancellationTracker:       cancellationTracker,
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
 		PlanStore:                 planStore,
+		TerraformExecutor:         terraformClient,
+		DefaultTFDistribution:     defaultTfDistribution,
+		DefaultTFVersion:          defaultTfVersion,
+		DetectPlanOutputChanges:   userConfig.AutoplanDependentProjects,
 	}
 
 	dbUpdater := &events.DBUpdater{
@@ -914,6 +918,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
 	)
+	planCommandRunner.PlanOutputDependents = userConfig.AutoplanDependentProjects
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,

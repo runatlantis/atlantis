@@ -176,6 +176,44 @@ Default merge method to use when automerging pull requests. Valid values are
 method is used. This can be overridden per command with the `--auto-merge-method`
 comment flag. Currently only implemented for GitHub.
 
+### `--autoplan-dependent-projects`
+
+```bash
+atlantis server --autoplan-dependent-projects
+# or
+ATLANTIS_AUTOPLAN_DEPENDENT_PROJECTS=true
+```
+
+Defaults to `false`. When set to `true`, Atlantis plans projects in the same repository that read the
+Terraform outputs of a project planned in the same run, whenever that project's plan changes one or
+more of those outputs. This keeps a stack that consumes another stack's state in sync within a single
+pull request, instead of requiring a second pull request after the producer is applied.
+
+Atlantis discovers dependencies in two ways:
+
+* A `depends_on` entry in `atlantis.yaml` names the producing project. The dependent is planned
+  whenever any output of that project changes.
+* A `data "terraform_remote_state"` block in the dependent's directory resolves to another project's
+  backend in the same repository. The dependent is planned only when an output it reads changes.
+  The backend configuration must be made of literal values: a `config` that references variables,
+  locals or functions cannot be matched to a project and is ignored (use `depends_on` instead).
+
+To decide whether outputs changed, Atlantis runs `terraform show -json` (or `tofu show -json`) on the
+plan file each project's built-in plan step produced. A project whose workflow has no built-in `plan`
+step manages its own plan file, so its outputs cannot be inspected; use `depends_on` and note that
+such projects are only planned when they themselves change.
+
+Dependent plans run after the plans that triggered them, and their results are added to the same
+pull request comment, commit statuses and policy checks. A dependent whose own plan changes outputs
+can in turn plan further dependents. Projects with autoplan disabled are never planned implicitly.
+
+::: tip NOTE
+Because the dependent is planned against the producer's *current* state, its plan shows the
+consumer's view before the producer's pull request is applied. The plan is still useful: it proves
+the configuration parses against the current outputs and surfaces any other drift. Atlantis cannot
+show the consumer's plan against the producer's unapplied values.
+:::
+
 ### `--autoplan-file-list`
 
 ```bash

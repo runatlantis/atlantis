@@ -204,6 +204,10 @@ type ProjectPlanCommandBuilder interface {
 	// comment doesn't specify one project then there may be multiple commands
 	// to be run.
 	BuildPlanCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error)
+	// BuildOutputDependentPlanCommands builds plan commands for projects that
+	// read the changed outputs of an already planned project in the same
+	// repository. Projects in alreadyPlanned are not returned again.
+	BuildOutputDependentPlanCommands(ctx *command.Context, producers []OutputDependentTrigger, alreadyPlanned []command.ProjectContext) ([]command.ProjectContext, error)
 }
 
 type ProjectApplyCommandBuilder interface {
@@ -985,6 +989,111 @@ func (p *DefaultProjectCommandBuilder) buildAllCommandsByCfg(ctx *command.Contex
 	})
 
 	// Filter projects to only include ones the user is authorized for
+	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
+}
+
+// BuildOutputDependentPlanCommands implements
+// ProjectPlanCommandBuilder.BuildOutputDependentPlanCommands.
+func (p *DefaultProjectCommandBuilder) BuildOutputDependentPlanCommands(
+	ctx *command.Context,
+	producers []OutputDependentTrigger,
+	alreadyPlanned []command.ProjectContext,
+) ([]command.ProjectContext, error) {
+	if len(producers) == 0 {
+		return nil, nil
+	}
+
+	workspace := DefaultWorkspace
+	unlockFn, err := p.WorkingDirLocker.TryLock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, workspace, DefaultRepoRelDir, "", command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
+	if err != nil {
+		ctx.Log.Warn("workspace was locked")
+		return nil, err
+	}
+	defer unlockFn()
+
+	// Clone is idempotent, so this reuses the checkout the plans just ran in.
+	repoDir, err := p.WorkingDir.Clone(ctx.Log, ctx.HeadRepo, ctx.Pull, workspace)
+	if err != nil {
+		return nil, err
+	}
+
+	repoCfg, hasRepoCfg, err := p.parseRepoCfg(ctx, repoDir)
+	if err != nil {
+		return nil, err
+	}
+
+	allCfgs, err := p.getAllMergedProjectCfgs(ctx, repoDir, repoCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	index := BuildOutputDependencyIndex(ctx.Log, repoDir, allCfgs)
+
+	exclude := make(map[ProjectKey]bool, len(alreadyPlanned))
+	for _, planned := range alreadyPlanned {
+		exclude[NewProjectKey(planned.RepoRelDir, planned.Workspace, planned.ProjectName)] = true
+	}
+
+	dependentKeys := index.Dependents(producers, exclude)
+	if len(dependentKeys) == 0 {
+		return nil, nil
+	}
+
+	cfgByKey := make(map[ProjectKey]valid.MergedProjectCfg, len(allCfgs))
+	for _, cfg := range allCfgs {
+		cfgByKey[NewProjectKey(cfg.RepoRelDir, cfg.Workspace, cfg.Name)] = cfg
+	}
+
+	automerge := p.EnableAutoMerge
+	parallelApply := p.EnableParallelApply
+	parallelPlan := p.EnableParallelPlan
+	abortOnExecutionOrderFail := DefaultAbortOnExecutionOrderFail
+	if hasRepoCfg {
+		if repoCfg.Automerge != nil {
+			automerge = *repoCfg.Automerge
+		}
+		if repoCfg.ParallelApply != nil {
+			parallelApply = *repoCfg.ParallelApply
+		}
+		if repoCfg.ParallelPlan != nil {
+			parallelPlan = *repoCfg.ParallelPlan
+		}
+		abortOnExecutionOrderFail = repoCfg.AbortOnExecutionOrderFail
+	}
+
+	projCtxs := make([]command.ProjectContext, 0, len(dependentKeys))
+	for _, key := range dependentKeys {
+		cfg, ok := cfgByKey[key]
+		if !ok {
+			ctx.Log.Debug("dependent project %s is no longer part of the repo config; skipping", key)
+			continue
+		}
+		if !cfg.AutoplanEnabled {
+			ctx.Log.Info("not planning dependent project %s because autoplan is disabled for it", key)
+			continue
+		}
+		ctx.Log.Info("planning dependent project %s because a project whose outputs it reads changed them", key)
+		projCtxs = append(projCtxs,
+			p.ProjectCommandContextBuilder.BuildProjectContext(
+				ctx,
+				command.Plan,
+				"",
+				cfg,
+				nil,
+				repoDir,
+				automerge,
+				parallelApply,
+				parallelPlan,
+				false,
+				abortOnExecutionOrderFail,
+				p.TerraformExecutor,
+			)...)
+	}
+
+	sort.Slice(projCtxs, func(i, j int) bool {
+		return projCtxs[i].ExecutionOrderGroup < projCtxs[j].ExecutionOrderGroup
+	})
+
 	return filterProjectContextsByTeamAllowlist(p.withLocalSharePlanDir(projCtxs), repoDir, ctx.FailOnTeamAllowlistDenied)
 }
 

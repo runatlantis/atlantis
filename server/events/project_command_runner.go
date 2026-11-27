@@ -14,8 +14,12 @@ import (
 	"regexp"
 	"strings"
 
+	version "github.com/hashicorp/go-version"
+
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -369,6 +373,17 @@ type DefaultProjectCommandRunner struct {
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
 	PlanStore                 runtime.PlanStore
+	// TerraformExecutor runs the Terraform binary directly. It is used to
+	// inspect a plan file after a successful plan.
+	TerraformExecutor tfclient.Client
+	// DefaultTFDistribution and DefaultTFVersion mirror the plan step runner
+	// defaults and are used when a project does not pin them.
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
+	// DetectPlanOutputChanges enables inspecting each successful plan's plan
+	// file to record which outputs it changes. The plan runner uses that to
+	// decide whether dependent projects need to be planned.
+	DetectPlanOutputChanges bool
 	// VarFileAllowlistChecker re-checks comment var-file arguments once the
 	// repository is cloned, so that a committed symlink cannot point a
 	// repository-relative path at a file outside the clone.
@@ -907,6 +922,18 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
+	var outputChanges map[string]models.OutputChange
+	if p.DetectPlanOutputChanges {
+		outputChanges, err = p.planOutputChanges(ctx, projAbsPath)
+		if err != nil {
+			// Output inspection is an optimisation for dependent project
+			// planning; a failure must not turn a successful plan into an
+			// error.
+			ctx.Log.Warn("unable to inspect output changes in the plan for project %q in %q: %s", ctx.ProjectName, ctx.RepoRelDir, err)
+			outputChanges = nil
+		}
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
@@ -914,7 +941,45 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,
 		PlanHash:        planHash,
+		OutputChanges:   outputChanges,
 	}, "", nil
+}
+
+// planOutputChanges reads the plan file written by the built-in plan step and
+// returns the planned state of every root module output. Custom workflows that
+// manage their own plan file return nil: Atlantis does not know where that file
+// is, so it cannot inspect it.
+func (p *DefaultProjectCommandRunner) planOutputChanges(ctx command.ProjectContext, absPath string) (map[string]models.OutputChange, error) {
+	if !hasAtlantisManagedPlanStep(ctx.Steps) {
+		return nil, nil
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	distribution := p.DefaultTFDistribution
+	if ctx.TerraformDistribution != nil {
+		distribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
+	tfVersion := p.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
+	}
+
+	output, err := p.TerraformExecutor.RunCommandWithVersion(
+		ctx,
+		filepath.Clean(absPath),
+		[]string{"show", "-json", planPath},
+		map[string]string{},
+		distribution,
+		tfVersion,
+		ctx.Workspace,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("running terraform show -json: %w", err)
+	}
+	return ParsePlanOutputChanges([]byte(output))
 }
 
 // planStagePlanHash hashes the convention plan file the built-in plan step
