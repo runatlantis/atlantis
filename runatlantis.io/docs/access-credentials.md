@@ -96,6 +96,10 @@ Repositories must be manually registered with the created GitHub app to allow At
 
 ::: tip NOTE
 Atlantis uses the GitHub App slug to identify its own comments. If `--gh-app-slug` is omitted, Atlantis attempts to discover it automatically at startup. If discovery fails, Atlantis logs a warning and starts without hiding previous comments or suppressing automatic replies to its own comments. See [GitHub App slug](server-configuration.md#gh-app-slug).
+
+If multiple Atlantis instances share this App and use `--hide-prev-plan-comments`, assign
+each instance a unique [`--vcs-comment-namespace`](server-configuration.md#vcs-comment-namespace)
+so it only hides comments created by that instance.
 :::
 
 #### Permissions
@@ -143,8 +147,9 @@ Since v0.30.0, a new permission for `Actions` has been added, which is required 
 
 * Create an App Password by following [BitBucket Cloud: Create an app password](https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/)
 * Label the password "atlantis"
-* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. If you want to enable the [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) feature and thus delete old comments, please add **Account**: **Read** as well.
+* Select **Pull requests**: **Read** and **Write** so that Atlantis can read your pull requests and write comments to them. To enable [hide-prev-plan-comments](server-configuration.md#hide-prev-plan-comments) and delete old comments, also add **Account**: **Read**.
 * **Account**: **Read** also allows Atlantis to identify and ignore its own comments. For scoped API tokens, the equivalent permission is `read:user:bitbucket`. If the identity lookup fails, Atlantis logs a warning and continues normal command processing. In that case, its own comments may still be parsed as commands, including producing parsing errors.
+* Bitbucket Cloud displays HTML comment markers as text, so `--vcs-comment-namespace` does not support previous-comment isolation. When a namespace is configured, Atlantis skips previous-comment deletion. To delete previous comments, leave the namespace unset and use credentials belonging to distinct Bitbucket Cloud users so their authenticated UUIDs differ.
 * Record the access token
 
 ### Bitbucket Server (aka Stash)
