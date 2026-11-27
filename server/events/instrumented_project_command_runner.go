@@ -66,6 +66,18 @@ func (p *InstrumentedProjectCommandRunner) Import(ctx command.ProjectContext) co
 	return RunAndEmitStats(ctx, p.projectCommandRunner.Import, p.scope)
 }
 
+func (p *InstrumentedProjectCommandRunner) Output(ctx command.ProjectContext) command.ProjectCommandOutput {
+	return RunAndEmitStats(ctx, p.projectCommandRunner.Output, p.scope)
+}
+
+func (p *InstrumentedProjectCommandRunner) StateList(ctx command.ProjectContext) command.ProjectCommandOutput {
+	return RunAndEmitStats(ctx, p.projectCommandRunner.StateList, p.scope)
+}
+
+func (p *InstrumentedProjectCommandRunner) StateShow(ctx command.ProjectContext) command.ProjectCommandOutput {
+	return RunAndEmitStats(ctx, p.projectCommandRunner.StateShow, p.scope)
+}
+
 func (p *InstrumentedProjectCommandRunner) StateRm(ctx command.ProjectContext) command.ProjectCommandOutput {
 	return RunAndEmitStats(ctx, p.projectCommandRunner.StateRm, p.scope)
 }

@@ -5146,3 +5146,90 @@ Ran Plan for 3 projects:
 		})
 	}
 }
+
+func TestOutputRenderingHandlesEmptyOutputAndLocalization(t *testing.T) {
+	name := command.Output
+	for _, language := range []string{"en", "es"} {
+		t.Run(name.String()+language, func(t *testing.T) {
+			renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+			ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+			output := command.ProjectCommandOutput{OutputSuccess: &models.OutputSuccess{}}
+			result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: output, Command: name, ProjectName: "app", RepoRelDir: ".", Workspace: "production"}}}
+			out := renderer.Render(ctx, result, events.CommentCommand{Name: name})
+			empty := "No results."
+			if language == "es" {
+				empty = "Sin resultados."
+			}
+			Assert(t, strings.Contains(out, empty), "missing empty output result: %s", out)
+			Assert(t, !strings.Contains(out, "bug"), "missing template: %s", out)
+			Assert(t, !strings.Contains(out, "atlantis plan"), "inspection should not prompt a re-plan: %s", out)
+		})
+	}
+}
+
+func TestStateListRenderingHandlesEmptyOutputAndLocalization(t *testing.T) {
+	name := command.StateList
+	for _, language := range []string{"en", "es"} {
+		t.Run(name.String()+language, func(t *testing.T) {
+			renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+			ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+			output := command.ProjectCommandOutput{StateListSuccess: &models.StateListSuccess{}}
+			result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: output, Command: name, ProjectName: "app", RepoRelDir: ".", Workspace: "production"}}}
+			out := renderer.Render(ctx, result, events.CommentCommand{Name: name})
+			empty := "No results."
+			if language == "es" {
+				empty = "Sin resultados."
+			}
+			Assert(t, strings.Contains(out, empty), "missing empty output result: %s", out)
+			Assert(t, !strings.Contains(out, "bug"), "missing template: %s", out)
+			Assert(t, !strings.Contains(out, "atlantis plan"), "inspection should not prompt a re-plan: %s", out)
+		})
+	}
+}
+
+func TestStateShowRenderingHandlesEmptyOutputAndLocalization(t *testing.T) {
+	name := command.StateShow
+	for _, language := range []string{"en", "es"} {
+		t.Run(name.String()+language, func(t *testing.T) {
+			renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false, i18n.TranslatorConfig{LanguageCode: language})
+			ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+			output := command.ProjectCommandOutput{StateShowSuccess: &models.StateShowSuccess{}}
+			result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: output, Command: name, ProjectName: "app", RepoRelDir: ".", Workspace: "production"}}}
+			out := renderer.Render(ctx, result, events.CommentCommand{Name: name})
+			empty := "No results."
+			if language == "es" {
+				empty = "Sin resultados."
+			}
+			Assert(t, strings.Contains(out, empty), "missing empty output result: %s", out)
+			Assert(t, !strings.Contains(out, "bug"), "missing template: %s", out)
+			Assert(t, !strings.Contains(out, "atlantis plan"), "inspection should not prompt a re-plan: %s", out)
+		})
+	}
+}
+
+func TestOutputRenderingShowsFailures(t *testing.T) {
+	renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+	result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: command.ProjectCommandOutput{Error: errors.New("backend unavailable")}, Command: command.Output, ProjectName: "app"}}}
+	out := renderer.Render(ctx, result, events.CommentCommand{Name: command.Output})
+	Assert(t, strings.Contains(out, "backend unavailable"), "missing error: %s", out)
+	Assert(t, !strings.Contains(out, "No results."), "failure rendered as empty success: %s", out)
+}
+
+func TestStateListRenderingShowsFailures(t *testing.T) {
+	renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+	result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: command.ProjectCommandOutput{Error: errors.New("backend unavailable")}, Command: command.StateList, ProjectName: "app"}}}
+	out := renderer.Render(ctx, result, events.CommentCommand{Name: command.StateList})
+	Assert(t, strings.Contains(out, "backend unavailable"), "missing error: %s", out)
+	Assert(t, !strings.Contains(out, "No results."), "failure rendered as empty success: %s", out)
+}
+
+func TestStateShowRenderingShowsFailures(t *testing.T) {
+	renderer := events.NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false)
+	ctx := &command.Context{Log: logging.NewNoopLogger(t).WithHistory()}
+	result := command.Result{ProjectResults: []command.ProjectResult{{ProjectCommandOutput: command.ProjectCommandOutput{Error: errors.New("backend unavailable")}, Command: command.StateShow, ProjectName: "app"}}}
+	out := renderer.Render(ctx, result, events.CommentCommand{Name: command.StateShow})
+	Assert(t, strings.Contains(out, "backend unavailable"), "missing error: %s", out)
+	Assert(t, !strings.Contains(out, "No results."), "failure rendered as empty success: %s", out)
+}

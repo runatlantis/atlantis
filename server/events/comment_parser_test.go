@@ -338,8 +338,8 @@ func TestParse_SubcommandUsage(t *testing.T) {
 		{"atlantis approve_policies --help", "approve_policies"},
 		{"atlantis import -h", "import ADDRESS ID"},
 		{"atlantis import --help", "import ADDRESS ID"},
-		{"atlantis state -h", "state [rm ADDRESS...]"},
-		{"atlantis state --help", "state [rm ADDRESS...]"},
+		{"atlantis state -h", "state [rm ADDRESS... | list [ADDRESS...] | show ADDRESS]"},
+		{"atlantis state --help", "state [rm ADDRESS... | list [ADDRESS...] | show ADDRESS]"},
 	}
 	for _, c := range tests {
 		r := commentParser.Parse(c.input, models.Github)
@@ -1213,6 +1213,12 @@ Commands:
   import ADDRESS ID
            Runs 'terraform import' for the passed address resource.
            To import a specific project, use the -d, -w and -p flags.
+  output [NAME]
+           Runs 'terraform output' for the selected project.
+  state list [ADDRESS...]
+           Lists resources in the selected project's Terraform state.
+  state show ADDRESS
+           Shows a resource in the selected project's Terraform state.
   state rm ADDRESS...
            Runs 'terraform state rm' for the passed address resource.
            To remove a specific project resource, use the -d, -w and -p flags.
@@ -1396,3 +1402,38 @@ var ImportUsage = `Usage of import ADDRESS ID:
       --verbose            Append Atlantis log to comment.
   -w, --workspace string   Switch to this Terraform workspace before importing.
 `
+
+func TestInspectionCommentAuthorization(t *testing.T) {
+	for _, tc := range []struct {
+		comment string
+		allowed []command.Name
+		want    command.Name
+		denied  bool
+	}{
+		{"atlantis output", nil, command.Output, true},
+		{"atlantis state list", nil, command.StateList, true},
+		{"atlantis state show aws_instance.web", nil, command.StateShow, true},
+		{"atlantis state list", []command.Name{command.State}, command.StateList, true},
+		{"atlantis state show aws_instance.web", []command.Name{command.State}, command.StateShow, true},
+		{"atlantis state rm aws_instance.web", []command.Name{command.StateList, command.StateShow}, command.State, true},
+		{"atlantis state show aws_instance.web", []command.Name{command.StateList}, command.StateShow, true},
+		{"atlantis state list -p app -- -id=i-123", []command.Name{command.StateList}, command.StateList, false},
+		{`atlantis state -w production show 'aws_instance.web["blue"]'`, []command.Name{command.StateShow}, command.StateShow, false},
+		{"atlantis output endpoint -d . -- -raw", []command.Name{command.Output}, command.Output, false},
+		{"atlantis output -- -json", []command.Name{command.Output}, command.Output, false},
+		{"atlantis output -- -state=/tmp/other", []command.Name{command.Output}, command.Output, true},
+		{"atlantis state show a -- b", []command.Name{command.StateShow}, command.StateShow, true},
+		{"atlantis output -- a b", []command.Name{command.Output}, command.Output, true},
+	} {
+		t.Run(tc.comment, func(t *testing.T) {
+			parser := events.NewCommentParser("", "", "", "", "", "atlantis", tc.allowed, nil)
+			got := parser.Parse(tc.comment, models.Github)
+			if tc.denied {
+				Assert(t, got.Command == nil && got.CommentResponse != "", "expected rejection, got %#v", got)
+				return
+			}
+			Assert(t, got.Command != nil, "parse error: %s", got.CommentResponse)
+			Equals(t, tc.want, got.Command.Name)
+		})
+	}
+}

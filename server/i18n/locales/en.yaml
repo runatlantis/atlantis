@@ -10,3 +10,6 @@ command_titles:
   import: Import
   state: State
   cancel: Cancel
+  output: Output
+  state_list: State List
+  state_show: State Show

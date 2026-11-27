@@ -43,6 +43,24 @@ func (b *InstrumentedProjectCommandBuilder) BuildPlanCommands(ctx *command.Conte
 	)
 }
 
+func (b *InstrumentedProjectCommandBuilder) BuildOutputCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats("output", func() ([]command.ProjectContext, error) {
+		return b.ProjectCommandBuilder.BuildOutputCommands(ctx, comment)
+	})
+}
+
+func (b *InstrumentedProjectCommandBuilder) BuildStateListCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats("state list", func() ([]command.ProjectContext, error) {
+		return b.ProjectCommandBuilder.BuildStateListCommands(ctx, comment)
+	})
+}
+
+func (b *InstrumentedProjectCommandBuilder) BuildStateShowCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
+	return b.buildAndEmitStats("state show", func() ([]command.ProjectContext, error) {
+		return b.ProjectCommandBuilder.BuildStateShowCommands(ctx, comment)
+	})
+}
+
 func (b *InstrumentedProjectCommandBuilder) BuildImportCommands(ctx *command.Context, comment *CommentCommand) ([]command.ProjectContext, error) {
 	return b.buildAndEmitStats(
 		"import",

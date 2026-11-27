@@ -32,6 +32,9 @@ const (
 	EnvStepName         = "env"
 	MultiEnvStepName    = "multienv"
 	ImportStepName      = "import"
+	OutputStepName      = "output"
+	StateListStepName   = "state_list"
+	StateShowStepName   = "state_show"
 	StateRmStepName     = "state_rm"
 	ShellArgKey         = "shell"
 	ShellArgsArgKey     = "shellArgs"
@@ -121,6 +124,9 @@ func (s Step) validStepName(stepName string) bool {
 		stepName == ShowStepName ||
 		stepName == PolicyCheckStepName ||
 		stepName == ImportStepName ||
+		stepName == OutputStepName ||
+		stepName == StateListStepName ||
+		stepName == StateShowStepName ||
 		stepName == StateRmStepName
 }
 

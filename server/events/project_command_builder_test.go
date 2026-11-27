@@ -1406,6 +1406,10 @@ func TestDefaultProjectCommandBuilder_BuildTargetedNonPlanCommand_IgnorePathsWit
 		cmd         events.CommentCommand
 		build       func(*command.Context, *events.CommentCommand) ([]command.ProjectContext, error)
 	}{
+
+		{description: "Output", cmd: events.CommentCommand{Name: command.Output, RepoRelDir: "environments/prod", Workspace: "default"}, build: builder.BuildOutputCommands},
+		{description: "StateList", cmd: events.CommentCommand{Name: command.StateList, RepoRelDir: "environments/prod", Workspace: "default"}, build: builder.BuildStateListCommands},
+		{description: "StateShow", cmd: events.CommentCommand{Name: command.StateShow, RepoRelDir: "environments/prod", Workspace: "default"}, build: builder.BuildStateShowCommands},
 		{
 			description: "apply",
 			cmd:         events.CommentCommand{Name: command.Apply, RepoRelDir: "environments/prod", Workspace: "default"},
@@ -6316,4 +6320,121 @@ projects:
 	Equals(t, "staging", ctxs[0].Workspace)
 	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
 		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
+}
+
+func TestBuildOutputCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
+	name := command.Output
+	for _, target := range []string{"", "app"} {
+		for _, allowlist := range []string{"*:" + name.String(), "*:state"} {
+			t.Run(name.String()+"/"+target+"/"+allowlist, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				repoDir := t.TempDir()
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), nil, 0600))
+				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
+				working := mocks.NewMockWorkingDir()
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				logger := logging.NewNoopLogger(t)
+				scope := metricstest.NewLoggingScope(t, logger, "inspection")
+				vcs := vcsmocks.NewMockClient()
+				u := defaultUserConfig
+				builder := events.NewProjectCommandBuilder(false, &config.ParserValidator{}, &events.DefaultProjectFinder{}, vcs, working, events.NewDefaultWorkingDirLocker(), valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}), &events.DefaultPendingPlanFinder{}, &events.CommentParser{ExecutableName: "atlantis"}, u.SkipCloneNoChanges, u.EnableRegExpCmd, u.EnableAutoMerge, u.EnableParallelPlan, u.EnableParallelApply, u.AutoDetectModuleFiles, u.AutoplanFileList, u.RestrictFileList, u.DefaultTFDistribution, u.SilenceNoProjects, u.IncludeGitUntrackedFiles, u.AutoDiscoverMode, scope, tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{})
+				checker, err := command.NewTeamAllowlistChecker(allowlist)
+				Ok(t, err)
+				repo := models.Repo{FullName: "owner/repo"}
+				ctx := &command.Context{Log: logger, Scope: scope, HeadRepo: repo, Pull: models.PullRequest{Num: 1, BaseRepo: repo}, TeamAllowlistChecker: checker, FailOnTeamAllowlistDenied: true, API: true}
+				build := builder.BuildOutputCommands
+				cmds, err := build(ctx, &events.CommentCommand{Name: name, ProjectName: target, Flags: []string{"literal"}})
+				if allowlist == "*:state" {
+					Assert(t, errors.Is(err, events.ErrTeamAllowlistDenied), "expected permission denial, got %v", err)
+					return
+				}
+				Ok(t, err)
+				Equals(t, 1, len(cmds))
+				Equals(t, "production", cmds[0].Workspace)
+				Equals(t, []valid.Step{{StepName: "init"}, {StepName: name.String(), ExtraArgs: []string{"-no-color"}}}, cmds[0].Steps)
+				Equals(t, []string{"literal"}, cmds[0].CommentArgs)
+				vcs.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+			})
+		}
+	}
+}
+
+func TestBuildStateListCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
+	name := command.StateList
+	for _, target := range []string{"", "app"} {
+		for _, allowlist := range []string{"*:" + name.String(), "*:state"} {
+			t.Run(name.String()+"/"+target+"/"+allowlist, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				repoDir := t.TempDir()
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), nil, 0600))
+				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
+				working := mocks.NewMockWorkingDir()
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				logger := logging.NewNoopLogger(t)
+				scope := metricstest.NewLoggingScope(t, logger, "inspection")
+				vcs := vcsmocks.NewMockClient()
+				u := defaultUserConfig
+				builder := events.NewProjectCommandBuilder(false, &config.ParserValidator{}, &events.DefaultProjectFinder{}, vcs, working, events.NewDefaultWorkingDirLocker(), valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}), &events.DefaultPendingPlanFinder{}, &events.CommentParser{ExecutableName: "atlantis"}, u.SkipCloneNoChanges, u.EnableRegExpCmd, u.EnableAutoMerge, u.EnableParallelPlan, u.EnableParallelApply, u.AutoDetectModuleFiles, u.AutoplanFileList, u.RestrictFileList, u.DefaultTFDistribution, u.SilenceNoProjects, u.IncludeGitUntrackedFiles, u.AutoDiscoverMode, scope, tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{})
+				checker, err := command.NewTeamAllowlistChecker(allowlist)
+				Ok(t, err)
+				repo := models.Repo{FullName: "owner/repo"}
+				ctx := &command.Context{Log: logger, Scope: scope, HeadRepo: repo, Pull: models.PullRequest{Num: 1, BaseRepo: repo}, TeamAllowlistChecker: checker, FailOnTeamAllowlistDenied: true, API: true}
+				build := builder.BuildStateListCommands
+				cmds, err := build(ctx, &events.CommentCommand{Name: name, ProjectName: target, Flags: []string{"literal"}})
+				if allowlist == "*:state" {
+					Assert(t, errors.Is(err, events.ErrTeamAllowlistDenied), "expected permission denial, got %v", err)
+					return
+				}
+				Ok(t, err)
+				Equals(t, 1, len(cmds))
+				Equals(t, "production", cmds[0].Workspace)
+				Equals(t, []valid.Step{{StepName: "init"}, {StepName: name.String(), ExtraArgs: []string{"-no-color"}}}, cmds[0].Steps)
+				Equals(t, []string{"literal"}, cmds[0].CommentArgs)
+				vcs.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+			})
+		}
+	}
+}
+
+func TestBuildStateShowCommands_ConfiguredStagesWithoutPlans(t *testing.T) {
+	name := command.StateShow
+	for _, target := range []string{"", "app"} {
+		for _, allowlist := range []string{"*:" + name.String(), "*:state"} {
+			t.Run(name.String()+"/"+target+"/"+allowlist, func(t *testing.T) {
+				RegisterMockTestingT(t)
+				repoDir := t.TempDir()
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "main.tf"), nil, 0600))
+				yaml := "version: 3\nprojects:\n- name: app\n  dir: .\n  workspace: production\n  workflow: inspection\nworkflows:\n  inspection:\n    " + name.String() + ":\n      steps:\n      - init\n      - " + name.String() + ":\n          extra_args: [-no-color]\n"
+				Ok(t, os.WriteFile(filepath.Join(repoDir, "atlantis.yaml"), []byte(yaml), 0600))
+				working := mocks.NewMockWorkingDir()
+				When(working.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				When(working.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Any[string]())).ThenReturn(repoDir, nil)
+				logger := logging.NewNoopLogger(t)
+				scope := metricstest.NewLoggingScope(t, logger, "inspection")
+				vcs := vcsmocks.NewMockClient()
+				u := defaultUserConfig
+				builder := events.NewProjectCommandBuilder(false, &config.ParserValidator{}, &events.DefaultProjectFinder{}, vcs, working, events.NewDefaultWorkingDirLocker(), valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}), &events.DefaultPendingPlanFinder{}, &events.CommentParser{ExecutableName: "atlantis"}, u.SkipCloneNoChanges, u.EnableRegExpCmd, u.EnableAutoMerge, u.EnableParallelPlan, u.EnableParallelApply, u.AutoDetectModuleFiles, u.AutoplanFileList, u.RestrictFileList, u.DefaultTFDistribution, u.SilenceNoProjects, u.IncludeGitUntrackedFiles, u.AutoDiscoverMode, scope, tfclientmocks.NewMockClient(), &runtime.LocalPlanStore{})
+				checker, err := command.NewTeamAllowlistChecker(allowlist)
+				Ok(t, err)
+				repo := models.Repo{FullName: "owner/repo"}
+				ctx := &command.Context{Log: logger, Scope: scope, HeadRepo: repo, Pull: models.PullRequest{Num: 1, BaseRepo: repo}, TeamAllowlistChecker: checker, FailOnTeamAllowlistDenied: true, API: true}
+				build := builder.BuildStateShowCommands
+				cmds, err := build(ctx, &events.CommentCommand{Name: name, ProjectName: target, Flags: []string{"literal"}})
+				if allowlist == "*:state" {
+					Assert(t, errors.Is(err, events.ErrTeamAllowlistDenied), "expected permission denial, got %v", err)
+					return
+				}
+				Ok(t, err)
+				Equals(t, 1, len(cmds))
+				Equals(t, "production", cmds[0].Workspace)
+				Equals(t, []valid.Step{{StepName: "init"}, {StepName: name.String(), ExtraArgs: []string{"-no-color"}}}, cmds[0].Steps)
+				Equals(t, []string{"literal"}, cmds[0].CommentArgs)
+				vcs.VerifyWasCalled(Never()).GetModifiedFiles(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest]())
+			})
+		}
+	}
 }

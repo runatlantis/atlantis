@@ -843,6 +843,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 			DefaultTFVersion:      defaultTfVersion,
 		},
 		ImportStepRunner:          runtime.NewImportStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, planStore),
+		OutputStepRunner:          runtime.NewOutputStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
+		StateListStepRunner:       runtime.NewStateListStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
+		StateShowStepRunner:       runtime.NewStateShowStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion),
 		StateRmStepRunner:         runtime.NewStateRmStepRunner(terraformClient, defaultTfDistribution, defaultTfVersion, planStore),
 		WorkingDir:                workingDir,
 		Webhooks:                  webhooksManager,
@@ -971,6 +974,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		userConfig.SilenceNoProjects,
 	)
 
+	outputCommandRunner := events.NewOutputCommandRunner(pullUpdater, projectCommandBuilder, instrumentedProjectCmdRunner, userConfig.SilenceNoProjects)
+	stateListCommandRunner := events.NewStateListCommandRunner(pullUpdater, projectCommandBuilder, instrumentedProjectCmdRunner, userConfig.SilenceNoProjects)
+	stateShowCommandRunner := events.NewStateShowCommandRunner(pullUpdater, projectCommandBuilder, instrumentedProjectCmdRunner, userConfig.SilenceNoProjects)
 	stateCommandRunner := events.NewStateCommandRunner(
 		pullUpdater,
 		dbUpdater,
@@ -994,6 +1000,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		command.Unlock:          unlockCommandRunner,
 		command.Version:         versionCommandRunner,
 		command.Import:          importCommandRunner,
+		command.Output:          outputCommandRunner,
+		command.StateList:       stateListCommandRunner,
+		command.StateShow:       stateShowCommandRunner,
 		command.State:           stateCommandRunner,
 		command.Cancel:          cancelCommandRunner,
 	}
@@ -1081,7 +1090,15 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		StatsScope:               statsScope.SubScope("api"),
 	}
 
+	allowAPICommands, err := userConfig.ToAllowAPICommandNames()
+	if err != nil {
+		return nil, fmt.Errorf("parsing allowed API commands: %w", err)
+	}
 	apiController := &controllers.APIController{
+		AllowAPICommands:                allowAPICommands,
+		ProjectOutputCommandRunner:      instrumentedProjectCmdRunner,
+		ProjectStateListCommandRunner:   instrumentedProjectCmdRunner,
+		ProjectStateShowCommandRunner:   instrumentedProjectCmdRunner,
 		APISecret:                       []byte(userConfig.APISecret),
 		Locker:                          lockingClient,
 		Logger:                          logger,
@@ -1096,6 +1113,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		PreWorkflowHooksCommandRunner:   preWorkflowHooksCommandRunner,
 		PostWorkflowHooksCommandRunner:  postWorkflowHooksCommandRunner,
 		RepoAllowlistChecker:            repoAllowlist,
+		TeamAllowlistChecker:            teamAllowlistChecker,
 		Scope:                           statsScope.SubScope("api"),
 		VCSClient:                       vcsClient,
 		WorkingDir:                      workingDir,
@@ -1215,6 +1233,9 @@ func (s *Server) SetupRoutes() {
 	if slices.Contains(s.Experiments, apiExperiment) {
 		s.Router.HandleFunc("/api/plan", s.APIController.Plan).Methods("POST")
 		s.Router.HandleFunc("/api/apply", s.APIController.Apply).Methods("POST")
+		s.Router.HandleFunc("/api/output", s.APIController.Output).Methods("POST")
+		s.Router.HandleFunc("/api/state/list", s.APIController.StateList).Methods("POST")
+		s.Router.HandleFunc("/api/state/show", s.APIController.StateShow).Methods("POST")
 		s.Router.HandleFunc("/api/locks", s.APIController.ListLocks).Methods("GET")
 	}
 	if slices.Contains(s.Experiments, driftExperiment) {

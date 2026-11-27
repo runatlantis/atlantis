@@ -56,6 +56,7 @@ var testFlags = map[string]any{
 	AtlantisURLFlag:                  "url",
 	AutoplanModules:                  false,
 	AutoplanModulesFromProjects:      "",
+	AllowAPICommandsFlag:             "plan,apply,output,state_list,state_show",
 	AllowCommandsFlag:                "version,plan,apply,unlock,import,approve_policies",
 	BlockedExtraArgsFlag:             "-no-color,-lock-timeout",
 	AllowForkPRsFlag:                 true,

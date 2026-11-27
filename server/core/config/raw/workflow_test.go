@@ -151,6 +151,9 @@ func TestWorkflow_ToValid(t *testing.T) {
 				Plan:        valid.DefaultPlanStage,
 				PolicyCheck: valid.DefaultPolicyCheckStage,
 				Import:      valid.DefaultImportStage,
+				Output:      valid.DefaultOutputStage,
+				StateList:   valid.DefaultStateListStage,
+				StateShow:   valid.DefaultStateShowStage,
 				StateRm:     valid.DefaultStateRmStage,
 			},
 		},
@@ -222,6 +225,9 @@ func TestWorkflow_ToValid(t *testing.T) {
 						},
 					},
 				},
+				Output:    valid.DefaultOutputStage,
+				StateList: valid.DefaultStateListStage,
+				StateShow: valid.DefaultStateShowStage,
 				StateRm: valid.Stage{
 					Steps: []valid.Step{
 						{
