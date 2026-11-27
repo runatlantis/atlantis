@@ -1697,13 +1697,18 @@ atlantis server --tf-download-url="https://releases.company.com"
 ATLANTIS_TF_DOWNLOAD_URL="https://releases.company.com"
 ```
 
-An alternative URL to download Terraform versions if they are missing. Useful in an airgapped
-environment where releases.hashicorp.com is not available. Directory structure of the custom
-endpoint should match that of releases.hashicorp.com.
+Defaults to `https://releases.hashicorp.com`. Set a custom URL to resolve Terraform versions and
+download binaries from a mirror, for example in an airgapped environment where the public endpoint
+is unavailable. The mirror must match the HashiCorp releases directory structure and serve
+`terraform/index.json` under the configured base URL for version resolution.
+
+A custom mirror URL is required when any of `--tf-download-username`, `--tf-download-password`, or
+`--tf-download-token` is set.
+
+The mirror applies to Terraform projects, including those that set `terraform_distribution: terraform`
+when the server defaults to OpenTofu.
 
 This has no impact if `--tf-download` is set to `false`.
-
-This setting is not yet supported when `--tf-distribution` is set to `opentofu`.
 
 ### `--tf-download-username` <Badge text="v0.42.0+" type="info"/>
 

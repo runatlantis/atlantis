@@ -174,6 +174,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err := userConfig.ValidateExperiments(); err != nil {
 		return nil, err
 	}
+	if err := userConfig.ValidateTFDownloadMirror(); err != nil {
+		return nil, err
+	}
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 

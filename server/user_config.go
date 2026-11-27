@@ -6,11 +6,17 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/logging"
 )
+
+const defaultTFDownloadHost = "releases.hashicorp.com"
+
+// DefaultTFDownloadURL is the public HashiCorp release endpoint for Terraform.
+const DefaultTFDownloadURL = "https://" + defaultTFDownloadHost
 
 // UserConfig holds config values passed in by the user.
 // The mapstructure tags correspond to flags in cmd/server.go and are used when
@@ -154,6 +160,20 @@ type UserConfig struct {
 
 	// Experiments grants server-only permissions for experimental settings and routes.
 	Experiments []string `mapstructure:"experiments"`
+}
+
+// ValidateTFDownloadMirror requires a custom mirror host when credentials are set.
+func (u UserConfig) ValidateTFDownloadMirror() error {
+	if u.TFDownloadUsername == "" && u.TFDownloadPassword == "" && u.TFDownloadToken == "" {
+		return nil
+	}
+
+	mirrorURL, err := url.Parse(u.TFDownloadURL)
+	if err != nil || (mirrorURL.Scheme != "https" && mirrorURL.Scheme != "http") ||
+		mirrorURL.Hostname() == "" || strings.EqualFold(strings.TrimSuffix(mirrorURL.Hostname(), "."), defaultTFDownloadHost) {
+		return fmt.Errorf("a custom --tf-download-url is required when Terraform mirror credentials are set")
+	}
+	return nil
 }
 
 // ToAllowCommandNames parse AllowCommands into a slice of CommandName

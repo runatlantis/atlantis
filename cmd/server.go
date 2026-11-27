@@ -203,7 +203,7 @@ const (
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
 	DefaultTFDistribution               = TFDistributionTerraform
-	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
+	DefaultTFDownloadURL                = server.DefaultTFDownloadURL
 	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
 	DefaultVCSStatusName                = "atlantis"
@@ -1108,6 +1108,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// Check before preparing directories; NewServer also validates direct callers.
 	if err := userConfig.ValidateExperiments(); err != nil {
+		return err
+	}
+	if err := userConfig.ValidateTFDownloadMirror(); err != nil {
 		return err
 	}
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)
