@@ -113,6 +113,7 @@ type applyResultData struct {
 type planSuccessData struct {
 	models.PlanSuccess
 	PlanSummary              string
+	PlanDiagramMarkdown      string
 	PlanWasDeleted           bool
 	DisableApply             bool
 	DisableRepoLocking       bool
@@ -262,6 +263,7 @@ func (m *MarkdownRenderer) renderProjectResults(ctx *command.Context, results []
 			result.PlanSuccess.TerraformOutput = strings.TrimSpace(result.PlanSuccess.TerraformOutput)
 			data := planSuccessData{
 				PlanSuccess:              *result.PlanSuccess,
+				PlanDiagramMarkdown:      RenderPlanDiagramMarkdown(result.PlanSuccess.PlanDiagram),
 				PlanWasDeleted:           common.PlansDeleted,
 				DisableApply:             common.DisableApply,
 				DisableRepoLocking:       common.DisableRepoLocking,

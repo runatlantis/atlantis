@@ -685,6 +685,27 @@ ATLANTIS_ENABLE_EXTERNAL_STORES=true
 
 Enable external storage backends configured in the server-side repo config (`external_stores` block). When set, Atlantis reads the `external_stores` section from the repo config YAML to initialize backends such as S3 for plan file persistence.
 
+### `--enable-plan-diagrams`
+
+```bash
+atlantis server --enable-plan-diagrams
+# or
+ATLANTIS_ENABLE_PLAN_DIAGRAMS=true
+```
+
+Adds an infrastructure diagram to every successful plan comment. Atlantis reads the saved plan file with `terraform show -json`, builds the resource dependency graph from the plan's `resource_changes` and configuration references, and renders it as a [Mermaid](https://mermaid.js.org/) flowchart colored by the planned action: green for resources to add, amber for in-place changes, red for replacements, dashed red for destroys, and grey for unchanged resources that the changed ones depend on.
+
+The diagram is drawn next to the summary of the plan and above the Terraform output:
+
+```
+**Planned infrastructure changes:** 3 to add, 2 to change, 1 to destroy, 4 unchanged.
+
+flowchart LR
+  ...
+```
+
+GitHub, GitLab and Gitea render Mermaid in Markdown natively; on other VCS hosts the comment shows the diagram source instead. Only plans produced by the built-in `plan` step can be inspected: custom workflows that write their own plan file, and Terraform Cloud remote plans, get no diagram. Graphs are capped at 60 resources and 300 edges, prioritizing the changed resources and their direct dependencies, so a large plan still produces a readable comment. If the plan cannot be inspected, the plan itself still succeeds and the diagram is omitted.
+
 ### `--enable-policy-checks`
 
 ```bash

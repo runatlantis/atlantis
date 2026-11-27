@@ -81,6 +81,7 @@ const (
 	DiscardApprovalOnPlanFlag        = "discard-approval-on-plan"
 	EmojiReaction                    = "emoji-reaction"
 	EnableDiffMarkdownFormat         = "enable-diff-markdown-format"
+	EnablePlanDiagrams               = "enable-plan-diagrams"
 	EnablePolicyChecksFlag           = "enable-policy-checks"
 	EnableRegExpCmdFlag              = "enable-regexp-cmd"
 	EnableProfilingAPI               = "enable-profiling-api"
@@ -587,6 +588,10 @@ var boolFlags = map[string]boolFlag{
 	},
 	EnableDiffMarkdownFormat: {
 		description:  "Enable Atlantis to format Terraform plan output into a markdown-diff friendly format for color-coding purposes.",
+		defaultValue: false,
+	},
+	EnablePlanDiagrams: {
+		description:  "Add an infrastructure diagram of the planned resource changes, colored by create, update, replace and destroy, to plan output. GitHub, GitLab and Gitea render the diagram; other VCS hosts show its source.",
 		defaultValue: false,
 	},
 	FailOnPreWorkflowHookError: {

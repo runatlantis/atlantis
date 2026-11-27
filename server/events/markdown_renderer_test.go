@@ -5146,3 +5146,52 @@ Ran Plan for 3 projects:
 		})
 	}
 }
+
+func TestRenderPlanIncludesDiagram(t *testing.T) {
+	renderer := events.NewMarkdownRenderer(false, true, true, false, false, false, "", "atlantis", false, false)
+	ctx := &command.Context{
+		Log:  logging.NewNoopLogger(t).WithHistory(),
+		Pull: models.PullRequest{BaseRepo: models.Repo{VCSHost: models.VCSHost{Type: models.Github}}},
+	}
+	planResult := func(diagram *models.PlanDiagram) command.Result {
+		return command.Result{ProjectResults: []command.ProjectResult{{
+			RepoRelDir: ".",
+			Workspace:  "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				PlanSuccess: &models.PlanSuccess{
+					TerraformOutput: "Plan: 1 to add, 0 to change, 0 to destroy.",
+					PlanDiagram:     diagram,
+				},
+			},
+		}}}
+	}
+	diagram := &models.PlanDiagram{
+		Nodes: []models.DiagramNode{{Address: "aws_vpc.main", Action: models.DiagramActionCreate}},
+	}
+
+	t.Run("diagram is rendered before the Terraform output", func(t *testing.T) {
+		rendered := renderer.Render(ctx, planResult(diagram), &events.CommentCommand{Name: command.Plan})
+
+		diagramAt := strings.Index(rendered, "```mermaid")
+		outputAt := strings.Index(rendered, "```diff")
+		if diagramAt == -1 || outputAt == -1 || diagramAt > outputAt {
+			t.Fatalf("expected the diagram before the plan output, got:\n%s", rendered)
+		}
+		for _, expected := range []string{
+			"**Planned infrastructure changes:** 1 to add.",
+			`aws_vpc.main<br/>+ add`,
+		} {
+			if !strings.Contains(rendered, expected) {
+				t.Fatalf("expected %q in:\n%s", expected, rendered)
+			}
+		}
+	})
+
+	t.Run("no diagram block without a plan diagram", func(t *testing.T) {
+		rendered := renderer.Render(ctx, planResult(nil), &events.CommentCommand{Name: command.Plan})
+
+		if strings.Contains(rendered, "```mermaid") {
+			t.Fatalf("unexpected diagram in:\n%s", rendered)
+		}
+	})
+}

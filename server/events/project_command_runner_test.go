@@ -5946,3 +5946,101 @@ func TestDefaultProjectCommandRunner_PlanRejectsVarFileSymlinkOutsideRepo(t *tes
 		"unexpected error: %s", res.Error)
 	Assert(t, unlocked, "expected the project lock to be released after the rejection")
 }
+
+func TestDefaultProjectCommandRunner_PlanRecordsDiagram(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: []byte("reviewed plan")}, repoDir)
+	mockTerraform := tfclientmocks.NewMockClient()
+	planJSON := `{
+	  "resource_changes": [
+	    {"address": "aws_vpc.main", "mode": "managed", "type": "aws_vpc", "name": "main", "change": {"actions": ["create"]}},
+	    {"address": "aws_subnet.public", "mode": "managed", "type": "aws_subnet", "name": "public", "change": {"actions": ["create"]}}
+	  ],
+	  "configuration": {"root_module": {"resources": [
+	    {"address": "aws_vpc.main", "expressions": {}},
+	    {"address": "aws_subnet.public", "expressions": {"vpc_id": {"references": ["aws_vpc.main.id"]}}}
+	  ]}}
+	}`
+	When(mockTerraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Eq(repoDir),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)).ThenReturn(planJSON, nil)
+	runner.TerraformExecutor = mockTerraform
+	runner.EnablePlanDiagrams = true
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	diagram := res.PlanSuccess.PlanDiagram
+	Assert(t, diagram != nil, "expected a plan diagram")
+	Equals(t, 2, len(diagram.Nodes))
+	Equals(t, 1, len(diagram.Edges))
+	Equals(t, "aws_vpc.main", diagram.Edges[0].From)
+	Equals(t, "aws_subnet.public", diagram.Edges[0].To)
+}
+
+func TestDefaultProjectCommandRunner_PlanDiagramFailureIsNotFatal(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: []byte("reviewed plan")}, repoDir)
+	mockTerraform := tfclientmocks.NewMockClient()
+	When(mockTerraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)).ThenReturn("", errors.New("show failed"))
+	runner.TerraformExecutor = mockTerraform
+	runner.EnablePlanDiagrams = true
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Assert(t, res.PlanSuccess.PlanDiagram == nil, "expected no diagram when the plan file cannot be inspected")
+}
+
+func TestDefaultProjectCommandRunner_PlanSkipsDiagramWhenDisabled(t *testing.T) {
+	RegisterMockTestingT(t)
+	repoDir := t.TempDir()
+	runner := newPlanHashTestRunner(t, &planFileWritingStepRunner{contents: []byte("reviewed plan")}, repoDir)
+	mockTerraform := tfclientmocks.NewMockClient()
+	When(mockTerraform.RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)).ThenReturn(`{"resource_changes": [{"address": "aws_vpc.main"}]}`, nil)
+	runner.TerraformExecutor = mockTerraform
+	ctx := planHashTestContext(t, []valid.Step{{StepName: "plan"}})
+
+	res := runner.Plan(ctx)
+
+	Ok(t, res.Error)
+	Assert(t, res.PlanSuccess != nil, "exp plan success")
+	Assert(t, res.PlanSuccess.PlanDiagram == nil, "expected no diagram when the feature is disabled")
+	mockTerraform.VerifyWasCalled(Never()).RunCommandWithVersion(
+		Any[command.ProjectContext](),
+		Any[string](),
+		Any[[]string](),
+		Any[map[string]string](),
+		Any[terraform.Distribution](),
+		Any[*version.Version](),
+		Any[string](),
+	)
+}

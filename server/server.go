@@ -852,6 +852,10 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		CancellationTracker:       cancellationTracker,
 		ApplyPlanValidator:        &events.DefaultApplyPlanValidator{PullStatusFetcher: database, LivePullHeadFetcher: livePullHeadFetcher},
 		PlanStore:                 planStore,
+		TerraformExecutor:         terraformClient,
+		DefaultTFDistribution:     defaultTfDistribution,
+		DefaultTFVersion:          defaultTfVersion,
+		EnablePlanDiagrams:        userConfig.EnablePlanDiagrams,
 	}
 
 	dbUpdater := &events.DBUpdater{

@@ -14,8 +14,11 @@ import (
 	"regexp"
 	"strings"
 
+	version "github.com/hashicorp/go-version"
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/runtime"
+	"github.com/runatlantis/atlantis/server/core/terraform"
+	"github.com/runatlantis/atlantis/server/core/terraform/tfclient"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
 	"github.com/runatlantis/atlantis/server/events/vcs"
@@ -369,6 +372,16 @@ type DefaultProjectCommandRunner struct {
 	CancellationTracker       CancellationTracker
 	ApplyPlanValidator        ApplyPlanValidator
 	PlanStore                 runtime.PlanStore
+	// TerraformExecutor runs the Terraform binary directly. It is used to
+	// inspect a plan file after a successful plan.
+	TerraformExecutor tfclient.Client
+	// DefaultTFDistribution and DefaultTFVersion mirror the plan step runner
+	// defaults and are used when a project does not pin them.
+	DefaultTFDistribution terraform.Distribution
+	DefaultTFVersion      *version.Version
+	// EnablePlanDiagrams inspects each successful plan's plan file and records
+	// its resource graph, which the plan comment renders as a diagram.
+	EnablePlanDiagrams bool
 	// VarFileAllowlistChecker re-checks comment var-file arguments once the
 	// repository is cloned, so that a committed symlink cannot point a
 	// repository-relative path at a file outside the clone.
@@ -907,6 +920,17 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		return nil, "", errorWithStepOutput(err, outputs)
 	}
 
+	var diagram *models.PlanDiagram
+	if p.EnablePlanDiagrams {
+		diagram, err = p.planDiagram(ctx, projAbsPath)
+		if err != nil {
+			// The diagram is decoration on a successful plan; failing to draw
+			// it must never fail the plan itself.
+			ctx.Log.Warn("unable to build an infrastructure diagram for project %q in %q: %s", ctx.ProjectName, ctx.RepoRelDir, err)
+			diagram = nil
+		}
+	}
+
 	return &models.PlanSuccess{
 		LockURL:         p.LockURLGenerator.GenerateLockURL(lockAttempt.LockKey),
 		TerraformOutput: strings.Join(outputs, "\n"),
@@ -914,7 +938,45 @@ func (p *DefaultProjectCommandRunner) doPlan(ctx command.ProjectContext) (*model
 		ApplyCmd:        ctx.ApplyCmd,
 		MergedAgain:     mergedAgain,
 		PlanHash:        planHash,
+		PlanDiagram:     diagram,
 	}, "", nil
+}
+
+// planDiagram reads the plan file written by the built-in plan step and builds
+// the resource graph the plan comment draws. Custom workflows that manage their
+// own plan file return nil: Atlantis does not know where that file is, so it
+// cannot inspect it.
+func (p *DefaultProjectCommandRunner) planDiagram(ctx command.ProjectContext, absPath string) (*models.PlanDiagram, error) {
+	if !hasAtlantisManagedPlanStep(ctx.Steps) {
+		return nil, nil
+	}
+	planPath, err := safePlanFilePath(ctx, absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	distribution := p.DefaultTFDistribution
+	if ctx.TerraformDistribution != nil {
+		distribution = terraform.NewDistribution(*ctx.TerraformDistribution)
+	}
+	tfVersion := p.DefaultTFVersion
+	if ctx.TerraformVersion != nil {
+		tfVersion = ctx.TerraformVersion
+	}
+
+	output, err := p.TerraformExecutor.RunCommandWithVersion(
+		ctx,
+		filepath.Clean(absPath),
+		[]string{"show", "-json", planPath},
+		map[string]string{},
+		distribution,
+		tfVersion,
+		ctx.Workspace,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("running terraform show -json: %w", err)
+	}
+	return ParsePlanDiagram([]byte(output))
 }
 
 // planStagePlanHash hashes the convention plan file the built-in plan step

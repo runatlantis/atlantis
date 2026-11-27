@@ -466,6 +466,10 @@ type PlanSuccess struct {
 	// empty when the plan stage is built only from custom run steps, which
 	// manage their own plan file.
 	PlanHash string
+	// PlanDiagram is the resource dependency graph of the plan, recorded only
+	// when plan diagrams are enabled and the plan file could be inspected.
+	// Nil means the graph is unknown, not that the plan has no resources.
+	PlanDiagram *PlanDiagram
 }
 
 func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {

@@ -54,6 +54,7 @@ type UserConfig struct {
 	EnableRegExpCmd             bool   `mapstructure:"enable-regexp-cmd"`
 	EnableProfilingAPI          bool   `mapstructure:"enable-profiling-api"`
 	EnableDiffMarkdownFormat    bool   `mapstructure:"enable-diff-markdown-format"`
+	EnablePlanDiagrams          bool   `mapstructure:"enable-plan-diagrams"`
 	EnableDriftDetection        bool   `mapstructure:"enable-drift-detection"`
 	EnableDriftRemediation      bool   `mapstructure:"enable-drift-remediation"`
 	ExecutableName              string `mapstructure:"executable-name"`
