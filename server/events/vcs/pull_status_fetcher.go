@@ -38,7 +38,10 @@ func (f *pullReqStatusFetcher) FetchPullStatus(logger logging.SimpleLogging, pul
 
 	mergeable, err := f.client.PullIsMergeable(logger, pull.BaseRepo, pull, f.vcsStatusName, f.ignoreVCSStatusNames)
 	if err != nil {
-		return pullStatus, fmt.Errorf("fetching mergeability status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
+		// Keep the approval status that was already fetched: callers continue
+		// after an error, and a failing mergeability check must not make an
+		// approved pull request look unapproved.
+		return models.PullReqStatus{ApprovalStatus: approvalStatus}, fmt.Errorf("fetching mergeability status for repo: %s, and pull number: %d: %w", pull.BaseRepo.FullName, pull.Num, err)
 	}
 
 	return models.PullReqStatus{

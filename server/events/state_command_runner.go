@@ -61,9 +61,9 @@ func (v *StateCommandRunner) runRm(ctx *command.Context, cmd *CommentCommand) co
 	var err error
 	ctx.PullRequestStatus, err = v.pullReqStatusFetcher.FetchPullStatus(ctx.Log, ctx.Pull)
 	if err != nil {
-		// Continue with approved and mergeable assumed false: a requirement
-		// that needs them then fails closed.
-		ctx.Log.Warn("unable to get pull request status: %s. Continuing with mergeable and approved assumed false", err)
+		// Continue with any status that could not be fetched assumed false: a
+		// requirement that needs it then fails closed.
+		ctx.Log.Warn("unable to get pull request status: %s. Continuing with statuses that could not be fetched assumed false", err)
 	}
 
 	projectCmds, err := v.prjCmdBuilder.BuildStateRmCommands(ctx, cmd)
