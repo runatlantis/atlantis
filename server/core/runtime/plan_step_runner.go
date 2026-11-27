@@ -58,11 +58,8 @@ func (p *planStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pat
 	if len(extraArgs) > 0 {
 		ctx.ExpandableArgs = extraArgs
 	}
-	tfDistribution := p.DefaultTFDistribution
+	tfDistribution := terraform.SelectDistribution(p.DefaultTFDistribution, ctx.TerraformDistribution)
 	tfVersion := p.DefaultTFVersion
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
-	}
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion
 	}

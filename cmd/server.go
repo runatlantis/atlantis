@@ -151,6 +151,9 @@ const (
 	TFDistributionFlag               = "tf-distribution" // deprecated for DefaultTFDistributionFlag
 	TFDownloadFlag                   = "tf-download"
 	TFDownloadURLFlag                = "tf-download-url"
+	TFDownloadUsernameFlag           = "tf-download-username"
+	TFDownloadPasswordFlag           = "tf-download-password"
+	TFDownloadTokenFlag              = "tf-download-token" // #nosec G101 -- CLI flag name, not a credential
 	UseTFPluginCache                 = "use-tf-plugin-cache"
 	VarFileAllowlistFlag             = "var-file-allowlist"
 	VCSStatusName                    = "vcs-status-name"
@@ -200,7 +203,7 @@ const (
 	DefaultRedisTLSEnabled              = false
 	DefaultRedisInsecureSkipVerify      = false
 	DefaultTFDistribution               = TFDistributionTerraform
-	DefaultTFDownloadURL                = "https://releases.hashicorp.com"
+	DefaultTFDownloadURL                = server.DefaultTFDownloadURL
 	DefaultTFDownload                   = true
 	DefaultTFEHostname                  = "app.terraform.io"
 	DefaultVCSStatusName                = "atlantis"
@@ -485,6 +488,18 @@ var stringFlags = map[string]stringFlag{
 	TFDownloadURLFlag: {
 		description:  "Base URL to download Terraform versions from.",
 		defaultValue: DefaultTFDownloadURL,
+	},
+	TFDownloadUsernameFlag: {
+		description: "Username for HTTP basic auth when downloading Terraform from a custom --tf-download-url mirror.",
+	},
+	TFDownloadPasswordFlag: {
+		description: "Password for HTTP basic auth when downloading Terraform from a custom --tf-download-url mirror." +
+			" For security, set via the ATLANTIS_TF_DOWNLOAD_PASSWORD environment variable.",
+	},
+	TFDownloadTokenFlag: {
+		description: "Bearer token for authenticating against a custom --tf-download-url mirror." +
+			" Takes precedence over basic auth when both are set." +
+			" For security, set via the ATLANTIS_TF_DOWNLOAD_TOKEN environment variable.",
 	},
 	TFEHostnameFlag: {
 		description:  "Hostname of your Terraform Enterprise installation. If using Terraform Cloud no need to set.",
@@ -1093,6 +1108,9 @@ func (s *ServerCmd) setDefaults(c *server.UserConfig, v *viper.Viper) {
 func (s *ServerCmd) validate(userConfig server.UserConfig) error {
 	// Check before preparing directories; NewServer also validates direct callers.
 	if err := userConfig.ValidateExperiments(); err != nil {
+		return err
+	}
+	if err := userConfig.ValidateTFDownloadMirror(); err != nil {
 		return err
 	}
 	userConfig.LogLevel = strings.ToLower(userConfig.LogLevel)

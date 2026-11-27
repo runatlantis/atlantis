@@ -174,6 +174,9 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 	if err := userConfig.ValidateExperiments(); err != nil {
 		return nil, err
 	}
+	if err := userConfig.ValidateTFDownloadMirror(); err != nil {
+		return nil, err
+	}
 	logging.SuppressDefaultLogging()
 	logger, err := logging.NewStructuredLoggerFromLevel(userConfig.ToLogLevel())
 
@@ -452,7 +455,12 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		)
 	}
 
-	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution)
+	apiAuth := terraform.APIAuth{
+		Username:    userConfig.TFDownloadUsername,
+		Password:    userConfig.TFDownloadPassword,
+		BearerToken: userConfig.TFDownloadToken,
+	}
+	distribution := terraform.NewDistribution(userConfig.DefaultTFDistribution, userConfig.TFDownloadURL, apiAuth)
 
 	terraformClient, err := tfclient.NewClient(
 		logger,

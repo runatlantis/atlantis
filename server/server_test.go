@@ -127,6 +127,11 @@ func TestNewServer_EnableDriftRemediationRequiresDriftDetection(t *testing.T) {
 
 // todo: test what happens if we set different flags. The generated config should be different.
 
+func TestNewServer_ValidateTFDownloadMirror(t *testing.T) {
+	_, err := server.NewServer(server.UserConfig{TFDownloadToken: "mirror-token"}, server.Config{})
+	ErrEquals(t, "a custom --tf-download-url is required when Terraform mirror credentials are set", err)
+}
+
 func TestNewServer_InvalidAtlantisURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	_, err := server.NewServer(server.UserConfig{

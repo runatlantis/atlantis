@@ -65,10 +65,7 @@ func (a *ApplyStepRunner) Run(ctx command.ProjectContext, extraArgs []string, pa
 
 	ctx.Log.Info("starting apply")
 	var out string
-	tfDistribution := a.DefaultTFDistribution
-	if ctx.TerraformDistribution != nil {
-		tfDistribution = terraform.NewDistribution(*ctx.TerraformDistribution)
-	}
+	tfDistribution := terraform.SelectDistribution(a.DefaultTFDistribution, ctx.TerraformDistribution)
 	tfVersion := a.DefaultTFVersion
 	if ctx.TerraformVersion != nil {
 		tfVersion = ctx.TerraformVersion

@@ -150,6 +150,9 @@ var testFlags = map[string]any{
 	TFDistributionFlag:               "terraform",
 	TFDownloadFlag:                   true,
 	TFDownloadURLFlag:                "https://my-hostname.com",
+	TFDownloadUsernameFlag:           "my-username",
+	TFDownloadPasswordFlag:           "my-password",
+	TFDownloadTokenFlag:              "my-download-token",
 	TFEHostnameFlag:                  "my-hostname",
 	TFELocalExecutionModeFlag:        true,
 	TFETokenFlag:                     "my-token",
@@ -1291,6 +1294,69 @@ func TestExecute_ValidateDefaultTFDistribution(t *testing.T) {
 		} else {
 			Ok(t, err)
 		}
+	}
+}
+
+func TestExecute_ValidateTFDownloadMirror(t *testing.T) {
+	const wantErr = "a custom --tf-download-url is required when Terraform mirror credentials are set"
+	cases := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name: "default without credentials",
+		},
+		{
+			name:    "username without mirror",
+			args:    []string{"--tf-download-username=mirror-user"},
+			wantErr: wantErr,
+		},
+		{
+			name:    "password without mirror",
+			args:    []string{"--tf-download-password=mirror-password"},
+			wantErr: wantErr,
+		},
+		{
+			name:    "token without mirror when OpenTofu is the default",
+			args:    []string{"--tf-download-token=mirror-token", "--default-tf-distribution=opentofu"},
+			wantErr: wantErr,
+		},
+		{
+			name:    "explicit public URL",
+			args:    []string{"--tf-download-token=mirror-token", "--tf-download-url=" + DefaultTFDownloadURL},
+			wantErr: wantErr,
+		},
+		{
+			name:    "equivalent public host",
+			args:    []string{"--tf-download-token=mirror-token", "--tf-download-url=https://RELEASES.HASHICORP.COM.:443/"},
+			wantErr: wantErr,
+		},
+		{
+			name:    "relative mirror URL",
+			args:    []string{"--tf-download-token=mirror-token", "--tf-download-url=mirror.example.com/releases"},
+			wantErr: wantErr,
+		},
+		{
+			name: "basic auth on a custom mirror",
+			args: []string{"--tf-download-username=mirror-user", "--tf-download-password=mirror-password", "--tf-download-url=https://mirror.example.com/releases"},
+		},
+		{
+			name: "bearer auth on a custom mirror",
+			args: []string{"--tf-download-token=mirror-token", "--tf-download-url=https://mirror.example.com", "--default-tf-distribution=opentofu"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := setupWithDefaults(map[string]any{}, t)
+			c.SetArgs(tc.args)
+			err := c.Execute()
+			if tc.wantErr != "" {
+				ErrEquals(t, tc.wantErr, err)
+				return
+			}
+			Ok(t, err)
+		})
 	}
 }
 

@@ -642,7 +642,7 @@ func TestPlanStepRunner_TestRun_UsesConfiguredDistribution(t *testing.T) {
 			Ok(t, err)
 			Equals(t, "output", output)
 
-			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expPlanArgs), Eq(map[string]string(nil)), NotEq(tfDistribution), Eq(tfVersion), Eq("default"))
+			terraform.VerifyWasCalledOnce().RunCommandWithVersion(Eq(ctx), Eq("/path"), Eq(expPlanArgs), Eq(map[string]string(nil)), Eq(tf.SelectDistribution(tfDistribution, ctx.TerraformDistribution)), Eq(tfVersion), Eq("default"))
 		})
 	}
 
