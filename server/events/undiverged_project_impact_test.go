@@ -212,7 +212,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackWhenGenerat
 	repoDir := autoDiscoveredRepo(t)
 	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
 	workingDir := NewMockWorkingDir()
-	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{"generated-only/**"}), Any[models.PullRequest]())).ThenReturn(true)
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{"generated-only/**"}), Any[models.PullRequest]())).ThenReturn(true, nil)
 
 	handler := &DefaultCommandRequirementHandler{
 		WorkingDir:            workingDir,
@@ -236,7 +236,7 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackForEmptyCon
 	repoDir := configuredProjectRepoWithEmptyWhenModified(t)
 	resolver := newTestUndivergedProjectImpactResolver("**/*.tf", defaultAutoplanFileList, "auto")
 	workingDir := NewMockWorkingDir()
-	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{}), Any[models.PullRequest]())).ThenReturn(true)
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{}), Any[models.PullRequest]())).ThenReturn(true, nil)
 
 	handler := &DefaultCommandRequirementHandler{
 		WorkingDir:            workingDir,
@@ -258,8 +258,8 @@ func TestDefaultCommandRequirementHandler_TargetedUndivergedFallsBackToFullCheck
 
 	repoDir := configuredProjectRepo(t)
 	workingDir := NewMockWorkingDir()
-	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{"modules/database/**"}), Any[models.PullRequest]())).ThenReturn(true)
-	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string(nil)), Any[models.PullRequest]())).ThenReturn(false)
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string{"modules/database/**"}), Any[models.PullRequest]())).ThenReturn(true, nil)
+	When(workingDir.HasDiverged(Any[logging.SimpleLogging](), Eq(repoDir), Eq("project1"), Eq([]string(nil)), Any[models.PullRequest]())).ThenReturn(false, nil)
 
 	handler := &DefaultCommandRequirementHandler{
 		WorkingDir:            workingDir,
