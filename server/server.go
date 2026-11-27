@@ -591,6 +591,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		NoOpLocker:     noOpLocker,
 		VCSClient:      vcsClient,
 		ExecutableName: userConfig.ExecutableName,
+
+		LockURLGenerator: router,
 	}
 	deleteLockCommand := &events.DefaultDeleteLockCommand{
 		Locker:           lockingClient,
