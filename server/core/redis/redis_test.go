@@ -1391,11 +1391,11 @@ func TestPullStatus_UpdateOverwritesCorruptData(t *testing.T) {
 		},
 	}
 
-	// Inject a corrupt pull-status blob simulating a legacy on-disk shape
-	// that the current Go types cannot unmarshal (Approvals used to be int).
+	// Inject a corrupt pull-status blob with a shape that the current Go
+	// types cannot unmarshal.
 	key := fmt.Sprintf("%s::%s::%d",
 		pull.BaseRepo.VCSHost.Hostname, pull.BaseRepo.FullName, pull.Num)
-	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":2}],"Status":0}],"Pull":{"Num":1}}`
+	corrupt := `{"Projects":[{"Workspace":"default","RepoRelDir":"mydir","ProjectName":"","PolicyStatus":[{"PolicySetName":"policy1","Passed":false,"Approvals":"two"}],"Status":0}],"Pull":{"Num":1}}`
 	Ok(t, s.Set(key, corrupt))
 
 	// Write fresh results. This must succeed despite the unreadable prior entry.
