@@ -1305,6 +1305,60 @@ func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled(t *testing.T) 
 		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]())
 }
 
+func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled_KeepsFailedStatus(t *testing.T) {
+	t.Log("if approve_policies finds no project to approve, for example because the user isn't authorized for any," +
+		" the policy_check status must reflect the stored policy check results instead of being set to success")
+	setup(t)
+	approvePoliciesCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+
+	_, err := dbUpdater.Database.UpdatePullWithResults(modelPull, []command.ProjectResult{
+		{
+			Command:     command.PolicyCheck,
+			RepoRelDir:  ".",
+			Workspace:   "default",
+			ProjectName: "default",
+			ProjectCommandOutput: command.ProjectCommandOutput{
+				Error: errors.New("failing policy"),
+			},
+		},
+	})
+	Ok(t, err)
+
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
+
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.FailedCommitStatus), Eq(command.PolicyCheck), Eq(models.ProjectCounts{Total: 1, Errored: 1}))
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus), Eq(command.PolicyCheck), Any[models.ProjectCounts]())
+}
+
+func TestRunCommentCommandApprovePolicy_NoProjects_SilenceEnabled_NoPullStatus(t *testing.T) {
+	t.Log("if approve_policies finds no project and there is no stored pull status, the policy_check status is set to 0/0 success")
+	setup(t)
+	approvePoliciesCommandRunner.SilenceNoProjects = true
+	var pull github.PullRequest
+	modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num}
+	When(githubGetter.GetPullRequest(Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(testdata.Pull.Num))).ThenReturn(&pull, nil)
+	When(eventParsing.ParseGithubPull(Any[logging.SimpleLogging](), Eq(&pull))).ThenReturn(modelPull, modelPull.BaseRepo, testdata.GithubRepo, nil)
+	When(projectCommandBuilder.BuildApprovePoliciesCommands(Any[*command.Context](), Any[*events.CommentCommand]())).
+		ThenReturn([]command.ProjectContext{}, nil)
+
+	ch.RunCommentCommand(testdata.GithubRepo, nil, nil, testdata.User, testdata.Pull.Num, &events.CommentCommand{Name: command.ApprovePolicies})
+
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Eq(models.SuccessCommitStatus), Eq(command.PolicyCheck), Eq(models.ProjectCounts{}))
+}
+
 func TestRunCommentCommandUnlock_NoProjects_SilenceEnabled(t *testing.T) {
 	t.Log("if an unlock command is run on a pull request and SilenceNoProjects is enabled and we are silencing all comments if the modified files don't have a matching project")
 	vcsClient := setup(t)

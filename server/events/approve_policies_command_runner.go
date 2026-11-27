@@ -67,6 +67,14 @@ func (a *ApprovePoliciesCommandRunner) Run(ctx *command.Context, cmd *CommentCom
 	if len(projectCmds) == 0 && a.SilenceNoProjects {
 		ctx.Log.Info("determined there was no project to run approve_policies in")
 		if !a.silenceVCSStatusNoProjects {
+			if ctx.PullStatus != nil && len(ctx.PullStatus.Projects) > 0 {
+				// Nothing was approved, for example because the user isn't
+				// authorized for any of the projects. Restore the status of the
+				// projects that were already checked instead of reporting success.
+				ctx.Log.Debug("resetting VCS status from the pull status")
+				a.updateCommitStatus(ctx, *ctx.PullStatus)
+				return
+			}
 			// If there were no projects modified, we set successful commit statuses
 			// with 0/0 projects approve_policies successfully because some users require
 			// the Atlantis status to be passing for all pull requests.
