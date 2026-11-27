@@ -4,7 +4,9 @@
 package web_templates
 
 import (
+	"bytes"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,12 +78,15 @@ func TestProjectJobsTemplate(t *testing.T) {
 }
 
 func TestProjectJobsErrorTemplate(t *testing.T) {
-	err := ProjectJobsTemplate.Execute(io.Discard, ProjectJobsError{
+	var buf bytes.Buffer
+	err := ProjectJobsErrorTemplate.Execute(&buf, ProjectJobsError{
 		AtlantisVersion: "v0.0.0",
 		ProjectPath:     "project path",
 		CleanedBasePath: "/path",
 	})
 	Ok(t, err)
+	Assert(t, strings.Contains(buf.String(), "Project Does Not Exist in PR"),
+		"expected the project jobs error page to be rendered")
 }
 
 func TestGithubAppSetupTemplate(t *testing.T) {
