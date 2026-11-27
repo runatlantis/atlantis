@@ -1171,6 +1171,219 @@ func TestDefaultProjectCommandBuilder_BuildPlanCommandsDiscoverAllProjectsAPITea
 	}
 }
 
+func TestDefaultProjectCommandBuilder_ShouldSilenceTargetedApply(t *testing.T) {
+	const atlantisYAML = `
+version: 3
+projects:
+- name: project-a
+  dir: infra
+  workspace: production
+`
+	cases := []struct {
+		Description              string
+		Cmd                      events.CommentCommand
+		AtlantisYAML             string
+		NoRepoConfig             bool
+		WorkingDirErr            error
+		SilenceNoProjects        bool
+		EnableRegExpCmd          bool
+		ExactProjectNameMatching bool
+		API                      bool
+		ModifyContext            func(*command.Context)
+		ExpSilenced              bool
+	}{
+		{
+			Description:       "unknown project is silenced",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ExpSilenced:       true,
+		},
+		{
+			Description:       "owned project follows the normal apply path",
+			Cmd:               events.CommentCommand{ProjectName: "project-a"},
+			SilenceNoProjects: true,
+		},
+		{
+			Description: "unknown project is not silenced when disabled",
+			Cmd:         events.CommentCommand{ProjectName: "project-b"},
+		},
+		{
+			Description:       "directory-only command is not silenced",
+			Cmd:               events.CommentCommand{RepoRelDir: "other"},
+			SilenceNoProjects: true,
+		},
+		{
+			Description:       "missing config does not prove the project is unowned",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			NoRepoConfig:      true,
+			SilenceNoProjects: true,
+		},
+		{
+			Description:       "empty project list does not silence the command",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			AtlantisYAML:      "version: 3\nprojects: []\n",
+			SilenceNoProjects: true,
+		},
+		{
+			Description:       "invalid config follows the normal error path",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			AtlantisYAML:      "version: 3\nprojects: [\n",
+			SilenceNoProjects: true,
+		},
+		{
+			Description:       "missing working directory follows the normal recovery path",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			WorkingDirErr:     os.ErrNotExist,
+			SilenceNoProjects: true,
+		},
+		{
+			Description:       "missing recorded pull status does not silence the command",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.PullStatus = nil
+			},
+		},
+		{
+			Description:       "matching empty heads do not establish a current config",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.Pull.HeadCommit = ""
+				ctx.PullStatus.Pull.HeadCommit = ""
+			},
+		},
+		{
+			Description:       "matching empty base branches do not establish a current config",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.Pull.BaseBranch = ""
+				ctx.PullStatus.Pull.BaseBranch = ""
+			},
+		},
+		{
+			Description:       "recorded status for an older head does not silence the command",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.PullStatus.Pull.HeadCommit = "old123"
+			},
+		},
+		{
+			Description:       "recorded status for a different base branch does not silence the command",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.PullStatus.Pull.BaseBranch = "release"
+			},
+		},
+		{
+			Description:       "recorded status without identity does not silence the command",
+			Cmd:               events.CommentCommand{ProjectName: "project-b"},
+			SilenceNoProjects: true,
+			ModifyContext: func(ctx *command.Context) {
+				ctx.PullStatus.Pull.HeadCommit = ""
+				ctx.PullStatus.Pull.BaseBranch = ""
+			},
+		},
+		{
+			Description:       "enabled regular expression selects the owned project",
+			Cmd:               events.CommentCommand{ProjectName: "project-.*"},
+			SilenceNoProjects: true,
+			EnableRegExpCmd:   true,
+		},
+		{
+			Description:       "disabled regular expression is matched literally",
+			Cmd:               events.CommentCommand{ProjectName: "project-.*"},
+			SilenceNoProjects: true,
+			ExpSilenced:       true,
+		},
+		{
+			Description:              "exact matching overrides enabled regular expressions",
+			Cmd:                      events.CommentCommand{ProjectName: "project-.*"},
+			SilenceNoProjects:        true,
+			EnableRegExpCmd:          true,
+			ExactProjectNameMatching: true,
+			ExpSilenced:              true,
+		},
+		{
+			Description:       "API filters preserve a matching project",
+			Cmd:               events.CommentCommand{ProjectName: "project-a", RepoRelDir: "infra", Workspace: "production"},
+			SilenceNoProjects: true,
+			API:               true,
+		},
+		{
+			Description:       "API directory filter excludes a project with the same name",
+			Cmd:               events.CommentCommand{ProjectName: "project-a", RepoRelDir: "other", Workspace: "production"},
+			SilenceNoProjects: true,
+			API:               true,
+			ExpSilenced:       true,
+		},
+		{
+			Description:       "API workspace filter excludes a project with the same name",
+			Cmd:               events.CommentCommand{ProjectName: "project-a", RepoRelDir: "infra", Workspace: "staging"},
+			SilenceNoProjects: true,
+			API:               true,
+			ExpSilenced:       true,
+		},
+		{
+			Description:       "API filters require an exact project name even when regular expressions are enabled",
+			Cmd:               events.CommentCommand{ProjectName: "project-.*", RepoRelDir: "infra", Workspace: "production"},
+			SilenceNoProjects: true,
+			EnableRegExpCmd:   true,
+			API:               true,
+			ExpSilenced:       true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.Description, func(t *testing.T) {
+			RegisterMockTestingT(t)
+			dirStructure := map[string]any{
+				"infra": map[string]any{"main.tf": ""},
+			}
+			if !c.NoRepoConfig {
+				repoConfig := c.AtlantisYAML
+				if repoConfig == "" {
+					repoConfig = atlantisYAML
+				}
+				dirStructure[valid.DefaultAtlantisFile] = repoConfig
+			}
+			repoDir := DirStructure(t, dirStructure)
+			workingDir := mocks.NewMockWorkingDir()
+			When(workingDir.GetWorkingDir(Any[models.Repo](), Any[models.PullRequest](), Eq(events.DefaultWorkspace))).ThenReturn(repoDir, c.WorkingDirErr)
+			builder := &events.DefaultProjectCommandBuilder{
+				ParserValidator:   &config.ParserValidator{},
+				WorkingDir:        workingDir,
+				GlobalCfg:         valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+				SilenceNoProjects: c.SilenceNoProjects,
+				EnableRegExpCmd:   c.EnableRegExpCmd,
+			}
+			ctx := &command.Context{
+				Log: logging.NewNoopLogger(t),
+				Pull: models.PullRequest{
+					Num:        1,
+					HeadCommit: "abc123",
+					BaseBranch: "main",
+					BaseRepo:   models.Repo{FullName: "owner/repo"},
+				},
+				ExactProjectNameMatching: c.ExactProjectNameMatching,
+				API:                      c.API,
+			}
+			ctx.PullStatus = &models.PullStatus{Pull: ctx.Pull}
+			if c.ModifyContext != nil {
+				c.ModifyContext(ctx)
+			}
+			cmd := c.Cmd
+			cmd.Name = command.Apply
+
+			Equals(t, c.ExpSilenced, builder.ShouldSilenceTargetedApply(ctx, &cmd))
+			workingDir.VerifyWasCalled(Never()).Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Any[string]())
+		})
+	}
+}
+
 // Test that autodiscover.ignore_paths blocks targeted plan/apply -d commands
 // when the directory has no explicit project config (global config ignore_paths).
 func TestDefaultProjectCommandBuilder_BuildTargetedCommand_IgnorePaths(t *testing.T) {

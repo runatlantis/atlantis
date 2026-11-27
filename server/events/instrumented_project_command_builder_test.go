@@ -50,6 +50,10 @@ func (f fakeInstrumentedProjectCommandBuilder) ShouldIgnoreTargetedDir(ctx *comm
 	return false
 }
 
+func (f fakeInstrumentedProjectCommandBuilder) ShouldSilenceTargetedApply(ctx *command.Context, comment *CommentCommand) bool {
+	return false
+}
+
 func (f fakeInstrumentedProjectCommandBuilder) BuildAutoplanCommands(ctx *command.Context) ([]command.ProjectContext, error) {
 	return nil, f.err
 }
