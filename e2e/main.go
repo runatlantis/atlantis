@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
+	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
 )
@@ -58,7 +61,16 @@ func main() {
 		log.Fatalf("failed to get vcs client: %v", err)
 	}
 
-	ctx := context.Background()
+	// Cancelling a workflow run sends SIGINT and then SIGTERM. Stop the tests
+	// on either so this run's webhook is still deleted.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	log.Print("deleting webhooks left by earlier runs")
+	if err := deleteLeftoverHooks(ctx, vcsClient); err != nil {
+		log.Printf("could not delete leftover webhooks, continuing: %v", err)
+	}
+
 	log.Print("creating atlantis webhook")
 	hookID, err := vcsClient.CreateAtlantisWebhook(ctx, atlantisURL)
 	if err != nil {
@@ -126,9 +138,21 @@ func runCases(ctx context.Context, vcsClient VCSClient, hookID int64, cloneDirRo
 	var results []*E2EResult
 	var testErrors *multierror.Error
 
-	defer vcsClient.DeleteAtlantisHook(ctx, hookID) // nolint: errcheck
+	defer func() {
+		// Use a fresh context: ctx is already cancelled when the run was
+		// interrupted, and that is exactly when the hook must still go.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if err := vcsClient.DeleteAtlantisHook(cleanupCtx, hookID); err != nil {
+			log.Printf("could not delete webhook %d: %v", hookID, err) // #nosec G706 -- hookID is an int64 and err comes from the VCS API client
+		}
+	}()
 
 	for _, tc := range cases {
+		if ctx.Err() != nil {
+			log.Print("interrupted; skipping the remaining test cases")
+			break
+		}
 		log.Printf("━━━ starting: %s ━━━", tc.Name)
 		e2e := &E2ETester{
 			vcsClient:    vcsClient,

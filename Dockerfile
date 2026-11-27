@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # what distro is the image being built for
-ARG ALPINE_TAG=3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+ARG ALPINE_TAG=3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 ARG DEBIAN_TAG=13.6-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 # renovate: datasource=docker depName=golang versioning=docker
-ARG GOLANG_TAG=1.27.3-alpine3.24@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+ARG GOLANG_TAG=1.27.4-alpine3.24@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280
 
 # renovate: datasource=github-releases depName=open-policy-agent/conftest
 ARG DEFAULT_CONFTEST_VERSION=0.70.1
@@ -119,14 +119,14 @@ RUN AVAILABLE_CONFTEST_VERSIONS=${DEFAULT_CONFTEST_VERSION} && \
 
 # install git-lfs
 # renovate: datasource=github-releases depName=git-lfs/git-lfs
-ENV GIT_LFS_VERSION=3.8.0
+ENV GIT_LFS_VERSION=3.8.1
 
 # Keep these hashes in sync with GIT_LFS_VERSION; mismatches fail closed.
 # SHA256 hashes are published in the release's signed sha256sums.asc file.
 RUN case ${TARGETPLATFORM} in \
-        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e455e00f15d9b95661b8d53498ffb0c3367962cf1ec73c31ab7369516cd6ab8d ;; \
-        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=ac9c8efac980bb0505ead384d087e2acb6486fd8498691a2165fa174ec6118c2 ;; \
-        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=67144f93c2342f46456d22dbf33077f54e0581cb91f2966393151871ca328553 ;; \
+        "linux/amd64") GIT_LFS_ARCH=amd64; GIT_LFS_SHA256=e72cf723a4a660438862282e8aecf3885fc8123e88bfcad534cf6b941a354b75 ;; \
+        "linux/arm64") GIT_LFS_ARCH=arm64; GIT_LFS_SHA256=67895dd77b63329796bc5efdd47b57f218e1f7b98717ebaf936a8238dbcaec0f ;; \
+        "linux/arm/v7") GIT_LFS_ARCH=arm; GIT_LFS_SHA256=51850fba78f08c8ffe86e162ce277a36fb41929ba699c2853f4b0ff178cf0eb2 ;; \
         *) echo "unsupported target platform: ${TARGETPLATFORM}" >&2; exit 1 ;; \
     esac && \
     curl -L -s --output git-lfs.tar.gz "https://github.com/git-lfs/git-lfs/releases/download/v${GIT_LFS_VERSION}/git-lfs-linux-${GIT_LFS_ARCH}-v${GIT_LFS_VERSION}.tar.gz" && \
@@ -177,7 +177,7 @@ ENV CA_CERTIFICATES_VERSION="20261020-r0"
 # renovate: datasource=apk depName=curl
 ENV CURL_VERSION="8.23.0-r0"
 # renovate: datasource=apk depName=git
-ENV GIT_VERSION="2.54.0-r0"
+ENV GIT_VERSION="2.54.1-r0"
 # renovate: datasource=apk depName=unzip
 ENV UNZIP_VERSION="6.0-r16"
 # renovate: datasource=apk depName=bash

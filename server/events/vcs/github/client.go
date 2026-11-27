@@ -30,6 +30,10 @@ import (
 // by GitHub.
 const maxCommentLength = 65536
 
+func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	return g.user != "" && user.Username != "" && strings.EqualFold(g.user, user.Username), nil
+}
+
 var (
 	clientMutationID            = githubv4.NewString("atlantis")
 	pullRequestDismissalMessage = *githubv4.NewString("Dismissing reviews because of plan changes")
@@ -144,7 +148,13 @@ func New(hostname string, credentials Credentials, config Config, maxCommentsPer
 	logger.Debug("GH User: %s", user)
 
 	if err != nil {
-		return nil, fmt.Errorf("getting user: %w", err)
+		if app, ok := credentials.(*AppCredentials); ok && app.AppSlug == "" {
+			// Slug discovery is optional, as it was before self-comment filtering.
+			logger.Warn("unable to discover github app identity, continuing without self-comment filtering with error %q", err)
+			user = ""
+		} else {
+			return nil, fmt.Errorf("getting user: %w", err)
+		}
 	}
 
 	return &Client{

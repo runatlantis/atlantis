@@ -85,6 +85,12 @@
       groupName: 'go',
     },
     {
+      matchManagers: ['gomod'],
+      matchDepNames: ['go'],
+      matchDepTypes: ['golang'],
+      rangeStrategy: 'bump',
+    },
+    {
       "matchFileNames": ["Dockerfile"],
       "matchPackageNames": ["golang"],
       "versioning": "docker",

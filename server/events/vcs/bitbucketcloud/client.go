@@ -8,16 +8,19 @@ package bitbucketcloud
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	validator "github.com/go-playground/validator/v10"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs/common"
 	"github.com/runatlantis/atlantis/server/logging"
 )
 
@@ -30,6 +33,7 @@ type Client struct {
 	password    string
 	BaseURL     string
 	atlantisURL string
+	identity    common.IdentityCache
 }
 
 // NewClient builds a bitbucket cloud client. atlantisURL is the
@@ -55,8 +59,6 @@ func New(httpClient *http.Client, username string, password string, apiUser stri
 		atlantisURL: atlantisURL,
 	}
 }
-
-var MY_UUID = ""
 
 // GetModifiedFiles returns the names of files that were modified in the merge request
 // relative to the repo root, e.g. parent/child/file.txt.
@@ -186,31 +188,39 @@ func (b *Client) GetPullRequestComments(repo models.Repo, pullNum int) (comments
 	return pulls.Values, nil
 }
 
-func (b *Client) GetMyUUID() (uuid string, err error) {
-	if MY_UUID == "" {
-		path := fmt.Sprintf("%s/2.0/user", b.BaseURL)
-		resp, err := b.makeRequest("GET", path, nil)
+// GetMyUUID caches successful account lookups for this client.
+func (b *Client) GetMyUUID() (string, error) {
+	return b.identity.Get("", b.fetchMyUUID)
+}
 
-		if err != nil {
-			return uuid, err
-		}
-
-		var user User
-		if err := json.Unmarshal(resp, &user); err != nil {
-			return uuid, fmt.Errorf("parsing response %q: %w", string(resp), err)
-		}
-
-		if err := validator.New().Struct(user); err != nil {
-			return uuid, fmt.Errorf("response %q was missing a field: %w", string(resp), err)
-		}
-
-		uuid = *user.UUID
-		MY_UUID = uuid
-
-		return uuid, nil
-	} else {
-		return MY_UUID, nil
+func (b *Client) fetchMyUUID() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := b.makeRequestWithContext(ctx, http.MethodGet, b.BaseURL+"/2.0/user", nil)
+	if err != nil {
+		return "", err
 	}
+	var user User
+	if err := json.Unmarshal(resp, &user); err != nil {
+		return "", fmt.Errorf("parsing current user: %w", err)
+	}
+	if user.UUID == nil || *user.UUID == "" {
+		return "", fmt.Errorf("current user uuid is missing")
+	}
+	return *user.UUID, nil
+}
+
+func (b *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.ID == "" {
+		return false, nil
+	}
+	me, err := b.GetMyUUID()
+	if err != nil {
+		return false, err
+	}
+	// Username is an Atlassian account_id; compare the UUID supplied by
+	// both the webhook and the current-user API instead.
+	return strings.EqualFold(me, user.ID), nil
 }
 
 // PullIsApproved returns true if the merge request was approved.
@@ -379,11 +389,15 @@ func (b *Client) DiscardReviews(_ logging.SimpleLogging, _ models.Repo, _ models
 }
 
 func (b *Client) makeRequest(method string, path string, reqBody io.Reader) ([]byte, error) {
+	return b.makeRequestWithContext(context.Background(), method, path, reqBody)
+}
+
+func (b *Client) makeRequestWithContext(ctx context.Context, method string, path string, reqBody io.Reader) ([]byte, error) {
 	req, err := b.prepRequest(method, path, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("constructing request: %w", err)
 	}
-	resp, err := b.httpClient.Do(req)
+	resp, err := b.httpClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}

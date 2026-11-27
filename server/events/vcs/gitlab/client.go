@@ -31,7 +31,8 @@ import (
 const maxCommentLength = 1000000 - 100
 
 type Client struct {
-	Client *gitlab.Client
+	Client   *gitlab.Client
+	identity common.IdentityCache
 	// Version is set to the server version.
 	Version *version.Version
 	// All GitLab groups configured in allowlists and policies
@@ -218,6 +219,27 @@ func (g *Client) ReactToComment(logger logging.SimpleLogging, repo models.Repo, 
 		logger.Debug("POST /projects/%s/merge_requests/%d/notes/%d/award_emoji returned: %d", repo.FullName, pullNum, commentID, resp.StatusCode)
 	}
 	return err
+}
+
+func (g *Client) IsAtlantisUser(_ models.Repo, user models.User) (bool, error) {
+	if user.Username == "" {
+		return false, nil
+	}
+	username, err := g.identity.Get("", g.fetchCurrentUsername)
+	return strings.EqualFold(username, user.Username), err
+}
+
+func (g *Client) fetchCurrentUsername() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	currentUser, _, err := g.Client.Users.CurrentUser(gitlab.WithContext(ctx))
+	if err != nil {
+		return "", fmt.Errorf("getting current user: %w", err)
+	}
+	if currentUser == nil {
+		return "", nil
+	}
+	return currentUser.Username, nil
 }
 
 func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
