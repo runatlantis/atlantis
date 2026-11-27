@@ -531,7 +531,7 @@ func TestClient_HidePRCommentsRequiresUserRead(t *testing.T) {
 	defer server.Close()
 	client := bitbucketcloud.New(server.Client(), "user", "pass", "", "")
 	client.BaseURL = server.URL
-	err := client.HidePrevCommandComments(logging.NewNoopLogger(t), models.Repo{}, 1, "plan", "")
+	err := client.HidePrevCommandComments(logging.NewNoopLogger(t), models.Repo{}, 1, "plan", "", "")
 	Assert(t, err != nil, "comment hiding must still require user-read permission")
 	Assert(t, strings.Contains(err.Error(), "check required scope"), "expected scope error, got %v", err)
 }
@@ -664,7 +664,7 @@ func TestClient_HidePRComments(t *testing.T) {
 				Type:     models.BitbucketCloud,
 				Hostname: "bitbucket.org",
 			},
-		}, 5, "plan", "")
+		}, 5, "plan", "", "")
 	Ok(t, err)
 	Equals(t, 2, called)
 }

@@ -28,7 +28,7 @@ func (a *NotConfiguredVCSClient) GetModifiedFiles(_ logging.SimpleLogging, _ mod
 func (a *NotConfiguredVCSClient) CreateComment(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
 	return a.err()
 }
-func (a *NotConfiguredVCSClient) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string) error {
+func (a *NotConfiguredVCSClient) HidePrevCommandComments(_ logging.SimpleLogging, _ models.Repo, _ int, _ string, _ string, _ string) error {
 	return nil
 }
 func (a *NotConfiguredVCSClient) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error { // nolint: revive

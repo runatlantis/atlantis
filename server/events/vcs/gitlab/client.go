@@ -242,7 +242,7 @@ func (g *Client) fetchCurrentUsername() (string, error) {
 	return currentUser.Username, nil
 }
 
-func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
+func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, project string) error {
 	logger.Debug("Hiding previous command comments on GitLab merge request %d", pullNum)
 	var allComments []*gitlab.Note
 
@@ -295,6 +295,11 @@ func (g *Client) HidePrevCommandComments(logger logging.SimpleLogging, repo mode
 
 		// If dir was specified, skip processing comments that don't contain the dir in the first line
 		if dir != "" && !strings.Contains(firstLine, strings.ToLower(dir)) {
+			continue
+		}
+
+		// If project was specified, skip processing comments that don't contain the project in the first line
+		if project != "" && !strings.Contains(firstLine, strings.ToLower(fmt.Sprintf("project: `%s`", project))) {
 			continue
 		}
 

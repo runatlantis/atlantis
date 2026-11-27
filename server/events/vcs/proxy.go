@@ -60,8 +60,8 @@ func (d *ClientProxy) CreateComment(logger logging.SimpleLogging, repo models.Re
 	return d.clients[repo.VCSHost.Type].CreateComment(logger, repo, pullNum, comment, command)
 }
 
-func (d *ClientProxy) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string) error {
-	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(logger, repo, pullNum, command, dir)
+func (d *ClientProxy) HidePrevCommandComments(logger logging.SimpleLogging, repo models.Repo, pullNum int, command string, dir string, project string) error {
+	return d.clients[repo.VCSHost.Type].HidePrevCommandComments(logger, repo, pullNum, command, dir, project)
 }
 
 func (d *ClientProxy) ReactToComment(logger logging.SimpleLogging, repo models.Repo, pullNum int, commentID int64, reaction string) error {

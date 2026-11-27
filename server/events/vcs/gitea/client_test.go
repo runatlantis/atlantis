@@ -451,7 +451,7 @@ func TestClient_NilResponseErrorsDoNotPanic(t *testing.T) {
 		{
 			description: "HidePrevCommandComments",
 			run: func(client *gitea.Client) error {
-				return client.HidePrevCommandComments(logger, repo, pull.Num, "plan", "")
+				return client.HidePrevCommandComments(logger, repo, pull.Num, "plan", "", "")
 			},
 		},
 		{
