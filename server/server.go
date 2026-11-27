@@ -1114,6 +1114,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		LivePullHeadFetcher:             livePullHeadFetcher,
 		SilenceVCSStatusNoProjects:      userConfig.SilenceVCSStatusNoProjects,
 		ParallelPoolSize:                userConfig.ParallelPoolSize,
+		Drainer:                         drainer,
 	}
 
 	if userConfig.EnableDriftDetection {
