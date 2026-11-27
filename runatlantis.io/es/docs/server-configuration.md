@@ -176,6 +176,20 @@ Método de merge predeterminado a usar al hacer automerging de pull requests. Lo
 predeterminado del proveedor VCS. Esto puede sobrescribirse por comando con el flag de comentario `--auto-merge-method`.
 Actualmente solo está implementado para GitHub.
 
+### `--automerge-retry-count`
+
+```bash
+atlantis server --automerge-retry-count=3
+# or
+ATLANTIS_AUTOMERGE_RETRY_COUNT=3
+```
+
+Número de veces para reintentar la fusión de un pull request cuando `--automerge` está habilitado y
+la fusión falla. Los reintentos usan un backoff exponencial y ayudan a solucionar errores transitorios
+del VCS, como cuando la protección de rama de GitHub o los conjuntos de reglas del repositorio reportan
+brevemente las verificaciones de estado requeridas como pendientes inmediatamente después de que Atlantis aplica.
+El valor predeterminado es `0`, lo que intenta la fusión exactamente una vez.
+
 ### `--autoplan-file-list`
 
 ```bash
