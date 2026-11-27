@@ -60,6 +60,23 @@ To prevent this, you could:
 1. Modify your [server-side repo configuration](server-side-repo-config.md)'s `plan` step to validate against the
    use of disallowed providers or data sources or PRs from not allowed users. You could also add in extra validation at this point, e.g.
    requiring a "thumbs-up" on the PR before allowing the `plan` to continue. Conftest could be of use here.
+1. Control which providers Terraform can install with a
+   [`provider_installation`](https://developer.hashicorp.com/terraform/cli/config/config-file#provider-installation)
+   block in `~/.terraformrc` on the Atlantis host. Use `include` to allow only approved providers,
+   or `exclude` to block specific providers. `terraform init` fails for any provider that is not allowed:
+
+   ```hcl
+   provider_installation {
+     direct {
+       include = ["registry.terraform.io/hashicorp/aws"]
+       # or: exclude = ["registry.terraform.io/hashicorp/external"]
+     }
+   }
+   ```
+
+   If you use OpenTofu, put this block in `~/.tofurc` and use `registry.opentofu.org` in provider addresses.
+   Do not let repositories set environment variables for `plan`, for example with custom workflows.
+   Otherwise a pull request can set `TF_CLI_CONFIG_FILE` to its own file and skip this check.
 
 ### `--var-file-allowlist`
 
