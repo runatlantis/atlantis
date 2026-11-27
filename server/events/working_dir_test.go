@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -1207,6 +1208,225 @@ func TestMergeAgain_ConcurrentDiverged(t *testing.T) {
 	// the upstream merge was applied to disk.
 	assert.FileExists(t, filepath.Join(workspaceDir, "base-update.txt"))
 	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
+}
+
+// TestMergeAgain_BaseBranchRetargetedAfterParentMerged verifies that a stacked
+// pull request recovers when its base branch is replaced after the checkout was
+// created. This happens whenever the parent of a stacked PR merges: the forge
+// deletes the parent branch and retargets the child onto the repo's main branch.
+// The existing checkout was cloned with --single-branch against the parent
+// branch, so it has no refs/remotes/origin/<new base> to reset to, and the head
+// commit is unchanged so Clone reuses the directory. MergeAgain must re-clone
+// rather than fail with "unknown revision or path not in the working tree".
+func TestMergeAgain_BaseBranchRetargetedAfterParentMerged(t *testing.T) {
+	// Use the repo dir as both the "remote" and the Atlantis DataDir — same
+	// pattern as TestMergeAgain_ConcurrentDiverged.
+	repoDir := initRepo(t)
+
+	// Parent PR: branch off main.
+	runCmd(t, repoDir, "git", "checkout", "-b", "parent-pr")
+	runCmd(t, repoDir, "touch", "parent-file.txt")
+	runCmd(t, repoDir, "git", "add", "parent-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "parent change")
+
+	// Child PR: stacked on the parent branch, so its base branch is parent-pr.
+	runCmd(t, repoDir, "git", "checkout", "-b", "child-pr")
+	runCmd(t, repoDir, "touch", "child-file.txt")
+	runCmd(t, repoDir, "git", "add", "child-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "child change")
+	childHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Atlantis checks out the child PR merged into its base, parent-pr. This is
+	// what forceClone does for the merge checkout strategy, and it leaves
+	// refs/remotes/origin/parent-pr as the only remote-tracking branch.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	workspaceDir := filepath.Join(repoDir, "repos", "1", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "1", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "parent-pr", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/child-pr")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// Sanity check the precondition: the checkout knows the old base branch and
+	// not the new one.
+	runCmd(t, workspaceDir, "git", "show-ref", "--verify", "refs/remotes/origin/parent-pr")
+	_, err := exec.Command("git", "-C", workspaceDir, "show-ref", "--verify", "refs/remotes/origin/main").CombinedOutput() // nolint: gosec
+	Assert(t, err != nil, "precondition: refs/remotes/origin/main should not exist in the checkout")
+
+	// The parent PR merges into main and its branch is deleted, so the forge
+	// retargets the child PR onto main. The child's head commit is unchanged.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "git", "merge", "--no-ff", "-m", "merge parent-pr", "parent-pr")
+	runCmd(t, repoDir, "git", "branch", "-D", "parent-pr")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		Num:        1,
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "child-pr",
+		BaseBranch: "main",
+		HeadCommit: childHeadCommit,
+	}
+
+	// MergeAgain is exercised directly here, without a preceding Clone. Clone
+	// also repairs this now (see TestClone_RetargetedBaseBranchWithUnchangedHead),
+	// so going through it would leave nothing for MergeAgain to do and this guard
+	// would not be covered.
+	mergedAgain, err := wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
+	Ok(t, err)
+	Assert(t, mergedAgain == true, "expected the working tree to be refreshed after the base branch changed")
+
+	// The checkout must now be the child PR merged into the new base branch.
+	assert.FileExists(t, filepath.Join(workspaceDir, "child-file.txt"))
+	assert.FileExists(t, filepath.Join(workspaceDir, "parent-file.txt"))
+	runCmd(t, workspaceDir, "git", "show-ref", "--verify", "refs/remotes/origin/main")
+
+	// HEAD^2 is the PR head, which is how Atlantis verifies a merge checkout.
+	actCommit := strings.TrimSpace(runCmd(t, workspaceDir, "git", "rev-parse", "HEAD^2"))
+	Equals(t, childHeadCommit, actCommit)
+}
+
+// TestMergeAgain_RetargetedWhileOldBaseStillExists covers retargeting a pull
+// request onto a different branch while its original base branch still exists
+// and has not advanced, e.g. a user changed the target branch by hand. The
+// checkout was cloned with --single-branch against the old base, so it has no
+// ref for the new one, and the head commit is unchanged so Clone reuses the
+// directory. Comparing against the old base reports no divergence, so without
+// an explicit base-ref check the working tree would silently stay merged into
+// the wrong base and the plan would run against it.
+func TestMergeAgain_RetargetedWhileOldBaseStillExists(t *testing.T) {
+	repoDir := initRepo(t)
+
+	// The branch the pull request originally targeted.
+	runCmd(t, repoDir, "git", "checkout", "-b", "old-base")
+	runCmd(t, repoDir, "touch", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "add", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "old base change")
+
+	// The pull request itself, branched off the old base.
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "pr change")
+	prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	// Give main a commit of its own so it is distinguishable from the old base.
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-only.txt")
+	runCmd(t, repoDir, "git", "add", "main-only.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "main only change")
+
+	// Atlantis checks the pull request out merged into the old base.
+	workspaceDir := filepath.Join(repoDir, "repos", "1", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "1", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "old-base", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	// The old base is deliberately left in place and unchanged: this is what
+	// makes the divergence check report that there is nothing to do.
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+	pullRequest := models.PullRequest{
+		Num:        1,
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+		HeadCommit: prHeadCommit,
+	}
+
+	// As above, MergeAgain is exercised directly so that its own handling of the
+	// retarget is covered rather than Clone's.
+	mergedAgain, err := wd.MergeAgain(logger, models.Repo{CloneURL: repoDir}, pullRequest, "default")
+	Ok(t, err)
+	Assert(t, mergedAgain == true, "expected the working tree to be refreshed after the retarget")
+
+	// The checkout must be the pull request merged into the new base branch.
+	// old-base-file.txt is deliberately not asserted against: the pull request
+	// branched off the old base, so that commit is part of its own history and
+	// legitimately survives the merge.
+	assert.FileExists(t, filepath.Join(workspaceDir, "main-only.txt"), "new base branch content should be present")
+	assert.FileExists(t, filepath.Join(workspaceDir, "pr-file.txt"))
+
+	actCommit := strings.TrimSpace(runCmd(t, workspaceDir, "git", "rev-parse", "HEAD^2"))
+	Equals(t, prHeadCommit, actCommit)
+}
+
+// TestClone_RetargetedBaseBranchWithUnchangedHead covers the callers that use a
+// checkout without ever calling MergeAgain — pre-workflow hooks and project
+// discovery among them. Clone's reuse checks are driven by the head commit, so
+// a pull request retargeted onto a branch the checkout never fetched would be
+// reused as-is and those callers would run against the old base branch.
+func TestClone_RetargetedBaseBranchWithUnchangedHead(t *testing.T) {
+	repoDir := initRepo(t)
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "old-base")
+	runCmd(t, repoDir, "touch", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "add", "old-base-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "old base change")
+
+	runCmd(t, repoDir, "git", "checkout", "-b", "pr-branch")
+	runCmd(t, repoDir, "touch", "pr-file.txt")
+	runCmd(t, repoDir, "git", "add", "pr-file.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "pr change")
+	prHeadCommit := strings.TrimSpace(runCmd(t, repoDir, "git", "rev-parse", "HEAD"))
+
+	runCmd(t, repoDir, "git", "checkout", "main")
+	runCmd(t, repoDir, "touch", "main-only.txt")
+	runCmd(t, repoDir, "git", "add", "main-only.txt")
+	runCmd(t, repoDir, "git", "commit", "-m", "main only change")
+
+	workspaceDir := filepath.Join(repoDir, "repos", "1", "default")
+	runCmd(t, repoDir, "mkdir", "-p", filepath.Join("repos", "1", "default"))
+	runCmd(t, workspaceDir, "git", "clone", "--branch", "old-base", "--single-branch", repoDir, ".")
+	runCmd(t, workspaceDir, "git", "remote", "add", "source", repoDir)
+	runCmd(t, workspaceDir, "git", "fetch", "source", "+refs/heads/pr-branch")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.email", "atlantisbot@runatlantis.io")
+	runCmd(t, workspaceDir, "git", "config", "--local", "user.name", "atlantisbot")
+	runCmd(t, workspaceDir, "git", "config", "--local", "commit.gpgsign", "false")
+	runCmd(t, workspaceDir, "git", "merge", "-q", "--no-ff", "-m", "atlantis-merge", "FETCH_HEAD")
+
+	logger := logging.NewNoopLogger(t)
+	wd := &events.FileWorkspace{
+		DataDir:             repoDir,
+		CheckoutMerge:       true,
+		CheckoutDepth:       50,
+		GpgNoSigningEnabled: true,
+	}
+
+	// Clone only, with the head commit unchanged: no MergeAgain to fall back on.
+	cloneDir, err := wd.Clone(logger, models.Repo{CloneURL: repoDir}, models.PullRequest{
+		Num:        1,
+		BaseRepo:   models.Repo{CloneURL: repoDir},
+		HeadBranch: "pr-branch",
+		BaseBranch: "main",
+		HeadCommit: prHeadCommit,
+	}, "default")
+	Ok(t, err)
+
+	assert.FileExists(t, filepath.Join(cloneDir, "main-only.txt"), "new base branch content should be present")
+	assert.FileExists(t, filepath.Join(cloneDir, "pr-file.txt"))
+
+	actCommit := strings.TrimSpace(runCmd(t, cloneDir, "git", "rev-parse", "HEAD^2"))
+	Equals(t, prHeadCommit, actCommit)
 }
 
 func TestHasDiverged_MasterHasDiverged(t *testing.T) {
