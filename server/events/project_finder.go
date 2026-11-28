@@ -452,15 +452,27 @@ func (p *DefaultProjectFinder) unique(strs []string) []string {
 	return unique
 }
 
-// removeNonExistingDirs removes paths from relativePaths that don't exist.
-// relativePaths is a list of paths relative to absRepoDir.
+// removeNonExistingDirs drops paths that do not exist or contain no project indicator files.
+// When git reset removes tracked files, untracked artifacts like .terraform/ can leave
+// the directory on disk. Requiring an indicator file avoids planning these empty dirs.
+// The repo root (".") is exempt since env/ changes can target it without root indicator files.
 func (p *DefaultProjectFinder) removeNonExistingDirs(relativePaths []string, absRepoDir string) []string {
 	var filtered []string
+	var repoFS fs.FS
+	if absRepoDir != "" {
+		repoFS = os.DirFS(absRepoDir)
+	}
 	for _, pth := range relativePaths {
 		absPath := filepath.Join(absRepoDir, pth)
-		if _, err := os.Stat(absPath); !os.IsNotExist(err) {
-			filtered = append(filtered, pth)
+		if _, err := os.Stat(absPath); os.IsNotExist(err) {
+			continue
 		}
+		// Skip directories that only exist due to untracked leftovers.
+		cleanPth := filepath.Clean(pth)
+		if repoFS != nil && cleanPth != "." && !hasProjectIndicator(repoFS, cleanPth) {
+			continue
+		}
+		filtered = append(filtered, pth)
 	}
 	return filtered
 }
