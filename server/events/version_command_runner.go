@@ -53,7 +53,7 @@ func (v *VersionCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	var result command.Result
 	if v.isParallelEnabled(projectCmds) {
 		ctx.Log.Info("Running version in parallel")
-		result = runProjectCmdsParallelGroups(ctx, projectCmds, v.prjCmdRunner.Version, v.parallelPoolSize, nil)
+		result = runProjectCmdsParallelGroups(ctx, projectCmds, v.prjCmdRunner.Version, v.parallelPoolSize)
 	} else {
 		result = runProjectCmds(projectCmds, v.prjCmdRunner.Version)
 	}

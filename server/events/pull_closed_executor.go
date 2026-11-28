@@ -48,7 +48,6 @@ type PullClosedExecutor struct {
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
-	CancellationTracker      CancellationTracker
 	PlanStore                runtime.PlanStore
 }
 
@@ -125,11 +124,6 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Delete pull from DB.
 	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
-	}
-
-	// Clear any operations to avoid unbounded growth.
-	if p.CancellationTracker != nil {
-		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.

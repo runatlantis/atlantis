@@ -539,16 +539,36 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	before := func() bool { return c.runCommentPreHooks(ctx, cmdRunner, cmd, targetInitiallyIgnored) }
+	after := func() {
+		if !ctx.CommandSkipped {
+			c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+		}
+	}
+	switch runner := cmdRunner.(type) {
+	case *PlanCommandRunner:
+		runner.RunCommentPlanWithHooks(ctx, cmd, before, after)
+	case *ApplyCommandRunner:
+		runner.runWithHooks(ctx, cmd, before, after)
+	default:
+		if before() {
+			cmdRunner.Run(ctx, cmd)
+			after()
+		}
+	}
+}
+
+func (c *DefaultCommandRunner) runCommentPreHooks(ctx *command.Context, cmdRunner CommentCommandRunner, cmd *CommentCommand, targetInitiallyIgnored bool) bool {
 	preWorkflowHooksMayUpdateRepo := preWorkflowHooksConfigured(c.PreWorkflowHooksCommandRunner, ctx)
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
 		if !preWorkflowHooksMayUpdateRepo {
-			return
+			return false
 		}
 		ctx.PreferLocalRepoCfgForTargetedIgnore = true
 		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
-			return
+			return false
 		}
 	}
 	if preWorkflowHooksErr != nil {
@@ -573,18 +593,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 				}
 			}
 
-			return
+			return false
 		}
 
 		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
-
-	cmdRunner.Run(ctx, cmd)
-	if ctx.CommandSkipped {
-		return
-	}
-
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	return true
 }
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

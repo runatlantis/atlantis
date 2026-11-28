@@ -116,7 +116,7 @@ type PlanCommandRunner struct {
 	Drainer *Drainer
 }
 
-func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
+func (p *PlanCommandRunner) runAutoplan(ctx *command.Context, isCancelled func() bool) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
 	var err error
@@ -178,7 +178,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellation(ctx, projectCmds, isCancelled, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -215,15 +215,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 }
 
-func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
+func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand, isCancelled func() bool) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, cmd)
-	if !ok {
-		return
-	}
-	defer unlockPullPlan()
 
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -325,7 +320,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellation(ctx, projectCmds, isCancelled, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -375,7 +370,26 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.Trigger == command.AutoTrigger {
 		p.RunAutoplanWithHooks(ctx, nil, nil)
 	} else {
-		p.run(ctx, cmd)
+		p.RunCommentPlanWithHooks(ctx, cmd, nil, nil)
+	}
+}
+
+// RunCommentPlanWithHooks holds the pull lock while the plan and both hooks use the workspace.
+func (p *PlanCommandRunner) RunCommentPlanWithHooks(ctx *command.Context, cmd *CommentCommand, before func() bool, after func()) {
+	unlock, ok := p.lockPullForPlan(ctx, cmd)
+	if !ok {
+		return
+	}
+	defer unlock()
+	isCancelled, finish := trackProjectCmds(p.cancellationTracker, ctx.Pull)
+	defer finish()
+
+	if before != nil && !before() {
+		return
+	}
+	p.run(ctx, cmd, isCancelled)
+	if after != nil {
+		after()
 	}
 }
 
@@ -389,10 +403,12 @@ func (p *PlanCommandRunner) RunAutoplanWithHooks(ctx *command.Context, before fu
 		return
 	}
 	defer unlock()
+	isCancelled, finish := trackProjectCmds(p.cancellationTracker, ctx.Pull)
+	defer finish()
 	if before != nil && !before() {
 		return
 	}
-	p.runAutoplan(ctx)
+	p.runAutoplan(ctx, isCancelled)
 	if after != nil {
 		after()
 	}
@@ -444,10 +460,10 @@ func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCo
 	})
 	switch {
 	case errors.Is(err, ErrPullLockSuperseded):
-		ctx.Log.Info("skipping autoplan for commit %s: a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
+		ctx.Log.Info("skipping autoplan for commit %s because a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
 		return nil, false
 	case errors.Is(err, ErrPullLockCancelled):
-		ctx.Log.Info("skipping autoplan for commit %s: the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
+		ctx.Log.Info("skipping autoplan for commit %s because the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
 		return nil, false
 	case err != nil:
 		p.handleNoProjectPlanStateError(ctx, cmd, err)

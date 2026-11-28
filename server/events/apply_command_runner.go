@@ -84,6 +84,22 @@ type ApplyCommandRunner struct {
 }
 
 func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
+	a.runWithHooks(ctx, cmd, nil, nil)
+}
+
+func (a *ApplyCommandRunner) runWithHooks(ctx *command.Context, cmd *CommentCommand, before func() bool, after func()) {
+	isCancelled, finish := trackProjectCmds(a.cancellationTracker, ctx.Pull)
+	defer finish()
+	if before != nil && !before() {
+		return
+	}
+	a.run(ctx, cmd, isCancelled)
+	if after != nil {
+		after()
+	}
+}
+
+func (a *ApplyCommandRunner) run(ctx *command.Context, cmd *CommentCommand, isCancelled func() bool) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
@@ -234,7 +250,7 @@ func (a *ApplyCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	}
 
 	preApplyPullStatus := ctx.PullStatus
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, a.cancellationTracker, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
+	result := runProjectCmdsWithCancellation(ctx, projectCmds, isCancelled, a.parallelPoolSize, a.isParallelEnabled(projectCmds), a.prjCmdRunner.Apply)
 	finalLivePull, err := a.refreshLivePullIdentity(ctx)
 	if err != nil {
 		ctx.Log.Err("fetching live pull request after apply: %s", err)
