@@ -536,7 +536,7 @@ func TestRunProjectCmdsWithCancellation_OverlappingApplies(t *testing.T) {
 	})
 
 	require.Len(t, result.ProjectResults, 2)
-	assert.NoError(t, result.ProjectResults[0].Error)
+	require.NoError(t, result.ProjectResults[0].Error)
 	require.ErrorContains(t, result.ProjectResults[1].Error, "cancelled")
 }
 
