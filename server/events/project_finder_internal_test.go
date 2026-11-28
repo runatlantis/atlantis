@@ -107,3 +107,25 @@ func TestGetProjectDirFromFs_ModuleParentTerragrunt(t *testing.T) {
 	result := getProjectDirFromFs(fs.FS(files), "project/modules/foo/main.tf")
 	Equals(t, "project", result)
 }
+
+// https://github.com/runatlantis/atlantis/issues/7091
+// A parent directory whose name merely ends in "modules" (e.g. "tf-modules")
+// must not be mistaken for the modules/ path element: the project root is
+// tf-modules/network, not "tf-".
+func TestGetProjectDirFromFs_ModuleParentEndingInModules(t *testing.T) {
+	files := fstest.MapFS{
+		"tf-modules/network/main.tf":             &fstest.MapFile{},
+		"tf-modules/network/modules/vpc/main.tf": &fstest.MapFile{},
+	}
+	result := getProjectDirFromFs(fs.FS(files), "tf-modules/network/modules/vpc/main.tf")
+	Equals(t, "tf-modules/network", result)
+}
+
+func TestGetProjectDirFromFs_ModuleParentEndingInModulesUnderscore(t *testing.T) {
+	files := fstest.MapFS{
+		"terraform_modules/network/main.tf":             &fstest.MapFile{},
+		"terraform_modules/network/modules/vpc/main.tf": &fstest.MapFile{},
+	}
+	result := getProjectDirFromFs(fs.FS(files), "terraform_modules/network/modules/vpc/main.tf")
+	Equals(t, "terraform_modules/network", result)
+}
