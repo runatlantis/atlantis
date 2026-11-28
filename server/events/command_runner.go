@@ -214,37 +214,51 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 
 	cmdRunner := buildCommentCommandRunner(c, command.Plan)
-	if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
-		return
-	}
+	before := func() bool {
+		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
+			return false
+		}
+		preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 
-	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
+		if preWorkflowHooksErr != nil {
+			if c.FailOnPreWorkflowHookError {
+				ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
 
-	if preWorkflowHooksErr != nil {
-		if c.FailOnPreWorkflowHookError {
-			ctx.Log.Err("'fail-on-pre-workflow-hook-error' set, so not running %s command.", command.Plan)
+				// Create comment on pull request about the pre-workflow hook failure
+				errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
+				if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
+					ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+				}
 
-			// Create comment on pull request about the pre-workflow hook failure
-			errMsg := fmt.Sprintf("```\nError: Pre-workflow hook failed: %s\n```", preWorkflowHooksErr.Error())
-			if err := c.VCSClient.CreateComment(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull.Num, errMsg, ""); err != nil {
-				ctx.Log.Warn("Unable to create comment about pre-workflow hook failure: %s", err)
+				if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
+					ctx.Log.Warn("Unable to update plan commit status: %s", err)
+				}
+
+				return false
 			}
 
-			if err := c.CommitStatusUpdater.UpdateCombined(ctx.Log, ctx.Pull.BaseRepo, ctx.Pull, models.FailedCommitStatus, command.Plan); err != nil {
-				ctx.Log.Warn("Unable to update plan commit status: %s", err)
-			}
-
-			return
+			ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
 		}
 
-		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", command.Plan)
+		return true
 	}
+	after := func() {
+		c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	}
+	if runner, ok := cmdRunner.(autoplanHookRunner); ok {
+		runner.RunAutoplanWithHooks(ctx, before, after)
+		return
+	}
+	if before() {
+		cmdRunner.Run(ctx, nil)
+		after()
+	}
+}
 
-	autoPlanRunner := buildCommentCommandRunner(c, command.Plan)
-
-	autoPlanRunner.Run(ctx, nil)
-
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+// autoplanHookRunner locks the pull before hooks, so a waiter does not touch
+// a working directory another plan still owns.
+type autoplanHookRunner interface {
+	RunAutoplanWithHooks(ctx *command.Context, before func() bool, after func())
 }
 
 // commentUserDoesNotHavePermissions comments on the pull request that the user
@@ -523,16 +537,36 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 		return
 	}
 
+	before := func() bool { return c.runCommentPreHooks(ctx, cmdRunner, cmd, targetInitiallyIgnored) }
+	after := func() {
+		if !ctx.CommandSkipped {
+			c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+		}
+	}
+	switch runner := cmdRunner.(type) {
+	case *PlanCommandRunner:
+		runner.runCommentPlanWithHooks(ctx, cmd, before, after)
+	case *ApplyCommandRunner:
+		runner.runWithHooks(ctx, cmd, before, after)
+	default:
+		if before() {
+			cmdRunner.Run(ctx, cmd)
+			after()
+		}
+	}
+}
+
+func (c *DefaultCommandRunner) runCommentPreHooks(ctx *command.Context, cmdRunner CommentCommandRunner, cmd *CommentCommand, targetInitiallyIgnored bool) bool {
 	preWorkflowHooksMayUpdateRepo := preWorkflowHooksConfigured(c.PreWorkflowHooksCommandRunner, ctx)
 	preWorkflowHooksErr := c.PreWorkflowHooksCommandRunner.RunPreHooks(ctx, cmd)
 	if targetInitiallyIgnored {
 		ctx.CommandSkipped = false
 		if !preWorkflowHooksMayUpdateRepo {
-			return
+			return false
 		}
 		ctx.PreferLocalRepoCfgForTargetedIgnore = true
 		if shouldSkipPreWorkflowHooks(ctx, cmdRunner, cmd) {
-			return
+			return false
 		}
 	}
 	if preWorkflowHooksErr != nil {
@@ -557,18 +591,12 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 				}
 			}
 
-			return
+			return false
 		}
 
 		ctx.Log.Err("'fail-on-pre-workflow-hook-error' not set so running %s command.", cmd.Name.String())
 	}
-
-	cmdRunner.Run(ctx, cmd)
-	if ctx.CommandSkipped {
-		return
-	}
-
-	c.PostWorkflowHooksCommandRunner.RunPostHooks(ctx, cmd) // nolint: errcheck
+	return true
 }
 
 func (c *DefaultCommandRunner) getGithubData(logger logging.SimpleLogging, baseRepo models.Repo, pullNum int) (models.PullRequest, models.Repo, error) {

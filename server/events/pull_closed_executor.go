@@ -41,13 +41,13 @@ type PullCleaner interface {
 // PullClosedExecutor executes the tasks required to clean up a closed pull
 // request.
 type PullClosedExecutor struct {
+	WorkingDirLocker         WorkingDirLocker
 	Locker                   locking.Locker
 	VCSClient                vcs.Client
 	WorkingDir               WorkingDir
 	Database                 db.Database
 	PullClosedTemplate       PullCleanupTemplate
 	LogStreamResourceCleaner ResourceCleaner
-	CancellationTracker      CancellationTracker
 	PlanStore                runtime.PlanStore
 }
 
@@ -73,6 +73,9 @@ func (t *PullClosedEventTemplate) Execute(wr io.Writer, data any) error {
 
 // CleanUpPull cleans up after a closed pull request.
 func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo models.Repo, pull models.PullRequest) error {
+	if p.WorkingDirLocker != nil {
+		p.WorkingDirLocker.CancelAutoplanWaiter(repo.FullName, pull.Num)
+	}
 	pullStatus, err := p.Database.GetPullStatus(pull)
 	if err != nil {
 		// Log and continue to clean up other resources.
@@ -121,11 +124,6 @@ func (p *PullClosedExecutor) CleanUpPull(logger logging.SimpleLogging, repo mode
 	// Delete pull from DB.
 	if err := p.Database.DeletePullStatus(pull); err != nil {
 		logger.Err("deleting pull from db: %s", err)
-	}
-
-	// Clear any operations to avoid unbounded growth.
-	if p.CancellationTracker != nil {
-		p.CancellationTracker.Clear(pull)
 	}
 
 	// If there are no locks then there's no need to comment.

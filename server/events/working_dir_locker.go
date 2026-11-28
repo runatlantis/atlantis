@@ -5,6 +5,7 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -37,14 +38,62 @@ func (e *workingDirLockError) Error() string {
 }
 
 type workingDirLock struct {
-	Command command.Name
+	owner *pullLockWaiter
+	// shared counts the holders of a pull-level lock taken with
+	// TryLockPullShared. It is zero for exclusive locks.
+	shared int
+	// autoplan marks a pull-level lock taken by LockPullAfterStalePlan.
+	autoplan bool
+	Command  command.Name
 	WorkingDirLockMetadata
+}
+
+var (
+	// ErrPullLockSuperseded is returned by LockPullAfterStalePlan when the
+	// caller stopped waiting because it is no longer the newest commit
+	// waiting for this pull request, or because a plan for its commit is
+	// already running.
+	ErrPullLockSuperseded = errors.New("pull lock wait superseded")
+	// ErrPullLockCancelled is returned by LockPullAfterStalePlan when the
+	// caller stopped waiting because the pull request's locks were released
+	// with UnlockByPull (pull request closed or command cancelled).
+	ErrPullLockCancelled = errors.New("pull lock wait cancelled")
+)
+
+// pullLockWaiter is the single queued pull-level lock request for a pull
+// request until it is authorized to start. reason is set when it is cancelled or superseded.
+type pullLockWaiter struct {
+	reason error
+}
+
+type PullLock struct {
+	Start          func() bool
+	Unlock         func()
+	UpdateMetadata func(WorkingDirLockMetadata) bool
 }
 
 type WorkingDirLocker interface {
 	// TryLockPull tries to acquire a pull-level lock for a command. It is used to
 	// coordinate commands that can make pull-wide plan state inconsistent.
 	TryLockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
+	// TryLockPullShared acquires the pull-level lock like TryLockPull, but
+	// several holders with the same command name and head commit can hold it
+	// at once. It is used by targeted applies, which only touch the projects
+	// they name; TryLock still serializes them per project. It conflicts with
+	// any exclusive pull-level lock and with running plans.
+	TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error)
+	// LockPullAfterStalePlan acquires the pull-level lock like TryLockPull,
+	// except when the pull request is held by a plan for a different head
+	// commit. In that case it calls onWait with the holder's metadata and
+	// blocks until that plan releases its locks, then takes the lock for
+	// metadata.HeadCommit.
+	//
+	// Only the newest waiter per pull request is kept. An older waiter
+	// returns ErrPullLockSuperseded, and UnlockByPull makes waiters return
+	// ErrPullLockCancelled. Any other conflict returns the same error as
+	// TryLockPull without waiting.
+	LockPullAfterStalePlan(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata, onWait func(holder WorkingDirLockMetadata)) (PullLock, error)
+	CancelAutoplanWaiter(repoFullName string, pullNum int)
 	// TryLock tries to acquire a lock for this repo, pull, workspace, and path.
 	// It returns a function that should be used to unlock the workspace and
 	// an error if the workspace is already locked. The error is expected to
@@ -63,11 +112,22 @@ type DefaultWorkingDirLocker struct {
 	mutex sync.Mutex
 	// locks is a map of workspaces and their owning command metadata.
 	locks map[string]workingDirLock
+	// waiters holds the queued or refreshing LockPullAfterStalePlan request per pull
+	// request, keyed by pullLockPrefix.
+	waiters map[string]*pullLockWaiter
+	// released is signalled whenever locks or waiters change so that
+	// LockPullAfterStalePlan callers can re-check. It uses mutex.
+	released *sync.Cond
 }
 
 // NewDefaultWorkingDirLocker is a constructor.
 func NewDefaultWorkingDirLocker() *DefaultWorkingDirLocker {
-	return &DefaultWorkingDirLocker{locks: make(map[string]workingDirLock)}
+	d := &DefaultWorkingDirLocker{
+		locks:   make(map[string]workingDirLock),
+		waiters: make(map[string]*pullLockWaiter),
+	}
+	d.released = sync.NewCond(&d.mutex)
+	return d
 }
 
 func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, workspace string, path string, projectName string, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
@@ -82,9 +142,10 @@ func (d *DefaultWorkingDirLocker) TryLock(repoFullName string, pullNum int, work
 			metadata: currentLock.WorkingDirLockMetadata,
 		}
 	}
-	d.locks[workspaceKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
+	owner := &pullLockWaiter{}
+	d.locks[workspaceKey] = workingDirLock{owner: owner, Command: cmdName, WorkingDirLockMetadata: metadata}
 	return func() {
-		d.unlock(repoFullName, pullNum, workspace, path, projectName)
+		d.unlock(workspaceKey, d.pullLockPrefix(repoFullName, pullNum), owner)
 	}, nil
 }
 
@@ -92,21 +153,172 @@ func (d *DefaultWorkingDirLocker) TryLockPull(repoFullName string, pullNum int, 
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
-	pullKey := d.pullKey(repoFullName, pullNum)
-	if currentLock, exists := d.locks[pullKey]; exists {
+	if currentLock, blocked := d.blockingPullLock(repoFullName, pullNum, metadata); blocked {
 		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+	}
+	return d.lockPull(repoFullName, pullNum, cmdName, metadata, &pullLockWaiter{}, false).Unlock, nil
+}
+
+func (d *DefaultWorkingDirLocker) TryLockPullShared(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata) (func(), error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	key := d.pullKey(repoFullName, pullNum)
+	if current, exists := d.locks[key]; exists && current.shared > 0 && current.Command == cmdName && current.HeadCommit == metadata.HeadCommit {
+		current.shared++
+		d.locks[key] = current
+		return d.unlockShared(key, current.owner), nil
+	}
+	if currentLock, blocked := d.blockingPullLock(repoFullName, pullNum, metadata); blocked {
+		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+	}
+	owner := &pullLockWaiter{}
+	d.locks[key] = workingDirLock{owner: owner, shared: 1, Command: cmdName, WorkingDirLockMetadata: metadata}
+	return d.unlockShared(key, owner), nil
+}
+
+// unlockShared returns a function that releases one hold on a shared
+// pull-level lock. Calling it more than once has no further effect.
+func (d *DefaultWorkingDirLocker) unlockShared(key string, owner *pullLockWaiter) func() {
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			d.mutex.Lock()
+			defer d.mutex.Unlock()
+			lock, ok := d.locks[key]
+			if !ok || lock.owner != owner {
+				return
+			}
+			lock.shared--
+			if lock.shared > 0 {
+				d.locks[key] = lock
+				return
+			}
+			delete(d.locks, key)
+			d.broadcast()
+		})
+	}
+}
+
+func (d *DefaultWorkingDirLocker) LockPullAfterStalePlan(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata, onWait func(holder WorkingDirLockMetadata)) (PullLock, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	var waiter *pullLockWaiter
+	acquired := false
+	defer func() {
+		if !acquired && waiter != nil && d.waiters[prefix] == waiter {
+			delete(d.waiters, prefix)
+		}
+	}()
+
+	for {
+		if waiter != nil && d.waiters[prefix] != waiter {
+			return PullLock{}, waiter.reason
+		}
+		currentLock, blocked := d.blockingPullLock(repoFullName, pullNum, metadata)
+		if !blocked {
+			if previous := d.waiters[prefix]; previous != nil && previous != waiter {
+				previous.reason = ErrPullLockSuperseded
+				delete(d.waiters, prefix)
+				d.broadcast()
+			}
+			if waiter == nil {
+				waiter = &pullLockWaiter{}
+				d.waiters[prefix] = waiter
+			}
+			acquired = true
+			return d.lockPull(repoFullName, pullNum, cmdName, metadata, waiter, true), nil
+		}
+		if !isStalePlanLock(currentLock, metadata) {
+			if currentLock.Command == command.Plan && currentLock.HeadCommit == metadata.HeadCommit && (waiter != nil || currentLock.autoplan) {
+				// A plan for our commit is already running: either another
+				// plan got the lock while we waited, or an autoplan already
+				// adopted this commit as the live head (a late or redelivered
+				// webhook). Nothing is left for this autoplan to do.
+				return PullLock{}, ErrPullLockSuperseded
+			}
+			return PullLock{}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+		}
+		if waiter == nil {
+			if previous := d.waiters[prefix]; previous != nil {
+				previous.reason = ErrPullLockSuperseded
+			}
+			waiter = &pullLockWaiter{}
+			d.waiters[prefix] = waiter
+			d.released.Broadcast()
+			if onWait != nil {
+				onWait(currentLock.WorkingDirLockMetadata)
+			}
+		}
+		d.released.Wait()
+	}
+}
+
+func (d *DefaultWorkingDirLocker) CancelAutoplanWaiter(repoFullName string, pullNum int) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	if waiter := d.waiters[prefix]; waiter != nil {
+		waiter.reason = ErrPullLockCancelled
+		delete(d.waiters, prefix)
+		d.broadcast()
+	}
+}
+
+// isStalePlanLock reports whether lock belongs to a plan for a different
+// commit than the one described by metadata.
+func isStalePlanLock(lock workingDirLock, metadata WorkingDirLockMetadata) bool {
+	return lock.Command == command.Plan &&
+		lock.HeadCommit != "" &&
+		metadata.HeadCommit != "" &&
+		lock.HeadCommit != metadata.HeadCommit
+}
+
+// blockingPullLock returns the lock that prevents taking the pull-level lock
+// for metadata, if any. d.mutex must be held.
+func (d *DefaultWorkingDirLocker) blockingPullLock(repoFullName string, pullNum int, metadata WorkingDirLockMetadata) (workingDirLock, bool) {
+	if currentLock, exists := d.locks[d.pullKey(repoFullName, pullNum)]; exists {
+		return currentLock, true
 	}
 	currentLock, exists := d.findCommandLock(repoFullName, pullNum, command.Plan, metadata.HeadCommit)
 	if !exists && metadata.HeadCommit != "" {
 		currentLock, exists = d.findCommandLock(repoFullName, pullNum, command.Plan, "")
 	}
-	if exists {
-		return func() {}, d.pullLockError(repoFullName, pullNum, cmdName, currentLock)
+	return currentLock, exists
+}
+
+// lockPull records the pull-level lock. d.mutex must be held.
+func (d *DefaultWorkingDirLocker) lockPull(repoFullName string, pullNum int, cmdName command.Name, metadata WorkingDirLockMetadata, owner *pullLockWaiter, autoplan bool) PullLock {
+	key := d.pullKey(repoFullName, pullNum)
+	prefix := d.pullLockPrefix(repoFullName, pullNum)
+	d.locks[key] = workingDirLock{owner: owner, autoplan: autoplan, Command: cmdName, WorkingDirLockMetadata: metadata}
+	return PullLock{
+		Start: func() bool {
+			d.mutex.Lock()
+			defer d.mutex.Unlock()
+			lock, ok := d.locks[key]
+			if !ok || lock.owner != owner || owner.reason != nil || d.waiters[prefix] != owner {
+				return false
+			}
+			delete(d.waiters, prefix)
+			return true
+		},
+		Unlock: func() { d.unlock(key, prefix, owner) },
+		UpdateMetadata: func(metadata WorkingDirLockMetadata) bool {
+			d.mutex.Lock()
+			defer d.mutex.Unlock()
+			lock, ok := d.locks[key]
+			if !ok || lock.owner != owner || owner.reason != nil {
+				return false
+			}
+			lock.WorkingDirLockMetadata = metadata
+			d.locks[key] = lock
+			d.broadcast()
+			return true
+		},
 	}
-	d.locks[pullKey] = workingDirLock{Command: cmdName, WorkingDirLockMetadata: metadata}
-	return func() {
-		d.unlockPull(repoFullName, pullNum)
-	}, nil
 }
 
 func (d *DefaultWorkingDirLocker) HasCommandLock(repoFullName string, pullNum int, cmdName command.Name) bool {
@@ -194,22 +406,30 @@ func (d *DefaultWorkingDirLocker) UnlockByPull(repoFullName string, pullNum int)
 			delete(d.locks, key)
 		}
 	}
+	if waiter := d.waiters[prefix]; waiter != nil {
+		waiter.reason = ErrPullLockCancelled
+		delete(d.waiters, prefix)
+	}
+	d.broadcast()
 }
 
-// Unlock unlocks the workspace for this pull.
-func (d *DefaultWorkingDirLocker) unlock(repoFullName string, pullNum int, workspace string, path string, projectName string) {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-
-	workspaceKey := d.workspaceKey(repoFullName, pullNum, workspace, path, projectName)
-	delete(d.locks, workspaceKey)
+// broadcast wakes LockPullAfterStalePlan callers. d.mutex must be held.
+func (d *DefaultWorkingDirLocker) broadcast() {
+	if d.released != nil {
+		d.released.Broadcast()
+	}
 }
 
-func (d *DefaultWorkingDirLocker) unlockPull(repoFullName string, pullNum int) {
+func (d *DefaultWorkingDirLocker) unlock(key, prefix string, owner *pullLockWaiter) {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-
-	delete(d.locks, d.pullKey(repoFullName, pullNum))
+	if d.waiters[prefix] == owner {
+		delete(d.waiters, prefix)
+	}
+	if lock, ok := d.locks[key]; ok && lock.owner == owner {
+		delete(d.locks, key)
+		d.broadcast()
+	}
 }
 
 func (d *DefaultWorkingDirLocker) workspaceKey(repo string, pull int, workspace string, path string, projectName string) string {

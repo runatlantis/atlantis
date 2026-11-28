@@ -740,6 +740,7 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		statsScope,
 		logger,
 		&events.PullClosedExecutor{
+			WorkingDirLocker:         workingDirLocker,
 			Locker:                   lockingClient,
 			WorkingDir:               workingDir,
 			Database:                 database,
@@ -922,6 +923,8 @@ func NewServer(userConfig UserConfig, config Config) (*Server, error) {
 		pullReqStatusFetcher,
 		userConfig.PendingApplyStatus,
 	)
+	planCommandRunner.LivePullHeadFetcher = livePullHeadFetcher
+	planCommandRunner.Drainer = drainer
 
 	applyCommandRunner := events.NewApplyCommandRunner(
 		vcsClient,

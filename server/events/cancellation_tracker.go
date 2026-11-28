@@ -7,49 +7,60 @@ package events
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/runatlantis/atlantis/server/events/models"
 )
 
 type CancellationTracker interface {
+	Start(pull models.PullRequest) (isCancelled func() bool, finish func())
 	Cancel(pull models.PullRequest)
-	IsCancelled(pull models.PullRequest) bool
-	Clear(pull models.PullRequest)
 }
 
 type DefaultCancellationTracker struct {
-	mutex          sync.RWMutex
-	cancelledPulls map[string]struct{}
+	mutex sync.Mutex
+	runs  map[string]map[*atomic.Bool]struct{}
 }
 
 func NewCancellationTracker() *DefaultCancellationTracker {
-	return &DefaultCancellationTracker{
-		cancelledPulls: make(map[string]struct{}),
+	return &DefaultCancellationTracker{runs: make(map[string]map[*atomic.Bool]struct{})}
+}
+
+// Start tracks a command until it finishes. A previous cancel does not affect a new command.
+func (p *DefaultCancellationTracker) Start(pull models.PullRequest) (func() bool, func()) {
+	key := pullKey(pull)
+	cancelled := new(atomic.Bool)
+	p.mutex.Lock()
+	if p.runs[key] == nil {
+		p.runs[key] = make(map[*atomic.Bool]struct{})
+	}
+	p.runs[key][cancelled] = struct{}{}
+	p.mutex.Unlock()
+
+	return cancelled.Load, func() {
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
+		delete(p.runs[key], cancelled)
+		if len(p.runs[key]) == 0 {
+			delete(p.runs, key)
+		}
 	}
 }
 
-// Cancel marks an entire pull request as cancelled, preventing any future operations
+// Cancel prevents commands already running on this pull from starting more groups.
 func (p *DefaultCancellationTracker) Cancel(pull models.PullRequest) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-
-	pullKeyStr := pullKey(pull)
-	p.cancelledPulls[pullKeyStr] = struct{}{}
+	for run := range p.runs[pullKey(pull)] {
+		run.Store(true)
+	}
 }
 
-// IsCancelled checks if the entire pull request has been cancelled
-func (p *DefaultCancellationTracker) IsCancelled(pull models.PullRequest) bool {
-	p.mutex.RLock()
-	defer p.mutex.RUnlock()
-	_, exists := p.cancelledPulls[pullKey(pull)]
-	return exists
-}
-
-// Clear removes cancellation for a pull request (called when a PR is closed)
-func (p *DefaultCancellationTracker) Clear(pull models.PullRequest) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	delete(p.cancelledPulls, pullKey(pull))
+func trackProjectCmds(tracker CancellationTracker, pull models.PullRequest) (func() bool, func()) {
+	if tracker == nil {
+		return nil, func() {}
+	}
+	return tracker.Start(pull)
 }
 
 func pullKey(pull models.PullRequest) string {

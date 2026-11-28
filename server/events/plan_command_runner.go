@@ -107,17 +107,15 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
+	// LivePullHeadFetcher returns the pull request's current head. A waiter plans that commit.
+	LivePullHeadFetcher LivePullHeadFetcher
+	// Drainer, when set, stops a waiter from starting during shutdown.
+	Drainer *Drainer
 }
 
-func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
+func (p *PlanCommandRunner) runAutoplan(ctx *command.Context, isCancelled func() bool) {
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
-	if !ok {
-		return
-	}
-	defer unlockPullPlan()
-
 	var err error
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -177,7 +175,7 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 		return
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellation(ctx, projectCmds, isCancelled, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
 		ctx.Log.Info("deleting plans because there were errors and automerge requires all plans succeed")
@@ -214,15 +212,10 @@ func (p *PlanCommandRunner) runAutoplan(ctx *command.Context) {
 	}
 }
 
-func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
+func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand, isCancelled func() bool) {
 	var err error
 	baseRepo := ctx.Pull.BaseRepo
 	pull := ctx.Pull
-	unlockPullPlan, ok := p.lockPullForPlan(ctx, cmd)
-	if !ok {
-		return
-	}
-	defer unlockPullPlan()
 
 	ctx.PullRequestStatus, err = p.pullReqStatusFetcher.FetchPullStatus(ctx.Log, pull)
 	if err != nil {
@@ -324,7 +317,7 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 		}
 	}
 
-	result := runProjectCmdsWithCancellationTracker(ctx, projectCmds, p.cancellationTracker, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
+	result := runProjectCmdsWithCancellation(ctx, projectCmds, isCancelled, p.parallelPoolSize, p.isParallelEnabled(projectCmds), p.prjCmdRunner.Plan)
 	ctx.CommandHasErrors = result.HasErrors()
 
 	if p.autoMerger.automergeEnabled(projectCmds) && result.HasErrors() {
@@ -372,9 +365,47 @@ func (p *PlanCommandRunner) run(ctx *command.Context, cmd *CommentCommand) {
 
 func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.Trigger == command.AutoTrigger {
-		p.runAutoplan(ctx)
+		p.RunAutoplanWithHooks(ctx, nil, nil)
 	} else {
-		p.run(ctx, cmd)
+		p.runCommentPlanWithHooks(ctx, cmd, nil, nil)
+	}
+}
+
+// runCommentPlanWithHooks holds the pull lock while the plan and both hooks use the workspace.
+func (p *PlanCommandRunner) runCommentPlanWithHooks(ctx *command.Context, cmd *CommentCommand, before func() bool, after func()) {
+	unlock, ok := p.lockPullForPlan(ctx, cmd)
+	if !ok {
+		return
+	}
+	defer unlock()
+	isCancelled, finish := trackProjectCmds(p.cancellationTracker, ctx.Pull)
+	defer finish()
+
+	if before != nil && !before() {
+		return
+	}
+	p.run(ctx, cmd, isCancelled)
+	if after != nil {
+		after()
+	}
+}
+
+// RunAutoplanWithHooks holds the pull lock across both hooks and the autoplan.
+// A superseded or cancelled waiter runs neither hook.
+func (p *PlanCommandRunner) RunAutoplanWithHooks(ctx *command.Context, before func() bool, after func()) {
+	unlock, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
+	if !ok {
+		return
+	}
+	defer unlock()
+	isCancelled, finish := trackProjectCmds(p.cancellationTracker, ctx.Pull)
+	defer finish()
+	if before != nil && !before() {
+		return
+	}
+	p.runAutoplan(ctx, isCancelled)
+	if after != nil {
+		after()
 	}
 }
 
@@ -393,12 +424,110 @@ func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullComman
 	if p.workingDirLocker == nil {
 		return func() {}, true
 	}
-	unlockFn, err := p.workingDirLocker.TryLockPull(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, command.Plan, WorkingDirLockMetadataForPull(ctx.Pull))
-	if err != nil {
+	repoFullName, pullNum, metadata := ctx.Pull.BaseRepo.FullName, ctx.Pull.Num, WorkingDirLockMetadataForPull(ctx.Pull)
+	if ctx.Trigger != command.AutoTrigger {
+		unlockFn, err := p.workingDirLocker.TryLockPull(repoFullName, pullNum, command.Plan, metadata)
+		if err != nil {
+			p.handleNoProjectPlanStateError(ctx, cmd, err)
+			return nil, false
+		}
+		return unlockFn, true
+	}
+
+	return p.lockPullForAutoplan(ctx, cmd)
+}
+
+// lockPullForAutoplan waits out a plan for an older commit instead of failing
+// the new head. After the wait it plans the live head, because webhooks can
+// arrive out of order.
+func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCommand) (func(), bool) {
+	repoFullName, pullNum := ctx.Pull.BaseRepo.FullName, ctx.Pull.Num
+	metadata := WorkingDirLockMetadataForPull(ctx.Pull)
+	waited := false
+	lock, err := p.workingDirLocker.LockPullAfterStalePlan(repoFullName, pullNum, command.Plan, metadata, func(holder WorkingDirLockMetadata) {
+		waited = true
+		ctx.Log.Info("pull request is still planning commit %q and autoplan for commit %q will start when it finishes", shortSHA(holder.HeadCommit), shortSHA(metadata.HeadCommit))
+	})
+	switch {
+	case errors.Is(err, ErrPullLockSuperseded):
+		ctx.Log.Info("skipping autoplan for commit %q because a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
+		return nil, false
+	case errors.Is(err, ErrPullLockCancelled):
+		ctx.Log.Info("skipping autoplan for commit %q because the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
+		return nil, false
+	case err != nil:
 		p.handleNoProjectPlanStateError(ctx, cmd, err)
 		return nil, false
 	}
-	return unlockFn, true
+	// Unlock unless the caller takes the lock, including after a panic.
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			lock.Unlock()
+		}
+	}()
+	if waited {
+		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+			return nil, false
+		}
+		livePull, err := p.livePullIdentity(ctx)
+		if err != nil {
+			if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+				return nil, false
+			}
+			if !lock.Start() {
+				return nil, false
+			}
+			p.handleNoProjectPlanStateError(ctx, cmd, fmt.Errorf("fetching live pull request: %w", err))
+			return nil, false
+		}
+		if livePull.State == models.ClosedPullState {
+			return nil, false
+		}
+		ctx.Pull.HeadCommit = livePull.HeadCommit
+		if livePull.BaseBranch != "" {
+			ctx.Pull.BaseBranch = livePull.BaseBranch
+		}
+		if !lock.UpdateMetadata(WorkingDirLockMetadataForPull(ctx.Pull)) {
+			return nil, false
+		}
+		if p.pullStatusFetcher != nil {
+			pullStatus, err := p.pullStatusFetcher.GetPullStatus(ctx.Pull)
+			if err != nil {
+				if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+					return nil, false
+				}
+				if !lock.Start() {
+					return nil, false
+				}
+				p.handleNoProjectPlanStateError(ctx, cmd, fmt.Errorf("fetching current pull status: %w", err))
+				return nil, false
+			}
+			ctx.PullStatus = pullStatus
+		}
+		if p.Drainer != nil && p.Drainer.GetStatus().ShuttingDown {
+			return nil, false
+		}
+	}
+	if !lock.Start() {
+		return nil, false
+	}
+	handedOff = true
+	return lock.Unlock, true
+}
+
+func (p *PlanCommandRunner) livePullIdentity(ctx *command.Context) (models.PullRequest, error) {
+	if p.LivePullHeadFetcher == nil {
+		return models.PullRequest{}, errors.New("live pull request fetcher is not configured")
+	}
+	livePull, err := p.LivePullHeadFetcher.GetLivePullIdentity(command.ProjectContext{Log: ctx.Log, Pull: ctx.Pull, PullStatus: ctx.PullStatus})
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+	if livePull.State != models.ClosedPullState && livePull.HeadCommit == "" {
+		return models.PullRequest{}, errors.New("live pull request head is empty")
+	}
+	return livePull, nil
 }
 
 func (p *PlanCommandRunner) handleNoProjectPlanStateError(ctx *command.Context, cmd PullCommand, err error) {
