@@ -4,9 +4,12 @@
 package events
 
 import (
+	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/boltdb"
 	"github.com/runatlantis/atlantis/server/core/locking"
@@ -16,6 +19,7 @@ import (
 	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
 	"github.com/runatlantis/atlantis/server/metrics/metricstest"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 type unlockedApplyLockChecker struct{}
@@ -468,4 +472,223 @@ func TestApplyCommandRunner_SilencedNoProjectLegacyEmptyIdentityDoesNotPublishZe
 
 func containsCommitStatus(statuses []models.CommitStatus, expected models.CommitStatus) bool {
 	return slices.Contains(statuses, expected)
+}
+
+type applyCountPost struct {
+	status models.CommitStatus
+	counts models.ProjectCounts
+}
+
+// Holds the first 1/2 status post until the other apply has posted 2/2.
+type gatedApplyStatus struct {
+	mu          sync.Mutex
+	posts       []applyCountPost
+	partialSeen chan struct{}
+	fullPosted  chan struct{}
+	oncePartial sync.Once
+	onceFull    sync.Once
+}
+
+func (s *gatedApplyStatus) UpdateCombined(logging.SimpleLogging, models.Repo, models.PullRequest, models.CommitStatus, command.Name) error {
+	return nil
+}
+
+func (s *gatedApplyStatus) UpdateCombinedCount(_ logging.SimpleLogging, _ models.Repo, _ models.PullRequest, status models.CommitStatus, _ command.Name, counts models.ProjectCounts) error {
+	partial := status == models.PendingCommitStatus && counts.Total == 2 && counts.Success == 1
+	if partial {
+		s.oncePartial.Do(func() { close(s.partialSeen) })
+		// Let this 1/2 post land after the 2/2 post.
+		select {
+		case <-s.fullPosted:
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	s.mu.Lock()
+	s.posts = append(s.posts, applyCountPost{status: status, counts: counts})
+	full := status == models.SuccessCommitStatus && counts.Success == counts.Total && counts.Total == 2
+	s.mu.Unlock()
+	if full {
+		s.onceFull.Do(func() { close(s.fullPosted) })
+	}
+	return nil
+}
+
+func (s *gatedApplyStatus) UpdatePreWorkflowHook(logging.SimpleLogging, models.PullRequest, models.CommitStatus, string, string, string) error {
+	return nil
+}
+
+func (s *gatedApplyStatus) UpdatePostWorkflowHook(logging.SimpleLogging, models.PullRequest, models.CommitStatus, string, string, string) error {
+	return nil
+}
+
+func (s *gatedApplyStatus) snapshot() []applyCountPost {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]applyCountPost, len(s.posts))
+	copy(out, s.posts)
+	return out
+}
+
+type projectByNameBuilder struct {
+	byName map[string]command.ProjectContext
+}
+
+func (b projectByNameBuilder) BuildApplyCommands(_ *command.Context, cmd *CommentCommand) ([]command.ProjectContext, error) {
+	project, ok := b.byName[cmd.ProjectName]
+	if !ok {
+		return nil, fmt.Errorf("no project %q", cmd.ProjectName)
+	}
+	return []command.ProjectContext{project}, nil
+}
+
+func (projectByNameBuilder) ShouldIgnoreTargetedDir(*command.Context, *CommentCommand) bool {
+	return false
+}
+
+// Starts both applies together, then holds one until the other has written its snapshot.
+type phasedApplyRunner struct {
+	entered  *sync.WaitGroup
+	release  <-chan struct{}
+	holdName string
+}
+
+func (r *phasedApplyRunner) Apply(ctx command.ProjectContext) command.ProjectCommandOutput {
+	r.entered.Done()
+	r.entered.Wait()
+	if ctx.ProjectName == r.holdName {
+		<-r.release
+	}
+	return command.ProjectCommandOutput{ApplySuccess: "applied"}
+}
+
+// Overlapping apply -p must not publish a 1/2 status after 2/2.
+func TestApply_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
+	database, err := boltdb.New(t.TempDir())
+	Ok(t, err)
+	t.Cleanup(func() { database.Close() })
+
+	pull := models.PullRequest{
+		BaseRepo:   testdata.GithubRepo,
+		State:      models.OpenPullState,
+		Num:        testdata.Pull.Num,
+		HeadCommit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		BaseBranch: "main",
+	}
+	_, err = database.UpdatePullWithResults(pull, []command.ProjectResult{
+		internalPlannedProjectResult("dirA", DefaultWorkspace, "projA"),
+		internalPlannedProjectResult("dirB", DefaultWorkspace, "projB"),
+	})
+	Ok(t, err)
+
+	project := func(dir, name string) command.ProjectContext {
+		return command.ProjectContext{
+			CommandName:       command.Apply,
+			RepoRelDir:        dir,
+			Workspace:         DefaultWorkspace,
+			ProjectName:       name,
+			ProjectPlanStatus: models.PlannedPlanStatus,
+			Pull:              pull,
+			SilencePRComments: []string{command.Apply.String()},
+		}
+	}
+	statuses := &gatedApplyStatus{
+		partialSeen: make(chan struct{}),
+		fullPosted:  make(chan struct{}),
+	}
+	entered := &sync.WaitGroup{}
+	entered.Add(2)
+	projectRunner := &phasedApplyRunner{entered: entered, release: statuses.partialSeen, holdName: "projB"}
+	vcsClient := &vcs.NotConfiguredVCSClient{Host: models.Github}
+	pullUpdater := &PullUpdater{
+		VCSClient:        vcsClient,
+		MarkdownRenderer: NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
+	}
+	builder := projectByNameBuilder{byName: map[string]command.ProjectContext{
+		"projA": project("dirA", "projA"),
+		"projB": project("dirB", "projB"),
+	}}
+	locker := NewDefaultWorkingDirLocker()
+	newRunner := func() *ApplyCommandRunner {
+		return NewApplyCommandRunner(
+			vcsClient,
+			false,
+			unlockedApplyLockChecker{},
+			statuses,
+			builder,
+			projectRunner,
+			NewCancellationTracker(),
+			&AutoMerger{VCSClient: vcsClient},
+			pullUpdater,
+			&DBUpdater{Database: database},
+			database,
+			1,
+			false,
+			false,
+			locker,
+			noopPullReqStatusFetcher{},
+			nil,
+			"",
+		)
+	}
+	runnerA := newRunner()
+	runnerB := newRunner()
+	ctxA := newInternalApplyContext(t, pull)
+	ctxB := newInternalApplyContext(t, pull)
+
+	errA := make(chan error, 1)
+	errB := make(chan error, 1)
+	go func() {
+		runnerA.Run(ctxA, &CommentCommand{Name: command.Apply, ProjectName: "projA"})
+		if ctxA.CommandHasErrors {
+			errA <- errors.New("projA apply recorded command errors")
+			return
+		}
+		errA <- nil
+	}()
+	go func() {
+		runnerB.Run(ctxB, &CommentCommand{Name: command.Apply, ProjectName: "projB"})
+		if ctxB.CommandHasErrors {
+			errB <- errors.New("projB apply recorded command errors")
+			return
+		}
+		errB <- nil
+	}()
+
+	timeout := time.After(8 * time.Second)
+	select {
+	case applyErr := <-errA:
+		Ok(t, applyErr)
+	case <-timeout:
+		t.Fatal("timed out waiting for projA apply")
+	}
+	select {
+	case applyErr := <-errB:
+		Ok(t, applyErr)
+	case <-timeout:
+		t.Fatal("timed out waiting for projB apply")
+	}
+
+	stored, err := database.GetPullStatus(pull)
+	Ok(t, err)
+	if stored == nil || len(stored.Projects) != 2 {
+		t.Fatalf("expected both projects to stay in the database, got %#v", stored)
+	}
+	for _, projectStatus := range stored.Projects {
+		Equals(t, models.AppliedPlanStatus, projectStatus.Status)
+	}
+
+	posts := statuses.snapshot()
+	sawFullSuccess := false
+	regressed := false
+	for _, post := range posts {
+		if post.status == models.SuccessCommitStatus && post.counts.Success == post.counts.Total && post.counts.Total == 2 {
+			sawFullSuccess = true
+		}
+		if sawFullSuccess && post.status == models.PendingCommitStatus && post.counts.Success < post.counts.Total {
+			regressed = true
+		}
+	}
+	if !sawFullSuccess || regressed {
+		t.Fatalf("combined apply status regressed after a complete success, database has both projects applied, posts=%+v", posts)
+	}
 }

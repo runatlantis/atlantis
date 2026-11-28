@@ -4,14 +4,19 @@
 package events
 
 import (
+	"errors"
 	"slices"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/runatlantis/atlantis/server/core/config/valid"
 	"github.com/runatlantis/atlantis/server/core/locking"
 	"github.com/runatlantis/atlantis/server/events/command"
 	"github.com/runatlantis/atlantis/server/events/models"
+	"github.com/runatlantis/atlantis/server/events/vcs"
 	"github.com/runatlantis/atlantis/server/logging"
+	. "github.com/runatlantis/atlantis/testing"
 )
 
 func TestPlanCommandRunner_DeletePlansAndPlanLocksByRepoLockMode(t *testing.T) {
@@ -404,4 +409,184 @@ func equalStringSlices(a, b []string) bool {
 
 func equalUnlockIfOwnedByPullCalls(calls []unlockIfOwnedByPullCall, expected []unlockIfOwnedByPullCall) bool {
 	return slices.Equal(calls, expected)
+}
+
+type recordedCommitStatus struct {
+	head   string
+	status models.CommitStatus
+	cmd    command.Name
+}
+
+type recordingCommitStatusUpdater struct {
+	mu      sync.Mutex
+	updates []recordedCommitStatus
+}
+
+func (s *recordingCommitStatusUpdater) UpdateCombined(_ logging.SimpleLogging, _ models.Repo, pull models.PullRequest, status models.CommitStatus, cmd command.Name) error {
+	s.mu.Lock()
+	s.updates = append(s.updates, recordedCommitStatus{head: pull.HeadCommit, status: status, cmd: cmd})
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *recordingCommitStatusUpdater) UpdateCombinedCount(logging.SimpleLogging, models.Repo, models.PullRequest, models.CommitStatus, command.Name, models.ProjectCounts) error {
+	return nil
+}
+
+func (s *recordingCommitStatusUpdater) UpdatePreWorkflowHook(logging.SimpleLogging, models.PullRequest, models.CommitStatus, string, string, string) error {
+	return nil
+}
+
+func (s *recordingCommitStatusUpdater) UpdatePostWorkflowHook(logging.SimpleLogging, models.PullRequest, models.CommitStatus, string, string, string) error {
+	return nil
+}
+
+func (s *recordingCommitStatusUpdater) snapshot() []recordedCommitStatus {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]recordedCommitStatus, len(s.updates))
+	copy(out, s.updates)
+	return out
+}
+
+type recordingCommentClient struct {
+	*vcs.NotConfiguredVCSClient
+	mu       sync.Mutex
+	comments []string
+}
+
+func (c *recordingCommentClient) CreateComment(_ logging.SimpleLogging, _ models.Repo, _ int, comment string, _ string) error {
+	c.mu.Lock()
+	c.comments = append(c.comments, comment)
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *recordingCommentClient) snapshot() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make([]string, len(c.comments))
+	copy(out, c.comments)
+	return out
+}
+
+// A webhook for a head the waiter already adopted must not fail that commit.
+func TestAutoplan_LateWebhookForAdoptedLiveHeadExitsQuietly(t *testing.T) {
+	locker := NewDefaultWorkingDirLocker()
+	statuses := &recordingCommitStatusUpdater{}
+	comments := &recordingCommentClient{NotConfiguredVCSClient: &vcs.NotConfiguredVCSClient{}}
+	runner := &PlanCommandRunner{
+		workingDirLocker:    locker,
+		LivePullHeadFetcher: &stubLivePullHeadFetcher{head: "live"},
+		commitStatusUpdater: statuses,
+		pullUpdater: &PullUpdater{
+			VCSClient:        comments,
+			MarkdownRenderer: NewMarkdownRenderer(false, false, false, false, false, false, "", "atlantis", false, false),
+		},
+	}
+
+	ctx, unlock, ok := runAutoplanLockBehindStalePlan(t, runner, locker)
+	Assert(t, ok, "expected the waiting autoplan to adopt the live head and take the lock")
+	defer unlock()
+	Equals(t, "live", ctx.Pull.HeadCommit)
+	beforeStatus := len(statuses.snapshot())
+	beforeComments := len(comments.snapshot())
+
+	webhook := &command.Context{
+		Log: logging.NewNoopLogger(t),
+		Pull: models.PullRequest{
+			BaseRepo:   ctx.Pull.BaseRepo,
+			Num:        ctx.Pull.Num,
+			HeadCommit: ctx.Pull.HeadCommit,
+		},
+		Trigger: command.AutoTrigger,
+	}
+	_, webhookOK := runner.lockPullForPlan(webhook, AutoplanCommand{})
+	Assert(t, !webhookOK, "the live head is already being planned, so its webhook must not start a second plan")
+
+	var failed []recordedCommitStatus
+	for _, update := range statuses.snapshot()[beforeStatus:] {
+		if update.status == models.FailedCommitStatus {
+			failed = append(failed, update)
+		}
+	}
+	posted := comments.snapshot()[beforeComments:]
+	if len(failed) > 0 || len(posted) > 0 {
+		t.Fatalf("webhook for the commit the waiter adopted posted a failure while that plan holds the lock: statuses=%+v comments=%q", failed, posted)
+	}
+}
+
+// A panic while fetching the live head must release the pull lock and the waiter slot.
+func TestAutoplan_PanicDuringLiveHeadFetchReleasesPullLock(t *testing.T) {
+	repo := models.Repo{FullName: "owner/repo"}
+	locker := NewDefaultWorkingDirLocker()
+	unlockOld, err := locker.TryLockPull(repo.FullName, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+
+	runner := &PlanCommandRunner{
+		workingDirLocker: locker,
+		LivePullHeadFetcher: &stubLivePullHeadFetcher{
+			head:    "live",
+			onFetch: func() { panic("live head fetch panicked") },
+		},
+	}
+	ctx := &command.Context{
+		Log:     logging.NewNoopLogger(t),
+		Pull:    models.PullRequest{BaseRepo: repo, Num: 1, HeadCommit: "event"},
+		Trigger: command.AutoTrigger,
+	}
+
+	type outcome struct {
+		unlock   func()
+		ok       bool
+		panicked any
+	}
+	result := make(chan outcome, 1)
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				result <- outcome{panicked: recovered}
+			}
+		}()
+		unlock, ok := runner.lockPullForPlan(ctx, AutoplanCommand{})
+		result <- outcome{unlock: unlock, ok: ok}
+	}()
+	waitForPullLockWaiter(t, locker, repo.FullName, 1)
+	unlockOld()
+
+	var got outcome
+	select {
+	case got = <-result:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the autoplan that panics during live head fetch")
+	}
+	if got.panicked == nil {
+		if got.ok && got.unlock != nil {
+			got.unlock()
+		}
+		t.Fatal("expected the live head fetch to panic")
+	}
+
+	later := make(chan error, 1)
+	go func() {
+		lock, lockErr := locker.LockPullAfterStalePlan(repo.FullName, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: "later"}, nil)
+		if lockErr == nil {
+			if !lock.Start() {
+				lock.Unlock()
+				later <- errors.New("later autoplan acquired the lock but Start failed")
+				return
+			}
+			lock.Unlock()
+		}
+		later <- lockErr
+	}()
+	select {
+	case lockErr := <-later:
+		Ok(t, lockErr)
+	case <-time.After(500 * time.Millisecond):
+		locker.UnlockByPull(repo.FullName, 1)
+		lockErr := <-later
+		Ok(t, lockErr)
+		t.Fatal("panic during live-head fetch leaked the pull lock; a later autoplan stayed blocked until UnlockByPull")
+	}
 }

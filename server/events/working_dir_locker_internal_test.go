@@ -427,8 +427,8 @@ func TestPlanCommandRunnerAutoplanReportsUnavailableLiveHead(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			locker := NewDefaultWorkingDirLocker()
-			statuses := &issue7050StatusRecorder{}
-			comments := &issue7050CommentClient{NotConfiguredVCSClient: &vcs.NotConfiguredVCSClient{}}
+			statuses := &recordingCommitStatusUpdater{}
+			comments := &recordingCommentClient{NotConfiguredVCSClient: &vcs.NotConfiguredVCSClient{}}
 			runner := &PlanCommandRunner{
 				workingDirLocker:    locker,
 				commitStatusUpdater: statuses,
@@ -709,4 +709,59 @@ type closedLivePullFetcher struct{}
 
 func (*closedLivePullFetcher) GetLivePullIdentity(command.ProjectContext) (models.PullRequest, error) {
 	return models.PullRequest{HeadCommit: "live", State: models.ClosedPullState}, nil
+}
+
+func TestWorkingDirLocker_StressAutoplanWaitersAndSharedApplies(t *testing.T) {
+	const repo = "owner/repo"
+	for i := range 40 {
+		locker := NewDefaultWorkingDirLocker()
+		unlock, err := locker.TryLockPull(repo, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: "base"})
+		Ok(t, err)
+
+		var wg sync.WaitGroup
+		wg.Add(8)
+		for n := range 8 {
+			sha := fmt.Sprintf("sha-%d-%d", i, n)
+			go func() {
+				defer wg.Done()
+				lock, lockErr := locker.LockPullAfterStalePlan(repo, 1, command.Plan, WorkingDirLockMetadata{HeadCommit: sha}, nil)
+				if lockErr != nil {
+					return
+				}
+				if !lock.Start() {
+					lock.Unlock()
+					return
+				}
+				lock.Unlock()
+			}()
+		}
+		time.Sleep(time.Millisecond)
+		unlock()
+
+		finished := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(finished)
+		}()
+		select {
+		case <-finished:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("iteration %d: autoplan waiters did not finish", i)
+		}
+
+		sharedA, err := locker.TryLockPullShared(repo, 2, command.Apply, WorkingDirLockMetadata{HeadCommit: "same"})
+		Ok(t, err)
+		sharedB, err := locker.TryLockPullShared(repo, 2, command.Apply, WorkingDirLockMetadata{HeadCommit: "same"})
+		Ok(t, err)
+		sharedA()
+		sharedB()
+
+		locker.mutex.Lock()
+		leftoverLocks := len(locker.locks)
+		leftoverWaiters := len(locker.waiters)
+		locker.mutex.Unlock()
+		if leftoverLocks != 0 || leftoverWaiters != 0 {
+			t.Fatalf("iteration %d: leftover locks=%d waiters=%d", i, leftoverLocks, leftoverWaiters)
+		}
+	}
 }
