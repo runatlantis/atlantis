@@ -6317,3 +6317,113 @@ projects:
 	Assert(t, slices.Contains(workingDir.cloneCalls, "staging"),
 		"expected the project's workspace to be cloned, cloned: %v", workingDir.cloneCalls)
 }
+
+func TestDefaultProjectCommandBuilder_BuildOutputDependentPlanCommands(t *testing.T) {
+	RegisterMockTestingT(t)
+	logger := logging.NewNoopLogger(t)
+	scope := metricstest.NewLoggingScope(t, logger, "atlantis")
+
+	repoDir := t.TempDir()
+	writeFile := func(rel, contents string) {
+		t.Helper()
+		path := filepath.Join(repoDir, filepath.FromSlash(rel))
+		Ok(t, os.MkdirAll(filepath.Dir(path), 0700))
+		Ok(t, os.WriteFile(path, []byte(contents), 0600))
+	}
+	writeFile("network/main.tf", `
+terraform {
+  backend "s3" {
+    bucket = "acme-tf"
+    key    = "network/terraform.tfstate"
+  }
+}
+output "vpc_id" { value = "vpc-1" }
+output "unused" { value = "x" }
+`)
+	writeFile("app/main.tf", `
+data "terraform_remote_state" "network" {
+  backend = "s3"
+  config = {
+    bucket = "acme-tf"
+    key    = "network/terraform.tfstate"
+  }
+}
+output "vpc" { value = data.terraform_remote_state.network.outputs.vpc_id }
+`)
+	writeFile("unrelated/main.tf", `output "x" { value = "x" }`)
+	writeFile(valid.DefaultAtlantisFile, `
+version: 3
+projects:
+- name: network
+  dir: network
+- name: app
+  dir: app
+- name: unrelated
+  dir: unrelated
+`)
+
+	workingDir := mocks.NewMockWorkingDir()
+	When(workingDir.Clone(Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](),
+		Any[string]())).ThenReturn(repoDir, nil)
+	builder := events.NewProjectCommandBuilder(
+		false,
+		&config.ParserValidator{},
+		&events.DefaultProjectFinder{},
+		vcsmocks.NewMockClient(),
+		workingDir,
+		events.NewDefaultWorkingDirLocker(),
+		valid.NewGlobalCfgFromArgs(valid.GlobalCfgArgs{AllowAllRepoSettings: true}),
+		&events.DefaultPendingPlanFinder{},
+		&events.CommentParser{ExecutableName: "atlantis"},
+		false,
+		false,
+		false,
+		false,
+		false,
+		"",
+		"**/*.tf",
+		false,
+		"terraform",
+		false,
+		false,
+		"",
+		scope,
+		tfclientmocks.NewMockClient(),
+		&runtime.LocalPlanStore{},
+	)
+
+	ctx := &command.Context{
+		Log:      logger,
+		Scope:    scope,
+		Pull:     models.PullRequest{Num: 1, BaseRepo: models.Repo{FullName: "owner/repo"}},
+		HeadRepo: models.Repo{FullName: "owner/repo"},
+		User:     models.User{Username: "user"},
+	}
+	trigger := events.OutputDependentTrigger{
+		RepoRelDir:     "network",
+		ProjectName:    "network",
+		Workspace:      "default",
+		ChangedOutputs: map[string]bool{"vpc_id": true},
+	}
+
+	cmds, err := builder.BuildOutputDependentPlanCommands(ctx, []events.OutputDependentTrigger{trigger}, nil)
+	Ok(t, err)
+	Equals(t, 1, len(cmds))
+	Equals(t, "app", cmds[0].RepoRelDir)
+	Equals(t, "app", cmds[0].ProjectName)
+	Equals(t, command.Plan, cmds[0].CommandName)
+
+	// An output nobody reads must not re-plan the consumer.
+	unread := trigger
+	unread.ChangedOutputs = map[string]bool{"unused": true}
+	cmds, err = builder.BuildOutputDependentPlanCommands(ctx, []events.OutputDependentTrigger{unread}, nil)
+	Ok(t, err)
+	Equals(t, 0, len(cmds))
+
+	// A project already planned in this run must not be planned twice.
+	cmds, err = builder.BuildOutputDependentPlanCommands(ctx, []events.OutputDependentTrigger{trigger}, []command.ProjectContext{
+		{RepoRelDir: "app", Workspace: "default", ProjectName: "app"},
+	})
+	Ok(t, err)
+	Equals(t, 0, len(cmds))
+}

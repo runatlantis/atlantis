@@ -466,6 +466,26 @@ type PlanSuccess struct {
 	// empty when the plan stage is built only from custom run steps, which
 	// manage their own plan file.
 	PlanHash string
+	// OutputChanges records the state of every root module output in the
+	// plan. It is populated only when the plan file could be inspected and
+	// output-change detection is enabled. Nil means the outputs are unknown,
+	// not that there are no outputs.
+	OutputChanges map[string]OutputChange
+}
+
+// OutputChange is the planned change to a single Terraform output.
+type OutputChange struct {
+	// Actions are the Terraform plan actions for the output, for example
+	// ["no-op"], ["update"] or ["create"].
+	Actions []string
+}
+
+// Changed reports whether applying the plan changes this output's value.
+func (o OutputChange) Changed() bool {
+	if len(o.Actions) == 0 {
+		return false
+	}
+	return !(len(o.Actions) == 1 && o.Actions[0] == "no-op")
 }
 
 func NewPolicySetResult(policySetName string, policyOutput string, passed bool, reqApprovalCount int, policyItemRegex string) (*PolicySetResult, error) {

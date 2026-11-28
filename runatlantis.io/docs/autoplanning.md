@@ -32,6 +32,7 @@ Given the directory structure:
 * If `modules/module1/main.tf` were modified, we would not automatically run `plan` because we couldn't determine the location of the terraform project
   * You could use an [atlantis.yaml](repo-level-atlantis-yaml.md#configuring-planning) file to specify which projects to plan when this module changed
   * You could enable [module autoplanning](server-configuration.md#autoplan-modules) which indexes projects to their local module dependencies.
+  * You could enable [dependent project autoplanning](server-configuration.md#autoplan-dependent-projects), which plans a project when a project whose `terraform_remote_state` outputs it reads changes those outputs.
   * Or you could manually plan with `atlantis plan -d <dir>`
 * If `project1/modules/module1/main.tf` were modified, we would look one level above `project1/modules`
 into `project1/`, see that there was a `main.tf` file and so run plan in `project1/`

@@ -58,6 +58,7 @@ const (
 	ParallelApplyFlag                = "parallel-apply"
 	AutoplanModules                  = "autoplan-modules"
 	AutoplanModulesFromProjects      = "autoplan-modules-from-projects"
+	AutoplanDependentProjects        = "autoplan-dependent-projects"
 	AutoplanFileListFlag             = "autoplan-file-list"
 	BitbucketApiUserFlag             = "bitbucket-api-user"
 	BitbucketBaseURLFlag             = "bitbucket-base-url"
@@ -563,6 +564,13 @@ var boolFlags = map[string]boolFlag{
 	},
 	AutoplanModules: {
 		description:  "Automatically plan projects that have a changed module from the local repository.",
+		defaultValue: false,
+	},
+	AutoplanDependentProjects: {
+		description: "Automatically plan projects in the same repository that read the Terraform outputs of a project " +
+			"planned in the same run, when that project's plan changes one or more of those outputs. Dependencies are " +
+			"discovered from depends_on entries in atlantis.yaml and from data \"terraform_remote_state\" blocks that " +
+			"resolve to another project's backend.",
 		defaultValue: false,
 	},
 	AutomergeFlag: {
