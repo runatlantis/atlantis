@@ -545,7 +545,7 @@ func (c *DefaultCommandRunner) RunCommentCommand(baseRepo models.Repo, maybeHead
 	}
 	switch runner := cmdRunner.(type) {
 	case *PlanCommandRunner:
-		runner.RunCommentPlanWithHooks(ctx, cmd, before, after)
+		runner.runCommentPlanWithHooks(ctx, cmd, before, after)
 	case *ApplyCommandRunner:
 		runner.runWithHooks(ctx, cmd, before, after)
 	default:

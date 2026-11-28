@@ -562,7 +562,7 @@ func (r *phasedApplyRunner) Apply(ctx command.ProjectContext) command.ProjectCom
 }
 
 // Overlapping apply -p must not publish a 1/2 status after 2/2.
-func TestApply_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
+func TestApplyCommandRunner_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	Ok(t, err)
 	t.Cleanup(func() { database.Close() })

@@ -367,12 +367,12 @@ func (p *PlanCommandRunner) Run(ctx *command.Context, cmd *CommentCommand) {
 	if ctx.Trigger == command.AutoTrigger {
 		p.RunAutoplanWithHooks(ctx, nil, nil)
 	} else {
-		p.RunCommentPlanWithHooks(ctx, cmd, nil, nil)
+		p.runCommentPlanWithHooks(ctx, cmd, nil, nil)
 	}
 }
 
-// RunCommentPlanWithHooks holds the pull lock while the plan and both hooks use the workspace.
-func (p *PlanCommandRunner) RunCommentPlanWithHooks(ctx *command.Context, cmd *CommentCommand, before func() bool, after func()) {
+// runCommentPlanWithHooks holds the pull lock while the plan and both hooks use the workspace.
+func (p *PlanCommandRunner) runCommentPlanWithHooks(ctx *command.Context, cmd *CommentCommand, before func() bool, after func()) {
 	unlock, ok := p.lockPullForPlan(ctx, cmd)
 	if !ok {
 		return
@@ -446,14 +446,14 @@ func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCo
 	waited := false
 	lock, err := p.workingDirLocker.LockPullAfterStalePlan(repoFullName, pullNum, command.Plan, metadata, func(holder WorkingDirLockMetadata) {
 		waited = true
-		ctx.Log.Info("pull request is still planning commit %s; autoplan for commit %s will start when it finishes", shortSHA(holder.HeadCommit), shortSHA(metadata.HeadCommit))
+		ctx.Log.Info("pull request is still planning commit %q and autoplan for commit %q will start when it finishes", shortSHA(holder.HeadCommit), shortSHA(metadata.HeadCommit))
 	})
 	switch {
 	case errors.Is(err, ErrPullLockSuperseded):
-		ctx.Log.Info("skipping autoplan for commit %s because a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
+		ctx.Log.Info("skipping autoplan for commit %q because a newer autoplan for this pull request is waiting or already running", shortSHA(metadata.HeadCommit))
 		return nil, false
 	case errors.Is(err, ErrPullLockCancelled):
-		ctx.Log.Info("skipping autoplan for commit %s because the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
+		ctx.Log.Info("skipping autoplan for commit %q because the pull request was closed or its commands were cancelled while it waited", shortSHA(metadata.HeadCommit))
 		return nil, false
 	case err != nil:
 		p.handleNoProjectPlanStateError(ctx, cmd, err)

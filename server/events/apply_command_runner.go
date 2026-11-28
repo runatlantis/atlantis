@@ -281,10 +281,8 @@ func (a *ApplyCommandRunner) run(ctx *command.Context, cmd *CommentCommand, isCa
 		cmd,
 		result)
 
-	// Targeted applies for one pull request can run at the same time. Record
-	// results and publish the combined status one apply at a time, so a slow
-	// status request can't post an older count after a newer one, and a
-	// read-modify-write database can't drop another apply's result.
+	// Targeted applies share a pull. Write the result and post the status one
+	// apply at a time so an older count cannot land after a newer one.
 	pullStatus, currentPull, published := func() (models.PullStatus, models.PullRequest, bool) {
 		defer applyResultLocks.lock(ctx.Pull.BaseRepo.FullName, ctx.Pull.Num)()
 

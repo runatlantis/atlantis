@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v88/github"
 	. "github.com/petergtz/pegomock/v4"
@@ -1841,4 +1843,60 @@ func (a assertApplyLockDB) GetPullStatus(pull models.PullRequest) (*models.PullS
 	*a.called = true
 	Assert(a.t, a.locker.HasCommandLock(a.repoFullName, a.pullNum, command.Apply), "expected apply lock during pull status refresh")
 	return a.Database.GetPullStatus(pull)
+}
+
+// apply -d dir2 must not fail on the pull lock while apply -d dir1 is running.
+func TestApplyCommandRunner_TargetedAppliesToDifferentDirsRunConcurrently(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	vcsClient := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+	pull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "abc123"}
+	newCtx := func() *command.Context {
+		return &command.Context{
+			User:     testdata.User,
+			Log:      logging.NewNoopLogger(t),
+			Scope:    metricstest.NewLoggingScope(t, logging.NewNoopLogger(t), "atlantis"),
+			Pull:     pull,
+			HeadRepo: testdata.GithubRepo,
+			Trigger:  command.CommentTrigger,
+		}
+	}
+	applyDir1 := &events.CommentCommand{Name: command.Apply, RepoRelDir: "dir1"}
+	applyDir2 := &events.CommentCommand{Name: command.Apply, RepoRelDir: "dir2"}
+
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	var blockFirst sync.Once
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Eq(applyDir1))).Then(func([]Param) ReturnValues {
+		// Hold the first apply inside the pull lock.
+		if locker.HasCommandLock(pull.BaseRepo.FullName, pull.Num, command.Apply) {
+			blockFirst.Do(func() {
+				close(firstStarted)
+				<-releaseFirst
+			})
+		}
+		return ReturnValues{[]command.ProjectContext{}, nil}
+	})
+	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Eq(applyDir2))).ThenReturn([]command.ProjectContext{}, nil)
+
+	firstDone := make(chan struct{})
+	go func() {
+		applyCommandRunner.Run(newCtx(), applyDir1)
+		close(firstDone)
+	}()
+	select {
+	case <-firstStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the first apply to start")
+	}
+
+	applyCommandRunner.Run(newCtx(), applyDir2)
+	close(releaseFirst)
+	<-firstDone
+
+	projectCommandBuilder.VerifyWasCalled(AtLeast(1)).BuildApplyCommands(Any[*command.Context](), Eq(applyDir2))
+	_, _, _, comments, _ := vcsClient.VerifyWasCalled(AtLeast(0)).CreateComment(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[int](), Any[string](), Any[string]()).GetAllCapturedArguments()
+	for _, comment := range comments {
+		Assert(t, !strings.Contains(comment, "currently locked by"), "second apply hit the pull lock: %s", comment)
+	}
 }

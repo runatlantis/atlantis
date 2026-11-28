@@ -3283,6 +3283,46 @@ func TestRunAutoplanCommand_SupersededAndCancelledWaitersSkipHooks(t *testing.T)
 	Assert(t, locker.HasCommandLock(modelPull.BaseRepo.FullName, modelPull.Num, command.Plan), "running plan must retain its lock")
 }
 
+// A push during an older plan must not fail the new head's autoplan.
+func TestRunAutoplanCommand_PushDuringOlderPlanDoesNotFailNewHead(t *testing.T) {
+	locker := events.NewDefaultWorkingDirLocker()
+	setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
+	planCommandRunner.LivePullHeadFetcher = autoplanHeadFetcherFunc(func(ctx command.ProjectContext) (models.PullRequest, error) {
+		pull := ctx.Pull
+		pull.HeadCommit = "new"
+		return pull, nil
+	})
+	newHead := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "new"}
+
+	unlockOldPlan, err := locker.TryLockPull(newHead.BaseRepo.FullName, newHead.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
+	Ok(t, err)
+
+	When(projectCommandBuilder.BuildAutoplanCommands(Any[*command.Context]())).ThenReturn([]command.ProjectContext{}, nil)
+	When(workingDir.GetPullDir(Any[models.Repo](), Any[models.PullRequest]())).ThenReturn(t.TempDir(), nil)
+
+	done := make(chan struct{})
+	go func() {
+		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, newHead, testdata.User)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+	}
+	unlockOldPlan()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for autoplan")
+	}
+
+	commitUpdater.VerifyWasCalled(Never()).UpdateCombined(
+		Any[logging.SimpleLogging](), Any[models.Repo](), Any[models.PullRequest](), Eq(models.FailedCommitStatus), Eq(command.Plan))
+	projectCommandBuilder.VerifyWasCalledOnce().BuildAutoplanCommands(Any[*command.Context]())
+	commitUpdater.VerifyWasCalledOnce().UpdateCombinedCount(
+		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newHead), Eq(models.SuccessCommitStatus), Eq(command.Plan), Eq(models.ProjectCounts{}))
+}
+
 type autoplanHeadFetcherFunc func(command.ProjectContext) (models.PullRequest, error)
 
 func (f autoplanHeadFetcherFunc) GetLivePullIdentity(ctx command.ProjectContext) (models.PullRequest, error) {
@@ -3293,7 +3333,7 @@ func TestRunAutoplanCommand_CloseOrCancelBeforeAuthorization(t *testing.T) {
 	for _, action := range []string{"close", "cancel"} {
 		for _, phase := range []string{"queued", "refreshing"} {
 			t.Run(action+"/"+phase, func(t *testing.T) {
-				t.Log("issue #7050 requires close/cancel to discard an autoplan before hooks start, including during live-head lookup")
+				t.Log("close or cancel discards an autoplan before hooks start, including during live-head lookup")
 				locker := &notifyingAutoplanLocker{WorkingDirLocker: events.NewDefaultWorkingDirLocker(), waiting: make(chan struct{}, 1)}
 				client := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
 				modelPull := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "event"}
