@@ -255,10 +255,8 @@ func (c *DefaultCommandRunner) RunAutoplanCommand(baseRepo models.Repo, headRepo
 	}
 }
 
-// autoplanHookRunner is implemented by a plan runner that must take its
-// pull-level lock before workflow hooks run, so that an autoplan waiting
-// behind a plan of an older commit doesn't run hooks against a working
-// directory that plan still owns (#7050).
+// autoplanHookRunner locks the pull before hooks, so a waiter does not touch
+// a working directory another plan still owns.
 type autoplanHookRunner interface {
 	RunAutoplanWithHooks(ctx *command.Context, before func() bool, after func())
 }

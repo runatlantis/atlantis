@@ -19,10 +19,6 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// Regression tests for races found while testing the #7050 fix: a late
-// webhook for a head an autoplan already adopted, a panic while fetching the
-// live head, and overlapping targeted applies publishing statuses out of order.
-
 type issue7050StatusUpdate struct {
 	head   string
 	status models.CommitStatus
@@ -82,10 +78,7 @@ func (c *issue7050CommentClient) snapshot() []string {
 	return out
 }
 
-// TestAutoplan_LateWebhookForAdoptedLiveHeadExitsQuietly adopts a newer live head while an
-// older plan lock is outstanding, then delivers the webhook for that live
-// head. That webhook is the first plan for the commit, so it must not post a
-// failed status or a lock comment while the adopted plan still holds the lock.
+// A webhook for a head the waiter already adopted must not fail that commit.
 func TestAutoplan_LateWebhookForAdoptedLiveHeadExitsQuietly(t *testing.T) {
 	locker := NewDefaultWorkingDirLocker()
 	statuses := &issue7050StatusRecorder{}
@@ -131,9 +124,7 @@ func TestAutoplan_LateWebhookForAdoptedLiveHeadExitsQuietly(t *testing.T) {
 	}
 }
 
-// TestAutoplan_PanicDuringLiveHeadFetchReleasesPullLock panics after the waiter has
-// the pull lock and before Start. The lock and waiter slot must be released so
-// a later autoplan can acquire the pull.
+// A panic while fetching the live head must release the pull lock and the waiter slot.
 func TestAutoplan_PanicDuringLiveHeadFetchReleasesPullLock(t *testing.T) {
 	repo := models.Repo{FullName: "owner/repo"}
 	locker := NewDefaultWorkingDirLocker()
@@ -213,9 +204,7 @@ type issue7050CountPost struct {
 	counts models.ProjectCounts
 }
 
-// issue7050GatedApplyStatus lets the first partial apply snapshot sit inside the
-// status post until the other apply has posted a complete success. That is the
-// order UpdateCombinedCount can observe once two targeted applies overlap.
+// Holds the first 1/2 status post until the other apply has posted 2/2.
 type issue7050GatedApplyStatus struct {
 	mu          sync.Mutex
 	posts       []issue7050CountPost
@@ -233,9 +222,7 @@ func (s *issue7050GatedApplyStatus) UpdateCombinedCount(_ logging.SimpleLogging,
 	partial := status == models.PendingCommitStatus && counts.Total == 2 && counts.Success == 1
 	if partial {
 		s.oncePartial.Do(func() { close(s.partialSeen) })
-		// Act like a slow status request. Without serialization the other
-		// apply posts its complete count meanwhile and this older count
-		// lands after it.
+		// Let this 1/2 post land after the 2/2 post.
 		select {
 		case <-s.fullPosted:
 		case <-time.After(300 * time.Millisecond):
@@ -283,10 +270,7 @@ func (issue7050ProjectBuilder) ShouldIgnoreTargetedDir(*command.Context, *Commen
 	return false
 }
 
-// issue7050PhasedApplyRunner releases both applies from the same point, then holds
-// one until the other has published its database snapshot. The held apply
-// therefore commits the complete 2/2 result while the first status post is
-// still in flight.
+// Starts both applies together, then holds one until the other has written its snapshot.
 type issue7050PhasedApplyRunner struct {
 	entered  *sync.WaitGroup
 	release  <-chan struct{}
@@ -302,10 +286,7 @@ func (r *issue7050PhasedApplyRunner) Apply(ctx command.ProjectContext) command.P
 	return command.ProjectCommandOutput{ApplySuccess: "applied"}
 }
 
-// TestApply_OverlappingTargetedAppliesKeepLatestStatus runs apply -p projA and
-// apply -p projB for the same commit. Both are allowed through the shared
-// pull lock. The combined commit status must not move from "2/2 applied"
-// back to a pending 1/2 snapshot.
+// Overlapping apply -p must not publish a 1/2 status after 2/2.
 func TestApply_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
 	database, err := boltdb.New(t.TempDir())
 	Ok(t, err)
@@ -437,8 +418,6 @@ func TestApply_OverlappingTargetedAppliesKeepLatestStatus(t *testing.T) {
 	}
 }
 
-// TestWorkingDirLocker_StressAutoplanWaitersAndSharedApplies exercises the waiter and shared-apply paths.
-// It is expected to pass; a leftover lock or a blocked waiter is a failure.
 func TestWorkingDirLocker_StressAutoplanWaitersAndSharedApplies(t *testing.T) {
 	const repo = "owner/repo"
 	for i := range 40 {

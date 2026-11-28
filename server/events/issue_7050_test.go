@@ -19,15 +19,13 @@ import (
 	. "github.com/runatlantis/atlantis/testing"
 )
 
-// Reproduces #7050: pushing a commit while a plan is running for an older
-// commit of the same pull request must not fail the new head's autoplan.
+// A push during an older plan must not fail the new head's autoplan.
 func TestIssue7050_PushDuringPlanDoesNotFailNewHead(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 	setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
 	setAutoplanLiveHead("new")
 	newHead := models.PullRequest{BaseRepo: testdata.GithubRepo, State: models.OpenPullState, Num: testdata.Pull.Num, HeadCommit: "new"}
 
-	// The plan for the previous commit is still running.
 	unlockOldPlan, err := locker.TryLockPull(newHead.BaseRepo.FullName, newHead.Num, command.Plan, events.WorkingDirLockMetadata{HeadCommit: "old"})
 	Ok(t, err)
 
@@ -39,7 +37,6 @@ func TestIssue7050_PushDuringPlanDoesNotFailNewHead(t *testing.T) {
 		ch.RunAutoplanCommand(testdata.GithubRepo, testdata.GithubRepo, newHead, testdata.User)
 		close(done)
 	}()
-	// Let the old plan keep running for a moment after the push.
 	select {
 	case <-done:
 	case <-time.After(300 * time.Millisecond):
@@ -58,9 +55,7 @@ func TestIssue7050_PushDuringPlanDoesNotFailNewHead(t *testing.T) {
 		Any[logging.SimpleLogging](), Eq(testdata.GithubRepo), Eq(newHead), Eq(models.SuccessCommitStatus), Eq(command.Plan), Eq(models.ProjectCounts{}))
 }
 
-// Reproduces the report on #7050: `atlantis apply -d dir1` followed by
-// `atlantis apply -d dir2` must not fail the second apply with
-// "pull request N is currently locked by apply".
+// apply -d dir2 must not fail on the pull lock while apply -d dir1 is running.
 func TestIssue7050_TargetedAppliesToDifferentDirsRunConcurrently(t *testing.T) {
 	locker := events.NewDefaultWorkingDirLocker()
 	vcsClient := setup(t, func(tc *TestConfig) { tc.workingDirLocker = locker })
@@ -82,8 +77,7 @@ func TestIssue7050_TargetedAppliesToDifferentDirsRunConcurrently(t *testing.T) {
 	releaseFirst := make(chan struct{})
 	var blockFirst sync.Once
 	When(projectCommandBuilder.BuildApplyCommands(Any[*command.Context](), Eq(applyDir1))).Then(func([]Param) ReturnValues {
-		// Block the first build that runs under the pull-level apply lock,
-		// so the second apply arrives while the first one is in progress.
+		// Hold the first apply inside the pull lock.
 		if locker.HasCommandLock(pull.BaseRepo.FullName, pull.Num, command.Apply) {
 			blockFirst.Do(func() {
 				close(firstStarted)
@@ -105,7 +99,6 @@ func TestIssue7050_TargetedAppliesToDifferentDirsRunConcurrently(t *testing.T) {
 		t.Fatal("timed out waiting for the first apply to start")
 	}
 
-	// The first apply is still running when the second one is requested.
 	secondCtx := newCtx()
 	applyCommandRunner.Run(secondCtx, applyDir2)
 	close(releaseFirst)
@@ -127,8 +120,7 @@ func (h staticLivePullHead) GetLivePullIdentity(ctx command.ProjectContext) (mod
 	return pull, nil
 }
 
-// setAutoplanLiveHead makes the plan runner from setup() report head as the
-// pull request's live head commit.
+// setAutoplanLiveHead makes setup()'s plan runner report this live head.
 func setAutoplanLiveHead(head string) {
 	planCommandRunner.LivePullHeadFetcher = staticLivePullHead(head)
 }

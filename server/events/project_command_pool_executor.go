@@ -93,14 +93,9 @@ func runProjectCmdsParallel(
 	return command.Result{ProjectResults: results}
 }
 
-// RunProjectCmdsParallelInOrder runs up to poolSize cmds at once. A cmd starts
-// only after every earlier cmd from a different execution order group has
-// finished, and every cmd gets a result, returned in cmds order.
-//
-// Like the PR path, it stops running groups once a group with
-// AbortOnExecutionOrderFail set has an error. The cmds that did not run get an
-// errored result, so callers still see one result per cmd. A panic in a runner
-// becomes an errored result for that cmd instead of crashing the server.
+// RunProjectCmdsParallelInOrder runs up to poolSize cmds at once, in execution
+// order. A failed group with AbortOnExecutionOrderFail set skips the rest, and
+// a panic becomes an error result for that cmd.
 func RunProjectCmdsParallelInOrder(
 	log logging.SimpleLogging,
 	cmds []command.ProjectContext,

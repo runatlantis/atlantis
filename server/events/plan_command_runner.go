@@ -107,12 +107,9 @@ type PlanCommandRunner struct {
 	pullReqStatusFetcher  vcs.PullReqStatusFetcher
 	SilencePRComments     []string
 	PendingApplyStatus    bool
-	// LivePullHeadFetcher fetches the pull request's current head commit. An
-	// autoplan that waited behind a plan of an older commit uses it to plan
-	// the live head.
+	// LivePullHeadFetcher returns the pull request's current head. A waiter plans that commit.
 	LivePullHeadFetcher LivePullHeadFetcher
-	// Drainer reports whether Atlantis is shutting down, so that an autoplan
-	// that waited doesn't start a new plan during shutdown. Optional.
+	// Drainer, when set, stops a waiter from starting during shutdown.
 	Drainer *Drainer
 }
 
@@ -393,10 +390,8 @@ func (p *PlanCommandRunner) RunCommentPlanWithHooks(ctx *command.Context, cmd *C
 	}
 }
 
-// RunAutoplanWithHooks takes the pull-level plan lock, then runs before
-// (pre-workflow hooks), the autoplan, and after (post-workflow hooks) while
-// holding it. If the autoplan waited and was superseded or cancelled, neither
-// hook runs.
+// RunAutoplanWithHooks holds the pull lock across both hooks and the autoplan.
+// A superseded or cancelled waiter runs neither hook.
 func (p *PlanCommandRunner) RunAutoplanWithHooks(ctx *command.Context, before func() bool, after func()) {
 	unlock, ok := p.lockPullForPlan(ctx, AutoplanCommand{})
 	if !ok {
@@ -442,14 +437,9 @@ func (p *PlanCommandRunner) lockPullForPlan(ctx *command.Context, cmd PullComman
 	return p.lockPullForAutoplan(ctx, cmd)
 }
 
-// lockPullForAutoplan takes the pull-level plan lock for an autoplan. Autoplan
-// runs because a new commit was pushed, so if this pull request is still
-// planning an older commit it waits for that plan to finish instead of
-// failing the new head (#7050).
-//
-// Waiters are ordered by arrival, not by commit, and webhooks can arrive out
-// of order. After waiting, the pull request's live head is fetched so the plan
-// runs for the commit that is HEAD now, not the one the event carried.
+// lockPullForAutoplan waits out a plan for an older commit instead of failing
+// the new head. After the wait it plans the live head, because webhooks can
+// arrive out of order.
 func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCommand) (func(), bool) {
 	repoFullName, pullNum := ctx.Pull.BaseRepo.FullName, ctx.Pull.Num
 	metadata := WorkingDirLockMetadataForPull(ctx.Pull)
@@ -469,8 +459,7 @@ func (p *PlanCommandRunner) lockPullForAutoplan(ctx *command.Context, cmd PullCo
 		p.handleNoProjectPlanStateError(ctx, cmd, err)
 		return nil, false
 	}
-	// Release the lock on every path that doesn't hand it to the caller,
-	// including a panic while fetching the live head.
+	// Unlock unless the caller takes the lock, including after a panic.
 	handedOff := false
 	defer func() {
 		if !handedOff {
