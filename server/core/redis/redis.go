@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -147,12 +148,13 @@ func NewWithConfig(cfg Config) (*RedisDB, error) {
 // migrateOldLockKeys migrates old lock key format to new format.
 // Old format: pr/{repoFullName}/{path}/{workspace}
 // New format: pr/{repoFullName}/{path}/{workspace}/{projectName}
-// Uses Scan instead of Keys for compatibility with Redis Cluster (Scan fans out
-// across all nodes via go-redis ClusterClient, whereas Keys does not).
+// Uses scanKeys so cluster mode traverses every primary shard via ForEachMaster.
 func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
-	iter := rdb.Scan(ctx, 0, "pr/*", 0).Iterator()
-	for iter.Next(ctx) {
-		oldKey := iter.Val()
+	keys, err := scanKeys(ctx, rdb, "pr/*")
+	if err != nil {
+		return fmt.Errorf("failed scanning for old lock keys: %w", err)
+	}
+	for _, oldKey := range keys {
 		// Remove the "pr/" prefix to validate the key format
 		keyWithoutPrefix := strings.TrimPrefix(oldKey, "pr/")
 
@@ -160,7 +162,9 @@ func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 		if err != nil {
 			var currLock models.ProjectLock
 			oldValue, err := rdb.Get(ctx, oldKey).Result()
-			if err != nil {
+			if err == redis.Nil {
+				continue
+			} else if err != nil {
 				return errors.Wrap(err, "failed to get current lock")
 			}
 			if err := json.Unmarshal([]byte(oldValue), &currLock); err != nil {
@@ -183,10 +187,49 @@ func migrateOldLockKeys(ctx context.Context, rdb redis.Cmdable) error {
 			}
 		}
 	}
-	if err := iter.Err(); err != nil {
-		return fmt.Errorf("failed scanning for old lock keys: %w", err)
-	}
 	return nil
+}
+
+func scanNodeKeys(ctx context.Context, node redis.Cmdable, pattern string) ([]string, error) {
+	var keys []string
+	iter := node.Scan(ctx, 0, pattern, 0).Iterator()
+	for iter.Next(ctx) {
+		keys = append(keys, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+// scanKeys collects keys matching pattern across a single Redis instance or
+// across every primary shard when client is a *redis.ClusterClient.
+func scanKeys(ctx context.Context, client redis.Cmdable, pattern string) ([]string, error) {
+	if clusterClient, ok := client.(*redis.ClusterClient); ok {
+		var mu sync.Mutex
+		var allKeys []string
+		seen := make(map[string]struct{})
+		err := clusterClient.ForEachMaster(ctx, func(shardCtx context.Context, master *redis.Client) error {
+			shardKeys, err := scanNodeKeys(shardCtx, master, pattern)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			for _, k := range shardKeys {
+				if _, exists := seen[k]; !exists {
+					seen[k] = struct{}{}
+					allKeys = append(allKeys, k)
+				}
+			}
+			mu.Unlock()
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return allKeys, nil
+	}
+	return scanNodeKeys(ctx, client, pattern)
 }
 
 // NewWithClient is used for testing.
@@ -273,21 +316,23 @@ func (r *RedisDB) UnlockIfOwnedByPull(project models.Project, workspace string, 
 
 // List lists all current locks.
 func (r *RedisDB) List() ([]models.ProjectLock, error) {
+	keys, err := scanKeys(ctx, r.client, "pr*")
+	if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
 	var locks []models.ProjectLock
-	iter := r.client.Scan(ctx, 0, "pr*", 0).Iterator()
-	for iter.Next(ctx) {
+	for _, key := range keys {
 		var lock models.ProjectLock
-		val, err := r.client.Get(ctx, iter.Val()).Result()
-		if err != nil {
+		val, err := r.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("db transaction failed: %w", err)
 		}
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", iter.Val(), err)
+			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", key, err)
 		}
 		locks = append(locks, lock)
-	}
-	if err := iter.Err(); err != nil {
-		return locks, fmt.Errorf("db transaction failed: %w", err)
 	}
 
 	return locks, nil
@@ -316,28 +361,31 @@ func (r *RedisDB) GetLock(project models.Project, workspace string) (*models.Pro
 
 // UnlockByPull deletes all locks associated with that pull request and returns them.
 func (r *RedisDB) UnlockByPull(repoFullName string, pullNum int) ([]models.ProjectLock, error) {
+	keys, err := scanKeys(ctx, r.client, fmt.Sprintf("pr/%s*", repoFullName))
+	if err != nil {
+		return nil, fmt.Errorf("db transaction failed: %w", err)
+	}
 	var locks []models.ProjectLock
-
-	iter := r.client.Scan(ctx, 0, fmt.Sprintf("pr/%s*", repoFullName), 0).Iterator()
-	for iter.Next(ctx) {
+	for _, key := range keys {
 		var lock models.ProjectLock
-		val, err := r.client.Get(ctx, iter.Val()).Result()
-		if err != nil {
+		val, err := r.client.Get(ctx, key).Result()
+		if err == redis.Nil {
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("db transaction failed: %w", err)
 		}
 		if err := json.Unmarshal([]byte(val), &lock); err != nil {
-			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", iter.Val(), err)
+			return locks, fmt.Errorf("failed to deserialize lock at key '%s': %w", key, err)
 		}
 		if lock.Pull.Num == pullNum {
-			locks = append(locks, lock)
-			if _, err := r.Unlock(lock.Project, lock.Workspace); err != nil {
+			unlocked, err := r.UnlockIfOwnedByPull(lock.Project, lock.Workspace, pullNum)
+			if err != nil {
 				return locks, fmt.Errorf("unlocking repo %s, path %s, workspace %s: %w", lock.Project.RepoFullName, lock.Project.Path, lock.Workspace, err)
 			}
+			if unlocked != nil {
+				locks = append(locks, *unlocked)
+			}
 		}
-	}
-
-	if err := iter.Err(); err != nil {
-		return locks, fmt.Errorf("db transaction failed: %w", err)
 	}
 
 	return locks, nil
